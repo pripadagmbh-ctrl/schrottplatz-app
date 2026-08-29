@@ -71,6 +71,26 @@ const PICKUP_OUT: Array<[number, number]> = [
   [GATE_X, 24],
   [GATE_X, 40],
 ];
+// KIPPER: Wer selbst abkippen kann, muss nicht vor dem Bagger halten. Er fährt
+// rückwärts an die Nordkante des Stahlschrotthaufens (Mitte bei x −9, z 1) und
+// kippt seine Ladung direkt dort ab (Design-Fix 29.08.2026).
+const TIP_APPROACH: Array<[number, number]> = [
+  [GATE_X, 24],
+  [-14, 20],
+  [-9, 13],
+];
+const TIP_IN_REV: Array<[number, number]> = [
+  [-9, 13],
+  [-9, 7.5],
+];
+const TIP_OUT: Array<[number, number]> = [
+  [-9, 7.5],
+  [-9, 13],
+  [-14, 20],
+  [GATE_X, 24],
+  [GATE_X, 40],
+];
+
 const SPEED = 3.5; // m/s (SW)
 const FIRST_DELAY_S = 20; // (SW)
 const NEXT_DELAY_S: [number, number] = [35, 60]; // (SW)
@@ -87,6 +107,7 @@ const BED_HALF_W = 1.35;
 export const WORK_ZONES: Array<[number, number, number]> = [
   [0, 9, 11], // Abkippplatz vor dem Bagger inkl. Halteposition
   [11, -9.5, 9], // Verladeplatz neben der Presse
+  [-9, 4, 10], // Stahlschrotthaufen — dorthin kippen die Kipper selbst ab
 ];
 /** Nach so langer Blockade fährt der Fahrer vorsichtig weiter (kein Deadlock) */
 const BLOCK_GIVEUP_S = 35;
@@ -165,14 +186,24 @@ class DeliveryVehicle {
   private get isPickup(): boolean {
     return this.kind === "abholer";
   }
+  /** Fährt selbst ab: dann geht es direkt auf den Stahlschrotthaufen. */
+  private get isSelfTipping(): boolean {
+    return this.kind === "kipper";
+  }
   private get routeIn(): Array<[number, number]> {
     return this.isPickup ? PICKUP_IN_FWD : ROUTE_IN_FWD;
   }
+  private get routeApproach(): Array<[number, number]> {
+    if (this.isPickup) return PICKUP_APPROACH;
+    return this.isSelfTipping ? TIP_APPROACH : ROUTE_APPROACH;
+  }
   private get routeRev(): Array<[number, number]> {
-    return this.isPickup ? PICKUP_IN_REV : ROUTE_IN_REV;
+    if (this.isPickup) return PICKUP_IN_REV;
+    return this.isSelfTipping ? TIP_IN_REV : ROUTE_IN_REV;
   }
   private get routeOut(): Array<[number, number]> {
-    return this.isPickup ? PICKUP_OUT : ROUTE_OUT;
+    if (this.isPickup) return PICKUP_OUT;
+    return this.isSelfTipping ? TIP_OUT : ROUTE_OUT;
   }
 
   constructor(
@@ -675,7 +706,7 @@ class DeliveryVehicle {
         }
         break;
       case "approach": {
-        const r = this.isPickup ? PICKUP_APPROACH : ROUTE_APPROACH;
+        const r = this.routeApproach;
         this.advance(r, SPEED * dt, false, dt);
         if (this.routeS >= this.routeLength(r)) {
           this.phase = "shiftPause";
@@ -809,7 +840,7 @@ class DeliveryVehicle {
     this.sideWalls = [];
     // Was noch auf der Fläche klemmt, setzt der Fahrer am Abladeplatz ab —
     // sonst führe er Material vom Platz und es wäre für den Spieler weg.
-    const [dx, dz] = ROUTE_IN_REV[ROUTE_IN_REV.length - 1];
+    const [dx, dz] = this.routeRev[this.routeRev.length - 1];
     let k = 0;
     for (const it of this.cargo.items) {
       if (!it.body.isValid()) continue;

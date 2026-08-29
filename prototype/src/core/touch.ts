@@ -3,11 +3,14 @@
  * Aufteilung (Design 2026-08-29):
  *   linker Stick   — X: Oberwagen drehen, Y: Hauptarm heben/senken
  *   rechter Stick  — X: Spinne öffnen/schließen, Y: Ausleger heran/weg
+ *   (alle vier Achsen sind im Steuerungsmenü frei belegbar)
  *   ↺ / ↻          — Spinne links bzw. rechts drehen (Rotator)
  *   Fadenkreuz     — nur Fahren: vor/zurück und links/rechts lenken (simultan)
  *   Greifen        — über den rechten Stick (oder festen Fingerdruck)
  *   Extras         — Doppeltipp wechselt die Ansicht, Kippen ersetzt das Fadenkreuz
  */
+import { type ControlConfig, type AxisId, loadConfig } from "./controlConfig";
+
 export interface TouchAxes {
   cab: number;
   stick: number;
@@ -35,7 +38,11 @@ const PRESSURE_GRAB = 0.55;
 /** Neigung in Grad, ab der die Kippsteuerung Vollausschlag gibt */
 const TILT_FULL = 22;
 
+const clamp1 = (v: number): number => Math.max(-1, Math.min(1, v));
+
 export class TouchControls {
+  /** Achsenbelegung — vom Steuerungsmenü geändert, im Browser gespeichert */
+  config: ControlConfig = loadConfig();
   readonly axes: TouchAxes = {
     cab: 0,
     stick: 0,
@@ -273,24 +280,58 @@ export class TouchControls {
     if (!this.active) return;
     const l = this.left;
     const r = this.right;
-    // Linker Stick: Oberwagen drehen (X) und Hauptarm heben/senken (Y)
-    this.axes.cab = l ? l.dx : 0;
-    this.axes.boom = l ? l.dy : 0;
-    // Rechter Stick: Spinne öffnen/schließen (X) und Ausleger heran/weg (Y).
-    // Der Wert bleibt stufenlos — je weiter der Ausschlag, desto schneller
-    // schließt bzw. öffnet die Spinne.
-    const gx = r ? r.dx : 0;
-    this.axes.grapple = Math.abs(gx) > 0.16 ? gx : 0;
-    this.axes.stick = r ? r.dy : 0;
-    // Rotator liegt auf den beiden Drehtasten
-    this.axes.rotator =
-      (this.held.has("rotR") ? 1 : 0) - (this.held.has("rotL") ? 1 : 0);
+    // Die vier Stickachsen sind frei belegbar (Steuerungsmenü). Werkseinstellung:
+    // Hauptarm und Oberwagen links, Ausleger und Spinne rechts.
+    this.axes.cab = 0;
+    this.axes.boom = 0;
+    this.axes.stick = 0;
+    this.axes.grapple = 0;
+    let rotAxis = 0;
+    const raw: Record<AxisId, number> = {
+      leftY: l ? l.dy : 0,
+      leftX: l ? l.dx : 0,
+      rightY: r ? r.dy : 0,
+      rightX: r ? r.dx : 0,
+    };
+    for (const id of ["leftY", "leftX", "rightY", "rightX"] as AxisId[]) {
+      const b = this.config[id];
+      const v = raw[id] * (b.invert ? -1 : 1);
+      switch (b.fn) {
+        case "boom":
+          this.axes.boom += v;
+          break;
+        case "stick":
+          this.axes.stick += v;
+          break;
+        case "cab":
+          this.axes.cab += v;
+          break;
+        case "grapple":
+          // stufenlos: je weiter der Ausschlag, desto schneller schließt
+          // bzw. öffnet die Spinne
+          if (Math.abs(v) > 0.16) this.axes.grapple += v;
+          break;
+        case "rotator":
+          rotAxis += v;
+          break;
+        default:
+          break;
+      }
+    }
+    // Rotator: Drehtasten, zusätzlich eine Stickachse, falls so belegt
+    this.axes.rotator = clamp1(
+      (this.held.has("rotR") ? 1 : 0) - (this.held.has("rotL") ? 1 : 0) + rotAxis
+    );
     this.axes.drive =
       (this.held.has("fwd") ? 1 : 0) - (this.held.has("back") ? 1 : 0) + this.tiltDrive;
     this.axes.steer =
       (this.held.has("right") ? 1 : 0) - (this.held.has("left") ? 1 : 0) + this.tiltSteer;
-    this.axes.drive = Math.max(-1, Math.min(1, this.axes.drive));
-    this.axes.steer = Math.max(-1, Math.min(1, this.axes.steer));
+    this.axes.drive = clamp1(this.axes.drive);
+    this.axes.steer = clamp1(this.axes.steer);
+    this.axes.boom = clamp1(this.axes.boom);
+    this.axes.stick = clamp1(this.axes.stick);
+    this.axes.cab = clamp1(this.axes.cab);
+    this.axes.grapple = clamp1(this.axes.grapple);
     this.axes.grab = this.pressureGrab;
   }
 }

@@ -19,6 +19,13 @@ import { VehicleManager } from "./delivery/vehicles";
 import { PressManager } from "./world/press";
 import { randomCargo } from "./world/scrapItems";
 import { Shift } from "./economy/shift";
+import {
+  type AxisId,
+  type ControlFunction,
+  FUNCTION_LABELS,
+  defaultConfig,
+  saveConfig,
+} from "./core/controlConfig";
 import { Account } from "./economy/account";
 import { getMaterial } from "./materials/catalog";
 import { StaffManager } from "./world/people";
@@ -187,6 +194,10 @@ async function main(): Promise<void> {
   const setPaused = (v: boolean): void => {
     paused = v;
     pauseEl.classList.toggle("open", v);
+    if (!v) {
+      pauseEl.classList.remove("settings");
+      document.getElementById("controls-menu")!.classList.remove("open");
+    }
   };
   document.getElementById("pause-resume")!.addEventListener("click", () => setPaused(false));
   document.getElementById("pause-save")!.addEventListener("click", () => {
@@ -197,6 +208,55 @@ async function main(): Promise<void> {
   document.getElementById("pause-new")!.addEventListener("click", () => {
     clearSave();
     location.reload();
+  });
+
+  // --- Steuerungsmenü: die vier Stickachsen frei belegen ---
+  const AXIS_IDS: AxisId[] = ["leftY", "leftX", "rightY", "rightX"];
+  const warnEl = document.getElementById("ctrl-warn")!;
+  const renderControls = (): void => {
+    for (const id of AXIS_IDS) {
+      const sel = document.getElementById(`ax-${id}`) as HTMLSelectElement;
+      const b = touch.config[id];
+      if (sel.options.length === 0) {
+        for (const [fn, label] of Object.entries(FUNCTION_LABELS)) {
+          sel.add(new Option(label, fn));
+        }
+      }
+      sel.value = b.fn;
+      document.getElementById(`inv-${id}`)!.classList.toggle("on", b.invert);
+    }
+    // Doppelt belegte Funktionen sind erlaubt, aber selten gewollt — Hinweis
+    const used = AXIS_IDS.map((i) => touch.config[i].fn).filter((f) => f !== "none");
+    const doppelt = used.filter((f, i) => used.indexOf(f) !== i);
+    warnEl.textContent = doppelt.length
+      ? `Mehrfach belegt: ${[...new Set(doppelt)].map((f) => FUNCTION_LABELS[f]).join(", ")}`
+      : "";
+  };
+  for (const id of AXIS_IDS) {
+    document.getElementById(`ax-${id}`)!.addEventListener("change", (e) => {
+      touch.config[id].fn = (e.target as HTMLSelectElement).value as ControlFunction;
+      saveConfig(touch.config);
+      renderControls();
+    });
+    document.getElementById(`inv-${id}`)!.addEventListener("click", () => {
+      touch.config[id].invert = !touch.config[id].invert;
+      saveConfig(touch.config);
+      renderControls();
+    });
+  }
+  const showControls = (v: boolean): void => {
+    pauseEl.classList.toggle("settings", v);
+    document.getElementById("controls-menu")!.classList.toggle("open", v);
+    if (v) renderControls();
+  };
+  const ctrlBtn = document.getElementById("pause-controls")!;
+  if (!touch.active) ctrlBtn.style.display = "none";
+  ctrlBtn.addEventListener("click", () => showControls(true));
+  document.getElementById("ctrl-back")!.addEventListener("click", () => showControls(false));
+  document.getElementById("ctrl-reset")!.addEventListener("click", () => {
+    touch.config = defaultConfig();
+    saveConfig(touch.config);
+    renderControls();
   });
 
   const helpEl = document.getElementById("help")!;
@@ -315,6 +375,7 @@ async function main(): Promise<void> {
       press,
       bus,
       saveNow: () => storeSave(buildSaveData()),
+      touch,
       togglePause: () => setPaused(!paused),
       isPaused: () => paused,
       step: (n: number) => {

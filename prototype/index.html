@@ -102,6 +102,27 @@
       }
       #pause button:hover, #pause button:active { background: rgba(240,180,41,0.75); color: #1a1c1e; }
       #pause .hint { margin: 16px 0 0; font-size: 11px; line-height: 1.7; color: #9aa2a8; }
+      /* --- Steuerungsmenü --- */
+      #controls-menu { display: none; }
+      #controls-menu.open { display: block; }
+      #pause.settings .panel > :not(#controls-menu) { display: none; }
+      #controls-menu h2 { margin: 0 0 14px; font-size: 19px; letter-spacing: 3px; color: #f0b429; }
+      #controls-menu .row {
+        display: flex; align-items: center; gap: 8px; margin: 7px 0; text-align: left;
+      }
+      #controls-menu .row label { flex: 0 0 108px; font-size: 12px; color: #c8ced2; }
+      #controls-menu select {
+        flex: 1; padding: 8px 6px; border-radius: 7px; background: rgba(46,52,57,0.95);
+        color: #e8e8e4; border: 2px solid rgba(255,255,255,0.22);
+        font: 13px "Consolas", monospace;
+      }
+      #controls-menu .inv {
+        flex: 0 0 auto; padding: 8px 10px; border-radius: 7px; cursor: pointer;
+        background: rgba(46,52,57,0.95); border: 2px solid rgba(255,255,255,0.22);
+        color: #9aa2a8; font: 600 13px "Consolas", monospace; touch-action: manipulation;
+      }
+      #controls-menu .inv.on { background: rgba(240,180,41,0.75); color: #1a1c1e; }
+      #controls-menu .warn { margin: 10px 0 0; font-size: 11px; color: #e08a5a; min-height: 15px; }
     </style>
   </head>
   <body>
@@ -149,12 +170,42 @@
       <div class="panel">
         <h1>PAUSE</h1>
         <button id="pause-resume">Weiterspielen</button>
+        <button id="pause-controls">Steuerung</button>
         <button id="pause-save">Speichern</button>
         <button id="pause-load">Stand laden</button>
         <button id="pause-new">Neues Spiel</button>
         <p class="hint">
           Linker Stick: Hauptarm &amp; Oberwagen · Rechter Stick: Ausleger &amp; Spinne<br />
           ↺ ↻ Spinne drehen · Fadenkreuz: fahren · Doppeltipp: Ansicht
+        </p>
+      </div>
+      <div id="controls-menu">
+        <h2>STEUERUNG</h2>
+        <div class="row">
+          <label for="ax-leftY">Linker Stick ↕</label>
+          <select id="ax-leftY"></select>
+          <div class="inv" id="inv-leftY" title="Richtung umkehren">↕</div>
+        </div>
+        <div class="row">
+          <label for="ax-leftX">Linker Stick ↔</label>
+          <select id="ax-leftX"></select>
+          <div class="inv" id="inv-leftX" title="Richtung umkehren">↔</div>
+        </div>
+        <div class="row">
+          <label for="ax-rightY">Rechter Stick ↕</label>
+          <select id="ax-rightY"></select>
+          <div class="inv" id="inv-rightY" title="Richtung umkehren">↕</div>
+        </div>
+        <div class="row">
+          <label for="ax-rightX">Rechter Stick ↔</label>
+          <select id="ax-rightX"></select>
+          <div class="inv" id="inv-rightX" title="Richtung umkehren">↔</div>
+        </div>
+        <p class="warn" id="ctrl-warn"></p>
+        <button id="ctrl-reset">Werkseinstellung</button>
+        <button id="ctrl-back">Zurück</button>
+        <p class="hint">
+          Fahren läuft immer über das Fadenkreuz, Spinne drehen zusätzlich über ↺ ↻.
         </p>
       </div>
     </div>
