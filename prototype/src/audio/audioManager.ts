@@ -1,0 +1,230 @@
+/**
+ * Kern-Sounds M1 (Briefing Kap. 15) — komplett prozedural per WebAudio, keine Assets.
+ * Audio ist der primäre Belohnungskanal: jeder Abwurf klingt nach seinem Material,
+ * richtig = angenehmer Doppelton, falsch = stumpfer Missklang.
+ * Startet erst nach der ersten echten Nutzereingabe (Browser-Autoplay-Policy).
+ */
+export class AudioManager {
+  private ctx: AudioContext | null = null;
+  private master: GainNode | null = null;
+  private engineOsc: OscillatorNode | null = null;
+  private engineGain: GainNode | null = null;
+  private hydraulicGain: GainNode | null = null;
+  private scrapeGain: GainNode | null = null;
+
+  constructor() {
+    const start = () => this.ensureStarted();
+    window.addEventListener("pointerdown", start, { once: false });
+    window.addEventListener("keydown", start, { once: false });
+  }
+
+  private ensureStarted(): void {
+    if (this.ctx) {
+      if (this.ctx.state === "suspended") this.ctx.resume().catch(() => {});
+      return;
+    }
+    try {
+      this.ctx = new AudioContext();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = 0.5;
+      this.master.connect(this.ctx.destination);
+
+      // Diesel-Loop: tiefer Sägezahn + Tiefpass, Drehzahl folgt der Aktivität
+      this.engineOsc = this.ctx.createOscillator();
+      this.engineOsc.type = "sawtooth";
+      this.engineOsc.frequency.value = 48;
+      const engineFilter = this.ctx.createBiquadFilter();
+      engineFilter.type = "lowpass";
+      engineFilter.frequency.value = 220;
+      this.engineGain = this.ctx.createGain();
+      this.engineGain.gain.value = 0.05;
+      this.engineOsc.connect(engineFilter).connect(this.engineGain).connect(this.master);
+      this.engineOsc.start();
+
+      // Hydraulikzischen: gefiltertes Rauschen, Gain folgt Achsbewegung
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = this.noiseBuffer();
+      noise.loop = true;
+      const hydFilter = this.ctx.createBiquadFilter();
+      hydFilter.type = "bandpass";
+      hydFilter.frequency.value = 1400;
+      hydFilter.Q.value = 0.8;
+      this.hydraulicGain = this.ctx.createGain();
+      this.hydraulicGain.gain.value = 0;
+      noise.connect(hydFilter).connect(this.hydraulicGain).connect(this.master);
+      noise.start();
+
+      // Kratzen auf Beton: helleres, raueres Rauschband — Gain folgt der Kontakt-Intensität
+      const scrapeNoise = this.ctx.createBufferSource();
+      scrapeNoise.buffer = this.noiseBuffer();
+      scrapeNoise.loop = true;
+      const scrapeFilter = this.ctx.createBiquadFilter();
+      scrapeFilter.type = "bandpass";
+      scrapeFilter.frequency.value = 2600;
+      scrapeFilter.Q.value = 1.2;
+      this.scrapeGain = this.ctx.createGain();
+      this.scrapeGain.gain.value = 0;
+      scrapeNoise.connect(scrapeFilter).connect(this.scrapeGain).connect(this.master);
+      scrapeNoise.start();
+    } catch {
+      this.ctx = null; // Audio bleibt aus, Spiel läuft weiter
+    }
+  }
+
+  /** Pro Frame: activity 0..1 (Achsbewegung), load 0..1 (Traglast-Anteil). */
+  updateEngine(activity: number, load: number): void {
+    if (!this.ctx || !this.engineOsc || !this.engineGain || !this.hydraulicGain) return;
+    const t = this.ctx.currentTime;
+    this.engineOsc.frequency.setTargetAtTime(48 * (1 + 0.35 * activity + 0.15 * load), t, 0.15);
+    this.engineGain.gain.setTargetAtTime(0.045 + 0.035 * activity, t, 0.2);
+    this.hydraulicGain.gain.setTargetAtTime(0.09 * Math.min(activity * 1.5, 1), t, 0.08);
+  }
+
+  /** Pro Frame: Kratz-Intensität 0..1 (Zackenspitzen schleifen über den Boden). */
+  setScrape(intensity: number): void {
+    if (!this.ctx || !this.scrapeGain) return;
+    this.scrapeGain.gain.setTargetAtTime(0.14 * intensity, this.ctx.currentTime, 0.06);
+  }
+
+  playGrab(): void {
+    // sattes Zupacken: kurzer Rauschimpuls + tiefer Thump
+    this.burst([70], 0.18, 0.35, "triangle");
+    this.noiseBurst(500, 0.08, 0.25);
+  }
+
+  /** Abwurfklang je Material (Teil der Materialerkennung, Kap. 15). */
+  playDrop(materialId: string): void {
+    switch (materialId) {
+      case "steel":
+        this.burst([180, 241, 322], 0.4, 0.3);
+        this.noiseBurst(3000, 0.05, 0.15);
+        break;
+      case "cast":
+        this.burst([88, 132], 0.5, 0.4, "triangle");
+        break;
+      case "alu":
+        this.burst([395, 528], 0.22, 0.25);
+        break;
+      case "copper":
+        this.burst([648, 872, 1160], 0.3, 0.22);
+        break;
+      case "cable":
+        this.noiseBurst(800, 0.28, 0.3);
+        break;
+      default: // Störstoff/Holz
+        this.burst([108], 0.18, 0.3, "triangle");
+        this.noiseBurst(400, 0.12, 0.2);
+    }
+  }
+
+  /** Metall-Kreischen beim Abreißen einer Baugruppe. */
+  playTear(): void {
+    if (!this.ctx || !this.master) return;
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(340, t);
+    osc.frequency.exponentialRampToValueAtTime(70, t + 0.45);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.22, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+    osc.connect(g).connect(this.master);
+    osc.start(t);
+    osc.stop(t + 0.55);
+    this.noiseBurst(1800, 0.35, 0.3);
+  }
+
+  /** Schwerer Blech-Crash (Quetschstufe). */
+  playCrash(strength = 1): void {
+    this.burst([52, 78], 0.7, 0.35 + 0.25 * strength, "sine");
+    this.burst([161, 214, 289], 0.5, 0.32, "triangle");
+    this.noiseBurst(2500, 0.18, 0.3);
+  }
+
+  /** Scheibe birst. */
+  playGlass(): void {
+    this.burst([1900, 2600, 3400], 0.28, 0.2);
+    this.noiseBurst(7000, 0.14, 0.22);
+  }
+
+  /** Zaunfeld reißt aus der Verankerung / scheppert. */
+  playRattle(): void {
+    this.noiseBurst(900, 0.35, 0.3);
+    this.burst([178, 242], 0.32, 0.24, "triangle");
+  }
+
+  /** Verkauf: Münz-Dreiklang. */
+  playSale(): void {
+    this.tone(880, 0.12, 0.14, 0);
+    this.tone(1175, 0.12, 0.14, 0.09);
+    this.tone(1568, 0.2, 0.14, 0.18);
+  }
+
+  playCorrect(): void {
+    // dezentes „Kaching": zwei weiche Sinustöne (−6 dB unter Weltklang, SW)
+    this.tone(660, 0.1, 0.12, 0);
+    this.tone(990, 0.16, 0.12, 0.07);
+  }
+
+  playWrong(): void {
+    this.burst([110, 116], 0.3, 0.25, "square");
+  }
+
+  // ---------- Synthese-Helfer ----------
+
+  private tone(freq: number, dur: number, gain: number, delay: number): void {
+    if (!this.ctx || !this.master) return;
+    const t = this.ctx.currentTime + delay;
+    const osc = this.ctx.createOscillator();
+    osc.frequency.value = freq;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(gain, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    osc.connect(g).connect(this.master);
+    osc.start(t);
+    osc.stop(t + dur + 0.05);
+  }
+
+  private burst(freqs: number[], dur: number, gain: number, type: OscillatorType = "sine"): void {
+    if (!this.ctx || !this.master) return;
+    const t = this.ctx.currentTime;
+    for (const f of freqs) {
+      const osc = this.ctx.createOscillator();
+      osc.type = type;
+      osc.frequency.value = f * (0.98 + Math.random() * 0.04); // leichte Verstimmung
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(gain / freqs.length, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      osc.connect(g).connect(this.master);
+      osc.start(t);
+      osc.stop(t + dur + 0.05);
+    }
+  }
+
+  private noiseBurst(cutoff: number, dur: number, gain: number): void {
+    if (!this.ctx || !this.master) return;
+    const t = this.ctx.currentTime;
+    const src = this.ctx.createBufferSource();
+    src.buffer = this.noiseBuffer();
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = cutoff;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(gain, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    src.connect(filter).connect(g).connect(this.master);
+    src.start(t);
+    src.stop(t + dur + 0.05);
+  }
+
+  private cachedNoise: AudioBuffer | null = null;
+  private noiseBuffer(): AudioBuffer {
+    if (this.cachedNoise) return this.cachedNoise;
+    const len = this.ctx!.sampleRate;
+    const buf = this.ctx!.createBuffer(1, len, this.ctx!.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    this.cachedNoise = buf;
+    return buf;
+  }
+}

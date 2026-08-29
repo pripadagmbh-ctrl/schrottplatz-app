@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Schrottplatz — Prototyp (M3)</title>
+    <style>
+      html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #1a1c1e; }
+      #app { position: fixed; inset: 0; }
+      canvas { display: block; }
+      .hud {
+        position: fixed; color: #e8e8e4; font: 13px/1.5 "Consolas", monospace;
+        background: rgba(20, 22, 24, 0.72); border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 6px; padding: 8px 12px; pointer-events: none; user-select: none;
+      }
+      #help { top: 12px; left: 12px; }
+      #help b { color: #f0b429; }
+      #gripinfo { bottom: 12px; left: 50%; transform: translateX(-50%); font-size: 14px; }
+      #money { top: 12px; right: 12px; font-size: 15px; color: #f0d060; }
+      #debug { top: 60px; right: 12px; display: none; text-align: right; }
+      #loading {
+        position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+        color: #e8e8e4; font: 16px "Consolas", monospace; background: #1a1c1e;
+      }
+      /* --- Touch-Steuerung (Tablet/Smartphone) --- */
+      #touch { display: none; position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+      #touch .pad {
+        position: absolute; bottom: 18px; width: 140px; height: 140px; border-radius: 50%;
+        background: rgba(20,22,24,0.35); border: 2px solid rgba(255,255,255,0.25);
+        pointer-events: auto; touch-action: none;
+      }
+      #touch-left { left: 18px; }
+      #touch-right { right: 18px; }
+      #touch .knob {
+        position: absolute; left: 50%; top: 50%; width: 58px; height: 58px; margin: -29px 0 0 -29px;
+        border-radius: 50%; background: rgba(240,180,41,0.75); pointer-events: none;
+      }
+      #touch .btn {
+        position: absolute; pointer-events: auto; touch-action: none; user-select: none;
+        background: rgba(20,22,24,0.6); border: 2px solid rgba(255,255,255,0.28); color: #e8e8e4;
+        font: 600 13px/1 "Consolas", monospace; border-radius: 10px; padding: 12px 10px; text-align: center;
+      }
+      #touch .btn.down { background: rgba(240,180,41,0.6); color: #1a1c1e; }
+      #btn-grab {
+        right: 170px; bottom: 34px; width: 96px; height: 96px; border-radius: 50%;
+        line-height: 72px; padding: 0; font-size: 15px;
+      }
+      #btn-fwd { left: 172px; bottom: 96px; width: 62px; }
+      #btn-back { left: 172px; bottom: 34px; width: 62px; }
+      #btn-view { right: 18px; top: 60px; width: 74px; }
+      #btn-cab { right: 18px; top: 110px; width: 74px; }
+      #btn-press { right: 18px; top: 160px; width: 74px; }
+      #btn-pickup { right: 18px; top: 210px; width: 74px; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="help" class="hud">
+      <b>Steuerung</b> (H: ein/aus)<br />
+      W/S&nbsp;&nbsp;Fahren &nbsp;·&nbsp; A/D&nbsp;&nbsp;Lenken<br />
+      Q/E oder ←/→&nbsp;&nbsp;Oberwagen drehen<br />
+      R/F oder Bild↑/↓&nbsp;&nbsp;Ausleger heben/senken<br />
+      T/G oder ↑/↓&nbsp;&nbsp;Stiel weg/ran<br />
+      LMB halten&nbsp;&nbsp;Spinne schließen<br />
+      Mausrad&nbsp;&nbsp;Rotator &nbsp;·&nbsp; Shift+Rad&nbsp;&nbsp;Zoom<br />
+      MMB ziehen&nbsp;&nbsp;Kamera/Kopfblick &nbsp;·&nbsp; F3&nbsp;&nbsp;Debug<br />
+      C&nbsp;&nbsp;Ansicht: Orbit → Draufsicht → Kabine<br />
+      X&nbsp;&nbsp;Kabine hoch/runter &nbsp;·&nbsp; O&nbsp;&nbsp;Stützen aus/ein<br />
+      V&nbsp;&nbsp;Abholung rufen / abfahren &nbsp;·&nbsp; B&nbsp;&nbsp;Schere<br />
+      K&nbsp;&nbsp;Speichern<br />
+      L&nbsp;&nbsp;Stand laden &nbsp;·&nbsp; N&nbsp;&nbsp;Neues Spiel
+    </div>
+    <div id="gripinfo" class="hud">Greifer: offen</div>
+    <div id="money" class="hud">Konto: 0 €</div>
+    <div id="toast" class="hud" style="top: 56px; left: 50%; transform: translateX(-50%); opacity: 0; transition: opacity 0.4s; color: #f0d060;"></div>
+    <div id="debug" class="hud"></div>
+    <div id="touch">
+      <div class="pad" id="touch-left"><div class="knob"></div></div>
+      <div class="pad" id="touch-right"><div class="knob"></div></div>
+      <div class="btn" id="btn-grab">GREIFEN</div>
+      <div class="btn" id="btn-fwd">VOR</div>
+      <div class="btn" id="btn-back">ZURÜCK</div>
+      <div class="btn" id="btn-view">ANSICHT</div>
+      <div class="btn" id="btn-cab">KABINE</div>
+      <div class="btn" id="btn-press">SCHERE</div>
+      <div class="btn" id="btn-pickup">ABHOLEN</div>
+    </div>
+    <div id="loading">Lade Physik …</div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
