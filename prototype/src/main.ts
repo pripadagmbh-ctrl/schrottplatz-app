@@ -19,6 +19,7 @@ import { VehicleManager } from "./delivery/vehicles";
 import { PressManager } from "./world/press";
 import { randomCargo } from "./world/scrapItems";
 import { Shift } from "./economy/shift";
+import { Signage } from "./world/signage";
 import {
   type AxisId,
   type ControlFunction,
@@ -71,6 +72,7 @@ async function main(): Promise<void> {
   const input = new Input(renderer.domElement);
   const touch = new TouchControls(renderer.domElement);
   const yard = new Yard(scene, physics.world);
+  const signage = new Signage(scene); // Orientierungstexte, mit M umschaltbar
   const items = new ItemManager(scene, physics.world);
   const containers = new ContainerManager(scene, physics.world, bus);
   const composites = new CompositeManager(scene, physics.world, items, bus);
@@ -273,6 +275,17 @@ async function main(): Promise<void> {
   grip.onTear = () => audio.playTear();
   grip.partResolver = (pos) => composites.findPartNear(pos);
   grip.insideGrapple = (pos) => excavator.isInsideGrapple(pos);
+  // Zudrücken: was nachgibt, wird in der Spinne plattgequetscht
+  grip.crusher = (body) => {
+    const it = items.items.find((i) => i.body.handle === body.handle);
+    if (!it || !items.isCrushable(it)) return false;
+    if (!items.flattenItem(it)) return false;
+    const p = body.translation();
+    audio.playDrop(it.materialId);
+    particles.spawn(new THREE.Vector3(p.x, p.y, p.z), 6, 0xb0b6bb, 1.6, 1.2, 0.5);
+    hud.toast(`${getMaterial(it.materialId).name} zusammengedrückt`);
+    return true;
+  };
   bus.on("itemEntered", (e) => {
     audio.playDrop(e.materialId);
     if (e.correct) {
@@ -427,6 +440,7 @@ async function main(): Promise<void> {
     if (input.wasPressed("KeyM") || touch.consumePress("KeyM")) {
       labelsOn = !labelsOn;
       containers.setLabelsVisible(labelsOn);
+      signage.setVisible(labelsOn);
       hud.toast(labelsOn ? "Markierungen an" : "Markierungen aus");
     }
     if (input.wasPressed("F3")) debug.toggle();
@@ -440,12 +454,12 @@ async function main(): Promise<void> {
       else if (r === "abgefahren") hud.toast("Container geht raus …");
       else hud.toast("Erst muss das Fahrzeug auf dem Platz fertig werden.");
     }
-    // Anlieferer wegschicken — etwa wenn die Ladung nichts taugt
+    // „Mach Platz": vor dem Abladen wegschicken, danach ein Stück vorfahren
     if (input.wasPressed("KeyZ") || touch.consumePress("KeyZ")) {
-      const r = vehicles.sendAway();
+      const r = vehicles.makeRoom();
       if (r === "weggeschickt") hud.toast("Weggeschickt — der Fahrer dreht ab.");
-      else if (r === "zuSpaet") hud.toast("Zu spät, die Ladung liegt schon auf dem Platz.");
-      else hud.toast("Gerade ist kein Anlieferer da.");
+      else if (r === "vorgefahren") hud.toast("LKW fährt ein Stück vor.");
+      else hud.toast("Gerade ist kein Fahrzeug auf dem Platz.");
     }
     if (input.wasPressed("KeyU") || touch.consumePress("KeyU")) {
       hud.toast(audio.toggleMusic() ? "Musik an." : "Musik aus.");
@@ -535,6 +549,7 @@ async function main(): Promise<void> {
       hud.toast(`Platz ist frei — die Einfahrt macht wieder auf (Zyklus ${shift.cycle + 1})`);
     }
     hud.updateShift(shift.statusText(looseKg), shift.phase === "sortieren");
+    excavator.updateInstruments(frameDt);
     hud.updateMoney(account.moneyEur, containers.totalValue());
     audio.updateEngine(excavator.activity, Math.min(grip.totalMassKg / 2000, 1));
 

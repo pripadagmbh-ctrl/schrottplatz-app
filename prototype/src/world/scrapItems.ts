@@ -18,6 +18,25 @@ export interface ScrapShape {
   flat?: boolean;
 }
 
+/**
+ * Aufgerolltes Kabel: ein Strang, der sich mehrfach um sich selbst windet.
+ * Der Radius schwankt leicht, damit die Rolle nicht wie gedrechselt wirkt.
+ */
+function cableCoilGeometry(r: number, tube: number): THREE.BufferGeometry {
+  const TURNS = 3.6;
+  const STEPS = 132;
+  const pts: THREE.Vector3[] = [];
+  for (let i = 0; i <= STEPS; i++) {
+    const t = i / STEPS;
+    const a = t * Math.PI * 2 * TURNS;
+    // nach außen auslaufende Wicklung, dazu etwas Höhenversatz je Lage
+    const rad = r * (0.62 + 0.38 * t) + Math.sin(a * 3) * r * 0.05;
+    pts.push(new THREE.Vector3(Math.cos(a) * rad, (t - 0.5) * tube * 1.6, Math.sin(a) * rad));
+  }
+  const curve = new THREE.CatmullRomCurve3(pts);
+  return new THREE.TubeGeometry(curve, STEPS, tube * 0.42, 6, false);
+}
+
 /** Kollider für ein plattgedrücktes Teil (flacher Quader über der Grundfläche). */
 function flatColliderDesc(shape: ScrapShape): RAPIER.ColliderDesc {
   const H = 0.06;
@@ -215,8 +234,16 @@ export class ItemManager {
       }
     } else if (shape.kind === "torus") {
       const [r, tube] = shape.dims;
-      geo = new THREE.TorusGeometry(r, tube, 8, 16);
-      geo.rotateX(Math.PI / 2);
+      // Kabel wird als mehrfach gewickelter Strang gebaut — ein glatter Ring
+      // sah aus wie ein Donut, nicht wie aufgerolltes Kabel.
+      geo =
+        materialId === "cable"
+          ? cableCoilGeometry(r, tube)
+          : (() => {
+              const g = new THREE.TorusGeometry(r, tube, 8, 16);
+              g.rotateX(Math.PI / 2);
+              return g;
+            })();
       collider = RAPIER.ColliderDesc.cylinder(tube, r + tube);
     } else {
       // Drahtknäuel: verrauschte Kugel im Wireframe liest sich als Maschendraht
@@ -256,10 +283,11 @@ export class ItemManager {
         .setRotation({ x: q.x, y: q.y, z: q.z, w: q.w })
         // Dämpfung: Schrott ist sperrig und rutscht nicht weit — ohne das
         // schlittern und schleudern die Teile unrealistisch über den Platz
-        .setLinearDamping(0.35)
-        .setAngularDamping(0.75)
+        .setLinearDamping(0.55)
+        .setAngularDamping(0.95)
     );
-    this.world.createCollider(collider.setMass(massKg).setFriction(0.9).setRestitution(0.02), body);
+    // Restitution 0: Metall auf Beton springt nicht, es klatscht und liegt
+    this.world.createCollider(collider.setMass(massKg).setFriction(1.1).setRestitution(0), body);
     return this.register({ materialId, massKg, mesh, body, shape });
   }
 
@@ -305,6 +333,22 @@ export class ItemManager {
         new THREE.Vector3(spot.x, spot.y, spot.z)
       );
     }
+  }
+
+  /**
+   * Lässt sich das Teil in der Spinne zusammendrücken?
+   *
+   * Bleche, Kabel, Fässer, Buntmetall und Draht geben nach. Massiver
+   * Stahlschrott — Träger und dicke Platten — nicht: den bekommt man nur in
+   * der Presse klein.
+   */
+  isCrushable(item: ScrapItem): boolean {
+    if (!item.shape || item.shape.flat) return false;
+    if (item.materialId !== "steel") return true;
+    // Stahl gibt nur nach, solange er dünn und leicht ist (Blech statt Träger)
+    const dims = item.shape.dims;
+    const dickste = Math.min(...dims);
+    return item.massKg < 140 && dickste < 0.22;
   }
 
   /** Teil in der Presse plattdrücken: Mesh stauchen, Kollider tauschen. */

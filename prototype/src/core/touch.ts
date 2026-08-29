@@ -37,6 +37,8 @@ const RADIUS = 62; // px bis Vollausschlag
 const PRESSURE_GRAB = 0.55;
 /** Neigung in Grad, ab der die Kippsteuerung Vollausschlag gibt */
 const TILT_FULL = 22;
+/** Totzone der Spinnenachse — schützt vor ungewolltem Öffnen beim Baggern */
+const GRAPPLE_DEADZONE = 0.38;
 
 const clamp1 = (v: number): number => Math.max(-1, Math.min(1, v));
 
@@ -308,11 +310,18 @@ export class TouchControls {
         case "cab":
           this.axes.cab += v;
           break;
-        case "grapple":
-          // stufenlos: je weiter der Ausschlag, desto schneller schließt
-          // bzw. öffnet die Spinne
-          if (Math.abs(v) > 0.16) this.axes.grapple += v;
+        case "grapple": {
+          // Die Spinne braucht eine großzügige Totzone: beim Ziehen am
+          // Ausleger rutscht der Daumen leicht zur Seite, und die Schalen
+          // gingen dann ungewollt auf. Zusätzlich wird die Querachse gedämpft,
+          // solange die Längsachse desselben Sticks stark ausgelenkt ist —
+          // bewusste Diagonalbewegungen bleiben trotzdem möglich.
+          const quer = id === "leftX" || id === "rightX";
+          const laengs = Math.abs(quer ? (id === "leftX" ? raw.leftY : raw.rightY) : 0);
+          const eff = v * (1 - Math.min(laengs, 1) * 0.5);
+          if (Math.abs(eff) > GRAPPLE_DEADZONE) this.axes.grapple += eff;
           break;
+        }
         case "rotator":
           rotAxis += v;
           break;

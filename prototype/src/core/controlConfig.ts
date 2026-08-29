@@ -34,17 +34,26 @@ export const AXIS_LABELS: Record<AxisId, string> = {
   rightX: "Rechter Stick ↔",
 };
 
-/** Werkseinstellung: Hauptarm links, Ausleger und Spinne rechts. */
+/**
+ * Werkseinstellung nach dem Bedienschema echter Umschlagbagger:
+ *   linker Stick   ↕ Hauptarm hoch/runter   ↔ Oberwagen links/rechts
+ *   rechter Stick  ↕ Ausleger hoch/runter   ↔ Spinne öffnen/schließen
+ *
+ * Beide Y-Achsen sind umgekehrt, weil ein Stick nach vorne einen negativen
+ * Bildschirmwert liefert, „nach oben drücken" aber „Arm heben" bedeuten soll.
+ */
 export function defaultConfig(): ControlConfig {
   return {
-    leftY: { fn: "boom", invert: false },
+    leftY: { fn: "boom", invert: true },
     leftX: { fn: "cab", invert: false },
-    rightY: { fn: "stick", invert: false },
+    rightY: { fn: "stick", invert: true },
     rightX: { fn: "grapple", invert: false },
   };
 }
 
-const KEY = "schrottplatz.controls.v1";
+// v2: die Y-Achsen laufen jetzt richtig herum — alte Stände sollen die neue
+// Werkseinstellung bekommen, statt die verkehrte weiterzuschleppen
+const KEY = "schrottplatz.controls.v2";
 
 export function loadConfig(): ControlConfig {
   const base = defaultConfig();

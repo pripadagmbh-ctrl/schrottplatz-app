@@ -557,6 +557,10 @@ export class Excavator {
   private outriggerGroups: THREE.Group[] = [];
   private outriggerDown = 1;
   private outriggerTarget = 1;
+  /** true, solange der Spieler auf Stützen zu fahren versucht (für HUD/Ton) */
+  blockedByOutriggers = false;
+  /** Aufbockhöhe: so weit hebt sich die Maschine auf den Stützen (m) */
+  static readonly JACK_UP_M = 0.34;
 
   private buildCabin(
     frameMat: THREE.MeshStandardMaterial,
@@ -653,6 +657,10 @@ export class Excavator {
       pane.position.set(x, y, z);
       this.cabLiftGroup.add(pane);
     }
+
+    // Bordinstrument rechts vorn an der Säule — zeigt Achswinkel, Hydraulik
+    // und Greiferstatus, wie das Display in der echten Maschine
+    this.buildInstrumentPanel(cx, cz);
 
     // Sitz + Konsolen
     const seatMat = new THREE.MeshStandardMaterial({ color: 0x24272a, roughness: 0.9 });
@@ -1064,9 +1072,16 @@ export class Excavator {
     const prevPos = this.tmpPrevPos.copy(this.position);
 
     // --- Fahrwerk ---
-    const driveTarget = clamp1(input.axis("KeyS", "KeyW") + (this.touch?.drive ?? 0)) * DRIVE_MAX;
+    // Auf ausgefahrenen Stützen steht die Maschine aufgebockt — dann wird
+    // nicht gefahren, so wie es sich gehört.
+    const wantsDrive = clamp1(input.axis("KeyS", "KeyW") + (this.touch?.drive ?? 0));
+    const rawSteer = clamp1(input.axis("KeyA", "KeyD") + (this.touch?.steer ?? 0));
+    this.blockedByOutriggers =
+      this.outriggerDown > 0.15 && (wantsDrive !== 0 || rawSteer !== 0);
+    const locked = this.outriggerDown > 0.15;
+    const driveTarget = (locked ? 0 : wantsDrive) * DRIVE_MAX;
     this.driveVel = ramp(this.driveVel, driveTarget, (DRIVE_MAX / RAMP_TIME) * dt);
-    const steer = clamp1(input.axis("KeyA", "KeyD") + (this.touch?.steer ?? 0));
+    const steer = locked ? 0 : rawSteer;
     if (Math.abs(this.driveVel) > 0.05 || steer !== 0) {
       const dir = this.driveVel >= 0 ? 1 : -1;
       const speedFactor = THREE.MathUtils.clamp(Math.abs(this.driveVel) / DRIVE_MAX, 0.35, 1);
@@ -1135,6 +1150,10 @@ export class Excavator {
       -outStep,
       outStep
     );
+    // Aufbocken: die ganze Maschine steigt auf den Stützen. Über position.y
+    // wandern Arm, Greifer und Physikkörper mit — nur die Optik anzuheben
+    // würde den Greifer von seinem Kollider trennen.
+    this.position.y = this.outriggerDown * Excavator.JACK_UP_M;
 
     this.resolveGroundClamp();
     this.syncMeshes();
@@ -1193,7 +1212,9 @@ export class Excavator {
     // Spitzentiefe direkt aus der Krallengeometrie — so bleibt der Bodenanschlag
     // richtig, auch wenn sich Form oder Öffnungswinkel ändern.
     const tipDepth = -clawPoint(0, this.currentSplay(), CLAW_SEGMENTS, this.groundTmp).y;
-    const minTipY = tipDepth + 0.02;
+    // tipY() rechnet ab der Maschinenbasis; steht die Maschine aufgebockt,
+    // ist der Boden entsprechend weiter unten
+    const minTipY = tipDepth + 0.02 - this.position.y;
     const tipY = () =>
       BOOM_PIVOT.y +
       BOOM_LEN * Math.sin(this.boomAngle) +
@@ -1409,6 +1430,126 @@ export class Excavator {
   }
 
   /** Weltposition des Greif-Sensors (zwischen den Fingerspitzen) — pendelt mit. */
+  private instrCanvas: HTMLCanvasElement | null = null;
+  private instrTex: THREE.CanvasTexture | null = null;
+  private instrT = 0;
+
+  /**
+   * Bordinstrument: eine Leinwand-Textur auf einer Platte an der rechten
+   * Säule. Sie wird viermal je Sekunde neu gezeichnet — häufiger bringt nichts
+   * und kostet nur Zeit.
+   */
+  private buildInstrumentPanel(cx: number, cz: number): void {
+    const canvas = document.createElement("canvas");
+    canvas.width = 320;
+    canvas.height = 224;
+    this.instrCanvas = canvas;
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    this.instrTex = tex;
+
+    const frame = new THREE.Mesh(
+      new THREE.BoxGeometry(0.36, 0.26, 0.02),
+      new THREE.MeshStandardMaterial({ color: 0x121416, roughness: 0.7 })
+    );
+    const screen = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.33, 0.23),
+      // unbeleuchtet: ein Display leuchtet selbst und soll nicht abdunkeln
+      new THREE.MeshBasicMaterial({ map: tex })
+    );
+    screen.position.z = 0.012;
+    const holder = new THREE.Group();
+    holder.add(frame, screen);
+    // Rechts neben dem Fahrer: er blickt in +Z, seine rechte Seite ist −X.
+    // Tief genug, dass das Display nicht in die Arbeitssicht ragt.
+    holder.position.set(cx - 0.42, 1.16, cz + 0.46);
+    holder.rotation.y = 2.55; // Bildfläche zum Fahrer gedreht
+    holder.rotation.x = -0.3; // leicht nach hinten gekippt, wie im Armaturenbrett
+    this.cabLiftGroup.add(holder);
+    this.drawInstruments();
+  }
+
+  /** Anzeigen auffrischen (aus der Hauptschleife, gedrosselt). */
+  updateInstruments(dt: number): void {
+    this.instrT += dt;
+    if (this.instrT < 0.25) return;
+    this.instrT = 0;
+    this.drawInstruments();
+  }
+
+  private drawInstruments(): void {
+    const c = this.instrCanvas;
+    if (!c) return;
+    const x = c.getContext("2d");
+    if (!x) return;
+    const W = c.width;
+    const H = c.height;
+    x.fillStyle = "#0f1417";
+    x.fillRect(0, 0, W, H);
+
+    // Kopfzeile
+    x.fillStyle = "#1b2429";
+    x.fillRect(0, 0, W, 30);
+    x.fillStyle = "#7ec96a";
+    x.font = "bold 17px Consolas, monospace";
+    x.fillText("PRIPADA", 10, 21);
+    x.fillStyle = "#8d979d";
+    x.font = "13px Consolas, monospace";
+    x.fillText(this.outriggerDown > 0.85 ? "ABGESTÜTZT" : "FAHRBETRIEB", 108, 21);
+
+    const deg = (r: number): number => Math.round(THREE.MathUtils.radToDeg(r));
+    const rows: Array<[string, string]> = [
+      ["Oberwagen", `${Math.abs(deg(this.cabYaw) % 360)}°`],
+      ["Hauptarm", `${deg(this.boomAngle)}°`],
+      ["Ausleger", `${deg(this.stickAngle)}°`],
+    ];
+    x.font = "14px Consolas, monospace";
+    rows.forEach(([label, value], i) => {
+      const y = 54 + i * 26;
+      x.fillStyle = "#8d979d";
+      x.fillText(label, 10, y);
+      x.fillStyle = "#e8e8e4";
+      x.fillText(value, 130, y);
+    });
+
+    // Hydraulikdruck steigt mit Last und Achsbewegung
+    const bar = Math.round(90 + this.activity * 120 + Math.min(this.carriedMassKg / 40, 90));
+    x.fillStyle = "#8d979d";
+    x.fillText("Hydraulik", 10, 132);
+    x.fillStyle = bar > 260 ? "#e0864a" : "#e8e8e4";
+    x.fillText(`${bar} bar`, 130, 132);
+    // Balken
+    x.fillStyle = "#232c31";
+    x.fillRect(10, 140, 180, 8);
+    x.fillStyle = bar > 260 ? "#e0864a" : "#7ec96a";
+    x.fillRect(10, 140, Math.min(180, (bar / 320) * 180), 8);
+
+    // Greiferstatus
+    x.fillStyle = "#8d979d";
+    x.fillText("Spinne", 10, 172);
+    const zu = this.closure > 0.85;
+    x.fillStyle = zu ? "#e0c14a" : "#7ec96a";
+    x.fillText(
+      this.carriedCount > 0
+        ? `beladen · ${Math.round(this.carriedMassKg)} kg`
+        : zu
+          ? "geschlossen"
+          : this.closure < 0.15
+            ? "offen"
+            : `${Math.round(this.closure * 100)} %`,
+      130,
+      172
+    );
+
+    // Öltemperatur — steigt langsam mit der Arbeit
+    x.fillStyle = "#8d979d";
+    x.fillText("Öltemperatur", 10, 200);
+    x.fillStyle = "#e8e8e4";
+    x.fillText(`${Math.round(44 + this.activity * 14)} °C`, 130, 200);
+
+    if (this.instrTex) this.instrTex.needsUpdate = true;
+  }
+
   getSensorPosition(out: THREE.Vector3): THREE.Vector3 {
     return out
       .set(0, -GRAPPLE_LINK - 0.2 - PALM_TO_SENSOR, 0)

@@ -7,6 +7,15 @@ export class PhysicsWorld {
   constructor() {
     this.world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
     this.world.timestep = 1 / 60;
+
+    // Schrott soll satt liegen bleiben, nicht auf dem Beton tanzen. Drückt die
+    // Spinne ein Teil in den Haufen, schob der Löser es vorher ruckartig wieder
+    // heraus — das sah aus wie Gummi. Weichere Kontaktkorrektur und mehr
+    // Iterationen lassen die Teile stattdessen ineinander zur Ruhe kommen.
+    const p = this.world.integrationParameters;
+    p.numSolverIterations = 8;
+    p.contact_natural_frequency = 20;
+    p.normalizedAllowedLinearError = 0.004;
   }
 
   step(): void {

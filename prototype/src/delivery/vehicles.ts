@@ -129,6 +129,7 @@ type Phase =
   | "tipBack"
   | "waitUnload"
   | "waitLoad"
+  | "nudging"
   | "out";
 
 interface Cargo {
@@ -189,6 +190,22 @@ class DeliveryVehicle {
    * Vom Hof schicken. Geht nur, solange noch nichts abgeladen ist — wer schon
    * gekippt hat, muss auch bezahlt werden.
    */
+  /**
+   * Ein Stück vorfahren, damit man an Schrott herankommt, der unter dem
+   * Fahrzeug liegt. Fährt entlang der Ausfahrtsroute und hält wieder an.
+   */
+  nudgeForward(meters = 3.5): boolean {
+    if (this.phase === "out" || this.phase === "nudging") return false;
+    this.nudgeReturn = this.phase;
+    this.nudgeTargetS = this.nearestS(this.routeOut) + meters;
+    this.routeS = this.nearestS(this.routeOut);
+    this.phase = "nudging";
+    return true;
+  }
+
+  private nudgeReturn: Phase = "waitUnload";
+  private nudgeTargetS = 0;
+
   sendAway(): boolean {
     if (this.cargoReleased || this.phase === "out") return false;
     this.phase = "out";
@@ -784,6 +801,15 @@ class DeliveryVehicle {
           this.routeS = 0;
         }
         break;
+      case "nudging": {
+        this.advance(this.routeOut, SPEED * 0.45 * dt, false, dt);
+        // am Ziel oder am Ende der Route: wieder anhalten und weitermachen
+        if (this.routeS >= this.nudgeTargetS || this.routeS >= this.routeLength(this.routeOut)) {
+          this.phase = this.nudgeReturn;
+          this.phaseT = 0;
+        }
+        break;
+      }
       case "waitLoad":
         // Abhol-LKW wartet, bis der Spieler den Container beladen hat und
         // die Abfahrt freigibt (Taste V) — oder bis die Standzeit abläuft.
@@ -1011,6 +1037,17 @@ export class VehicleManager {
   sendAway(): "weggeschickt" | "zuSpaet" | "niemandDa" {
     if (!this.active || this.active.kind === "abholer") return "niemandDa";
     return this.active.sendAway() ? "weggeschickt" : "zuSpaet";
+  }
+
+  /**
+   * „Mach mal Platz": Vor dem Abladen dreht der Fahrer ab, danach fährt er
+   * nur ein Stück vor — so kommt man an Schrott heran, der unter dem
+   * Fahrzeug liegt.
+   */
+  makeRoom(): "vorgefahren" | "weggeschickt" | "niemandDa" {
+    if (!this.active) return "niemandDa";
+    if (this.active.sendAway()) return "weggeschickt";
+    return this.active.nudgeForward() ? "vorgefahren" : "niemandDa";
   }
 
   /** Körper-Handles des aktiven Fahrzeugs — der Baggerarm taucht da nicht ein. */

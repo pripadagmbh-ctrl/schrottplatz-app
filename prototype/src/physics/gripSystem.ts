@@ -18,6 +18,8 @@ const MAX_TOTAL_KG = 2000; // (SW)
 const GRAB_WINDOW_START = 0.6;
 const GRAB_WINDOW_END = 0.98;
 const SENSOR_RADIUS = 1.05; // m (SW) — Wirkradius der größeren Spinne
+/** So lange muss die Spinne ganz zu gehalten werden, bis das Teil nachgibt */
+const CRUSH_TIME = 1.1;
 
 interface GrippedItem {
   body: RAPIER.RigidBody;
@@ -74,7 +76,29 @@ export class GripSystem {
     };
   }
 
+  /**
+   * Zusammendrücken: Hält der Spieler die Spinne ganz zu, quetscht sie, was
+   * sie gefasst hat. Der Aufrufer entscheidet über `crusher`, welche Teile
+   * nachgeben — Stahlträger tun das nicht.
+   */
+  crusher: ((body: RAPIER.RigidBody) => boolean) | null = null;
+  private crushT = 0;
+
+  private updateCrush(closure: number, dt: number): void {
+    if (!this.crusher || this.items.length === 0 || closure < 0.93) {
+      this.crushT = 0;
+      return;
+    }
+    this.crushT += dt;
+    if (this.crushT < CRUSH_TIME) return;
+    this.crushT = 0;
+    for (const it of this.items) {
+      if (it.body.isValid()) this.crusher(it.body);
+    }
+  }
+
   update(closure: number, closing: boolean, sensorPos: THREE.Vector3, dt: number): void {
+    this.updateCrush(closure, dt);
     if (!closing) {
       // Loslassen wirft sofort ab — und die Spinne ist direkt wieder scharf
       // (schnelles Auf/Zu zum Auffangen und Umsortieren im Fallen).

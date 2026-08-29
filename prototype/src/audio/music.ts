@@ -1,31 +1,32 @@
 /**
- * Hintergrundmusik — komplett prozedural erzeugt (Briefing Kap. 15).
+ * Kabinenradio — komplett prozedural erzeugt (Briefing Kap. 15).
  *
- * Es wird nichts abgespielt, was jemandem gehört: Akkorde, Bass und Melodie
- * entstehen zur Laufzeit aus Oszillatoren. Damit sind keinerlei Lizenz- oder
- * GEMA-Fragen berührt, und die App bleibt ohne Audio-Dateien.
+ * Gewünscht war Schlager beziehungsweise Radioprogramm. Echte Aufnahmen oder
+ * ein Senderstream scheiden aus: beides ist lizenz- und GEMA-pflichtig und
+ * würde die Veröffentlichung im Store blockieren. Stattdessen spielt hier eine
+ * eigene Komposition im Schlagerstil — Dur, Vier-Viertel-Takt, Umtata-Bass,
+ * eingängige Melodie — durch einen Bandpass geschickt, damit es aus dem
+ * Lautsprecher der Fahrerkabine kommt.
  *
- * Stimmung: ruhiger, leicht schwermütiger Werkhof-Groove in a-Moll. Die Musik
- * hält sich bewusst zurück — sie trägt die Szene, ohne den Schrott zu
- * übertönen.
+ * Da nichts Fremdes abgespielt wird, entstehen keinerlei Rechtefragen.
  */
 
-/** Akkordfolge in Halbtönen über dem Grundton A (a-Moll → F → C → G) */
+/** Klassische Schlager-Kadenz in C-Dur: C → G → Am → F */
 const PROGRESSION: number[][] = [
-  [0, 3, 7], // Am
-  [-4, 0, 5], // F
-  [-9, -5, 0], // C
-  [-2, 2, 7], // G
+  [0, 4, 7], // C
+  [-5, -1, 2], // G
+  [-3, 0, 4], // Am
+  [-7, -3, 0], // F
 ];
-/** Töne der Melodie je Akkord (Halbtöne über dem Grundton) */
+/** Eingängige Melodie, ein Ton je Schlag */
 const MELODY: number[][] = [
-  [12, 15, 19, 15],
-  [17, 12, 14, 12],
-  [15, 19, 15, 12],
-  [14, 17, 14, 10],
+  [12, 12, 16, 14],
+  [14, 11, 7, 11],
+  [12, 16, 19, 16],
+  [17, 14, 12, 12],
 ];
-const ROOT_HZ = 110; // A2
-const BEAT_S = 0.55;
+const ROOT_HZ = 131; // C3
+const BEAT_S = 0.46; // etwa 130 bpm — flott, wie es sich gehört
 const BEATS_PER_BAR = 4;
 /** So weit im Voraus werden Töne gesetzt (WebAudio plant exakt) */
 const SCHEDULE_AHEAD_S = 0.7;
@@ -46,7 +47,16 @@ export class Music {
   ) {
     this.gain = ctx.createGain();
     this.gain.gain.value = 0;
-    this.gain.connect(destination);
+    // Radio-Klangfarbe: schmalbandig wie ein Kabinenlautsprecher, ohne Tiefbass
+    // und ohne Höhenglanz
+    const band = ctx.createBiquadFilter();
+    band.type = "bandpass";
+    band.frequency.value = 1100;
+    band.Q.value = 0.75;
+    const hp = ctx.createBiquadFilter();
+    hp.type = "highpass";
+    hp.frequency.value = 220;
+    this.gain.connect(band).connect(hp).connect(destination);
   }
 
   get enabled(): boolean {
@@ -101,22 +111,29 @@ export class Music {
   private playBeat(t: number): void {
     const chord = PROGRESSION[this.bar];
 
-    // Bass auf der Eins und der Drei — trägt den Groove
-    if (this.beat === 0 || this.beat === 2) {
-      this.pluck(hz(chord[0] - 12), t, 0.9, "triangle", 0.5, 260);
+    // Umtata: Bass auf den Zählzeiten, Akkord auf den Nachschlägen — das
+    // typische Schlager-Fundament
+    if (this.beat % 2 === 0) {
+      this.pluck(hz(chord[0] - 12), t, 0.34, "triangle", 0.55, 320);
+    } else {
+      this.pluck(hz(chord[0] - 5), t, 0.3, "triangle", 0.38, 300);
+    }
+    // „Tata" — kurzer Akkordschlag auf dem Off
+    for (const s of chord) {
+      this.pluck(hz(s + 12), t + BEAT_S * 0.5, 0.22, "square", 0.1, 1500);
     }
 
-    // Akkord-Pad zu Beginn des Takts, weich und lang
+    // Streicherteppich über den ganzen Takt
     if (this.beat === 0) {
       for (const s of chord) this.pad(hz(s), t, BEAT_S * BEATS_PER_BAR * 0.95);
     }
 
-    // Melodie: ein Ton je Schlag, aber nicht jeder — das lässt Luft
+    // Melodie führt durch — bei Schlager darf sie gerne mitsingbar sein
     const note = MELODY[this.bar][this.beat];
-    if (this.beat !== 1) this.pluck(hz(note), t + 0.02, 0.55, "sine", 0.22, 1800);
+    this.pluck(hz(note), t + 0.02, 0.42, "sawtooth", 0.2, 2200);
 
-    // Leises Hi-Hat-Ticken auf den Nachschlägen
-    this.tick(t + BEAT_S * 0.5, this.beat % 2 === 0 ? 0.05 : 0.09);
+    // Schlagzeug: Schlag auf zwei und vier
+    this.tick(t, this.beat % 2 === 1 ? 0.14 : 0.05);
   }
 
   /** Kurzer, gezupfter Ton mit schnellem Abfall. */
