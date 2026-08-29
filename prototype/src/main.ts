@@ -98,7 +98,9 @@ async function main(): Promise<void> {
     }
   } else {
     fence = new FenceManager(scene, physics.world, items, bus);
-    items.spawnPile(yard.pileCenter);
+    // Großer Berg auf der Stahlschrottfläche. Die Annahmefläche bleibt frei,
+    // dort laden die Pritschen ab.
+    items.spawnPile(new THREE.Vector3(-9, 0, 1));
     // Altfahrzeuge stehen von Anfang an am Rand des Stahlschrott-Haufens
     composites.spawnCar(new THREE.Vector3(-15.8, 0.5, 3.5));
     composites.spawnCar(new THREE.Vector3(-15.8, 0.5, -2.5));
@@ -270,6 +272,7 @@ async function main(): Promise<void> {
   };
   grip.onTear = () => audio.playTear();
   grip.partResolver = (pos) => composites.findPartNear(pos);
+  grip.insideGrapple = (pos) => excavator.isInsideGrapple(pos);
   bus.on("itemEntered", (e) => {
     audio.playDrop(e.materialId);
     if (e.correct) {
@@ -344,6 +347,11 @@ async function main(): Promise<void> {
     excavator.carriedMassKg = grip.totalMassKg;
     excavator.carriedCount = grip.grippedCount;
     vehicles.obstacleHandles(excavator.obstacleBodies);
+    // Karossen sind ebenfalls feste Störer: der Arm soll nicht hindurchfahren.
+    // Die Spinne selbst bleibt frei — sonst käme man nicht mehr zum Greifen ran.
+    for (const car of composites.cars) {
+      if (car.body.isValid()) excavator.obstacleBodies.add(car.body.handle);
+    }
     physics.step();
     items.clampSpeeds();
     composites.update();
@@ -431,6 +439,16 @@ async function main(): Promise<void> {
       if (r === "gerufen") hud.toast("Abholung angefordert — LKW kommt über die Ostspur.");
       else if (r === "abgefahren") hud.toast("Container geht raus …");
       else hud.toast("Erst muss das Fahrzeug auf dem Platz fertig werden.");
+    }
+    // Anlieferer wegschicken — etwa wenn die Ladung nichts taugt
+    if (input.wasPressed("KeyZ") || touch.consumePress("KeyZ")) {
+      const r = vehicles.sendAway();
+      if (r === "weggeschickt") hud.toast("Weggeschickt — der Fahrer dreht ab.");
+      else if (r === "zuSpaet") hud.toast("Zu spät, die Ladung liegt schon auf dem Platz.");
+      else hud.toast("Gerade ist kein Anlieferer da.");
+    }
+    if (input.wasPressed("KeyU") || touch.consumePress("KeyU")) {
+      hud.toast(audio.toggleMusic() ? "Musik an." : "Musik aus.");
     }
     if (input.wasPressed("KeyK")) {
       hud.toast(storeSave(buildSaveData()) ? "Gespeichert." : "Speichern fehlgeschlagen!");

@@ -32,7 +32,9 @@ const INNER_D = 6.0; // z — Breite (verdoppelt)
 const WALL_H = 1.9;
 const PLATE_T = 0.3; // dicke Eisenplatten (SW)
 const LID_HINGE_Y = WALL_H - 0.1;
-const LID_OPEN_ANGLE = 1.5; // rad, Klappen stehen fast senkrecht (SW)
+// Offen legen sich die Klappen nach außen weg, statt hochkant über der Mulde
+// zu stehen — so bleibt der Blick auf die Schere frei (Design-Fix 29.08.2026)
+const LID_OPEN_ANGLE = 2.25; // rad ≈ 129°
 const RAM_HOME_X = INNER_W / 2 - 0.35;
 const RAM_END_X = -INNER_W / 2 + 1.1; // Restdicke = Paketdicke (SW)
 

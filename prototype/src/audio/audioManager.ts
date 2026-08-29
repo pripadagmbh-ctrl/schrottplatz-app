@@ -4,9 +4,14 @@
  * richtig = angenehmer Doppelton, falsch = stumpfer Missklang.
  * Startet erst nach der ersten echten Nutzereingabe (Browser-Autoplay-Policy).
  */
+import { Music } from "./music";
+
 export class AudioManager {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
+  private music: Music | null = null;
+  /** Musikwunsch des Spielers — gilt auch, bevor der Ton überhaupt läuft */
+  private musicWanted = true;
   private engineOsc: OscillatorNode | null = null;
   private engineGain: GainNode | null = null;
   private hydraulicGain: GainNode | null = null;
@@ -19,6 +24,20 @@ export class AudioManager {
     window.addEventListener("keydown", start, { once: false });
   }
 
+  /** Musik an/aus. Liefert den neuen Zustand. */
+  toggleMusic(): boolean {
+    this.musicWanted = !this.musicWanted;
+    if (this.music) {
+      if (this.musicWanted) this.music.start();
+      else this.music.stop();
+    }
+    return this.musicWanted;
+  }
+
+  get musicOn(): boolean {
+    return this.musicWanted;
+  }
+
   private ensureStarted(): void {
     if (this.ctx) {
       if (this.ctx.state === "suspended") this.ctx.resume().catch(() => {});
@@ -29,6 +48,10 @@ export class AudioManager {
       this.master = this.ctx.createGain();
       this.master.gain.value = 0.5;
       this.master.connect(this.ctx.destination);
+
+      // Hintergrundmusik, zur Laufzeit erzeugt — keine fremden Aufnahmen
+      this.music = new Music(this.ctx, this.master);
+      if (this.musicWanted) this.music.start();
 
       // Diesel-Loop: tiefer Sägezahn + Tiefpass, Drehzahl folgt der Aktivität
       this.engineOsc = this.ctx.createOscillator();

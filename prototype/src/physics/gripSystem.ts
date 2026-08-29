@@ -34,6 +34,12 @@ export class GripSystem {
   onTear: ((name: string) => void) | null = null;
   /** liefert eine abreißbare Baugruppe nahe des Sensors (Verbundobjekte, Kap. 8) */
   partResolver: ((pos: THREE.Vector3) => TearTarget | null) | null = null;
+  /**
+   * Prüft, ob ein Weltpunkt im Schalenkorb der Spinne liegt. Ohne diese Prüfung
+   * würde alles im Sensorradius angehoben, auch was neben dem Greifer liegt.
+   */
+  insideGrapple: ((worldPos: THREE.Vector3) => boolean) | null = null;
+  private probe = new THREE.Vector3();
   private tearState: { id: string; name: string; seconds: number; progress: number } | null = null;
 
   constructor(
@@ -122,6 +128,13 @@ export class GripSystem {
       (collider) => {
         const body = collider.parent();
         if (body && body.isDynamic() && !candidates.includes(body)) {
+          // Nur fassen, was wirklich zwischen den Schalen liegt. Die Kugel
+          // allein ließ Material anheben, das neben oder unter der Spinne lag.
+          if (this.insideGrapple) {
+            const t = body.translation();
+            this.probe.set(t.x, t.y, t.z);
+            if (!this.insideGrapple(this.probe)) return true;
+          }
           candidates.push(body);
         }
         return true; // weitersuchen

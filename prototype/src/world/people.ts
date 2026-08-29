@@ -339,8 +339,18 @@ export class StaffManager {
       g.position.addScaledVector(step, 1.5 * dt); // 1,5 m/s (SW)
       g.rotation.y = Math.atan2(step.x, step.z);
       this.walkPhase += dt * 7;
+      // Festgefahren? Wenn das Ausweichen ihn im Kreis schickt, kommt er dem
+      // Ziel nicht näher — dann lieber aufgeben als endlos am Hindernis kleben.
+      this.stuckT += dt;
+      if (dist < this.bestDist - 0.3) {
+        this.bestDist = dist;
+        this.stuckT = 0;
+      } else if (this.stuckT > 5) {
+        this.giveUpTarget();
+      }
     } else {
       this.walkPhase = 0;
+      this.resetStuck();
       this.onArrived();
     }
 
@@ -379,6 +389,26 @@ export class StaffManager {
         this.carriedItemId = null;
       }
     }
+  }
+
+  private stuckT = 0;
+  private bestDist = Infinity;
+
+  private resetStuck(): void {
+    this.stuckT = 0;
+    this.bestDist = Infinity;
+  }
+
+  /**
+   * Ziel aufgeben und weiterziehen. Ein aufgesammeltes Teil legt er dabei ab,
+   * sonst würde er es ewig mit sich herumtragen.
+   */
+  private giveUpTarget(): void {
+    this.resetStuck();
+    this.carriedItemId = null;
+    this.lambertState = "patrol";
+    this.patrolIdx = (this.patrolIdx + 1) % this.patrol.length;
+    this.lambertTarget.copy(this.patrol[this.patrolIdx]);
   }
 
   /** Reaktion beim Erreichen des Ziels — je nach Aufgabe. */

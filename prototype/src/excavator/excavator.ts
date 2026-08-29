@@ -47,7 +47,7 @@ function clawPoint(a: number, splay: number, k: number, out: THREE.Vector3): THR
   const r = CLAW_RING_R + z;
   return out.set(Math.sin(a) * r, CLAW_RING_Y + y, Math.cos(a) * r);
 }
-const PALM_TO_SENSOR = 1.15; // Palm-Zentrum → Sensor im Schalenvolumen
+const PALM_TO_SENSOR = 0.75; // Palm-Zentrum → Sensor in der Mitte des Schalenkorbs
 
 // Achsgrenzen (SW)
 const BOOM_MIN = THREE.MathUtils.degToRad(5);
@@ -1414,6 +1414,36 @@ export class Excavator {
       .set(0, -GRAPPLE_LINK - 0.2 - PALM_TO_SENSOR, 0)
       .applyQuaternion(this.grappleGroup.quaternion)
       .add(this.grappleGroup.position);
+  }
+
+  private basketTmp = new THREE.Vector3();
+  private basketTip = new THREE.Vector3();
+  private basketQuatInv = new THREE.Quaternion();
+
+  /**
+   * Liegt der Weltpunkt wirklich im Schalenkorb?
+   *
+   * Vorher genügte eine Kugel um den Greifer, wodurch Material angehoben wurde,
+   * das gar nicht zwischen den Schalen lag — es schwebte sichtbar darunter.
+   * Jetzt wird gegen die tatsächliche Krallengeometrie geprüft: oben der
+   * Gelenkring, unten die Spitzen, seitlich der Kreis, den die Krallen bei der
+   * aktuellen Öffnung aufspannen.
+   */
+  isInsideGrapple(worldPoint: THREE.Vector3): boolean {
+    const p = this.basketTmp
+      .copy(worldPoint)
+      .sub(this.grappleGroup.position)
+      .applyQuaternion(this.basketQuatInv.copy(this.grappleGroup.quaternion).invert());
+    // clawPoint legt den Umfangswinkel auf x/z: bei a = 0 steht der Radius in z
+    clawPoint(0, this.currentSplay(), CLAW_SEGMENTS, this.basketTip);
+    const tipY = this.basketTip.y;
+    const tipR = Math.max(this.basketTip.z, 0);
+    // etwas Luft nach oben und unten, damit sperrige Teile noch gefasst werden
+    if (p.y > CLAW_RING_Y + 0.45 || p.y < tipY - 0.35) return false;
+    // Radius des Korbs auf dieser Höhe: vom Gelenkring zur Spitze verjüngt
+    const t = THREE.MathUtils.clamp((CLAW_RING_Y - p.y) / Math.max(CLAW_RING_Y - tipY, 0.01), 0, 1);
+    const r = THREE.MathUtils.lerp(CLAW_RING_R, tipR, t) + 0.45;
+    return Math.hypot(p.x, p.z) <= r;
   }
 
   /** Zielpunkt für die Kamera (Oberwagen). */

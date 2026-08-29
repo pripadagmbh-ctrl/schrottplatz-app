@@ -263,22 +263,48 @@ export class ItemManager {
     return this.register({ materialId, massKg, mesh, body, shape });
   }
 
-  /** Misch-Haufen für die Annahmefläche (Neues Spiel). */
-  spawnPile(pileCenter: THREE.Vector3): void {
-    SPECS.forEach((spec, i) => {
-      const ang = (i / SPECS.length) * Math.PI * 2;
-      const rad = 0.4 + (i % 5) * 0.45;
+  /**
+   * Großer Schrottberg zum Spielstart. Liegt auf der Stahlschrottfläche, nicht
+   * auf der Annahmefläche — dort müssen die Pritschen abladen können.
+   *
+   * Die Teile werden überlappungsfrei gesetzt: klemmen sie beim Spawn
+   * ineinander, schleudert die Physik sie über den halben Platz.
+   */
+  spawnPile(pileCenter: THREE.Vector3, count = 70, spread = 3.4): void {
+    const placed: Array<{ x: number; y: number; z: number; r: number }> = [];
+    const specs = randomCargo(count, 0.45);
+    for (const s of specs) {
+      const dims = s.shape.dims;
+      const half = s.shape.kind === "wire" ? dims[0] : Math.max(...dims) / 2;
+      const r = half + 0.15;
+      let spot: { x: number; y: number; z: number; r: number } | null = null;
+      for (let layer = 0; layer < 7 && !spot; layer++) {
+        const y = 0.6 + layer * 0.95;
+        // innen dichter, außen weiter — das ergibt die Kegelform eines Haufens
+        const maxRad = spread * (1 - layer * 0.11);
+        for (let attempt = 0; attempt < 30; attempt++) {
+          const a = Math.random() * Math.PI * 2;
+          const rad = Math.sqrt(Math.random()) * maxRad;
+          const x = pileCenter.x + Math.cos(a) * rad;
+          const z = pileCenter.z + Math.sin(a) * rad;
+          const clash = placed.some(
+            (p) => Math.hypot(p.x - x, (p.y - y) * 1.5, p.z - z) < p.r + r
+          );
+          if (!clash) {
+            spot = { x, y, z, r };
+            break;
+          }
+        }
+      }
+      if (!spot) continue;
+      placed.push(spot);
       this.spawnScrap(
-        spec.materialId,
-        spec.massKg,
-        { kind: spec.kind, dims: spec.dims, color: colorFor(spec, i) },
-        new THREE.Vector3(
-          pileCenter.x + Math.cos(ang) * rad,
-          pileCenter.y + 0.4 + (i % 4) * 0.35,
-          pileCenter.z + Math.sin(ang) * rad
-        )
+        s.materialId,
+        s.massKg,
+        s.shape,
+        new THREE.Vector3(spot.x, spot.y, spot.z)
       );
-    });
+    }
   }
 
   /** Teil in der Presse plattdrücken: Mesh stauchen, Kollider tauschen. */

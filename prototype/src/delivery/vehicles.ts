@@ -96,6 +96,8 @@ const FIRST_DELAY_S = 20; // (SW)
 const NEXT_DELAY_S: [number, number] = [35, 60]; // (SW)
 /** Sicherheitsabstand zum Bagger: darunter wartet der Fahrer (Briefing Kap. 13) */
 const BLOCK_RADIUS = 5.5;
+/** Ab diesem Gewicht gilt ein liegendes Teil als echtes Hindernis (SW) */
+const BLOCKING_MASS_KG = 120;
 const HONK_AFTER_S = 10;
 /** Halbe Innenbreite der Ladefläche (SW) — größer als das breiteste Großteil */
 const BED_HALF_W = 1.35;
@@ -181,6 +183,47 @@ class DeliveryVehicle {
     if (!this.justDeparted) return false;
     this.justDeparted = false;
     return true;
+  }
+
+  /**
+   * Vom Hof schicken. Geht nur, solange noch nichts abgeladen ist — wer schon
+   * gekippt hat, muss auch bezahlt werden.
+   */
+  sendAway(): boolean {
+    if (this.cargoReleased || this.phase === "out") return false;
+    this.phase = "out";
+    this.phaseT = 0;
+    // Dort in die Ausfahrt einfädeln, wo der Wagen gerade steht — sonst
+    // würde er an den Anfang der Ausfahrtsroute springen.
+    this.routeS = this.nearestS(this.routeOut);
+    this.sideOpenTarget = 0;
+    return true;
+  }
+
+  /** Bogenlänge des Routenpunkts, der der aktuellen Position am nächsten liegt. */
+  private nearestS(route: Array<[number, number]>): number {
+    const px = this.group.position.x;
+    const pz = this.group.position.z;
+    let best = 0;
+    let bestD = Infinity;
+    let s = 0;
+    for (let i = 0; i < route.length - 1; i++) {
+      const [ax, az] = route[i];
+      const [bx, bz] = route[i + 1];
+      const dx = bx - ax;
+      const dz = bz - az;
+      const len = Math.hypot(dx, dz);
+      if (len < 1e-6) continue;
+      // Projektion des Fahrzeugs auf dieses Segment
+      const t = Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / (len * len)));
+      const d = Math.hypot(px - (ax + dx * t), pz - (az + dz * t));
+      if (d < bestD) {
+        bestD = d;
+        best = s + len * t;
+      }
+      s += len;
+    }
+    return best;
   }
 
   private get isPickup(): boolean {
@@ -415,7 +458,9 @@ class DeliveryVehicle {
       return;
     }
     // Händler liefern volle Ladungen mit viel Großteil-Anteil (SW)
-    const count = this.kind === "kipper" ? 20 : 16;
+    // Nicht bis unter die Bordwand vollpacken: zu volle Ladungen quollen beim
+    // Kippen über und blieben halb auf der Fläche hängen.
+    const count = this.kind === "kipper" ? 13 : 10;
     const specs = randomCargo(count, 0.5);
     const bedQuat = new THREE.Quaternion();
     this.bedGroup.getWorldQuaternion(bedQuat);
@@ -901,7 +946,10 @@ export class VehicleManager {
       if (Math.hypot(zx - x, zz - z) < zr) return false;
     }
     for (const it of this.items.items) {
-      if (it.massKg < 25 || !it.body.isDynamic()) continue;
+      // Nur wirklich sperrige Brocken halten einen LKW auf. Vorher blockierte
+      // schon jedes 25-kg-Teil, wodurch die Fahrspur nach dem Abkippen fast
+      // immer als versperrt galt — kleineres Zeug wird jetzt überrollt.
+      if (it.massKg < BLOCKING_MASS_KG || !it.body.isDynamic()) continue;
       if (ignore.has(it.body.handle)) continue; // eigene Ladung
       const p = it.body.translation();
       if (p.y > 1.3) continue; // auf einer Ladefläche, nicht auf dem Fahrweg
@@ -954,6 +1002,15 @@ export class VehicleManager {
   /** Der wartende Abhol-LKW (für Beladung/Verkauf), sonst null. */
   get pickupTruck(): DeliveryVehicle | null {
     return this.active && this.active.kind === "abholer" ? this.active : null;
+  }
+
+  /**
+   * Anlieferer vom Hof schicken — etwa wenn der Wagen offensichtlich leer ist
+   * oder man gerade keinen Platz hat. Er dreht ab und fährt zur Ausfahrt.
+   */
+  sendAway(): "weggeschickt" | "zuSpaet" | "niemandDa" {
+    if (!this.active || this.active.kind === "abholer") return "niemandDa";
+    return this.active.sendAway() ? "weggeschickt" : "zuSpaet";
   }
 
   /** Körper-Handles des aktiven Fahrzeugs — der Baggerarm taucht da nicht ein. */
