@@ -1026,15 +1026,29 @@ export class Excavator {
     );
 
     // --- Spinne ---
-    // Spinne: Tastatur/Knopf drücken hält sie zu. Der rechte Touch-Stick
-    // schaltet dagegen um — bei neutralem Stick bleibt der Zustand erhalten.
+    // Spinne: Tastatur, Maus und Druckgriff schließen mit voller Kraft.
+    // Der rechte Stick arbeitet stufenlos — je weiter der Ausschlag, desto
+    // schneller schließt bzw. öffnet die Spinne; neutral hält den Zustand.
     const cmd = this.touch?.grapple ?? 0;
-    if (cmd > 0) this.grappleHold = true;
-    else if (cmd < 0) this.grappleHold = false;
-    this.closing =
-      input.mouseHeld(0) || input.isDown("Space") || (this.touch?.grab ?? false) || this.grappleHold;
-    const closeRate = this.closing ? dt / CLOSE_TIME : -dt / OPEN_TIME;
+    const held = input.mouseHeld(0) || input.isDown("Space") || (this.touch?.grab ?? false);
+    let closeRate: number;
+    if (held) {
+      closeRate = dt / CLOSE_TIME;
+      this.grappleHold = true;
+    } else if (cmd !== 0) {
+      const intensity = Math.min(Math.abs(cmd), 1);
+      closeRate = cmd > 0 ? (intensity * dt) / CLOSE_TIME : (-intensity * dt) / OPEN_TIME;
+      this.grappleHold = cmd > 0;
+    } else if (this.touch) {
+      closeRate = 0; // Stick neutral: Position halten
+    } else {
+      closeRate = -dt / OPEN_TIME; // Tastatur losgelassen: öffnet
+      this.grappleHold = false;
+    }
     this.closure = THREE.MathUtils.clamp(this.closure + closeRate, 0, 1);
+    // „closing" steuert das Greifsystem: Zupacken solange die Spinne schließt
+    // oder geschlossen gehalten wird
+    this.closing = held || closeRate > 0 || (this.grappleHold && this.closure > 0.5);
 
     // Kabinenhub fährt gleichmäßig auf die Zielhöhe
     const liftStep = CAB_LIFT_SPEED * dt;

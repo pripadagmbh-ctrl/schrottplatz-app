@@ -58,17 +58,13 @@
         text-align: center;
       }
       #touch .btn.down { background: rgba(240,180,41,0.65); color: #1a1c1e; }
-      /* Fahr-Fadenkreuz links oben — nur fürs Fahren und Lenken */
-      #touch .cross { position: absolute; width: 44px; height: 40px; padding: 10px 4px; }
-      #btn-fwd { left: 62px; top: 52px; }
-      #btn-back { left: 62px; top: 140px; }
-      #btn-left { left: 14px; top: 96px; }
-      #btn-right { left: 110px; top: 96px; }
-      /* Greifen: großer Knopf links neben dem Stick */
-      #btn-grab {
-        left: 168px; bottom: 26px; width: 100px; height: 100px; border-radius: 50%;
-        line-height: 76px; padding: 0; font-size: 15px;
-      }
+      /* Fahr-Fadenkreuz rechts neben dem linken Stick (dort, wo vorher der
+         Greifen-Knopf saß) — nur fürs Fahren und Lenken */
+      #touch .cross { position: absolute; width: 46px; height: 42px; padding: 11px 4px; }
+      #btn-fwd { left: 214px; bottom: 108px; }
+      #btn-back { left: 214px; bottom: 12px; }
+      #btn-left { left: 164px; bottom: 60px; }
+      #btn-right { left: 264px; bottom: 60px; }
       /* Spinne drehen: zwei Tasten über dem rechten Stick */
       #btn-rot-l, #btn-rot-r {
         bottom: 160px; width: 56px; height: 46px; padding: 0; line-height: 46px; font-size: 20px;
@@ -84,6 +80,27 @@
       #btn-pickup { top: 228px; }
       #btn-tilt { top: 274px; }
       #btn-marks { top: 320px; }
+      #btn-pause { top: 366px; }
+      /* --- Pausenmenü --- */
+      #pause {
+        display: none; position: fixed; inset: 0; z-index: 20;
+        background: rgba(12,14,16,0.72); backdrop-filter: blur(3px);
+        align-items: center; justify-content: center;
+      }
+      #pause.open { display: flex; }
+      #pause .panel {
+        background: rgba(24,27,30,0.96); border: 2px solid rgba(255,255,255,0.18);
+        border-radius: 14px; padding: 24px 28px; text-align: center; min-width: 260px;
+        color: #e8e8e4; font-family: "Consolas", monospace;
+      }
+      #pause h1 { margin: 0 0 18px; font-size: 26px; letter-spacing: 6px; color: #f0b429; }
+      #pause button {
+        display: block; width: 100%; margin: 8px 0; padding: 13px 18px; cursor: pointer;
+        background: rgba(46,52,57,0.95); color: #e8e8e4; font: 600 15px "Consolas", monospace;
+        border: 2px solid rgba(255,255,255,0.22); border-radius: 9px; touch-action: manipulation;
+      }
+      #pause button:hover, #pause button:active { background: rgba(240,180,41,0.75); color: #1a1c1e; }
+      #pause .hint { margin: 16px 0 0; font-size: 11px; line-height: 1.7; color: #9aa2a8; }
     </style>
   </head>
   <body>
@@ -101,6 +118,7 @@
       X&nbsp;&nbsp;Kabine hoch/runter &nbsp;·&nbsp; O&nbsp;&nbsp;Stützen aus/ein<br />
       V&nbsp;&nbsp;Abholung rufen / abfahren &nbsp;·&nbsp; B&nbsp;&nbsp;Schere<br />
       M&nbsp;&nbsp;Markierungen an/aus &nbsp;·&nbsp; K&nbsp;&nbsp;Speichern<br />
+      ESC oder P&nbsp;&nbsp;Pause<br />
       L&nbsp;&nbsp;Stand laden &nbsp;·&nbsp; N&nbsp;&nbsp;Neues Spiel
     </div>
     <div id="gripinfo" class="hud">Greifer: offen</div>
@@ -110,7 +128,6 @@
     <div id="touch">
       <div class="pad" id="touch-left"><div class="knob"></div></div>
       <div class="pad" id="touch-right"><div class="knob"></div></div>
-      <div class="btn" id="btn-grab">GREIFEN</div>
       <div class="btn" id="btn-rot-l">↺</div>
       <div class="btn" id="btn-rot-r">↻</div>
       <div class="btn cross" id="btn-fwd">▲</div>
@@ -124,6 +141,20 @@
       <div class="btn fn" id="btn-pickup">ABHOLEN</div>
       <div class="btn fn" id="btn-tilt">KIPPEN</div>
       <div class="btn fn" id="btn-marks">SCHILDER</div>
+      <div class="btn fn" id="btn-pause">PAUSE</div>
+    </div>
+    <div id="pause">
+      <div class="panel">
+        <h1>PAUSE</h1>
+        <button id="pause-resume">Weiterspielen</button>
+        <button id="pause-save">Speichern</button>
+        <button id="pause-load">Stand laden</button>
+        <button id="pause-new">Neues Spiel</button>
+        <p class="hint">
+          Linker Stick: Stiel &amp; Oberwagen · Rechter Stick: Ausleger &amp; Spinne<br />
+          ↺ ↻ Spinne drehen · Fadenkreuz: fahren · Doppeltipp: Ansicht
+        </p>
+      </div>
     </div>
     <div id="loading">Lade Physik …</div>
     <script type="module" src="/src/main.ts"></script>

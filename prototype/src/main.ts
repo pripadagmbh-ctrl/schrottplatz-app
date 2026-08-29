@@ -158,6 +158,24 @@ async function main(): Promise<void> {
   const hud = new Hud();
   const particles = new Particles(scene);
 
+  // --- Pausenmenü ---
+  const pauseEl = document.getElementById("pause")!;
+  let paused = false;
+  const setPaused = (v: boolean): void => {
+    paused = v;
+    pauseEl.classList.toggle("open", v);
+  };
+  document.getElementById("pause-resume")!.addEventListener("click", () => setPaused(false));
+  document.getElementById("pause-save")!.addEventListener("click", () => {
+    hud.toast(storeSave(buildSaveData()) ? "Gespeichert." : "Speichern fehlgeschlagen!");
+    setPaused(false);
+  });
+  document.getElementById("pause-load")!.addEventListener("click", () => location.reload());
+  document.getElementById("pause-new")!.addEventListener("click", () => {
+    clearSave();
+    location.reload();
+  });
+
   const helpEl = document.getElementById("help")!;
   if (touch.active) helpEl.style.display = "none"; // auf Touchgeräten stört die Tastenliste
   const sensorPos = new THREE.Vector3();
@@ -273,6 +291,8 @@ async function main(): Promise<void> {
       press,
       bus,
       saveNow: () => storeSave(buildSaveData()),
+      togglePause: () => setPaused(!paused),
+      isPaused: () => paused,
       step: (n: number) => {
         for (let i = 0; i < n; i++) stepOnce();
         items.syncMeshes();
@@ -297,6 +317,16 @@ async function main(): Promise<void> {
     lastTime = now;
 
     touch.update();
+    if (input.wasPressed("Escape") || input.wasPressed("KeyP") || touch.consumePress("Escape")) {
+      setPaused(!paused);
+    }
+    if (paused) {
+      // In der Pause ruht die Simulation; nur Rendern und Eingaben laufen weiter
+      renderer.render(scene, orbit.camera);
+      input.endFrame();
+      requestAnimationFrame(frame);
+      return;
+    }
     excavator.touch = touch.active ? touch.axes : null;
     if (touch.consumePress("KeyC")) orbit.touchViewPress = true;
     if (touch.consumePress("KeyX")) excavator.toggleCabLift();

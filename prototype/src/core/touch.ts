@@ -5,7 +5,7 @@
  *   rechter Stick  — X: Spinne öffnen/schließen, Y: Ausleger heben/senken
  *   ↺ / ↻          — Spinne links bzw. rechts drehen (Rotator)
  *   Fadenkreuz     — nur Fahren: vor/zurück und links/rechts lenken (simultan)
- *   Greifen        — großer Knopf links, zusätzlich per festem Fingerdruck
+ *   Greifen        — über den rechten Stick (oder festen Fingerdruck)
  *   Extras         — Doppeltipp wechselt die Ansicht, Kippen ersetzt das Fadenkreuz
  */
 export interface TouchAxes {
@@ -70,7 +70,6 @@ export class TouchControls {
     root.style.display = "block";
     this.left = this.makeStick("touch-left");
     this.right = this.makeStick("touch-right");
-    this.bindHold("btn-grab", "grab");
     this.bindHold("btn-fwd", "fwd");
     this.bindHold("btn-back", "back");
     this.bindHold("btn-left", "left");
@@ -83,6 +82,7 @@ export class TouchControls {
     this.bindTap("btn-press", "KeyB");
     this.bindTap("btn-pickup", "KeyV");
     this.bindTap("btn-marks", "KeyM");
+    this.bindTap("btn-pause", "Escape");
     this.bindTilt();
     this.bindCanvas(canvas);
     TouchControls.blockBrowserZoom();
@@ -276,9 +276,11 @@ export class TouchControls {
     // Linker Stick: Oberwagen drehen und Stiel (Y-Achse umgekehrt)
     this.axes.cab = l ? l.dx : 0;
     this.axes.stick = l ? l.dy : 0;
-    // Rechter Stick: Spinne öffnen/schließen (X) und Ausleger (Y)
+    // Rechter Stick: Spinne öffnen/schließen (X) und Ausleger (Y).
+    // Der Wert bleibt stufenlos — je weiter der Ausschlag, desto schneller
+    // schließt bzw. öffnet die Spinne.
     const gx = r ? r.dx : 0;
-    this.axes.grapple = gx > 0.25 ? 1 : gx < -0.25 ? -1 : 0;
+    this.axes.grapple = Math.abs(gx) > 0.16 ? gx : 0;
     this.axes.boom = r ? r.dy : 0;
     // Rotator liegt auf den beiden Drehtasten
     this.axes.rotator =
@@ -289,6 +291,6 @@ export class TouchControls {
       (this.held.has("right") ? 1 : 0) - (this.held.has("left") ? 1 : 0) + this.tiltSteer;
     this.axes.drive = Math.max(-1, Math.min(1, this.axes.drive));
     this.axes.steer = Math.max(-1, Math.min(1, this.axes.steer));
-    this.axes.grab = this.held.has("grab") || this.pressureGrab;
+    this.axes.grab = this.pressureGrab;
   }
 }
