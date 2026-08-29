@@ -1,0 +1,12 @@
+{
+  "appId": "de.pripada.schrottplatz",
+  "appName": "PRIPADA Schrottplatz",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#1a1c1e"
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

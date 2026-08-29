@@ -6,7 +6,17 @@
       name="viewport"
       content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover"
     />
-    <title>Schrottplatz — Prototyp (M3)</title>
+    <title>PRIPADA Schrottplatz</title>
+    <meta name="description" content="Umschlagbagger auf dem Schrottplatz: annehmen, greifen, sortieren, pressen und verladen." />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <meta name="theme-color" content="#1a1c1e" />
+    <!-- Vollbild ohne Browserleisten, wenn die Seite als App abgelegt wird -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Schrottplatz" />
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+    <link rel="apple-touch-icon" href="icon-192.png" />
     <style>
       html, body {
         margin: 0; padding: 0; height: 100%; overflow: hidden; background: #1a1c1e;
@@ -122,6 +132,27 @@
         background: rgba(24,27,30,0.96); border: 2px solid rgba(255,255,255,0.18);
         border-radius: 14px; padding: 24px 28px; text-align: center; min-width: 260px;
         color: #e8e8e4; font-family: "Consolas", monospace;
+        /* Auf flachen Displays passt die Liste nicht aufs Bild — dann wird sie
+           scrollbar, statt unten abgeschnitten zu werden. */
+        /* border-box, damit die Innenabstände in die Höhenschranke zählen —
+           sonst ragt das Feld trotz Begrenzung unten aus dem Bild */
+        box-sizing: border-box;
+        max-height: 88vh; overflow-y: auto; -webkit-overflow-scrolling: touch;
+        touch-action: pan-y; overscroll-behavior: contain;
+      }
+      @media (max-height: 430px) {
+        #pause .panel { padding: 12px 16px; min-width: 220px; max-height: 94vh; }
+        #pause h1 { margin: 0 0 8px; font-size: 18px; letter-spacing: 3px; }
+        #pause button { margin: 5px 0; padding: 9px 12px; font-size: 13px; }
+        #pause .hint { margin: 8px 0 0; font-size: 10px; line-height: 1.5; }
+        #controls-menu { padding: 12px 16px; min-width: 240px; max-height: 94vh; }
+        #controls-menu h2 { margin: 0 0 8px; font-size: 15px; }
+        #controls-menu button { margin: 5px 0; padding: 9px 12px; font-size: 13px; }
+        #controls-menu .hint { margin: 8px 0 0; font-size: 10px; line-height: 1.5; }
+        #controls-menu .row { margin: 4px 0; gap: 6px; }
+        #controls-menu .row label { flex-basis: 88px; font-size: 11px; }
+        #controls-menu select { padding: 5px 4px; font-size: 11px; }
+        #controls-menu .inv { padding: 5px 8px; font-size: 11px; }
       }
       #pause h1 { margin: 0 0 18px; font-size: 26px; letter-spacing: 6px; color: #f0b429; }
       #pause button {
@@ -131,10 +162,27 @@
       }
       #pause button:hover, #pause button:active { background: rgba(240,180,41,0.75); color: #1a1c1e; }
       #pause .hint { margin: 16px 0 0; font-size: 11px; line-height: 1.7; color: #9aa2a8; }
-      /* --- Steuerungsmenü --- */
-      #controls-menu { display: none; }
+      /* --- Steuerungsmenü: eigenständige Tafel neben dem Pausenfeld --- */
+      #controls-menu {
+        display: none;
+        background: rgba(24,27,30,0.96); border: 2px solid rgba(255,255,255,0.18);
+        border-radius: 14px; padding: 20px 24px; text-align: center; min-width: 280px;
+        color: #e8e8e4; font-family: "Consolas", monospace;
+        box-sizing: border-box; max-height: 88vh; overflow-y: auto;
+        -webkit-overflow-scrolling: touch; touch-action: pan-y; overscroll-behavior: contain;
+      }
       #controls-menu.open { display: block; }
-      #pause.settings .panel > :not(#controls-menu) { display: none; }
+      #controls-menu button {
+        display: block; width: 100%; margin: 8px 0; padding: 12px 18px; cursor: pointer;
+        background: rgba(46,52,57,0.95); color: #e8e8e4; font: 600 15px "Consolas", monospace;
+        border: 2px solid rgba(255,255,255,0.22); border-radius: 9px; touch-action: manipulation;
+      }
+      #controls-menu button:hover, #controls-menu button:active {
+        background: rgba(240,180,41,0.75); color: #1a1c1e;
+      }
+      #controls-menu .hint { margin: 14px 0 0; font-size: 11px; line-height: 1.6; color: #9aa2a8; }
+      /* solange die Steuerung offen ist, tritt das Pausenfeld zurück */
+      #pause.settings .panel { display: none; }
       #controls-menu h2 { margin: 0 0 14px; font-size: 19px; letter-spacing: 3px; color: #f0b429; }
       #controls-menu .row {
         display: flex; align-items: center; gap: 8px; margin: 7px 0; text-align: left;

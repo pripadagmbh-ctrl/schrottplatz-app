@@ -97,6 +97,18 @@ export class Music {
   /** Alle fälligen Töne bis zum Vorausschau-Fenster einplanen. */
   private schedule(): void {
     if (!this.running) return;
+    // Solange der Ton schläft, steht die Uhr des AudioContext. Würden wir
+    // trotzdem planen, lägen nach dem Aufwachen alle Töne in der
+    // Vergangenheit und kämen als Knall auf einmal. Stattdessen mitziehen.
+    if (this.ctx.state !== "running") {
+      this.nextTime = this.ctx.currentTime + 0.1;
+      return;
+    }
+    // Nach einer Pause (Bildschirm aus, Tabwechsel) den Faden neu aufnehmen,
+    // statt die verpasste Zeit nachzuholen
+    if (this.nextTime < this.ctx.currentTime - 1) {
+      this.nextTime = this.ctx.currentTime + 0.05;
+    }
     while (this.nextTime < this.ctx.currentTime + SCHEDULE_AHEAD_S) {
       this.playBeat(this.nextTime);
       this.nextTime += BEAT_S;

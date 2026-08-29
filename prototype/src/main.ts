@@ -404,6 +404,7 @@ async function main(): Promise<void> {
       bus,
       saveNow: () => storeSave(buildSaveData()),
       touch,
+      audio,
       togglePause: () => setPaused(!paused),
       isPaused: () => paused,
       step: (n: number) => {

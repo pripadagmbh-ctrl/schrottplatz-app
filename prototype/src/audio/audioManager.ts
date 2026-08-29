@@ -20,8 +20,12 @@ export class AudioManager {
 
   constructor() {
     const start = () => this.ensureStarted();
-    window.addEventListener("pointerdown", start, { once: false });
-    window.addEventListener("keydown", start, { once: false });
+    // Mobile Browser geben den Ton erst nach einer echten Geste frei, und
+    // welches Ereignis dabei zählt, unterscheidet sich je nach System — daher
+    // auf alle üblichen hören.
+    for (const ev of ["pointerdown", "pointerup", "touchend", "click", "keydown"]) {
+      window.addEventListener(ev, start, { once: false, passive: true });
+    }
   }
 
   /** Musik an/aus. Liefert den neuen Zustand. */
@@ -38,9 +42,21 @@ export class AudioManager {
     return this.musicWanted;
   }
 
+  /** Zustandsbericht für Fehlersuche und Tests. */
+  get diagnostics(): { ctx: string; musicWanted: boolean; musicRunning: boolean } {
+    return {
+      ctx: this.ctx?.state ?? "keiner",
+      musicWanted: this.musicWanted,
+      musicRunning: this.music?.enabled ?? false,
+    };
+  }
+
   private ensureStarted(): void {
     if (this.ctx) {
-      if (this.ctx.state === "suspended") this.ctx.resume().catch(() => {});
+      // Auf dem Handy kann der Ton jederzeit wieder einschlafen (Anruf,
+      // Bildschirm aus, Tabwechsel) — bei jeder Geste erneut aufwecken.
+      if (this.ctx.state !== "running") this.ctx.resume().catch(() => {});
+      if (this.musicWanted) this.music?.start();
       return;
     }
     try {
