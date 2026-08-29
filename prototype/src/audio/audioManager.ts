@@ -10,6 +10,7 @@ export class AudioManager {
   private engineOsc: OscillatorNode | null = null;
   private engineGain: GainNode | null = null;
   private hydraulicGain: GainNode | null = null;
+  private hydOsc: OscillatorNode | null = null;
   private scrapeGain: GainNode | null = null;
 
   constructor() {
@@ -41,18 +42,25 @@ export class AudioManager {
       this.engineOsc.connect(engineFilter).connect(this.engineGain).connect(this.master);
       this.engineOsc.start();
 
-      // Hydraulikzischen: gefiltertes Rauschen, Gain folgt Achsbewegung
-      const noise = this.ctx.createBufferSource();
-      noise.buffer = this.noiseBuffer();
-      noise.loop = true;
+      // Hydraulik: kein Zischen mehr, sondern ein dezenter Pumpenton, der beim
+      // Bedienen mitläuft (Design-Wunsch 2026-08-29)
+      this.hydOsc = this.ctx.createOscillator();
+      this.hydOsc.type = "triangle";
+      this.hydOsc.frequency.value = 118;
       const hydFilter = this.ctx.createBiquadFilter();
-      hydFilter.type = "bandpass";
-      hydFilter.frequency.value = 1400;
-      hydFilter.Q.value = 0.8;
+      hydFilter.type = "lowpass";
+      hydFilter.frequency.value = 520;
       this.hydraulicGain = this.ctx.createGain();
       this.hydraulicGain.gain.value = 0;
-      noise.connect(hydFilter).connect(this.hydraulicGain).connect(this.master);
-      noise.start();
+      this.hydOsc.connect(hydFilter).connect(this.hydraulicGain).connect(this.master);
+      this.hydOsc.start();
+      // leichtes Pulsieren der Pumpe
+      const lfo = this.ctx.createOscillator();
+      lfo.frequency.value = 7.5;
+      const lfoGain = this.ctx.createGain();
+      lfoGain.gain.value = 5;
+      lfo.connect(lfoGain).connect(this.hydOsc.frequency);
+      lfo.start();
 
       // Kratzen auf Beton: helleres, raueres Rauschband — Gain folgt der Kontakt-Intensität
       const scrapeNoise = this.ctx.createBufferSource();
@@ -75,9 +83,14 @@ export class AudioManager {
   updateEngine(activity: number, load: number): void {
     if (!this.ctx || !this.engineOsc || !this.engineGain || !this.hydraulicGain) return;
     const t = this.ctx.currentTime;
-    this.engineOsc.frequency.setTargetAtTime(48 * (1 + 0.35 * activity + 0.15 * load), t, 0.15);
-    this.engineGain.gain.setTargetAtTime(0.045 + 0.035 * activity, t, 0.2);
-    this.hydraulicGain.gain.setTargetAtTime(0.09 * Math.min(activity * 1.5, 1), t, 0.08);
+    // Beim Bedienen geht der Motor spürbar hoch — das trägt das Feedback
+    this.engineOsc.frequency.setTargetAtTime(46 * (1 + 0.55 * activity + 0.22 * load), t, 0.12);
+    this.engineGain.gain.setTargetAtTime(0.05 + 0.085 * activity + 0.02 * load, t, 0.15);
+    // Hydraulikpumpe nur dezent darunter, Tonhöhe folgt der Last
+    if (this.hydOsc) {
+      this.hydOsc.frequency.setTargetAtTime(112 + 26 * activity + 14 * load, t, 0.1);
+    }
+    this.hydraulicGain.gain.setTargetAtTime(0.028 * Math.min(activity * 1.6, 1), t, 0.1);
   }
 
   /** Pro Frame: Kratz-Intensität 0..1 (Zackenspitzen schleifen über den Boden). */

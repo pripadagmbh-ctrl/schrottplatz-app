@@ -248,6 +248,10 @@ class GameContainer {
     return containerValue(getMaterial(this.cfg.fractionId), this.contentKg, this.contaminationKg);
   }
 
+  setLabelVisible(v: boolean): void {
+    this.label.sprite.visible = v;
+  }
+
   /** Nach dem Verkauf: Aggregat leeren (Items wurden bereits entfernt). */
   clearAfterSale(): void {
     this.itemIds.clear();
@@ -398,6 +402,11 @@ export class ContainerManager {
       over.refreshLabel(this.hoverAmpel);
     }
     return result;
+  }
+
+  /** Zonen-Schilder ein-/ausblenden (Taste M bzw. Touch-Knopf). */
+  setLabelsVisible(v: boolean): void {
+    for (const c of this.containers) c.setLabelVisible(v);
   }
 
   byId(id: string): GameContainer {

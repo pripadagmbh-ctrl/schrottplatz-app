@@ -97,7 +97,15 @@ export class Excavator {
   private stickMesh!: THREE.Mesh;
 
   /** Touch-Achsen (Tablet/Smartphone); null auf Desktop */
-  touch: { cab: number; stick: number; boom: number; rotator: number; drive: number; grab: boolean } | null = null;
+  touch: {
+    cab: number;
+    stick: number;
+    boom: number;
+    rotator: number;
+    drive: number;
+    steer: number;
+    grab: boolean;
+  } | null = null;
 
   /** von außen gesetzt (GripSystem): getragene Masse → Achsen werden träger */
   carriedMassKg = 0;
@@ -948,12 +956,18 @@ export class Excavator {
       this.rotatorYaw += input.wheelDelta * ROTATOR_STEP;
     }
     if (this.touch?.rotator) this.rotatorYaw += this.touch.rotator * ROTATOR_STEP * 0.25;
-    if (input.wasPressed("KeyX")) {
-      this.cabLiftTarget = this.cabLiftTarget > 0.1 ? 0 : CAB_LIFT_MAX;
-    }
-    if (input.wasPressed("KeyO")) {
-      this.outriggerTarget = this.outriggerTarget > 0.5 ? 0 : 1;
-    }
+    if (input.wasPressed("KeyX")) this.toggleCabLift();
+    if (input.wasPressed("KeyO")) this.toggleOutriggers();
+  }
+
+  /** Kabine hoch-/runterfahren (Taste X oder Touch-Knopf). */
+  toggleCabLift(): void {
+    this.cabLiftTarget = this.cabLiftTarget > 0.1 ? 0 : CAB_LIFT_MAX;
+  }
+
+  /** Abstützpratzen aus-/einfahren (Taste O oder Touch-Knopf). */
+  toggleOutriggers(): void {
+    this.outriggerTarget = this.outriggerTarget > 0.5 ? 0 : 1;
   }
 
   /** Aktuelle Kabinenhöhe (0 = unten) — fürs HUD. */
@@ -974,7 +988,7 @@ export class Excavator {
     // --- Fahrwerk ---
     const driveTarget = clamp1(input.axis("KeyS", "KeyW") + (this.touch?.drive ?? 0)) * DRIVE_MAX;
     this.driveVel = ramp(this.driveVel, driveTarget, (DRIVE_MAX / RAMP_TIME) * dt);
-    const steer = input.axis("KeyA", "KeyD");
+    const steer = clamp1(input.axis("KeyA", "KeyD") + (this.touch?.steer ?? 0));
     if (Math.abs(this.driveVel) > 0.05 || steer !== 0) {
       const dir = this.driveVel >= 0 ? 1 : -1;
       const speedFactor = THREE.MathUtils.clamp(Math.abs(this.driveVel) / DRIVE_MAX, 0.35, 1);

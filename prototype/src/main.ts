@@ -61,7 +61,7 @@ async function main(): Promise<void> {
   const bus = new EventBus();
   const physics = new PhysicsWorld();
   const input = new Input(renderer.domElement);
-  const touch = new TouchControls();
+  const touch = new TouchControls(renderer.domElement);
   const yard = new Yard(scene, physics.world);
   const items = new ItemManager(scene, physics.world);
   const containers = new ContainerManager(scene, physics.world, bus);
@@ -289,6 +289,7 @@ async function main(): Promise<void> {
   let accumulator = 0;
   let lastTime = performance.now();
   let frameCount = 0;
+  let labelsOn = true; // Zonen-Schilder sichtbar
 
   function frame(): void {
     const now = performance.now();
@@ -297,6 +298,14 @@ async function main(): Promise<void> {
 
     touch.update();
     excavator.touch = touch.active ? touch.axes : null;
+    if (touch.consumePress("KeyC")) orbit.touchViewPress = true;
+    if (touch.consumePress("KeyX")) excavator.toggleCabLift();
+    if (touch.consumePress("KeyO")) excavator.toggleOutriggers();
+    if (input.wasPressed("KeyM") || touch.consumePress("KeyM")) {
+      labelsOn = !labelsOn;
+      containers.setLabelsVisible(labelsOn);
+      hud.toast(labelsOn ? "Markierungen an" : "Markierungen aus");
+    }
     if (input.wasPressed("F3")) debug.toggle();
     if (input.wasPressed("KeyH")) {
       helpEl.style.display = helpEl.style.display === "none" ? "block" : "none";

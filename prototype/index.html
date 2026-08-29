@@ -25,12 +25,10 @@
       /* --- Touch-Steuerung (Tablet/Smartphone) --- */
       #touch { display: none; position: fixed; inset: 0; pointer-events: none; z-index: 5; }
       #touch .pad {
-        position: absolute; bottom: 18px; width: 140px; height: 140px; border-radius: 50%;
-        background: rgba(20,22,24,0.35); border: 2px solid rgba(255,255,255,0.25);
-        pointer-events: auto; touch-action: none;
+        position: absolute; right: 18px; bottom: 18px; width: 140px; height: 140px;
+        border-radius: 50%; background: rgba(20,22,24,0.35);
+        border: 2px solid rgba(255,255,255,0.25); pointer-events: auto; touch-action: none;
       }
-      #touch-left { left: 18px; }
-      #touch-right { right: 18px; }
       #touch .knob {
         position: absolute; left: 50%; top: 50%; width: 58px; height: 58px; margin: -29px 0 0 -29px;
         border-radius: 50%; background: rgba(240,180,41,0.75); pointer-events: none;
@@ -38,19 +36,35 @@
       #touch .btn {
         position: absolute; pointer-events: auto; touch-action: none; user-select: none;
         background: rgba(20,22,24,0.6); border: 2px solid rgba(255,255,255,0.28); color: #e8e8e4;
-        font: 600 13px/1 "Consolas", monospace; border-radius: 10px; padding: 12px 10px; text-align: center;
+        font: 600 12px/1 "Consolas", monospace; border-radius: 10px; padding: 11px 6px;
+        text-align: center;
       }
-      #touch .btn.down { background: rgba(240,180,41,0.6); color: #1a1c1e; }
+      #touch .btn.down { background: rgba(240,180,41,0.65); color: #1a1c1e; }
+      /* Greifen: großer Knopf links */
       #btn-grab {
-        right: 170px; bottom: 34px; width: 96px; height: 96px; border-radius: 50%;
-        line-height: 72px; padding: 0; font-size: 15px;
+        left: 20px; bottom: 128px; width: 104px; height: 104px; border-radius: 50%;
+        line-height: 80px; padding: 0; font-size: 15px;
       }
-      #btn-fwd { left: 172px; bottom: 96px; width: 62px; }
-      #btn-back { left: 172px; bottom: 34px; width: 62px; }
-      #btn-view { right: 18px; top: 60px; width: 74px; }
-      #btn-cab { right: 18px; top: 110px; width: 74px; }
-      #btn-press { right: 18px; top: 160px; width: 74px; }
-      #btn-pickup { right: 18px; top: 210px; width: 74px; }
+      /* Fahr-Fadenkreuz links unten */
+      #touch .cross { position: absolute; width: 46px; height: 42px; }
+      #btn-fwd { left: 66px; bottom: 92px; }
+      #btn-back { left: 66px; bottom: 6px; }
+      #btn-left { left: 16px; bottom: 49px; }
+      #btn-right { left: 116px; bottom: 49px; }
+      /* Stiel + Rotator rechts über dem Stick */
+      #btn-stick-out { right: 172px; bottom: 108px; width: 62px; }
+      #btn-stick-in { right: 172px; bottom: 52px; width: 62px; }
+      #btn-rot-l { right: 172px; bottom: 6px; width: 30px; padding: 11px 2px; }
+      #btn-rot-r { right: 204px; bottom: 6px; width: 30px; padding: 11px 2px; }
+      /* Funktionstasten rechts oben */
+      #touch .fn { right: 14px; width: 78px; }
+      #btn-view { top: 54px; }
+      #btn-cab { top: 100px; }
+      #btn-outrig { top: 146px; }
+      #btn-press { top: 192px; }
+      #btn-pickup { top: 238px; }
+      #btn-tilt { top: 284px; }
+      #btn-marks { top: 330px; }
     </style>
   </head>
   <body>
@@ -67,7 +81,7 @@
       C&nbsp;&nbsp;Ansicht: Orbit → Draufsicht → Kabine<br />
       X&nbsp;&nbsp;Kabine hoch/runter &nbsp;·&nbsp; O&nbsp;&nbsp;Stützen aus/ein<br />
       V&nbsp;&nbsp;Abholung rufen / abfahren &nbsp;·&nbsp; B&nbsp;&nbsp;Schere<br />
-      K&nbsp;&nbsp;Speichern<br />
+      M&nbsp;&nbsp;Markierungen an/aus &nbsp;·&nbsp; K&nbsp;&nbsp;Speichern<br />
       L&nbsp;&nbsp;Stand laden &nbsp;·&nbsp; N&nbsp;&nbsp;Neues Spiel
     </div>
     <div id="gripinfo" class="hud">Greifer: offen</div>
@@ -75,15 +89,23 @@
     <div id="toast" class="hud" style="top: 56px; left: 50%; transform: translateX(-50%); opacity: 0; transition: opacity 0.4s; color: #f0d060;"></div>
     <div id="debug" class="hud"></div>
     <div id="touch">
-      <div class="pad" id="touch-left"><div class="knob"></div></div>
-      <div class="pad" id="touch-right"><div class="knob"></div></div>
       <div class="btn" id="btn-grab">GREIFEN</div>
-      <div class="btn" id="btn-fwd">VOR</div>
-      <div class="btn" id="btn-back">ZURÜCK</div>
-      <div class="btn" id="btn-view">ANSICHT</div>
-      <div class="btn" id="btn-cab">KABINE</div>
-      <div class="btn" id="btn-press">SCHERE</div>
-      <div class="btn" id="btn-pickup">ABHOLEN</div>
+      <div class="btn cross" id="btn-fwd">▲</div>
+      <div class="btn cross" id="btn-back">▼</div>
+      <div class="btn cross" id="btn-left">◀</div>
+      <div class="btn cross" id="btn-right">▶</div>
+      <div class="pad" id="touch-right"><div class="knob"></div></div>
+      <div class="btn" id="btn-stick-out">STIEL ▲</div>
+      <div class="btn" id="btn-stick-in">STIEL ▼</div>
+      <div class="btn" id="btn-rot-l">⟲</div>
+      <div class="btn" id="btn-rot-r">⟳</div>
+      <div class="btn fn" id="btn-view">ANSICHT</div>
+      <div class="btn fn" id="btn-cab">KABINE</div>
+      <div class="btn fn" id="btn-outrig">STÜTZEN</div>
+      <div class="btn fn" id="btn-press">SCHERE</div>
+      <div class="btn fn" id="btn-pickup">ABHOLEN</div>
+      <div class="btn fn" id="btn-tilt">KIPPEN</div>
+      <div class="btn fn" id="btn-marks">SCHILDER</div>
     </div>
     <div id="loading">Lade Physik …</div>
     <script type="module" src="/src/main.ts"></script>

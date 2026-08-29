@@ -1,15 +1,17 @@
 /**
- * Touch-Steuerung für Tablet und Smartphone (Briefing Kap. 5.1, `[V1]`).
- * Zwei virtuelle Sticks im ISO-Baggerschema plus Aktionstasten:
- *   links  — X: Oberwagen drehen, Y: Stiel weg/ran
- *   rechts — X: Rotator, Y: Ausleger heben/senken
- * Die Achsen werden in dieselben Werte gespeist, die sonst die Tastatur liefert.
+ * Touch-Steuerung für Tablet und Smartphone (Briefing Kap. 5.1).
+ * Aufteilung (Design 2026-08-29):
+ *   links   — Greif-Taste und Fahr-Fadenkreuz (vor/zurück/links/rechts)
+ *   rechts  — Arbeitsstick: X dreht den Oberwagen, Y hebt/senkt den Ausleger
+ *             (Achse invertiert: hoch = senken), dazu Stiel- und Rotator-Tasten
+ *   Extras  — fester Fingerdruck auf die freie Fläche greift ebenfalls,
+ *             Doppeltipp wechselt die Ansicht, Kippsteuerung ersetzt das Fadenkreuz
  */
 export interface TouchAxes {
-  cab: number; // Oberwagen (-1..1)
+  cab: number;
   stick: number;
   boom: number;
-  rotator: number; // diskrete Rotator-Rasten pro Frame
+  rotator: number;
   drive: number;
   steer: number;
   grab: boolean;
@@ -22,10 +24,13 @@ interface StickState {
   dx: number;
   dy: number;
   knob: HTMLElement;
-  pad: HTMLElement;
 }
 
-const RADIUS = 62; // px Auslenkung bis Vollausschlag
+const RADIUS = 62; // px bis Vollausschlag
+/** Ab diesem Druck (0..1) gilt eine Berührung als „festes Drücken" = Greifen */
+const PRESSURE_GRAB = 0.55;
+/** Neigung in Grad, ab der die Kippsteuerung Vollausschlag gibt */
+const TILT_FULL = 22;
 
 export class TouchControls {
   readonly axes: TouchAxes = {
@@ -37,41 +42,52 @@ export class TouchControls {
     steer: 0,
     grab: false,
   };
-  /** true, sobald das Gerät als Touch-Gerät erkannt wurde */
   readonly active: boolean;
-  private left: StickState;
-  private right: StickState;
-  private buttons = new Map<string, HTMLElement>();
-  /** Tastendrücke, die diesen Frame ausgelöst wurden (Kamera, Presse …) */
+  /** true, sobald das Gerät echten Druck meldet — dann geht Greifen per Drücken */
+  pressureSupported = false;
+  private right: StickState | null = null;
   private pressed = new Set<string>();
+  private held = new Set<string>();
+  private pressureGrab = false;
+  private tiltEnabled = false;
+  private tiltDrive = 0;
+  private tiltSteer = 0;
+  private lastTap = 0;
 
-  constructor() {
+  constructor(canvas: HTMLElement) {
     this.active = matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0;
     const root = document.getElementById("touch");
-    if (!root) {
-      this.left = this.right = null as unknown as StickState;
-      return;
-    }
+    if (!root) return;
     if (!this.active) {
       root.style.display = "none";
-      this.left = this.right = null as unknown as StickState;
       return;
     }
     root.style.display = "block";
-
-    this.left = this.makeStick("touch-left");
     this.right = this.makeStick("touch-right");
-    for (const id of ["btn-grab", "btn-view", "btn-cab", "btn-press", "btn-pickup", "btn-fwd", "btn-back"]) {
-      const el = document.getElementById(id);
-      if (el) this.buttons.set(id, el);
-    }
-    this.bindButtons();
+    this.bindHold("btn-grab", "grab");
+    this.bindHold("btn-fwd", "fwd");
+    this.bindHold("btn-back", "back");
+    this.bindHold("btn-left", "left");
+    this.bindHold("btn-right", "right");
+    this.bindHold("btn-stick-out", "stickOut");
+    this.bindHold("btn-stick-in", "stickIn");
+    this.bindTap("btn-rot-l", "rotL");
+    this.bindTap("btn-rot-r", "rotR");
+    this.bindTap("btn-view", "KeyC");
+    this.bindTap("btn-cab", "KeyX");
+    this.bindTap("btn-outrig", "KeyO");
+    this.bindTap("btn-press", "KeyB");
+    this.bindTap("btn-pickup", "KeyV");
+    this.bindTap("btn-marks", "KeyM");
+    this.bindTilt();
+    this.bindCanvas(canvas);
   }
 
-  private makeStick(id: string): StickState {
-    const pad = document.getElementById(id)!;
+  private makeStick(id: string): StickState | null {
+    const pad = document.getElementById(id);
+    if (!pad) return null;
     const knob = pad.querySelector<HTMLElement>(".knob")!;
-    const st: StickState = { id: null, baseX: 0, baseY: 0, dx: 0, dy: 0, knob, pad };
+    const st: StickState = { id: null, baseX: 0, baseY: 0, dx: 0, dy: 0, knob };
     pad.addEventListener(
       "pointerdown",
       (e) => {
@@ -84,13 +100,17 @@ export class TouchControls {
       },
       { passive: false }
     );
-    const move = (e: PointerEvent): void => {
-      if (st.id !== e.pointerId) return;
-      st.dx = Math.max(-1, Math.min(1, (e.clientX - st.baseX) / RADIUS));
-      st.dy = Math.max(-1, Math.min(1, (e.clientY - st.baseY) / RADIUS));
-      knob.style.transform = `translate(${st.dx * RADIUS * 0.6}px, ${st.dy * RADIUS * 0.6}px)`;
-      e.preventDefault();
-    };
+    pad.addEventListener(
+      "pointermove",
+      (e) => {
+        if (st.id !== e.pointerId) return;
+        st.dx = Math.max(-1, Math.min(1, (e.clientX - st.baseX) / RADIUS));
+        st.dy = Math.max(-1, Math.min(1, (e.clientY - st.baseY) / RADIUS));
+        knob.style.transform = `translate(${st.dx * RADIUS * 0.6}px, ${st.dy * RADIUS * 0.6}px)`;
+        e.preventDefault();
+      },
+      { passive: false }
+    );
     const end = (e: PointerEvent): void => {
       if (st.id !== e.pointerId) return;
       st.id = null;
@@ -98,73 +118,134 @@ export class TouchControls {
       st.dy = 0;
       knob.style.transform = "translate(0,0)";
     };
-    pad.addEventListener("pointermove", move, { passive: false });
     pad.addEventListener("pointerup", end);
     pad.addEventListener("pointercancel", end);
     return st;
   }
 
-  private bindButtons(): void {
-    const hold = (id: string, on: () => void, off: () => void): void => {
-      const el = this.buttons.get(id);
-      if (!el) return;
-      el.addEventListener("pointerdown", (e) => {
-        on();
+  private bindHold(id: string, key: string): void {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener(
+      "pointerdown",
+      (e) => {
+        this.held.add(key);
         el.classList.add("down");
         e.preventDefault();
-      });
-      const up = (): void => {
-        off();
-        el.classList.remove("down");
-      };
-      el.addEventListener("pointerup", up);
-      el.addEventListener("pointercancel", up);
-      el.addEventListener("pointerleave", up);
+      },
+      { passive: false }
+    );
+    const up = (): void => {
+      this.held.delete(key);
+      el.classList.remove("down");
     };
-    hold(
-      "btn-grab",
-      () => (this.axes.grab = true),
-      () => (this.axes.grab = false)
-    );
-    hold(
-      "btn-fwd",
-      () => (this.axes.drive = 1),
-      () => (this.axes.drive = 0)
-    );
-    hold(
-      "btn-back",
-      () => (this.axes.drive = -1),
-      () => (this.axes.drive = 0)
-    );
-    const tap = (id: string, code: string): void => {
-      const el = this.buttons.get(id);
-      if (!el) return;
-      el.addEventListener("pointerdown", (e) => {
-        this.pressed.add(code);
-        e.preventDefault();
-      });
-    };
-    tap("btn-view", "KeyC");
-    tap("btn-cab", "KeyX");
-    tap("btn-press", "KeyB");
-    tap("btn-pickup", "KeyV");
+    el.addEventListener("pointerup", up);
+    el.addEventListener("pointercancel", up);
+    el.addEventListener("pointerleave", up);
   }
 
-  /** true, wenn die zugehörige Taste diesen Frame per Touch ausgelöst wurde. */
+  private bindTap(id: string, code: string): void {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener(
+      "pointerdown",
+      (e) => {
+        this.pressed.add(code);
+        el.classList.add("down");
+        window.setTimeout(() => el.classList.remove("down"), 120);
+        e.preventDefault();
+      },
+      { passive: false }
+    );
+  }
+
+  /** Kippsteuerung: Gerät neigen statt Fadenkreuz drücken. */
+  private bindTilt(): void {
+    const el = document.getElementById("btn-tilt");
+    if (!el) return;
+    el.addEventListener("pointerdown", async (e) => {
+      e.preventDefault();
+      if (this.tiltEnabled) {
+        this.tiltEnabled = false;
+        this.tiltDrive = 0;
+        this.tiltSteer = 0;
+        el.classList.remove("down");
+        return;
+      }
+      // iOS verlangt eine ausdrückliche Freigabe für Bewegungssensoren
+      type OrientCtor = { requestPermission?: () => Promise<string> };
+      const ctor = (window as unknown as { DeviceOrientationEvent?: OrientCtor })
+        .DeviceOrientationEvent;
+      if (ctor?.requestPermission) {
+        try {
+          if ((await ctor.requestPermission()) !== "granted") return;
+        } catch {
+          return;
+        }
+      }
+      this.tiltEnabled = true;
+      el.classList.add("down");
+    });
+    window.addEventListener("deviceorientation", (e) => {
+      if (!this.tiltEnabled) return;
+      // beta = vor/zurück kippen, gamma = seitlich kippen (Landscape-Halterung)
+      const beta = e.beta ?? 0;
+      const gamma = e.gamma ?? 0;
+      this.tiltDrive = Math.max(-1, Math.min(1, -(beta - 45) / TILT_FULL));
+      this.tiltSteer = Math.max(-1, Math.min(1, gamma / TILT_FULL));
+    });
+  }
+
+  /**
+   * Freie Fläche: fester Druck greift (sofern das Gerät Druck meldet),
+   * Doppeltipp wechselt die Ansicht.
+   */
+  private bindCanvas(canvas: HTMLElement): void {
+    const check = (e: PointerEvent): void => {
+      if (e.pointerType !== "touch") return;
+      // Geräte ohne Kraftsensor melden konstant 0 oder 0.5
+      if (e.pressure > 0 && e.pressure !== 0.5) this.pressureSupported = true;
+      this.pressureGrab = this.pressureSupported && e.pressure >= PRESSURE_GRAB;
+    };
+    canvas.addEventListener("pointerdown", (e) => {
+      check(e);
+      const now = performance.now();
+      if (now - this.lastTap < 320) {
+        this.pressed.add("KeyC"); // Doppeltipp → Ansicht wechseln
+        this.lastTap = 0;
+      } else {
+        this.lastTap = now;
+      }
+    });
+    canvas.addEventListener("pointermove", check);
+    const clear = (): void => {
+      this.pressureGrab = false;
+    };
+    canvas.addEventListener("pointerup", clear);
+    canvas.addEventListener("pointercancel", clear);
+  }
+
   consumePress(code: string): boolean {
     if (!this.pressed.has(code)) return false;
     this.pressed.delete(code);
     return true;
   }
 
-  /** Achsen aus der Stickstellung aktualisieren (einmal pro Frame). */
   update(): void {
-    if (!this.active || !this.left) return;
-    this.axes.cab = this.left.dx;
-    this.axes.stick = -this.left.dy; // hoch = Stiel weg
-    this.axes.boom = -this.right.dy; // hoch = Ausleger heben
-    this.axes.steer = 0;
-    // Rotator: seitlicher Ausschlag des rechten Sticks als langsame Drehung
-    this.axes.rotator = Math.abs(this.right.dx) > 0.4 ? Math.sign(this.right.dx) : 0;
+    if (!this.active) return;
+    const r = this.right;
+    this.axes.cab = r ? r.dx : 0;
+    // Ausleger-Achse invertiert: Stick nach vorn senkt den Ausleger
+    this.axes.boom = r ? r.dy : 0;
+    this.axes.stick =
+      (this.held.has("stickOut") ? 1 : 0) - (this.held.has("stickIn") ? 1 : 0);
+    this.axes.drive =
+      (this.held.has("fwd") ? 1 : 0) - (this.held.has("back") ? 1 : 0) + this.tiltDrive;
+    this.axes.steer =
+      (this.held.has("right") ? 1 : 0) - (this.held.has("left") ? 1 : 0) + this.tiltSteer;
+    this.axes.drive = Math.max(-1, Math.min(1, this.axes.drive));
+    this.axes.steer = Math.max(-1, Math.min(1, this.axes.steer));
+    this.axes.grab = this.held.has("grab") || this.pressureGrab;
+    this.axes.rotator = this.consumePress("rotL") ? -1 : this.consumePress("rotR") ? 1 : 0;
   }
 }
