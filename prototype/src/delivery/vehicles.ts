@@ -834,6 +834,12 @@ export class VehicleManager {
   private t = 0;
   /** Anlieferungs-Zähler (für Tests/Statistik) */
   deliveries = 0;
+  /**
+   * Während der Sortierphase macht die Einfahrt zu — es kommt kein Anlieferer
+   * mehr, bis der Platz wieder aufgeräumt ist. Abholer ruft der Spieler
+   * weiterhin selbst.
+   */
+  acceptDeliveries = true;
 
   /** Baggerposition für die Blockade-Prüfung; von main gesetzt. */
   getExcavatorPos: (() => THREE.Vector3) | null = null;
@@ -933,7 +939,7 @@ export class VehicleManager {
   update(dt: number): void {
     this.t += dt;
     if (!this.active) {
-      if (this.t >= this.nextSpawnT) this.spawnNow();
+      if (this.acceptDeliveries && this.t >= this.nextSpawnT) this.spawnNow();
       return;
     }
     this.active.update(dt);

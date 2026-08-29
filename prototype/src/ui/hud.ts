@@ -63,6 +63,14 @@ export class Hud {
     this.moneyEl.textContent = `Konto: ${this.displayedValue.toFixed(0)} € · Haufen ≈ ${pilesValue.toFixed(0)} €`;
   }
 
+  /** Phase des Tagesablaufs samt Fortschritt. */
+  updateShift(text: string, sortierphase: boolean): void {
+    const el = document.getElementById("shift");
+    if (!el) return;
+    el.textContent = text;
+    el.style.color = sortierphase ? "#7ec96a" : "#f0d060";
+  }
+
   /** Kurze Einblendung (Verkauf, Speichern, Anlieferung). */
   toast(msg: string): void {
     const el = document.getElementById("toast")!;

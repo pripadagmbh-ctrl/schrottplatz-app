@@ -27,6 +27,8 @@ export interface SaveData {
   schemaVersion: 1;
   savedAt: string;
   moneyEur: number;
+  /** Tagesablauf — fehlt in alten Ständen, dann beginnt die Annahme neu */
+  shift?: { phase: string; t: number; cycle: number; deliveries: number };
   items: SavedItem[];
   cars: SavedCar[];
   fencesBroken: boolean[];

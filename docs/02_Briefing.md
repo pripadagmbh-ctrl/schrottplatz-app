@@ -719,3 +719,67 @@ Annahme: 5–10 h/Woche, Umsetzung primär durch KI-Coding-Agent, du testest. Au
 | Fixed Joint | Physik-Verbindung, die zwei Körper starr aneinander koppelt (unser Greif-Mechanismus) |
 | Sleep (Physik) | Ruhende Körper werden von der Simulation ausgenommen, bis sie berührt werden — spart Rechenzeit |
 | AAB | Android App Bundle — das Dateiformat, das bei Google Play eingereicht wird |
+
+---
+
+## 25. Spielablauf und Wirtschaft (Fassung 29.08.2026)
+
+Diese Fassung ersetzt die frühere Annahme, der Spieler sortiere durchgehend
+mit. Der Rhythmus des Spiels entsteht stattdessen aus dem Wechsel von vollem
+Platz und befriedigendem Leerräumen.
+
+### 25.1 Der Zyklus
+
+1. **Annahme.** LKW kommen, werden bei Mario gewogen und kippen auf dem
+   Sammelplatz ab. Sortiert wird hier nicht — der Schrott darf fallen, wo er
+   fällt. Nach der Leerwiegung bekommt der Kunde sein Geld.
+2. **Feierabend an der Einfahrt.** Liegen rund 4,5 t lose auf dem Platz (oder
+   sind fünf Fuhren durch), macht die Einfahrt zu. Bis zu zehn Minuten Ruhe.
+3. **Sortieren.** Jetzt wird auf die Haufen und in die Boxen geworfen,
+   Mischschrott und Alu gehen in die Schere und werden gepresst.
+4. **Abholung.** Der Spieler ruft den Abhol-LKW und verlädt. Gepresste Pakete
+   passen deutlich besser hinein. Erst wenn der LKW abgefahren ist, gibt es
+   Geld — und zwar nach Sortenreinheit.
+5. Sinkt der lose Schrott unter etwa 1,2 t, öffnet die Einfahrt wieder.
+
+Die Buntmetallboxen (Alu, Kupfer, VA, Kabel) werden über zwei bis drei Zyklen
+gefüllt. Erst dann lohnt der eigene, kleinere Sortenrein-LKW.
+
+### 25.2 Upgrades
+
+Verdientes Geld fließt in den Platz. Das Be- und Entladen selbst muss den Spaß
+tragen; Upgrades sind das Sahnehäubchen, nicht der Antrieb.
+
+| Upgrade | Wirkung |
+| --- | --- |
+| Bulldozer | Lambert schiebt loses Material zusammen und kehrt den Platz |
+| Stapler | Lambert stapelt Karossen und räumt Kleinteile schneller |
+| Magnet | Stahl lässt sich sauber vom Rest trennen, höhere Reinheit |
+| Bagger-Ausbau | größere Spinne, schnellere Hydraulik, mehr Reichweite |
+| Zweite Box | mehr Fraktionen parallel sammeln |
+| Größere Presse | schwerere Pakete, mehr Ladung pro Abholung |
+
+### 25.3 Kundschaft
+
+Drei Gruppen, die sich im Auftreten und beim Verhandeln unterscheiden:
+
+- **Privatleute** — PKW mit Anhänger, kleine Mengen, kennen die Preise nicht.
+  Lassen sich drücken, nehmen es aber übel, wenn man es übertreibt.
+- **Gewerbekunden** — feste Pritschen, regelmäßig. Der Preis ist zweitrangig,
+  entscheidend ist, dass es reibungslos läuft: kurze Standzeit, keine
+  Wartezeit an der Waage. Sachlicher Ton.
+- **Schrotthändler** — ein Familienclan im Reisegewerbe, die Namen Boxbücher,
+  Schmitz, Hart, Zölzer und Prison. Kennen die Tagespreise genau, verhandeln
+  hart und lautstark, lassen sich nicht drücken. Gelegentlich ist ein Auto
+  dabei, das schnell weg soll — wer zugreift, verdient gut und geht ein
+  Risiko ein.
+
+Jede Gruppe bekommt eigene Sprachbausteine bei Ankunft, Verhandlung und
+Abfahrt. Der Ton macht die Persönlichkeit, nicht der Umfang des Textes.
+
+### 25.4 MVP für den Store
+
+Für die erste Fassung im Play Store reicht: der Zyklus aus 25.1, drei bis vier
+Upgrades, die drei Kundengruppen mit Textsprüchen (noch ohne Sprachausgabe),
+Speichern, Pausenmenü und eine geführte erste Viertelstunde. Alles Weitere ist
+Nachschub für spätere Fassungen.

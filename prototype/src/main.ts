@@ -18,6 +18,7 @@ import { FenceManager } from "./world/fence";
 import { VehicleManager } from "./delivery/vehicles";
 import { PressManager } from "./world/press";
 import { randomCargo } from "./world/scrapItems";
+import { Shift } from "./economy/shift";
 import { Account } from "./economy/account";
 import { getMaterial } from "./materials/catalog";
 import { StaffManager } from "./world/people";
@@ -134,6 +135,7 @@ async function main(): Promise<void> {
     schemaVersion: 1,
     savedAt: new Date().toISOString(),
     moneyEur: account.moneyEur,
+    shift: shift.toJSON(),
     items: items.items
       .filter((i) => i.shape)
       .map((i) => {
@@ -159,6 +161,27 @@ async function main(): Promise<void> {
   const particles = new Particles(scene);
 
   // --- Pausenmenü ---
+  // Tagesablauf: Annahme → Sortieren → Annahme (Briefing Kap. 21)
+  const shift = new Shift();
+  shift.load(save?.shift);
+  let looseKg = 0;
+  let looseTimer = 0;
+  /**
+   * Lose auf dem Platz liegender Schrott. Alles, was nicht in einer Box liegt
+   * und am Boden ist, zählt — das ist die Arbeit, die noch vor dem Spieler
+   * liegt. Die Summe ändert sich träge, daher reicht viermal pro Sekunde.
+   */
+  const measureLoose = (): number => {
+    let kg = 0;
+    for (const it of items.items) {
+      if (it.containerId) continue;
+      if (!it.body.isValid() || !it.body.isDynamic()) continue;
+      if (it.body.translation().y > 2.5) continue; // noch auf einer Ladefläche
+      kg += it.massKg;
+    }
+    return kg;
+  };
+
   const pauseEl = document.getElementById("pause")!;
   let paused = false;
   const setPaused = (v: boolean): void => {
@@ -233,6 +256,7 @@ async function main(): Promise<void> {
   vehicles.onWeighIn = (kg) => hud.toast(`Waage: ${kg.toFixed(0)} kg brutto — bitte abladen.`);
   vehicles.onWeighOut = (netKg) => {
     const paid = account.payDelivery(netKg);
+    shift.deliveriesThisShift++;
     audio.playSale();
     hud.toast(`Waage: ${netKg.toFixed(0)} kg netto · Kunde erhält ${paid.toFixed(0)} €`);
   };
@@ -418,6 +442,20 @@ async function main(): Promise<void> {
         hud.showClosedEmpty();
       }
     }
+    looseTimer += frameDt;
+    if (looseTimer > 0.25) {
+      looseKg = measureLoose();
+      looseTimer = 0;
+    }
+    shift.update(frameDt, looseKg);
+    vehicles.acceptDeliveries = shift.acceptsDeliveries;
+    const wechsel = shift.consumeChange();
+    if (wechsel === "sortieren") {
+      hud.toast("Feierabend an der Einfahrt — jetzt sortieren, pressen, abholen lassen (V)");
+    } else if (wechsel === "annahme") {
+      hud.toast(`Platz ist frei — die Einfahrt macht wieder auf (Zyklus ${shift.cycle + 1})`);
+    }
+    hud.updateShift(shift.statusText(looseKg), shift.phase === "sortieren");
     hud.updateMoney(account.moneyEur, containers.totalValue());
     audio.updateEngine(excavator.activity, Math.min(grip.totalMassKg / 2000, 1));
 
