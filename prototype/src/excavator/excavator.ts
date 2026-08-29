@@ -23,6 +23,12 @@ const CLAW_SEG_LEN = 0.26;
 const CLAW_SEG_BEND = 0.22; // Krümmung je Segment nach innen (rad)
 const CLAW_SEGMENTS = 6;
 const CLAW_COUNT = 5;
+/**
+ * Spreizung der ganz offenen Spinne (rad). Das Datenblatt nennt 2225 mm
+ * Öffnungsweite (entspräche 0,8) — zum Spielen ist das zu eng, der Greifer
+ * soll weit aufreißen und ordentlich Volumen fassen.
+ */
+const CLAW_OPEN_SPLAY = 1.25;
 const UP_Y = new THREE.Vector3(0, 1, 0);
 
 /**
@@ -1168,9 +1174,25 @@ export class Excavator {
    * gleichzeitiger Dreh-/Fahrbewegung liefert die Kratz-Intensität für
    * Sound + Staub/Funken.
    */
+  /**
+   * Aktuelle Spreizung der Schalen. Geschlossen legen sie sich zur Kalotte
+   * zusammen — es sei denn, es liegt Material darin: dann bleibt die Spinne
+   * so weit offen, wie die Ladung Platz braucht.
+   */
+  private currentSplay(): number {
+    const minSplay = Math.min(
+      0.5,
+      this.carriedCount * 0.06 + Math.min(this.carriedMassKg / 2000, 1) * 0.28
+    );
+    return THREE.MathUtils.lerp(CLAW_OPEN_SPLAY, minSplay, this.closure);
+  }
+
+  private groundTmp = new THREE.Vector3();
+
   private resolveGroundClamp(): void {
-    // Spitzentiefe unter dem Greifer-Ursprung: offen 2,12 m, geschlossen 2,31 m (gemessen)
-    const tipDepth = THREE.MathUtils.lerp(2.12, 2.31, this.closure);
+    // Spitzentiefe direkt aus der Krallengeometrie — so bleibt der Bodenanschlag
+    // richtig, auch wenn sich Form oder Öffnungswinkel ändern.
+    const tipDepth = -clawPoint(0, this.currentSplay(), CLAW_SEGMENTS, this.groundTmp).y;
     const minTipY = tipDepth + 0.02;
     const tipY = () =>
       BOOM_PIVOT.y +
@@ -1248,11 +1270,7 @@ export class Excavator {
     // Zacken: offen weit gespreizt. Geschlossen fügen sich die Schalen zur
     // dichten Kalotte — es sei denn, es liegt Material darin: dann bleibt die
     // Spinne so weit offen, wie die Ladung Platz braucht.
-    const minSplay = Math.min(
-      0.5,
-      this.carriedCount * 0.06 + Math.min(this.carriedMassKg / 2000, 1) * 0.28
-    );
-    const splay = THREE.MathUtils.lerp(0.8, minSplay, this.closure);
+    const splay = this.currentSplay();
     for (const pivot of this.fingerPivots) {
       pivot.rotation.x = -splay;
     }
