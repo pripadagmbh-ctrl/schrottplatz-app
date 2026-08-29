@@ -1,8 +1,8 @@
 /**
  * Touch-Steuerung für Tablet und Smartphone (Briefing Kap. 5.1).
  * Aufteilung (Design 2026-08-29):
- *   linker Stick   — X: Oberwagen drehen, Y: Stiel heran/weg
- *   rechter Stick  — X: Spinne öffnen/schließen, Y: Ausleger heben/senken
+ *   linker Stick   — X: Oberwagen drehen, Y: Hauptarm heben/senken
+ *   rechter Stick  — X: Spinne öffnen/schließen, Y: Ausleger heran/weg
  *   ↺ / ↻          — Spinne links bzw. rechts drehen (Rotator)
  *   Fadenkreuz     — nur Fahren: vor/zurück und links/rechts lenken (simultan)
  *   Greifen        — über den rechten Stick (oder festen Fingerdruck)
@@ -273,15 +273,15 @@ export class TouchControls {
     if (!this.active) return;
     const l = this.left;
     const r = this.right;
-    // Linker Stick: Oberwagen drehen und Stiel (Y-Achse umgekehrt)
+    // Linker Stick: Oberwagen drehen (X) und Hauptarm heben/senken (Y)
     this.axes.cab = l ? l.dx : 0;
-    this.axes.stick = l ? l.dy : 0;
-    // Rechter Stick: Spinne öffnen/schließen (X) und Ausleger (Y).
+    this.axes.boom = l ? l.dy : 0;
+    // Rechter Stick: Spinne öffnen/schließen (X) und Ausleger heran/weg (Y).
     // Der Wert bleibt stufenlos — je weiter der Ausschlag, desto schneller
     // schließt bzw. öffnet die Spinne.
     const gx = r ? r.dx : 0;
     this.axes.grapple = Math.abs(gx) > 0.16 ? gx : 0;
-    this.axes.boom = r ? r.dy : 0;
+    this.axes.stick = r ? r.dy : 0;
     // Rotator liegt auf den beiden Drehtasten
     this.axes.rotator =
       (this.held.has("rotR") ? 1 : 0) - (this.held.has("rotL") ? 1 : 0);
