@@ -105,7 +105,10 @@ export class Excavator {
     drive: number;
     steer: number;
     grab: boolean;
+    grapple: number;
   } | null = null;
+  /** gemerkter Spinnen-Zustand für die Stick-Steuerung (Stick neutral = halten) */
+  private grappleHold = false;
 
   /** von außen gesetzt (GripSystem): getragene Masse → Achsen werden träger */
   carriedMassKg = 0;
@@ -955,7 +958,7 @@ export class Excavator {
     if (!input.shiftHeld && input.wheelDelta !== 0) {
       this.rotatorYaw += input.wheelDelta * ROTATOR_STEP;
     }
-    if (this.touch?.rotator) this.rotatorYaw += this.touch.rotator * ROTATOR_STEP * 0.12;
+    
     if (input.wasPressed("KeyX")) this.toggleCabLift();
     if (input.wasPressed("KeyO")) this.toggleOutriggers();
   }
@@ -1002,6 +1005,7 @@ export class Excavator {
     // ↑/↓ Stiel, Bild↑/Bild↓ Ausleger
     // Tastatur + Touch-Sticks auf dieselben Achsen
     const t = this.touch;
+    if (t?.rotator) this.rotatorYaw += t.rotator * ROTATOR_STEP * 0.06; // Dauerdrehung, ~54°/s
     this.inCab = clamp1(axis2(input, "KeyE", "KeyQ", "ArrowRight", "ArrowLeft") + (t?.cab ?? 0));
     this.inBoom = clamp1(axis2(input, "KeyF", "KeyR", "PageDown", "PageUp") + (t?.boom ?? 0));
     this.inStick = clamp1(axis2(input, "KeyG", "KeyT", "ArrowDown", "ArrowUp") + (t?.stick ?? 0));
@@ -1022,7 +1026,13 @@ export class Excavator {
     );
 
     // --- Spinne ---
-    this.closing = input.mouseHeld(0) || input.isDown("Space") || (this.touch?.grab ?? false);
+    // Spinne: Tastatur/Knopf drücken hält sie zu. Der rechte Touch-Stick
+    // schaltet dagegen um — bei neutralem Stick bleibt der Zustand erhalten.
+    const cmd = this.touch?.grapple ?? 0;
+    if (cmd > 0) this.grappleHold = true;
+    else if (cmd < 0) this.grappleHold = false;
+    this.closing =
+      input.mouseHeld(0) || input.isDown("Space") || (this.touch?.grab ?? false) || this.grappleHold;
     const closeRate = this.closing ? dt / CLOSE_TIME : -dt / OPEN_TIME;
     this.closure = THREE.MathUtils.clamp(this.closure + closeRate, 0, 1);
 

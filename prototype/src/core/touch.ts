@@ -2,7 +2,8 @@
  * Touch-Steuerung für Tablet und Smartphone (Briefing Kap. 5.1).
  * Aufteilung (Design 2026-08-29):
  *   linker Stick   — X: Oberwagen drehen, Y: Stiel heran/weg
- *   rechter Stick  — X: Rotator, Y: Ausleger heben/senken
+ *   rechter Stick  — X: Spinne öffnen/schließen, Y: Ausleger heben/senken
+ *   ↺ / ↻          — Spinne links bzw. rechts drehen (Rotator)
  *   Fadenkreuz     — nur Fahren: vor/zurück und links/rechts lenken (simultan)
  *   Greifen        — großer Knopf links, zusätzlich per festem Fingerdruck
  *   Extras         — Doppeltipp wechselt die Ansicht, Kippen ersetzt das Fadenkreuz
@@ -15,6 +16,8 @@ export interface TouchAxes {
   drive: number;
   steer: number;
   grab: boolean;
+  /** Spinnen-Befehl vom rechten Stick: 1 = schließen, -1 = öffnen, 0 = halten */
+  grapple: number;
 }
 
 interface StickState {
@@ -41,6 +44,7 @@ export class TouchControls {
     drive: 0,
     steer: 0,
     grab: false,
+    grapple: 0,
   };
   readonly active: boolean;
   /** true, sobald das Gerät echten Druck meldet — dann geht Greifen per Drücken */
@@ -71,6 +75,8 @@ export class TouchControls {
     this.bindHold("btn-back", "back");
     this.bindHold("btn-left", "left");
     this.bindHold("btn-right", "right");
+    this.bindHold("btn-rot-l", "rotL");
+    this.bindHold("btn-rot-r", "rotR");
     this.bindTap("btn-view", "KeyC");
     this.bindTap("btn-cab", "KeyX");
     this.bindTap("btn-outrig", "KeyO");
@@ -270,9 +276,13 @@ export class TouchControls {
     // Linker Stick: Oberwagen drehen und Stiel (Y-Achse umgekehrt)
     this.axes.cab = l ? l.dx : 0;
     this.axes.stick = l ? l.dy : 0;
-    // Rechter Stick: Rotator und Ausleger (nach vorn = senken)
-    this.axes.rotator = r && Math.abs(r.dx) > 0.25 ? r.dx : 0;
+    // Rechter Stick: Spinne öffnen/schließen (X) und Ausleger (Y)
+    const gx = r ? r.dx : 0;
+    this.axes.grapple = gx > 0.25 ? 1 : gx < -0.25 ? -1 : 0;
     this.axes.boom = r ? r.dy : 0;
+    // Rotator liegt auf den beiden Drehtasten
+    this.axes.rotator =
+      (this.held.has("rotR") ? 1 : 0) - (this.held.has("rotL") ? 1 : 0);
     this.axes.drive =
       (this.held.has("fwd") ? 1 : 0) - (this.held.has("back") ? 1 : 0) + this.tiltDrive;
     this.axes.steer =
