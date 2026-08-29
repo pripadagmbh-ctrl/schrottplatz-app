@@ -412,8 +412,8 @@ export class StaffManager {
       return;
     }
 
-    // Patrouille: alle paar Sekunden nach einem verirrten Kleinteil suchen
-    if (this.stateT > 4) {
+    // Patrouille: regelmäßig nach einem verirrten Kleinteil sehen
+    if (this.stateT > 1.5) {
       this.stateT = 0;
       const stray = this.findStray();
       if (stray) {
@@ -429,7 +429,7 @@ export class StaffManager {
   }
 
   /** Sicherheitsabstand zum schwenkenden Ausleger (SW) */
-  private static readonly EXCAVATOR_KEEPOUT = 11;
+  private static readonly EXCAVATOR_KEEPOUT = 8;
   private avoidTmp = new THREE.Vector3();
 
   /**
@@ -461,11 +461,13 @@ export class StaffManager {
     for (const it of this.items.items) {
       // Lambert kümmert sich nur um kleine Buntmetalle & Co. — Stahlschrott
       // ist Sache des Baggers
-      if (it.containerId || it.massKg > 25 || it.materialId === "steel") continue;
+      // Kleinteile und Buntmetalle sind seine Aufgabe — schwerer Stahlschrott
+      // bleibt beim Bagger
+      if (it.containerId || it.massKg > 60 || it.materialId === "steel") continue;
       if (!it.body.isValid() || !it.body.isDynamic()) continue;
       const p = it.body.translation();
       if (p.y > 1.2) continue;
-      if (Math.abs(p.x) > 16 || p.z < -6 || p.z > 16) continue;
+      if (Math.abs(p.x) > 22 || p.z < -10 || p.z > 22) continue;
       // niemals im Schwenkbereich des Auslegers arbeiten
       if (ex && Math.hypot(p.x - ex.x, p.z - ex.z) < StaffManager.EXCAVATOR_KEEPOUT) continue;
       return it;

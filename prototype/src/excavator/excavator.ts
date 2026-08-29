@@ -14,6 +14,33 @@ const BOOM_LEN = 5.2;
 const STICK_LEN = 4.0;
 const BOOM_PIVOT = new THREE.Vector3(0, 2.55, 0.55); // relativ zum Chassis-Ursprung (Boden)
 const GRAPPLE_LINK = 0.55; // Abstand Stielspitze → Palm-Oberkante
+
+// Geometrie der Spinne — Mesh UND Kollider leiten sich davon ab, damit die
+// Krallen physisch dort sind, wo man sie sieht.
+const CLAW_RING_R = 0.757; // Gelenkkreis = ØC/2 laut Datenblatt (1514 mm)
+const CLAW_RING_Y = -0.9; // Unterkante Traverse ab Kardangelenk
+const CLAW_SEG_LEN = 0.26;
+const CLAW_SEG_BEND = 0.22; // Krümmung je Segment nach innen (rad)
+const CLAW_SEGMENTS = 6;
+const CLAW_COUNT = 5;
+const UP_Y = new THREE.Vector3(0, 1, 0);
+
+/**
+ * Punkt auf einer Kralle nach `k` Segmenten, im Frame der Spinne.
+ * `splay` ist der Öffnungswinkel (0 = zu, 1.0 = ganz offen), `a` der
+ * Umfangswinkel der Kralle.
+ */
+function clawPoint(a: number, splay: number, k: number, out: THREE.Vector3): THREE.Vector3 {
+  let y = 0;
+  let z = 0;
+  for (let i = 0; i < k; i++) {
+    const th = -splay + i * CLAW_SEG_BEND;
+    y -= CLAW_SEG_LEN * Math.cos(th);
+    z -= CLAW_SEG_LEN * Math.sin(th);
+  }
+  const r = CLAW_RING_R + z;
+  return out.set(Math.sin(a) * r, CLAW_RING_Y + y, Math.cos(a) * r);
+}
 const PALM_TO_SENSOR = 1.15; // Palm-Zentrum → Sensor im Schalenvolumen
 
 // Achsgrenzen (SW)
@@ -89,6 +116,12 @@ export class Excavator {
   // Physik
   chassisBody!: RAPIER.RigidBody;
   grappleBody!: RAPIER.RigidBody;
+  private clawColliders: RAPIER.Collider[] = [];
+  private clawA = new THREE.Vector3();
+  private clawB = new THREE.Vector3();
+  private clawMid = new THREE.Vector3();
+  private clawDir = new THREE.Vector3();
+  private clawQuat = new THREE.Quaternion();
   /** Ausleger und Stiel bekommen eigene Kollider, damit der Kran nicht
    *  durch Schrott oder LKW hindurchtaucht (Design-Fix 2026-08-29) */
   private boomBody!: RAPIER.RigidBody;
@@ -392,16 +425,19 @@ export class Excavator {
     // Maße nach Datenblatt MG4.1-800-HO5 (800 l): Öffnungsweite d = 2225 mm,
     // Schalenkreis ØD = 2409 mm, Zylinderkreis ØC = 1514 mm, Gesamthöhe
     // A = 2363 mm. Alle Werte hier in Metern.
-    const RING_R = 0.42; // Gelenkkreis der Schalen
-    const CYL_R = 0.3; // Zylinderkreis (ØC/2 abzüglich Gehäuse)
-    const ringY = -0.9; // Unterkante Traverse ab Kardangelenk
-    const SEG_LEN = 0.24;
-    const SEG_BEND = 0.155; // Krümmung je Segment nach innen (rad)
+    // Gelenkkreis = ØC/2 aus dem Datenblatt (1514 mm). Segmentlänge und
+    // Krümmung sind so gewählt, dass die Spitzen bei geschlossener Spinne
+    // exakt in der Mitte zusammenkommen — vorher liefen sie übereinander.
+    const RING_R = CLAW_RING_R;
+    const CYL_R = 0.42; // Anlenkkreis der Zylinder am Gehäuse
+    const ringY = CLAW_RING_Y;
+    const SEG_LEN = CLAW_SEG_LEN;
+    const SEG_BEND = CLAW_SEG_BEND;
     const SEGMENTS = 6;
-    const segWidth = [0.34, 0.31, 0.28, 0.24, 0.19, 0.13];
-    const segThick = [0.14, 0.13, 0.12, 0.105, 0.095, 0.08];
+    const segWidth = [0.4, 0.37, 0.33, 0.28, 0.22, 0.15];
+    const segThick = [0.16, 0.15, 0.135, 0.12, 0.105, 0.085];
 
-    const rotator = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.34, 0.46), edgeMat);
+    const rotator = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.36, 0.5), edgeMat);
     rotator.position.y = -0.48;
     rotator.castShadow = true;
     this.grappleGroup.add(rotator);
@@ -410,12 +446,12 @@ export class Excavator {
     this.grappleGroup.add(rotatorCap);
 
     // Traverse: Stahlgussblock, nach unten verjüngt
-    const traverse = new THREE.Mesh(new THREE.CylinderGeometry(0.56, 0.38, 0.38, 5), shellMat);
+    const traverse = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.5, 0.4, 5), shellMat);
     traverse.position.y = -0.75;
     traverse.rotation.y = Math.PI / 5;
     traverse.castShadow = true;
     this.grappleGroup.add(traverse);
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(RING_R, 0.068, 8, 20), edgeMat);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(RING_R, 0.075, 8, 22), edgeMat);
     ring.rotation.x = Math.PI / 2;
     ring.position.y = ringY;
     this.grappleGroup.add(ring);
@@ -483,7 +519,7 @@ export class Excavator {
       this.grappleGroup.add(rod);
       this.grappleCylinders.push({
         pivot,
-        fromLocal: new THREE.Vector3(Math.sin(a) * CYL_R * 0.6, -0.56, Math.cos(a) * CYL_R * 0.6),
+        fromLocal: new THREE.Vector3(Math.sin(a) * CYL_R, -0.56, Math.cos(a) * CYL_R),
         toLocalOnShell: new THREE.Vector3(0, -0.3, 0.19),
         barrel,
         rod,
@@ -944,11 +980,44 @@ export class Excavator {
     this.grappleBody = world.createRigidBody(
       RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(0, 5, 0)
     );
-    // Palm-Kollider: schiebt Teile weg; Finger sind visuell (M0-Vereinfachung, Briefing 6.1)
     world.createCollider(
       RAPIER.ColliderDesc.cylinder(0.22, 0.5).setTranslation(0, -GRAPPLE_LINK - 0.2, 0),
       this.grappleBody
     );
+    // Die Krallen bekommen eigene Kollider — je zwei Kapseln bilden die Sichel
+    // grob nach. Ohne sie fuhr die Spinne sichtbar durch Schrottteile hindurch.
+    for (let i = 0; i < CLAW_COUNT * 2; i++) {
+      this.clawColliders.push(
+        world.createCollider(RAPIER.ColliderDesc.capsule(0.16, 0.1), this.grappleBody)
+      );
+    }
+  }
+
+  /**
+   * Krallen-Kollider der aktuellen Öffnung nachführen. Beim Tragen werden sie
+   * abgeschaltet: die Last hängt am Gelenk und würde sonst herausgequetscht.
+   */
+  private updateClawColliders(splay: number): void {
+    const carrying = this.carriedCount > 0;
+    for (let c = 0; c < CLAW_COUNT; c++) {
+      const a = (c / CLAW_COUNT) * Math.PI * 2;
+      for (let h = 0; h < 2; h++) {
+        const col = this.clawColliders[c * 2 + h];
+        col.setEnabled(!carrying);
+        if (carrying) continue;
+        clawPoint(a, splay, h * (CLAW_SEGMENTS / 2), this.clawA);
+        clawPoint(a, splay, (h + 1) * (CLAW_SEGMENTS / 2), this.clawB);
+        this.clawMid.addVectors(this.clawA, this.clawB).multiplyScalar(0.5);
+        this.clawDir.subVectors(this.clawB, this.clawA);
+        const len = this.clawDir.length();
+        if (len < 1e-4) continue;
+        this.clawDir.divideScalar(len);
+        this.clawQuat.setFromUnitVectors(UP_Y, this.clawDir);
+        col.setHalfHeight(Math.max(len / 2 - 0.1, 0.03));
+        col.setTranslationWrtParent(this.clawMid);
+        col.setRotationWrtParent(this.clawQuat);
+      }
+    }
   }
 
   // ---------- Simulation ----------
@@ -1183,10 +1252,11 @@ export class Excavator {
       0.5,
       this.carriedCount * 0.06 + Math.min(this.carriedMassKg / 2000, 1) * 0.28
     );
-    const splay = THREE.MathUtils.lerp(1.0, minSplay, this.closure);
+    const splay = THREE.MathUtils.lerp(0.8, minSplay, this.closure);
     for (const pivot of this.fingerPivots) {
       pivot.rotation.x = -splay;
     }
+    this.updateClawColliders(splay);
 
     this.updateHydraulics();
 

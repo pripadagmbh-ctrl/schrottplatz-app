@@ -420,7 +420,11 @@ class DeliveryVehicle {
       placed.push(fin);
       const local = new THREE.Vector3(fin.x, fin.y, fin.z);
       this.bedGroup.localToWorld(local);
-      this.cargo.items.push(items.spawnScrap(s.materialId, s.massKg, s.shape, local, bedQuat));
+      const it = items.spawnScrap(s.materialId, s.massKg, s.shape, local, bedQuat);
+      // Das Setzen soll niemand sehen: erst wenn die Ladung ruhig liegt,
+      // taucht der LKW fertig beladen auf.
+      it.mesh.visible = false;
+      this.cargo.items.push(it);
     });
   }
 
@@ -508,7 +512,10 @@ class DeliveryVehicle {
   /** Nach dem Setzen: alles für die Fahrt an die Mulde koppeln. */
   private lockAllCargo(): void {
     if (this.cargo.car) this.lockToBed(this.cargo.car.body);
-    for (const it of this.cargo.items) this.lockToBed(it.body);
+    for (const it of this.cargo.items) {
+      this.lockToBed(it.body);
+      it.mesh.visible = true; // jetzt liegt sie sauber — ab hier sichtbar
+    }
   }
 
   private lockToBed(body: RAPIER.RigidBody): void {
@@ -694,12 +701,11 @@ class DeliveryVehicle {
         // Pritschen klappen die Bordwände auf — der Schrott darf herunter.
         // Kipper braucht das nicht (er kippt), der Container bleibt zu.
         if (this.kind === "pritsche" || this.kind === "wrack") this.sideOpenTarget = 1;
-        if (this.kind !== "kipper" && !this.isPickup) this.releaseCargo(); // Pritsche: Ladung liegt frei
-        if (this.phaseT > 1) {
+        if (!this.isPickup) this.releaseCargo();
+        if (this.phaseT > 1.8) {
           this.phase = this.isPickup ? "waitLoad" : this.kind === "kipper" ? "tipping" : "waitUnload";
           this.phaseT = 0;
           this.routeS = 0;
-          if (this.kind === "kipper") this.releaseCargo(); // ab jetzt rutscht sie
         }
         break;
       case "waitLoad":
@@ -712,7 +718,7 @@ class DeliveryVehicle {
         }
         break;
       case "tipping":
-        this.tip = Math.min(this.tip + dt / 2.5, 1);
+        this.tip = Math.min(this.tip + dt / 4.5, 1);
         if (this.tip >= 1) {
           this.phase = "tipHold";
           this.phaseT = 0;
