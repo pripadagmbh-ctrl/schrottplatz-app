@@ -105,29 +105,96 @@ export class AudioManager {
     this.noiseBurst(500, 0.08, 0.25);
   }
 
-  /** Abwurfklang je Material (Teil der Materialerkennung, Kap. 15). */
+  /**
+   * Abwurfklang je Material (Kap. 15). Metall klingt nicht harmonisch wie ein
+   * Instrument, sondern über INHARMONISCHE Teiltöne mit unterschiedlich langem
+   * Abklingen — genau das bildet metalHit nach. Dazu ein kurzer Aufprall-
+   * Transient, der Masse und Härte vermittelt.
+   */
   playDrop(materialId: string): void {
     switch (materialId) {
       case "steel":
-        this.burst([180, 241, 322], 0.4, 0.3);
-        this.noiseBurst(3000, 0.05, 0.15);
+        // schwerer Stahl: tiefer Anschlag, langes metallisches Nachklingen
+        this.metalHit([214, 331, 487, 712, 1043], [0.9, 0.7, 0.5, 0.34, 0.22], 0.26, {
+          transient: 1600,
+          transientGain: 0.3,
+          spread: 0.05,
+        });
         break;
-      case "cast":
-        this.burst([88, 132], 0.5, 0.4, "triangle");
+      case "va":
+        // Edelstahl: heller und klarer, klingt am längsten nach
+        this.metalHit([392, 611, 913, 1327, 1904], [1.25, 0.95, 0.7, 0.45, 0.3], 0.2, {
+          transient: 3400,
+          transientGain: 0.2,
+          spread: 0.03,
+        });
         break;
       case "alu":
-        this.burst([395, 528], 0.22, 0.25);
+        // Aluminium: leicht, hell, kurzer Nachhall
+        this.metalHit([523, 807, 1188, 1673], [0.5, 0.36, 0.24, 0.16], 0.19, {
+          transient: 4200,
+          transientGain: 0.22,
+          spread: 0.04,
+        });
         break;
       case "copper":
-        this.burst([648, 872, 1160], 0.3, 0.22);
+        // Kupfer/Messing: weicher, dunkler Klang mit tragendem Sustain
+        this.metalHit([297, 449, 668, 951], [1.0, 0.8, 0.55, 0.35], 0.22, {
+          transient: 1100,
+          transientGain: 0.18,
+          spread: 0.06,
+        });
         break;
       case "cable":
-        this.noiseBurst(800, 0.28, 0.3);
+        // Kabelbund: fast tonlos, dumpfes Poltern mit Raschelanteil
+        this.metalHit([132, 189], [0.24, 0.18], 0.2, {
+          transient: 900,
+          transientGain: 0.3,
+          spread: 0.09,
+        });
+        this.noiseBurst(1600, 0.22, 0.16);
         break;
-      default: // Störstoff/Holz
-        this.burst([108], 0.18, 0.3, "triangle");
-        this.noiseBurst(400, 0.12, 0.2);
+      default:
+        // Störstoff (Holz, Beton, Kunststoff): Schlag ohne metallisches Klingen
+        this.metalHit([96, 143], [0.14, 0.1], 0.3, {
+          transient: 420,
+          transientGain: 0.26,
+          spread: 0.02,
+        });
     }
+  }
+
+  /**
+   * Ein Metallschlag: kurzer Aufprall-Transient plus inharmonische Partialtöne,
+   * die unterschiedlich schnell verklingen.
+   * @param partials Teiltonfrequenzen (bewusst nicht harmonisch)
+   * @param decays Abklingzeit je Teilton in Sekunden
+   * @param gain Grundlautstärke
+   */
+  private metalHit(
+    partials: number[],
+    decays: number[],
+    gain: number,
+    opts: { transient: number; transientGain: number; spread: number }
+  ): void {
+    if (!this.ctx || !this.master) return;
+    const t = this.ctx.currentTime;
+    // Aufprall: sehr kurzer, gefilterter Rauschimpuls
+    this.noiseBurst(opts.transient, 0.045, opts.transientGain);
+    partials.forEach((f, i) => {
+      const osc = this.ctx!.createOscillator();
+      // leichte Verstimmung je Anschlag — kein Ton klingt exakt wie der vorige
+      osc.frequency.value = f * (1 + (Math.random() - 0.5) * opts.spread);
+      osc.type = i === 0 ? "triangle" : "sine";
+      const g = this.ctx!.createGain();
+      const amp = (gain / (i + 1.4)) * (0.85 + Math.random() * 0.3);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(amp, t + 0.006); // harter Anschlag
+      g.gain.exponentialRampToValueAtTime(0.0001, t + decays[i]);
+      osc.connect(g).connect(this.master!);
+      osc.start(t);
+      osc.stop(t + decays[i] + 0.05);
+    });
   }
 
   /** Metall-Kreischen beim Abreißen einer Baugruppe. */

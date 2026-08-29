@@ -1,11 +1,11 @@
 /**
  * Touch-Steuerung für Tablet und Smartphone (Briefing Kap. 5.1).
  * Aufteilung (Design 2026-08-29):
- *   links   — Greif-Taste und Fahr-Fadenkreuz (vor/zurück/links/rechts)
- *   rechts  — Arbeitsstick: X dreht den Oberwagen, Y hebt/senkt den Ausleger
- *             (Achse invertiert: hoch = senken), dazu Stiel- und Rotator-Tasten
- *   Extras  — fester Fingerdruck auf die freie Fläche greift ebenfalls,
- *             Doppeltipp wechselt die Ansicht, Kippsteuerung ersetzt das Fadenkreuz
+ *   linker Stick   — X: Oberwagen drehen, Y: Stiel heran/weg
+ *   rechter Stick  — X: Rotator, Y: Ausleger heben/senken
+ *   Fadenkreuz     — nur Fahren: vor/zurück und links/rechts lenken (simultan)
+ *   Greifen        — großer Knopf links, zusätzlich per festem Fingerdruck
+ *   Extras         — Doppeltipp wechselt die Ansicht, Kippen ersetzt das Fadenkreuz
  */
 export interface TouchAxes {
   cab: number;
@@ -45,6 +45,7 @@ export class TouchControls {
   readonly active: boolean;
   /** true, sobald das Gerät echten Druck meldet — dann geht Greifen per Drücken */
   pressureSupported = false;
+  private left: StickState | null = null;
   private right: StickState | null = null;
   private pressed = new Set<string>();
   private held = new Set<string>();
@@ -63,16 +64,13 @@ export class TouchControls {
       return;
     }
     root.style.display = "block";
+    this.left = this.makeStick("touch-left");
     this.right = this.makeStick("touch-right");
     this.bindHold("btn-grab", "grab");
     this.bindHold("btn-fwd", "fwd");
     this.bindHold("btn-back", "back");
     this.bindHold("btn-left", "left");
     this.bindHold("btn-right", "right");
-    this.bindHold("btn-stick-out", "stickOut");
-    this.bindHold("btn-stick-in", "stickIn");
-    this.bindTap("btn-rot-l", "rotL");
-    this.bindTap("btn-rot-r", "rotR");
     this.bindTap("btn-view", "KeyC");
     this.bindTap("btn-cab", "KeyX");
     this.bindTap("btn-outrig", "KeyO");
@@ -81,6 +79,40 @@ export class TouchControls {
     this.bindTap("btn-marks", "KeyM");
     this.bindTilt();
     this.bindCanvas(canvas);
+    TouchControls.blockBrowserZoom();
+  }
+
+  /**
+   * Browser-Zoom unterbinden: Safari kennt eigene Gesture-Events, und ein
+   * schneller Doppeltipp zoomt sonst die Seite, statt die Ansicht zu wechseln.
+   */
+  private static blockBrowserZoom(): void {
+    for (const type of ["gesturestart", "gesturechange", "gestureend"]) {
+      document.addEventListener(type, (e) => e.preventDefault(), { passive: false });
+    }
+    document.addEventListener("dblclick", (e) => e.preventDefault(), { passive: false });
+    // iOS/Android markieren sonst Elemente beim Halten und zeigen ein Kontextmenü
+    document.addEventListener("contextmenu", (e) => e.preventDefault(), { passive: false });
+    document.addEventListener("selectstart", (e) => e.preventDefault(), { passive: false });
+    // Mehrfinger-Gesten (Pinch) abfangen
+    document.addEventListener(
+      "touchmove",
+      (e) => {
+        if (e.touches.length > 1) e.preventDefault();
+      },
+      { passive: false }
+    );
+    // Ein zweiter Tipp binnen 320 ms würde sonst den Doppeltipp-Zoom auslösen
+    let last = 0;
+    document.addEventListener(
+      "touchend",
+      (e) => {
+        const now = performance.now();
+        if (now - last < 320) e.preventDefault();
+        last = now;
+      },
+      { passive: false }
+    );
   }
 
   private makeStick(id: string): StickState | null {
@@ -233,12 +265,14 @@ export class TouchControls {
 
   update(): void {
     if (!this.active) return;
+    const l = this.left;
     const r = this.right;
-    this.axes.cab = r ? r.dx : 0;
-    // Ausleger-Achse invertiert: Stick nach vorn senkt den Ausleger
+    // Linker Stick: Oberwagen drehen und Stiel (Y-Achse umgekehrt)
+    this.axes.cab = l ? l.dx : 0;
+    this.axes.stick = l ? l.dy : 0;
+    // Rechter Stick: Rotator und Ausleger (nach vorn = senken)
+    this.axes.rotator = r && Math.abs(r.dx) > 0.25 ? r.dx : 0;
     this.axes.boom = r ? r.dy : 0;
-    this.axes.stick =
-      (this.held.has("stickOut") ? 1 : 0) - (this.held.has("stickIn") ? 1 : 0);
     this.axes.drive =
       (this.held.has("fwd") ? 1 : 0) - (this.held.has("back") ? 1 : 0) + this.tiltDrive;
     this.axes.steer =
@@ -246,6 +280,5 @@ export class TouchControls {
     this.axes.drive = Math.max(-1, Math.min(1, this.axes.drive));
     this.axes.steer = Math.max(-1, Math.min(1, this.axes.steer));
     this.axes.grab = this.held.has("grab") || this.pressureGrab;
-    this.axes.rotator = this.consumePress("rotL") ? -1 : this.consumePress("rotR") ? 1 : 0;
   }
 }

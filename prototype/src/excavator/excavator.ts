@@ -955,7 +955,7 @@ export class Excavator {
     if (!input.shiftHeld && input.wheelDelta !== 0) {
       this.rotatorYaw += input.wheelDelta * ROTATOR_STEP;
     }
-    if (this.touch?.rotator) this.rotatorYaw += this.touch.rotator * ROTATOR_STEP * 0.25;
+    if (this.touch?.rotator) this.rotatorYaw += this.touch.rotator * ROTATOR_STEP * 0.12;
     if (input.wasPressed("KeyX")) this.toggleCabLift();
     if (input.wasPressed("KeyO")) this.toggleOutriggers();
   }

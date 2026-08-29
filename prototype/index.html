@@ -2,10 +2,26 @@
 <html lang="de">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
     <title>Schrottplatz — Prototyp (M3)</title>
     <style>
-      html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #1a1c1e; }
+      html, body {
+        margin: 0; padding: 0; height: 100%; overflow: hidden; background: #1a1c1e;
+        /* Kein Doppeltipp- oder Pinch-Zoom: der Doppeltipp gehört dem Spiel */
+        touch-action: none; overscroll-behavior: none;
+        -webkit-user-select: none; user-select: none;
+        -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+      }
+      canvas { touch-action: none; }
+      /* iOS markiert sonst beim Tippen/Halten Elemente (blaue Auswahl, Lupe) */
+      * {
+        -webkit-user-select: none; user-select: none;
+        -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+      }
+      ::selection { background: transparent; }
       #app { position: fixed; inset: 0; }
       canvas { display: block; }
       .hud {
@@ -25,12 +41,14 @@
       /* --- Touch-Steuerung (Tablet/Smartphone) --- */
       #touch { display: none; position: fixed; inset: 0; pointer-events: none; z-index: 5; }
       #touch .pad {
-        position: absolute; right: 18px; bottom: 18px; width: 140px; height: 140px;
+        position: absolute; bottom: 16px; width: 138px; height: 138px;
         border-radius: 50%; background: rgba(20,22,24,0.35);
         border: 2px solid rgba(255,255,255,0.25); pointer-events: auto; touch-action: none;
       }
+      #touch-left { left: 16px; }
+      #touch-right { right: 16px; }
       #touch .knob {
-        position: absolute; left: 50%; top: 50%; width: 58px; height: 58px; margin: -29px 0 0 -29px;
+        position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px;
         border-radius: 50%; background: rgba(240,180,41,0.75); pointer-events: none;
       }
       #touch .btn {
@@ -40,31 +58,26 @@
         text-align: center;
       }
       #touch .btn.down { background: rgba(240,180,41,0.65); color: #1a1c1e; }
-      /* Greifen: großer Knopf links */
+      /* Fahr-Fadenkreuz links oben — nur fürs Fahren und Lenken */
+      #touch .cross { position: absolute; width: 44px; height: 40px; padding: 10px 4px; }
+      #btn-fwd { left: 62px; top: 52px; }
+      #btn-back { left: 62px; top: 140px; }
+      #btn-left { left: 14px; top: 96px; }
+      #btn-right { left: 110px; top: 96px; }
+      /* Greifen: großer Knopf links neben dem Stick */
       #btn-grab {
-        left: 20px; bottom: 128px; width: 104px; height: 104px; border-radius: 50%;
-        line-height: 80px; padding: 0; font-size: 15px;
+        left: 168px; bottom: 26px; width: 100px; height: 100px; border-radius: 50%;
+        line-height: 76px; padding: 0; font-size: 15px;
       }
-      /* Fahr-Fadenkreuz links unten */
-      #touch .cross { position: absolute; width: 46px; height: 42px; }
-      #btn-fwd { left: 66px; bottom: 92px; }
-      #btn-back { left: 66px; bottom: 6px; }
-      #btn-left { left: 16px; bottom: 49px; }
-      #btn-right { left: 116px; bottom: 49px; }
-      /* Stiel + Rotator rechts über dem Stick */
-      #btn-stick-out { right: 172px; bottom: 108px; width: 62px; }
-      #btn-stick-in { right: 172px; bottom: 52px; width: 62px; }
-      #btn-rot-l { right: 172px; bottom: 6px; width: 30px; padding: 11px 2px; }
-      #btn-rot-r { right: 204px; bottom: 6px; width: 30px; padding: 11px 2px; }
-      /* Funktionstasten rechts oben */
+      /* Funktionstasten am rechten Rand */
       #touch .fn { right: 14px; width: 78px; }
-      #btn-view { top: 54px; }
-      #btn-cab { top: 100px; }
-      #btn-outrig { top: 146px; }
-      #btn-press { top: 192px; }
-      #btn-pickup { top: 238px; }
-      #btn-tilt { top: 284px; }
-      #btn-marks { top: 330px; }
+      #btn-view { top: 44px; }
+      #btn-cab { top: 90px; }
+      #btn-outrig { top: 136px; }
+      #btn-press { top: 182px; }
+      #btn-pickup { top: 228px; }
+      #btn-tilt { top: 274px; }
+      #btn-marks { top: 320px; }
     </style>
   </head>
   <body>
@@ -89,16 +102,13 @@
     <div id="toast" class="hud" style="top: 56px; left: 50%; transform: translateX(-50%); opacity: 0; transition: opacity 0.4s; color: #f0d060;"></div>
     <div id="debug" class="hud"></div>
     <div id="touch">
+      <div class="pad" id="touch-left"><div class="knob"></div></div>
+      <div class="pad" id="touch-right"><div class="knob"></div></div>
       <div class="btn" id="btn-grab">GREIFEN</div>
       <div class="btn cross" id="btn-fwd">▲</div>
       <div class="btn cross" id="btn-back">▼</div>
       <div class="btn cross" id="btn-left">◀</div>
       <div class="btn cross" id="btn-right">▶</div>
-      <div class="pad" id="touch-right"><div class="knob"></div></div>
-      <div class="btn" id="btn-stick-out">STIEL ▲</div>
-      <div class="btn" id="btn-stick-in">STIEL ▼</div>
-      <div class="btn" id="btn-rot-l">⟲</div>
-      <div class="btn" id="btn-rot-r">⟳</div>
       <div class="btn fn" id="btn-view">ANSICHT</div>
       <div class="btn fn" id="btn-cab">KABINE</div>
       <div class="btn fn" id="btn-outrig">STÜTZEN</div>
