@@ -136,7 +136,12 @@ function colorFor(spec: PileSpec, seed: number): number {
  */
 export function randomCargo(
   count: number,
-  bigShare = 0
+  bigShare = 0,
+  /**
+   * Sortenrein: Händler liefern ihre Ware oft schon getrennt an. Ist eine
+   * Fraktion gesetzt, besteht die ganze Ladung daraus.
+   */
+  onlyMaterial?: string
 ): Array<{ materialId: string; massKg: number; shape: ScrapShape }> {
   const out = [];
   for (let i = 0; i < count; i++) {
@@ -145,8 +150,14 @@ export function randomCargo(
     // 20 % Aluminium, der Rest verteilt sich auf VA, Kupfer, Kabel, Störstoff
     const r = Math.random();
     const wanted =
-      r < 0.6 ? "steel" : r < 0.8 ? "alu" : ["va", "copper", "cable", "contaminant"][Math.floor(Math.random() * 4)];
-    const matching = pool.filter((s) => s.materialId === wanted);
+      onlyMaterial ??
+      (r < 0.6 ? "steel" : r < 0.8 ? "alu" : ["va", "copper", "cable", "contaminant"][Math.floor(Math.random() * 4)]);
+    let matching = pool.filter((s) => s.materialId === wanted);
+    // Sortenreine Ladung: notfalls in der anderen Größenklasse suchen, damit
+    // die Fraktion auf jeden Fall stimmt
+    if (onlyMaterial && matching.length === 0) {
+      matching = [...SPECS, ...BIG_SPECS].filter((s) => s.materialId === wanted);
+    }
     const spec =
       matching.length > 0
         ? matching[Math.floor(Math.random() * matching.length)]
@@ -298,25 +309,28 @@ export class ItemManager {
    * Die Teile werden überlappungsfrei gesetzt: klemmen sie beim Spawn
    * ineinander, schleudert die Physik sie über den halben Platz.
    */
-  spawnPile(pileCenter: THREE.Vector3, count = 70, spread = 3.4): void {
+  spawnPile(pileCenter: THREE.Vector3, count = 150, spread = 4.0): void {
     const placed: Array<{ x: number; y: number; z: number; r: number }> = [];
     const specs = randomCargo(count, 0.45);
     for (const s of specs) {
       const dims = s.shape.dims;
       const half = s.shape.kind === "wire" ? dims[0] : Math.max(...dims) / 2;
-      const r = half + 0.15;
+      // Nur so viel Abstand, dass beim Spawn nichts klemmt. Beim Setzen
+      // rutschen und verkanten die Teile dann ineinander — genau so, wie ein
+      // gewachsener Schrottberg aussieht.
+      const r = half + 0.04;
       let spot: { x: number; y: number; z: number; r: number } | null = null;
-      for (let layer = 0; layer < 7 && !spot; layer++) {
-        const y = 0.6 + layer * 0.95;
+      for (let layer = 0; layer < 14 && !spot; layer++) {
+        const y = 0.5 + layer * 0.62;
         // innen dichter, außen weiter — das ergibt die Kegelform eines Haufens
-        const maxRad = spread * (1 - layer * 0.11);
-        for (let attempt = 0; attempt < 30; attempt++) {
+        const maxRad = spread * (1 - layer * 0.055);
+        for (let attempt = 0; attempt < 40; attempt++) {
           const a = Math.random() * Math.PI * 2;
           const rad = Math.sqrt(Math.random()) * maxRad;
           const x = pileCenter.x + Math.cos(a) * rad;
           const z = pileCenter.z + Math.sin(a) * rad;
           const clash = placed.some(
-            (p) => Math.hypot(p.x - x, (p.y - y) * 1.5, p.z - z) < p.r + r
+            (p) => Math.hypot(p.x - x, (p.y - y) * 1.2, p.z - z) < p.r + r
           );
           if (!clash) {
             spot = { x, y, z, r };
@@ -326,11 +340,20 @@ export class ItemManager {
       }
       if (!spot) continue;
       placed.push(spot);
+      // zufällig verdreht spawnen: nichts liegt sauber ausgerichtet auf dem Hof
+      const q = new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(
+          (Math.random() - 0.5) * 1.6,
+          Math.random() * Math.PI * 2,
+          (Math.random() - 0.5) * 1.6
+        )
+      );
       this.spawnScrap(
         s.materialId,
         s.massKg,
         s.shape,
-        new THREE.Vector3(spot.x, spot.y, spot.z)
+        new THREE.Vector3(spot.x, spot.y, spot.z),
+        q
       );
     }
   }
@@ -349,6 +372,60 @@ export class ItemManager {
     const dims = item.shape.dims;
     const dickste = Math.min(...dims);
     return item.massKg < 140 && dickste < 0.22;
+  }
+
+  /**
+   * Gepresstes Paket: ein fester Ballen aus mehreren Teilen. Die Kantenlänge
+   * wächst mit der Masse, bleibt aber im Rahmen dessen, was ein Container
+   * fasst. Die zerknautschte Oberfläche entsteht aus einem verrauschten
+   * Quader — glatt sähe es aus wie ein Umzugskarton.
+   */
+  spawnBale(materialId: string, massKg: number, pos: THREE.Vector3): ScrapItem {
+    // Richtwert: rund 1,2 t je Kubikmeter Paket
+    const vol = THREE.MathUtils.clamp(massKg / 1200, 0.12, 1.5);
+    const w = Math.cbrt(vol);
+    const dims: [number, number, number] = [w * 1.25, w * 0.85, w];
+    const geo = new THREE.BoxGeometry(dims[0], dims[1], dims[2], 3, 2, 3);
+    const p = geo.getAttribute("position") as THREE.BufferAttribute;
+    for (let i = 0; i < p.count; i++) {
+      const n = 0.055 * w;
+      p.setXYZ(
+        i,
+        p.getX(i) + (Math.random() - 0.5) * n,
+        p.getY(i) + (Math.random() - 0.5) * n,
+        p.getZ(i) + (Math.random() - 0.5) * n
+      );
+    }
+    geo.computeVertexNormals();
+    const mat = getMaterial(materialId);
+    const mesh = new THREE.Mesh(
+      geo,
+      new THREE.MeshStandardMaterial({ color: mat.color, roughness: 0.85, metalness: 0.35 })
+    );
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    this.scene.add(mesh);
+    const body = this.world.createRigidBody(
+      RAPIER.RigidBodyDesc.dynamic()
+        .setTranslation(pos.x, pos.y, pos.z)
+        .setLinearDamping(0.6)
+        .setAngularDamping(1.1)
+    );
+    this.world.createCollider(
+      RAPIER.ColliderDesc.cuboid(dims[0] / 2, dims[1] / 2, dims[2] / 2)
+        .setMass(massKg)
+        .setFriction(1.2)
+        .setRestitution(0),
+      body
+    );
+    // `flat` markiert es als gepresst: es geht nicht noch einmal durch die Presse
+    return this.register({
+      materialId,
+      massKg,
+      mesh,
+      body,
+      shape: { kind: "box", dims, color: mat.color, flat: true },
+    });
   }
 
   /** Teil in der Presse plattdrücken: Mesh stauchen, Kollider tauschen. */

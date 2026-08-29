@@ -329,7 +329,14 @@ async function main(): Promise<void> {
     hud.toast("Der Fahrer hupt — Fahrspur ist blockiert!");
   };
   // Brückenwaage: voll rein, leer raus → Kunde bekommt sein Geld
-  vehicles.onWeighIn = (kg) => hud.toast(`Waage: ${kg.toFixed(0)} kg brutto — bitte abladen.`);
+  vehicles.onWeighIn = (kg) => {
+    const rein = vehicles.activeSortedMaterial;
+    hud.toast(
+      rein
+        ? `Waage: ${kg.toFixed(0)} kg brutto — sortenrein ${getMaterial(rein).name}.`
+        : `Waage: ${kg.toFixed(0)} kg brutto — bitte abladen.`
+    );
+  };
   vehicles.onWeighOut = (netKg) => {
     const paid = account.payDelivery(netKg);
     shift.deliveriesThisShift++;

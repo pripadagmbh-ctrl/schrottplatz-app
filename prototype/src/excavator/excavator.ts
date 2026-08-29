@@ -118,6 +118,7 @@ export class Excavator {
   private inCab = 0;
   private inBoom = 0;
   private inStick = 0;
+  private inGrapple = 0;
 
   // Physik
   chassisBody!: RAPIER.RigidBody;
@@ -1121,6 +1122,8 @@ export class Excavator {
     // schneller schließt bzw. öffnet die Spinne; neutral hält den Zustand.
     const cmd = this.touch?.grapple ?? 0;
     const held = input.mouseHeld(0) || input.isDown("Space") || (this.touch?.grab ?? false);
+    // für die Hebelanimation in der Kabine
+    this.inGrapple = held ? 1 : THREE.MathUtils.clamp(cmd, -1, 1);
     let closeRate: number;
     if (held) {
       closeRate = dt / CLOSE_TIME;
@@ -1301,13 +1304,16 @@ export class Excavator {
 
     this.updateGrappleCylinders();
 
-    // Joysticks kippen mit den Eingaben (ISO: links Stiel/Oberwagen, rechts Ausleger)
+    // Joysticks samt Unterarmen kippen genau so, wie der Spieler steuert:
+    // links Hauptarm und Oberwagen, rechts Ausleger und Spinne. Vorher stand
+    // hier noch die alte Belegung, weshalb die Hände nicht zur Bewegung passten.
     if (this.joyLeft && this.joyRight) {
       const tilt = 0.35;
-      this.joyLeft.rotation.x = this.inStick * tilt; // vor = Stiel weg
-      this.joyLeft.rotation.z = this.inCab * tilt; // seitlich = Oberwagen
-      this.joyRight.rotation.x = -this.inBoom * tilt; // vor = Ausleger senken
-      this.joyRight.rotation.z = this.closing ? -0.25 : 0; // Greifer zu = leichte Auslage
+      // Achse hoch (+1) → Hebel nach vorn, wie beim Wischen nach oben
+      this.joyLeft.rotation.x = this.inBoom * tilt;
+      this.joyLeft.rotation.z = this.inCab * tilt; // rechts = Oberwagen rechts
+      this.joyRight.rotation.x = this.inStick * tilt;
+      this.joyRight.rotation.z = this.inGrapple * tilt; // rechts = schließen
     }
   }
 

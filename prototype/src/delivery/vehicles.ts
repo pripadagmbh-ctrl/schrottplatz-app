@@ -250,6 +250,23 @@ class DeliveryVehicle {
   private get isSelfTipping(): boolean {
     return this.kind === "kipper";
   }
+
+  /**
+   * Sortenreine Ladung, falls der Händler seine Ware schon getrennt hat —
+   * in der Praxis kommt Schrott oft vorsortiert an. Für den Spieler heißt
+   * das: durchladen statt sortieren.
+   */
+  readonly sortedMaterial: string | null = DeliveryVehicle.rollSortedMaterial();
+
+  private static rollSortedMaterial(): string | null {
+    // gut ein Drittel der Anlieferungen kommt sortenrein
+    if (Math.random() > 0.36) return null;
+    const r = Math.random();
+    if (r < 0.4) return "steel";
+    if (r < 0.65) return "alu";
+    if (r < 0.82) return "va";
+    return r < 0.94 ? "copper" : "cable";
+  }
   private get routeIn(): Array<[number, number]> {
     return this.isPickup ? PICKUP_IN_FWD : ROUTE_IN_FWD;
   }
@@ -478,7 +495,7 @@ class DeliveryVehicle {
     // Nicht bis unter die Bordwand vollpacken: zu volle Ladungen quollen beim
     // Kippen über und blieben halb auf der Fläche hängen.
     const count = this.kind === "kipper" ? 13 : 10;
-    const specs = randomCargo(count, 0.5);
+    const specs = randomCargo(count, 0.5, this.sortedMaterial ?? undefined);
     const bedQuat = new THREE.Quaternion();
     this.bedGroup.getWorldQuaternion(bedQuat);
     // Überlappungsfrei stapeln: jedes Teil bekommt einen Platz, der von allen
@@ -1059,6 +1076,11 @@ export class VehicleManager {
 
   get activeKind(): DeliveryKind | null {
     return this.active?.kind ?? null;
+  }
+
+  /** Fraktion der laufenden Anlieferung, falls sie sortenrein ist. */
+  get activeSortedMaterial(): string | null {
+    return this.active?.sortedMaterial ?? null;
   }
 
   update(dt: number): void {

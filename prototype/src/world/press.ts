@@ -404,12 +404,37 @@ export class PressManager {
     }
   }
 
-  /** Zuschlagen: alles in der Mulde wird zum Paket. */
+  /**
+   * Zuschlagen: alles in der Mulde wird zu Paketen.
+   *
+   * Die Teile werden nicht einzeln plattgedrückt, sondern nach Fraktion zu
+   * je einem festen Ballen zusammengefasst — so kommt Schrott aus einer
+   * Presse auch wirklich heraus. Nebenbei sinkt die Zahl der Körper deutlich.
+   */
   private stamp(): void {
     let count = 0;
-    for (const item of [...this.items.items]) {
-      if (!this.inChamber(item.body.translation())) continue;
-      if (this.items.flattenItem(item)) count++;
+    const inChamber = this.items.items.filter((it) => this.inChamber(it.body.translation()));
+    // nach Fraktion bündeln: jede bekommt ihr eigenes Paket
+    const byMaterial = new Map<string, typeof inChamber>();
+    for (const it of inChamber) {
+      const list = byMaterial.get(it.materialId);
+      if (list) list.push(it);
+      else byMaterial.set(it.materialId, [it]);
+    }
+    for (const [materialId, list] of byMaterial) {
+      // ein einzelnes Teil ergibt noch kein Paket — das wird nur gestaucht
+      if (list.length < 2) {
+        if (this.items.flattenItem(list[0])) count++;
+        continue;
+      }
+      const kg = list.reduce((s, it) => s + it.massKg, 0);
+      const p = list[0].body.translation();
+      for (const it of list) {
+        const wasCar = this.composites.despawnByBody(it.body);
+        this.items.remove(it, !wasCar);
+      }
+      this.items.spawnBale(materialId, kg, new THREE.Vector3(p.x, 1.0, CENTER.z));
+      count += list.length;
     }
     for (const car of this.composites.cars) {
       if (!this.inChamber(car.body.translation())) continue;

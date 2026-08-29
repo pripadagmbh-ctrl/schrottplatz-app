@@ -72,18 +72,45 @@
       }
       #btn-rot-l { right: 100px; }
       #btn-rot-r { right: 16px; }
-      /* Funktionstasten am rechten Rand */
-      #touch .fn { right: 14px; width: 78px; }
-      #btn-view { top: 44px; }
-      #btn-cab { top: 90px; }
-      #btn-outrig { top: 136px; }
-      #btn-press { top: 182px; }
-      #btn-pickup { top: 228px; }
-      #btn-tilt { top: 274px; }
-      #btn-marks { top: 320px; }
-      #btn-away { top: 366px; }
-      #btn-music { top: 412px; }
-      #btn-pause { top: 458px; }
+      /* Funktionstasten am rechten Rand. Als umbrechende Spalte, damit sie
+         auf flachen Handy-Displays in eine zweite Reihe rutschen statt unten
+         aus dem Bild zu laufen. */
+      #fnbar {
+        position: absolute; top: 44px; right: 14px; bottom: 10px;
+        display: flex; flex-direction: column; flex-wrap: wrap-reverse;
+        align-content: flex-end; gap: 8px; pointer-events: none;
+      }
+      #touch #fnbar .btn {
+        position: static; width: 78px; padding: 11px 4px; margin-left: 8px;
+        pointer-events: auto;
+      }
+      /* Flache Displays (Handy quer): alles eine Nummer kleiner, sonst
+         verdecken Sticks und Tasten das halbe Bild. */
+      @media (max-height: 430px) {
+        #touch .pad { width: 108px; height: 108px; bottom: 10px; }
+        #touch .knob { width: 44px; height: 44px; margin: -22px 0 0 -22px; }
+        #touch-left { left: 10px; }
+        #touch-right { right: 10px; }
+        #touch .cross { width: 40px; height: 36px; padding: 8px 4px; }
+        #btn-fwd { left: 172px; bottom: 86px; }
+        #btn-back { left: 172px; bottom: 8px; }
+        #btn-left { left: 128px; bottom: 47px; }
+        #btn-right { left: 216px; bottom: 47px; }
+        /* neben den rechten Stick statt darüber — oben liegt die Tastenleiste */
+        #btn-rot-l, #btn-rot-r { bottom: 14px; width: 46px; height: 40px; line-height: 40px; }
+        #btn-rot-l { right: 190px; }
+        #btn-rot-r { right: 132px; }
+        /* endet über dem rechten Stick, sonst legen sich die Tasten darauf */
+        #fnbar { top: 8px; right: 10px; bottom: 128px; gap: 5px; }
+        #touch #fnbar .btn { width: 66px; padding: 7px 3px; font-size: 10px; margin-left: 5px; }
+        #help { display: none; }
+        /* Konto und Tagesablauf nach links: rechts oben braucht die
+           Tastenleiste den Platz, sobald sie zweispaltig umbricht */
+        #money { top: 8px; left: 8px; right: auto; font-size: 12px; padding: 4px 8px; }
+        #shift { top: 34px; left: 8px; right: auto; font-size: 11px; padding: 4px 8px; }
+        #gripinfo { bottom: 6px; font-size: 12px; padding: 4px 10px; }
+        #toast { top: 60px; font-size: 12px; }
+      }
       /* --- Pausenmenü --- */
       #pause {
         display: none; position: fixed; inset: 0; z-index: 20;
@@ -160,16 +187,18 @@
       <div class="btn cross" id="btn-back">▼</div>
       <div class="btn cross" id="btn-left">◀</div>
       <div class="btn cross" id="btn-right">▶</div>
-      <div class="btn fn" id="btn-view">ANSICHT</div>
-      <div class="btn fn" id="btn-cab">KABINE</div>
-      <div class="btn fn" id="btn-outrig">STÜTZEN</div>
-      <div class="btn fn" id="btn-press">SCHERE</div>
-      <div class="btn fn" id="btn-pickup">ABHOLEN</div>
-      <div class="btn fn" id="btn-tilt">KIPPEN</div>
-      <div class="btn fn" id="btn-marks">SCHILDER</div>
-      <div class="btn fn" id="btn-away">VORFAHREN</div>
-      <div class="btn fn" id="btn-music">MUSIK</div>
-      <div class="btn fn" id="btn-pause">PAUSE</div>
+      <div id="fnbar">
+        <div class="btn fn" id="btn-view">ANSICHT</div>
+        <div class="btn fn" id="btn-cab">KABINE</div>
+        <div class="btn fn" id="btn-outrig">STÜTZEN</div>
+        <div class="btn fn" id="btn-press">SCHERE</div>
+        <div class="btn fn" id="btn-pickup">ABHOLEN</div>
+        <div class="btn fn" id="btn-tilt">KIPPEN</div>
+        <div class="btn fn" id="btn-marks">SCHILDER</div>
+        <div class="btn fn" id="btn-away">VORFAHREN</div>
+        <div class="btn fn" id="btn-music">MUSIK</div>
+        <div class="btn fn" id="btn-pause">PAUSE</div>
+      </div>
     </div>
     <div id="pause">
       <div class="panel">
