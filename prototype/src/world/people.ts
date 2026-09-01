@@ -167,18 +167,25 @@ export class StaffManager {
   private stateT = 0;
   private patrolIdx = 0;
 
-  /** Wegpunkte für die Runde des Platzwarts (SW) */
+  /**
+   * Warteposten am Rand des Schrottfelds. Ist gerade nichts wegzuräumen,
+   * stellt er sich dorthin, statt sinnlos Runden zu drehen.
+   */
   private readonly patrol = [
-    new THREE.Vector3(-4, 0, 12),
-    new THREE.Vector3(9, 0, 6),
-    new THREE.Vector3(10, 0, -4),
-    new THREE.Vector3(-2, 0, -5),
+    new THREE.Vector3(-1.5, 0, 14),
+    new THREE.Vector3(1.5, 0, 14.5),
   ];
   /** Einweisplatz neben dem Abkippplatz */
   private readonly guidePos = new THREE.Vector3(3.6, 0, 8.5);
 
-  /** Baggerposition — Lambert hält Abstand vom Arbeitsbereich */
+  /** Baggerposition — um die Maschine selbst geht er herum */
   getExcavatorPos: (() => THREE.Vector3) | null = null;
+  /**
+   * Position der Spinne. Lambert arbeitet mitten im Schrottfeld — das liegt
+   * nun einmal vor dem Bagger. Ausweichen muss er nur dem, was sich gerade
+   * über ihm bewegt, nicht der ganzen Maschine (Design-Fix 29.08.2026).
+   */
+  getGrapplePos: (() => THREE.Vector3) | null = null;
   /** Karossen — durch die läuft er nicht hindurch */
   getObstaclePositions: (() => THREE.Vector3[]) | null = null;
 
@@ -523,8 +530,10 @@ export class StaffManager {
     return this.lambert.group.position;
   }
 
-  /** Sicherheitsabstand zum schwenkenden Ausleger (SW) */
-  private static readonly EXCAVATOR_KEEPOUT = 8;
+  /** Abstand zur Maschine selbst — sie steht, er geht drumherum */
+  private static readonly EXCAVATOR_KEEPOUT = 4.2;
+  /** Abstand zur arbeitenden Spinne — darunter macht er Platz */
+  private static readonly GRAPPLE_KEEPOUT = 5.5;
   private avoidTmp = new THREE.Vector3();
   private slideTmp = { x: 0, z: 0 };
 
@@ -546,6 +555,8 @@ export class StaffManager {
     };
     const ex = this.getExcavatorPos?.();
     if (ex) push(ex.x, ex.z, StaffManager.EXCAVATOR_KEEPOUT);
+    const gr = this.getGrapplePos?.();
+    if (gr) push(gr.x, gr.z, StaffManager.GRAPPLE_KEEPOUT);
     for (const c of this.getObstaclePositions?.() ?? []) push(c.x, c.z, 3.2);
     // Sperrige Schrottteile: er steigt nicht darüber, er geht drumherum
     for (const it of this.items.items) {
@@ -573,6 +584,7 @@ export class StaffManager {
     // Teil hat Vorrang, damit er nicht quer über den Platz läuft, während
     // neben ihm etwas liegt.
     const ex = this.getExcavatorPos?.();
+    const gr = this.getGrapplePos?.();
     const von = this.lambert.group.position;
     let best: (typeof this.items.items)[number] | null = null;
     let bestD = Infinity;
@@ -587,7 +599,8 @@ export class StaffManager {
       // im Stahlhaufen steckt — holt er heraus; genau das ist seine Aufgabe.
       if (Math.hypot(p.x - ziel[0], p.z - ziel[1]) < 2.8) continue;
       if (Math.abs(p.x) > 22 || p.z < -10 || p.z > 22) continue;
-      // niemals im Schwenkbereich des Auslegers arbeiten
+      // Nicht dort zugreifen, wo die Spinne gerade arbeitet
+      if (gr && Math.hypot(p.x - gr.x, p.z - gr.z) < StaffManager.GRAPPLE_KEEPOUT) continue;
       if (ex && Math.hypot(p.x - ex.x, p.z - ex.z) < StaffManager.EXCAVATOR_KEEPOUT) continue;
       // Nur holen, wohin ein freier Weg führt — was hinter Boxen oder Mauern
       // liegt, ist Baggerarbeit

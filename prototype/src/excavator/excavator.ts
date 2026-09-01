@@ -287,9 +287,12 @@ export class Excavator {
    * Stiel, die Spinne und der Unterwagen — die Bauteile sind kinematisch und
    * würden sonst einfach hindurchfahren (Design-Fix 29.08.2026).
    */
-  private hitsAnything(): boolean {
+  private chassisHits(): boolean {
     // Unterwagen: rein zweidimensional, er steht ja am Boden
-    if (hitsObstacle(this.position.x, this.position.z, 1.6)) return true;
+    return hitsObstacle(this.position.x, this.position.z, 1.3) !== null;
+  }
+
+  private hitsAnything(): boolean {
     // Spinne samt Schalen
     this.grappleGroup.getWorldPosition(this.blockPos);
     if (hitsObstacle(this.blockPos.x, this.blockPos.z, 0.9, this.blockPos.y - 1.2)) return true;
@@ -301,7 +304,7 @@ export class Excavator {
       for (const t of [-0.8, -0.3, 0.2, 0.7]) {
         this.blockLocal.set(0, 0, s.half[2] * 2 * t);
         this.blockPos.copy(this.blockLocal).applyMatrix4(mesh.matrixWorld);
-        if (hitsObstacle(this.blockPos.x, this.blockPos.z, 0.35, this.blockPos.y - s.half[1]))
+        if (hitsObstacle(this.blockPos.x, this.blockPos.z, 0.2, this.blockPos.y - s.half[1]))
           return true;
       }
     }
@@ -360,6 +363,10 @@ export class Excavator {
     );
     return hit;
   }
+
+  /** Zuletzt gültiger Zustand war frei — Grundlage für den Fluchtweg. */
+  private armFree = true;
+  private chassisFree = true;
 
   /** Handles der gerade gegriffenen Körper — die blockieren nicht. */
   grippedHandles = new Set<number>();
@@ -1303,21 +1310,38 @@ export class Excavator {
     this.resolveGroundClamp();
     this.syncMeshes();
 
-    // Arm darf nicht im LKW verschwinden: Bewegung zurücknehmen, wenn er
-    // Fahrzeugteile schneiden würde
-    if (this.hitsAnything()) {
-      this.armBlocked = true;
-      this.boomAngle = prevBoom;
-      this.stickAngle = prevStick;
-      this.cabYaw = prevCabYaw;
+    // Fahrwerk und Arm werden getrennt geprüft: ein Hindernis neben den
+    // Rädern darf den Ausleger nicht mit stilllegen.
+    if (this.chassisHits() && this.chassisFree) {
       this.position.copy(prevPos);
-      this.boomVel = 0;
-      this.stickVel = 0;
-      this.cabVel = 0;
       this.driveVel = 0;
       this.syncMeshes();
+      this.chassisFree = !this.chassisHits();
+    } else if (!this.chassisHits()) {
+      this.chassisFree = true;
+    }
+
+    // Arm, Stiel und Spinne. Wichtig ist der Fluchtweg: Steckt der Arm
+    // wirklich einmal fest, werden Bewegungen wieder durchgelassen — sonst
+    // verkantet er sich unrettbar, weil auch die befreiende Bewegung
+    // zurückgenommen würde.
+    if (this.hitsAnything()) {
+      this.armBlocked = true;
+      if (this.armFree) {
+        this.boomAngle = prevBoom;
+        this.stickAngle = prevStick;
+        this.cabYaw = prevCabYaw;
+        this.boomVel = 0;
+        this.stickVel = 0;
+        this.cabVel = 0;
+        this.syncMeshes();
+        // Hilft das Zurücknehmen überhaupt? Wenn nicht, sitzt er fest und
+        // darf sich im nächsten Bild frei herausbewegen.
+        this.armFree = !this.hitsAnything();
+      }
     } else {
       this.armBlocked = false;
+      this.armFree = true;
     }
 
     this.integratePendulum(dt);

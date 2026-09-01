@@ -150,9 +150,9 @@ export class Floodlights {
   /** @param daylight 0..1 — unter 0,45 wird zugeschaltet */
   update(daylight: number): void {
     const an = THREE.MathUtils.clamp((0.45 - daylight) / 0.3, 0, 1);
-    // Am Bild abgestimmt. Die Masten stehen am Zaun und leuchten quer über
-    // den ganzen Platz — entsprechend viel Leistung brauchen sie.
-    for (const l of this.lights) l.intensity = an * 900;
+    // Genug, um zu arbeiten, ohne den Platz auszubrennen — Nacht soll
+    // Nacht bleiben.
+    for (const l of this.lights) l.intensity = an * 380;
     const mat = an > 0.15 ? this.lampOn : this.lampOff;
     for (const lamp of this.lamps) lamp.material = mat;
   }

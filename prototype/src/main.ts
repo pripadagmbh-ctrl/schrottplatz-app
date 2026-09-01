@@ -332,6 +332,10 @@ async function main(): Promise<void> {
   grip.partResolver = (pos) => composites.findPartNear(pos);
   grip.insideGrapple = (pos) => excavator.isInsideGrapple(pos);
   excavator.getStaffPos = () => staff.lambertPosition();
+  staff.getGrapplePos = () => {
+    excavator.getSensorPosition(sensorPos);
+    return sensorPos;
+  };
   // Zudrücken: was nachgibt, wird in der Spinne plattgequetscht
   grip.crusher = (body) => {
     const it = items.items.find((i) => i.body.handle === body.handle);
