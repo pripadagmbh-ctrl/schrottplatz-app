@@ -216,7 +216,8 @@
       C&nbsp;&nbsp;Ansicht: Orbit → Draufsicht → Kabine<br />
       X&nbsp;&nbsp;Kabine hoch/runter &nbsp;·&nbsp; O&nbsp;&nbsp;Stützen aus/ein<br />
       V&nbsp;&nbsp;Abholung rufen / abfahren &nbsp;·&nbsp; B&nbsp;&nbsp;Schere<br />
-      Z&nbsp;&nbsp;LKW vorfahren / wegschicken &nbsp;·&nbsp; U&nbsp;&nbsp;Radio<br />
+      I&nbsp;&nbsp;Räumschild heben/senken<br />
+      J&nbsp;&nbsp;LKW vorfahren / wegschicken &nbsp;·&nbsp; U&nbsp;&nbsp;Radio<br />
       M&nbsp;&nbsp;Markierungen an/aus &nbsp;·&nbsp; K&nbsp;&nbsp;Speichern<br />
       ESC oder P&nbsp;&nbsp;Pause<br />
       L&nbsp;&nbsp;Stand laden &nbsp;·&nbsp; N&nbsp;&nbsp;Neues Spiel
@@ -243,6 +244,7 @@
         <div class="btn fn" id="btn-pickup">ABHOLEN</div>
         <div class="btn fn" id="btn-tilt">KIPPEN</div>
         <div class="btn fn" id="btn-marks">SCHILDER</div>
+        <div class="btn fn" id="btn-blade">SCHILD</div>
         <div class="btn fn" id="btn-away">VORFAHREN</div>
         <div class="btn fn" id="btn-music">MUSIK</div>
         <div class="btn fn" id="btn-pause">PAUSE</div>
@@ -289,6 +291,14 @@
         <p class="hint">
           Fahren läuft immer über das Fadenkreuz, Spinne drehen zusätzlich über ↺ ↻.
         </p>
+      </div>
+    </div>
+    <div id="pickup">
+      <div class="panel">
+        <h2>ABHOLUNG BESTELLEN</h2>
+        <p class="sub">Wofür schickst du den LKW? Sortenrein bringt deutlich mehr.</p>
+        <div id="pickup-list"></div>
+        <button id="pickup-cancel">Abbrechen</button>
       </div>
     </div>
     <div id="loading">Lade Physik …</div>

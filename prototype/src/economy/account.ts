@@ -38,12 +38,14 @@ export class Account {
     return eur;
   }
 
-  /** Sofortprämie fürs Sortieren. */
-  paySortingBonus(massKg: number): number {
-    const eur = massKg * SORTING_BONUS_PER_KG;
-    this.moneyEur += eur;
+  /**
+   * Sortiertes Material festhalten. Geld gibt es dafür bewusst NICHT mehr:
+   * verdient wird ausschließlich, wenn eine Ladung abgeholt und abgefahren
+   * ist (Design-Fix 29.08.2026). Sonst trug sich das Spiel über Kleinkram
+   * statt über den Verkauf.
+   */
+  noteSorted(massKg: number): void {
     this.sortedKg += massKg;
-    return eur;
   }
 
   /**
@@ -53,26 +55,41 @@ export class Account {
   sellContainer(
     loaded: ScrapItem[],
     items: ItemManager,
-    composites: CompositeManager
+    composites: CompositeManager,
+    /** Bestellte Fraktion; null = der Abnehmer nimmt, was dominiert */
+    order?: string | null
   ): SaleResult {
     if (loaded.length === 0) return { eur: 0, massKg: 0, purity: 1, dominant: "" };
     const massByMaterial = new Map<string, number>();
     let totalKg = 0;
     for (const it of loaded) {
-      massByMaterial.set(it.materialId, (massByMaterial.get(it.materialId) ?? 0) + it.massKg);
-      totalKg += it.massKg;
+      // Presspakete bringen ihre Zusammensetzung mit: ein gemischt gepresstes
+      // Paket gilt weiterhin als Mischung, nicht als sortenreine Ladung
+      for (const c of it.composition ?? [{ materialId: it.materialId, massKg: it.massKg }]) {
+        massByMaterial.set(c.materialId, (massByMaterial.get(c.materialId) ?? 0) + c.massKg);
+        totalKg += c.massKg;
+      }
     }
+    // Wurde für eine Fraktion bestellt, zählt genau die — alles andere ist
+    // Verunreinigung, auch wenn es zufällig mehr wiegt.
     let dominant = "";
     let dominantKg = 0;
-    for (const [id, kg] of massByMaterial) {
-      if (kg > dominantKg) {
-        dominantKg = kg;
-        dominant = id;
+    if (order && massByMaterial.has(order)) {
+      dominant = order;
+      dominantKg = massByMaterial.get(order)!;
+    } else {
+      for (const [id, kg] of massByMaterial) {
+        if (kg > dominantKg) {
+          dominantKg = kg;
+          dominant = id;
+        }
       }
     }
     const purity = dominantKg / totalKg;
     const price = getMaterial(dominant).sellPricePerKg;
-    const eur = totalKg * price * purity * purity;
+    // Sortenreinheit zählt stark: eine saubere Ladung bringt ein Vielfaches
+    // einer gemischten. Hoch drei spreizt das deutlicher als hoch zwei.
+    const eur = totalKg * price * purity * purity * purity;
     this.moneyEur += eur;
 
     for (const it of loaded) {

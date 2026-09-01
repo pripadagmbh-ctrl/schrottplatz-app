@@ -12,7 +12,7 @@ import type { TearTarget } from "../dismantle/composites";
  */
 
 const MAX_ITEMS = 5; // (SW)
-const MAX_TOTAL_KG = 2000; // (SW)
+const MAX_TOTAL_KG = 3500; // (SW) — eine ganze Karosse muss hochgehen
 // Greif-Fenster: solange die Spinne schließt und noch nicht ganz zu ist, wird
 // kontinuierlich zugepackt — so lassen sich fallende Objekte auffangen.
 const GRAB_WINDOW_START = 0.6;
@@ -152,11 +152,17 @@ export class GripSystem {
       (collider) => {
         const body = collider.parent();
         if (body && body.isDynamic() && !candidates.includes(body)) {
-          // Nur fassen, was wirklich zwischen den Schalen liegt. Die Kugel
-          // allein ließ Material anheben, das neben oder unter der Spinne lag.
+          // Nur fassen, was wirklich zwischen den Schalen liegt. Geprüft wird
+          // der nächstgelegene Punkt der Oberfläche, nicht der Schwerpunkt:
+          // bei einem Auto liegt der in der Fahrzeugmitte und damit nie im
+          // Schalenkorb — Karossen waren deshalb kaum zu fassen.
           if (this.insideGrapple) {
-            const t = body.translation();
-            this.probe.set(t.x, t.y, t.z);
+            const proj = collider.projectPoint(
+              { x: sensorPos.x, y: sensorPos.y, z: sensorPos.z },
+              true
+            );
+            if (!proj) return true;
+            this.probe.set(proj.point.x, proj.point.y, proj.point.z);
             if (!this.insideGrapple(this.probe)) return true;
           }
           candidates.push(body);

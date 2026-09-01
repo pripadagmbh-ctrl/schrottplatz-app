@@ -263,6 +263,44 @@ async function main(): Promise<void> {
     renderControls();
   });
 
+  // --- Abholung bestellen: Fraktion wählen, dann kommt der LKW ---
+  const pickupEl = document.getElementById("pickup")!;
+  const pickupListEl = document.getElementById("pickup-list")!;
+  const showPickup = (v: boolean): void => {
+    pickupEl.classList.toggle("open", v);
+    if (!v) return;
+    // Nur anbieten, was auch dasteht — mit der Menge, die bereitliegt
+    const kg = new Map<string, number>();
+    for (const it of items.items) {
+      if (!it.body.isValid() || !it.body.isDynamic()) continue;
+      for (const c of it.composition ?? [{ materialId: it.materialId, massKg: it.massKg }]) {
+        kg.set(c.materialId, (kg.get(c.materialId) ?? 0) + c.massKg);
+      }
+    }
+    pickupListEl.innerHTML = "";
+    const bestellen = (order: string | null, label: string): void => {
+      const b = document.createElement("button");
+      const menge = order ? kg.get(order) ?? 0 : [...kg.values()].reduce((a, c) => a + c, 0);
+      b.innerHTML = `${label}<span class="kg">${Math.round(menge)} kg</span>`;
+      b.addEventListener("click", () => {
+        showPickup(false);
+        vehicles.requestPickup(order);
+        hud.toast(
+          order
+            ? `Abholung für ${getMaterial(order).name} bestellt — sortenrein laden!`
+            : "Abholung für gemischte Ladung bestellt."
+        );
+      });
+      pickupListEl.appendChild(b);
+    };
+    for (const id of [...kg.keys()].sort((a, b) => (kg.get(b) ?? 0) - (kg.get(a) ?? 0))) {
+      if (id === "contaminant") continue; // Störstoff bestellt niemand
+      bestellen(id, getMaterial(id).name);
+    }
+    bestellen(null, "Gemischt (schlechter Preis)");
+  };
+  document.getElementById("pickup-cancel")!.addEventListener("click", () => showPickup(false));
+
   const helpEl = document.getElementById("help")!;
   if (touch.active) helpEl.style.display = "none"; // auf Touchgeräten stört die Tastenliste
   const sensorPos = new THREE.Vector3();
@@ -291,7 +329,7 @@ async function main(): Promise<void> {
     if (e.correct) {
       audio.playCorrect();
       const it = items.items.find((i) => i.id === e.itemId);
-      if (it) account.paySortingBonus(it.massKg); // Sortierprämie sofort aufs Konto
+      if (it) account.noteSorted(it.massKg); // Geld gibt es erst bei der Abholung
     } else {
       audio.playWrong();
     }
@@ -346,7 +384,7 @@ async function main(): Promise<void> {
   // Abhol-LKW fährt los → Container abrechnen (sortenrein zahlt sich aus)
   vehicles.onPickupDepart = (truck) => {
     const loaded = truck.containedItems(items);
-    const sale = account.sellContainer(loaded, items, composites);
+    const sale = account.sellContainer(loaded, items, composites, vehicles.pickupOrder);
     if (sale.massKg > 0) {
       audio.playSale();
       hud.toast(
@@ -445,6 +483,10 @@ async function main(): Promise<void> {
     if (touch.consumePress("KeyC")) orbit.touchViewPress = true;
     if (touch.consumePress("KeyX")) excavator.toggleCabLift();
     if (touch.consumePress("KeyO")) excavator.toggleOutriggers();
+    // I und J: liegen auf deutscher wie englischer Tastatur an derselben Stelle
+    if (input.wasPressed("KeyI") || touch.consumePress("KeyI")) {
+      hud.toast(excavator.toggleBlade() ? "Schild abgesenkt — schieben." : "Schild angehoben.");
+    }
     if (input.wasPressed("KeyM") || touch.consumePress("KeyM")) {
       labelsOn = !labelsOn;
       containers.setLabelsVisible(labelsOn);
@@ -455,15 +497,20 @@ async function main(): Promise<void> {
     if (input.wasPressed("KeyH")) {
       helpEl.style.display = helpEl.style.display === "none" ? "block" : "none";
     }
-    // Abholung anfordern / beladenen Container abfahren lassen
+    // Abholung: steht ein beladener Container bereit, fährt er ab —
+    // sonst öffnet die Bestellung, in der die Fraktion gewählt wird
     if (input.wasPressed("KeyV") || touch.consumePress("KeyV")) {
-      const r = vehicles.requestPickup();
-      if (r === "gerufen") hud.toast("Abholung angefordert — LKW kommt über die Ostspur.");
-      else if (r === "abgefahren") hud.toast("Container geht raus …");
-      else hud.toast("Erst muss das Fahrzeug auf dem Platz fertig werden.");
+      if (vehicles.pickupTruck?.waitingForLoad) {
+        vehicles.requestPickup();
+        hud.toast("Container geht raus …");
+      } else if (vehicles.activeKind) {
+        hud.toast("Erst muss das Fahrzeug auf dem Platz fertig werden.");
+      } else {
+        showPickup(true);
+      }
     }
     // „Mach Platz": vor dem Abladen wegschicken, danach ein Stück vorfahren
-    if (input.wasPressed("KeyZ") || touch.consumePress("KeyZ")) {
+    if (input.wasPressed("KeyJ") || touch.consumePress("KeyJ")) {
       const r = vehicles.makeRoom();
       if (r === "weggeschickt") hud.toast("Weggeschickt — der Fahrer dreht ab.");
       else if (r === "vorgefahren") hud.toast("LKW fährt ein Stück vor.");

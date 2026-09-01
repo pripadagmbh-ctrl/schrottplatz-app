@@ -336,7 +336,9 @@ export class StaffManager {
       // Ausweichen: nicht in den Schwenkbereich des Baggers und nicht durch
       // Karossen hindurch — im Zweifel seitlich am Hindernis vorbei
       const step = this.avoid(g.position, toTarget);
-      g.position.addScaledVector(step, 1.5 * dt); // 1,5 m/s (SW)
+      // zügiges Arbeitstempo: die Wege um den Schwenkbereich herum sind lang,
+      // bei Schlendertempo käme er kaum hinterher
+      g.position.addScaledVector(step, 2.2 * dt);
       g.rotation.y = Math.atan2(step.x, step.z);
       this.walkPhase += dt * 7;
       // Festgefahren? Wenn das Ausweichen ihn im Kreis schickt, kommt er dem
@@ -416,11 +418,18 @@ export class StaffManager {
     if (this.lambertState === "guide") return;
 
     if (this.lambertState === "fetch") {
-      // Kleinteil aufnehmen und zur Annahmefläche tragen
+      // Aufgenommen — jetzt zur Box, in die das Material gehört
       const it = this.items.items.find((i) => i.id === this.carriedItemId);
       if (it) {
-        this.lambertState = "carry";
-        this.lambertTarget.set(0, 0, 7); // Annahmefläche
+        const ziel = StaffManager.BOX_FOR_MATERIAL[it.materialId];
+        if (ziel) {
+          this.lambertState = "carry";
+          // vor der Box stehen bleiben, nicht mitten hinein laufen
+          this.lambertTarget.set(ziel[0] - 3.4, 0, ziel[1]);
+        } else {
+          this.carriedItemId = null;
+          this.lambertState = "patrol";
+        }
       } else {
         this.carriedItemId = null;
         this.lambertState = "patrol";
@@ -428,13 +437,22 @@ export class StaffManager {
       return;
     }
     if (this.lambertState === "carry") {
-      // ablegen
+      // In die Box legen: Lambert wirft es über die Wand hinein
       const it = this.items.items.find((i) => i.id === this.carriedItemId);
       if (it && it.body.isValid()) {
-        it.body.setTranslation(
-          { x: (Math.random() - 0.5) * 2, y: 0.6, z: 7 + (Math.random() - 0.5) * 2 },
-          true
-        );
+        const ziel = StaffManager.BOX_FOR_MATERIAL[it.materialId];
+        if (ziel) {
+          it.body.setTranslation(
+            {
+              x: ziel[0] + (Math.random() - 0.5) * 1.6,
+              y: 1.6,
+              z: ziel[1] + (Math.random() - 0.5) * 1.6,
+            },
+            true
+          );
+          it.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+          it.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+        }
       }
       this.carriedItemId = null;
       this.lambertState = "patrol";
@@ -443,7 +461,7 @@ export class StaffManager {
     }
 
     // Patrouille: regelmäßig nach einem verirrten Kleinteil sehen
-    if (this.stateT > 1.5) {
+    if (this.stateT > 0.8) {
       this.stateT = 0;
       const stray = this.findStray();
       if (stray) {
@@ -457,6 +475,17 @@ export class StaffManager {
       this.lambertTarget.copy(this.patrol[this.patrolIdx]);
     }
   }
+
+  /**
+   * Wohin gehört welche Fraktion? Koordinaten der Betonboxen aus
+   * containers.ts. Stahl fehlt bewusst: der bleibt Sache des Baggers.
+   */
+  private static readonly BOX_FOR_MATERIAL: Record<string, [number, number]> = {
+    va: [4.9, -4.2],
+    alu: [4.9, -0.3],
+    copper: [4.9, 3.6],
+    cable: [4.9, 7.5],
+  };
 
   /** Sicherheitsabstand zum schwenkenden Ausleger (SW) */
   private static readonly EXCAVATOR_KEEPOUT = 8;
@@ -487,21 +516,34 @@ export class StaffManager {
 
   /** Kleinteil, das frei herumliegt (nicht in einer Zone, nicht gegriffen). */
   private findStray(): (typeof this.items.items)[number] | null {
+    // Lamberts Hauptaufgabe: Buntmetall aus dem Stahlschrott holen und in die
+    // passende Box legen. Stahl und Störstoff lässt er liegen — der eine ist
+    // Sache des Baggers, der andere kommt gesondert weg. Das nächstgelegene
+    // Teil hat Vorrang, damit er nicht quer über den Platz läuft, während
+    // neben ihm etwas liegt.
     const ex = this.getExcavatorPos?.();
+    const von = this.lambert.group.position;
+    let best: (typeof this.items.items)[number] | null = null;
+    let bestD = Infinity;
     for (const it of this.items.items) {
-      // Lambert kümmert sich nur um kleine Buntmetalle & Co. — Stahlschrott
-      // ist Sache des Baggers
-      // Kleinteile und Buntmetalle sind seine Aufgabe — schwerer Stahlschrott
-      // bleibt beim Bagger
-      if (it.containerId || it.massKg > 60 || it.materialId === "steel") continue;
+      if (it.massKg > 60) continue;
+      const ziel = StaffManager.BOX_FOR_MATERIAL[it.materialId];
+      if (!ziel) continue;
       if (!it.body.isValid() || !it.body.isDynamic()) continue;
       const p = it.body.translation();
-      if (p.y > 1.2) continue;
+      if (p.y > 1.4) continue;
+      // Liegt es schon in seiner Box, bleibt es dort. Alles andere — auch was
+      // im Stahlhaufen steckt — holt er heraus; genau das ist seine Aufgabe.
+      if (Math.hypot(p.x - ziel[0], p.z - ziel[1]) < 2.8) continue;
       if (Math.abs(p.x) > 22 || p.z < -10 || p.z > 22) continue;
       // niemals im Schwenkbereich des Auslegers arbeiten
       if (ex && Math.hypot(p.x - ex.x, p.z - ex.z) < StaffManager.EXCAVATOR_KEEPOUT) continue;
-      return it;
+      const d = Math.hypot(p.x - von.x, p.z - von.z);
+      if (d < bestD) {
+        bestD = d;
+        best = it;
+      }
     }
-    return null;
+    return best;
   }
 }

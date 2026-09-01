@@ -8,14 +8,15 @@ export class PhysicsWorld {
     this.world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
     this.world.timestep = 1 / 60;
 
-    // Schrott soll satt liegen bleiben, nicht auf dem Beton tanzen. Drückt die
-    // Spinne ein Teil in den Haufen, schob der Löser es vorher ruckartig wieder
-    // heraus — das sah aus wie Gummi. Weichere Kontaktkorrektur und mehr
-    // Iterationen lassen die Teile stattdessen ineinander zur Ruhe kommen.
+    // Kontakte müssen hart sein: Beton ist Beton. Zu weiche Werte ließen
+    // Teile sichtbar in den Boden und ineinander einsinken, statt satt
+    // aufzuliegen. Viele Iterationen halten Haufen trotzdem ruhig.
     const p = this.world.integrationParameters;
-    p.numSolverIterations = 8;
-    p.contact_natural_frequency = 20;
-    p.normalizedAllowedLinearError = 0.004;
+    p.numSolverIterations = 12;
+    p.contact_natural_frequency = 40;
+    p.normalizedAllowedLinearError = 0.001;
+    // Zusätzliche Reibungsdurchläufe: sonst rutschen gestapelte Teile ab
+    p.numAdditionalFrictionIterations = 6;
   }
 
   step(): void {

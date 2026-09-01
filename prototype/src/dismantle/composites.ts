@@ -58,7 +58,7 @@ export class CarComposite {
     scene.add(this.group);
 
     this.body = world.createRigidBody(
-      RAPIER.RigidBodyDesc.dynamic()
+      RAPIER.RigidBodyDesc.dynamic().setCcdEnabled(true)
         .setTranslation(pos.x, pos.y, pos.z)
         .setAngularDamping(0.8)
         .setLinearDamping(0.05)
@@ -291,7 +291,7 @@ export class CarComposite {
     part.mesh.quaternion.copy(worldQuat);
 
     const body = this.world.createRigidBody(
-      RAPIER.RigidBodyDesc.dynamic()
+      RAPIER.RigidBodyDesc.dynamic().setCcdEnabled(true)
         .setTranslation(worldPos.x, worldPos.y, worldPos.z)
         .setRotation({ x: worldQuat.x, y: worldQuat.y, z: worldQuat.z, w: worldQuat.w })
     );

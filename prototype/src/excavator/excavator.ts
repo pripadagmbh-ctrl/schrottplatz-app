@@ -15,6 +15,12 @@ const STICK_LEN = 4.0;
 const BOOM_PIVOT = new THREE.Vector3(0, 2.55, 0.55); // relativ zum Chassis-Ursprung (Boden)
 const GRAPPLE_LINK = 0.55; // Abstand Stielspitze → Palm-Oberkante
 
+// Räumschild vorn am Unterwagen
+const BLADE_W = 2.9; // Schildbreite (SW) — deckt die Spur der Maschine ab
+const BLADE_Z = 2.55; // Abstand vom Drehmittelpunkt nach vorn
+const BLADE_UP_Y = 0.62; // Bodenfreiheit im angehobenen Zustand
+const BLADE_TIME = 1.4; // s für einen vollen Hub
+
 // Geometrie der Spinne — Mesh UND Kollider leiten sich davon ab, damit die
 // Krallen physisch dort sind, wo man sie sieht.
 const CLAW_RING_R = 0.757; // Gelenkkreis = ØC/2 laut Datenblatt (1514 mm)
@@ -562,6 +568,22 @@ export class Excavator {
   blockedByOutriggers = false;
   /** Aufbockhöhe: so weit hebt sich die Maschine auf den Stützen (m) */
   static readonly JACK_UP_M = 0.34;
+  /** Räumschild: 0 = angehoben, 1 = am Boden */
+  private bladeDown = 0;
+  private bladeTarget = 0;
+  private bladeGroup!: THREE.Group;
+  private bladeBody!: RAPIER.RigidBody;
+  private tmpQuat = new THREE.Quaternion();
+
+  /** Schild heben/senken (Taste G bzw. Knopf). */
+  toggleBlade(): boolean {
+    this.bladeTarget = this.bladeTarget > 0.5 ? 0 : 1;
+    return this.bladeTarget > 0.5;
+  }
+
+  get bladeIsDown(): boolean {
+    return this.bladeDown > 0.5;
+  }
 
   private buildCabin(
     frameMat: THREE.MeshStandardMaterial,
@@ -854,6 +876,8 @@ export class Excavator {
       roughness: 0.25,
       metalness: 0.8,
     });
+    this.buildBlade(darkMat, frameMat, rodMat);
+
     const UP = new THREE.Vector3(0, 1, 0);
     for (const [sx, sz] of [
       [-1, 1],
@@ -972,6 +996,18 @@ export class Excavator {
       )
     );
     world.createCollider(RAPIER.ColliderDesc.cuboid(1.2, 0.75, 2.2), this.chassisBody);
+
+    // Räumschild als eigener kinematischer Körper: abgesenkt schiebt es
+    // Schrott vor sich her, angehoben liegt es über allem
+    this.bladeBody = world.createRigidBody(
+      RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(0, 5, 0)
+    );
+    world.createCollider(
+      RAPIER.ColliderDesc.cuboid(BLADE_W / 2, 0.42, 0.16)
+        .setTranslation(0, 0.42, 0)
+        .setFriction(0.9),
+      this.bladeBody
+    );
 
     // Ausleger + Stiel als kinematische Kollider — der Kran schiebt Schrott
     // beiseite, statt hindurchzutauchen
@@ -1158,6 +1194,14 @@ export class Excavator {
     // würde den Greifer von seinem Kollider trennen.
     this.position.y = this.outriggerDown * Excavator.JACK_UP_M;
 
+    // Räumschild heben und senken
+    const bladeStep = dt / BLADE_TIME;
+    this.bladeDown += THREE.MathUtils.clamp(
+      this.bladeTarget - this.bladeDown,
+      -bladeStep,
+      bladeStep
+    );
+
     this.resolveGroundClamp();
     this.syncMeshes();
 
@@ -1268,6 +1312,11 @@ export class Excavator {
     this.cabLiftGroup.position.z = this.cabLift * 0.34;
     for (const g of this.outriggerGroups) {
       g.position.y = (1 - this.outriggerDown) * 0.72; // eingefahren = angehoben
+    }
+    // Schild: gesenkt sitzt die Schneide knapp über dem Beton
+    if (this.bladeGroup) {
+      this.bladeGroup.position.y = (1 - this.bladeDown) * BLADE_UP_Y;
+      this.bladeGroup.rotation.x = (1 - this.bladeDown) * 0.35; // gehoben angewinkelt
     }
     // Kabinen-Lenker zwischen Oberwagen und Kabinenschlitten ausrichten
     for (const l of this.cabLinks) {
@@ -1398,6 +1447,22 @@ export class Excavator {
     });
     this.chassisBody.setNextKinematicRotation({ x: q.x, y: q.y, z: q.z, w: q.w });
 
+    // Schildkörper der Weltpose des Schildmeshes nachführen
+    this.bladeGroup.updateWorldMatrix(true, false);
+    this.bladeGroup.getWorldPosition(this.tmpA);
+    this.bladeGroup.getWorldQuaternion(this.tmpQuat);
+    this.bladeBody.setNextKinematicTranslation({
+      x: this.tmpA.x,
+      y: this.tmpA.y,
+      z: this.tmpA.z,
+    });
+    this.bladeBody.setNextKinematicRotation({
+      x: this.tmpQuat.x,
+      y: this.tmpQuat.y,
+      z: this.tmpQuat.z,
+      w: this.tmpQuat.w,
+    });
+
     // Arm-Kollider den Meshes nachführen
     for (const [mesh, body] of [
       [this.boomMesh, this.boomBody],
@@ -1445,6 +1510,58 @@ export class Excavator {
    * Säule. Sie wird viermal je Sekunde neu gezeichnet — häufiger bringt nichts
    * und kostet nur Zeit.
    */
+  /**
+   * Räumschild vorn am Unterwagen (Design-Wunsch 29.08.2026).
+   *
+   * Abgesenkt lässt sich damit loser Schrott vor der Maschine
+   * zusammenschieben — das spart viele Einzelgriffe beim Aufräumen. Gehoben
+   * hängt es angewinkelt über dem Boden und stört nicht.
+   */
+  private buildBlade(
+    dark: THREE.Material,
+    frame: THREE.Material,
+    rod: THREE.Material
+  ): void {
+    const g = new THREE.Group();
+    g.position.set(0, 0, BLADE_Z);
+    this.root.add(g);
+    this.bladeGroup = g;
+
+    // Schildblatt: leicht nach vorn geneigt, mit umlaufender Kante
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(BLADE_W, 0.72, 0.16), dark);
+    blade.position.set(0, 0.42, 0);
+    blade.rotation.x = -0.22;
+    blade.castShadow = true;
+    g.add(blade);
+    // Schneide unten, hell abgesetzt wie angeschliffener Stahl
+    const edge = new THREE.Mesh(
+      new THREE.BoxGeometry(BLADE_W, 0.14, 0.2),
+      new THREE.MeshStandardMaterial({ color: 0x9aa2a8, roughness: 0.4, metalness: 0.9 })
+    );
+    edge.position.set(0, 0.07, 0.03);
+    g.add(edge);
+    // Seitenwangen, damit das Material nicht seitlich wegläuft
+    for (const s of [-1, 1]) {
+      const wing = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.62, 0.5), dark);
+      wing.position.set((s * BLADE_W) / 2, 0.4, 0.22);
+      g.add(wing);
+    }
+    // Verstrebungen zum Fahrgestell samt Hubzylinder
+    for (const s of [-1, 1]) {
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.9), frame);
+      arm.position.set(s * 0.7, 0.5, -0.45);
+      g.add(arm);
+      const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.5, 8), frame);
+      cyl.position.set(s * 0.42, 0.78, -0.3);
+      cyl.rotation.x = 0.9;
+      g.add(cyl);
+      const piston = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.34, 8), rod);
+      piston.position.set(s * 0.42, 0.55, -0.16);
+      piston.rotation.x = 0.9;
+      g.add(piston);
+    }
+  }
+
   private buildInstrumentPanel(cx: number, cz: number): void {
     const canvas = document.createElement("canvas");
     canvas.width = 320;

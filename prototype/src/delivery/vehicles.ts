@@ -92,8 +92,8 @@ const TIP_OUT: Array<[number, number]> = [
 ];
 
 const SPEED = 3.5; // m/s (SW)
-const FIRST_DELAY_S = 20; // (SW)
-const NEXT_DELAY_S: [number, number] = [35, 60]; // (SW)
+const FIRST_DELAY_S = 12; // (SW)
+const NEXT_DELAY_S: [number, number] = [12, 24]; // (SW) — dichter Verkehr
 /** Sicherheitsabstand zum Bagger: darunter wartet der Fahrer (Briefing Kap. 13) */
 const BLOCK_RADIUS = 5.5;
 /** Ab diesem Gewicht gilt ein liegendes Teil als echtes Hindernis (SW) */
@@ -312,7 +312,7 @@ class DeliveryVehicle {
     // liegen (Blechtafel 1,9 m), sonst klemmt die Ladung und die Physik explodiert.
     const halfW = BED_HALF_W;
     world.createCollider(
-      RAPIER.ColliderDesc.cuboid(halfW, 0.06, this.bedLen / 2).setTranslation(0, 0, this.bedLen / 2),
+      RAPIER.ColliderDesc.cuboid(halfW, 0.14, this.bedLen / 2).setTranslation(0, -0.08, this.bedLen / 2),
       this.bedBody
     );
     // Abhol-LKW trägt einen hohen Container, damit geladenes Material hält
@@ -434,8 +434,10 @@ class DeliveryVehicle {
       const wallBody = this.world.createRigidBody(
         RAPIER.RigidBodyDesc.kinematicPositionBased()
       );
+      // 12 cm statt 6: dünne Wände liessen die Ladung beim Kippen
+      // durchschlagen, als wäre der Wagen Luft
       this.world.createCollider(
-        RAPIER.ColliderDesc.cuboid(0.06, wallH / 2, this.bedLen / 2),
+        RAPIER.ColliderDesc.cuboid(0.12, wallH / 2, this.bedLen / 2),
         wallBody
       );
       this.sideWalls.push({ hinge, mesh: side, body: wallBody, dir });
@@ -456,7 +458,7 @@ class DeliveryVehicle {
         RAPIER.RigidBodyDesc.kinematicPositionBased()
       );
       this.world.createCollider(
-        RAPIER.ColliderDesc.cuboid(bedW / 2, wallH / 2, 0.06),
+        RAPIER.ColliderDesc.cuboid(bedW / 2, wallH / 2, 0.12),
         rearBody
       );
       this.tailGate = { hinge, mesh: rear, body: rearBody };
@@ -494,8 +496,16 @@ class DeliveryVehicle {
     // Händler liefern volle Ladungen mit viel Großteil-Anteil (SW)
     // Nicht bis unter die Bordwand vollpacken: zu volle Ladungen quollen beim
     // Kippen über und blieben halb auf der Fläche hängen.
-    const count = this.kind === "kipper" ? 13 : 10;
-    const specs = randomCargo(count, 0.5, this.sortedMaterial ?? undefined);
+    // Jede vierte Fuhre bringt ein Schwergewicht — Tank, Fahrerhaus,
+    // Drehgestell. Dann passt weniger daneben, das ist gewollt.
+    const schwer = !this.sortedMaterial && Math.random() < 0.28;
+    const count = schwer ? 4 : this.kind === "kipper" ? 13 : 10;
+    const specs = randomCargo(
+      count,
+      0.5,
+      schwer ? 0.55 : 0,
+      this.sortedMaterial ?? undefined
+    );
     const bedQuat = new THREE.Quaternion();
     this.bedGroup.getWorldQuaternion(bedQuat);
     // Überlappungsfrei stapeln: jedes Teil bekommt einen Platz, der von allen
@@ -1020,7 +1030,14 @@ export class VehicleManager {
   }
 
   /** Abholung anfordern bzw. wartenden Abhol-LKW abfahren lassen. */
-  requestPickup(): "gerufen" | "abgefahren" | "belegt" {
+  /**
+   * Fraktion, für die der Abholer bestellt wurde (null = gemischte Ladung).
+   * Danach richtet sich die Abrechnung: Wer Alu bestellt und Alu lädt,
+   * bekommt den vollen Preis.
+   */
+  pickupOrder: string | null = null;
+
+  requestPickup(order?: string | null): "gerufen" | "abgefahren" | "belegt" {
     if (this.active) {
       if (this.active.kind === "abholer" && this.active.waitingForLoad) {
         this.active.requestRelease();
@@ -1028,6 +1045,7 @@ export class VehicleManager {
       }
       return "belegt";
     }
+    this.pickupOrder = order ?? null;
     this.spawnNow("abholer");
     return "gerufen";
   }

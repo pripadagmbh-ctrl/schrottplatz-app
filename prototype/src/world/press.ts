@@ -407,34 +407,41 @@ export class PressManager {
   /**
    * Zuschlagen: alles in der Mulde wird zu Paketen.
    *
-   * Die Teile werden nicht einzeln plattgedrückt, sondern nach Fraktion zu
-   * je einem festen Ballen zusammengefasst — so kommt Schrott aus einer
-   * Presse auch wirklich heraus. Nebenbei sinkt die Zahl der Körper deutlich.
+   * Alles in der Kammer wird zu EINEM Paket — die Presse sortiert nicht.
+   * Wer ein sortenreines Paket will, muss sortenrein einlegen; das Paket
+   * merkt sich seine Zusammensetzung und bringt gemischt entsprechend
+   * weniger (Design-Fix 29.08.2026).
    */
   private stamp(): void {
-    let count = 0;
     const inChamber = this.items.items.filter((it) => this.inChamber(it.body.translation()));
-    // nach Fraktion bündeln: jede bekommt ihr eigenes Paket
-    const byMaterial = new Map<string, typeof inChamber>();
-    for (const it of inChamber) {
-      const list = byMaterial.get(it.materialId);
-      if (list) list.push(it);
-      else byMaterial.set(it.materialId, [it]);
-    }
-    for (const [materialId, list] of byMaterial) {
+    let count = 0;
+    if (inChamber.length === 1) {
       // ein einzelnes Teil ergibt noch kein Paket — das wird nur gestaucht
-      if (list.length < 2) {
-        if (this.items.flattenItem(list[0])) count++;
-        continue;
+      if (this.items.flattenItem(inChamber[0])) count++;
+    } else if (inChamber.length > 1) {
+      // Zusammensetzung festhalten, auch die von schon gepressten Paketen
+      const anteile = new Map<string, number>();
+      for (const it of inChamber) {
+        for (const c of it.composition ?? [{ materialId: it.materialId, massKg: it.massKg }]) {
+          anteile.set(c.materialId, (anteile.get(c.materialId) ?? 0) + c.massKg);
+        }
       }
-      const kg = list.reduce((s, it) => s + it.massKg, 0);
-      const p = list[0].body.translation();
-      for (const it of list) {
+      const composition = [...anteile].map(([materialId, massKg]) => ({ materialId, massKg }));
+      // Die dominante Fraktion gibt dem Paket Farbe und Namen
+      const dominant = composition.reduce((a, b) => (b.massKg > a.massKg ? b : a));
+      const kg = composition.reduce((s, c) => s + c.massKg, 0);
+      const p = inChamber[0].body.translation();
+      for (const it of inChamber) {
         const wasCar = this.composites.despawnByBody(it.body);
         this.items.remove(it, !wasCar);
       }
-      this.items.spawnBale(materialId, kg, new THREE.Vector3(p.x, 1.0, CENTER.z));
-      count += list.length;
+      this.items.spawnBale(
+        dominant.materialId,
+        kg,
+        new THREE.Vector3(p.x, 1.0, CENTER.z),
+        composition
+      );
+      count += inChamber.length;
     }
     for (const car of this.composites.cars) {
       if (!this.inChamber(car.body.translation())) continue;

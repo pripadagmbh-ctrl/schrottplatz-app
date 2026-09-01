@@ -38,6 +38,18 @@ function cableCoilGeometry(r: number, tube: number): THREE.BufferGeometry {
 }
 
 /** Kollider für ein plattgedrücktes Teil (flacher Quader über der Grundfläche). */
+/**
+ * Dämpfung nach Masse. Physikalisch bremst Luftwiderstand leichte Körper
+ * viel stärker als schwere; eine feste Bremse für alles ließ 2-Tonnen-Teile
+ * so zahm wirken wie Bleche.
+ */
+export function dampLin(massKg: number): number {
+  return Math.min(0.45, Math.max(0.02, 8 / Math.max(massKg, 1)));
+}
+export function dampAng(massKg: number): number {
+  return Math.min(0.9, Math.max(0.05, 16 / Math.max(massKg, 1)));
+}
+
 function flatColliderDesc(shape: ScrapShape): RAPIER.ColliderDesc {
   const H = 0.06;
   if (shape.kind === "box") return RAPIER.ColliderDesc.cuboid(shape.dims[0] / 2, H, shape.dims[2] / 2);
@@ -94,6 +106,26 @@ const SPECS: PileSpec[] = [
  * Großteile für Händler-Anlieferungen (Design-Wunsch 2026-08-29): sperrig und
  * schwer — genau das Material, für das sich Schere und Presse lohnen.
  */
+/**
+ * Schwergewichte, die einen ganzen Auflieger füllen: Tanks, Fahrzeugteile,
+ * Zug- und Flugzeugbauteile. Sie sind absichtlich sperrig — so ein Stück
+ * einzufädeln ist die eigentliche Aufgabe am Bagger (Wunsch 29.08.2026).
+ */
+const HUGE_SPECS: PileSpec[] = [
+  { materialId: "steel", massKg: 2400, kind: "box", dims: [2.4, 1.1, 1.9] }, // Waggon-Drehgestell
+  { materialId: "steel", massKg: 2200, kind: "box", dims: [3.2, 0.9, 0.8] }, // Kettenlaufwerk
+  { materialId: "steel", massKg: 1800, kind: "cyl", dims: [1.1, 3.6] }, // Kesselwagen-Segment
+  { materialId: "steel", massKg: 1400, kind: "cyl", dims: [1.2, 3.1] }, // Lagertank
+  { materialId: "steel", massKg: 1100, kind: "cyl", dims: [0.9, 2.0] }, // Turbinengehäuse
+  { materialId: "steel", massKg: 900, kind: "box", dims: [2.2, 1.9, 1.8] }, // LKW-Fahrerhaus
+  { materialId: "steel", massKg: 1600, kind: "box", dims: [2.8, 1.2, 1.1] }, // Pressenrahmen
+  { materialId: "va", massKg: 950, kind: "cyl", dims: [1.0, 2.8] }, // VA-Prozesstank
+  { materialId: "va", massKg: 700, kind: "box", dims: [2.6, 0.9, 1.2] }, // VA-Behälter
+  { materialId: "alu", massKg: 700, kind: "box", dims: [3.5, 0.35, 1.6] }, // Tragflächenstück
+  { materialId: "alu", massKg: 800, kind: "cyl", dims: [1.3, 3.0] }, // Rumpfsegment
+  { materialId: "alu", massKg: 550, kind: "box", dims: [2.9, 1.1, 0.9] }, // Aufbau/Kofferaufbau
+];
+
 const BIG_SPECS: PileSpec[] = [
   { materialId: "steel", massKg: 180, kind: "box", dims: [0.28, 0.28, 2.9] }, // Doppel-T-Träger
   { materialId: "steel", massKg: 220, kind: "box", dims: [1.9, 0.08, 1.5] }, // Blechtafel
@@ -137,6 +169,8 @@ function colorFor(spec: PileSpec, seed: number): number {
 export function randomCargo(
   count: number,
   bigShare = 0,
+  /** Anteil Schwergewichte (Tanks, Zug-/Flugzeugteile) an der Ladung */
+  hugeShare = 0,
   /**
    * Sortenrein: Händler liefern ihre Ware oft schon getrennt an. Ist eine
    * Fraktion gesetzt, besteht die ganze Ladung daraus.
@@ -145,7 +179,12 @@ export function randomCargo(
 ): Array<{ materialId: string; massKg: number; shape: ScrapShape }> {
   const out = [];
   for (let i = 0; i < count; i++) {
-    const pool = Math.random() < bigShare ? BIG_SPECS : SPECS;
+    const pool =
+      Math.random() < hugeShare
+        ? HUGE_SPECS
+        : Math.random() < bigShare
+          ? BIG_SPECS
+          : SPECS;
     // Fraktionsmix der Anlieferungen (SW): 60 % Misch-/Stahlschrott,
     // 20 % Aluminium, der Rest verteilt sich auf VA, Kupfer, Kabel, Störstoff
     const r = Math.random();
@@ -181,6 +220,12 @@ export interface ScrapItem {
   containerId: string | null;
   /** Form für Save/Load — Objekte ohne shape (Karossen) sichert das Composite-System */
   shape?: ScrapShape;
+  /**
+   * Nur bei Presspaketen: woraus das Paket besteht. Ein Mischpaket bleibt
+   * damit auch nach dem Pressen als Mischung erkennbar und bringt beim
+   * Verkauf weniger als ein sortenrein gepresstes.
+   */
+  composition?: Array<{ materialId: string; massKg: number }>;
 }
 
 export class ItemManager {
@@ -200,6 +245,7 @@ export class ItemManager {
     mesh: THREE.Object3D;
     body: RAPIER.RigidBody;
     shape?: ScrapShape;
+    composition?: Array<{ materialId: string; massKg: number }>;
   }): ScrapItem {
     const item: ScrapItem = {
       id: `item_${this.nextId++}`,
@@ -209,6 +255,7 @@ export class ItemManager {
       body: params.body,
       containerId: null,
       shape: params.shape,
+      composition: params.composition,
     };
     this.items.push(item);
     this.byHandle.set(params.body.handle, item);
@@ -292,10 +339,14 @@ export class ItemManager {
       RAPIER.RigidBodyDesc.dynamic()
         .setTranslation(pos.x, pos.y, pos.z)
         .setRotation({ x: q.x, y: q.y, z: q.z, w: q.w })
-        // Dämpfung: Schrott ist sperrig und rutscht nicht weit — ohne das
-        // schlittern und schleudern die Teile unrealistisch über den Platz
-        .setLinearDamping(0.55)
-        .setAngularDamping(0.95)
+        // Dämpfung nach Masse: eine feste Bremse für alles nahm schweren
+        // Teilen ihr Gewicht — ein Motorblock kam so schnell zur Ruhe wie ein
+        // Blech. Leichtes bremst stark, Schweres behält seinen Schwung.
+        .setLinearDamping(dampLin(massKg))
+        .setAngularDamping(dampAng(massKg))
+        // Ohne durchgehende Prüfung schlagen schnelle Teile durch Boden,
+        // Bordwände und Bagger hindurch
+        .setCcdEnabled(true)
     );
     // Restitution 0: Metall auf Beton springt nicht, es klatscht und liegt
     this.world.createCollider(collider.setMass(massKg).setFriction(1.1).setRestitution(0), body);
@@ -380,7 +431,12 @@ export class ItemManager {
    * fasst. Die zerknautschte Oberfläche entsteht aus einem verrauschten
    * Quader — glatt sähe es aus wie ein Umzugskarton.
    */
-  spawnBale(materialId: string, massKg: number, pos: THREE.Vector3): ScrapItem {
+  spawnBale(
+    materialId: string,
+    massKg: number,
+    pos: THREE.Vector3,
+    composition?: Array<{ materialId: string; massKg: number }>
+  ): ScrapItem {
     // Richtwert: rund 1,2 t je Kubikmeter Paket
     const vol = THREE.MathUtils.clamp(massKg / 1200, 0.12, 1.5);
     const w = Math.cbrt(vol);
@@ -408,8 +464,9 @@ export class ItemManager {
     const body = this.world.createRigidBody(
       RAPIER.RigidBodyDesc.dynamic()
         .setTranslation(pos.x, pos.y, pos.z)
-        .setLinearDamping(0.6)
-        .setAngularDamping(1.1)
+        .setLinearDamping(dampLin(massKg))
+        .setAngularDamping(dampAng(massKg))
+        .setCcdEnabled(true)
     );
     this.world.createCollider(
       RAPIER.ColliderDesc.cuboid(dims[0] / 2, dims[1] / 2, dims[2] / 2)
@@ -425,6 +482,7 @@ export class ItemManager {
       mesh,
       body,
       shape: { kind: "box", dims, color: mat.color, flat: true },
+      composition,
     });
   }
 

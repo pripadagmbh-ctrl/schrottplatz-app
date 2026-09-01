@@ -91,7 +91,8 @@ export class TouchControls {
     this.bindTap("btn-press", "KeyB");
     this.bindTap("btn-pickup", "KeyV");
     this.bindTap("btn-marks", "KeyM");
-    this.bindTap("btn-away", "KeyZ");
+    this.bindTap("btn-away", "KeyJ");
+    this.bindTap("btn-blade", "KeyI");
     this.bindTap("btn-music", "KeyU");
     this.bindTap("btn-pause", "Escape");
     this.bindTilt();

@@ -57,7 +57,7 @@ export class FenceManager {
       scene.add(group);
 
       const body = world.createRigidBody(
-        RAPIER.RigidBodyDesc.dynamic().setTranslation(x, 0.65, z)
+        RAPIER.RigidBodyDesc.dynamic().setCcdEnabled(true).setTranslation(x, 0.65, z)
       );
       body.lockTranslations(true, false);
       body.lockRotations(true, false);
