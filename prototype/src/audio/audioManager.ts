@@ -285,6 +285,16 @@ export class AudioManager {
     this.tone(990, 0.16, 0.12, 0.07);
   }
 
+  /**
+   * Rastklick des Funktionsrädchens — ein sehr kurzer, trockener Tick, wie
+   * das Einrasten eines Drehschalters. Bewusst leise: er kommt bei jedem
+   * Eintrag und darf nicht nerven.
+   */
+  playTick(): void {
+    this.tone(1760, 0.035, 0.045, 0);
+    this.tone(2640, 0.022, 0.025, 0.004);
+  }
+
   playWrong(): void {
     this.burst([110, 116], 0.3, 0.25, "square");
   }

@@ -102,6 +102,22 @@ export class TouchControls {
   }
 
   /**
+   * Kurzer Vibrationsimpuls, wo das Gerät ihn kann. Android liefert ihn über
+   * die Vibrations-Schnittstelle; iOS kennt sie nicht, dort bleibt es beim
+   * Klickgeräusch. Fehler werden geschluckt — Haptik ist Beiwerk.
+   */
+  private static vibrate(ms: number): void {
+    try {
+      navigator.vibrate?.(ms);
+    } catch {
+      // manche Browser werfen ohne vorherige Nutzergeste
+    }
+  }
+
+  /** Rastklick des Rädchens — von main mit dem Audiosystem verbunden. */
+  onWheelTick: (() => void) | null = null;
+
+  /**
    * Browser-Zoom unterbinden: Safari kennt eigene Gesture-Events, und ein
    * schneller Doppeltipp zoomt sonst die Seite, statt die Ansicht zu wechseln.
    */
@@ -202,6 +218,7 @@ export class TouchControls {
       "pointerdown",
       (e) => {
         this.pressed.add(code);
+        TouchControls.vibrate(22); // spürbare Bestätigung
         el.classList.add("down");
         window.setTimeout(() => el.classList.remove("down"), 120);
         e.preventDefault();
@@ -224,10 +241,11 @@ export class TouchControls {
     ) as HTMLElement[];
     if (items.length === 0) return;
     const n = items.length;
-    // Die Einträge verteilen sich auf den vollen Kreis: so ist die Walze
-    // geschlossen und dreht endlos weiter, ohne Anschlag oben oder unten.
-    const STEP = 360 / n;
-    const RADIUS = 118; // px — bestimmt, wie stark die Walze wölbt
+    // Eng gestaffelt, damit mehrere Befehle gleichzeitig lesbar sind. Die
+    // Walze dreht trotzdem endlos: der Sprung vom letzten zum ersten Eintrag
+    // passiert auf der abgewandten Seite und ist ausgeblendet.
+    const STEP = 23; // Grad zwischen zwei Einträgen
+    const RADIUS = 92; // px — bestimmt, wie stark die Walze wölbt
     let pos = 0; // aktuelle Position in Einträgen, darf zwischen zwei liegen
 
     /** Kürzester Abstand von Eintrag i zur aktuellen Position, rundherum. */
@@ -250,9 +268,45 @@ export class TouchControls {
       });
     };
 
+    /** Beim Überrasten fühlbar und hörbar quittieren. */
+    let letzterRast = 0;
     const drehen = (delta: number): void => {
       pos = (((pos + delta) % n) + n) % n;
+      const rast = Math.round(pos);
+      if (rast !== letzterRast) {
+        letzterRast = rast;
+        TouchControls.vibrate(9);
+        this.onWheelTick?.();
+      }
       render();
+    };
+
+    /**
+     * Nachlauf: Nach dem Loslassen dreht die Walze mit dem aufgenommenen
+     * Schwung weiter aus und rastet dann sanft ein. Das macht den Unterschied
+     * zwischen „Liste schieben" und einem Rad, das sich gut anfühlt.
+     */
+    let schwung = 0;
+    let laeuft = false;
+    const ausrollen = (): void => {
+      if (Math.abs(schwung) > 0.004) {
+        drehen(schwung);
+        schwung *= 0.92;
+        requestAnimationFrame(ausrollen);
+        return;
+      }
+      // sanft auf die nächste Rastung ziehen
+      const ziel = Math.round(pos);
+      const rest = ziel - pos;
+      if (Math.abs(rest) > 0.004) {
+        pos += rest * 0.25;
+        render();
+        requestAnimationFrame(ausrollen);
+        return;
+      }
+      pos = (((ziel % n) + n) % n);
+      render();
+      laeuft = false;
     };
 
     // Wischen: ein Eintrag je 34 px
@@ -265,6 +319,8 @@ export class TouchControls {
         dragId = e.pointerId;
         lastY = e.clientY;
         moved = 0;
+        schwung = 0;
+        laeuft = false;
         bar.setPointerCapture?.(e.pointerId);
       },
       { passive: true }
@@ -276,7 +332,9 @@ export class TouchControls {
         const dy = e.clientY - lastY;
         lastY = e.clientY;
         moved += Math.abs(dy);
-        drehen(-dy / 34);
+        const schritt = -dy / 30;
+        schwung = schwung * 0.6 + schritt * 0.4; // geglättet, für den Nachlauf
+        drehen(schritt);
         e.preventDefault();
       },
       { passive: false }
@@ -284,9 +342,11 @@ export class TouchControls {
     const ende = (e: PointerEvent): void => {
       if (dragId !== e.pointerId) return;
       dragId = null;
-      // Nach dem Wischen auf den nächsten Eintrag einrasten
-      pos = (((Math.round(pos) % n) + n) % n);
-      render();
+      // Mit Schwung ausrollen statt hart einzurasten
+      if (!laeuft) {
+        laeuft = true;
+        requestAnimationFrame(ausrollen);
+      }
     };
     bar.addEventListener("pointerup", ende);
     bar.addEventListener("pointercancel", ende);

@@ -319,6 +319,8 @@ async function main(): Promise<void> {
   };
   document.getElementById("pickup-cancel")!.addEventListener("click", () => showPickup(false));
 
+  touch.onWheelTick = () => audio.playTick();
+
   const helpEl = document.getElementById("help")!;
   if (touch.active) helpEl.style.display = "none"; // auf Touchgeräten stört die Tastenliste
   const sensorPos = new THREE.Vector3();
