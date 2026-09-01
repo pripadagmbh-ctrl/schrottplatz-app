@@ -8,6 +8,7 @@
  *   Fadenkreuz     — nur Fahren: vor/zurück und links/rechts lenken (simultan)
  *   Greifen        — über den rechten Stick (oder festen Fingerdruck)
  *   Extras         — Doppeltipp wechselt die Ansicht, Kippen ersetzt das Fadenkreuz
+ *   Rädchen        — die übrigen Funktionen, endlos drehbar
  */
 import { type ControlConfig, type AxisId, loadConfig } from "./controlConfig";
 
@@ -85,7 +86,6 @@ export class TouchControls {
     this.bindHold("btn-right", "right");
     this.bindHold("btn-rot-l", "rotL");
     this.bindHold("btn-rot-r", "rotR");
-    this.bindTap("btn-view", "KeyC");
     this.bindTap("btn-cab", "KeyX");
     this.bindTap("btn-outrig", "KeyO");
     this.bindTap("btn-press", "KeyB");
@@ -223,14 +223,24 @@ export class TouchControls {
       bar.querySelectorAll(".btn")
     ) as HTMLElement[];
     if (items.length === 0) return;
-    const STEP = 26; // Grad zwischen zwei Einträgen
+    const n = items.length;
+    // Die Einträge verteilen sich auf den vollen Kreis: so ist die Walze
+    // geschlossen und dreht endlos weiter, ohne Anschlag oben oder unten.
+    const STEP = 360 / n;
     const RADIUS = 118; // px — bestimmt, wie stark die Walze wölbt
     let pos = 0; // aktuelle Position in Einträgen, darf zwischen zwei liegen
 
+    /** Kürzester Abstand von Eintrag i zur aktuellen Position, rundherum. */
+    const ringAbstand = (i: number): number => {
+      let d = (((i - pos) % n) + n) % n;
+      if (d > n / 2) d -= n;
+      return d;
+    };
+
     const render = (): void => {
-      const sel = Math.round(pos);
+      const sel = ((Math.round(pos) % n) + n) % n;
       items.forEach((el, i) => {
-        const d = i - pos;
+        const d = ringAbstand(i);
         const ang = d * STEP;
         // Rückseite der Walze wegblenden
         const sichtbar = Math.abs(ang) < 78;
@@ -241,7 +251,7 @@ export class TouchControls {
     };
 
     const drehen = (delta: number): void => {
-      pos = Math.max(0, Math.min(items.length - 1, pos + delta));
+      pos = (((pos + delta) % n) + n) % n;
       render();
     };
 
@@ -275,7 +285,7 @@ export class TouchControls {
       if (dragId !== e.pointerId) return;
       dragId = null;
       // Nach dem Wischen auf den nächsten Eintrag einrasten
-      pos = Math.round(pos);
+      pos = (((Math.round(pos) % n) + n) % n);
       render();
     };
     bar.addEventListener("pointerup", ende);
