@@ -22,6 +22,7 @@ export class Yard {
   constructor(scene: THREE.Scene, world: RAPIER.World) {
     this.buildGround(scene, world);
     this.buildWalls(scene, world);
+    this.buildGraffiti(scene);
     this.buildReceivingArea(scene);
     this.buildScrapMounds(scene, world);
     this.buildDeliveryLane(scene);
@@ -311,6 +312,74 @@ export class Yard {
    * Der Platz ist ringsum mit Betonlego-Blöcken eingefasst (Design 2026-08-29).
    * In der linken hinteren Ecke (Nordwesten) bleibt eine Lücke als Einfahrt.
    */
+  /**
+   * Graffiti auf der Betonwand links neben dem Wiegehäuschen. Der Sprüher war
+   * offensichtlich Aarau-Fan (Wunsch 29.08.2026).
+   */
+  private buildGraffiti(scene: THREE.Scene): void {
+    const cv = document.createElement("canvas");
+    cv.width = 1024;
+    cv.height = 384;
+    const c = cv.getContext("2d")!;
+    c.clearRect(0, 0, cv.width, cv.height);
+
+    // Sprühnebel-Untergrund, damit es nicht wie ein Aufkleber wirkt
+    c.globalAlpha = 0.18;
+    for (let i = 0; i < 300; i++) {
+      c.fillStyle = i % 2 ? "#0f0f12" : "#e8e8e4";
+      const r = 6 + Math.random() * 26;
+      c.beginPath();
+      c.arc(80 + Math.random() * 880, 60 + Math.random() * 260, r, 0, Math.PI * 2);
+      c.fill();
+    }
+    c.globalAlpha = 1;
+
+    // Schriftzug in Vereinsfarben: schwarz-weiß, leicht schräg gesprüht
+    c.save();
+    c.translate(cv.width / 2, 168);
+    c.rotate(-0.055);
+    c.textAlign = "center";
+    c.textBaseline = "middle";
+    c.font = "italic 900 168px Impact, 'Arial Black', sans-serif";
+    // Versatzschatten wie beim Nachziehen mit der zweiten Dose
+    c.fillStyle = "#101014";
+    c.fillText("FC AARAU", 10, 12);
+    c.fillStyle = "#f2f2ee";
+    c.fillText("FC AARAU", 0, 0);
+    c.lineWidth = 7;
+    c.strokeStyle = "#101014";
+    c.strokeText("FC AARAU", 0, 0);
+    c.font = "italic 900 74px Impact, 'Arial Black', sans-serif";
+    c.fillStyle = "#101014";
+    c.fillText("1902", 0, 118);
+    c.restore();
+
+    // Laufende Farbnasen
+    c.fillStyle = "rgba(16,16,20,0.55)";
+    for (const x of [214, 352, 508, 655, 806]) {
+      c.fillRect(x, 236, 7, 40 + Math.random() * 55);
+    }
+
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 4;
+    const plane = new THREE.Mesh(
+      new THREE.PlaneGeometry(7.4, 2.8),
+      new THREE.MeshStandardMaterial({
+        map: tex,
+        transparent: true,
+        roughness: 0.95,
+        polygonOffset: true,
+        polygonOffsetFactor: -2,
+      })
+    );
+    // Innenseite der Nordwand, westlich vom Wiegehäuschen — von der Waage
+    // und aus der Kabine gut zu sehen
+    plane.position.set(-11.5, 1.02, YARD_D / 2 - 0.32);
+    plane.rotation.y = Math.PI;
+    scene.add(plane);
+  }
+
   private buildWalls(scene: THREE.Scene, world: RAPIER.World): void {
     const BL = 1.6; // Blocklänge
     const BH = 0.6;

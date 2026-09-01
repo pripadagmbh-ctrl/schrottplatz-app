@@ -308,12 +308,14 @@ class DeliveryVehicle {
       RAPIER.ColliderDesc.cuboid(1.1, 0.42, (this.bedLen + 1.6) / 2).setTranslation(0, 0.5, 0.8),
       this.chassisBody
     );
-    this.bedBody = world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased());
+    this.bedBody = world.createRigidBody(
+      RAPIER.RigidBodyDesc.kinematicPositionBased().setCcdEnabled(true)
+    );
     // Ladefläche: Boden + Wände. Innenbreite MUSS über dem breitesten Großteil
     // liegen (Blechtafel 1,9 m), sonst klemmt die Ladung und die Physik explodiert.
     const halfW = BED_HALF_W;
     world.createCollider(
-      RAPIER.ColliderDesc.cuboid(halfW, 0.14, this.bedLen / 2).setTranslation(0, -0.08, this.bedLen / 2),
+      RAPIER.ColliderDesc.cuboid(halfW, 0.3, this.bedLen / 2).setTranslation(0, -0.26, this.bedLen / 2),
       this.bedBody
     );
     // Abhol-LKW trägt einen hohen Container, damit geladenes Material hält
@@ -433,7 +435,7 @@ class DeliveryVehicle {
       }
       this.bedGroup.add(hinge);
       const wallBody = this.world.createRigidBody(
-        RAPIER.RigidBodyDesc.kinematicPositionBased()
+        RAPIER.RigidBodyDesc.kinematicPositionBased().setCcdEnabled(true)
       );
       // 12 cm statt 6: dünne Wände liessen die Ladung beim Kippen
       // durchschlagen, als wäre der Wagen Luft
@@ -456,7 +458,7 @@ class DeliveryVehicle {
       hinge.add(rear);
       this.bedGroup.add(hinge);
       const rearBody = this.world.createRigidBody(
-        RAPIER.RigidBodyDesc.kinematicPositionBased()
+        RAPIER.RigidBodyDesc.kinematicPositionBased().setCcdEnabled(true)
       );
       this.world.createCollider(
         RAPIER.ColliderDesc.cuboid(bedW / 2, wallH / 2, 0.12),
@@ -848,7 +850,7 @@ class DeliveryVehicle {
         }
         break;
       case "tipping":
-        this.tip = Math.min(this.tip + dt / 3.2, 1);
+        this.tip = Math.min(this.tip + dt / 4.2, 1);
         if (this.tip >= 1) {
           this.phase = "tipHold";
           this.phaseT = 0;

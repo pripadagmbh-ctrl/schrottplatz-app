@@ -37,6 +37,15 @@ const CLAW_COUNT = 5;
  */
 const CLAW_OPEN_SPLAY = 1.25;
 const UP_Y = new THREE.Vector3(0, 1, 0);
+const IDENT_QUAT = { x: 0, y: 0, z: 0, w: 1 };
+/**
+ * Prüfkugel im Schalenkorb — kleiner als die Spinne, etwas Eingraben ist
+ * erlaubt. Sie wird erst beim ersten Gebrauch angelegt: beim Laden des Moduls
+ * ist das Rapier-WASM noch nicht initialisiert.
+ */
+let grappleProbe: RAPIER.Ball | null = null;
+/** Ab dieser Masse ist ein Brocken nicht mehr wegzuschieben */
+const HEAVY_BLOCK_KG = 700;
 
 /**
  * Punkt auf einer Kralle nach `k` Segmenten, im Frame der Spinne.
@@ -284,6 +293,7 @@ export class Excavator {
     // Spinne samt Schalen
     this.grappleGroup.getWorldPosition(this.blockPos);
     if (hitsObstacle(this.blockPos.x, this.blockPos.z, 0.9, this.blockPos.y - 1.2)) return true;
+    if (this.grappleHitsBody()) return true;
     // Ausleger und Stiel an mehreren Punkten entlang abtasten
     for (const s of this.armShapes) {
       const mesh = s.mesh();
@@ -308,6 +318,51 @@ export class Excavator {
     }
     return this.obstacleBodies.size > 0 && this.armHitsObstacle();
   }
+
+  /**
+   * Steckt die Spinne in einem Fahrzeug oder einem schweren Brocken?
+   *
+   * Die Prüfkugel ist kleiner als die Spinne: ein Stück weit dürfen sich die
+   * Krallen eingraben — sie schneiden ja auch mal durch Blech —, aber sie
+   * sollen nicht im Objekt verschwinden. Leichter Schrott wird bewusst nicht
+   * geprüft, sonst käme man nicht mehr in einen Haufen hinein; den schieben
+   * die Krallen-Kollider ohnehin beiseite.
+   */
+  private grappleHitsBody(): boolean {
+    grappleProbe ??= new RAPIER.Ball(0.62);
+    this.grappleGroup.getWorldPosition(this.blockPos);
+    this.blockPos.y -= 1.35; // Mitte des Schalenkorbs
+    let hit = false;
+    this.physicsWorld.intersectionsWithShape(
+      this.blockPos,
+      IDENT_QUAT,
+      grappleProbe,
+      (collider) => {
+        const b = collider.parent();
+        if (!b) return true;
+        if (this.obstacleBodies.has(b.handle)) {
+          hit = true; // Fahrzeug auf dem Platz
+          return false;
+        }
+        if (this.grippedHandles.has(b.handle)) return true; // eigene Ladung
+        // Schwere Brocken lassen sich nicht wegschieben — an denen ist Schluss.
+        // Feste Körper (Bauten) ohnehin nicht, nur der Boden zählt nicht mit.
+        if (b.isFixed() && collider.translation().y > -0.05) {
+          hit = true;
+          return false;
+        }
+        if (b.isDynamic() && b.mass() > HEAVY_BLOCK_KG) {
+          hit = true;
+          return false;
+        }
+        return true;
+      }
+    );
+    return hit;
+  }
+
+  /** Handles der gerade gegriffenen Körper — die blockieren nicht. */
+  grippedHandles = new Set<number>();
 
   private blockPos = new THREE.Vector3();
   private blockLocal = new THREE.Vector3();

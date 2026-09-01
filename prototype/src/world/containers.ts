@@ -37,10 +37,10 @@ const CONFIGS: ContainerConfig[] = [
   // Vier Betonlego-Mulden in einer Reihe, Öffnung zeigt nach Westen zum Bagger
   // Nach Norden gerückt: die westliche Öffnung darf nicht von der Presse
   // versperrt werden
-  { id: "c_va", fractionId: "va", label: "EDELSTAHL VA", kind: "bay", x: 4.9, z: -4.2, size: [4.6, 3.2, 2.5] },
-  { id: "c_alu", fractionId: "alu", label: "ALU", kind: "bay", x: 4.9, z: -0.3, size: [4.6, 3.2, 2.5] },
-  { id: "c_copper", fractionId: "copper", label: "KUPFER/MS", kind: "bay", x: 4.9, z: 3.6, size: [4.6, 3.2, 2.5] },
-  { id: "c_cable", fractionId: "cable", label: "KABEL", kind: "bay", x: 4.9, z: 7.5, size: [4.6, 3.2, 2.5] },
+  { id: "c_va", fractionId: "va", label: "EDELSTAHL VA", kind: "bay", x: 5.9, z: -4.4, size: [4.6, 4.6, 2.5] },
+  { id: "c_alu", fractionId: "alu", label: "ALU", kind: "bay", x: 5.9, z: 0.7, size: [4.6, 4.6, 2.5] },
+  { id: "c_copper", fractionId: "copper", label: "KUPFER/MS", kind: "bay", x: 5.9, z: 5.8, size: [4.6, 4.6, 2.5] },
+  { id: "c_cable", fractionId: "cable", label: "KABEL", kind: "bay", x: 5.9, z: 10.9, size: [4.6, 4.6, 2.5] },
 ];
 
 /** Fangbereich über einer Haufen-Zone (Zonen-Zählung + Ampel) */

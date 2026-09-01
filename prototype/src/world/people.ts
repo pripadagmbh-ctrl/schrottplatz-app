@@ -489,11 +489,34 @@ export class StaffManager {
    * containers.ts. Stahl fehlt bewusst: der bleibt Sache des Baggers.
    */
   private static readonly BOX_FOR_MATERIAL: Record<string, [number, number]> = {
-    va: [4.9, -4.2],
-    alu: [4.9, -0.3],
-    copper: [4.9, 3.6],
-    cable: [4.9, 7.5],
+    va: [5.9, -4.4],
+    alu: [5.9, 0.7],
+    copper: [5.9, 5.8],
+    cable: [5.9, 10.9],
   };
+
+  /**
+   * Freier Weg von Lambert zum Ziel? Abgetastet wird die Luftlinie in
+   * Meterschritten gegen die festen Bauten. Was nur um Ecken erreichbar wäre,
+   * lässt er stehen — dafür ist der Bagger da.
+   */
+  private reachable(tx: number, tz: number): boolean {
+    const from = this.lambert.group.position;
+    const dx = tx - from.x;
+    const dz = tz - from.z;
+    const dist = Math.hypot(dx, dz);
+    if (dist > StaffManager.REACH_M) return false;
+    const steps = Math.ceil(dist);
+    for (let i = 1; i <= steps; i++) {
+      const f = i / steps;
+      if (hitsObstacle(from.x + dx * f, from.z + dz * f, 0.5)) return false;
+    }
+    return true;
+  }
+
+
+  /** So weit läuft er für ein Kleinteil — alles Weitere ist Baggerarbeit. */
+  private static readonly REACH_M = 26;
 
   /** Wo Lambert gerade steht — der Baggerarm weicht ihm aus. */
   lambertPosition(): THREE.Vector3 {
@@ -524,6 +547,14 @@ export class StaffManager {
     const ex = this.getExcavatorPos?.();
     if (ex) push(ex.x, ex.z, StaffManager.EXCAVATOR_KEEPOUT);
     for (const c of this.getObstaclePositions?.() ?? []) push(c.x, c.z, 3.2);
+    // Sperrige Schrottteile: er steigt nicht darüber, er geht drumherum
+    for (const it of this.items.items) {
+      if (it.massKg < 120 || !it.body.isValid()) continue;
+      const q = it.body.translation();
+      if (Math.abs(q.x - pos.x) > 3 || Math.abs(q.z - pos.z) > 3) continue;
+      if (it.id === this.carriedItemId) continue; // sein eigenes Ziel nicht
+      push(q.x, q.z, 1.5);
+    }
     out.y = 0;
     out.normalize();
     // Feste Bauten — Betonlego, Boxen, Schere — laufen lassen sich nicht
@@ -558,6 +589,9 @@ export class StaffManager {
       if (Math.abs(p.x) > 22 || p.z < -10 || p.z > 22) continue;
       // niemals im Schwenkbereich des Auslegers arbeiten
       if (ex && Math.hypot(p.x - ex.x, p.z - ex.z) < StaffManager.EXCAVATOR_KEEPOUT) continue;
+      // Nur holen, wohin ein freier Weg führt — was hinter Boxen oder Mauern
+      // liegt, ist Baggerarbeit
+      if (!this.reachable(p.x, p.z)) continue;
       const d = Math.hypot(p.x - von.x, p.z - von.z);
       if (d < bestD) {
         bestD = d;

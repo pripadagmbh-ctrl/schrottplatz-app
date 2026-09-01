@@ -1,4 +1,4 @@
-import { YARD_W, YARD_D, GATE_X } from "./yard";
+import { YARD_W, YARD_D, GATE_X, WEIGH_X, WEIGH_Z } from "./yard";
 
 /**
  * Feste Bauten auf dem Platz — alles, wodurch niemand hindurchlaufen oder
@@ -32,6 +32,24 @@ const WALL_T = 0.6;
 /** Höhe der Umrandung: drei Reihen */
 const WALL_H = 1.8;
 
+/** Mittelachse der Boxenreihe */
+const BAY_X = 5.9;
+/** halbe Boxentiefe (x) und -breite (z) */
+const BAY_HW = 2.3;
+const BAY_HD = 2.3;
+/** Wanddicke der Betonlego-Boxen */
+const BAY_T = 0.35;
+const BAY_TOP = 2.5;
+
+/** Die drei Wände einer Box — vorn nach Westen bleibt sie offen. */
+function bayWalls(z: number, name: string): Obstacle[] {
+  return [
+    { x: BAY_X, z: z - BAY_HD, hw: BAY_HW, hd: BAY_T, top: BAY_TOP, label: `Box ${name} Süd` },
+    { x: BAY_X, z: z + BAY_HD, hw: BAY_HW, hd: BAY_T, top: BAY_TOP, label: `Box ${name} Nord` },
+    { x: BAY_X + BAY_HW, z, hw: BAY_T, hd: BAY_HD, top: BAY_TOP, label: `Box ${name} Ost` },
+  ];
+}
+
 export const STATIC_OBSTACLES: Obstacle[] = [
   // --- Umrandung aus Betonlego, Einfahrt im Nordwesten ausgespart ---
   { x: 0, z: -HZ, hw: HX, hd: WALL_T / 2, top: WALL_H, label: "Südwand" },
@@ -55,14 +73,20 @@ export const STATIC_OBSTACLES: Obstacle[] = [
     label: "Nordwand Ost",
   },
 
-  // --- Betonlego-Boxen für die Buntmetalle (Öffnung nach Westen) ---
-  { x: 4.9, z: -4.2, hw: 2.3, hd: 1.6, top: 2.5, label: "Box VA" },
-  { x: 4.9, z: -0.3, hw: 2.3, hd: 1.6, top: 2.5, label: "Box Alu" },
-  { x: 4.9, z: 3.6, hw: 2.3, hd: 1.6, top: 2.5, label: "Box Kupfer" },
-  { x: 4.9, z: 7.5, hw: 2.3, hd: 1.6, top: 2.5, label: "Box Kabel" },
+  // --- Betonlego-Boxen für die Buntmetalle ---
+  // Je drei Wände, vorn (Westen) offen. Als Vollfläche eingetragen wäre der
+  // Innenraum gesperrt und man käme mit der Spinne nicht mehr hinein.
+  ...bayWalls(-4.4, "VA"),
+  ...bayWalls(0.7, "Alu"),
+  ...bayWalls(5.8, "Kupfer"),
+  ...bayWalls(10.9, "Kabel"),
 
   // --- Schere und Presse, südlich hinter dem Bagger ---
   { x: 0, z: -9.5, hw: 4.4, hd: 3.8, top: 2.2, label: "Schere" },
+
+  // --- Gebäude: Wiegehäuschen an der Waage, Kaffeebude abseits ---
+  { x: WEIGH_X + 4.6, z: WEIGH_Z, hw: 2.4, hd: 1.7, top: 3.2, label: "Wiegehäuschen" },
+  { x: GATE_X - 6, z: WEIGH_Z - 13, hw: 2.6, hd: 1.8, top: 3.2, label: "Kaffeebude" },
 ];
 
 /**

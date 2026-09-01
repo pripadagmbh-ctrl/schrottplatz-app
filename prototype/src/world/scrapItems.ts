@@ -51,7 +51,7 @@ export function dampAng(massKg: number): number {
 }
 
 function flatColliderDesc(shape: ScrapShape): RAPIER.ColliderDesc {
-  const H = 0.06;
+  const H = 0.18;
   if (shape.kind === "box") return RAPIER.ColliderDesc.cuboid(shape.dims[0] / 2, H, shape.dims[2] / 2);
   if (shape.kind === "cyl") {
     const [r, len] = shape.dims;
@@ -64,7 +64,12 @@ function flatColliderDesc(shape: ScrapShape): RAPIER.ColliderDesc {
   return RAPIER.ColliderDesc.cuboid(shape.dims[0], H * 2, shape.dims[0]); // wire
 }
 
-const FLAT_SCALE_Y = 0.18;
+/**
+ * Wie stark ein Teil beim Quetschen zusammengeht. 0,18 hat die Ursprungsform
+ * völlig ausgelöscht — aus allem wurde eine Platte. 0,55 verbeult das Stück
+ * sichtbar, man erkennt aber noch, was es einmal war.
+ */
+const FLAT_SCALE_Y = 0.55;
 
 interface PileSpec {
   materialId: string;
@@ -331,7 +336,7 @@ export class ItemManager {
     mesh.receiveShadow = true;
     this.scene.add(mesh);
     if (shape.flat) {
-      mesh.scale.y = shape.kind === "wire" ? 0.35 : FLAT_SCALE_Y;
+      mesh.scale.y = shape.kind === "wire" ? 0.5 : FLAT_SCALE_Y;
       collider = flatColliderDesc(shape);
     }
     const q = rot ?? new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.random() * Math.PI, 0));
@@ -490,7 +495,10 @@ export class ItemManager {
   flattenItem(item: ScrapItem): boolean {
     if (!item.shape || item.shape.flat) return false;
     item.shape.flat = true;
-    item.mesh.scale.y = item.shape.kind === "wire" ? 0.35 : FLAT_SCALE_Y;
+    // Zusätzlich leicht in die Breite gehen — gequetschtes Metall quillt aus
+    item.mesh.scale.y = item.shape.kind === "wire" ? 0.5 : FLAT_SCALE_Y;
+    item.mesh.scale.x *= 1.12;
+    item.mesh.scale.z *= 1.12;
     while (item.body.numColliders() > 0) {
       this.world.removeCollider(item.body.collider(0), false);
     }
@@ -547,7 +555,11 @@ export class ItemManager {
    * Spawn in einem Kollider), löst Rapier das mit extremem Impuls auf und das
    * Teil verlässt den Platz. Harte Deckelung hält alles im Spiel.
    */
-  clampSpeeds(maxLinear = 11, maxAngular = 12): void {
+  /**
+   * Geschwindigkeiten deckeln. Vorher flogen Teile beim Aufprall der Spinne
+   * weit durch die Gegend — schwerer Schrott springt nicht, er rutscht.
+   */
+  clampSpeeds(maxLinear = 6.5, maxAngular = 7): void {
     for (const item of this.items) {
       if (!item.body.isDynamic()) continue;
       const v = item.body.linvel();

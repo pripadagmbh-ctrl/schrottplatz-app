@@ -424,6 +424,9 @@ async function main(): Promise<void> {
     grip.update(excavator.closure, excavator.closing, sensorPos, FIXED_DT);
     excavator.carriedMassKg = grip.totalMassKg;
     excavator.carriedCount = grip.grippedCount;
+    // Was in der Spinne hängt, darf sie nicht selbst blockieren
+    excavator.grippedHandles.clear();
+    for (const b of grip.grippedBodies) excavator.grippedHandles.add(b.handle);
     vehicles.obstacleHandles(excavator.obstacleBodies);
     // Karossen sind ebenfalls feste Störer: der Arm soll nicht hindurchfahren.
     // Die Spinne selbst bleibt frei — sonst käme man nicht mehr zum Greifen ran.
