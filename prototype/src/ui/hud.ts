@@ -63,6 +63,31 @@ export class Hud {
     this.moneyEl.textContent = `Konto: ${this.displayedValue.toFixed(0)} € · Haufen ≈ ${pilesValue.toFixed(0)} €`;
   }
 
+  /**
+   * Ladezustand des wartenden Abholers. Sortenrein zu laden entscheidet über
+   * den Erlös — deshalb steht es dauerhaft im Bild, solange einer wartet.
+   */
+  updateLoad(kg: number | null, purity: number, bestellt: string | null): void {
+    const el = document.getElementById("load");
+    if (!el) return;
+    if (kg === null) {
+      el.style.display = "none";
+      return;
+    }
+    el.style.display = "block";
+    const p = Math.round(purity * 100);
+    const ziel = bestellt ? getMaterial(bestellt).name : "Gemischt";
+    if (kg === 0) {
+      el.textContent = `Auftrag: ${ziel} — Container ist leer`;
+      el.style.color = "#9aa2a8";
+      return;
+    }
+    const balken = "█".repeat(Math.round(p / 10)) + "░".repeat(10 - Math.round(p / 10));
+    el.textContent = `${ziel}: ${Math.round(kg)} kg · ${balken} ${p} % sortenrein`;
+    // Ab 90 % lohnt das Abfahren, darunter drückt die Reinheit den Preis
+    el.style.color = p >= 90 ? "#7ec96a" : p >= 65 ? "#f0d060" : "#e08a5a";
+  }
+
   /** Phase des Tagesablaufs samt Fortschritt. */
   updateShift(text: string, sortierphase: boolean): void {
     const el = document.getElementById("shift");

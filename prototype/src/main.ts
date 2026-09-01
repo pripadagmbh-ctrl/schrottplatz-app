@@ -636,6 +636,28 @@ async function main(): Promise<void> {
     hud.updateShift(`${daylight.clock} · ${shift.statusText(looseKg)}`, shift.jammed);
     excavator.updateInstruments(frameDt);
     containers.updateLabels(orbit.camera.position);
+
+    // Wartet ein Abholer, zählt nur eins: wie sortenrein ist die Ladung?
+    // Daran hängt der Erlös, also gehört es laufend ins Bild.
+    const abholer = vehicles.pickupTruck;
+    if (abholer?.waitingForLoad) {
+      const geladen = abholer.containedItems(items);
+      const nachMaterial = new Map<string, number>();
+      let gesamt = 0;
+      for (const it of geladen) {
+        for (const c of it.composition ?? [{ materialId: it.materialId, massKg: it.massKg }]) {
+          nachMaterial.set(c.materialId, (nachMaterial.get(c.materialId) ?? 0) + c.massKg);
+          gesamt += c.massKg;
+        }
+      }
+      const bestellt = vehicles.pickupOrder;
+      const passend = bestellt
+        ? nachMaterial.get(bestellt) ?? 0
+        : Math.max(0, ...nachMaterial.values());
+      hud.updateLoad(gesamt, gesamt > 0 ? passend / gesamt : 1, bestellt);
+    } else {
+      hud.updateLoad(null, 1, null);
+    }
     hud.updateMoney(account.moneyEur, containers.totalValue());
     audio.updateEngine(excavator.activity, Math.min(grip.totalMassKg / 2000, 1));
 

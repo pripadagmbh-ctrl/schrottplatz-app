@@ -152,23 +152,6 @@ class GameContainer {
         body
       );
       this.label = new ContainerLabel(cfg.label, fraction.color);
-      // Farbband oben auf den Wänden: Die Fraktion soll auch ohne Aufschrift
-      // erkennbar sein — vier gleiche graue Kästen ließen sich nicht
-      // auseinanderhalten.
-      const bandMat = new THREE.MeshStandardMaterial({
-        color: fraction.color,
-        roughness: 0.85,
-        metalness: 0.1,
-      });
-      for (const [bx, bz, bw, bd] of [
-        [0, -d / 2 - BLOCK_T / 2, w + 2 * BLOCK_T, BLOCK_T],
-        [0, d / 2 + BLOCK_T / 2, w + 2 * BLOCK_T, BLOCK_T],
-        [w / 2 + BLOCK_T / 2, 0, BLOCK_T, d + 2 * BLOCK_T],
-      ] as Array<[number, number, number, number]>) {
-        const band = new THREE.Mesh(new THREE.BoxGeometry(bw, 0.16, bd), bandMat);
-        band.position.set(bx, wallH + 0.08, bz);
-        group.add(band);
-      }
       // Schild am hinteren (geschlossenen) Ende — so steht es nicht im Blickfeld
       this.label.sprite.position.set(cfg.x + w / 2 + 0.6, wallH + 1.1, cfg.z);
     } else if (cfg.kind === "pile") {
@@ -282,7 +265,17 @@ class GameContainer {
     this.refreshLabel();
   }
 
+  /**
+   * Die Mulden sind zum Sortieren da, das Schild ist nur Hilfe. Es zeigt
+   * darum im Normalfall bloß, wofür die Mulde ist. Erst wenn der Greifer
+   * darüber steht, kommen Füllung, Sortenreinheit und Erlös dazu — dann
+   * braucht man sie auch (Design-Fix 29.08.2026).
+   */
   refreshLabel(ampel: AmpelState | null = null): void {
+    if (ampel === null) {
+      this.label.draw([this.cfg.label], null);
+      return;
+    }
     this.label.draw(
       [
         this.cfg.label,
@@ -330,21 +323,32 @@ class ContainerLabel {
   draw(lines: string[], ampel: AmpelState | null): void {
     const ctx = this.canvas.getContext("2d")!;
     ctx.clearRect(0, 0, 256, 128);
-    ctx.fillStyle = "rgba(20,22,24,0.78)";
-    ctx.fillRect(0, 0, 256, 128);
-    const border =
+    const kurz = lines.length === 1;
+    // Nur-Name-Schild ist flach und ruhig, das ausführliche nutzt die
+    // ganze Tafel
+    const h = kurz ? 52 : 128;
+    const y0 = kurz ? 38 : 128;
+    ctx.fillStyle = kurz ? "rgba(20,22,24,0.62)" : "rgba(20,22,24,0.82)";
+    ctx.fillRect(0, 0, 256, h);
+    ctx.strokeStyle =
       ampel === "green" ? "#35c24d" : ampel === "yellow" ? "#e0b528" : ampel === "red" ? "#d84a38" :
       "#" + this.fractionColor.toString(16).padStart(6, "0");
-    ctx.strokeStyle = border;
-    ctx.lineWidth = ampel ? 12 : 6;
-    ctx.strokeRect(0, 0, 256, 128);
+    ctx.lineWidth = ampel ? 12 : 4;
+    ctx.strokeRect(0, 0, 256, h);
     ctx.fillStyle = "#e8e8e4";
-    ctx.font = "bold 30px Consolas, monospace";
     ctx.textAlign = "center";
-    ctx.fillText(lines[0], 128, 42);
-    ctx.font = "24px Consolas, monospace";
-    ctx.fillText(lines[1], 128, 76);
-    ctx.fillText(lines[2], 128, 108);
+    if (kurz) {
+      ctx.font = "bold 27px Consolas, monospace";
+      ctx.fillText(lines[0], 128, y0);
+    } else {
+      ctx.font = "bold 30px Consolas, monospace";
+      ctx.fillText(lines[0], 128, 42);
+      ctx.font = "24px Consolas, monospace";
+      ctx.fillText(lines[1], 128, 76);
+      ctx.fillText(lines[2], 128, 108);
+    }
+    this.sprite.scale.set(2.3, kurz ? 0.47 : 1.15, 1);
+    this.sprite.center.set(0.5, kurz ? 0.79 : 0.5);
     this.texture.needsUpdate = true;
   }
 }
