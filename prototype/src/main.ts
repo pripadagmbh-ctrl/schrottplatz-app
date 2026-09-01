@@ -635,6 +635,7 @@ async function main(): Promise<void> {
     vehicles.intervalFactor = shift.intervalFactor(looseKg);
     hud.updateShift(`${daylight.clock} · ${shift.statusText(looseKg)}`, shift.jammed);
     excavator.updateInstruments(frameDt);
+    containers.updateLabels(orbit.camera.position);
     hud.updateMoney(account.moneyEur, containers.totalValue());
     audio.updateEngine(excavator.activity, Math.min(grip.totalMassKg / 2000, 1));
 

@@ -56,6 +56,11 @@ class GameContainer {
   readonly itemIds = new Set<string>();
   private label: ContainerLabel;
 
+  /** Schild nach Entfernung zur Kamera ein- oder ausblenden. */
+  updateLabelDistance(camPos: THREE.Vector3): void {
+    this.label.updateDistance(camPos);
+  }
+
   constructor(
     readonly cfg: ContainerConfig,
     scene: THREE.Scene,
@@ -147,6 +152,23 @@ class GameContainer {
         body
       );
       this.label = new ContainerLabel(cfg.label, fraction.color);
+      // Farbband oben auf den Wänden: Die Fraktion soll auch ohne Aufschrift
+      // erkennbar sein — vier gleiche graue Kästen ließen sich nicht
+      // auseinanderhalten.
+      const bandMat = new THREE.MeshStandardMaterial({
+        color: fraction.color,
+        roughness: 0.85,
+        metalness: 0.1,
+      });
+      for (const [bx, bz, bw, bd] of [
+        [0, -d / 2 - BLOCK_T / 2, w + 2 * BLOCK_T, BLOCK_T],
+        [0, d / 2 + BLOCK_T / 2, w + 2 * BLOCK_T, BLOCK_T],
+        [w / 2 + BLOCK_T / 2, 0, BLOCK_T, d + 2 * BLOCK_T],
+      ] as Array<[number, number, number, number]>) {
+        const band = new THREE.Mesh(new THREE.BoxGeometry(bw, 0.16, bd), bandMat);
+        band.position.set(bx, wallH + 0.08, bz);
+        group.add(band);
+      }
       // Schild am hinteren (geschlossenen) Ende — so steht es nicht im Blickfeld
       this.label.sprite.position.set(cfg.x + w / 2 + 0.6, wallH + 1.1, cfg.z);
     } else if (cfg.kind === "pile") {
@@ -282,10 +304,27 @@ class ContainerLabel {
     this.canvas.width = 256;
     this.canvas.height = 128;
     this.texture = new THREE.CanvasTexture(this.canvas);
-    const mat = new THREE.SpriteMaterial({ map: this.texture, depthTest: false });
+    // Tiefentest an: das Schild gehört zur Szene und verschwindet hinter
+    // Bagger oder Haufen. Ohne ihn schwebte es über allem und beherrschte
+    // jede Einstellung (Design-Fix 29.08.2026).
+    const mat = new THREE.SpriteMaterial({ map: this.texture, transparent: true });
     this.sprite = new THREE.Sprite(mat);
     this.sprite.scale.set(2.3, 1.15, 1);
-    this.sprite.renderOrder = 10;
+  }
+
+  /**
+   * Sichtbarkeit nach Entfernung. Aus der Nähe wächst ein Sprite ins Bild,
+   * bis es alles verdeckt — dort wird ausgeblendet, denn wer davorsteht,
+   * braucht die Aufschrift nicht mehr. Von weit weg ist sie ohnehin nicht
+   * zu lesen.
+   */
+  updateDistance(camPos: THREE.Vector3): void {
+    const d = this.sprite.position.distanceTo(camPos);
+    const nah = THREE.MathUtils.smoothstep(d, 4.5, 9);
+    const fern = 1 - THREE.MathUtils.smoothstep(d, 38, 52);
+    const a = Math.min(nah, fern);
+    (this.sprite.material as THREE.SpriteMaterial).opacity = a;
+    this.sprite.visible = a > 0.02;
   }
 
   draw(lines: string[], ampel: AmpelState | null): void {
@@ -324,6 +363,11 @@ export class ContainerManager {
    * Zonen-Zählung (alle ~10 Steps): Items den Containern zuordnen, Aggregate
    * neu berechnen, Enter/Leave-Events feuern. Gegriffene Items zählen nicht.
    */
+  /** Schilder nach Entfernung ein- und ausblenden. Jedes Bild aufrufen. */
+  updateLabels(camPos: THREE.Vector3): void {
+    for (const c of this.containers) c.updateLabelDistance(camPos);
+  }
+
   recount(itemManager: ItemManager, grippedBodies: Set<number>): void {
     const changes: Array<{ item: ScrapItem; from: string | null; to: string | null }> = [];
     for (const item of itemManager.items) {
