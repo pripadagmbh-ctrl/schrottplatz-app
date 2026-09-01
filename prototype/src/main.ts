@@ -19,6 +19,8 @@ import { VehicleManager } from "./delivery/vehicles";
 import { PressManager } from "./world/press";
 import { randomCargo } from "./world/scrapItems";
 import { Shift } from "./economy/shift";
+import { Daylight, Floodlights } from "./world/daylight";
+import { hitsObstacle } from "./world/obstacles";
 import { Signage } from "./world/signage";
 import {
   type AxisId,
@@ -65,6 +67,16 @@ async function main(): Promise<void> {
   sun.shadow.camera.bottom = -35;
   sun.shadow.camera.far = 80;
   scene.add(sun);
+
+  // Tageslauf und Flutlicht: vier Masten in den Ecken der Arbeitsfläche,
+  // alle nach innen gerichtet, schalten bei Dämmerung selbst zu
+  const daylight = new Daylight(scene, hemi, sun);
+  const floodlights = new Floodlights(scene, [
+    [-19, 15],
+    [19, 15],
+    [-19, -15],
+    [19, -15],
+  ]);
 
   // --- Spielobjekte ---
   const bus = new EventBus();
@@ -147,6 +159,7 @@ async function main(): Promise<void> {
     savedAt: new Date().toISOString(),
     moneyEur: account.moneyEur,
     shift: shift.toJSON(),
+    timeOfDay: daylight.time,
     items: items.items
       .filter((i) => i.shape)
       .map((i) => {
@@ -175,6 +188,7 @@ async function main(): Promise<void> {
   // Tagesablauf: Annahme → Sortieren → Annahme (Briefing Kap. 21)
   const shift = new Shift();
   shift.load(save?.shift);
+  if (typeof save?.timeOfDay === "number") daylight.time = save.timeOfDay;
   let looseKg = 0;
   let looseTimer = 0;
   /**
@@ -442,6 +456,10 @@ async function main(): Promise<void> {
       bus,
       saveNow: () => storeSave(buildSaveData()),
       touch,
+      hitsObstacle,
+      daylight,
+      floodlights,
+      staff,
       audio,
       togglePause: () => setPaused(!paused),
       isPaused: () => paused,
@@ -595,6 +613,8 @@ async function main(): Promise<void> {
       looseKg = measureLoose();
       looseTimer = 0;
     }
+    daylight.update(frameDt);
+    floodlights.update(daylight.daylight);
     shift.update(frameDt, looseKg);
     vehicles.acceptDeliveries = shift.acceptsDeliveries;
     const wechsel = shift.consumeChange();
@@ -603,7 +623,10 @@ async function main(): Promise<void> {
     } else if (wechsel === "annahme") {
       hud.toast(`Platz ist frei — die Einfahrt macht wieder auf (Zyklus ${shift.cycle + 1})`);
     }
-    hud.updateShift(shift.statusText(looseKg), shift.phase === "sortieren");
+    hud.updateShift(
+      `${daylight.clock} · ${shift.statusText(looseKg)}`,
+      shift.phase === "sortieren"
+    );
     excavator.updateInstruments(frameDt);
     hud.updateMoney(account.moneyEur, containers.totalValue());
     audio.updateEngine(excavator.activity, Math.min(grip.totalMassKg / 2000, 1));

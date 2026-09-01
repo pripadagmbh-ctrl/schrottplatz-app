@@ -3,6 +3,7 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import { randomCargo, type ItemManager, type ScrapItem } from "../world/scrapItems";
 import type { CompositeManager, CarComposite } from "../dismantle/composites";
 import { GATE_X, WEIGH_Z } from "../world/yard";
+import { hitsObstacle } from "../world/obstacles";
 
 /**
  * Anlieferungen M3: Kundenfahrzeuge auf fester Route (kinematisch).
@@ -991,6 +992,9 @@ export class VehicleManager {
    * liegender Schrott ab 25 kg — LKW fahren nicht darüber hinweg.
    */
   private blockedAt = (x: number, z: number, r: number, ignore: Set<number>): boolean => {
+    // Feste Bauten: Betonlego-Umrandung, Boxen, Schere. Ein LKW fährt da
+    // nicht hindurch — die Physik hält ihn nicht auf, er fährt kinematisch.
+    if (hitsObstacle(x, z, 1.4)) return true;
     const ex = this.getExcavatorPos?.();
     if (ex && Math.hypot(ex.x - x, ex.z - z) < r) return true;
     // In den Arbeitszonen (Abkipp-/Verladeplatz) darf Schrott liegen — dorthin

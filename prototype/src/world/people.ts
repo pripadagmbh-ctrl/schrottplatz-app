@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import type { ItemManager } from "./scrapItems";
+import { hitsObstacle, slideAround } from "./obstacles";
 
 /**
  * Platzpersonal (Design 2026-08-29):
@@ -338,7 +339,14 @@ export class StaffManager {
       const step = this.avoid(g.position, toTarget);
       // zügiges Arbeitstempo: die Wege um den Schwenkbereich herum sind lang,
       // bei Schlendertempo käme er kaum hinterher
+      const vorher = { x: g.position.x, z: g.position.z };
       g.position.addScaledVector(step, 2.2 * dt);
+      // Sicherheitsnetz: landet der Schritt trotz Ausweichen in einem
+      // Bauwerk, wird er verworfen — Lambert läuft durch nichts hindurch
+      if (hitsObstacle(g.position.x, g.position.z, 0.35)) {
+        g.position.x = vorher.x;
+        g.position.z = vorher.z;
+      }
       g.rotation.y = Math.atan2(step.x, step.z);
       this.walkPhase += dt * 7;
       // Festgefahren? Wenn das Ausweichen ihn im Kreis schickt, kommt er dem
@@ -490,6 +498,7 @@ export class StaffManager {
   /** Sicherheitsabstand zum schwenkenden Ausleger (SW) */
   private static readonly EXCAVATOR_KEEPOUT = 8;
   private avoidTmp = new THREE.Vector3();
+  private slideTmp = { x: 0, z: 0 };
 
   /**
    * Laufrichtung um Hindernisse herumlenken: Bagger-Schwenkbereich und
@@ -511,6 +520,12 @@ export class StaffManager {
     if (ex) push(ex.x, ex.z, StaffManager.EXCAVATOR_KEEPOUT);
     for (const c of this.getObstaclePositions?.() ?? []) push(c.x, c.z, 3.2);
     out.y = 0;
+    out.normalize();
+    // Feste Bauten — Betonlego, Boxen, Schere — laufen lassen sich nicht
+    // wegdrücken: hier wird die Richtung an der Wand entlang umgelenkt.
+    if (slideAround(pos.x, pos.z, out.x, out.z, 0.7, this.slideTmp)) {
+      out.set(this.slideTmp.x, 0, this.slideTmp.z);
+    }
     return out.normalize();
   }
 
