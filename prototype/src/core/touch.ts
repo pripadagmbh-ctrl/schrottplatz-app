@@ -95,6 +95,7 @@ export class TouchControls {
     this.bindTap("btn-blade", "KeyI");
     this.bindTap("btn-music", "KeyU");
     this.bindTap("btn-pause", "Escape");
+    this.buildWheel();
     this.bindTilt();
     this.bindCanvas(canvas);
     TouchControls.blockBrowserZoom();
@@ -207,6 +208,88 @@ export class TouchControls {
       },
       { passive: false }
     );
+  }
+
+  /**
+   * Funktionsrädchen: Die Tasten sitzen auf einer gedachten Walze. Wischen
+   * dreht sie, der Eintrag in der Mitte ist scharfgestellt und lässt sich
+   * antippen. So bleibt die Liste kurz, egal wie viele Funktionen dazukommen
+   * (Design 29.08.2026).
+   */
+  private buildWheel(): void {
+    const bar = document.getElementById("fnbar");
+    if (!bar) return;
+    const items = Array.prototype.slice.call(
+      bar.querySelectorAll(".btn")
+    ) as HTMLElement[];
+    if (items.length === 0) return;
+    const STEP = 26; // Grad zwischen zwei Einträgen
+    const RADIUS = 118; // px — bestimmt, wie stark die Walze wölbt
+    let pos = 0; // aktuelle Position in Einträgen, darf zwischen zwei liegen
+
+    const render = (): void => {
+      const sel = Math.round(pos);
+      items.forEach((el, i) => {
+        const d = i - pos;
+        const ang = d * STEP;
+        // Rückseite der Walze wegblenden
+        const sichtbar = Math.abs(ang) < 78;
+        el.style.transform = `rotateX(${-ang}deg) translateZ(${RADIUS}px)`;
+        el.style.opacity = sichtbar ? String(Math.max(0.25, 1 - Math.abs(d) / 3.4)) : "0";
+        el.classList.toggle("sel", i === sel);
+      });
+    };
+
+    const drehen = (delta: number): void => {
+      pos = Math.max(0, Math.min(items.length - 1, pos + delta));
+      render();
+    };
+
+    // Wischen: ein Eintrag je 34 px
+    let dragId: number | null = null;
+    let lastY = 0;
+    let moved = 0;
+    bar.addEventListener(
+      "pointerdown",
+      (e) => {
+        dragId = e.pointerId;
+        lastY = e.clientY;
+        moved = 0;
+        bar.setPointerCapture?.(e.pointerId);
+      },
+      { passive: true }
+    );
+    bar.addEventListener(
+      "pointermove",
+      (e) => {
+        if (dragId !== e.pointerId) return;
+        const dy = e.clientY - lastY;
+        lastY = e.clientY;
+        moved += Math.abs(dy);
+        drehen(-dy / 34);
+        e.preventDefault();
+      },
+      { passive: false }
+    );
+    const ende = (e: PointerEvent): void => {
+      if (dragId !== e.pointerId) return;
+      dragId = null;
+      // Nach dem Wischen auf den nächsten Eintrag einrasten
+      pos = Math.round(pos);
+      render();
+    };
+    bar.addEventListener("pointerup", ende);
+    bar.addEventListener("pointercancel", ende);
+    // Mausrad für den Test am Rechner
+    bar.addEventListener(
+      "wheel",
+      (e) => {
+        drehen(Math.sign(e.deltaY));
+        e.preventDefault();
+      },
+      { passive: false }
+    );
+    render();
   }
 
   /** Kippsteuerung: Gerät neigen statt Fadenkreuz drücken. */

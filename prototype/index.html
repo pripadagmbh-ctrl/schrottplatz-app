@@ -82,17 +82,37 @@
       }
       #btn-rot-l { right: 100px; }
       #btn-rot-r { right: 16px; }
-      /* Funktionstasten am rechten Rand. Als umbrechende Spalte, damit sie
-         auf flachen Handy-Displays in eine zweite Reihe rutschen statt unten
-         aus dem Bild zu laufen. */
+      /* Funktionen als Rädchen am rechten Rand: hoch- oder runterwischen
+         dreht die Walze, der Eintrag in der Mitte ist scharfgestellt und
+         wird mit einem Tipp ausgelöst. */
       #fnbar {
-        position: absolute; top: 44px; right: 14px; bottom: 10px;
-        display: flex; flex-direction: column; flex-wrap: wrap-reverse;
-        align-content: flex-end; gap: 8px; pointer-events: none;
+        position: absolute; top: 50%; right: 8px; transform: translateY(-50%);
+        width: 104px; height: 232px; pointer-events: auto; touch-action: none;
+        perspective: 460px; overflow: hidden;
+      }
+      /* Sanftes Ausblenden nach oben und unten, damit es nach Walze aussieht */
+      #fnbar::before, #fnbar::after {
+        content: ""; position: absolute; left: 0; right: 0; height: 74px;
+        pointer-events: none; z-index: 3;
+      }
+      #fnbar::before { top: 0; background: linear-gradient(rgba(20,22,24,0.72), transparent); }
+      #fnbar::after { bottom: 0; background: linear-gradient(transparent, rgba(20,22,24,0.72)); }
+      /* Markierung der scharfgestellten Mitte */
+      #fnbar .slot {
+        position: absolute; left: 2px; right: 2px; top: 50%; height: 40px;
+        margin-top: -20px; border-top: 2px solid rgba(240,180,41,0.55);
+        border-bottom: 2px solid rgba(240,180,41,0.55); pointer-events: none; z-index: 2;
       }
       #touch #fnbar .btn {
-        position: static; width: 78px; padding: 11px 4px; margin-left: 8px;
-        pointer-events: auto;
+        position: absolute; left: 4px; right: 4px; top: 50%; height: 36px;
+        margin-top: -18px; padding: 0; line-height: 36px; width: auto;
+        pointer-events: none; backface-visibility: hidden;
+        transition: opacity 0.12s linear;
+      }
+      /* Der scharfgestellte Eintrag ist der einzige, den man drücken kann */
+      #touch #fnbar .btn.sel {
+        pointer-events: auto; background: rgba(240,180,41,0.28);
+        border-color: rgba(240,180,41,0.85); color: #fff3d6;
       }
       /* Flache Displays (Handy quer): alles eine Nummer kleiner, sonst
          verdecken Sticks und Tasten das halbe Bild. */
@@ -111,8 +131,10 @@
         #btn-rot-l { right: 190px; }
         #btn-rot-r { right: 132px; }
         /* endet über dem rechten Stick, sonst legen sich die Tasten darauf */
-        #fnbar { top: 8px; right: 10px; bottom: 128px; gap: 5px; }
-        #touch #fnbar .btn { width: 66px; padding: 7px 3px; font-size: 10px; margin-left: 5px; }
+        #fnbar { width: 88px; height: 176px; right: 6px; bottom: auto; perspective: 360px; }
+        #fnbar::before, #fnbar::after { height: 56px; }
+        #touch #fnbar .btn { height: 30px; margin-top: -15px; line-height: 30px; font-size: 10px; }
+        #fnbar .slot { height: 34px; margin-top: -17px; }
         #help { display: none; }
         /* Konto und Tagesablauf nach links: rechts oben braucht die
            Tastenleiste den Platz, sobald sie zweispaltig umbricht */
@@ -236,7 +258,7 @@
       <div class="btn cross" id="btn-back">▼</div>
       <div class="btn cross" id="btn-left">◀</div>
       <div class="btn cross" id="btn-right">▶</div>
-      <div id="fnbar">
+      <div id="fnbar"><div class="slot"></div>
         <div class="btn fn" id="btn-view">ANSICHT</div>
         <div class="btn fn" id="btn-cab">KABINE</div>
         <div class="btn fn" id="btn-outrig">STÜTZEN</div>
