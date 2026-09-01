@@ -495,6 +495,11 @@ export class StaffManager {
     cable: [4.9, 7.5],
   };
 
+  /** Wo Lambert gerade steht — der Baggerarm weicht ihm aus. */
+  lambertPosition(): THREE.Vector3 {
+    return this.lambert.group.position;
+  }
+
   /** Sicherheitsabstand zum schwenkenden Ausleger (SW) */
   private static readonly EXCAVATOR_KEEPOUT = 8;
   private avoidTmp = new THREE.Vector3();

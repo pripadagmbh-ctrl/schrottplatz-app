@@ -81,8 +81,10 @@ export class Daylight {
 }
 
 /**
- * Vier Flutlichtmasten in den Ecken der Arbeitsfläche, alle nach innen auf
- * den Platz gerichtet. Sie schalten sich bei Dämmerung selbst zu.
+ * Flutlichtmasten am Rand des Platzes, alle nach innen auf die Arbeits-
+ * flächen gerichtet. Sie stehen bewusst an der Umrandung, damit auf dem
+ * Platz selbst nichts im Weg steht. Zuschalten passiert bei Dämmerung
+ * von allein.
  */
 export class Floodlights {
   private lights: THREE.SpotLight[] = [];
@@ -135,7 +137,7 @@ export class Floodlights {
 
       // Ein Scheinwerfer je Mast reicht für die Beleuchtung — vier echte
       // Lichtquellen je Mast wären für Mobilgeräte zu teuer
-      const spot = new THREE.SpotLight(0xfff2d0, 0, 78, Math.PI / 5.2, 0.45, 1.6);
+      const spot = new THREE.SpotLight(0xfff2d0, 0, 130, Math.PI / 5.2, 0.45, 1.35);
       spot.position.set(x, MAST_H, z);
       spot.target.position.set(x * 0.12, 0, z * 0.12); // zur Platzmitte hin
       scene.add(spot.target);
@@ -148,9 +150,9 @@ export class Floodlights {
   /** @param daylight 0..1 — unter 0,45 wird zugeschaltet */
   update(daylight: number): void {
     const an = THREE.MathUtils.clamp((0.45 - daylight) / 0.3, 0, 1);
-    // 45 ist am Bild abgestimmt: der Platz ist klar ausgeleuchtet,
-    // brennt aber nicht weiß aus, wenn sich mehrere Kegel überlagern
-    for (const l of this.lights) l.intensity = an * 45;
+    // Am Bild abgestimmt. Die Masten stehen am Zaun und leuchten quer über
+    // den ganzen Platz — entsprechend viel Leistung brauchen sie.
+    for (const l of this.lights) l.intensity = an * 900;
     const mat = an > 0.15 ? this.lampOn : this.lampOff;
     for (const lamp of this.lamps) lamp.material = mat;
   }

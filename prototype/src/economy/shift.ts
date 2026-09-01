@@ -1,105 +1,92 @@
 /**
- * Der Tagesablauf auf dem Platz (Briefing Kap. 21).
+ * Der Betrieb auf dem Platz (Briefing Kap. 21, Fassung 29.08.2026).
  *
- * Das Spiel wechselt zwischen zwei Phasen:
+ * Früher machte die Einfahrt zu, sobald genug Material dalag, und es gab eine
+ * Sortierpause. Das hat den Platz leergespielt und war am Ende zäh. Jetzt
+ * läuft der Umschlag durch: Es kommt immer Material nach, und woran man sich
+ * misst, ist der Durchsatz — wie viele Tonnen an einem Tag über den Platz
+ * gehen.
  *
- *   ANNAHME    LKW kommen, werden gewogen und laden auf dem Sammelplatz ab.
- *              Sortiert wird hier nicht — der Schrott darf erst mal fallen,
- *              wo er fällt. Bezahlt wird nach Gewicht bei der Ausfahrt.
- *
- *   SORTIEREN  Ist genug Material da, macht die Einfahrt zu: kein LKW mehr,
- *              Ruhe zum Aufräumen. Jetzt wird auf die Haufen und in die Boxen
- *              geworfen, gepresst und die Abholung gerufen.
- *
- * Zurück in die Annahme geht es, sobald der Platz wieder frei ist — oder wenn
- * die Sortierzeit abgelaufen ist. So entsteht der Rhythmus aus vollem Platz
- * und dem befriedigenden Leerräumen.
+ * Gesteuert wird nur noch die Dichte des Verkehrs. Ist der Platz voll,
+ * kommen die Fuhren etwas seltener, aber sie hören nie ganz auf. Erst wenn
+ * gar nichts mehr geht, macht die Einfahrt kurz zu — als Sicherheitsventil
+ * gegen einen Platz, der sich selbst zustellt.
  */
 
-/** Ab dieser losen Menge auf dem Platz endet die Annahme. */
-export const SORT_START_KG = 4500;
-/** Darunter gilt der Platz als aufgeräumt — die Einfahrt macht wieder auf. */
-export const SORT_DONE_KG = 1200;
-/** Ruhe zum Sortieren, auch wenn nicht alles weggeräumt wird. */
-export const SORT_MAX_S = 600;
-/** Nach so vielen Anlieferungen ist ebenfalls Schluss, selbst bei leichtem Schrott. */
-export const SORT_AFTER_DELIVERIES = 5;
-
-export type ShiftPhase = "annahme" | "sortieren";
+/** Ab hier gilt der Platz als gut gefüllt — der Verkehr wird etwas ruhiger. */
+export const BUSY_KG = 6000;
+/** Ab hier ist dicht: die Einfahrt macht zu, bis wieder Luft ist. */
+export const JAM_KG = 16000;
+/** Darunter läuft der Verkehr wieder normal an. */
+export const JAM_CLEAR_KG = 11000;
 
 export class Shift {
-  phase: ShiftPhase = "annahme";
-  /** Sekunden in der laufenden Phase */
+  /** Sekunden seit Beginn */
   t = 0;
-  /** abgeschlossene Sortierphasen — Grundlage für Abholung und Fortschritt */
-  cycle = 0;
-  /** Anlieferungen seit Beginn der aktuellen Annahme */
-  deliveriesThisShift = 0;
-  /** wird true, wenn die Phase in diesem Frame gewechselt hat */
-  private justChanged: ShiftPhase | null = null;
+  /** Heute abgefahrenes Material in kg — die eigentliche Wertung */
+  turnoverKg = 0;
+  /** abgeschlossene Abholungen */
+  pickups = 0;
+  /** Anlieferungen insgesamt */
+  deliveries = 0;
+  /** true, solange der Platz zugestellt ist */
+  jammed = false;
 
-  /**
-   * @param looseKg lose auf dem Platz liegender Schrott (nicht in Boxen)
-   */
   update(dt: number, looseKg: number): void {
     this.t += dt;
-    if (this.phase === "annahme") {
-      const voll = looseKg >= SORT_START_KG;
-      const genugFuhren = this.deliveriesThisShift >= SORT_AFTER_DELIVERIES;
-      if (voll || genugFuhren) this.switchTo("sortieren");
-      return;
-    }
-    // Sortierphase: fertig, wenn aufgeräumt ist oder die Zeit abläuft
-    if (looseKg <= SORT_DONE_KG || this.t >= SORT_MAX_S) {
-      this.cycle++;
-      this.deliveriesThisShift = 0;
-      this.switchTo("annahme");
+    // Hysterese, damit die Einfahrt nicht im Sekundentakt auf und zu geht
+    if (this.jammed) {
+      if (looseKg < JAM_CLEAR_KG) this.jammed = false;
+    } else if (looseKg > JAM_KG) {
+      this.jammed = true;
     }
   }
 
-  private switchTo(p: ShiftPhase): void {
-    this.phase = p;
-    this.t = 0;
-    this.justChanged = p;
-  }
-
-  /** true (einmalig), wenn gerade in diese Phase gewechselt wurde. */
-  consumeChange(): ShiftPhase | null {
-    const c = this.justChanged;
-    this.justChanged = null;
-    return c;
-  }
-
-  /** Dürfen gerade Anlieferer kommen? */
+  /** Kommen gerade Anlieferer? */
   get acceptsDeliveries(): boolean {
-    return this.phase === "annahme";
+    return !this.jammed;
   }
 
-  /** Restliche Sortierzeit in Sekunden (0 in der Annahme). */
-  get remainingS(): number {
-    return this.phase === "sortieren" ? Math.max(0, SORT_MAX_S - this.t) : 0;
+  /**
+   * Faktor auf die Wartezeit zwischen zwei Fuhren. Auf einem leeren Platz
+   * drängeln sie sich, auf einem vollen lassen sie etwas Luft — aber sie
+   * kommen weiter.
+   */
+  intervalFactor(looseKg: number): number {
+    if (looseKg <= 0) return 0.6;
+    const f = 0.6 + (looseKg / BUSY_KG) * 0.9;
+    return Math.min(f, 2.2);
   }
 
-  /** Kurztext für das HUD. */
+  /** Abgefahrene Ladung verbuchen. */
+  noteTurnover(massKg: number): void {
+    this.turnoverKg += massKg;
+    this.pickups++;
+  }
+
+  /** Kurztext fürs HUD. */
   statusText(looseKg: number): string {
-    if (this.phase === "annahme") {
-      const rest = Math.max(0, SORT_START_KG - looseKg);
-      return `Annahme · noch ${Math.round(rest)} kg bis Feierabend`;
-    }
-    const m = Math.floor(this.remainingS / 60);
-    const s = Math.floor(this.remainingS % 60);
-    return `Sortieren · ${m}:${String(s).padStart(2, "0")} · ${Math.round(looseKg)} kg liegen`;
+    const t = (this.turnoverKg / 1000).toFixed(1);
+    if (this.jammed) return `Platz dicht · ${t} t umgeschlagen · erst räumen!`;
+    return `${t} t umgeschlagen · ${Math.round(looseKg)} kg liegen`;
   }
 
-  toJSON(): { phase: ShiftPhase; t: number; cycle: number; deliveries: number } {
-    return { phase: this.phase, t: this.t, cycle: this.cycle, deliveries: this.deliveriesThisShift };
+  toJSON(): { t: number; turnoverKg: number; pickups: number; deliveries: number } {
+    return {
+      t: this.t,
+      turnoverKg: this.turnoverKg,
+      pickups: this.pickups,
+      deliveries: this.deliveries,
+    };
   }
 
-  load(d: { phase?: string; t?: number; cycle?: number; deliveries?: number } | undefined): void {
+  load(
+    d: { t?: number; turnoverKg?: number; pickups?: number; deliveries?: number } | undefined
+  ): void {
     if (!d) return;
-    this.phase = d.phase === "sortieren" ? "sortieren" : "annahme";
     this.t = d.t ?? 0;
-    this.cycle = d.cycle ?? 0;
-    this.deliveriesThisShift = d.deliveries ?? 0;
+    this.turnoverKg = d.turnoverKg ?? 0;
+    this.pickups = d.pickups ?? 0;
+    this.deliveries = d.deliveries ?? 0;
   }
 }

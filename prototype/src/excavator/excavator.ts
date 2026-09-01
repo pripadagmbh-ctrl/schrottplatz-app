@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import type { Input } from "../core/input";
+import { hitsObstacle } from "../world/obstacles";
 
 /**
  * Fuchsbagger (Umschlagbagger) — M0.
@@ -271,6 +272,48 @@ export class Excavator {
   private physicsWorld!: RAPIER.World;
 
   /** Schneidet Ausleger oder Stiel gerade ein Hindernis (LKW)? */
+  /**
+   * Alles, was fest steht, blockiert den Bagger: Betonwände, Boxen, Schere,
+   * dazu Lambert und das Fahrzeug auf dem Platz. Geprüft werden Ausleger,
+   * Stiel, die Spinne und der Unterwagen — die Bauteile sind kinematisch und
+   * würden sonst einfach hindurchfahren (Design-Fix 29.08.2026).
+   */
+  private hitsAnything(): boolean {
+    // Unterwagen: rein zweidimensional, er steht ja am Boden
+    if (hitsObstacle(this.position.x, this.position.z, 1.6)) return true;
+    // Spinne samt Schalen
+    this.grappleGroup.getWorldPosition(this.blockPos);
+    if (hitsObstacle(this.blockPos.x, this.blockPos.z, 0.9, this.blockPos.y - 1.2)) return true;
+    // Ausleger und Stiel an mehreren Punkten entlang abtasten
+    for (const s of this.armShapes) {
+      const mesh = s.mesh();
+      mesh.updateWorldMatrix(true, false);
+      for (const t of [-0.8, -0.3, 0.2, 0.7]) {
+        this.blockLocal.set(0, 0, s.half[2] * 2 * t);
+        this.blockPos.copy(this.blockLocal).applyMatrix4(mesh.matrixWorld);
+        if (hitsObstacle(this.blockPos.x, this.blockPos.z, 0.35, this.blockPos.y - s.half[1]))
+          return true;
+      }
+    }
+    // Lambert: er darf nicht vom Ausleger überfahren werden
+    const lam = this.getStaffPos?.();
+    if (lam) {
+      this.grappleGroup.getWorldPosition(this.blockPos);
+      if (
+        this.blockPos.y - 2.2 < 2.4 &&
+        Math.hypot(this.blockPos.x - lam.x, this.blockPos.z - lam.z) < 1.9
+      ) {
+        return true;
+      }
+    }
+    return this.obstacleBodies.size > 0 && this.armHitsObstacle();
+  }
+
+  private blockPos = new THREE.Vector3();
+  private blockLocal = new THREE.Vector3();
+  /** Position des Platzwarts — von main gesetzt, damit der Arm ihn verschont */
+  getStaffPos: (() => THREE.Vector3 | null) | null = null;
+
   private armHitsObstacle(): boolean {
     for (const s of this.armShapes) {
       const mesh = s.mesh();
@@ -1207,7 +1250,7 @@ export class Excavator {
 
     // Arm darf nicht im LKW verschwinden: Bewegung zurücknehmen, wenn er
     // Fahrzeugteile schneiden würde
-    if (this.obstacleBodies.size > 0 && this.armHitsObstacle()) {
+    if (this.hitsAnything()) {
       this.armBlocked = true;
       this.boomAngle = prevBoom;
       this.stickAngle = prevStick;

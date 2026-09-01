@@ -71,11 +71,15 @@ async function main(): Promise<void> {
   // Tageslauf und Flutlicht: vier Masten in den Ecken der Arbeitsfläche,
   // alle nach innen gerichtet, schalten bei Dämmerung selbst zu
   const daylight = new Daylight(scene, hemi, sun);
+  // Masten stehen dicht an der Umrandung, damit die Arbeitsflächen frei
+  // bleiben — der Platz misst 80 x 58 m
   const floodlights = new Floodlights(scene, [
-    [-19, 15],
-    [19, 15],
-    [-19, -15],
-    [19, -15],
+    [-37, 26],
+    [37, 26],
+    [-37, -26],
+    [37, -26],
+    [0, 26],
+    [0, -26],
   ]);
 
   // --- Spielobjekte ---
@@ -327,6 +331,7 @@ async function main(): Promise<void> {
   grip.onTear = () => audio.playTear();
   grip.partResolver = (pos) => composites.findPartNear(pos);
   grip.insideGrapple = (pos) => excavator.isInsideGrapple(pos);
+  excavator.getStaffPos = () => staff.lambertPosition();
   // Zudrücken: was nachgibt, wird in der Spinne plattgequetscht
   grip.crusher = (body) => {
     const it = items.items.find((i) => i.body.handle === body.handle);
@@ -391,7 +396,7 @@ async function main(): Promise<void> {
   };
   vehicles.onWeighOut = (netKg) => {
     const paid = account.payDelivery(netKg);
-    shift.deliveriesThisShift++;
+    shift.deliveries++;
     audio.playSale();
     hud.toast(`Waage: ${netKg.toFixed(0)} kg netto · Kunde erhält ${paid.toFixed(0)} €`);
   };
@@ -400,6 +405,7 @@ async function main(): Promise<void> {
     const loaded = truck.containedItems(items);
     const sale = account.sellContainer(loaded, items, composites, vehicles.pickupOrder);
     if (sale.massKg > 0) {
+      shift.noteTurnover(sale.massKg);
       audio.playSale();
       hud.toast(
         `Verkauft: ${sale.massKg.toFixed(0)} kg ${getMaterial(sale.dominant).name} · ` +
@@ -617,16 +623,8 @@ async function main(): Promise<void> {
     floodlights.update(daylight.daylight);
     shift.update(frameDt, looseKg);
     vehicles.acceptDeliveries = shift.acceptsDeliveries;
-    const wechsel = shift.consumeChange();
-    if (wechsel === "sortieren") {
-      hud.toast("Feierabend an der Einfahrt — jetzt sortieren, pressen, abholen lassen (V)");
-    } else if (wechsel === "annahme") {
-      hud.toast(`Platz ist frei — die Einfahrt macht wieder auf (Zyklus ${shift.cycle + 1})`);
-    }
-    hud.updateShift(
-      `${daylight.clock} · ${shift.statusText(looseKg)}`,
-      shift.phase === "sortieren"
-    );
+    vehicles.intervalFactor = shift.intervalFactor(looseKg);
+    hud.updateShift(`${daylight.clock} · ${shift.statusText(looseKg)}`, shift.jammed);
     excavator.updateInstruments(frameDt);
     hud.updateMoney(account.moneyEur, containers.totalValue());
     audio.updateEngine(excavator.activity, Math.min(grip.totalMassKg / 2000, 1));

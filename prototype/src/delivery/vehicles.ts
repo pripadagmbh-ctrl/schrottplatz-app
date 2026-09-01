@@ -92,9 +92,9 @@ const TIP_OUT: Array<[number, number]> = [
   [GATE_X, 40],
 ];
 
-const SPEED = 3.5; // m/s (SW)
+const SPEED = 4.8; // m/s (SW) — zuegiger Umschlag
 const FIRST_DELAY_S = 12; // (SW)
-const NEXT_DELAY_S: [number, number] = [12, 24]; // (SW) — dichter Verkehr
+const NEXT_DELAY_S: [number, number] = [7, 15]; // (SW) — dichter Umschlag
 /** Sicherheitsabstand zum Bagger: darunter wartet der Fahrer (Briefing Kap. 13) */
 const BLOCK_RADIUS = 5.5;
 /** Ab diesem Gewicht gilt ein liegendes Teil als echtes Hindernis (SW) */
@@ -787,7 +787,7 @@ class DeliveryVehicle {
         break;
       case "weighIn":
         // Der Fahrer geht bei Mario ins Wiegehäuschen — das dauert einen Moment
-        if (this.phaseT > 6) {
+        if (this.phaseT > 2.5) {
           this.bruttoKg = this.cargoMassKg();
           this.onWeighIn?.(this.bruttoKg);
           this.phase = "approach";
@@ -806,13 +806,13 @@ class DeliveryVehicle {
         break;
       }
       case "shiftPause":
-        if (this.phaseT > 1) {
+        if (this.phaseT > 0.5) {
           this.phase = "reverseIn";
           this.phaseT = 0;
         }
         break;
       case "reverseIn":
-        this.advance(this.routeRev, SPEED * 0.55 * dt, true, dt); // rückwärts langsamer (SW)
+        this.advance(this.routeRev, SPEED * 0.6 * dt, true, dt); // rückwärts langsamer (SW)
         if (this.routeS >= this.routeLength(this.routeRev)) {
           this.phase = "pauseBeforeUnload";
           this.phaseT = 0;
@@ -823,7 +823,7 @@ class DeliveryVehicle {
         // Kipper braucht das nicht (er kippt), der Container bleibt zu.
         if (this.kind === "pritsche" || this.kind === "wrack") this.sideOpenTarget = 1;
         if (!this.isPickup) this.releaseCargo();
-        if (this.phaseT > 1.8) {
+        if (this.phaseT > 1.2) {
           this.phase = this.isPickup ? "waitLoad" : this.kind === "kipper" ? "tipping" : "waitUnload";
           this.phaseT = 0;
           this.routeS = 0;
@@ -848,14 +848,14 @@ class DeliveryVehicle {
         }
         break;
       case "tipping":
-        this.tip = Math.min(this.tip + dt / 4.5, 1);
+        this.tip = Math.min(this.tip + dt / 3.2, 1);
         if (this.tip >= 1) {
           this.phase = "tipHold";
           this.phaseT = 0;
         }
         break;
       case "tipHold":
-        if (this.phaseT > 4) {
+        if (this.phaseT > 2.2) {
           this.phase = "tipBack";
         }
         break;
@@ -970,6 +970,11 @@ export class VehicleManager {
    * weiterhin selbst.
    */
   acceptDeliveries = true;
+  /**
+   * Faktor auf die Wartezeit bis zur nächsten Fuhre. Ein voller Platz
+   * bekommt etwas Luft, ein leerer Nachschub im Minutentakt.
+   */
+  intervalFactor = 1;
 
   /** Baggerposition für die Blockade-Prüfung; von main gesetzt. */
   getExcavatorPos: (() => THREE.Vector3) | null = null;
@@ -1118,7 +1123,8 @@ export class VehicleManager {
       this.active = null;
       this.t = 0;
       this.nextSpawnT =
-        NEXT_DELAY_S[0] + Math.random() * (NEXT_DELAY_S[1] - NEXT_DELAY_S[0]);
+        (NEXT_DELAY_S[0] + Math.random() * (NEXT_DELAY_S[1] - NEXT_DELAY_S[0])) *
+        this.intervalFactor;
     }
   }
 }

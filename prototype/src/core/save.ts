@@ -27,8 +27,8 @@ export interface SaveData {
   schemaVersion: 1;
   savedAt: string;
   moneyEur: number;
-  /** Tagesablauf — fehlt in alten Ständen, dann beginnt die Annahme neu */
-  shift?: { phase: string; t: number; cycle: number; deliveries: number };
+  /** Betriebszahlen — fehlen in alten Ständen, dann wird bei null begonnen */
+  shift?: { t: number; turnoverKg: number; pickups: number; deliveries: number };
   /** Tageszeit 0..1 (0,25 = Sonnenaufgang) */
   timeOfDay?: number;
   items: SavedItem[];
