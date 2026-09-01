@@ -343,21 +343,16 @@ export class Excavator {
       (collider) => {
         const b = collider.parent();
         if (!b) return true;
+        if (hit) return true; // schon fündig, Abfrage trotzdem sauber zu Ende
         if (this.obstacleBodies.has(b.handle)) {
           hit = true; // Fahrzeug auf dem Platz
-          return false;
+          return true;
         }
         if (this.grippedHandles.has(b.handle)) return true; // eigene Ladung
         // Schwere Brocken lassen sich nicht wegschieben — an denen ist Schluss.
         // Feste Körper (Bauten) ohnehin nicht, nur der Boden zählt nicht mit.
-        if (b.isFixed() && collider.translation().y > -0.05) {
-          hit = true;
-          return false;
-        }
-        if (b.isDynamic() && b.mass() > HEAVY_BLOCK_KG) {
-          hit = true;
-          return false;
-        }
+        if (b.isFixed() && collider.translation().y > -0.05) hit = true;
+        else if (b.isDynamic() && b.mass() > HEAVY_BLOCK_KG) hit = true;
         return true;
       }
     );
@@ -390,11 +385,9 @@ export class Excavator {
         shape,
         (collider) => {
           const b = collider.parent();
-          if (b && this.obstacleBodies.has(b.handle)) {
-            hit = true;
-            return false;
-          }
-          return true;
+          if (b && this.obstacleBodies.has(b.handle)) hit = true;
+          return true; // nie vorzeitig abbrechen, siehe hitsAnything
+        
         }
       );
       if (hit) return true;

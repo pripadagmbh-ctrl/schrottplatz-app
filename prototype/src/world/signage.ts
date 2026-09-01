@@ -24,8 +24,8 @@ const SIGNS: SignSpec[] = [
   { text: "STAHLSCHROTT", hint: "alles Eisen — hierher kippen die Kipper", x: -9, z: 8.5, rot: 0 },
   { text: "ANNAHME", hint: "Pritschen laden hier ab", x: 0, z: 12.5, rot: 0 },
   { text: "BOXEN", hint: "Alu · Kupfer · VA · Kabel", x: 9.5, z: 6.5, rot: -0.6 },
-  { text: "SCHERE / PRESSE", hint: "Mischschrott pressen (Taste B)", x: 0, z: -12.5, rot: Math.PI },
-  { text: "VERLADUNG", hint: "Abholer beladen (Taste V)", x: 13.5, z: -9.5, rot: -Math.PI / 2 },
+  { text: "SCHERE / PRESSE", hint: "Mischschrott pressen (Taste B)", x: -4.6, z: -13.4, rot: Math.PI },
+  { text: "VERLADUNG", hint: "Abholer beladen (Taste V)", x: 13.5, z: -13.5, rot: -Math.PI / 2 },
   { text: "WAAGE", hint: "brutto rein, tara raus", x: -20, z: 20, rot: 0.5 },
   { text: "EINFAHRT", hint: "hier kommen die Kunden", x: -26, z: 27, rot: 0.4 },
 ];

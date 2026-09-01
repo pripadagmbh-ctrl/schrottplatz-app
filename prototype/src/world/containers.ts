@@ -33,7 +33,6 @@ const CONFIGS: ContainerConfig[] = [
   // Riesiger Stahlhaufen direkt links neben dem Bagger (Guss läuft mit)
   { id: "c_steel", fractionId: "steel", label: "STAHLSCHROTT", kind: "pile", x: -9, z: 1, size: [11, 12, 0] },
   // Boxenreihe rechts, von Süd nach Nord aufgereiht
-  { id: "c_contaminant", fractionId: "contaminant", label: "STÖRSTOFF", kind: "pile", x: -6, z: -7, size: [3, 3, 0] },
   // Vier Betonlego-Mulden in einer Reihe, Öffnung zeigt nach Westen zum Bagger
   // Nach Norden gerückt: die westliche Öffnung darf nicht von der Presse
   // versperrt werden

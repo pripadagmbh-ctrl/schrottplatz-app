@@ -32,7 +32,7 @@ const ROUTE_IN_FWD: Array<[number, number]> = [
 // Nach dem Wiegen weiter zum Rangierpunkt vor dem Abkippplatz
 const ROUTE_APPROACH: Array<[number, number]> = [
   [GATE_X, 24],
-  [-14, 21],
+  [-14, 18.5],
   [0, 19],
 ];
 const ROUTE_IN_REV: Array<[number, number]> = [
@@ -42,7 +42,7 @@ const ROUTE_IN_REV: Array<[number, number]> = [
 const ROUTE_OUT: Array<[number, number]> = [
   [0, 9.5],
   [0, 19],
-  [-14, 21],
+  [-14, 18.5],
   [GATE_X, 24],
   [GATE_X, 40],
 ];
@@ -57,17 +57,17 @@ const PICKUP_APPROACH: Array<[number, number]> = [
   [GATE_X, 24],
   [-10, 22],
   [16, 22],
-  [16, -9.5],
+  [16, -13.5],
 ];
 // Rückwärts nach Westen direkt neben die Presse — Heck (Container-Öffnung)
 // zeigt zur Schere, der Bagger lädt von dort um (Design-Fix 2026-08-29)
 const PICKUP_IN_REV: Array<[number, number]> = [
-  [16, -9.5],
-  [8.5, -9.5],
+  [16, -13.5],
+  [8.5, -13.5],
 ];
 const PICKUP_OUT: Array<[number, number]> = [
-  [8.5, -9.5],
-  [16, -9.5],
+  [8.5, -13.5],
+  [16, -13.5],
   [16, 22],
   [GATE_X, 24],
   [GATE_X, 40],
@@ -77,7 +77,7 @@ const PICKUP_OUT: Array<[number, number]> = [
 // kippt seine Ladung direkt dort ab (Design-Fix 29.08.2026).
 const TIP_APPROACH: Array<[number, number]> = [
   [GATE_X, 24],
-  [-14, 20],
+  [-14, 18.5],
   [-9, 13],
 ];
 const TIP_IN_REV: Array<[number, number]> = [
@@ -87,7 +87,7 @@ const TIP_IN_REV: Array<[number, number]> = [
 const TIP_OUT: Array<[number, number]> = [
   [-9, 7.5],
   [-9, 13],
-  [-14, 20],
+  [-14, 18.5],
   [GATE_X, 24],
   [GATE_X, 40],
 ];
@@ -109,7 +109,7 @@ const BED_HALF_W = 1.35;
  */
 export const WORK_ZONES: Array<[number, number, number]> = [
   [0, 9, 11], // Abkippplatz vor dem Bagger inkl. Halteposition
-  [11, -9.5, 9], // Verladeplatz neben der Presse
+  [11, -13.5, 9], // Verladeplatz südöstlich, südlich der Muldenreihe
   [-9, 4, 10], // Stahlschrotthaufen — dorthin kippen die Kipper selbst ab
 ];
 /** Nach so langer Blockade fährt der Fahrer vorsichtig weiter (kein Deadlock) */

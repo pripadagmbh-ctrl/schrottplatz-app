@@ -18,7 +18,11 @@ import type { CompositeManager } from "../dismantle/composites";
  * Zustandswechsel der Teile — nichts wird gegen eine Wand zerquetscht.
  */
 
-const CENTER = new THREE.Vector3(0, 0, -9.5); // (SW) südlich hinter dem Bagger, im Schwenkbereich
+// Südwestlich hinter dem Bagger, auf dem früheren Störstoffplatz. Mittig
+// hinter der Maschine schnitt die Schere in die vorderste Sortiermulde;
+// hier steht sie frei neben dem Stahlschrotthaufen, und die offene Seite
+// bleibt in Reichweite (Design-Fix 29.08.2026).
+const CENTER = new THREE.Vector3(-4.6, 0, -9.8);
 /**
  * Die Mulde ist um 90° gedreht aufgestellt: Die lange Achse läuft Nord–Süd, die
  * aufstehenden Deckelplatten stehen dadurch östlich und westlich — die Stirnseite
