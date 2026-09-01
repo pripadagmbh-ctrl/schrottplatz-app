@@ -166,6 +166,9 @@ export class Yard {
       placeTree(x, z, 0.85 + rnd() * 0.8);
     }
 
+    // Auf einem der Bäume nördlich vom Platz steht ein Storchenhorst
+    this.buildStorkNest(scene, placeTree);
+
     // Hügelkette am Horizont
     const hillMat = new THREE.MeshStandardMaterial({ color: 0x63784f, roughness: 1, flatShading: true });
     for (let i = 0; i < 9; i++) {
@@ -378,6 +381,105 @@ export class Yard {
     plane.position.set(-11.5, 1.02, YARD_D / 2 - 0.32);
     plane.rotation.y = Math.PI;
     scene.add(plane);
+  }
+
+  /**
+   * Storchenhorst auf einem Baum nördlich des Platzes (Wunsch 29.08.2026).
+   * Aus der Kabine blickt man in diese Richtung, der Vogel steht also im Bild.
+   * Er nickt gelegentlich und dreht den Kopf — reine Kulisse, keine Physik.
+   */
+  private buildStorkNest(
+    scene: THREE.Scene,
+    placeTree: (x: number, z: number, scale: number) => void
+  ): void {
+    const X = -6.5;
+    const Z = 37;
+    const SCALE = 1.45; // ein kräftiger, alter Baum — Störche nehmen die höchsten
+    placeTree(X, Z, SCALE);
+
+    // Horst: Reisighaufen auf der Krone
+    const nestY = 5.6 * SCALE;
+    const twigMat = new THREE.MeshStandardMaterial({ color: 0x6b573c, roughness: 1, flatShading: true });
+    const nest = new THREE.Group();
+    nest.position.set(X, nestY, Z);
+    const bowl = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 0.72, 0.5, 9), twigMat);
+    nest.add(bowl);
+    // ein paar abstehende Äste, damit es zottelig wirkt
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2;
+      const twig = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.5 + Math.random() * 0.7, 4), twigMat);
+      twig.position.set(Math.sin(a) * 0.95, 0.2 + Math.random() * 0.18, Math.cos(a) * 0.95);
+      twig.rotation.set(Math.random() * 0.6 - 0.3, a, Math.PI / 2 - 0.35 - Math.random() * 0.4);
+      nest.add(twig);
+    }
+    scene.add(nest);
+
+    // --- Der Storch ---
+    const white = new THREE.MeshStandardMaterial({ color: 0xf4f3ee, roughness: 0.75 });
+    const black = new THREE.MeshStandardMaterial({ color: 0x22242a, roughness: 0.7 });
+    const red = new THREE.MeshStandardMaterial({ color: 0xc0392b, roughness: 0.55 });
+
+    const stork = new THREE.Group();
+    stork.position.set(X - 0.12, nestY + 0.3, Z + 0.1);
+    stork.rotation.y = -0.5; // schaut schräg über den Platz
+    scene.add(stork);
+
+    // Rumpf, hinten spitz zulaufend
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.24, 0.42, 4, 10), white);
+    body.rotation.z = Math.PI / 2;
+    body.position.y = 0.46;
+    body.castShadow = true;
+    stork.add(body);
+    // Angelegte Flügel und Schwanz sind beim Weißstorch schwarz
+    for (const side of [-1, 1]) {
+      const wing = new THREE.Mesh(new THREE.CapsuleGeometry(0.11, 0.4, 3, 8), black);
+      wing.rotation.z = Math.PI / 2;
+      wing.position.set(-0.1, 0.47, side * 0.19);
+      stork.add(wing);
+    }
+    const tail = new THREE.Mesh(new THREE.ConeGeometry(0.17, 0.42, 7), black);
+    tail.rotation.z = Math.PI / 2 + 0.25;
+    tail.position.set(-0.5, 0.5, 0);
+    stork.add(tail);
+
+    // Hals und Kopf hängen an einem Drehpunkt, damit er sich bewegen kann
+    const neckPivot = new THREE.Group();
+    neckPivot.position.set(0.2, 0.56, 0);
+    stork.add(neckPivot);
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.1, 0.5, 7), white);
+    neck.position.y = 0.24;
+    neck.rotation.z = -0.28;
+    neckPivot.add(neck);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.11, 9, 7), white);
+    head.position.set(0.14, 0.5, 0);
+    neckPivot.add(head);
+    // Der lange rote Schnabel macht den Storch aus
+    const beak = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.46, 6), red);
+    beak.rotation.z = -Math.PI / 2 + 0.12;
+    beak.position.set(0.38, 0.48, 0);
+    neckPivot.add(beak);
+    for (const side of [-1, 1]) {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.022, 6, 5), black);
+      eye.position.set(0.19, 0.53, side * 0.07);
+      neckPivot.add(eye);
+    }
+
+    // Stelzen
+    for (const side of [-1, 1]) {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.44, 5), red);
+      leg.position.set(0.02, 0.22, side * 0.1);
+      stork.add(leg);
+    }
+
+    // Sanftes Leben: der Kopf wandert langsam hin und her und nickt dabei
+    const start = performance.now();
+    const tick = (): void => {
+      const t = (performance.now() - start) / 1000;
+      neckPivot.rotation.y = Math.sin(t * 0.31) * 0.55 + Math.sin(t * 0.13) * 0.3;
+      neckPivot.rotation.z = Math.sin(t * 0.47) * 0.12 - 0.05;
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
   }
 
   private buildWalls(scene: THREE.Scene, world: RAPIER.World): void {
