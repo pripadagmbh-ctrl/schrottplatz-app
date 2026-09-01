@@ -33,10 +33,10 @@ const WALL_T = 0.6;
 const WALL_H = 1.8;
 
 /** Mittelachse der Boxenreihe */
-const BAY_X = 5.9;
+const BAY_X = 5.6;
 /** halbe Boxentiefe (x) und -breite (z) */
-const BAY_HW = 2.3;
-const BAY_HD = 2.3;
+const BAY_HW = 2.85;
+const BAY_HD = 2.45;
 /** Wanddicke der Betonlego-Boxen */
 const BAY_T = 0.35;
 const BAY_TOP = 2.5;
@@ -76,10 +76,10 @@ export const STATIC_OBSTACLES: Obstacle[] = [
   // --- Betonlego-Boxen für die Buntmetalle ---
   // Je drei Wände, vorn (Westen) offen. Als Vollfläche eingetragen wäre der
   // Innenraum gesperrt und man käme mit der Spinne nicht mehr hinein.
-  ...bayWalls(-4.4, "VA"),
-  ...bayWalls(0.7, "Alu"),
-  ...bayWalls(5.8, "Kupfer"),
-  ...bayWalls(10.9, "Kabel"),
+  ...bayWalls(-7.35, "VA"),
+  ...bayWalls(-2.45, "Alu"),
+  ...bayWalls(2.45, "Kupfer"),
+  ...bayWalls(7.35, "Kabel"),
 
   // --- Schere und Presse, südlich hinter dem Bagger ---
   { x: 0, z: -9.5, hw: 4.4, hd: 3.8, top: 2.2, label: "Schere" },

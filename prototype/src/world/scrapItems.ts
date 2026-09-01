@@ -354,7 +354,17 @@ export class ItemManager {
         .setCcdEnabled(true)
     );
     // Restitution 0: Metall auf Beton springt nicht, es klatscht und liegt
-    this.world.createCollider(collider.setMass(massKg).setFriction(1.1).setRestitution(0), body);
+    // Sperrig ineinander: viel Reibung, und bei zwei Teilen zählt der
+    // höhere Wert. Schrott rutscht nicht auseinander, er verhakt sich.
+    this.world.createCollider(
+      collider
+        .setMass(massKg)
+        .setFriction(2.2)
+        .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Max)
+        .setRestitution(0)
+        .setRestitutionCombineRule(RAPIER.CoefficientCombineRule.Min),
+      body
+    );
     return this.register({ materialId, massKg, mesh, body, shape });
   }
 
@@ -476,7 +486,8 @@ export class ItemManager {
     this.world.createCollider(
       RAPIER.ColliderDesc.cuboid(dims[0] / 2, dims[1] / 2, dims[2] / 2)
         .setMass(massKg)
-        .setFriction(1.2)
+        .setFriction(2.4)
+        .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Max)
         .setRestitution(0),
       body
     );

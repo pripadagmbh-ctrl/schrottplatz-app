@@ -37,10 +37,10 @@ const CONFIGS: ContainerConfig[] = [
   // Vier Betonlego-Mulden in einer Reihe, Öffnung zeigt nach Westen zum Bagger
   // Nach Norden gerückt: die westliche Öffnung darf nicht von der Presse
   // versperrt werden
-  { id: "c_va", fractionId: "va", label: "EDELSTAHL VA", kind: "bay", x: 5.9, z: -4.4, size: [4.6, 4.6, 2.5] },
-  { id: "c_alu", fractionId: "alu", label: "ALU", kind: "bay", x: 5.9, z: 0.7, size: [4.6, 4.6, 2.5] },
-  { id: "c_copper", fractionId: "copper", label: "KUPFER/MS", kind: "bay", x: 5.9, z: 5.8, size: [4.6, 4.6, 2.5] },
-  { id: "c_cable", fractionId: "cable", label: "KABEL", kind: "bay", x: 5.9, z: 10.9, size: [4.6, 4.6, 2.5] },
+  { id: "c_va", fractionId: "va", label: "EDELSTAHL VA", kind: "bay", x: 5.6, z: -7.35, size: [4.6, 3.8, 2.5] },
+  { id: "c_alu", fractionId: "alu", label: "ALU", kind: "bay", x: 5.6, z: -2.45, size: [4.6, 3.8, 2.5] },
+  { id: "c_copper", fractionId: "copper", label: "KUPFER/MS", kind: "bay", x: 5.6, z: 2.45, size: [4.6, 3.8, 2.5] },
+  { id: "c_cable", fractionId: "cable", label: "KABEL", kind: "bay", x: 5.6, z: 7.35, size: [4.6, 3.8, 2.5] },
 ];
 
 /** Fangbereich über einer Haufen-Zone (Zonen-Zählung + Ampel) */
@@ -96,16 +96,23 @@ class GameContainer {
       const BLOCK_H = 0.5;
       const BLOCK_T = 0.55;
       const ROWS = 5;
-      const concrete = [0x9b9b94, 0x92928b, 0xa4a49c].map(
-        (col) => new THREE.MeshStandardMaterial({ color: col, roughness: 0.95 })
+      // Fünf Grautöne statt drei: schon das lässt die Wand gebraucht
+      // wirken, weil Blöcke aus verschiedenen Chargen nebeneinanderstehen.
+      // Kostet nichts — die Materialien werden ohnehin geteilt.
+      const concrete = [0x9b9b94, 0x8d8d86, 0xa4a49c, 0x94908a, 0xaaa89f].map(
+        (col) => new THREE.MeshStandardMaterial({ color: col, roughness: 0.98 })
       );
       const blockGeo = new THREE.BoxGeometry(BLOCK_L, BLOCK_H, BLOCK_T);
       const studGeo = new THREE.CylinderGeometry(0.13, 0.13, 0.09, 10);
       let bi = 0;
       const placeBlock = (x: number, y: number, z: number, alongX: boolean): void => {
-        const b = new THREE.Mesh(blockGeo, concrete[bi++ % 3]);
-        b.position.set(x, y, z);
-        if (!alongX) b.rotation.y = Math.PI / 2;
+        const b = new THREE.Mesh(blockGeo, concrete[bi % 5]);
+        // Jeder Block sitzt ein wenig anders — von Hand mit dem Stapler
+        // gesetzt, nicht gegossen. Reiner Aufbau, keine Laufzeitkosten.
+        const j = (n: number): number => (((bi * 9301 + n * 49297) % 233280) / 233280 - 0.5);
+        b.position.set(x + j(1) * 0.05, y + j(2) * 0.02, z + j(3) * 0.05);
+        b.rotation.set(j(4) * 0.02, (alongX ? 0 : Math.PI / 2) + j(5) * 0.035, j(6) * 0.018);
+        bi++;
         b.castShadow = true;
         b.receiveShadow = true;
         group.add(b);
