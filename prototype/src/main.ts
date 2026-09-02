@@ -342,6 +342,9 @@ async function main(): Promise<void> {
   };
   grip.onTear = () => audio.playTear();
   grip.partResolver = (pos) => composites.findPartNear(pos);
+  // Gewalt beim Herausreißen: Rotator-Drehung zählt am stärksten, dazu die
+  // Achsbewegung. Wer die Spinne am Motor verdreht, bekommt ihn schneller los.
+  grip.getViolence = () => excavator.tearViolence;
   grip.insideGrapple = (pos) => excavator.isInsideGrapple(pos);
   excavator.getStaffPos = () => staff.lambertPosition();
   staff.getBlockingItem = () => {

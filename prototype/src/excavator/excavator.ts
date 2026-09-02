@@ -67,6 +67,9 @@ export class Excavator {
   boomAngle = THREE.MathUtils.degToRad(35);
   stickAngle = THREE.MathUtils.degToRad(-70);
   rotatorYaw = 0;
+  /** Drehgeschwindigkeit der Spinne (rad/s) — treibt das Herausreißen */
+  private rotatorVel = 0;
+  private lastRotatorYaw = 0;
   closure = 0; // 0 offen .. 1 zu
   closing = false;
 
@@ -1118,6 +1121,10 @@ export class Excavator {
       bladeStep
     );
 
+    // Drehgeschwindigkeit der Spinne für das Herausreißen festhalten
+    this.rotatorVel = (this.rotatorYaw - this.lastRotatorYaw) / Math.max(dt, 1e-4);
+    this.lastRotatorYaw = this.rotatorYaw;
+
     this.resolveGroundClamp();
     this.syncMeshes();
 
@@ -1419,6 +1426,23 @@ export class Excavator {
       z: this.grappleGroup.position.z,
     });
     this.grappleBody.setNextKinematicRotation({ x: gq.x, y: gq.y, z: gq.z, w: gq.w });
+  }
+
+  /**
+   * Wie viel Gewalt gerade auf eine gefasste Baugruppe wirkt (0..1).
+   *
+   * Das Drehen der Spinne zählt am stärksten — genau damit reißt man einen
+   * Motor aus seiner Aufhängung. Dazu kommt die Bewegung von Ausleger, Stiel
+   * und Oberwagen, also das Reißen mit dem ganzen Arm.
+   */
+  get tearViolence(): number {
+    const dreh = Math.min(Math.abs(this.rotatorVel) / 0.9, 1);
+    const arm =
+      (Math.abs(this.boomVel) / BOOM_RATE +
+        Math.abs(this.stickVel) / STICK_RATE +
+        Math.abs(this.cabVel) / CAB_MAX) /
+      3;
+    return Math.min(1, dreh * 0.7 + arm * 0.5);
   }
 
   /** Achs-Aktivität 0..1 — treibt Motor-/Hydrauliksound (Kap. 15). */

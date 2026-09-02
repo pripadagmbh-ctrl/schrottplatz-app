@@ -366,7 +366,14 @@ export class CarComposite {
     for (const part of this.parts) {
       if (!part.attached) continue;
       part.mesh.getWorldPosition(tmp);
-      if (pos.distanceTo(tmp) <= part.def.grabRadius) {
+      // Von oben zu greifen ist der übliche Fall: Die Spinne kommt senkrecht
+      // über die Motorhaube und fasst hinein. Deshalb zählt der waagerechte
+      // Abstand voll, der senkrechte nur zur Hälfte — sonst müsste man die
+      // Bauteilmitte auf den Zentimeter treffen (Design 02.09.2026).
+      const dx = pos.x - tmp.x;
+      const dy = (pos.y - tmp.y) * 0.5;
+      const dz = pos.z - tmp.z;
+      if (Math.hypot(dx, dy, dz) <= part.def.grabRadius) {
         const anchorWorld = tmp.clone();
         return {
           id: `${this.body.handle}_${part.def.id}`,

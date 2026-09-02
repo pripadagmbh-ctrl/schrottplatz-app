@@ -62,8 +62,10 @@ export const CAR_DEF: CarDef = {
       name: "Motor",
       materialId: "steel", // Guss läuft im Stahlschrott mit
       massKg: 210,
-      tearSeconds: 2.0,
-      grabRadius: 0.65,
+      // Zäher als ein Rad: der Motor hängt an Lagern und Leitungen. Mit
+      // gedrehter Spinne geht es deutlich schneller.
+      tearSeconds: 2.6,
+      grabRadius: 1.0,
       anchor: [0, 0.62, 1.45],
       size: [0.9, 0.42, 0.7],
       kind: "box",

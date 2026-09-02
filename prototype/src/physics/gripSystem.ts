@@ -30,6 +30,13 @@ interface GrippedItem {
 export class GripSystem {
   private items: GrippedItem[] = [];
   private sensorShape = new RAPIER.Ball(SENSOR_RADIUS);
+  /**
+   * Wie viel Gewalt gerade auf die gefasste Baugruppe wirkt: 0 = ruhig
+   * halten, 1 = kräftig drehen und reißen. Von main aus Rotator- und
+   * Achsbewegung gebildet.
+   */
+  getViolence: (() => number) | null = null;
+
   /** Traglast-Faktor aus dem Baggerausbau — von main gesetzt */
   getCapacityBonus: (() => number) | null = null;
 
@@ -124,9 +131,12 @@ export class GripSystem {
         }
         const d = sensorPos.distanceTo(target.anchorWorld);
         if (d < 2.5) {
-          // Gefasst halten reißt: voller Fortschritt, solange die Part im
-          // Lösebereich bleibt. (Echte Zug-Kopplung des Arms kommt später.)
-          this.tearState.progress += dt;
+          // Gefasst halten löst die Baugruppe. Wer dabei Gewalt anwendet —
+          // die Spinne dreht oder mit dem Arm reißt —, ist deutlich
+          // schneller: So reißt man einen Motor in Wirklichkeit heraus,
+          // nicht durch geduldiges Ziehen (Wunsch 02.09.2026).
+          const gewalt = this.getViolence?.() ?? 0;
+          this.tearState.progress += dt * (1 + gewalt * 2.5);
           if (this.tearState.progress >= this.tearState.seconds) {
             const body = target.tear();
             this.attachBody(body);
@@ -147,6 +157,10 @@ export class GripSystem {
   }
 
   private tryGrab(sensorPos: THREE.Vector3): void {
+    // Liegt eine abreißbare Baugruppe im Greifbereich, hat sie Vorrang: Wer
+    // einen Motor herausreißen will, soll nicht stattdessen das Blech davor
+    // fassen, das dann alles Weitere blockiert (Design-Fix 02.09.2026).
+    if (this.partResolver?.(sensorPos)) return;
     const candidates: RAPIER.RigidBody[] = [];
     this.world.intersectionsWithShape(
       { x: sensorPos.x, y: sensorPos.y, z: sensorPos.z },
