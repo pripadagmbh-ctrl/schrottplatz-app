@@ -561,6 +561,21 @@ class DeliveryVehicle {
       schwer ? 0.55 : 0,
       this.sortedMaterial ?? undefined
     );
+    // Ladung auf die Liefermenge des Kunden bringen. Auf eine Ladefläche
+    // passen nur begrenzt Stücke, also werden sie schwerer statt zahlreicher
+    // — ein Händler bringt eben Brocken, kein Kleinzeug. Der Faktor ist
+    // gedeckelt, damit kein Blech zwei Tonnen wiegt (Design 02.09.2026).
+    if (c) {
+      const summe = specs.reduce((a, sp) => a + sp.massKg, 0);
+      if (summe > 0) {
+        const faktor = THREE.MathUtils.clamp(c.massKg / summe, 0.3, 8);
+        for (const sp of specs) sp.massKg = Math.round(sp.massKg * faktor);
+        // Greift die Deckelung — etwa wenn nur vier Schwergewichte geladen
+        // sind —, wird die angekündigte Menge nach unten korrigiert. Sonst
+        // verspricht der Kunde an der Waage mehr, als auf dem Wagen liegt.
+        (c as { massKg: number }).massKg = specs.reduce((a, sp) => a + sp.massKg, 0);
+      }
+    }
     const bedQuat = new THREE.Quaternion();
     this.bedGroup.getWorldQuaternion(bedQuat);
     // Überlappungsfrei stapeln: jedes Teil bekommt einen Platz, der von allen

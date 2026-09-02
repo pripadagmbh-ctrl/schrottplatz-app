@@ -24,11 +24,13 @@ import type { CompositeManager } from "../dismantle/composites";
 // bleibt in Reichweite (Design-Fix 29.08.2026).
 const CENTER = new THREE.Vector3(-8.5, 0, -7.0);
 /**
- * Die Mulde ist um 90° gedreht aufgestellt: Die lange Achse läuft Nord–Süd, die
- * aufstehenden Deckelplatten stehen dadurch östlich und westlich — die Stirnseite
- * zum Baggerplatz bleibt frei zum Befüllen (Design-Fix 2026-08-29).
+ * Die Mulde liegt längs Ost–West, in einer Flucht mit dem Stahlschrottplatz
+ * darüber: Die 10 m lange Seite läuft parallel zum Haufen (x −13,5 bis −3,5),
+ * die 4 m Tiefe schließt südlich daran an (z −9 bis −5). Die Deckelklappen
+ * legen sich dadurch nach Norden und Süden weg, und der Bagger füllt von oben
+ * über die lange Seite ein (Design-Fix 02.09.2026).
  */
-const ROT = Math.PI / 2;
+const ROT = 0;
 // Große Mulde: die lange offene Seite zeigt nach Norden zum Baggerplatz,
 // damit von dort bequem eingefüllt werden kann (Design 2026-08-29).
 // Breite wie der Stahlschrottplatz (11 m), direkt daneben: So bildet die

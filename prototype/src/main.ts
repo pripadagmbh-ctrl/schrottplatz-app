@@ -407,6 +407,11 @@ async function main(): Promise<void> {
   const ruf = new Reputation();
   ruf.load(save?.reputation);
   let preisFaktor = 1;
+  /**
+   * Fester Kurs für Gewerbekunden. Etwas über Markt: Sie liefern sortenrein
+   * und verlässlich, das ist den Aufschlag wert.
+   */
+  const GEWERBE_KURS = 1.06;
   const haggleEl = document.getElementById("haggle")!;
   const zeigeVerhandlung = (
     kunde: import("./delivery/customers").CustomerProfile,
@@ -462,10 +467,17 @@ async function main(): Promise<void> {
         : `Waage: ${kg.toFixed(0)} kg brutto — bitte abladen.`
     );
     const kunde = vehicles.activeCustomer;
-    if (kunde) {
-      vehicles.dealPending = true; // der Fahrer wartet, bis der Preis steht
-      zeigeVerhandlung(kunde, kg, rein);
+    if (!kunde) return;
+    if (kunde.group === "gewerbe") {
+      // Betriebe verhandeln nicht. Sie liefern zuverlässig ab und bekommen
+      // dafür einen guten Kurs — das ist ihr Teil der Abmachung.
+      preisFaktor = GEWERBE_KURS;
+      ruf.note("sauberVerwogen", "gewerbe");
+      hud.toast(`${kunde.name}: „${kunde.greeting}" — fester Kurs, keine Diskussion.`);
+      return;
     }
+    vehicles.dealPending = true; // der Fahrer wartet, bis der Preis steht
+    zeigeVerhandlung(kunde, kg, rein);
   };
   vehicles.onWeighOut = (netKg) => {
     // Der beim Wiegen ausgehandelte Faktor gilt für diese Fuhre

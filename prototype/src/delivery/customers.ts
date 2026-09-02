@@ -263,7 +263,8 @@ function rollHaendler(): CustomerProfile {
     group: "haendler",
     name: f.firstName,
     subtitle: f.family,
-    massKg: 3000 + Math.random() * 17000,
+    // Was auf einen Kipper passt: rund 10-15 Kubikmeter Schrott
+    massKg: 2500 + Math.random() * 6500,
     // Auch wenn er eine Vorliebe hat: der Händler nimmt mit, was er kriegt
     sortedMaterial: f.typical && Math.random() < 0.45 ? f.typical : null,
     contaminantShare: 0.05 + Math.random() * 0.08,
@@ -278,7 +279,7 @@ function rollGewerbe(): CustomerProfile {
     group: "gewerbe",
     name: t.name,
     subtitle: "Gewerbe",
-    massKg: 1000 + Math.random() * 14000,
+    massKg: 1200 + Math.random() * 5300,
     sortedMaterial: t.material,
     contaminantShare: t.beifang,
     hardness: 2, // sachlich, wenig Spielraum

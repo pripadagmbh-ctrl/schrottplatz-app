@@ -28,8 +28,9 @@ describe("Kundschaft", () => {
         expect(c.massKg, "Privat bringt Kofferraummengen").toBeLessThan(800);
         expect(c.massKg).toBeGreaterThanOrEqual(50);
       } else {
+        // Was auf eine Ladefläche passt — nicht mehr
         expect(c.massKg, `${c.group} bringt Fuhren`).toBeGreaterThanOrEqual(1000);
-        expect(c.massKg).toBeLessThan(20001);
+        expect(c.massKg, `${c.group} passt auf einen LKW`).toBeLessThan(9001);
       }
     }
   });
