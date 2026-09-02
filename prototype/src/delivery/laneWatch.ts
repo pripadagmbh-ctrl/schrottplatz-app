@@ -8,7 +8,7 @@ import {
   PICKUP_IN_REV,
   TIP_APPROACH,
   TIP_IN_REV,
-} from "./vehicles";
+} from "./routes";
 
 /**
  * Überwachung der Fahrspuren (Wunsch 02.09.2026).

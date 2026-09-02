@@ -19,7 +19,7 @@ import {
   TIP_APPROACH,
   TIP_IN_REV,
   TIP_OUT,
-} from "../src/delivery/vehicles";
+} from "../src/delivery/routes";
 
 /**
  * Die Kollisionsprüfung hat schon mehrfach echte Fehler produziert: ein

@@ -2,7 +2,7 @@ import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { randomCargo, type ItemManager, type ScrapItem } from "../world/scrapItems";
 import type { CompositeManager, CarComposite } from "../dismantle/composites";
-import { GATE_X, WEIGH_Z } from "../world/yard";
+import { WEIGH_Z } from "../world/yard";
 import { hitsObstacle } from "../world/obstacles";
 import { rollCustomer, vehicleForCustomer, type CustomerProfile } from "./customers";
 
@@ -17,123 +17,31 @@ import { rollCustomer, vehicleForCustomer, type CustomerProfile } from "./custom
 
 export type DeliveryKind = "kipper" | "pritsche" | "wrack" | "abholer" | "pkw";
 
-/**
- * Fahrspur (SW, Design-Fix 2026-08-29): Die Route läuft ausschließlich über die
- * östliche Spur und endet in einer Sackgasse — sie kreuzt WEDER die Haufen-Zonen
- * (z ≈ 8–12) NOCH den Bagger-Standplatz. Abfahrt erfolgt vorwärts über dieselbe
- * Spur, also weg vom frisch abgekippten Schrott.
- */
-// ANLIEFERUNG: Nordspur über die Brückenwaage, dann rückwärts an den
-// Abkippplatz vor dem Bagger. Ausfahrt vorwärts wieder über die Waage.
-// Einfahrt → Brückenwaage (dort wird brutto gewogen)
-export const ROUTE_IN_FWD: Array<[number, number]> = [
-  [GATE_X, 40],
-  [GATE_X, 24],
-];
-// Nach dem Wiegen weiter zum Rangierpunkt vor dem Abkippplatz
-export const ROUTE_APPROACH: Array<[number, number]> = [
-  [GATE_X, 24],
-  [-14, 18.5],
-  [0, 19],
-];
-export const ROUTE_IN_REV: Array<[number, number]> = [
-  [0, 19],
-  // 7,0 m: so nah, dass der Bagger die ganze Ladefläche bestreicht, und noch
-  // weit genug, dass die Blockadeprüfung (5,5 m um die Maschine) nicht
-  // dauernd anspricht.
-  [0, 7.0],
-];
-export const ROUTE_OUT: Array<[number, number]> = [
-  [0, 7.0],
-  [0, 19],
-  [-14, 18.5],
-  [GATE_X, 24],
-  [GATE_X, 40],
-];
-
-// ABHOLUNG: Ostspur nach Süden, dann rückwärts an den Verladeplatz neben der
-// Presse — dort lädt der Spieler den Container mit sortenreinem Material.
-export const PICKUP_IN_FWD: Array<[number, number]> = [
-  [GATE_X, 40],
-  [GATE_X, 24],
-];
-export const PICKUP_APPROACH: Array<[number, number]> = [
-  [GATE_X, 24],
-  [-14, 18.5],
-  [-3.5, 19],
-];
-// Rückwärts nach Westen direkt neben die Presse — Heck (Container-Öffnung)
-// zeigt zur Schere, der Bagger lädt von dort um (Design-Fix 2026-08-29)
-export const PICKUP_IN_REV: Array<[number, number]> = [
-  [-3.5, 19],
-  [-3.5, 8.0],
-];
-export const PICKUP_OUT: Array<[number, number]> = [
-  [-3.5, 8.0],
-  [-3.5, 19],
-  [-14, 18.5],
-  [GATE_X, 24],
-  [GATE_X, 40],
-];
-// KIPPER: Wer selbst abkippen kann, muss nicht vor dem Bagger halten. Er fährt
-// rückwärts an die Nordkante des Stahlschrotthaufens (Mitte bei x −9, z 1) und
-// kippt seine Ladung direkt dort ab (Design-Fix 29.08.2026).
-export const TIP_APPROACH: Array<[number, number]> = [
-  [GATE_X, 24],
-  [-14, 18.5],
-  [-9, 13],
-];
-export const TIP_IN_REV: Array<[number, number]> = [
-  [-9, 13],
-  [-9, 7.5],
-];
-export const TIP_OUT: Array<[number, number]> = [
-  [-9, 7.5],
-  [-9, 13],
-  [-14, 18.5],
-  [GATE_X, 24],
-  [GATE_X, 40],
-];
-
-/**
- * Warteplatz an der Innenseite der Nordwand, westlich der Einfahrt: Nach dem
- * Abladen stellen sich vor allem die Händler dort ab, holen sich bei Janine
- * einen Kaffee und quatschen, bevor sie fahren. Das hält Betrieb auf dem
- * Platz — und macht den Abladeplatz sofort für den Nächsten frei
- * (Wunsch 02.09.2026).
- */
-export const PARK_SLOTS: Array<[number, number]> = [
-  [-30, 24],
-  [-33.5, 24],
-  [-30, 20],
-];
-/** So lange bleibt ein Fahrzeug stehen (s) */
-const PARK_TIME_S: [number, number] = [45, 120];
-
-const SPEED = 4.8; // m/s (SW) — zuegiger Umschlag
-const FIRST_DELAY_S = 12; // (SW)
-const NEXT_DELAY_S: [number, number] = [7, 15]; // (SW) — dichter Umschlag
-/** Sicherheitsabstand zum Bagger: darunter wartet der Fahrer (Briefing Kap. 13) */
-const BLOCK_RADIUS = 5.5;
-/** Ab diesem Gewicht gilt ein liegendes Teil als echtes Hindernis (SW) */
-const BLOCKING_MASS_KG = 120;
-const HONK_AFTER_S = 10;
-/** Halbe Innenbreite der Ladefläche (SW) — größer als das breiteste Großteil */
-const BED_HALF_W = 1.35;
-/**
- * Arbeitszonen, in denen liegender Schrott NICHT als Blockade gilt: Genau
- * dorthin wird abgekippt bzw. verladen — dort muss das Fahrzeug hin.
- * [x, z, radius]
- */
-export const WORK_ZONES: Array<[number, number, number]> = [
-  [0, 9, 11], // Abkippplatz vor dem Bagger inkl. Halteposition
-  [-3.5, 10, 8], // Verladeplatz westlich neben dem Abladeplatz
-  [-9, 4, 10], // Stahlschrotthaufen — dorthin kippen die Kipper selbst ab
-];
-/** Nach so langer Blockade fährt der Fahrer vorsichtig weiter (kein Deadlock) */
-const BLOCK_GIVEUP_S = 35;
-
-const TIP_ANGLE = THREE.MathUtils.degToRad(58); // (SW) steil genug für sperrige Großteile
+import {
+  ROUTE_IN_FWD,
+  ROUTE_APPROACH,
+  ROUTE_IN_REV,
+  ROUTE_OUT,
+  PICKUP_IN_FWD,
+  PICKUP_APPROACH,
+  PICKUP_IN_REV,
+  PICKUP_OUT,
+  TIP_APPROACH,
+  TIP_IN_REV,
+  TIP_OUT,
+  PARK_SLOTS,
+  PARK_TIME_S,
+  SPEED,
+  FIRST_DELAY_S,
+  NEXT_DELAY_S,
+  BLOCK_RADIUS,
+  BLOCKING_MASS_KG,
+  HONK_AFTER_S,
+  BED_HALF_W,
+  WORK_ZONES,
+  BLOCK_GIVEUP_S,
+  TIP_ANGLE,
+} from "./routes";
 
 type Phase =
   | "settleCargo"
