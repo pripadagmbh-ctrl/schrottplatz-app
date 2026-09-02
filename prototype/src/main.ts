@@ -19,6 +19,7 @@ import { VehicleManager } from "./delivery/vehicles";
 import { PressManager } from "./world/press";
 import { randomCargo } from "./world/scrapItems";
 import { Shift } from "./economy/shift";
+import { Tutorial } from "./ui/tutorial";
 import { Reputation } from "./economy/reputation";
 import { UPGRADES, UpgradeState, type UpgradeId } from "./economy/upgrades";
 import { haggle, leavesOnRefusal, hint, OFFER_FACTOR, OFFER_LABEL, type Offer } from "./economy/haggle";
@@ -168,6 +169,7 @@ async function main(): Promise<void> {
     moneyEur: account.moneyEur,
     shift: shift.toJSON(),
     reputation: ruf.toJSON(),
+    tutorial: tutorial.toJSON(),
     upgrades: ausbau.toJSON(),
     timeOfDay: daylight.time,
     items: items.items
@@ -199,6 +201,31 @@ async function main(): Promise<void> {
   // Fahrspuren überwachen: liegt Schrott im Weg, steht der Betrieb
   const lanes = new LaneWatch(items);
   let stoerfallGemeldet = false;
+  // Geführter Einstieg — zeigt den Kreislauf einmal und hält sich dann raus
+  const tutorial = new Tutorial();
+  tutorial.load(save?.tutorial);
+  const tutEl = document.getElementById("tutorial")!;
+  let tutSortiertKg = 0;
+  let tutGepresst = false;
+  let tutAbholer = false;
+  let tutPreis = false;
+  const zeigeTutorial = (): void => {
+    const st = tutorial.step;
+    if (!st) {
+      tutEl.classList.remove("open");
+      return;
+    }
+    document.getElementById("tut-schritt")!.textContent = tutorial.progress;
+    document.getElementById("tut-titel")!.textContent = st.title;
+    document.getElementById("tut-text")!.textContent = st.text;
+    tutEl.classList.add("open");
+  };
+  document.getElementById("tut-skip")!.addEventListener("click", () => {
+    tutorial.skip();
+    zeigeTutorial();
+  });
+  zeigeTutorial();
+
   const shift = new Shift();
   shift.load(save?.shift);
   if (typeof save?.timeOfDay === "number") daylight.time = save.timeOfDay;
@@ -313,6 +340,7 @@ async function main(): Promise<void> {
       b.addEventListener("click", () => {
         showPickup(false);
         vehicles.requestPickup(order);
+        tutAbholer = true;
         hud.toast(
           order
             ? `Abholung für ${getMaterial(order).name} bestellt — sortenrein laden!`
@@ -371,7 +399,10 @@ async function main(): Promise<void> {
     if (e.correct) {
       audio.playCorrect();
       const it = items.items.find((i) => i.id === e.itemId);
-      if (it) account.noteSorted(it.massKg); // Geld gibt es erst bei der Abholung
+      if (it) {
+        account.noteSorted(it.massKg); // Geld gibt es erst bei der Abholung
+        tutSortiertKg += it.massKg;
+      }
     } else {
       audio.playWrong();
     }
@@ -396,6 +427,7 @@ async function main(): Promise<void> {
   };
   press.onLidsClosed = () => audio.playCrash(0.6); // Eisenplatten schlagen auf
   press.onStamp = (count, pos) => {
+    if (count > 0) tutGepresst = true;
     audio.playCrash(1);
     audio.playTear();
     particles.spawn(pos, 16, 0x9a8b74, 2.5, 1.8, 0.7);
@@ -496,6 +528,7 @@ async function main(): Promise<void> {
       b.addEventListener("click", () => {
         haggleEl.classList.remove("open");
         vehicles.dealPending = false;
+        tutPreis = true;
         const r = haggle(kunde, offer, reinheit, ruf.get(kunde.group) / 100);
         preisFaktor = r.factor;
         hud.toast(`${kunde.name}: „${r.reply}"`);
@@ -794,6 +827,19 @@ async function main(): Promise<void> {
     if (lanes.blocked !== stoerfallGemeldet) {
       stoerfallGemeldet = lanes.blocked;
       hud.toast(lanes.blocked ? lanes.message + " — freiräumen!" : "Fahrspur wieder frei.");
+    }
+    if (
+      tutorial.update(frameDt, {
+        verhandeltGerade: haggleEl.classList.contains("open"),
+        preisVereinbart: tutPreis,
+        looseKg,
+        sortiertKg: tutSortiertKg,
+        gepresst: tutGepresst,
+        abholerBestellt: tutAbholer,
+        turnoverKg: shift.turnoverKg,
+      })
+    ) {
+      zeigeTutorial();
     }
     shift.update(frameDt, looseKg);
     // Zahlungsdruck: Wer die Ware nicht bezahlen kann, bekommt keine mehr.
