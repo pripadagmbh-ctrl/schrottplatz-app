@@ -392,6 +392,16 @@ async function main(): Promise<void> {
     hud.toast("Der Fahrer hupt — Fahrspur ist blockiert!");
   };
   // Brückenwaage: voll rein, leer raus → Kunde bekommt sein Geld
+  // Kundschaft meldet sich bei der Ankunft — Name, Herkunft und ein Wort
+  vehicles.onCustomerArrived = (c) => {
+    const wer =
+      c.group === "haendler"
+        ? `${c.name} ${c.subtitle}`
+        : c.group === "gewerbe"
+          ? c.name
+          : `${c.name} ${c.subtitle}`;
+    hud.toast(`${wer}: „${c.greeting}"`);
+  };
   vehicles.onWeighIn = (kg) => {
     const rein = vehicles.activeSortedMaterial;
     hud.toast(

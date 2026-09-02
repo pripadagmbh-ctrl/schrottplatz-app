@@ -783,3 +783,89 @@ Für die erste Fassung im Play Store reicht: der Zyklus aus 25.1, drei bis vier
 Upgrades, die drei Kundengruppen mit Textsprüchen (noch ohne Sprachausgabe),
 Speichern, Pausenmenü und eine geführte erste Viertelstunde. Alles Weitere ist
 Nachschub für spätere Fassungen.
+
+---
+
+## 26. Kundschaft und Persönlichkeit (Fassung 02.09.2026)
+
+### 26.1 Der Spieler: Daniel
+
+Sohn von Lambert und Margarete, beide aus den Händlerfamilien Bähring und
+Prieser. Baggerfahrer und Platzchef in einer Person: charmant, ruhig, etwas
+verschlafen, kennt jeden Preis und jeden Trick. Lässt sich nicht drängen,
+trinkt gern Kaffee und hört Musik. Im Spiel kommentiert er Ereignisse in
+kurzen Textblasen von zwei bis acht Wörtern.
+
+Stufen: stumm im MVP · Textblasen in V1 · Sprachausgabe später.
+
+### 26.2 Die drei Kundengruppen
+
+| | Privatleute | Schrotthändler | Gewerbe |
+| --- | --- | --- | --- |
+| Auftreten | wechselnd, generiert | Stammfiguren mit Namen | Stammkunden (Betriebe) |
+| Menge | 50–800 kg | 3–20 t | 1–15 t |
+| Material | Mischschrott, Haushaltsauflösung | alles | sortenrein je Branche |
+| Fahrzeug | PKW mit Anhänger, Kombi | Kipper, Pritsche, Abschlepper | Kipper, Mulde, Sattelzug |
+| Preiswissen | keins — vertrauen dir | kennen jeden Preis | kennen Marktnotierungen |
+| Verhandlung | akzeptieren fast alles | drücken hart zurück | sachlich, wenig Spielraum |
+| Gedächtnis | grob (fair / unfair) | lang und nachtragend | Zuverlässigkeits-Score |
+| Besonderheit | bringen unwissentlich Störstoff | gelegentlich graue Ware | verlangen korrekte Wiegescheine |
+
+### 26.3 Die Händlerfamilien
+
+Wiederkehrende Stammfiguren, die sich untereinander kennen: **Bäring,
+Lorsbach, Prieser, Hardwig, Boxmann, Zöllner, Adorf, Schmikatz.**
+
+Je Figur zu briefen: Vorname, Alter, Fahrzeug, typisches Material,
+Verhandlungsstil (1–5 hart), Marotte, Verhältnis zu den anderen Familien,
+Standardsätze und Beziehung zu Daniel. Gesetzt sind bisher die Familiennamen;
+Vornamen und Sprüche in `customers.ts` sind eine Erstfassung zum Überschreiben.
+
+### 26.4 Gewerbekunden nach Branche
+
+| Branche | Material | Besonderheit |
+| --- | --- | --- |
+| Gießerei | Guss, Schlacke | Schlacke ist geringwertiger Beifang |
+| Fräserei/Dreherei | Späne (Stahl, Alu) | ölig, hohe Schüttdichte, sortenrein |
+| Maschinenbau | Stahl, Elektromotoren | große, sperrige Teile |
+| Kfz-Werkstatt | Katalysatoren, Alufelgen, Akkus | kleine Menge, hoher Wert |
+| Autohändler | Unfallwagen | Stückgeschäft, Papiere sauber |
+| Elektrobetrieb | Kabel, Schaltschränke | Kupferanteil variiert stark |
+| Schlosserei | Edelstahl V2A, Baustahl | sauber getrennt, guter Kunde |
+| Abriss | Mischschrott, Heizkörper, Rohre | große Mengen, viel Störstoff |
+
+### 26.5 Ruf
+
+| Verhalten | Privat | Händler | Gewerbe |
+| --- | --- | --- | --- |
+| Faire Preise zahlen | ++ | + | 0 |
+| Hart drücken | −− | − | 0 |
+| Graue Ware annehmen | 0 | ++ | −− (falls bekannt) |
+| Graue Ware ablehnen | 0 | − | + |
+| Kontrolle mit Fund | − | + | −− |
+| Pünktlich, saubere Papiere | + | 0 | ++ |
+
+Der Ruf steuert Anlieferfrequenz, Materialqualität und Verhandlungsspielraum —
+nie, ob man gewinnt. Er versiegt nie ganz, sonst spielt sich das Spiel in eine
+Sackgasse.
+
+### 26.6 Graue Geschäfte [V1]
+
+Ware mit unklarer Herkunft wird nie offen angesprochen; der Kunde signalisiert
+sie über den Wortlaut, und der Spieler muss zuhören — „Das Kupfer ist noch
+warm", „Ohne Zettel, ja?", „Der Onkel schaut nachher vorbei". Annehmen bringt
+Marge und Ansehen bei den Händlern, dazu Timer und Kontrollrisiko. Ablehnen ist
+sicher, aber die Händler merken es sich. **Beide Wege sind gültig — das Spiel
+urteilt nicht.**
+
+**Ton-Leitplanke (verbindlich):** Das Milieu entsteht aus Beruf, Familien und
+Geschäft — nie aus Herkunft oder Ethnie. Keine Gruppe wird als kriminell
+markiert. Das hält den Ton glaubwürdig und jede Store-Prüfung sauber.
+
+### 26.7 Offen für das Charakter-Briefing
+
+Vornamen, Alter und Persönlichkeit je Familienmitglied · Fehden der Familien
+untereinander · Willis Vorgeschichte und Sprechstil · drei bis fünf
+Standardsätze je Figur · Namen der Gewerbe-Stammkunden · Erweiterung der
+Geheimsprache auf zwölf bis fünfzehn Wendungen · Startbestand (Empfehlung:
+sieben Händler, sechs Gewerbe, generierte Privatleute).

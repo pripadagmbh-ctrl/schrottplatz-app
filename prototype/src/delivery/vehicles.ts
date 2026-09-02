@@ -4,6 +4,7 @@ import { randomCargo, type ItemManager, type ScrapItem } from "../world/scrapIte
 import type { CompositeManager, CarComposite } from "../dismantle/composites";
 import { GATE_X, WEIGH_Z } from "../world/yard";
 import { hitsObstacle } from "../world/obstacles";
+import { rollCustomer, vehicleForCustomer, type CustomerProfile } from "./customers";
 
 /**
  * Anlieferungen M3: Kundenfahrzeuge auf fester Route (kinematisch).
@@ -253,20 +254,14 @@ class DeliveryVehicle {
   }
 
   /**
-   * Sortenreine Ladung, falls der Händler seine Ware schon getrennt hat —
-   * in der Praxis kommt Schrott oft vorsortiert an. Für den Spieler heißt
-   * das: durchladen statt sortieren.
+   * Wer da anliefert. Bestimmt Menge, Material, Störstoffanteil und den Ton
+   * an der Waage. Abholer haben kein Profil — die kommen leer.
    */
-  readonly sortedMaterial: string | null = DeliveryVehicle.rollSortedMaterial();
+  readonly customer: CustomerProfile | null;
 
-  private static rollSortedMaterial(): string | null {
-    // gut ein Drittel der Anlieferungen kommt sortenrein
-    if (Math.random() > 0.36) return null;
-    const r = Math.random();
-    if (r < 0.4) return "steel";
-    if (r < 0.65) return "alu";
-    if (r < 0.82) return "va";
-    return r < 0.94 ? "copper" : "cable";
+  /** Sortenreine Ladung? Ergibt sich aus der Kundschaft. */
+  get sortedMaterial(): string | null {
+    return this.customer?.sortedMaterial ?? null;
   }
   private get routeIn(): Array<[number, number]> {
     return this.isPickup ? PICKUP_IN_FWD : ROUTE_IN_FWD;
@@ -295,8 +290,10 @@ class DeliveryVehicle {
     private onHonk: (() => void) | null = null,
     /** Wiegung bei Einfahrt (brutto) bzw. Ausfahrt (netto = brutto − tara) */
     private onWeighIn: ((kg: number) => void) | null = null,
-    private onWeighOut: ((netKg: number) => void) | null = null
+    private onWeighOut: ((netKg: number) => void) | null = null,
+    customer: CustomerProfile | null = null
   ) {
+    this.customer = kind === "abholer" ? null : (customer ?? rollCustomer());
     this.bedLen = kind === "wrack" ? 5.4 : kind === "kipper" ? 6.0 : 5.4;
     this.buildMeshes();
     scene.add(this.group);
@@ -499,10 +496,14 @@ class DeliveryVehicle {
     // Händler liefern volle Ladungen mit viel Großteil-Anteil (SW)
     // Nicht bis unter die Bordwand vollpacken: zu volle Ladungen quollen beim
     // Kippen über und blieben halb auf der Fläche hängen.
-    // Jede vierte Fuhre bringt ein Schwergewicht — Tank, Fahrerhaus,
+    // Menge nach Kundschaft: der Privatmann bringt einen Kofferraum voll,
+    // der Händler eine ganze Fuhre.
+    const c = this.customer;
+    const klein = c?.group === "privat";
+    // Jede vierte große Fuhre bringt ein Schwergewicht — Tank, Fahrerhaus,
     // Drehgestell. Dann passt weniger daneben, das ist gewollt.
-    const schwer = !this.sortedMaterial && Math.random() < 0.28;
-    const count = schwer ? 4 : this.kind === "kipper" ? 13 : 10;
+    const schwer = !klein && !this.sortedMaterial && Math.random() < 0.28;
+    const count = schwer ? 4 : klein ? 5 : this.kind === "kipper" ? 13 : 10;
     const specs = randomCargo(
       count,
       0.5,
@@ -1023,10 +1024,18 @@ export class VehicleManager {
   };
 
   /** Sofort ein Fahrzeug schicken (Tests, Tutorial). */
-  spawnNow(kind?: DeliveryKind): void {
+  /** Meldung, wenn ein Kunde eintrifft — für Begrüßung und HUD. */
+  onCustomerArrived: ((c: CustomerProfile) => void) | null = null;
+
+  spawnNow(kind?: DeliveryKind, kunde?: CustomerProfile): void {
     if (this.active) return;
+    // Erst die Kundschaft, dann das Fahrzeug dazu: ein Privatmann kommt nicht
+    // mit dem Sattelzug, und ein Abbruchbetrieb nicht mit dem PKW-Anhänger.
+    // Zweimal zu würfeln hätte Fahrzeug und Kunde entkoppelt.
+    const gezogen = kunde ?? rollCustomer();
     const k: DeliveryKind =
-      kind ?? (["kipper", "pritsche", "wrack"] as DeliveryKind[])[Math.floor(Math.random() * 3)];
+      kind ?? vehicleForCustomer(gezogen);
+    const c = k === "abholer" ? null : gezogen;
     this.active = new DeliveryVehicle(
       k,
       this.scene,
@@ -1034,8 +1043,10 @@ export class VehicleManager {
       this.blockedAt,
       () => this.onHonk?.(),
       (kg) => this.onWeighIn?.(kg),
-      (kg) => this.onWeighOut?.(kg)
+      (kg) => this.onWeighOut?.(kg),
+      c
     );
+    if (c) this.onCustomerArrived?.(c);
     this.active.loadCargo(this.items, this.composites);
     if (k !== "abholer") this.deliveries++;
   }
