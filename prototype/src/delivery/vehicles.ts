@@ -60,17 +60,17 @@ export const PICKUP_IN_FWD: Array<[number, number]> = [
 export const PICKUP_APPROACH: Array<[number, number]> = [
   [GATE_X, 24],
   [-14, 18.5],
-  [3.5, 19],
+  [-3.5, 19],
 ];
 // Rückwärts nach Westen direkt neben die Presse — Heck (Container-Öffnung)
 // zeigt zur Schere, der Bagger lädt von dort um (Design-Fix 2026-08-29)
 export const PICKUP_IN_REV: Array<[number, number]> = [
-  [3.5, 19],
-  [3.5, 8.0],
+  [-3.5, 19],
+  [-3.5, 8.0],
 ];
 export const PICKUP_OUT: Array<[number, number]> = [
-  [3.5, 8.0],
-  [3.5, 19],
+  [-3.5, 8.0],
+  [-3.5, 19],
   [-14, 18.5],
   [GATE_X, 24],
   [GATE_X, 40],
@@ -127,7 +127,7 @@ const BED_HALF_W = 1.35;
  */
 export const WORK_ZONES: Array<[number, number, number]> = [
   [0, 9, 11], // Abkippplatz vor dem Bagger inkl. Halteposition
-  [3.5, 10, 8], // Verladeplatz neben dem Abladeplatz, in Baggerreichweite
+  [-3.5, 10, 8], // Verladeplatz westlich neben dem Abladeplatz
   [-9, 4, 10], // Stahlschrotthaufen — dorthin kippen die Kipper selbst ab
 ];
 /** Nach so langer Blockade fährt der Fahrer vorsichtig weiter (kein Deadlock) */

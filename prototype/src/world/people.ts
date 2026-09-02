@@ -535,10 +535,13 @@ export class StaffManager {
    * containers.ts. Stahl fehlt bewusst: der bleibt Sache des Baggers.
    */
   private static readonly BOX_FOR_MATERIAL: Record<string, [number, number]> = {
-    va: [5.6, -7.35],
-    alu: [5.6, -2.45],
-    copper: [5.6, 2.45],
-    cable: [5.6, 7.35],
+    va: [4.6, -5.6],
+    alu: [4.6, -1.9],
+    copper: [4.6, 1.9],
+    cable: [4.6, 5.6],
+    wood: [7.9, -3.9],
+    tires: [7.9, 0],
+    rubble: [7.9, 3.9],
   };
 
   /**

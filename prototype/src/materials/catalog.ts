@@ -24,6 +24,12 @@ export const MATERIALS: Record<string, MaterialClass> = {
   copper: { id: "copper", name: "Kupfer/Messing", buyPricePerKg: 6.0, sellPricePerKg: 7.2, color: 0xc7622b },
   cable: { id: "cable", name: "Kabel", buyPricePerKg: 1.6, sellPricePerKg: 2.2, color: 0xb0682a },
   contaminant: { id: "contaminant", name: "Störstoff", buyPricePerKg: 0, sellPricePerKg: -0.08, color: 0x7a6a52 },
+  // Nichtmetalle: Sie kommen als Beifang mit und müssen getrennt entsorgt
+  // werden. Verdienen lässt sich daran nichts — wer sie sauber trennt, zahlt
+  // aber weniger drauf, als wenn sie im Mischschrott landen.
+  wood: { id: "wood", name: "Holz", buyPricePerKg: 0, sellPricePerKg: -0.02, color: 0x8a6a42 },
+  tires: { id: "tires", name: "Reifen", buyPricePerKg: 0, sellPricePerKg: -0.05, color: 0x2e2c2b },
+  rubble: { id: "rubble", name: "Baumischabfall", buyPricePerKg: 0, sellPricePerKg: -0.04, color: 0x9a9083 },
 };
 
 /** Alte Fraktionen aus früheren Spielständen auf die aktuellen abbilden. */

@@ -22,7 +22,7 @@ import type { CompositeManager } from "../dismantle/composites";
 // hinter der Maschine schnitt die Schere in die vorderste Sortiermulde;
 // hier steht sie frei neben dem Stahlschrotthaufen, und die offene Seite
 // bleibt in Reichweite (Design-Fix 29.08.2026).
-const CENTER = new THREE.Vector3(-4.6, 0, -9.8);
+const CENTER = new THREE.Vector3(-8.5, 0, -9.8);
 /**
  * Die Mulde ist um 90° gedreht aufgestellt: Die lange Achse läuft Nord–Süd, die
  * aufstehenden Deckelplatten stehen dadurch östlich und westlich — die Stirnseite
@@ -31,7 +31,7 @@ const CENTER = new THREE.Vector3(-4.6, 0, -9.8);
 const ROT = Math.PI / 2;
 // Große Mulde: die lange offene Seite zeigt nach Norden zum Baggerplatz,
 // damit von dort bequem eingefüllt werden kann (Design 2026-08-29).
-const INNER_W = 7.0; // x — Länge, Pressweg (rechts → links)
+const INNER_W = 5.0; // x — Länge, Pressweg (rechts → links)
 const INNER_D = 6.0; // z — Breite (verdoppelt)
 const WALL_H = 1.9;
 const PLATE_T = 0.3; // dicke Eisenplatten (SW)

@@ -22,6 +22,21 @@ interface ContainerConfig {
   z: number;
   /** Zonenmaße [Breite, Tiefe, Wandhöhe] */
   size: [number, number, number];
+  /**
+   * Wohin die offene Seite zeigt. Standard ist Westen (die Boxenreihe im
+   * Osten öffnet sich zum Bagger); die Nichtmetall-Mulden im Süden öffnen
+   * nach Norden.
+   */
+  facing?: "west" | "north" | "east";
+  /**
+   * Seitenwände weglassen, wo eine Nachbarmulde direkt anschließt — dort
+   * genügt eine Trennwand statt zweier nebeneinanderstehender.
+   */
+  shareSouth?: boolean;
+  shareNorth?: boolean;
+  /** Rückwand weglassen — die Nachbarmulde dahinter bringt sie mit */
+  shareEast?: boolean;
+  shareWest?: boolean;
 }
 
 /**
@@ -36,10 +51,21 @@ const CONFIGS: ContainerConfig[] = [
   // Vier Betonlego-Mulden in einer Reihe, Öffnung zeigt nach Westen zum Bagger
   // Nach Norden gerückt: die westliche Öffnung darf nicht von der Presse
   // versperrt werden
-  { id: "c_va", fractionId: "va", label: "EDELSTAHL VA", kind: "bay", x: 5.6, z: -7.35, size: [4.6, 3.8, 2.5] },
-  { id: "c_alu", fractionId: "alu", label: "ALU", kind: "bay", x: 5.6, z: -2.45, size: [4.6, 3.8, 2.5] },
-  { id: "c_copper", fractionId: "copper", label: "KUPFER/MS", kind: "bay", x: 5.6, z: 2.45, size: [4.6, 3.8, 2.5] },
-  { id: "c_cable", fractionId: "cable", label: "KABEL", kind: "bay", x: 5.6, z: 7.35, size: [4.6, 3.8, 2.5] },
+  { id: "c_va", fractionId: "va", label: "EDELSTAHL VA", kind: "bay", x: 4.6, z: -5.6, size: [3.0, 3.3, 2.5], shareEast: true },
+  { id: "c_alu", fractionId: "alu", label: "ALU", kind: "bay", x: 4.6, z: -1.9, size: [3.0, 3.3, 2.5], shareEast: true },
+  { id: "c_copper", fractionId: "copper", label: "KUPFER/MS", kind: "bay", x: 4.6, z: 1.9, size: [3.0, 3.3, 2.5], shareEast: true },
+  { id: "c_cable", fractionId: "cable", label: "KABEL", kind: "bay", x: 4.6, z: 5.6, size: [3.0, 3.3, 2.5], shareEast: true },
+  // Nichtmetalle Rücken an Rücken hinter der Sortierreihe: Sie teilen sich
+  // deren Rückwand, öffnen nach Osten und werden vom Radlader beschickt.
+  // Eine Doppelwand zur Mitte braucht es dafür nicht.
+  { id: "c_wood", fractionId: "wood", label: "HOLZ", kind: "bay", x: 7.9, z: -3.9,
+    size: [3.0, 3.5, 2.0], facing: "east", shareWest: true },
+  { id: "c_tires", fractionId: "tires", label: "REIFEN", kind: "bay", x: 7.9, z: 0,
+    size: [3.0, 3.5, 2.0], facing: "east", shareWest: true },
+  { id: "c_rubble", fractionId: "rubble", label: "BAUMISCH", kind: "bay", x: 7.9, z: 3.9,
+    size: [3.0, 3.5, 2.0], facing: "east", shareWest: true },
+  // Nichtmetalle südlich, im Bogen um den Bagger gelegt, damit alle drei in
+  // Reichweite bleiben. Öffnung nach Norden zur Maschine.
 ];
 
 /** Fangbereich über einer Haufen-Zone (Zonen-Zählung + Ampel) */
@@ -127,13 +153,20 @@ class GameContainer {
         const y = BLOCK_H / 2 + r * BLOCK_H;
         const off = (r % 2) * (BLOCK_L / 2);
         for (let x = -w / 2 + BLOCK_L / 2 - off; x < w / 2 + 0.4; x += BLOCK_L) {
-          placeBlock(x, y, d / 2 + BLOCK_T / 2, true); // Nordwand
-          placeBlock(x, y, -(d / 2 + BLOCK_T / 2), true); // Südwand
+          if (!cfg.shareNorth) placeBlock(x, y, d / 2 + BLOCK_T / 2, true);
+          if (!cfg.shareSouth) placeBlock(x, y, -(d / 2 + BLOCK_T / 2), true);
         }
-        for (let z = -d / 2 + BLOCK_L / 2 - off; z < d / 2 + 0.4; z += BLOCK_L) {
-          placeBlock(w / 2 + BLOCK_T / 2, y, z, false); // Ostwand
+        // Rückwand: entfällt, wenn die Nachbarmulde dahinter sie schon stellt
+        if (!cfg.shareEast) {
+          for (let z = -d / 2 + BLOCK_L / 2 - off; z < d / 2 + 0.4; z += BLOCK_L) {
+            placeBlock(w / 2 + BLOCK_T / 2, y, z, false);
+          }
         }
       }
+      // Öffnung nach Norden: die ganze Mulde wird gedreht, statt die
+      // Wandlogik zu verdoppeln
+      if (cfg.facing === "north") group.rotation.y = Math.PI / 2;
+      else if (cfg.facing === "east") group.rotation.y = Math.PI;
       // Kollider: drei Wandquader (Ostseite offen)
       const body = world.createRigidBody(
         RAPIER.RigidBodyDesc.fixed().setTranslation(cfg.x, 0, cfg.z)

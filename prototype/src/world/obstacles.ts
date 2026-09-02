@@ -33,10 +33,10 @@ const WALL_T = 0.6;
 const WALL_H = 1.8;
 
 /** Mittelachse der Boxenreihe */
-const BAY_X = 5.6;
+const BAY_X = 4.6;
 /** halbe Boxentiefe (x) und -breite (z) */
-const BAY_HW = 2.85;
-const BAY_HD = 2.45;
+const BAY_HW = 1.8;
+const BAY_HD = 2.0;
 /** Wanddicke der Betonlego-Boxen */
 const BAY_T = 0.35;
 const BAY_TOP = 2.5;
@@ -76,13 +76,22 @@ export const STATIC_OBSTACLES: Obstacle[] = [
   // --- Betonlego-Boxen für die Buntmetalle ---
   // Je drei Wände, vorn (Westen) offen. Als Vollfläche eingetragen wäre der
   // Innenraum gesperrt und man käme mit der Spinne nicht mehr hinein.
-  ...bayWalls(-7.35, "VA"),
-  ...bayWalls(-2.45, "Alu"),
-  ...bayWalls(2.45, "Kupfer"),
-  ...bayWalls(7.35, "Kabel"),
+  ...bayWalls(-5.6, "VA"),
+  ...bayWalls(-1.9, "Alu"),
+  ...bayWalls(1.9, "Kupfer"),
+  ...bayWalls(5.6, "Kabel"),
+
+  // --- Nichtmetall-Mulden dahinter, Rücken an Rücken, Öffnung nach Osten ---
+  // Die gemeinsame Wand zwischen beiden Reihen steht bei x 6,4.
+  { x: 6.4, z: 0, hw: 0.35, hd: 6.0, top: 2.5, label: "Mittelwand Muldenreihen" },
+  { x: 7.9, z: -5.75, hw: 1.8, hd: 0.3, top: 2.0, label: "Mulde Holz Süd" },
+  { x: 7.9, z: -2.05, hw: 1.8, hd: 0.3, top: 2.0, label: "Trennwand Holz/Reifen" },
+  { x: 7.9, z: 1.85, hw: 1.8, hd: 0.3, top: 2.0, label: "Trennwand Reifen/Baumisch" },
+  { x: 7.9, z: 5.75, hw: 1.8, hd: 0.3, top: 2.0, label: "Mulde Baumisch Nord" },
 
   // --- Schere und Presse, südlich hinter dem Bagger ---
-  { x: -4.6, z: -9.8, hw: 4.4, hd: 3.8, top: 2.2, label: "Schere" },
+  { x: -8.5, z: -9.8, hw: 3.4, hd: 3.8, top: 2.2, label: "Schere" },
+
 
   // --- Gebäude: Wiegehäuschen an der Waage, Kaffeebude abseits ---
   { x: WEIGH_X - 4.6, z: WEIGH_Z, hw: 2.4, hd: 1.7, top: 3.2, label: "Wiegehäuschen" },

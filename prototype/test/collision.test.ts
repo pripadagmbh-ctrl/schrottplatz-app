@@ -30,6 +30,13 @@ import {
 
 /** Gemessene Reichweite des Auslegers am Boden */
 const REICHWEITE_M = 9.8;
+/** Mitten der vier Sortiermulden (Reihe im Osten) */
+const SORTIERMULDEN_Z = [-5.6, -1.9, 1.9, 5.6];
+/** Mitte der Sortiermuldenreihe in x */
+const SORTIER_X = 4.6;
+/** Mitten der drei Nichtmetall-Mulden (dahinter, Öffnung nach Osten) */
+const NICHTMETALL_Z = [-3.9, 0, 3.9];
+const NICHTMETALL_X = 7.9;
 
 describe("Feste Bauten", () => {
   it("sperrt jedes eingetragene Bauwerk an seinem Platz", () => {
@@ -80,14 +87,22 @@ describe("Feste Bauten", () => {
     }
   });
 
-  it("lässt die Mulden von vorn offen, sperrt aber ihre Wände", () => {
-    for (const z of [-7.35, -2.45, 2.45, 7.35]) {
-      expect(hitsObstacle(5.6, z, 0), "Innenraum frei").toBeNull();
+  it("lässt die Sortiermulden von vorn offen, sperrt aber ihre Wände", () => {
+    for (const z of SORTIERMULDEN_Z) {
+      expect(hitsObstacle(SORTIER_X, z, 0), "Innenraum frei").toBeNull();
       expect(hitsObstacle(2.4, z, 0), "Öffnung nach Westen frei").toBeNull();
-      expect(hitsObstacle(5.6, z + 2.45, 0), "Nordwand sperrt").not.toBeNull();
-      expect(hitsObstacle(5.6, z - 2.45, 0), "Südwand sperrt").not.toBeNull();
-      expect(hitsObstacle(5.6 + 2.85, z, 0), "Ostwand sperrt").not.toBeNull();
+      expect(hitsObstacle(SORTIER_X, z + 2.0, 0), "Nordwand sperrt").not.toBeNull();
+      expect(hitsObstacle(SORTIER_X, z - 2.0, 0), "Südwand sperrt").not.toBeNull();
     }
+  });
+
+  it("lässt die Nichtmetall-Mulden nach Osten offen", () => {
+    for (const z of NICHTMETALL_Z) {
+      expect(hitsObstacle(NICHTMETALL_X, z, 0), "Innenraum frei").toBeNull();
+      expect(hitsObstacle(10.2, z, 0), "Öffnung nach Osten frei").toBeNull();
+    }
+    // Die gemeinsame Wand zwischen beiden Reihen steht
+    expect(hitsObstacle(6.4, 0, 0), "Mittelwand sperrt").not.toBeNull();
   });
 
   it("lässt den Arm über niedrige Mauern schwenken, aber nicht hindurch", () => {
@@ -106,8 +121,8 @@ describe("Feste Bauten", () => {
 
   it("lenkt eine Richtung an der Wand entlang, statt hindurch", () => {
     const out = { x: 0, z: 0 };
-    // Von Westen frontal auf eine Muldenwand zu
-    const abgelenkt = slideAround(5.6, -2.45 - 3.2, 0, 1, 0.7, out);
+    // Von Süden frontal auf die Südwand einer Sortiermulde zu
+    const abgelenkt = slideAround(SORTIER_X, SORTIERMULDEN_Z[0] - 2.9, 0, 1, 0.7, out);
     expect(abgelenkt).toBe(true);
     expect(Math.hypot(out.x, out.z)).toBeCloseTo(1, 3);
   });
@@ -123,10 +138,10 @@ describe("Reichweite des Baggers", () => {
     // Der Bagger steht im Ursprung. Lag eine Mulde außerhalb, war sie im
     // Spiel schlicht nicht bedienbar.
     for (const [name, x, z] of [
-      ["VA", 5.6, -7.35],
-      ["Alu", 5.6, -2.45],
-      ["Kupfer", 5.6, 2.45],
-      ["Kabel", 5.6, 7.35],
+      ["VA", SORTIER_X, SORTIERMULDEN_Z[0]],
+      ["Alu", SORTIER_X, SORTIERMULDEN_Z[1]],
+      ["Kupfer", SORTIER_X, SORTIERMULDEN_Z[2]],
+      ["Kabel", SORTIER_X, SORTIERMULDEN_Z[3]],
     ] as Array<[string, number, number]>) {
       expect(Math.hypot(x, z), `${name} muss in Reichweite liegen`).toBeLessThan(REICHWEITE_M);
     }
@@ -134,7 +149,13 @@ describe("Reichweite des Baggers", () => {
 
   it("erreicht die offene Seite der Schere", () => {
     // Nächster Punkt der Kammer, nicht deren Mitte
-    expect(Math.hypot(-4.6 + 3.5, -9.8 + 3.0)).toBeLessThan(REICHWEITE_M);
+    expect(Math.hypot(-8.5 + 2.5, -9.8 + 3.0)).toBeLessThan(REICHWEITE_M);
+  });
+
+  it("erreicht auch die drei Nichtmetall-Mulden dahinter", () => {
+    for (const z of NICHTMETALL_Z) {
+      expect(Math.hypot(NICHTMETALL_X, z), `Mulde bei z ${z}`).toBeLessThan(REICHWEITE_M);
+    }
   });
 });
 
