@@ -768,8 +768,8 @@ Drei Gruppen, die sich im Auftreten und beim Verhandeln unterscheiden:
 - **Gewerbekunden** — feste Pritschen, regelmäßig. Der Preis ist zweitrangig,
   entscheidend ist, dass es reibungslos läuft: kurze Standzeit, keine
   Wartezeit an der Waage. Sachlicher Ton.
-- **Schrotthändler** — ein Familienclan im Reisegewerbe, die Namen Boxbücher,
-  Schmitz, Hart, Zölzer und Prison. Kennen die Tagespreise genau, verhandeln
+- **Schrotthändler** — wiederkehrende Stammfiguren aus acht Familien (die
+  gültigen Namen stehen in 26.3). Kennen die Tagespreise genau, verhandeln
   hart und lautstark, lassen sich nicht drücken. Gelegentlich ist ein Auto
   dabei, das schnell weg soll — wer zugreift, verdient gut und geht ein
   Risiko ein.
@@ -869,3 +869,152 @@ untereinander · Willis Vorgeschichte und Sprechstil · drei bis fünf
 Standardsätze je Figur · Namen der Gewerbe-Stammkunden · Erweiterung der
 Geheimsprache auf zwölf bis fünfzehn Wendungen · Startbestand (Empfehlung:
 sieben Händler, sechs Gewerbe, generierte Privatleute).
+
+---
+
+## 27. Umsetzungsstand der Kapitel 25 und 26 (Fassung 02.09.2026)
+
+Die Kapitel 25 und 26 beschreiben die Absicht. Dieses Kapitel hält fest, was
+davon gebaut ist und mit welchen Zahlen es läuft — damit beim Nachjustieren
+klar ist, an welcher Schraube man dreht. Die Werte stehen als Konstanten im
+Quelltext und sind dort auch kommentiert.
+
+### 27.1 Verhandeln
+
+`src/economy/haggle.ts`. Nach der Wiegung wählt der Spieler zwischen drei
+Angeboten; der Kunde nimmt an oder lehnt ab.
+
+| Angebot | Anteil des Marktpreises |
+| --- | --- |
+| Marktpreis zahlen | 100 % |
+| Etwas drücken | 85 % |
+| Hart drücken | 68 % |
+
+Ob es durchgeht, entscheidet eine Toleranzgrenze je Gruppe, von der drei
+Dinge abgezogen werden:
+
+```
+Grenze = Toleranz(Gruppe) − Reinheit × 0,18 − (Härte − 1) × 0,035 + Ruf × 0,1
+```
+
+Toleranz: Privat 0,50 · Gewerbe 0,30 · Händler 0,31. Die Härte 1–5 kommt aus
+der Familie und schlägt nur bei Händlern spürbar durch — deshalb sind sie die
+schwerste Gruppe, obwohl ihre Grundtoleranz kaum unter der von Gewerbe liegt.
+
+Damit ergeben sich die drei Handschriften, die Kap. 26.2 verlangt:
+
+- **Privatleute** kennen die Notierung nicht. Selbst hartes Drücken (0,32)
+  bleibt unter ihrer Grenze — es geht durch, aber es bleibt hängen (der Ruf
+  nimmt auch angenommenes Drücken übel, mit 60 % des Abschlags).
+- **Gewerbe** verhandelt nicht wirklich. Ein kleines Entgegenkommen geht, mehr
+  nicht. Dafür bekommt es einen guten, verlässlichen Kurs — die Gruppe ist
+  bewusst der bequeme Teil des Geschäfts.
+- **Händler** rechnen mit. Bei sortenreiner Ware und einer harten Familie
+  (Bäring, Prieser, Zöllner) fällt die Grenze auf den Mindestwert 0,05: Da
+  geht nur noch der Marktpreis.
+
+**Sortenreinheit als Hebel:** Sauber getrennte Ware hat einen bekannten Wert,
+da glaubt niemand an Aufwandszuschläge. Bei Mischschrott ist Spielraum, weil
+der Aufwand im Preis steckt. Das ist die Verbindung zwischen Verhandlung und
+Kernmechanik — wer sortenrein einkauft, verdient an der Sortierung, nicht am
+Drücken.
+
+**Ablehnung:** Händler fahren mit ihrer Ladung wieder vom Hof
+(`leavesOnRefusal`). Privat und Gewerbe laden trotzdem ab und murren. Verlässt
+ein Händler den Platz, ist die Fuhre weg und der Ruf beschädigt — das ist die
+eigentliche Strafe fürs Übertreiben.
+
+**Notausstieg:** Bleibt eine Verhandlung 32 Sekunden unbeantwortet, fährt der
+Fahrer zum Marktpreis weiter. Der Betrieb darf nie an einem offenen Dialog
+hängenbleiben.
+
+### 27.2 Ruf
+
+`src/economy/reputation.ts`. Je Gruppe ein Wert von −100 bis 100, Start 0.
+
+| Ereignis | Privat | Händler | Gewerbe |
+| --- | --- | --- | --- |
+| Fair bezahlt | +6 | +3 | 0 |
+| Hart gedrückt | −8 | −4 | 0 |
+| Kurze Standzeit | +1 | +2 | **+7** |
+| Lange warten lassen | −2 | −3 | **−9** |
+| Sauber verwogen | +2 | 0 | +5 |
+
+Die Nullen sind Absicht: Dem Gewerbe ist der Preis gleich, es zählt nur der
+Ablauf. Damit sind die drei Gruppen nicht nur unterschiedlich schwer, sondern
+über verschiedene Dinge zufrieden.
+
+Vergessen pro Tag: Privat 6 · Gewerbe 3 · Händler 1,5. Händler sind nachtragend,
+wie in 26.2 gefordert.
+
+Der Ruf steuert die Anlieferfrequenz (`frequencyFactor`) und den
+Verhandlungsspielraum. **Er versiegt nie ganz** — auch bei −100 kommen noch
+Fuhren (Faktor über 0,2). Ein Spielstand kann sich nicht totlaufen.
+
+### 27.3 Der Platz wächst mit: Ausbaustufen
+
+`src/economy/upgrades.ts`, Gebäude in `src/world/office.ts`. Jede Stufe kostet
+mehr und wird erst ab einer Umschlagmenge angeboten — wer nur den jeweils
+nächsten Eintrag kauft, kommt sinnvoll voran.
+
+| Ausbau | Preis | ab Umschlag | setzt voraus |
+| --- | --- | --- | --- |
+| Radlader | 12.000 € | — | — |
+| Büro | 9.000 € | 15 t | — |
+| Bulldozer | 18.000 € | 30 t | Halle |
+| Halle am Büro | 28.000 € | 50 t | Büro |
+| Stapler | 22.000 € | 60 t | Halle |
+| Magnet | 26.000 € | 90 t | Halle |
+| Baggerausbau | 34.000 € | 120 t | — |
+| Größere Presse | 42.000 € | 160 t | — |
+
+**Die Gebäudekette** ist der rote Faden: Aus dem Wiegehäuschen wird ein Büro,
+aus dem Büro ein Büro mit Halle. Das ist keine Kulisse — das Büro bringt
+Marktkenntnis (mehr Spielraum, und die Zusammensetzung gemischter Ladungen ist
+schon an der Waage zu sehen), und erst die Halle gibt den Maschinen einen
+Unterstellplatz. Ohne Halle kein Bulldozer, kein Stapler, kein Magnet. So
+hängt der sichtbare Ausbau des Platzes an derselben Kette wie der Zuwachs an
+Möglichkeiten.
+
+Die Grundflächen der jeweils sichtbaren Stufe melden sich über `footprints()`
+bei der Hindernisprüfung an — was gebaut ist, ist auch im Weg.
+
+### 27.4 Störfall: blockierte Fahrspuren
+
+`src/delivery/laneWatch.ts`. Der Betrieb steht, wenn die Wege zu sind, und das
+ist als Spielsituation gewollt: Wer schludert, blockiert sich selbst.
+
+Überwacht werden die Fahrspuren (Einfahrt, Waage, Kippstelle, Verladeplatz,
+Ausfahrt) in 2,6 m Halbbreite. Ein Teil gilt als Hindernis ab **120 kg** und
+unterhalb von 1,3 m Höhe — Kleinkram stört nicht, ein Motorblock schon.
+
+Liegt etwas im Weg, hupt der Fahrer nach 10 Sekunden und gibt nach 35 Sekunden
+auf. Lambert fährt den nächstgelegenen Brocken an und räumt ihn weg; mit
+Radlader schafft er auch schwere Teile. Der Spieler kann schneller sein.
+
+### 27.5 Ballenlager
+
+Hinter der Schere stehen Boxen für gepresstes Material, direkt aus der Presse
+heraus zu beladen. Der Abholer nimmt eine andere Route als die Anlieferer und
+fährt von Norden an den Verladeplatz — Anlieferung und Abholung kommen sich
+nicht in die Quere, auch wenn beides gleichzeitig läuft.
+
+### 27.6 Geführter Einstieg
+
+`src/ui/tutorial.ts`, sechs Schritte durch den ersten Zyklus: umsehen ·
+annehmen · sortieren · pressen · abholen · verdienen. Die Führung schreibt
+nichts vor und blockiert nichts — jeder Schritt beobachtet nur, ob sein Ziel
+erreicht ist, und wer schon weiß, wie es geht, wird nicht aufgehalten.
+Abbrechen ist jederzeit möglich, der Fortschritt liegt im Spielstand.
+
+Damit ist die in 25.4 verlangte „geführte erste Viertelstunde" abgedeckt.
+
+### 27.7 Was aus 25 und 26 noch offen ist
+
+- **Graue Geschäfte (26.6)** — die Geheimsprache ist noch nicht im Spiel.
+  Braucht das Charakter-Briefing aus 26.7.
+- **Kontrolle mit Fund** aus der Ruf-Matrix (26.5) hat noch kein Ereignis.
+- **Vornamen, Marotten und Fehden** der Familien (26.7) sind Erstfassung.
+- **Daniels Textblasen (26.1)** — vorgesehen für V1, noch nicht gebaut.
+- **Wiegescheine** für Gewerbe (26.2) sind als Ruf-Ereignis vorhanden, aber
+  noch ohne eigene Spielhandlung.

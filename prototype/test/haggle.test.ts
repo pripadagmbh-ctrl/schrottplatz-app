@@ -98,3 +98,29 @@ describe("Verhandeln", () => {
     }
   });
 });
+
+/**
+ * Das Briefing (Kap. 27.1) nennt vier Aussagen über das Verhandeln als
+ * Tatsachen. Wenn jemand an den Konstanten dreht, soll hier auffallen, dass
+ * das Kapitel nachgezogen werden muss.
+ */
+describe("Briefing 27.1", () => {
+  it("Privatleute nehmen selbst hartes Drücken hin", () => {
+    expect(haggle(kunde("privat", 1), "hart", REIN).accepted).toBe(true);
+  });
+
+  it("harte Familie plus sortenreine Ware lässt nur den Marktpreis", () => {
+    expect(haggle(kunde("haendler", 5), "leicht", REIN).accepted).toBe(false);
+    expect(haggle(kunde("haendler", 5), "markt", REIN).accepted).toBe(true);
+  });
+
+  it("Gewerbe lässt ein kleines Entgegenkommen zu, mehr nicht", () => {
+    expect(haggle(kunde("gewerbe", 2), "leicht", GEMISCHT).accepted).toBe(true);
+    expect(haggle(kunde("gewerbe", 2), "hart", GEMISCHT).accepted).toBe(false);
+  });
+
+  it("Mischschrott gibt mehr Spielraum als sortenreine Ware", () => {
+    expect(haggle(kunde("haendler", 3), "leicht", 0).accepted).toBe(true);
+    expect(haggle(kunde("haendler", 3), "leicht", REIN).accepted).toBe(false);
+  });
+});
