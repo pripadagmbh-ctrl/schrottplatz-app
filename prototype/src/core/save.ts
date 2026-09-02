@@ -31,6 +31,8 @@ export interface SaveData {
   shift?: { t: number; turnoverKg: number; pickups: number; deliveries: number };
   /** Tageszeit 0..1 (0,25 = Sonnenaufgang) */
   timeOfDay?: number;
+  /** Ruf bei den drei Kundengruppen */
+  reputation?: { privat?: number; haendler?: number; gewerbe?: number };
   items: SavedItem[];
   cars: SavedCar[];
   fencesBroken: boolean[];

@@ -31,8 +31,12 @@ export class Account {
   sortedKg = 0;
 
   /** Ankauf nach der Ausfahrtswiegung: Kunde erhält Geld. */
-  payDelivery(netKg: number): number {
-    const eur = netKg * PURCHASE_PRICE_PER_KG;
+  /**
+   * Ankauf nach der Ausfahrtswiegung.
+   * @param factor ausgehandelter Anteil des Marktpreises (1 = voll)
+   */
+  payDelivery(netKg: number, factor = 1): number {
+    const eur = netKg * PURCHASE_PRICE_PER_KG * factor;
     this.moneyEur -= eur;
     this.purchasedKg += netKg;
     return eur;

@@ -238,6 +238,11 @@ class DeliveryVehicle {
     }
   }
 
+  /** true, solange über den Preis verhandelt wird — der Fahrer wartet dann. */
+  awaitingDeal = false;
+  /** Bruttowiegung erledigt; verhindert, dass sie sich wiederholt */
+  private weighedIn = false;
+
   /** Zugewiesener Warteplatz, null = fährt direkt vom Hof. */
   parkSpot: [number, number] | null = null;
   /** Wie lange die Pause dauert */
@@ -835,10 +840,16 @@ class DeliveryVehicle {
         }
         break;
       case "weighIn":
-        // Der Fahrer geht bei Mario ins Wiegehäuschen — das dauert einen Moment
-        if (this.phaseT > 2.5) {
+        // Der Fahrer geht bei Mario ins Wiegehäuschen — das dauert einen
+        // Moment. Danach wird über den Preis geredet, und erst wenn man sich
+        // einig ist, fährt er auf den Platz. Solange bleibt er auf der Waage
+        // stehen (Design 02.09.2026).
+        if (this.phaseT > 2.5 && !this.weighedIn) {
+          this.weighedIn = true;
           this.bruttoKg = this.cargoMassKg();
-          this.onWeighIn?.(this.bruttoKg);
+          this.onWeighIn?.(this.bruttoKg); // kann awaitingDeal setzen
+        }
+        if (this.weighedIn && !this.awaitingDeal) {
           this.phase = "approach";
           this.phaseT = 0;
           this.routeS = 0;
@@ -1199,6 +1210,16 @@ export class VehicleManager {
     // Auch die Wartenden stehen im Weg — der Arm darf nicht hindurchfahren
     for (const v of this.parked) v.collectBodyHandles(out);
     return out;
+  }
+
+  /** Verhandlung läuft: Das Fahrzeug wartet an der Waage. */
+  set dealPending(v: boolean) {
+    if (this.active) this.active.awaitingDeal = v;
+  }
+
+  /** Wer gerade an der Waage steht — für die Verhandlung. */
+  get activeCustomer(): CustomerProfile | null {
+    return this.active?.customer ?? null;
   }
 
   get activeKind(): DeliveryKind | null {

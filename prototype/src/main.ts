@@ -19,6 +19,8 @@ import { VehicleManager } from "./delivery/vehicles";
 import { PressManager } from "./world/press";
 import { randomCargo } from "./world/scrapItems";
 import { Shift } from "./economy/shift";
+import { Reputation } from "./economy/reputation";
+import { haggle, leavesOnRefusal, hint, OFFER_FACTOR, OFFER_LABEL, type Offer } from "./economy/haggle";
 import { LaneWatch } from "./delivery/laneWatch";
 import { Daylight, Floodlights } from "./world/daylight";
 import { hitsObstacle } from "./world/obstacles";
@@ -30,7 +32,7 @@ import {
   defaultConfig,
   saveConfig,
 } from "./core/controlConfig";
-import { Account } from "./economy/account";
+import { Account, PURCHASE_PRICE_PER_KG } from "./economy/account";
 import { getMaterial } from "./materials/catalog";
 import { StaffManager } from "./world/people";
 import { GATE_X, WEIGH_X, WEIGH_Z } from "./world/yard";
@@ -164,6 +166,7 @@ async function main(): Promise<void> {
     savedAt: new Date().toISOString(),
     moneyEur: account.moneyEur,
     shift: shift.toJSON(),
+    reputation: ruf.toJSON(),
     timeOfDay: daylight.time,
     items: items.items
       .filter((i) => i.shape)
@@ -400,6 +403,47 @@ async function main(): Promise<void> {
     hud.toast("Der Fahrer hupt — Fahrspur ist blockiert!");
   };
   // Brückenwaage: voll rein, leer raus → Kunde bekommt sein Geld
+  // --- Verhandeln an der Waage ---
+  const ruf = new Reputation();
+  ruf.load(save?.reputation);
+  let preisFaktor = 1;
+  const haggleEl = document.getElementById("haggle")!;
+  const zeigeVerhandlung = (
+    kunde: import("./delivery/customers").CustomerProfile,
+    kg: number,
+    rein: string | null
+  ): void => {
+    preisFaktor = 1;
+    const marktEur = kg * PURCHASE_PRICE_PER_KG;
+    // Sortenrein heißt: klarer Marktwert, wenig zu behaupten
+    const reinheit = rein ? 1 : 0.45;
+    document.getElementById("haggle-who")!.textContent =
+      kunde.group === "haendler" ? `${kunde.name} ${kunde.subtitle}` : kunde.name;
+    document.getElementById("haggle-info")!.textContent =
+      `${Math.round(kg)} kg ${rein ? getMaterial(rein).name : "Mischschrott"} · ` +
+      `Marktpreis ${marktEur.toFixed(0)} € · ${hint(kunde)}`;
+    const liste = document.getElementById("haggle-list")!;
+    liste.innerHTML = "";
+    for (const offer of ["markt", "leicht", "hart"] as Offer[]) {
+      const b = document.createElement("button");
+      b.innerHTML =
+        `${OFFER_LABEL[offer]}<span class="eur">${(marktEur * OFFER_FACTOR[offer]).toFixed(0)} €</span>`;
+      b.addEventListener("click", () => {
+        haggleEl.classList.remove("open");
+        vehicles.dealPending = false;
+        const r = haggle(kunde, offer, reinheit, ruf.get(kunde.group) / 100);
+        preisFaktor = r.factor;
+        hud.toast(`${kunde.name}: „${r.reply}"`);
+        if (r.offense > 0.05) ruf.note("hartGedrueckt", kunde.group);
+        else if (offer === "markt") ruf.note("fairBezahlt", kunde.group);
+        // Händler nehmen ihre Ware wieder mit, wenn der Preis nicht stimmt
+        if (!r.accepted && leavesOnRefusal(kunde)) vehicles.sendAway();
+      });
+      liste.appendChild(b);
+    }
+    haggleEl.classList.add("open");
+  };
+
   // Kundschaft meldet sich bei der Ankunft — Name, Herkunft und ein Wort
   vehicles.onCustomerArrived = (c) => {
     const wer =
@@ -417,12 +461,23 @@ async function main(): Promise<void> {
         ? `Waage: ${kg.toFixed(0)} kg brutto — sortenrein ${getMaterial(rein).name}.`
         : `Waage: ${kg.toFixed(0)} kg brutto — bitte abladen.`
     );
+    const kunde = vehicles.activeCustomer;
+    if (kunde) {
+      vehicles.dealPending = true; // der Fahrer wartet, bis der Preis steht
+      zeigeVerhandlung(kunde, kg, rein);
+    }
   };
   vehicles.onWeighOut = (netKg) => {
-    const paid = account.payDelivery(netKg);
+    // Der beim Wiegen ausgehandelte Faktor gilt für diese Fuhre
+    const paid = account.payDelivery(netKg, preisFaktor);
     shift.deliveries++;
     audio.playSale();
-    hud.toast(`Waage: ${netKg.toFixed(0)} kg netto · Kunde erhält ${paid.toFixed(0)} €`);
+    hud.toast(
+      preisFaktor < 1
+        ? `Waage: ${netKg.toFixed(0)} kg netto · ${paid.toFixed(0)} € (${Math.round(preisFaktor * 100)} %)`
+        : `Waage: ${netKg.toFixed(0)} kg netto · Kunde erhält ${paid.toFixed(0)} €`
+    );
+    preisFaktor = 1;
   };
   // Abhol-LKW fährt los → Container abrechnen (sortenrein zahlt sich aus)
   vehicles.onPickupDepart = (truck) => {
