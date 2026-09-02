@@ -64,6 +64,11 @@ const CONFIGS: ContainerConfig[] = [
     size: [3.0, 3.5, 2.0], facing: "east", shareWest: true },
   { id: "c_rubble", fractionId: "rubble", label: "BAUMISCH", kind: "bay", x: 7.9, z: 3.9,
     size: [3.0, 3.5, 2.0], facing: "east", shareWest: true },
+  // Ballenlager direkt neben der Schere: Was gepresst aus der Kammer kommt,
+  // wandert hierher und wartet auf den Abholer. Offen nach Osten, damit der
+  // Bagger von seinem Standplatz aus hineinlangt (Wunsch 02.09.2026).
+  { id: "c_bales", fractionId: "steel", label: "BALLEN", kind: "bay", x: -2.6, z: -7.0,
+    size: [3.2, 4.2, 2.0], facing: "east" },
   // Nichtmetalle südlich, im Bogen um den Bagger gelegt, damit alle drei in
   // Reichweite bleiben. Öffnung nach Norden zur Maschine.
 ];

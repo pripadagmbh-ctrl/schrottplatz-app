@@ -100,6 +100,46 @@ export class Yard {
   }
 
   /**
+   * Eingefahrene Reifenspuren auf den Wegen, die tatsächlich befahren werden:
+   * von der Einfahrt über die Waage zum Abladeplatz und weiter zur Schere.
+   * Ein Platz, über den täglich Tonnen gehen, hat dort dunkle Bahnen.
+   */
+  private buildTireTracks(scene: THREE.Scene): void {
+    const spur = new THREE.MeshStandardMaterial({
+      color: 0x6b6357,
+      roughness: 1,
+      transparent: true,
+      opacity: 0.45,
+      depthWrite: false,
+    });
+    // Streckenzüge, die den echten Fahrspuren folgen
+    const wege: Array<Array<[number, number]>> = [
+      [[GATE_X, 34], [GATE_X, 24], [-14, 18.5], [0, 19], [0, 7]],
+      [[-14, 18.5], [-9, 13], [-9, 7.5]],
+      [[-14, 18.5], [-3.5, 19], [-3.5, 8]],
+    ];
+    for (const weg of wege) {
+      for (let i = 0; i < weg.length - 1; i++) {
+        const [x1, z1] = weg[i];
+        const [x2, z2] = weg[i + 1];
+        const dx = x2 - x1;
+        const dz = z2 - z1;
+        const len = Math.hypot(dx, dz);
+        // Zwei Spurrinnen im Achsabstand eines LKW
+        for (const off of [-0.95, 0.95]) {
+          const nx = (-dz / len) * off;
+          const nz = (dx / len) * off;
+          const bahn = new THREE.Mesh(new THREE.PlaneGeometry(0.55, len), spur);
+          bahn.rotation.x = -Math.PI / 2;
+          bahn.rotation.z = -Math.atan2(dx, dz);
+          bahn.position.set(x1 + dx / 2 + nx, 0.012, z1 + dz / 2 + nz);
+          scene.add(bahn);
+        }
+      }
+    }
+  }
+
+  /**
    * Umland hinter der Platzmauer (Design 2026-08-29): Wiesenring, Baumgruppen
    * und ein paar Hügel am Horizont. Reine Kulisse ohne Kollider.
    */
@@ -189,6 +229,7 @@ export class Yard {
    * - OSTSPUR (x = 16): Abhol-LKW mit Container bis zum Verladeplatz im Süden.
    */
   private buildDeliveryLane(scene: THREE.Scene): void {
+    this.buildTireTracks(scene);
     const dash = new THREE.MeshStandardMaterial({ color: 0xcfc06a, roughness: 0.9 });
     const mark = (x: number, z: number, alongZ: boolean): void => {
       const m = new THREE.Mesh(
@@ -283,12 +324,56 @@ export class Yard {
   }
 
   private buildGround(scene: THREE.Scene, world: RAPIER.World): void {
-    // Sandboden mit dezentem Raster (Canvas-Textur, kein Asset nötig)
+    // Sandboden mit dezentem Raster (Canvas-Textur, kein Asset nötig).
+    // Dazu Gebrauchsspuren: Der Platz sah aus wie frisch gegossen, obwohl
+    // täglich Tonnen darüber gehen (Wunsch 02.09.2026).
     const canvas = document.createElement("canvas");
     canvas.width = canvas.height = 256;
     const ctx = canvas.getContext("2d")!;
     ctx.fillStyle = "#8b8071";
     ctx.fillRect(0, 0, 256, 256);
+    // Fleckige Verwitterung: hellere und dunklere Zonen, wie ausgewaschener
+    // Beton
+    for (let i = 0; i < 26; i++) {
+      const r = 14 + Math.random() * 46;
+      ctx.fillStyle = Math.random() < 0.5 ? "rgba(120,112,98,0.3)" : "rgba(104,96,84,0.3)";
+      ctx.beginPath();
+      ctx.arc(Math.random() * 256, Math.random() * 256, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Ölflecken — dunkel, mit weichem Rand
+    for (let i = 0; i < 7; i++) {
+      const x = Math.random() * 256;
+      const y = Math.random() * 256;
+      const r = 5 + Math.random() * 13;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, "rgba(28,24,20,0.5)");
+      g.addColorStop(1, "rgba(28,24,20,0)");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Rostabrieb, wo Schrott gelegen hat
+    for (let i = 0; i < 18; i++) {
+      ctx.fillStyle = "rgba(122,74,42,0.18)";
+      ctx.beginPath();
+      ctx.arc(Math.random() * 256, Math.random() * 256, 3 + Math.random() * 9, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Kratzspuren vom Greifer, der über den Beton schleift
+    ctx.strokeStyle = "rgba(150,142,128,0.35)";
+    for (let i = 0; i < 22; i++) {
+      const x = Math.random() * 256;
+      const y = Math.random() * 256;
+      const len = 12 + Math.random() * 34;
+      const a = Math.random() * Math.PI;
+      ctx.lineWidth = 0.6 + Math.random() * 1.4;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + Math.cos(a) * len, y + Math.sin(a) * len);
+      ctx.stroke();
+    }
     ctx.strokeStyle = "rgba(60,55,45,0.25)";
     ctx.lineWidth = 2;
     ctx.strokeRect(0, 0, 256, 256);

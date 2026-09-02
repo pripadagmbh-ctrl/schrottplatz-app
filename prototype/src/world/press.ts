@@ -23,6 +23,8 @@ import type { CompositeManager } from "../dismantle/composites";
 // hier steht sie frei neben dem Stahlschrotthaufen, und die offene Seite
 // bleibt in Reichweite (Design-Fix 29.08.2026).
 const CENTER = new THREE.Vector3(-8.5, 0, -7.0);
+/** Ballenlager: dorthin kommt, was fertig gepresst ist */
+const BALE_YARD = new THREE.Vector3(-2.6, 0, -7.0);
 /**
  * Die Mulde liegt längs Ost–West, in einer Flucht mit dem Stahlschrottplatz
  * darüber: Die 10 m lange Seite läuft parallel zum Haufen (x −13,5 bis −3,5),
@@ -446,15 +448,16 @@ export class PressManager {
       // Die dominante Fraktion gibt dem Paket Farbe und Namen
       const dominant = composition.reduce((a, b) => (b.massKg > a.massKg ? b : a));
       const kg = composition.reduce((s, c) => s + c.massKg, 0);
-      const p = inChamber[0].body.translation();
       for (const it of inChamber) {
         const wasCar = this.composites.despawnByBody(it.body);
         this.items.remove(it, !wasCar);
       }
+      // Das fertige Paket wandert ins Ballenlager östlich der Kammer —
+      // dort liegt es griffbereit für den Abholer, statt der Presse im Weg
       this.items.spawnBale(
         dominant.materialId,
         kg,
-        new THREE.Vector3(p.x, 1.0, CENTER.z),
+        new THREE.Vector3(BALE_YARD.x + (Math.random() - 0.5) * 1.6, 1.4, BALE_YARD.z + (Math.random() - 0.5) * 2.6),
         composition
       );
       count += inChamber.length;
