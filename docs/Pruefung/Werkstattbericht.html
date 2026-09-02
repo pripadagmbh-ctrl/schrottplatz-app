@@ -1,0 +1,498 @@
+<title>Werkstattbericht Schrottplatz</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+  /* Palette aus der Spielwelt: Betonstaub, Werkstattdunkel, Baustellengelb,
+     PRIPADA-Grün. Neutrale mit warmem Stich statt reinem Grau. */
+  :root {
+    --ground: #e9e5dd;
+    --panel: #f4f1ec;
+    --panel-2: #ded9d0;
+    --line: #c9c2b6;
+    --ink: #1b1d1e;
+    --ink-2: #55504a;
+    --ink-3: #7d766c;
+    --accent: #d99400;
+    --gruen: #4e7d3a;
+    --ok: #3f7d46;
+    --warn: #b8791b;
+    --krit: #a63426;
+    --ok-bg: #dfe9dd;
+    --warn-bg: #f2e4c8;
+    --krit-bg: #f0d9d4;
+    --fertig-bg: #e2e6e8;
+    --fertig: #5d6b72;
+    --shadow: 0 1px 0 rgba(27,29,30,0.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #141617;
+      --panel: #1d2022;
+      --panel-2: #272b2d;
+      --line: #383d40;
+      --ink: #e4e1da;
+      --ink-2: #a9a49b;
+      --ink-3: #7d776e;
+      --accent: #f0b429;
+      --gruen: #7cb35f;
+      --ok: #7cb35f;
+      --warn: #e0a63f;
+      --krit: #e07a68;
+      --ok-bg: #26332a;
+      --warn-bg: #38301c;
+      --krit-bg: #3a2724;
+      --fertig-bg: #23282a;
+      --fertig: #8b959a;
+      --shadow: 0 1px 0 rgba(0,0,0,0.3);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #141617;
+    --panel: #1d2022;
+    --panel-2: #272b2d;
+    --line: #383d40;
+    --ink: #e4e1da;
+    --ink-2: #a9a49b;
+    --ink-3: #7d776e;
+    --accent: #f0b429;
+    --gruen: #7cb35f;
+    --ok: #7cb35f;
+    --warn: #e0a63f;
+    --krit: #e07a68;
+    --ok-bg: #26332a;
+    --warn-bg: #38301c;
+    --krit-bg: #3a2724;
+    --fertig-bg: #23282a;
+    --fertig: #8b959a;
+    --shadow: 0 1px 0 rgba(0,0,0,0.3);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font: 400 16px/1.6 "Barlow", system-ui, sans-serif;
+    padding: 40px 20px 80px;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+
+  header { border-bottom: 3px solid var(--ink); padding-bottom: 18px; }
+  .eyebrow {
+    font: 600 13px/1 "IBM Plex Mono", monospace;
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3);
+    margin-bottom: 10px;
+  }
+  h1 {
+    font: 700 clamp(34px, 6vw, 54px)/0.98 "Barlow Condensed", sans-serif;
+    text-transform: uppercase; letter-spacing: 0.01em;
+    margin: 0 0 8px; text-wrap: balance;
+  }
+  .sub { color: var(--ink-2); max-width: 62ch; margin: 0; }
+
+  .kpis {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1px; background: var(--line); border: 1px solid var(--line);
+    margin: 26px 0 40px;
+  }
+  .kpi { background: var(--panel); padding: 14px 16px; }
+  .kpi dt {
+    font: 500 11px/1.3 "IBM Plex Mono", monospace; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--ink-3); margin-bottom: 6px;
+  }
+  .kpi dd {
+    margin: 0; font: 600 26px/1 "Barlow Condensed", sans-serif;
+    font-variant-numeric: tabular-nums;
+  }
+  .kpi dd span { font-size: 14px; color: var(--ink-2); font-weight: 500; }
+  .kpi .delta {
+    display: block; font: 500 11px/1.4 "IBM Plex Mono", monospace;
+    color: var(--gruen); margin-top: 3px; letter-spacing: 0.02em;
+  }
+
+  h2 {
+    font: 600 13px/1 "IBM Plex Mono", monospace; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--ink-3);
+    margin: 44px 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--line);
+  }
+  h2 .zahl { color: var(--ink-2); letter-spacing: 0; }
+
+  .system {
+    background: var(--panel); border: 1px solid var(--line);
+    padding: 20px 22px; margin-bottom: 14px; box-shadow: var(--shadow);
+  }
+  .system-head {
+    display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+  .system-head h3 {
+    font: 600 23px/1.1 "Barlow Condensed", sans-serif;
+    text-transform: uppercase; letter-spacing: 0.02em; margin: 0; flex: 1 1 auto;
+  }
+  .files { font: 400 12px/1.4 "IBM Plex Mono", monospace; color: var(--ink-3); }
+  .zustand {
+    font: 600 11px/1 "IBM Plex Mono", monospace; letter-spacing: 0.09em;
+    text-transform: uppercase; padding: 5px 9px; border-radius: 2px; white-space: nowrap;
+  }
+  .z-ok { background: var(--ok-bg); color: var(--ok); }
+  .z-warn { background: var(--warn-bg); color: var(--warn); }
+  .z-krit { background: var(--krit-bg); color: var(--krit); }
+  .z-fertig { background: var(--fertig-bg); color: var(--fertig); }
+  .befund { margin: 0 0 14px; color: var(--ink-2); max-width: 72ch; }
+  .befund:last-child { margin-bottom: 0; }
+  .befund strong { color: var(--ink); font-weight: 600; }
+
+  ul.tasks { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+  ul.tasks li {
+    display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start;
+    font-size: 15px; padding-left: 2px;
+  }
+  .tag {
+    font: 500 10px/1.5 "IBM Plex Mono", monospace; letter-spacing: 0.07em;
+    text-transform: uppercase; padding: 2px 6px; margin-top: 3px;
+    border: 1px solid var(--line); color: var(--ink-3); white-space: nowrap;
+  }
+  .tag.art { border-color: var(--gruen); color: var(--gruen); }
+  .tag.code { border-color: var(--accent); color: var(--accent); }
+  .tag.neu { border-color: var(--krit); color: var(--krit); }
+
+  /* Erledigte Bausteine kompakt, damit die offene Arbeit im Vordergrund steht */
+  .fertig-liste { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); }
+  .fertig-zeile {
+    background: var(--panel); padding: 13px 18px;
+    display: grid; grid-template-columns: 150px 1fr; gap: 16px; align-items: baseline;
+  }
+  .fertig-zeile h4 {
+    margin: 0; font: 600 17px/1.2 "Barlow Condensed", sans-serif;
+    text-transform: uppercase; letter-spacing: 0.02em; color: var(--fertig);
+  }
+  .fertig-zeile p { margin: 0; font-size: 14.5px; color: var(--ink-2); }
+
+  .plan { border: 1px solid var(--line); background: var(--panel); margin-top: 8px; }
+  .plan-row {
+    display: grid; grid-template-columns: 44px 1fr auto; gap: 16px; align-items: center;
+    padding: 15px 20px; border-bottom: 1px solid var(--line);
+  }
+  .plan-row:last-child { border-bottom: 0; }
+  .num {
+    font: 600 22px/1 "Barlow Condensed", sans-serif; color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+  .plan-row p { margin: 0; }
+  .plan-row .warum { font-size: 14px; color: var(--ink-2); margin-top: 2px; }
+  .aufwand { font: 500 12px/1 "IBM Plex Mono", monospace; color: var(--ink-3); white-space: nowrap; }
+
+  .notiz {
+    border-left: 3px solid var(--accent); background: var(--panel);
+    padding: 16px 20px; margin: 14px 0 0;
+  }
+  .notiz h4 {
+    margin: 0 0 6px; font: 600 12px/1 "IBM Plex Mono", monospace;
+    letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent);
+  }
+  .notiz p { margin: 0; color: var(--ink-2); max-width: 70ch; }
+
+  footer {
+    margin-top: 44px; padding-top: 16px; border-top: 1px solid var(--line);
+    font-size: 14px; color: var(--ink-3);
+  }
+  @media (max-width: 620px) {
+    .plan-row { grid-template-columns: 32px 1fr; }
+    .aufwand { grid-column: 2; }
+    .fertig-zeile { grid-template-columns: 1fr; gap: 4px; }
+  }
+</style>
+
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Bestandsaufnahme · Stand 02.09.2026, abends</div>
+    <h1>Werkstattbericht Schrottplatz</h1>
+    <p class="sub">Systematischer Durchgang durch alle Bausteine der App — technischer Zustand und
+      gestalterischer Eindruck, jeweils mit den Aufgaben, die daraus folgen. Grundlage sind der
+      aktuelle Code, frisch gemessene Laufzeiten und Bildschirmaufnahmen aus dem laufenden Spiel.
+      <strong>Seit der letzten Fassung ist die Kundschaft gebaut worden</strong> — der größte
+      Rückstand von damals ist abgearbeitet, und mit ihm fünf der sieben geplanten Punkte.</p>
+  </header>
+
+  <dl class="kpis">
+    <div class="kpi"><dt>Codezeilen</dt><dd>12 309 <span>· 45 Module</span></dd>
+      <span class="delta">+2 409 · 10 Module mehr</span></div>
+    <div class="kpi"><dt>Tests</dt><dd>97 <span>· 8 Module</span></dd>
+      <span class="delta">+60 seit letztem Bericht</span></div>
+    <div class="kpi"><dt>Physikschritt</dt><dd>2,78 <span>ms von 16,7</span></dd>
+      <span class="delta">+1,0 ms · bei vollem Platz</span></div>
+    <div class="kpi"><dt>Körper aktiv</dt><dd>218 <span>· 108 wach</span></dd>
+      <span class="delta">Obergrenze greift bei 260</span></div>
+    <div class="kpi"><dt>Paketgröße</dt><dd>2,74 <span>MB</span></dd>
+      <span class="delta">+0,16 MB</span></div>
+  </dl>
+
+  <h2>Abgeschlossen <span class="zahl">— 5 von 7 aus dem letzten Plan</span></h2>
+  <div class="fertig-liste">
+    <div class="fertig-zeile">
+      <h4>Kundschaft mit Persönlichkeit</h4>
+      <p>Der größte Rückstand des letzten Berichts. Drei Gruppen, die sich in allem unterscheiden:
+        Privatleute kommen mit PKW und Anhänger aus fünfundzwanzig Mönchengladbacher Stadtteilen
+        und kennen die Notierung nicht; sieben Gewerbebetriebe liefern sortenrein je Branche und
+        verhandeln gar nicht; acht Händlerfamilien kennen jeden Preis. Dazu Sprüche bei Ankunft,
+        Zusage und Absage.</p>
+    </div>
+    <div class="fertig-zeile">
+      <h4>Verhandeln und Ruf</h4>
+      <p>Nach der Wiegung wählt der Spieler zwischen Marktpreis, leichtem und hartem Drücken. Ob
+        es durchgeht, hängt an Gruppe, Familienhärte, <strong>Sortenreinheit</strong> und Ruf —
+        sauber getrennte Ware lässt sich nicht drücken, bei Mischschrott ist Spielraum. Wer einen
+        Händler übervorteilt, sieht ihn mit seiner Ladung wieder abfahren. Der Ruf steuert
+        Anlieferfrequenz und Spielraum, versiegt aber nie ganz.</p>
+    </div>
+    <div class="fertig-zeile">
+      <h4>Zahlungsdruck und Ausbau</h4>
+      <p>Das Konto rutscht nicht mehr folgenlos ins Minus: Ab −1 500 € liefert niemand mehr, bis
+        wieder Geld da ist. Acht Ausbaustufen von 9 000 € bis 42 000 €, gestaffelt nach
+        Umschlagmenge. Die Gebäudekette trägt den Fortschritt sichtbar — aus dem Wiegehäuschen
+        wird ein Büro, aus dem Büro ein Büro mit Halle, und erst die Halle gibt Bulldozer,
+        Stapler und Magnet einen Platz.</p>
+    </div>
+    <div class="fertig-zeile">
+      <h4>Geführter Einstieg</h4>
+      <p>Sechs Schritte durch den ersten Zyklus: umsehen, annehmen, sortieren, pressen, abholen,
+        verdienen. Die Führung schreibt nichts vor und blockiert nichts — jeder Schritt beobachtet
+        nur, ob sein Ziel erreicht ist. Wer schon weiß, wie es geht, wird nicht aufgehalten.</p>
+    </div>
+    <div class="fertig-zeile">
+      <h4>Materialphysik</h4>
+      <p>Schrott verhielt sich wie Bälle: zu leicht zu bewegen, flog beim Anschlagen durch die
+        Luft. Jetzt bremst die Masse — ein 20-kg-Teil fliegt 1,79 m weit, ein 2-Tonnen-Brocken
+        0,27 m. Der Boden hält bis 80 m/s Aufprall, das Pflügen durch einen Haufen bremst den
+        Greifer um 26 %. Gehüpft wird nur noch von Drahtballen.</p>
+    </div>
+    <div class="fertig-zeile">
+      <h4>Fahrzeugmodul aufgeteilt</h4>
+      <p>Von 1 314 auf 1 100 Zeilen: Streckennetz und Modellbau sind eigene Module. Damit ist der
+        Bagger mit 1 604 Zeilen wieder die größte Datei — dort war die Aufteilung schon im letzten
+        Bericht fällig und ist erledigt.</p>
+    </div>
+    <div class="fertig-zeile">
+      <h4>Obergrenze für lose Teile</h4>
+      <p>Ab 260 losen Teilen wird Kleinkram unter 45 kg zu Bündeln zusammengefasst. Eine volle
+        Sitzung ging damit von 443 auf 256 Teile zurück, ohne dass beim Spielen etwas fehlt.</p>
+    </div>
+    <div class="fertig-zeile">
+      <h4>Früher erledigt</h4>
+      <p>Beschilderung (Schilder gehören zur Szene, blenden nach Entfernung aus) · Sortiermulden
+        (alle sieben in Reichweite, höchstens 8,8 m bei 9,8 m Reichweite) · Bagger (Geometrie,
+        Kinematik und Kollisionsprüfung getrennt).</p>
+    </div>
+  </div>
+
+  <h2>Spielwelt und Optik</h2>
+
+  <div class="system">
+    <div class="system-head">
+      <h3>Platz, Landschaft, Licht</h3>
+      <span class="files">world/yard.ts · daylight.ts · office.ts</span>
+      <span class="zustand z-ok">tragfähig</span>
+    </div>
+    <p class="befund">Tageslauf, Flutlicht vom Rand, Umland, Umrandung, Storch und Graffiti geben
+      dem Platz Charakter. Der Grundriss stimmt jetzt: Die Schere steht auf Platzbreite und bündig
+      mit dem Rand, die drei Nichtmetall-Mulden liegen Rücken an Rücken, das Betriebsgebäude wächst
+      in drei Stufen mit. Was seit dem letzten Bericht unverändert offen ist: Der Beton bleibt eine
+      <strong>einzige gleichmäßige Fläche</strong> ohne Öl, Pfützen oder Fahrspuren — der Platz
+      sieht unbenutzt aus, obwohl täglich Tonnen darüber gehen.</p>
+    <ul class="tasks">
+      <li><span class="tag art">Optik</span><span>Bodentextur mit Ölflecken, Reifenspuren und Rostabrieb, besonders auf den Fahrspuren.</span></li>
+      <li><span class="tag art">Optik</span><span>Schleifspuren dort, wo der Greifer regelmäßig über den Beton kratzt.</span></li>
+    </ul>
+  </div>
+
+  <h2>Maschine und Bedienung</h2>
+
+  <div class="system">
+    <div class="system-head">
+      <h3>Steuerung und Menüs</h3>
+      <span class="files">core/touch.ts · controlConfig.ts</span>
+      <span class="zustand z-ok">tragfähig</span>
+    </div>
+    <p class="befund">Zwei Sticks nach Bedienschema, frei belegbar, dazu das Funktionsrädchen mit
+      Rastklick, Vibration und Nachlauf. Unverändert offen: Auf <strong>iOS gibt es keine
+      Vibration</strong> — dort trägt allein der Klick, und ob das reicht, weiß nur wer es dort
+      spielt. Die Tastenbelegung am Rechner ist mit inzwischen mehr als fünfzehn Tasten
+      unübersichtlich und nicht konfigurierbar.</p>
+    <ul class="tasks">
+      <li><span class="tag code">Code</span><span>Tastenbelegung am Rechner ebenfalls über das Steuerungsmenü einstellbar machen.</span></li>
+      <li><span class="tag art">Optik</span><span>Klick auf iOS präsenter abstimmen, falls die Rückmeldung ohne Vibration zu dünn wirkt.</span></li>
+    </ul>
+  </div>
+
+  <h2>Betrieb und Wirtschaft</h2>
+
+  <div class="system">
+    <div class="system-head">
+      <h3>Kundschaft</h3>
+      <span class="files">delivery/customers.ts · economy/haggle.ts · reputation.ts</span>
+      <span class="zustand z-ok">tragfähig</span>
+    </div>
+    <p class="befund">Aus dem größten Rückstand ist ein tragender Teil des Spiels geworden. Die
+      drei Gruppen fühlen sich unterschiedlich an, und die Zahlen dahinter stehen jetzt im
+      Briefing (Kap. 27). Was fehlt, ist nicht mehr Mechanik, sondern <strong>Zeichnung</strong>:
+      Die Vornamen und Sprüche der acht Familien sind eine Erstfassung von mir, keine Charaktere.
+      Fehden, Marotten und Vorgeschichten stehen aus — und daran hängen auch die grauen
+      Geschäfte, weil deren Geheimsprache ohne Figuren nicht zu schreiben ist.</p>
+    <ul class="tasks">
+      <li><span class="tag neu">wartet</span><span>Charakter-Briefing: Vornamen, Alter, Marotten, Fehden je Familie. Braucht deine Eingabe.</span></li>
+      <li><span class="tag code">Code</span><span>Graue Geschäfte — Geheimsprache, Timer, Kontrollrisiko. Setzt das Briefing voraus.</span></li>
+      <li><span class="tag code">Code</span><span>Daniels Textblasen: kurze Kommentare zu Ereignissen, zwei bis acht Wörter.</span></li>
+    </ul>
+  </div>
+
+  <div class="system">
+    <div class="system-head">
+      <h3>Umschlag und Abrechnung</h3>
+      <span class="files">economy/shift.ts · account.ts · upgrades.ts</span>
+      <span class="zustand z-warn">nacharbeiten</span>
+    </div>
+    <p class="befund">Der Kreislauf trägt, das Geld hat eine Verwendung, und das Konto hat eine
+      Untergrenze bei −1 500 €. Damit sind beide Lücken des letzten Berichts zu. Geblieben ist
+      eine kleinere: Es gibt <strong>keinen Rückblick</strong>. Der Spieler sieht seinen
+      Kontostand, aber nie, was ein Tag gebracht hat — was kam rein, was ging raus, wofür lohnt
+      sich die Mühe. Bei einem Spiel, das über Sortenreinheit funktioniert, ist das die
+      Rückmeldung, die den Groschen fallen lässt.</p>
+    <ul class="tasks">
+      <li><span class="tag code">Code</span><span>Tagesabschluss mit Bilanz — Ankauf, Verkauf, Sortenreinheit je Fraktion, Wert des Platzes.</span></li>
+      <li><span class="tag code">Code</span><span>Sichtbar machen, was Sortieren einbringt: Erlös sortenrein gegen Erlös gemischt, nebeneinander.</span></li>
+    </ul>
+  </div>
+
+  <div class="system">
+    <div class="system-head">
+      <h3>Personal</h3>
+      <span class="files">world/people.ts · world/loader.ts · delivery/laneWatch.ts</span>
+      <span class="zustand z-warn">nacharbeiten</span>
+    </div>
+    <p class="befund">Lambert hat seinen Radlader — knickgelenkt, 4,2 m/s — und räumt damit auch
+      schwere Brocken von der Fahrspur. Zusammen mit der Fahrspurüberwachung ergibt das eine echte
+      Spielsituation: Liegt etwas über 120 kg im Weg, hupt der Fahrer nach zehn Sekunden und gibt
+      nach fünfunddreißig auf; Lambert fährt hin, der Spieler kann schneller sein. Ob Lambert sich
+      <strong>nützlich anfühlt</strong>, ist damit besser geworden, aber immer noch nicht belegt —
+      das lässt sich nicht messen, nur spielen.</p>
+    <ul class="tasks">
+      <li><span class="tag code">Code</span><span>Seinen Nutzen belegen: Anzeige, wie viel er heute weggeräumt hat.</span></li>
+      <li><span class="tag art">Optik</span><span>Kleine Lebenszeichen: Kaffeepause, Winken, Blick zum Bagger, wenn der schwenkt.</span></li>
+    </ul>
+  </div>
+
+  <h2>Technik und Auslieferung</h2>
+
+  <div class="system">
+    <div class="system-head">
+      <h3>Physik</h3>
+      <span class="files">physics/ · world/scrapItems.ts</span>
+      <span class="zustand z-krit">dringend</span>
+    </div>
+    <p class="befund">Masse, Kontakte, Durchdringung und Verkanten stimmen, und das Gewichtsgefühl
+      ist da. Der Preis dafür steht in der Messung: Bei 218 Körpern kostet ein reiner
+      Physikschritt <strong>2,78 ms</strong>, mit Spiellogik 4,42 ms von 16,7 ms. Gegenüber
+      1,78 ms beim letzten Bericht ist das ein Aufschlag von 56 %, obwohl die Bündelung die
+      Teilezahl inzwischen deckelt — die schwereren Kontakte und die zusätzlichen
+      Kollisionsprüfungen kosten. <strong>Ein Mittelklasse-Handy rechnet drei- bis viermal
+      langsamer</strong>; damit wäre das Budget dort bereits gerissen. Diese Zahl ist jetzt das
+      größte Risiko vor der Veröffentlichung, und sie ist nur auf echter Hardware zu klären.</p>
+    <ul class="tasks">
+      <li><span class="tag code">Code</span><span>Lasttest auf einem echten Mittelklasse-Handy. Ohne diese Messung ist jede weitere Optimierung geraten.</span></li>
+      <li><span class="tag code">Code</span><span>Schlafende Körper härter aussortieren — 108 von 218 sind wach, das sind mehr als nötig.</span></li>
+      <li><span class="tag code">Code</span><span>Prüfen, ob die Bündelung früher greifen kann, ohne dass der Platz leer wirkt.</span></li>
+    </ul>
+  </div>
+
+  <div class="system">
+    <div class="system-head">
+      <h3>Auslieferung in den Store</h3>
+      <span class="files">docs/10 · capacitor.config.json</span>
+      <span class="zustand z-warn">nacharbeiten</span>
+    </div>
+    <p class="befund">Web-Manifest, Icons, Capacitor-Konfiguration und Anleitung liegen bereit, und
+      der geführte Einstieg — die eigentliche inhaltliche Hürde des letzten Berichts — steht.
+      Übrig bleibt Handwerk, das <strong>ein Entwicklerkonto voraussetzt</strong> (einmalig 25 $).
+      Das Paket ist mit 2,74 MB weiter unauffällig.</p>
+    <ul class="tasks">
+      <li><span class="tag neu">wartet</span><span>Android-Projekt anlegen, AAB bauen, auf einem Gerät prüfen — braucht das Konto.</span></li>
+      <li><span class="tag code">Code</span><span>Store-Eintrag: Beschreibung, Bildschirmfotos, Alterseinstufung, Datenschutzerklärung.</span></li>
+    </ul>
+  </div>
+
+  <h2>Vorgeschlagene Reihenfolge</h2>
+  <div class="plan">
+    <div class="plan-row">
+      <span class="num">1</span>
+      <div>
+        <p>Lasttest auf echter Hardware</p>
+        <p class="warum">2,78 ms sind auf einem Handy schnell 11 ms. Alles Weitere ist Raten, solange das nicht gemessen ist — und es entscheidet, wie viel Spielraum für Inhalte bleibt.</p>
+      </div>
+      <span class="aufwand">klein</span>
+    </div>
+    <div class="plan-row">
+      <span class="num">2</span>
+      <div>
+        <p>Tagesabschluss mit Bilanz</p>
+        <p class="warum">Die fehlende Rückmeldung auf die Kernmechanik. Wer nicht sieht, was Sortieren einbringt, sortiert nicht.</p>
+      </div>
+      <span class="aufwand">mittel</span>
+    </div>
+    <div class="plan-row">
+      <span class="num">3</span>
+      <div>
+        <p>Charakter-Briefing der Familien</p>
+        <p class="warum">Die Mechanik steht, die Figuren fehlen. Braucht deine Eingabe — danach sind Sprüche und graue Geschäfte Fleißarbeit.</p>
+      </div>
+      <span class="aufwand">wartet</span>
+    </div>
+    <div class="plan-row">
+      <span class="num">4</span>
+      <div>
+        <p>Bodenspuren und Gebrauchsspuren</p>
+        <p class="warum">Reine Optik, jederzeit einschiebbar. Steht seit zwei Berichten und macht am meisten aus, was den Platz benutzt aussehen lässt.</p>
+      </div>
+      <span class="aufwand">klein</span>
+    </div>
+    <div class="plan-row">
+      <span class="num">5</span>
+      <div>
+        <p>Daniels Textblasen und Lamberts Lebenszeichen</p>
+        <p class="warum">Kleine Sachen mit großer Wirkung aufs Gefühl. Gut für zwischendurch.</p>
+      </div>
+      <span class="aufwand">klein</span>
+    </div>
+    <div class="plan-row">
+      <span class="num">6</span>
+      <div>
+        <p>Android-Build und Store-Eintrag</p>
+        <p class="warum">Zuletzt, wenn das Spiel steht. Entwicklerkonto einmalig 25 $.</p>
+      </div>
+      <span class="aufwand">klein</span>
+    </div>
+  </div>
+
+  <div class="notiz">
+    <h4>Aus der Werkstatt</h4>
+    <p>Der teuerste Fehler dieser Runde war unsichtbar: Verhandlung und Abholung öffneten sich
+      nicht, Händler blieben auf der Waage stehen. Der Grund lag nicht im Ablauf, sondern darin,
+      dass für die drei Dialoge <strong>überhaupt keine Gestaltungsregeln existierten</strong> —
+      der Einfügepunkt, an den sie gehört hätten, war nie da. Sie standen also im Bild, unsichtbar,
+      während der Code korrekt lief. Gefunden über die berechneten Stile im Browser, nicht durch
+      Lesen. Seitdem gilt: Wenn etwas nicht erscheint, obwohl die Logik stimmt, wird zuerst
+      nachgesehen, ob es überhaupt Regeln zum Anzeigen gibt. Dazu ein Notausstieg — bleibt eine
+      Verhandlung 32 Sekunden unbeantwortet, fährt der Fahrer zum Marktpreis weiter. Der Betrieb
+      darf nie an einem offenen Fenster hängenbleiben.</p>
+  </div>
+
+  <footer>
+    Zustände: <strong>tragfähig</strong> — funktioniert, Feinschliff offen ·
+    <strong>nacharbeiten</strong> — brauchbar, aber mit spürbarer Lücke ·
+    <strong>dringend</strong> — steht dem Spielgefühl oder der Veröffentlichung im Weg.
+    Marke <strong>wartet</strong>: geht nicht ohne dich weiter.
+    Messwerte vom 02.09.2026 im Desktop-Browser bei 218 Körpern und vollem Platz.
+  </footer>
+</div>
