@@ -2,6 +2,7 @@ import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import type { ItemManager } from "./scrapItems";
 import { hitsObstacle, slideAround } from "./obstacles";
+import { WheelLoader, LOADER_SPEED } from "./loader";
 
 /**
  * Platzpersonal (Design 2026-08-29):
@@ -186,6 +187,37 @@ export class StaffManager {
    * über ihm bewegt, nicht der ganzen Maschine (Design-Fix 29.08.2026).
    */
   getGrapplePos: (() => THREE.Vector3) | null = null;
+  /**
+   * Teil, das gerade eine Fahrspur blockiert. Das hat Vorrang vor allem
+   * anderen: Solange es dort liegt, steht der Betrieb.
+   */
+  getBlockingItem: (() => (typeof this.items.items)[number] | null) | null = null;
+
+  /**
+   * Was Lambert bewegen kann. Von Hand sind das Kleinteile; mit dem Radlader
+   * räumt er auch schwere Brocken von der Fahrspur.
+   */
+  get tragkraft(): number {
+    return this.hasLoader ? 900 : 60;
+  }
+  /** Radlader vorhanden? Wird vom Upgrade-System gesetzt. */
+  private _hasLoader = false;
+  private loader: WheelLoader | null = null;
+
+  get hasLoader(): boolean {
+    return this._hasLoader;
+  }
+
+  /**
+   * Radlader freischalten. Von da an fährt Lambert statt zu laufen und kann
+   * auch schwere Brocken von den Fahrspuren räumen.
+   */
+  setLoader(on: boolean): void {
+    this._hasLoader = on;
+    this.loader?.setVisible(on);
+    // Zu Fuß oder auf der Maschine — nicht beides sichtbar
+    this.lambert.group.visible = !on;
+  }
   /** Karossen — durch die läuft er nicht hindurch */
   getObstaclePositions: (() => THREE.Vector3[]) | null = null;
 
@@ -252,6 +284,7 @@ export class StaffManager {
 
     // Lambert Prison — Platzwart in Warnweste
     this.lambert = buildPerson({ shirt: 0xf2c018, trousers: 0x2f3a45, hair: 0x5a4632 });
+    this.loader = new WheelLoader(scene);
     this.lambert.group.position.copy(this.patrol[0]);
     scene.add(this.lambert.group);
     const vest = new THREE.Mesh(
@@ -347,7 +380,8 @@ export class StaffManager {
       // zügiges Arbeitstempo: die Wege um den Schwenkbereich herum sind lang,
       // bei Schlendertempo käme er kaum hinterher
       const vorher = { x: g.position.x, z: g.position.z };
-      g.position.addScaledVector(step, 2.2 * dt);
+      // Mit dem Radlader ist er deutlich schneller unterwegs als zu Fuß
+      g.position.addScaledVector(step, (this.hasLoader ? LOADER_SPEED : 2.2) * dt);
       // Sicherheitsnetz: landet der Schritt trotz Ausweichen in einem
       // Bauwerk, wird er verworfen — Lambert läuft durch nichts hindurch
       if (hitsObstacle(g.position.x, g.position.z, 0.35)) {
@@ -356,6 +390,7 @@ export class StaffManager {
       }
       g.rotation.y = Math.atan2(step.x, step.z);
       this.walkPhase += dt * 7;
+      this.loader?.update(dt, g.position, g.rotation.y, true);
       // Festgefahren? Wenn das Ausweichen ihn im Kreis schickt, kommt er dem
       // Ziel nicht näher — dann lieber aufgeben als endlos am Hindernis kleben.
       this.stuckT += dt;
@@ -367,6 +402,7 @@ export class StaffManager {
       }
     } else {
       this.walkPhase = 0;
+      this.loader?.update(dt, g.position, g.rotation.y, false);
       this.resetStuck();
       this.onArrived();
     }
@@ -582,6 +618,18 @@ export class StaffManager {
     // passende Box legen. Stahl und Störstoff lässt er liegen — der eine ist
     // Sache des Baggers, der andere kommt gesondert weg. Das nächstgelegene
     // Teil hat Vorrang, damit er nicht quer über den Platz läuft, während
+    // Vorrang hat immer, was eine Fahrspur blockiert — daran hängt der
+    // ganze Betrieb, und ein Kleinteil in der Box kann warten.
+    const stoerfall = this.getBlockingItem?.();
+    if (
+      stoerfall &&
+      stoerfall.body.isValid() &&
+      stoerfall.massKg <= this.tragkraft &&
+      this.reachable(stoerfall.body.translation().x, stoerfall.body.translation().z)
+    ) {
+      return stoerfall;
+    }
+
     // neben ihm etwas liegt.
     const ex = this.getExcavatorPos?.();
     const gr = this.getGrapplePos?.();

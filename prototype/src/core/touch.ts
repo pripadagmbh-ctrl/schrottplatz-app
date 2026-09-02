@@ -94,6 +94,7 @@ export class TouchControls {
     this.bindTap("btn-away", "KeyJ");
     this.bindTap("btn-blade", "KeyI");
     this.bindTap("btn-music", "KeyU");
+    this.bindTap("btn-loader", "KeyZ");
     this.bindTap("btn-pause", "Escape");
     this.buildWheel();
     this.bindTilt();

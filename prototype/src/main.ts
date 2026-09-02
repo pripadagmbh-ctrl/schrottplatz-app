@@ -19,6 +19,7 @@ import { VehicleManager } from "./delivery/vehicles";
 import { PressManager } from "./world/press";
 import { randomCargo } from "./world/scrapItems";
 import { Shift } from "./economy/shift";
+import { LaneWatch } from "./delivery/laneWatch";
 import { Daylight, Floodlights } from "./world/daylight";
 import { hitsObstacle } from "./world/obstacles";
 import { Signage } from "./world/signage";
@@ -190,6 +191,9 @@ async function main(): Promise<void> {
 
   // --- Pausenmenü ---
   // Tagesablauf: Annahme → Sortieren → Annahme (Briefing Kap. 21)
+  // Fahrspuren überwachen: liegt Schrott im Weg, steht der Betrieb
+  const lanes = new LaneWatch(items);
+  let stoerfallGemeldet = false;
   const shift = new Shift();
   shift.load(save?.shift);
   if (typeof save?.timeOfDay === "number") daylight.time = save.timeOfDay;
@@ -334,6 +338,10 @@ async function main(): Promise<void> {
   grip.partResolver = (pos) => composites.findPartNear(pos);
   grip.insideGrapple = (pos) => excavator.isInsideGrapple(pos);
   excavator.getStaffPos = () => staff.lambertPosition();
+  staff.getBlockingItem = () => {
+    const b = lanes.nearest(staff.lambertPosition());
+    return b ? b.item : null;
+  };
   staff.getGrapplePos = () => {
     excavator.getSensorPosition(sensorPos);
     return sensorPos;
@@ -485,6 +493,7 @@ async function main(): Promise<void> {
       daylight,
       floodlights,
       staff,
+      lanes,
       audio,
       togglePause: () => setPaused(!paused),
       isPaused: () => paused,
@@ -558,6 +567,16 @@ async function main(): Promise<void> {
       if (r === "weggeschickt") hud.toast("Weggeschickt — der Fahrer dreht ab.");
       else if (r === "vorgefahren") hud.toast("LKW fährt ein Stück vor.");
       else hud.toast("Gerade ist kein Fahrzeug auf dem Platz.");
+    }
+    // Radlader vorerst auf Taste — bis das Upgrade-System da ist, mit dem er
+    // eigentlich gekauft werden soll
+    if (input.wasPressed("KeyZ") || touch.consumePress("KeyZ")) {
+      staff.setLoader(!staff.hasLoader);
+      hud.toast(
+        staff.hasLoader
+          ? "Lambert hat den Radlader — räumt jetzt auch schwere Brocken"
+          : "Lambert ist wieder zu Fuß unterwegs"
+      );
     }
     if (input.wasPressed("KeyU") || touch.consumePress("KeyU")) {
       hud.toast(audio.toggleMusic() ? "Musik an." : "Musik aus.");
@@ -640,6 +659,12 @@ async function main(): Promise<void> {
     }
     daylight.update(frameDt);
     floodlights.update(daylight.daylight);
+    lanes.update(frameDt);
+    // Störfall nur beim Wechsel melden, nicht in Dauerschleife
+    if (lanes.blocked !== stoerfallGemeldet) {
+      stoerfallGemeldet = lanes.blocked;
+      hud.toast(lanes.blocked ? lanes.message + " — freiräumen!" : "Fahrspur wieder frei.");
+    }
     shift.update(frameDt, looseKg);
     vehicles.acceptDeliveries = shift.acceptsDeliveries;
     vehicles.intervalFactor = shift.intervalFactor(looseKg);
