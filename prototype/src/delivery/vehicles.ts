@@ -15,7 +15,7 @@ import { rollCustomer, vehicleForCustomer, type CustomerProfile } from "./custom
  * und fährt per Reibung mit.
  */
 
-export type DeliveryKind = "kipper" | "pritsche" | "wrack" | "abholer";
+export type DeliveryKind = "kipper" | "pritsche" | "wrack" | "abholer" | "pkw";
 
 /**
  * Fahrspur (SW, Design-Fix 2026-08-29): Die Route läuft ausschließlich über die
@@ -342,7 +342,8 @@ class DeliveryVehicle {
     customer: CustomerProfile | null = null
   ) {
     this.customer = kind === "abholer" ? null : (customer ?? rollCustomer());
-    this.bedLen = kind === "wrack" ? 5.4 : kind === "kipper" ? 6.0 : 5.4;
+    // Der PKW-Anhänger ist kurz — ein Kofferraum voll, keine Fuhre
+    this.bedLen = kind === "pkw" ? 2.4 : kind === "wrack" ? 5.4 : kind === "kipper" ? 6.0 : 5.4;
     this.buildMeshes();
     scene.add(this.group);
     this.chassisBody = world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased());
@@ -399,11 +400,114 @@ class DeliveryVehicle {
     this.bedBody.setRotation({ x: bq.x, y: bq.y, z: bq.z, w: bq.w }, false);
   }
 
+  /**
+   * Privatleute kommen nicht mit dem LKW, sondern mit dem eigenen Wagen und
+   * einem Anhänger — oder mit einem Kastenwagen. Das macht sie auf den ersten
+   * Blick von Gewerbe und Händlern unterscheidbar (Wunsch 02.09.2026).
+   */
+  private buildCarAndTrailer(
+    paint: THREE.MeshStandardMaterial,
+    dark: THREE.MeshStandardMaterial,
+    bedMat: THREE.MeshStandardMaterial
+  ): void {
+    void paint;
+    // Jeder Privatwagen sieht etwas anders aus
+    const farben = [0x8a3b32, 0x2f4858, 0x6b7a52, 0xa8a49c, 0x3c3f45, 0x7a5c3a];
+    const lack = new THREE.MeshStandardMaterial({
+      color: farben[Math.floor(Math.random() * farben.length)],
+      roughness: 0.45,
+      metalness: 0.2,
+    });
+    const glas = new THREE.MeshPhysicalMaterial({
+      color: 0xd6ecf4,
+      roughness: 0.06,
+      metalness: 0,
+      transmission: 0.82,
+      thickness: 0.05,
+      transparent: true,
+      opacity: 0.32,
+    });
+    const kombi = Math.random() < 0.7;
+    const zugZ = this.bedLen / 2 + 2.6; // Mitte des Zugfahrzeugs
+    const len = kombi ? 4.3 : 5.0;
+    const hoehe = kombi ? 0.72 : 1.35;
+
+    // Karosserie: Kombi flach mit Dachaufbau, Kastenwagen ein hoher Kasten
+    const wanne = new THREE.Mesh(new THREE.BoxGeometry(1.82, hoehe, len), lack);
+    wanne.position.set(0, 0.62 + hoehe / 2, zugZ);
+    wanne.castShadow = true;
+    this.group.add(wanne);
+    if (kombi) {
+      const dach = new THREE.Mesh(new THREE.BoxGeometry(1.72, 0.62, len - 1.5), lack);
+      dach.position.set(0, 1.65, zugZ + 0.15);
+      dach.castShadow = true;
+      this.group.add(dach);
+      for (const sx of [-1, 1]) {
+        const seite = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.46, len - 1.9), glas);
+        seite.position.set(sx * 0.87, 1.68, zugZ + 0.15);
+        this.group.add(seite);
+      }
+      const front = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.5, 0.06), glas);
+      front.position.set(0, 1.66, zugZ + len / 2 - 0.72);
+      front.rotation.x = 0.34;
+      this.group.add(front);
+    } else {
+      // Kastenwagen: verglaste Fahrerkabine vorn, geschlossener Aufbau
+      const front = new THREE.Mesh(new THREE.BoxGeometry(1.66, 0.62, 0.06), glas);
+      front.position.set(0, 1.6, zugZ + len / 2 - 0.35);
+      front.rotation.x = 0.22;
+      this.group.add(front);
+      for (const sx of [-1, 1]) {
+        const seite = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.5, 1.0), glas);
+        seite.position.set(sx * 0.89, 1.56, zugZ + len / 2 - 1.15);
+        this.group.add(seite);
+      }
+    }
+    const haut = new THREE.MeshStandardMaterial({ color: 0xe3b18c, roughness: 0.8 });
+    const kopf = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 10), haut);
+    kopf.position.set(-0.42, kombi ? 1.6 : 1.55, zugZ + len / 2 - 1.1);
+    this.group.add(kopf);
+
+    // Anhänger: offener Kasten auf einer Achse
+    const rahmen = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.24, this.bedLen + 0.5), dark);
+    rahmen.position.set(0, 0.72, this.bedLen / 2 - 0.1);
+    this.group.add(rahmen);
+    const boden = new THREE.Mesh(new THREE.BoxGeometry(1.86, 0.08, this.bedLen), bedMat);
+    boden.position.set(0, 0.86, this.bedLen / 2);
+    this.group.add(boden);
+    const deichsel = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 1.5), dark);
+    deichsel.position.set(0, 0.66, this.bedLen + 0.85);
+    this.group.add(deichsel);
+
+    // Räder: zwei am Anhänger, vier am Zugfahrzeug
+    const radGeo = new THREE.CylinderGeometry(0.33, 0.33, 0.22, 12);
+    radGeo.rotateZ(Math.PI / 2);
+    const gummi = new THREE.MeshStandardMaterial({ color: 0x1e2022, roughness: 0.9 });
+    const raeder: Array<[number, number]> = [
+      [-0.98, this.bedLen / 2],
+      [0.98, this.bedLen / 2],
+      [-0.86, zugZ + len / 2 - 0.9],
+      [0.86, zugZ + len / 2 - 0.9],
+      [-0.86, zugZ - len / 2 + 0.9],
+      [0.86, zugZ - len / 2 + 0.9],
+    ];
+    for (const [rx, rz] of raeder) {
+      const rad = new THREE.Mesh(radGeo, gummi);
+      rad.position.set(rx, 0.33, rz);
+      rad.castShadow = true;
+      this.group.add(rad);
+    }
+  }
+
   private buildMeshes(): void {
     const paint = new THREE.MeshStandardMaterial({ color: 0x35618f, roughness: 0.55 });
     const dark = new THREE.MeshStandardMaterial({ color: 0x2b2e31, roughness: 0.8 });
     const bedMat = new THREE.MeshStandardMaterial({ color: 0x5c6166, roughness: 0.7, metalness: 0.4 });
 
+    if (this.kind === "pkw") {
+      this.buildCarAndTrailer(paint, dark, bedMat);
+      return;
+    }
     const chassis = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.5, this.bedLen + 1.6), dark);
     chassis.position.set(0, 0.65, 0.8);
     this.group.add(chassis);

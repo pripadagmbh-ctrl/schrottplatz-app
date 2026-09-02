@@ -288,11 +288,13 @@ function rollGewerbe(): CustomerProfile {
 }
 
 /** Fahrzeugart, die zu dieser Kundschaft passt. */
-export function vehicleForCustomer(c: CustomerProfile): "kipper" | "pritsche" | "wrack" {
+export function vehicleForCustomer(
+  c: CustomerProfile
+): "kipper" | "pritsche" | "wrack" | "pkw" {
   if (c.group === "privat") {
-    // PKW mit Anhänger — im Modell die kleine Pritsche; gelegentlich schleppt
-    // jemand ein Altauto an
-    return Math.random() < 0.2 ? "wrack" : "pritsche";
+    // PKW mit Anhänger oder Kastenwagen. Gelegentlich schleppt jemand ein
+    // Altauto an — dann kommt der Abschleppwagen.
+    return Math.random() < 0.15 ? "wrack" : "pkw";
   }
   if (c.group === "gewerbe") return Math.random() < 0.65 ? "kipper" : "pritsche";
   // Händler: alles unterwegs, was Räder hat
