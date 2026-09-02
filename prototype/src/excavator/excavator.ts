@@ -262,6 +262,9 @@ export class Excavator {
 
   /** Handles der gerade gegriffenen Körper — die blockieren die Spinne nicht. */
   grippedHandles = new Set<number>();
+  /** Faktor aus dem Baggerausbau — von main gesetzt (1 = ohne Ausbau) */
+  getSpeedBonus: (() => number) | null = null;
+
   /** Position des Platzwarts — von main gesetzt, damit der Arm ihn verschont */
   getStaffPos: (() => THREE.Vector3 | null) | null = null;
   /** Prüfung von Fahrwerk, Arm und Spinne gegen alles Festinstallierte */
@@ -1010,7 +1013,9 @@ export class Excavator {
     // Lastfaktor (Briefing 6.1): 1 − 0,5 × (Last / 2000 kg). Dazu kommt der
     // Widerstand des Materials, durch das die Spinne gerade pflügt — beides
     // zusammen macht schweres Arbeiten spürbar zäh.
-    const carried = 1 - 0.5 * Math.min(this.carriedMassKg / 2000, 1);
+    // Der Baggerausbau macht die Hydraulik schneller
+    const ausbau = this.getSpeedBonus?.() ?? 1;
+    const carried = (1 - 0.5 * Math.min(this.carriedMassKg / 2000, 1)) * ausbau;
     this.plowFactor += (this.collision.plowFactor() - this.plowFactor) * Math.min(dt * 6, 1);
     const loadFactor = carried * this.plowFactor;
     // Zustand vor der Bewegung merken (für die Fahrzeug-Sperre unten)

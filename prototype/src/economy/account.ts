@@ -24,6 +24,13 @@ export interface SaleResult {
   dominant: string;
 }
 
+/**
+ * Ab diesem Kontostand ist Schluss: Wer die Ware nicht bezahlen kann, bekommt
+ * keine mehr geliefert. Ein kleiner Dispo bleibt — sonst steht das Spiel beim
+ * ersten Fehlgriff (Design 02.09.2026).
+ */
+export const CREDIT_LIMIT_EUR = -1500;
+
 export class Account {
   moneyEur = 5000; // Startkapital (SW)
   /** Statistik für HUD/Bilanz */
@@ -56,6 +63,19 @@ export class Account {
    * Containerinhalt verkaufen: Wert nach dominanter Fraktion, gedämpft mit
    * Sortenreinheit² — eine sortenreine Ladung bringt ein Vielfaches.
    */
+  /**
+   * Kann noch angekauft werden? Händler wollen bezahlt werden, und wer nichts
+   * hat, bekommt nichts. Erst wenn wieder Geld hereinkommt, geht es weiter.
+   */
+  get canBuy(): boolean {
+    return this.moneyEur > CREDIT_LIMIT_EUR;
+  }
+
+  /** Wie knapp es ist — für die Warnung im HUD. */
+  get lowOnCash(): boolean {
+    return this.moneyEur < 800;
+  }
+
   sellContainer(
     loaded: ScrapItem[],
     items: ItemManager,

@@ -20,6 +20,7 @@ import { PressManager } from "./world/press";
 import { randomCargo } from "./world/scrapItems";
 import { Shift } from "./economy/shift";
 import { Reputation } from "./economy/reputation";
+import { UPGRADES, UpgradeState, type UpgradeId } from "./economy/upgrades";
 import { haggle, leavesOnRefusal, hint, OFFER_FACTOR, OFFER_LABEL, type Offer } from "./economy/haggle";
 import { LaneWatch } from "./delivery/laneWatch";
 import { Daylight, Floodlights } from "./world/daylight";
@@ -167,6 +168,7 @@ async function main(): Promise<void> {
     moneyEur: account.moneyEur,
     shift: shift.toJSON(),
     reputation: ruf.toJSON(),
+    upgrades: ausbau.toJSON(),
     timeOfDay: daylight.time,
     items: items.items
       .filter((i) => i.shape)
@@ -403,10 +405,64 @@ async function main(): Promise<void> {
     hud.toast("Der Fahrer hupt — Fahrspur ist blockiert!");
   };
   // Brückenwaage: voll rein, leer raus → Kunde bekommt sein Geld
+  // --- Platz ausbauen: verdientes Geld bekommt eine Verwendung ---
+  const ausbau = new UpgradeState();
+  ausbau.load(save?.upgrades);
+  const shopEl = document.getElementById("shop")!;
+  /** Wirkung eines gekauften Ausbaus sofort anwenden. */
+  const wendeAn = (id: UpgradeId): void => {
+    if (id === "loader") staff.setLoader(true);
+    // dozer, forklift, magnet, boom und press wirken über Abfragen an
+    // anderer Stelle — hier ist nichts einzuschalten
+  };
+  for (const u of UPGRADES) if (ausbau.has(u.id)) wendeAn(u.id);
+  // Baggerausbau und größere Presse wirken über diese Abfragen
+  excavator.getSpeedBonus = () => (ausbau.has("boom") ? 1.35 : 1);
+  grip.getCapacityBonus = () => (ausbau.has("boom") ? 1.5 : 1);
+  press.getBaleBonus = () => (ausbau.has("press") ? 1.6 : 1);
+  staff.getSpeedBonus = () => (ausbau.has("dozer") || ausbau.has("forklift") ? 1.4 : 1);
+
+  const zeigeAusbau = (): void => {
+    const liste = document.getElementById("shop-list")!;
+    document.getElementById("shop-info")!.textContent =
+      `Konto ${Math.round(account.moneyEur)} € · ` +
+      `${(shift.turnoverKg / 1000).toFixed(1)} t umgeschlagen`;
+    liste.innerHTML = "";
+    for (const u of UPGRADES) {
+      const b = document.createElement("button");
+      const gekauft = ausbau.has(u.id);
+      const frei = ausbau.available(u.id, shift.turnoverKg);
+      const zahlbar = ausbau.affordable(u.id, shift.turnoverKg, account.moneyEur);
+      b.disabled = gekauft || !zahlbar;
+      const status = gekauft
+        ? "vorhanden"
+        : !frei
+          ? `ab ${(u.requiresTurnoverKg / 1000).toFixed(0)} t Umschlag`
+          : `${u.priceEur.toLocaleString("de-DE")} €`;
+      b.innerHTML = `${u.name}<span class="preis">${status}</span><small>${u.effect}</small>`;
+      if (!b.disabled) {
+        b.addEventListener("click", () => {
+          account.moneyEur -= u.priceEur;
+          ausbau.buy(u.id);
+          wendeAn(u.id);
+          audio.playSale();
+          hud.toast(`${u.name} gekauft — ${u.effect}`);
+          zeigeAusbau(); // Liste auffrischen
+        });
+      }
+      liste.appendChild(b);
+    }
+    shopEl.classList.add("open");
+  };
+  document.getElementById("shop-close")!.addEventListener("click", () =>
+    shopEl.classList.remove("open")
+  );
+
   // --- Verhandeln an der Waage ---
   const ruf = new Reputation();
   ruf.load(save?.reputation);
   let preisFaktor = 1;
+  let zahlungsUnfaehig = false;
   /**
    * Fester Kurs für Gewerbekunden. Etwas über Markt: Sie liefern sortenrein
    * und verlässlich, das ist den Aufschlag wert.
@@ -635,16 +691,7 @@ async function main(): Promise<void> {
       else if (r === "vorgefahren") hud.toast("LKW fährt ein Stück vor.");
       else hud.toast("Gerade ist kein Fahrzeug auf dem Platz.");
     }
-    // Radlader vorerst auf Taste — bis das Upgrade-System da ist, mit dem er
-    // eigentlich gekauft werden soll
-    if (input.wasPressed("KeyZ") || touch.consumePress("KeyZ")) {
-      staff.setLoader(!staff.hasLoader);
-      hud.toast(
-        staff.hasLoader
-          ? "Lambert hat den Radlader — räumt jetzt auch schwere Brocken"
-          : "Lambert ist wieder zu Fuß unterwegs"
-      );
-    }
+    if (input.wasPressed("KeyZ") || touch.consumePress("KeyZ")) zeigeAusbau();
     if (input.wasPressed("KeyU") || touch.consumePress("KeyU")) {
       hud.toast(audio.toggleMusic() ? "Musik an." : "Musik aus.");
     }
@@ -733,7 +780,17 @@ async function main(): Promise<void> {
       hud.toast(lanes.blocked ? lanes.message + " — freiräumen!" : "Fahrspur wieder frei.");
     }
     shift.update(frameDt, looseKg);
-    vehicles.acceptDeliveries = shift.acceptsDeliveries;
+    // Zahlungsdruck: Wer die Ware nicht bezahlen kann, bekommt keine mehr.
+    // Erst wenn wieder Geld hereinkommt, liefern die Händler weiter.
+    vehicles.acceptDeliveries = shift.acceptsDeliveries && account.canBuy;
+    if (!account.canBuy !== zahlungsUnfaehig) {
+      zahlungsUnfaehig = !account.canBuy;
+      if (zahlungsUnfaehig) {
+        hud.toast("Konto leer — es liefert niemand mehr. Erst verkaufen, dann ankaufen!");
+      } else {
+        hud.toast("Wieder zahlungsfähig — die Händler kommen zurück.");
+      }
+    }
     vehicles.intervalFactor = shift.intervalFactor(looseKg);
     hud.updateShift(`${daylight.clock} · ${shift.statusText(looseKg)}`, shift.jammed);
     excavator.updateInstruments(frameDt);

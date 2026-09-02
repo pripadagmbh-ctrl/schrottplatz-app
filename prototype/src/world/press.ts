@@ -55,6 +55,9 @@ const RAM_BACK_TIME = 2.0;
 type Phase = "idle" | "lidsClose" | "ramFwd" | "hold" | "ramBack" | "lidsOpen";
 
 export class PressManager {
+  /** Faktor aus der größeren Presse — von main gesetzt (1 = Grundausbau) */
+  getBaleBonus: (() => number) | null = null;
+
   private lidLeft = new THREE.Group();
   private lidRight = new THREE.Group();
   /** Hubzylinder der Deckelplatten (Winkelhebel-Antrieb) */

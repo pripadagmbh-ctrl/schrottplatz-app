@@ -30,6 +30,9 @@ interface GrippedItem {
 export class GripSystem {
   private items: GrippedItem[] = [];
   private sensorShape = new RAPIER.Ball(SENSOR_RADIUS);
+  /** Traglast-Faktor aus dem Baggerausbau — von main gesetzt */
+  getCapacityBonus: (() => number) | null = null;
+
   /** Hooks für Events (Audio/HUD) — von main verdrahtet, kein Modul-Import nötig */
   onGrabbed: ((bodies: RAPIER.RigidBody[]) => void) | null = null;
   onReleased: ((count: number) => void) | null = null;
@@ -185,7 +188,8 @@ export class GripSystem {
   attachBody(body: RAPIER.RigidBody): boolean {
     if (this.items.length >= MAX_ITEMS) return false;
     if (this.items.some((it) => it.body.handle === body.handle)) return false; // schon gegriffen
-    if (this.totalMassKg + body.mass() > MAX_TOTAL_KG) return false;
+    if (this.totalMassKg + body.mass() > MAX_TOTAL_KG * (this.getCapacityBonus?.() ?? 1))
+      return false;
 
     const gPos = this.grappleBody.translation();
     const gRot = this.grappleBody.rotation();

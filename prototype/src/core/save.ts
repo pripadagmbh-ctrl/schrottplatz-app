@@ -33,6 +33,8 @@ export interface SaveData {
   timeOfDay?: number;
   /** Ruf bei den drei Kundengruppen */
   reputation?: { privat?: number; haendler?: number; gewerbe?: number };
+  /** Gekaufte Ausbaustufen */
+  upgrades?: string[];
   items: SavedItem[];
   cars: SavedCar[];
   fencesBroken: boolean[];

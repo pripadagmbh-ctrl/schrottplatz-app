@@ -200,6 +200,9 @@ export class StaffManager {
   get tragkraft(): number {
     return this.hasLoader ? 900 : 60;
   }
+  /** Tempofaktor aus Bulldozer und Stapler — von main gesetzt */
+  getSpeedBonus: (() => number) | null = null;
+
   /** Radlader vorhanden? Wird vom Upgrade-System gesetzt. */
   private _hasLoader = false;
   private loader: WheelLoader | null = null;
@@ -384,7 +387,8 @@ export class StaffManager {
       // bei Schlendertempo käme er kaum hinterher
       const vorher = { x: g.position.x, z: g.position.z };
       // Mit dem Radlader ist er deutlich schneller unterwegs als zu Fuß
-      g.position.addScaledVector(step, (this.hasLoader ? LOADER_SPEED : 2.2) * dt);
+      const tempo = (this.hasLoader ? LOADER_SPEED : 2.2) * (this.getSpeedBonus?.() ?? 1);
+      g.position.addScaledVector(step, tempo * dt);
       // Sicherheitsnetz: landet der Schritt trotz Ausweichen in einem
       // Bauwerk, wird er verworfen — Lambert läuft durch nichts hindurch
       if (hitsObstacle(g.position.x, g.position.z, 0.35)) {
