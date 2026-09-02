@@ -171,14 +171,39 @@ export const TRADES: Trade[] = [
   },
 ];
 
-/** Herkunftsorte für Privatleute — sie kommen aus der Gegend. */
+/**
+ * Herkunftsorte für Privatleute: Mönchengladbacher Stadtteile und die
+ * Nachbarorte am Niederrhein. Die Kundschaft kommt aus der Gegend, nicht
+ * von irgendwoher — das verankert den Platz da, wo er steht.
+ */
 const PRIVAT_ORTE = [
-  "aus Beckum",
-  "aus Ahlen",
-  "vom Nachbarort",
-  "aus der Siedlung",
-  "vom Hof",
-  "aus der Stadt",
+  // Mönchengladbacher Stadtteile
+  "aus Eicken",
+  "aus Rheydt",
+  "aus Hardt",
+  "aus Neuwerk",
+  "aus Odenkirchen",
+  "aus Giesenkirchen",
+  "aus Lürrip",
+  "aus Waldhausen",
+  "aus Windberg",
+  "aus Wickrath",
+  "aus Venn",
+  "aus Hehn",
+  "aus Holt",
+  "aus Bettrath",
+  "aus Schelsen",
+  "vom Westend",
+  "vom Bunten Garten",
+  "aus dem Volksgarten",
+  // Nachbarschaft
+  "aus Korschenbroich",
+  "aus Viersen",
+  "aus Jüchen",
+  "aus Wegberg",
+  "aus Schwalmtal",
+  "aus Willich",
+  "aus Erkelenz",
 ];
 
 const PRIVAT_NAMEN = [
