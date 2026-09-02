@@ -22,7 +22,7 @@ import type { CompositeManager } from "../dismantle/composites";
 // hinter der Maschine schnitt die Schere in die vorderste Sortiermulde;
 // hier steht sie frei neben dem Stahlschrotthaufen, und die offene Seite
 // bleibt in Reichweite (Design-Fix 29.08.2026).
-const CENTER = new THREE.Vector3(-8.5, 0, -8.0);
+const CENTER = new THREE.Vector3(-8.5, 0, -7.0);
 /**
  * Die Mulde ist um 90° gedreht aufgestellt: Die lange Achse läuft Nord–Süd, die
  * aufstehenden Deckelplatten stehen dadurch östlich und westlich — die Stirnseite
@@ -31,8 +31,11 @@ const CENTER = new THREE.Vector3(-8.5, 0, -8.0);
 const ROT = Math.PI / 2;
 // Große Mulde: die lange offene Seite zeigt nach Norden zum Baggerplatz,
 // damit von dort bequem eingefüllt werden kann (Design 2026-08-29).
-const INNER_W = 5.0; // x — Länge, Pressweg (rechts → links)
-const INNER_D = 6.0; // z — Breite (verdoppelt)
+// Breite wie der Stahlschrottplatz (11 m), direkt daneben: So bildet die
+// Schere mit dem Haufen eine Flucht. Die geringe Tiefe hält die Deckelklappen
+// kurz — die Spinne reicht bequem darüber (Wunsch 02.09.2026).
+const INNER_W = 10.0; // x — Länge, Pressweg (rechts → links)
+const INNER_D = 4.0; // z — Tiefe; bestimmt die Klappenlänge
 const WALL_H = 1.9;
 const PLATE_T = 0.3; // dicke Eisenplatten (SW)
 const LID_HINGE_Y = WALL_H - 0.1;
@@ -138,7 +141,9 @@ export class PressManager {
     // Platten über Winkelhebel, die von je zwei Hubzylindern angetrieben werden.
     const lidReach = INNER_D / 2 + 0.14; // wie weit die Platte zur Mitte reicht
     const lidLen = INNER_W + 0.25; // über die ganze Muldenlänge
-    const leverX = [-INNER_W / 2 + 0.9, INNER_W / 2 - 0.9];
+    // Drei Hebelpaare je Klappe: Bei 10 m Breite trügen zwei die Platte
+    // sichtbar zu wenig.
+    const leverX = [-INNER_W / 2 + 1.1, 0, INNER_W / 2 - 1.1];
     const rodMat = new THREE.MeshStandardMaterial({
       color: 0xb8bec4,
       roughness: 0.22,
@@ -153,7 +158,7 @@ export class PressManager {
       plate.castShadow = true;
       pivot.add(plate);
       // Quer-Versteifungen auf der Platte
-      for (const rx of [-2.4, -0.8, 0.8, 2.4]) {
+      for (const rx of [-4.2, -2.5, -0.8, 0.8, 2.5, 4.2]) {
         const rib = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.1, lidReach - 0.25), warn);
         rib.position.set(rx, PLATE_T / 2 + 0.05, -side * (lidReach / 2));
         pivot.add(rib);
@@ -167,7 +172,7 @@ export class PressManager {
       pivot.add(hinge);
       // Winkelhebel: stehen nach außen-oben ab und werden von den Zylindern gezogen
       for (const lx of leverX) {
-        const lever = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.78, 0.18), warn);
+        const lever = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.86, 0.26), warn);
         lever.position.set(lx, 0.34, side * 0.2);
         lever.rotation.x = -side * 0.42;
         lever.castShadow = true;
@@ -179,13 +184,15 @@ export class PressManager {
         const base = new THREE.Object3D();
         base.position.set(lx, 0.6, side * (INNER_D / 2 + 1.25));
         group.add(base);
-        const stand = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.2, 0.3), steel);
+        const stand = new THREE.Mesh(new THREE.BoxGeometry(0.44, 1.2, 0.44), steel);
         stand.position.copy(base.position);
         stand.position.y = 0.6;
         stand.castShadow = true;
         group.add(stand);
-        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 1, 10), heavy);
-        const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 1, 8), rodMat);
+        // Kräftiger als nötig gezeichnet: Die Hubzylinder sollen die Mechanik
+        // erzählen, nicht als Striche verschwinden (Wunsch 02.09.2026).
+        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 1, 12), heavy);
+        const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 1, 10), rodMat);
         barrel.castShadow = true;
         scene.add(barrel);
         scene.add(rod);

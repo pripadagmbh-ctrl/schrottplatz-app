@@ -90,7 +90,7 @@ export const STATIC_OBSTACLES: Obstacle[] = [
   { x: 7.9, z: 5.75, hw: 1.8, hd: 0.3, top: 2.0, label: "Mulde Baumisch Nord" },
 
   // --- Schere und Presse, südlich hinter dem Bagger ---
-  { x: -8.5, z: -8.0, hw: 3.0, hd: 3.4, top: 2.2, label: "Schere" },
+  { x: -8.5, z: -7.0, hw: 5.4, hd: 2.4, top: 2.2, label: "Schere" },
 
 
   // --- Gebäude: Wiegehäuschen an der Waage, Kaffeebude abseits ---

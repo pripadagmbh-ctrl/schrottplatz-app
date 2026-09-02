@@ -85,13 +85,15 @@ export class Yard {
     frame.castShadow = true;
     scene.add(frame);
     const body = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
+    // Pfeiler liegen hinter der Tafel, nicht davor: Sonst schneiden ihre
+    // Kanten in die Schrift. Die Schaufläche bleibt plan (Wunsch 02.09.2026).
     for (const px of [-4.5, 4.5]) {
       const post = new THREE.Mesh(new THREE.BoxGeometry(0.5, 8, 0.5), frameMat);
-      post.position.set(6 + px, 4, z - 0.2);
+      post.position.set(6 + px, 4, z - 0.62);
       post.castShadow = true;
       scene.add(post);
       world.createCollider(
-        RAPIER.ColliderDesc.cuboid(0.25, 4, 0.25).setTranslation(6 + px, 4, z - 0.2),
+        RAPIER.ColliderDesc.cuboid(0.25, 4, 0.25).setTranslation(6 + px, 4, z - 0.62),
         body
       );
     }
