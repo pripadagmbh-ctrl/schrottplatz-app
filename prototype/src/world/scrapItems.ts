@@ -22,19 +22,44 @@ export interface ScrapShape {
  * Aufgerolltes Kabel: ein Strang, der sich mehrfach um sich selbst windet.
  * Der Radius schwankt leicht, damit die Rolle nicht wie gedrechselt wirkt.
  */
+/**
+ * Kabelbund, wie er auf dem Schrottplatz liegt.
+ *
+ * Die frühere Wicklung sah aus wie ein aufgerollter Gartenschlauch: zu
+ * gleichmäßig, zu dünn, zu ordentlich. Ein Kabelbund ist ein grob
+ * zusammengelegter Strang, der in mehreren Lagen übereinanderfällt, sich
+ * kreuzt und an den Rändern ausbeult. Dafür bekommt die Kurve jetzt eine
+ * unregelmäßige Wicklung mit wechselnder Höhe und ein deutlich dickeres
+ * Rohr — Starkstromkabel haben Finger- bis Armdicke (Wunsch 02.09.2026).
+ */
 function cableCoilGeometry(r: number, tube: number): THREE.BufferGeometry {
-  const TURNS = 3.6;
-  const STEPS = 132;
+  const TURNS = 2.7;
+  const STEPS = 150;
   const pts: THREE.Vector3[] = [];
+  // fester Zufall je Bund, damit nicht alle gleich aussehen
+  let seed = Math.floor(r * 1000) % 97;
+  const rnd = (): number => {
+    seed = (seed * 1103515245 + 12345) % 2147483648;
+    return seed / 2147483648 - 0.5;
+  };
+  const wobbleA = rnd() * 0.9;
+  const wobbleB = rnd() * 0.9;
   for (let i = 0; i <= STEPS; i++) {
     const t = i / STEPS;
     const a = t * Math.PI * 2 * TURNS;
-    // nach außen auslaufende Wicklung, dazu etwas Höhenversatz je Lage
-    const rad = r * (0.62 + 0.38 * t) + Math.sin(a * 3) * r * 0.05;
-    pts.push(new THREE.Vector3(Math.cos(a) * rad, (t - 0.5) * tube * 1.6, Math.sin(a) * rad));
+    // Der Strang läuft nicht sauber spiralig, sondern legt sich in Lagen
+    // übereinander und beult dabei aus
+    const rad =
+      r * (0.72 + 0.3 * Math.sin(t * Math.PI)) +
+      Math.sin(a * 1.7 + wobbleA) * r * 0.16 +
+      Math.cos(a * 2.9 + wobbleB) * r * 0.1;
+    // Höhe schwingt: der Bund liegt in zwei, drei Lagen
+    const y = Math.sin(t * Math.PI * 2.2 + wobbleA) * tube * 1.5 + (t - 0.5) * tube * 0.6;
+    pts.push(new THREE.Vector3(Math.cos(a) * rad, y, Math.sin(a) * rad));
   }
   const curve = new THREE.CatmullRomCurve3(pts);
-  return new THREE.TubeGeometry(curve, STEPS, tube * 0.42, 6, false);
+  // Deutlich dicker: ein Kabel ist kein Draht
+  return new THREE.TubeGeometry(curve, STEPS, tube * 0.78, 7, false);
 }
 
 /** Kollider für ein plattgedrücktes Teil (flacher Quader über der Grundfläche). */
@@ -538,6 +563,55 @@ export class ItemManager {
    * Teil entfernen (Verkauf/Despawn).
    * @param destroyBody false, wenn Körper+Mesh schon anderweitig entsorgt wurden (Karosse)
    */
+  /**
+   * Kleinkram zusammenfassen, wenn zu viele Einzelteile herumliegen.
+   *
+   * Der Umschlagbetrieb füllt den Platz laufend, und jedes Teil kostet
+   * Rechenzeit — bei 400 Körpern wäre auf einem Mittelklasse-Handy Schluss.
+   * Statt die Bildrate einbrechen zu lassen, werden die leichtesten Teile
+   * eines Haufens zu einem Bündel verschmolzen: gleiche Masse, gleiche
+   * Fraktion, ein Körper statt vieler. Große Stücke bleiben unangetastet,
+   * die machen den Reiz aus (Design 02.09.2026).
+   *
+   * @param limit    ab so vielen losen Teilen wird zusammengefasst
+   * @param maxKg    nur Teile bis zu dieser Masse
+   * @returns wie viele Teile eingespart wurden
+   */
+  consolidate(limit = 260, maxKg = 45): number {
+    const klein = this.items.filter(
+      (it) => it.body.isValid() && it.body.isDynamic() && it.massKg <= maxKg && !it.composition
+    );
+    if (this.items.length <= limit || klein.length < 6) return 0;
+
+    // Nach Fraktion UND Zone gruppieren: Verschmolzen wird nur Gleiches mit
+    // Gleichem am selben Ort — sonst ginge Sortenreinheit oder Zuordnung
+    // verloren. Auch einsortierte Teile werden zusammengefasst; sie kosten
+    // dieselbe Rechenzeit wie lose.
+    const nachMaterial = new Map<string, ScrapItem[]>();
+    for (const it of klein) {
+      const key = `${it.materialId}|${it.containerId ?? "lose"}`;
+      const l = nachMaterial.get(key);
+      if (l) l.push(it);
+      else nachMaterial.set(key, [it]);
+    }
+    let gespart = 0;
+    for (const [key, list] of nachMaterial) {
+      if (list.length < 6) continue;
+      const materialId = key.split("|")[0];
+      // Nur so viele zusammenfassen, wie über dem Limit liegen
+      const nehmen = Math.min(list.length, Math.max(6, this.items.length - limit));
+      const gruppe = list.slice(0, nehmen);
+      const kg = gruppe.reduce((a, it) => a + it.massKg, 0);
+      const p = gruppe[0].body.translation();
+      const pos = new THREE.Vector3(p.x, p.y + 0.3, p.z);
+      for (const it of gruppe) this.remove(it, true);
+      this.spawnBale(materialId, kg, pos);
+      gespart += gruppe.length - 1;
+      if (this.items.length <= limit) break;
+    }
+    return gespart;
+  }
+
   remove(item: ScrapItem, destroyBody = true): void {
     const idx = this.items.indexOf(item);
     if (idx < 0) return;

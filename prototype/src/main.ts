@@ -204,6 +204,7 @@ async function main(): Promise<void> {
   if (typeof save?.timeOfDay === "number") daylight.time = save.timeOfDay;
   let looseKg = 0;
   let looseTimer = 0;
+  let verdichtungsTimer = 0;
   /**
    * Lose auf dem Platz liegender Schrott. Alles, was nicht in einer Box liegt
    * und am Boden ist, zählt — das ist die Arbeit, die noch vor dem Spieler
@@ -773,6 +774,13 @@ async function main(): Promise<void> {
     }
     daylight.update(frameDt);
     floodlights.update(daylight.daylight);
+    // Kleinkram zusammenfassen, bevor die Teilezahl die Bildrate drückt
+    verdichtungsTimer += frameDt;
+    if (verdichtungsTimer > 4) {
+      verdichtungsTimer = 0;
+      const gespart = items.consolidate();
+      if (gespart > 0) hud.toast(`${gespart} Kleinteile zu Bündeln zusammengefasst`);
+    }
     lanes.update(frameDt);
     // Störfall nur beim Wechsel melden, nicht in Dauerschleife
     if (lanes.blocked !== stoerfallGemeldet) {
