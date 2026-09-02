@@ -407,12 +407,15 @@ class DeliveryVehicle {
     cab.castShadow = true;
     this.group.add(cab);
     // Verglasung: Frontscheibe und zwei Seitenfenster
-    const windowMat = new THREE.MeshStandardMaterial({
-      color: 0x9fc4d8,
-      roughness: 0.1,
-      metalness: 0.1,
+    // Klar durchsichtig, damit man den Fahrer dahinter sitzen sieht
+    const windowMat = new THREE.MeshPhysicalMaterial({
+      color: 0xd6ecf4,
+      roughness: 0.06,
+      metalness: 0,
+      transmission: 0.82,
+      thickness: 0.05,
       transparent: true,
-      opacity: 0.45,
+      opacity: 0.32,
     });
     const windshield = new THREE.Mesh(new THREE.BoxGeometry(1.85, 0.7, 0.06), windowMat);
     windshield.position.set(0, 1.72, this.bedLen / 2 + 1.66);

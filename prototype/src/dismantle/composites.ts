@@ -92,11 +92,17 @@ export class CarComposite {
       metalness: 0.3,
       flatShading: true,
     });
-    const glassMat = new THREE.MeshStandardMaterial({
-      color: 0xbfe3f0,
-      roughness: 0.1,
+    // Klar durchsichtig: Man soll durch die Scheiben hindurchsehen, nicht
+    // gegen eine milchige Fläche schauen. Der leichte Blaustich und die
+    // Spiegelung machen es trotzdem als Glas erkennbar.
+    const glassMat = new THREE.MeshPhysicalMaterial({
+      color: 0xd6ecf4,
+      roughness: 0.06,
+      metalness: 0,
+      transmission: 0.82,
+      thickness: 0.05,
       transparent: true,
-      opacity: 0.45,
+      opacity: 0.32,
       side: THREE.DoubleSide,
     });
 

@@ -43,6 +43,16 @@ function cableCoilGeometry(r: number, tube: number): THREE.BufferGeometry {
  * viel stärker als schwere; eine feste Bremse für alles ließ 2-Tonnen-Teile
  * so zahm wirken wie Bleche.
  */
+/**
+ * Höchstgeschwindigkeit nach Masse. Ein 20-kg-Blech kommt auf gut 4 m/s,
+ * ein 500-kg-Brocken auf keine 1 m/s, ein 2-Tonnen-Teil rührt sich kaum.
+ * Fallen bleibt davon unberührt — die Grenze greift erst über der Fallhöhe,
+ * aus der Schrott üblicherweise abgekippt wird.
+ */
+export function maxSpeedFor(massKg: number): number {
+  return Math.min(5.5, Math.max(0.55, 19 / Math.sqrt(Math.max(massKg, 1))));
+}
+
 export function dampLin(massKg: number): number {
   return Math.min(0.45, Math.max(0.02, 8 / Math.max(massKg, 1)));
 }
@@ -361,8 +371,14 @@ export class ItemManager {
         .setMass(massKg)
         .setFriction(2.2)
         .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Max)
-        .setRestitution(0)
-        .setRestitutionCombineRule(RAPIER.CoefficientCombineRule.Min),
+        // Nur Drahtknäuel federn — die sind elastisch. Alles andere ist
+        // Metall auf Beton: das klatscht und bleibt liegen.
+        .setRestitution(shape.kind === "wire" ? 0.55 : 0)
+        .setRestitutionCombineRule(
+          shape.kind === "wire"
+            ? RAPIER.CoefficientCombineRule.Max
+            : RAPIER.CoefficientCombineRule.Min
+        ),
       body
     );
     return this.register({ materialId, massKg, mesh, body, shape });
@@ -570,9 +586,16 @@ export class ItemManager {
    * Geschwindigkeiten deckeln. Vorher flogen Teile beim Aufprall der Spinne
    * weit durch die Gegend — schwerer Schrott springt nicht, er rutscht.
    */
-  clampSpeeds(maxLinear = 6.5, maxAngular = 7): void {
+  clampSpeeds(): void {
     for (const item of this.items) {
       if (!item.body.isDynamic()) continue;
+      // Trägheit nach Masse: Die Spinne ist ein kinematischer Körper und
+      // überträgt beim Anschlagen praktisch beliebig viel Schwung — ohne
+      // Grenze fliegt ein Motorblock so weit wie ein Blech. Ein schwerer
+      // Brocken darf sich deshalb nur langsam bewegen lassen, ein leichter
+      // schneller. Das erzeugt den Widerstand, den Masse haben muss.
+      const maxLinear = maxSpeedFor(item.massKg);
+      const maxAngular = maxLinear * 1.4;
       const v = item.body.linvel();
       const s = Math.hypot(v.x, v.y, v.z);
       if (s > maxLinear) {
