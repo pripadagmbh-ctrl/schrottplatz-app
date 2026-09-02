@@ -1,7 +1,20 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import type { Input } from "../core/input";
-import { hitsObstacle } from "../world/obstacles";
+import { ExcavatorCollision, type ArmShape } from "./collision";
+import { InstrumentPanel, type InstrumentReadout } from "./instruments";
+import { buildDriver } from "./driver";
+import {
+  CLAW_COUNT,
+  CLAW_OPEN_SPLAY,
+  CLAW_RING_R,
+  CLAW_RING_Y,
+  CLAW_SEGMENTS,
+  CLAW_SEG_BEND,
+  CLAW_SEG_LEN,
+  clawPoint,
+  clawTipDepth,
+} from "./clawGeometry";
 
 /**
  * Fuchsbagger (Umschlagbagger) — M0.
@@ -22,47 +35,8 @@ const BLADE_Z = 2.55; // Abstand vom Drehmittelpunkt nach vorn
 const BLADE_UP_Y = 0.62; // Bodenfreiheit im angehobenen Zustand
 const BLADE_TIME = 1.4; // s für einen vollen Hub
 
-// Geometrie der Spinne — Mesh UND Kollider leiten sich davon ab, damit die
-// Krallen physisch dort sind, wo man sie sieht.
-const CLAW_RING_R = 0.757; // Gelenkkreis = ØC/2 laut Datenblatt (1514 mm)
-const CLAW_RING_Y = -0.9; // Unterkante Traverse ab Kardangelenk
-const CLAW_SEG_LEN = 0.26;
-const CLAW_SEG_BEND = 0.22; // Krümmung je Segment nach innen (rad)
-const CLAW_SEGMENTS = 6;
-const CLAW_COUNT = 5;
-/**
- * Spreizung der ganz offenen Spinne (rad). Das Datenblatt nennt 2225 mm
- * Öffnungsweite (entspräche 0,8) — zum Spielen ist das zu eng, der Greifer
- * soll weit aufreißen und ordentlich Volumen fassen.
- */
-const CLAW_OPEN_SPLAY = 1.25;
 const UP_Y = new THREE.Vector3(0, 1, 0);
-const IDENT_QUAT = { x: 0, y: 0, z: 0, w: 1 };
-/**
- * Prüfkugel im Schalenkorb — kleiner als die Spinne, etwas Eingraben ist
- * erlaubt. Sie wird erst beim ersten Gebrauch angelegt: beim Laden des Moduls
- * ist das Rapier-WASM noch nicht initialisiert.
- */
-let grappleProbe: RAPIER.Ball | null = null;
-/** Ab dieser Masse ist ein Brocken nicht mehr wegzuschieben */
-const HEAVY_BLOCK_KG = 700;
 
-/**
- * Punkt auf einer Kralle nach `k` Segmenten, im Frame der Spinne.
- * `splay` ist der Öffnungswinkel (0 = zu, 1.0 = ganz offen), `a` der
- * Umfangswinkel der Kralle.
- */
-function clawPoint(a: number, splay: number, k: number, out: THREE.Vector3): THREE.Vector3 {
-  let y = 0;
-  let z = 0;
-  for (let i = 0; i < k; i++) {
-    const th = -splay + i * CLAW_SEG_BEND;
-    y -= CLAW_SEG_LEN * Math.cos(th);
-    z -= CLAW_SEG_LEN * Math.sin(th);
-  }
-  const r = CLAW_RING_R + z;
-  return out.set(Math.sin(a) * r, CLAW_RING_Y + y, Math.cos(a) * r);
-}
 const PALM_TO_SENSOR = 0.75; // Palm-Zentrum → Sensor in der Mitte des Schalenkorbs
 
 // Achsgrenzen (SW)
@@ -277,123 +251,16 @@ export class Excavator {
   private armPos = new THREE.Vector3();
   private armQuat = new THREE.Quaternion();
   private tmpPrevPos = new THREE.Vector3();
-  private armShapes: Array<{ mesh: () => THREE.Mesh; half: [number, number, number] }> = [];
-  private physicsWorld!: RAPIER.World;
+  private armShapes: ArmShape[] = [];
 
-  /** Schneidet Ausleger oder Stiel gerade ein Hindernis (LKW)? */
-  /**
-   * Alles, was fest steht, blockiert den Bagger: Betonwände, Boxen, Schere,
-   * dazu Lambert und das Fahrzeug auf dem Platz. Geprüft werden Ausleger,
-   * Stiel, die Spinne und der Unterwagen — die Bauteile sind kinematisch und
-   * würden sonst einfach hindurchfahren (Design-Fix 29.08.2026).
-   */
-  private chassisHits(): boolean {
-    // Unterwagen: rein zweidimensional, er steht ja am Boden
-    return hitsObstacle(this.position.x, this.position.z, 1.3) !== null;
-  }
-
-  private hitsAnything(): boolean {
-    // Spinne samt Schalen
-    this.grappleGroup.getWorldPosition(this.blockPos);
-    if (hitsObstacle(this.blockPos.x, this.blockPos.z, 0.9, this.blockPos.y - 1.2)) return true;
-    if (this.grappleHitsBody()) return true;
-    // Ausleger und Stiel an mehreren Punkten entlang abtasten
-    for (const s of this.armShapes) {
-      const mesh = s.mesh();
-      mesh.updateWorldMatrix(true, false);
-      for (const t of [-0.8, -0.3, 0.2, 0.7]) {
-        this.blockLocal.set(0, 0, s.half[2] * 2 * t);
-        this.blockPos.copy(this.blockLocal).applyMatrix4(mesh.matrixWorld);
-        if (hitsObstacle(this.blockPos.x, this.blockPos.z, 0.2, this.blockPos.y - s.half[1]))
-          return true;
-      }
-    }
-    // Lambert: er darf nicht vom Ausleger überfahren werden
-    const lam = this.getStaffPos?.();
-    if (lam) {
-      this.grappleGroup.getWorldPosition(this.blockPos);
-      if (
-        this.blockPos.y - 2.2 < 2.4 &&
-        Math.hypot(this.blockPos.x - lam.x, this.blockPos.z - lam.z) < 1.9
-      ) {
-        return true;
-      }
-    }
-    return this.obstacleBodies.size > 0 && this.armHitsObstacle();
-  }
-
-  /**
-   * Steckt die Spinne in einem Fahrzeug oder einem schweren Brocken?
-   *
-   * Die Prüfkugel ist kleiner als die Spinne: ein Stück weit dürfen sich die
-   * Krallen eingraben — sie schneiden ja auch mal durch Blech —, aber sie
-   * sollen nicht im Objekt verschwinden. Leichter Schrott wird bewusst nicht
-   * geprüft, sonst käme man nicht mehr in einen Haufen hinein; den schieben
-   * die Krallen-Kollider ohnehin beiseite.
-   */
-  private grappleHitsBody(): boolean {
-    grappleProbe ??= new RAPIER.Ball(0.62);
-    this.grappleGroup.getWorldPosition(this.blockPos);
-    this.blockPos.y -= 1.35; // Mitte des Schalenkorbs
-    let hit = false;
-    this.physicsWorld.intersectionsWithShape(
-      this.blockPos,
-      IDENT_QUAT,
-      grappleProbe,
-      (collider) => {
-        const b = collider.parent();
-        if (!b) return true;
-        if (hit) return true; // schon fündig, Abfrage trotzdem sauber zu Ende
-        if (this.obstacleBodies.has(b.handle)) {
-          hit = true; // Fahrzeug auf dem Platz
-          return true;
-        }
-        if (this.grippedHandles.has(b.handle)) return true; // eigene Ladung
-        // Schwere Brocken lassen sich nicht wegschieben — an denen ist Schluss.
-        // Feste Körper (Bauten) ohnehin nicht, nur der Boden zählt nicht mit.
-        if (b.isFixed() && collider.translation().y > -0.05) hit = true;
-        else if (b.isDynamic() && b.mass() > HEAVY_BLOCK_KG) hit = true;
-        return true;
-      }
-    );
-    return hit;
-  }
-
-  /** Zuletzt gültiger Zustand war frei — Grundlage für den Fluchtweg. */
-  private armFree = true;
-  private chassisFree = true;
-
-  /** Handles der gerade gegriffenen Körper — die blockieren nicht. */
+  /** Handles der gerade gegriffenen Körper — die blockieren die Spinne nicht. */
   grippedHandles = new Set<number>();
-
-  private blockPos = new THREE.Vector3();
-  private blockLocal = new THREE.Vector3();
   /** Position des Platzwarts — von main gesetzt, damit der Arm ihn verschont */
   getStaffPos: (() => THREE.Vector3 | null) | null = null;
+  /** Prüfung von Fahrwerk, Arm und Spinne gegen alles Festinstallierte */
+  private collision!: ExcavatorCollision;
 
-  private armHitsObstacle(): boolean {
-    for (const s of this.armShapes) {
-      const mesh = s.mesh();
-      mesh.updateWorldMatrix(true, false);
-      mesh.getWorldPosition(this.armPos);
-      mesh.getWorldQuaternion(this.armQuat);
-      const shape = new RAPIER.Cuboid(s.half[0], s.half[1], s.half[2]);
-      let hit = false;
-      this.physicsWorld.intersectionsWithShape(
-        this.armPos,
-        this.armQuat,
-        shape,
-        (collider) => {
-          const b = collider.parent();
-          if (b && this.obstacleBodies.has(b.handle)) hit = true;
-          return true; // nie vorzeitig abbrechen, siehe hitsAnything
-        
-        }
-      );
-      if (hit) return true;
-    }
-    return false;
-  }
+  // Rechenpuffer für die Hydraulik-Zylinder
   private tmpA = new THREE.Vector3();
   private tmpB = new THREE.Vector3();
   private tmpDir = new THREE.Vector3();
@@ -781,7 +648,8 @@ export class Excavator {
 
     // Bordinstrument rechts vorn an der Säule — zeigt Achswinkel, Hydraulik
     // und Greiferstatus, wie das Display in der echten Maschine
-    this.buildInstrumentPanel(cx, cz);
+    this.instruments = new InstrumentPanel(this.cabLiftGroup, cx, cz);
+    this.instruments.draw(this.readout());
 
     // Sitz + Konsolen
     const seatMat = new THREE.MeshStandardMaterial({ color: 0x24272a, roughness: 0.9 });
@@ -872,7 +740,7 @@ export class Excavator {
       else this.joyRight = pivot;
     }
 
-    this.buildDriver(cx, cz);
+    this.driverBody = buildDriver(this.cabLiftGroup, cx, cz);
     this.buildNamePlate(cx, cz);
 
     // Augpunkt der Kabinenkamera: Kopf an der Lehne, Konsolen liegen im Blickfeld
@@ -885,80 +753,6 @@ export class Excavator {
    * Spiels. In der Kabinenansicht wird der Kopf ausgeblendet, damit er nicht
    * vor der Kamera steht.
    */
-  private buildDriver(cx: number, cz: number): void {
-    const skin = new THREE.MeshStandardMaterial({ color: 0xe3b18c, roughness: 0.8 });
-    const shirt = new THREE.MeshStandardMaterial({ color: 0xf4f3ee, roughness: 0.85 });
-    const jeans = new THREE.MeshStandardMaterial({ color: 0x3d4b5c, roughness: 0.9 });
-    const hair = new THREE.MeshStandardMaterial({ color: 0x6b4a2e, roughness: 0.95 });
-    const boot = new THREE.MeshStandardMaterial({ color: 0x2a2724, roughness: 0.95 });
-
-    const g = new THREE.Group();
-    g.position.set(cx, 0, cz);
-    this.cabLiftGroup.add(g);
-
-    const add = (
-      geo: THREE.BufferGeometry,
-      mat: THREE.Material,
-      x: number,
-      y: number,
-      z: number,
-      rx = 0,
-      rz = 0
-    ): THREE.Mesh => {
-      const m = new THREE.Mesh(geo, mat);
-      m.position.set(x, y, z);
-      m.rotation.set(rx, 0, rz);
-      m.castShadow = true;
-      g.add(m);
-      return m;
-    };
-
-    // Von außen ist Daniel komplett zu sehen; in der Ego-Sicht bleiben nur die
-    // Unterarme stehen. Alles aus runden Grundformen (Kapseln/Kugeln).
-    const body: THREE.Object3D[] = [];
-    body.push(add(new THREE.CapsuleGeometry(0.16, 0.3, 4, 12), shirt, 0, 1.42, -0.24));
-    body.push(add(new THREE.SphereGeometry(0.17, 12, 10), shirt, 0, 1.58, -0.24)); // Schultern
-    // Sitzende Beine (nur von außen sichtbar)
-    body.push(add(new THREE.CapsuleGeometry(0.12, 0.12, 4, 10), jeans, 0, 1.12, -0.16));
-    for (const sx of [-0.1, 0.1]) {
-      body.push(add(new THREE.CapsuleGeometry(0.07, 0.26, 4, 10), jeans, sx, 1.1, 0.02, Math.PI / 2));
-      body.push(add(new THREE.CapsuleGeometry(0.065, 0.24, 4, 10), jeans, sx, 0.88, 0.2));
-      body.push(add(new THREE.SphereGeometry(0.075, 10, 8), boot, sx, 0.7, 0.26));
-    }
-    for (const sx of [-1, 1] as const) {
-      // Oberarm gehört zum Körper, Unterarm + Hand bleiben in der Ego-Sicht
-      body.push(
-        add(new THREE.CapsuleGeometry(0.058, 0.22, 4, 10), shirt, sx * 0.29, 1.44, -0.18, 0, sx * 0.28)
-      );
-      // Unterarm und Hand sitzen am Joystick selbst (siehe buildCabin) und
-      // bewegen sich mit ihm — der Oberarm bleibt am Körper.
-    }
-    // Hals, Kopf, Haare, Lederband
-    body.push(add(new THREE.CapsuleGeometry(0.05, 0.06, 4, 10), skin, 0, 1.73, -0.25));
-    const head = add(new THREE.SphereGeometry(0.115, 14, 12), skin, 0, 1.87, -0.25);
-    head.scale.set(1, 1.12, 1.02);
-    body.push(head);
-    const hairCap = new THREE.Mesh(new THREE.SphereGeometry(0.122, 14, 12), hair);
-    hairCap.position.set(0, 1.9, -0.26);
-    hairCap.scale.set(1, 0.95, 1.02);
-    g.add(hairCap);
-    body.push(hairCap);
-    // kurze Haare — nur ein flacher Nackenansatz, kein Zopf
-    const nape = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 10), hair);
-    nape.position.set(0, 1.84, -0.3);
-    nape.scale.set(1, 0.7, 0.7);
-    g.add(nape);
-    body.push(nape);
-    const necklace = new THREE.Mesh(
-      new THREE.TorusGeometry(0.075, 0.01, 6, 16),
-      new THREE.MeshStandardMaterial({ color: 0x2a2724, roughness: 0.7 })
-    );
-    necklace.rotation.x = Math.PI / 2;
-    necklace.position.set(0, 1.65, -0.23);
-    g.add(necklace);
-    body.push(necklace);
-    this.driverBody = body;
-  }
 
   /**
    * Abstützpratzen (Design nach Vorbildfoto 2026-08-29): vier ausgestellte
@@ -1120,11 +914,19 @@ export class Excavator {
       this.stickBody
     );
 
-    this.physicsWorld = world;
     this.armShapes = [
       { mesh: () => this.boomMesh, half: [0.21, 0.31, BOOM_LEN / 2 - 0.1] },
       { mesh: () => this.stickMesh, half: [0.16, 0.225, STICK_LEN / 2 - 0.1] },
     ];
+    this.collision = new ExcavatorCollision({
+      world,
+      position: this.position,
+      grappleGroup: this.grappleGroup,
+      armShapes: this.armShapes,
+      obstacleBodies: this.obstacleBodies,
+      grippedHandles: this.grippedHandles,
+      getStaffPos: () => this.getStaffPos?.() ?? null,
+    });
 
     this.grappleBody = world.createRigidBody(
       RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(0, 5, 0)
@@ -1305,22 +1107,23 @@ export class Excavator {
 
     // Fahrwerk und Arm werden getrennt geprüft: ein Hindernis neben den
     // Rädern darf den Ausleger nicht mit stilllegen.
-    if (this.chassisHits() && this.chassisFree) {
+    const col = this.collision;
+    if (col.chassisHits() && col.chassisFree) {
       this.position.copy(prevPos);
       this.driveVel = 0;
       this.syncMeshes();
-      this.chassisFree = !this.chassisHits();
-    } else if (!this.chassisHits()) {
-      this.chassisFree = true;
+      col.chassisFree = !col.chassisHits();
+    } else if (!col.chassisHits()) {
+      col.chassisFree = true;
     }
 
     // Arm, Stiel und Spinne. Wichtig ist der Fluchtweg: Steckt der Arm
     // wirklich einmal fest, werden Bewegungen wieder durchgelassen — sonst
     // verkantet er sich unrettbar, weil auch die befreiende Bewegung
     // zurückgenommen würde.
-    if (this.hitsAnything()) {
+    if (col.armHits()) {
       this.armBlocked = true;
-      if (this.armFree) {
+      if (col.armFree) {
         this.boomAngle = prevBoom;
         this.stickAngle = prevStick;
         this.cabYaw = prevCabYaw;
@@ -1330,11 +1133,11 @@ export class Excavator {
         this.syncMeshes();
         // Hilft das Zurücknehmen überhaupt? Wenn nicht, sitzt er fest und
         // darf sich im nächsten Bild frei herausbewegen.
-        this.armFree = !this.hitsAnything();
+        col.armFree = !col.armHits();
       }
     } else {
       this.armBlocked = false;
-      this.armFree = true;
+      col.armFree = true;
     }
 
     this.integratePendulum(dt);
@@ -1368,12 +1171,10 @@ export class Excavator {
     return THREE.MathUtils.lerp(CLAW_OPEN_SPLAY, minSplay, this.closure);
   }
 
-  private groundTmp = new THREE.Vector3();
-
   private resolveGroundClamp(): void {
     // Spitzentiefe direkt aus der Krallengeometrie — so bleibt der Bodenanschlag
     // richtig, auch wenn sich Form oder Öffnungswinkel ändern.
-    const tipDepth = -clawPoint(0, this.currentSplay(), CLAW_SEGMENTS, this.groundTmp).y;
+    const tipDepth = clawTipDepth(this.currentSplay());
     // tipY() rechnet ab der Maschinenbasis; steht die Maschine aufgebockt,
     // ist der Boden entsprechend weiter unten
     const minTipY = tipDepth + 0.02 - this.position.y;
@@ -1616,9 +1417,7 @@ export class Excavator {
   }
 
   /** Weltposition des Greif-Sensors (zwischen den Fingerspitzen) — pendelt mit. */
-  private instrCanvas: HTMLCanvasElement | null = null;
-  private instrTex: THREE.CanvasTexture | null = null;
-  private instrT = 0;
+  private instruments!: InstrumentPanel;
 
   /**
    * Bordinstrument: eine Leinwand-Textur auf einer Platte an der rechten
@@ -1677,115 +1476,23 @@ export class Excavator {
     }
   }
 
-  private buildInstrumentPanel(cx: number, cz: number): void {
-    const canvas = document.createElement("canvas");
-    canvas.width = 320;
-    canvas.height = 224;
-    this.instrCanvas = canvas;
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    this.instrTex = tex;
-
-    const frame = new THREE.Mesh(
-      new THREE.BoxGeometry(0.36, 0.26, 0.02),
-      new THREE.MeshStandardMaterial({ color: 0x121416, roughness: 0.7 })
-    );
-    const screen = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.33, 0.23),
-      // unbeleuchtet: ein Display leuchtet selbst und soll nicht abdunkeln
-      new THREE.MeshBasicMaterial({ map: tex })
-    );
-    screen.position.z = 0.012;
-    const holder = new THREE.Group();
-    holder.add(frame, screen);
-    // Rechts neben dem Fahrer: er blickt in +Z, seine rechte Seite ist −X.
-    // Tief genug, dass das Display nicht in die Arbeitssicht ragt.
-    holder.position.set(cx - 0.42, 1.16, cz + 0.46);
-    holder.rotation.y = 2.55; // Bildfläche zum Fahrer gedreht
-    holder.rotation.x = -0.3; // leicht nach hinten gekippt, wie im Armaturenbrett
-    this.cabLiftGroup.add(holder);
-    this.drawInstruments();
+  /** Zustand fürs Bordinstrument zusammenstellen. */
+  private readout(): InstrumentReadout {
+    return {
+      boomAngle: this.boomAngle,
+      stickAngle: this.stickAngle,
+      cabYaw: this.cabYaw,
+      closure: this.closure,
+      carriedMassKg: this.carriedMassKg,
+      carriedCount: this.carriedCount,
+      outriggerDown: this.outriggerDown,
+      activity: this.activity,
+    };
   }
 
   /** Anzeigen auffrischen (aus der Hauptschleife, gedrosselt). */
   updateInstruments(dt: number): void {
-    this.instrT += dt;
-    if (this.instrT < 0.25) return;
-    this.instrT = 0;
-    this.drawInstruments();
-  }
-
-  private drawInstruments(): void {
-    const c = this.instrCanvas;
-    if (!c) return;
-    const x = c.getContext("2d");
-    if (!x) return;
-    const W = c.width;
-    const H = c.height;
-    x.fillStyle = "#0f1417";
-    x.fillRect(0, 0, W, H);
-
-    // Kopfzeile
-    x.fillStyle = "#1b2429";
-    x.fillRect(0, 0, W, 30);
-    x.fillStyle = "#7ec96a";
-    x.font = "bold 17px Consolas, monospace";
-    x.fillText("PRIPADA", 10, 21);
-    x.fillStyle = "#8d979d";
-    x.font = "13px Consolas, monospace";
-    x.fillText(this.outriggerDown > 0.85 ? "ABGESTÜTZT" : "FAHRBETRIEB", 108, 21);
-
-    const deg = (r: number): number => Math.round(THREE.MathUtils.radToDeg(r));
-    const rows: Array<[string, string]> = [
-      ["Oberwagen", `${Math.abs(deg(this.cabYaw) % 360)}°`],
-      ["Hauptarm", `${deg(this.boomAngle)}°`],
-      ["Ausleger", `${deg(this.stickAngle)}°`],
-    ];
-    x.font = "14px Consolas, monospace";
-    rows.forEach(([label, value], i) => {
-      const y = 54 + i * 26;
-      x.fillStyle = "#8d979d";
-      x.fillText(label, 10, y);
-      x.fillStyle = "#e8e8e4";
-      x.fillText(value, 130, y);
-    });
-
-    // Hydraulikdruck steigt mit Last und Achsbewegung
-    const bar = Math.round(90 + this.activity * 120 + Math.min(this.carriedMassKg / 40, 90));
-    x.fillStyle = "#8d979d";
-    x.fillText("Hydraulik", 10, 132);
-    x.fillStyle = bar > 260 ? "#e0864a" : "#e8e8e4";
-    x.fillText(`${bar} bar`, 130, 132);
-    // Balken
-    x.fillStyle = "#232c31";
-    x.fillRect(10, 140, 180, 8);
-    x.fillStyle = bar > 260 ? "#e0864a" : "#7ec96a";
-    x.fillRect(10, 140, Math.min(180, (bar / 320) * 180), 8);
-
-    // Greiferstatus
-    x.fillStyle = "#8d979d";
-    x.fillText("Spinne", 10, 172);
-    const zu = this.closure > 0.85;
-    x.fillStyle = zu ? "#e0c14a" : "#7ec96a";
-    x.fillText(
-      this.carriedCount > 0
-        ? `beladen · ${Math.round(this.carriedMassKg)} kg`
-        : zu
-          ? "geschlossen"
-          : this.closure < 0.15
-            ? "offen"
-            : `${Math.round(this.closure * 100)} %`,
-      130,
-      172
-    );
-
-    // Öltemperatur — steigt langsam mit der Arbeit
-    x.fillStyle = "#8d979d";
-    x.fillText("Öltemperatur", 10, 200);
-    x.fillStyle = "#e8e8e4";
-    x.fillText(`${Math.round(44 + this.activity * 14)} °C`, 130, 200);
-
-    if (this.instrTex) this.instrTex.needsUpdate = true;
+    this.instruments.update(dt, this.readout());
   }
 
   getSensorPosition(out: THREE.Vector3): THREE.Vector3 {

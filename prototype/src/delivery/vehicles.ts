@@ -25,21 +25,21 @@ export type DeliveryKind = "kipper" | "pritsche" | "wrack" | "abholer";
 // ANLIEFERUNG: Nordspur über die Brückenwaage, dann rückwärts an den
 // Abkippplatz vor dem Bagger. Ausfahrt vorwärts wieder über die Waage.
 // Einfahrt → Brückenwaage (dort wird brutto gewogen)
-const ROUTE_IN_FWD: Array<[number, number]> = [
+export const ROUTE_IN_FWD: Array<[number, number]> = [
   [GATE_X, 40],
   [GATE_X, 24],
 ];
 // Nach dem Wiegen weiter zum Rangierpunkt vor dem Abkippplatz
-const ROUTE_APPROACH: Array<[number, number]> = [
+export const ROUTE_APPROACH: Array<[number, number]> = [
   [GATE_X, 24],
   [-14, 18.5],
   [0, 19],
 ];
-const ROUTE_IN_REV: Array<[number, number]> = [
+export const ROUTE_IN_REV: Array<[number, number]> = [
   [0, 19],
   [0, 9.5], // näher an den Abkippplatz — die Blockadeprüfung stoppt bei Bedarf
 ];
-const ROUTE_OUT: Array<[number, number]> = [
+export const ROUTE_OUT: Array<[number, number]> = [
   [0, 9.5],
   [0, 19],
   [-14, 18.5],
@@ -49,11 +49,11 @@ const ROUTE_OUT: Array<[number, number]> = [
 
 // ABHOLUNG: Ostspur nach Süden, dann rückwärts an den Verladeplatz neben der
 // Presse — dort lädt der Spieler den Container mit sortenreinem Material.
-const PICKUP_IN_FWD: Array<[number, number]> = [
+export const PICKUP_IN_FWD: Array<[number, number]> = [
   [GATE_X, 40],
   [GATE_X, 24],
 ];
-const PICKUP_APPROACH: Array<[number, number]> = [
+export const PICKUP_APPROACH: Array<[number, number]> = [
   [GATE_X, 24],
   [-10, 22],
   [16, 22],
@@ -61,11 +61,11 @@ const PICKUP_APPROACH: Array<[number, number]> = [
 ];
 // Rückwärts nach Westen direkt neben die Presse — Heck (Container-Öffnung)
 // zeigt zur Schere, der Bagger lädt von dort um (Design-Fix 2026-08-29)
-const PICKUP_IN_REV: Array<[number, number]> = [
+export const PICKUP_IN_REV: Array<[number, number]> = [
   [16, -13.5],
   [8.5, -13.5],
 ];
-const PICKUP_OUT: Array<[number, number]> = [
+export const PICKUP_OUT: Array<[number, number]> = [
   [8.5, -13.5],
   [16, -13.5],
   [16, 22],
@@ -75,16 +75,16 @@ const PICKUP_OUT: Array<[number, number]> = [
 // KIPPER: Wer selbst abkippen kann, muss nicht vor dem Bagger halten. Er fährt
 // rückwärts an die Nordkante des Stahlschrotthaufens (Mitte bei x −9, z 1) und
 // kippt seine Ladung direkt dort ab (Design-Fix 29.08.2026).
-const TIP_APPROACH: Array<[number, number]> = [
+export const TIP_APPROACH: Array<[number, number]> = [
   [GATE_X, 24],
   [-14, 18.5],
   [-9, 13],
 ];
-const TIP_IN_REV: Array<[number, number]> = [
+export const TIP_IN_REV: Array<[number, number]> = [
   [-9, 13],
   [-9, 7.5],
 ];
-const TIP_OUT: Array<[number, number]> = [
+export const TIP_OUT: Array<[number, number]> = [
   [-9, 7.5],
   [-9, 13],
   [-14, 18.5],
