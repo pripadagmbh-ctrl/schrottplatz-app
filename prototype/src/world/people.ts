@@ -231,8 +231,11 @@ export class StaffManager {
     // Wiegehäuschen links neben der Einfahrt, breit, Schalter zur Fahrspur
     const weighHut = buildHut(
       scene,
-      new THREE.Vector3(weighPos.x + 4.6, 0, weighPos.z), // direkt an der Wiegeplatte
-      Math.PI * -0.5, // Schalter zeigt zur Waage
+      // Westlich der Waage, also auf der anderen Seite der Einfahrt: So
+      // blickt man von der Wiegeplatte und vom Platz aus in den Schalter
+      // hinein und sieht Mario darin sitzen (Wunsch 02.09.2026).
+      new THREE.Vector3(weighPos.x - 4.6, 0, weighPos.z),
+      Math.PI * 0.5, // Schalter zeigt zur Waage — jetzt nach Osten
       0xb9c0c4,
       "WAAGE",
       "#f0d060",

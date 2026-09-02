@@ -95,6 +95,21 @@ export const TIP_OUT: Array<[number, number]> = [
   [GATE_X, 40],
 ];
 
+/**
+ * Warteplatz an der Innenseite der Nordwand, westlich der Einfahrt: Nach dem
+ * Abladen stellen sich vor allem die Händler dort ab, holen sich bei Janine
+ * einen Kaffee und quatschen, bevor sie fahren. Das hält Betrieb auf dem
+ * Platz — und macht den Abladeplatz sofort für den Nächsten frei
+ * (Wunsch 02.09.2026).
+ */
+export const PARK_SLOTS: Array<[number, number]> = [
+  [-30, 24],
+  [-33.5, 24],
+  [-30, 20],
+];
+/** So lange bleibt ein Fahrzeug stehen (s) */
+const PARK_TIME_S: [number, number] = [45, 120];
+
 const SPEED = 4.8; // m/s (SW) — zuegiger Umschlag
 const FIRST_DELAY_S = 12; // (SW)
 const NEXT_DELAY_S: [number, number] = [7, 15]; // (SW) — dichter Umschlag
@@ -134,6 +149,8 @@ type Phase =
   | "waitUnload"
   | "waitLoad"
   | "nudging"
+  | "toPark"
+  | "parked"
   | "out";
 
 interface Cargo {
@@ -205,6 +222,30 @@ class DeliveryVehicle {
     this.routeS = this.nearestS(this.routeOut);
     this.phase = "nudging";
     return true;
+  }
+
+  /**
+   * Abladeplatz räumen. Wer einen Warteplatz zugewiesen bekommen hat, stellt
+   * sich dort ab und macht Pause; alle anderen fahren gleich vom Hof.
+   */
+  private leaveUnloadingBay(): void {
+    this.phaseT = 0;
+    if (this.parkSpot) {
+      this.phase = "toPark";
+    } else {
+      this.phase = "out";
+      this.routeS = 0;
+    }
+  }
+
+  /** Zugewiesener Warteplatz, null = fährt direkt vom Hof. */
+  parkSpot: [number, number] | null = null;
+  /** Wie lange die Pause dauert */
+  parkSeconds = 60;
+
+  /** Steht das Fahrzeug auf dem Warteplatz und macht Pause? */
+  get isParked(): boolean {
+    return this.phase === "parked" || this.phase === "toPark";
   }
 
   private nudgeReturn: Phase = "waitUnload";
@@ -866,15 +907,35 @@ class DeliveryVehicle {
         break;
       case "tipBack":
         this.tip = Math.max(this.tip - dt / 1.5, 0);
-        if (this.tip <= 0) {
-          this.phase = "out";
-          this.routeS = 0;
-        }
+        if (this.tip <= 0) this.leaveUnloadingBay();
         break;
       case "waitUnload":
-        if (this.phaseT > 1 && this.isUnloaded()) {
+        if (this.phaseT > 1 && this.isUnloaded()) this.leaveUnloadingBay();
+        break;
+      case "toPark": {
+        // Zum Warteplatz rollen. Der Abladeplatz ist damit sofort frei.
+        this.sideOpenTarget = 0;
+        const ziel = this.parkSpot!;
+        const dx = ziel[0] - this.group.position.x;
+        const dz = ziel[1] - this.group.position.z;
+        const d = Math.hypot(dx, dz);
+        if (d < 0.6) {
+          this.phase = "parked";
+          this.phaseT = 0;
+          break;
+        }
+        const schritt = Math.min(SPEED * dt, d);
+        this.group.position.x += (dx / d) * schritt;
+        this.group.position.z += (dz / d) * schritt;
+        this.group.rotation.y = Math.atan2(dx, dz);
+        this.snapBodiesToPose();
+        break;
+      }
+      case "parked":
+        // Kaffeepause. Danach geht es über die Waage vom Hof.
+        if (this.phaseT > this.parkSeconds) {
           this.phase = "out";
-          this.routeS = 0;
+          this.routeS = this.nearestS(this.routeOut);
         }
         break;
       case "out":
@@ -965,6 +1026,13 @@ class DeliveryVehicle {
 
 export class VehicleManager {
   private active: DeliveryVehicle | null = null;
+  /**
+   * Fahrzeuge, die abgeladen haben und auf dem Warteplatz stehen. Sie
+   * blockieren den Abladeplatz nicht mehr, sind aber weiter auf dem Hof —
+   * so ist immer Betrieb, statt dass der Platz zwischen zwei Fuhren
+   * leersteht (Wunsch 02.09.2026).
+   */
+  private parked: DeliveryVehicle[] = [];
   private nextSpawnT = FIRST_DELAY_S;
   private t = 0;
   /** Anlieferungs-Zähler (für Tests/Statistik) */
@@ -1049,6 +1117,18 @@ export class VehicleManager {
       c
     );
     if (c) this.onCustomerArrived?.(c);
+    // Händler bleiben gern noch auf einen Kaffee; Gewerbe hat es eilig.
+    // Nur freie Plätze vergeben, sonst stünde einer im anderen.
+    if (c && c.group !== "gewerbe" && Math.random() < (c.group === "haendler" ? 0.75 : 0.35)) {
+      const frei = PARK_SLOTS.filter(
+        (p) => !this.parked.some((v) => v.parkSpot?.[0] === p[0] && v.parkSpot?.[1] === p[1])
+      );
+      if (frei.length > 0) {
+        this.active.parkSpot = frei[Math.floor(Math.random() * frei.length)];
+        this.active.parkSeconds =
+          PARK_TIME_S[0] + Math.random() * (PARK_TIME_S[1] - PARK_TIME_S[0]);
+      }
+    }
     this.active.loadCargo(this.items, this.composites);
     if (k !== "abholer") this.deliveries++;
   }
@@ -1113,6 +1193,8 @@ export class VehicleManager {
   obstacleHandles(out: Set<number>): Set<number> {
     out.clear();
     if (this.active) this.active.collectBodyHandles(out);
+    // Auch die Wartenden stehen im Weg — der Arm darf nicht hindurchfahren
+    for (const v of this.parked) v.collectBodyHandles(out);
     return out;
   }
 
@@ -1127,12 +1209,33 @@ export class VehicleManager {
 
   update(dt: number): void {
     this.t += dt;
+    // Wartende Fahrzeuge weiterlaufen lassen: Pause, dann Ausfahrt
+    for (let i = this.parked.length - 1; i >= 0; i--) {
+      const v = this.parked[i];
+      v.update(dt);
+      if (v.done) {
+        v.despawn();
+        this.parked.splice(i, 1);
+      }
+    }
     if (!this.active) {
       if (this.acceptDeliveries && this.t >= this.nextSpawnT) this.spawnNow();
       return;
     }
     this.active.update(dt);
     if (this.active.consumeDeparted()) this.onPickupDepart?.(this.active);
+    // Sobald das Fahrzeug den Abladeplatz Richtung Warteplatz verlässt, ist
+    // der Platz frei und der Nächste darf kommen — auch wenn der Vorige noch
+    // beim Kaffee steht.
+    if (this.active.isParked) {
+      this.parked.push(this.active);
+      this.active = null;
+      this.t = 0;
+      this.nextSpawnT =
+        (NEXT_DELAY_S[0] + Math.random() * (NEXT_DELAY_S[1] - NEXT_DELAY_S[0])) *
+        this.intervalFactor;
+      return;
+    }
     if (this.active.done) {
       this.active.despawn();
       this.active = null;

@@ -85,7 +85,7 @@ export const STATIC_OBSTACLES: Obstacle[] = [
   { x: -4.6, z: -9.8, hw: 4.4, hd: 3.8, top: 2.2, label: "Schere" },
 
   // --- Gebäude: Wiegehäuschen an der Waage, Kaffeebude abseits ---
-  { x: WEIGH_X + 4.6, z: WEIGH_Z, hw: 2.4, hd: 1.7, top: 3.2, label: "Wiegehäuschen" },
+  { x: WEIGH_X - 4.6, z: WEIGH_Z, hw: 2.4, hd: 1.7, top: 3.2, label: "Wiegehäuschen" },
   { x: GATE_X - 6, z: WEIGH_Z - 13, hw: 2.6, hd: 1.8, top: 3.2, label: "Kaffeebude" },
 ];
 

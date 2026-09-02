@@ -113,8 +113,10 @@ export class LaneWatch {
     if (!this.blocked) return "";
     const spuren = [...new Set(this.blockages.map((b) => b.lane))];
     const n = this.blockages.length;
+    // Ohne Artikel formuliert: die Spurnamen haben unterschiedliche
+    // Geschlechter ("die Einfahrt", "der Abladeplatz").
     return n === 1
-      ? `Störfall: ein Teil blockiert die ${spuren[0]}`
+      ? `Störfall: ein Teil blockiert ${spuren[0]}`
       : `Störfall: ${n} Teile blockieren ${spuren.join(" und ")}`;
   }
 

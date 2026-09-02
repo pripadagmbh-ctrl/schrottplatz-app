@@ -32,16 +32,19 @@ import {
 const REICHWEITE_M = 9.8;
 
 describe("Feste Bauten", () => {
-  it("sperrt Wände, Mulden und Schere", () => {
-    const sperren: Array<[string, number, number]> = [
-      ["Südwand", 0, -29],
-      ["Westwand", -40, 0],
-      ["Ostwand", 40, 0],
-      ["Schere", -4.6, -9.8],
-      ["Wiegehäuschen", -17.4, 24],
-    ];
-    for (const [name, x, z] of sperren) {
-      expect(hitsObstacle(x, z, 0), `${name} muss sperren`).not.toBeNull();
+  it("sperrt jedes eingetragene Bauwerk an seinem Platz", () => {
+    // Aus der Liste selbst geprüft statt gegen abgeschriebene Koordinaten:
+    // So bricht der Test nicht, wenn ein Gebäude umzieht — er prüft die
+    // Zusicherung, nicht den Standort.
+    for (const o of STATIC_OBSTACLES) {
+      expect(hitsObstacle(o.x, o.z, 0), `${o.label} muss sperren`).not.toBeNull();
+    }
+  });
+
+  it("führt die erwarteten Bauwerke", () => {
+    const labels = STATIC_OBSTACLES.map((o) => o.label).join(" ");
+    for (const pflicht of ["Südwand", "Westwand", "Ostwand", "Schere", "Wiegehäuschen", "Kaffeebude"]) {
+      expect(labels, `${pflicht} fehlt in der Hindernisliste`).toContain(pflicht);
     }
   });
 
