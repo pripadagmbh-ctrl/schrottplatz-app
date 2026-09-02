@@ -253,6 +253,13 @@ export class Excavator {
   private tmpPrevPos = new THREE.Vector3();
   private armShapes: ArmShape[] = [];
 
+  /**
+   * Geglätteter Widerstand des Materials, durch das die Spinne pflügt.
+   * Ohne Glättung ruckelt die Bewegung, weil die verdrängte Masse von Bild
+   * zu Bild springt.
+   */
+  private plowFactor = 1;
+
   /** Handles der gerade gegriffenen Körper — die blockieren die Spinne nicht. */
   grippedHandles = new Set<number>();
   /** Position des Platzwarts — von main gesetzt, damit der Arm ihn verschont */
@@ -1000,8 +1007,12 @@ export class Excavator {
 
   /** Ein fester Physik-Step (dt = 1/60). Reihenfolge: Achsen → Meshes → kinematische Körper. */
   update(dt: number, input: Input): void {
-    // Lastfaktor (Briefing 6.1): 1 − 0,5 × (Last / 2000 kg)
-    const loadFactor = 1 - 0.5 * Math.min(this.carriedMassKg / 2000, 1);
+    // Lastfaktor (Briefing 6.1): 1 − 0,5 × (Last / 2000 kg). Dazu kommt der
+    // Widerstand des Materials, durch das die Spinne gerade pflügt — beides
+    // zusammen macht schweres Arbeiten spürbar zäh.
+    const carried = 1 - 0.5 * Math.min(this.carriedMassKg / 2000, 1);
+    this.plowFactor += (this.collision.plowFactor() - this.plowFactor) * Math.min(dt * 6, 1);
+    const loadFactor = carried * this.plowFactor;
     // Zustand vor der Bewegung merken (für die Fahrzeug-Sperre unten)
     const prevBoom = this.boomAngle;
     const prevStick = this.stickAngle;

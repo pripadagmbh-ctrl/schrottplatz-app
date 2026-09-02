@@ -47,6 +47,18 @@ const ARM_PAD = 0.2;
 const GRAPPLE_PAD = 0.9;
 /** Radius der Prüfkugel im Schalenkorb */
 const PROBE_R = 0.62;
+/**
+ * Radius, in dem die Spinne Material verdrängt. Größer als die Prüfkugel:
+ * Beim Pflügen durch einen Haufen schiebt sie auch, was sie nur streift.
+ */
+const PLOW_R = 1.45;
+/**
+ * Masse, bei der die Achsen auf die Hälfte einbrechen. Am Bild abgestimmt:
+ * Bei 750 kg war der Unterschied kaum zu merken, weil die Spinne beim
+ * Schwenken ohnehin aus dem Haufen herausläuft und der Widerstand dabei
+ * abfällt. Bei 350 kg pflügt man spürbar zäh.
+ */
+const PLOW_HALF_KG = 350;
 /** Ab dieser Masse ist ein Brocken nicht mehr wegzuschieben */
 const HEAVY_BLOCK_KG = 700;
 /** So nah darf die tief hängende Spinne an den Platzwart heran */
@@ -61,6 +73,7 @@ const IDENT_QUAT = { x: 0, y: 0, z: 0, w: 1 };
  * initialisiert ist.
  */
 let probe: RAPIER.Ball | null = null;
+let plowProbe: RAPIER.Ball | null = null;
 
 export class ExcavatorCollision {
   /**
@@ -76,6 +89,40 @@ export class ExcavatorCollision {
   private armQuat = new THREE.Quaternion();
 
   constructor(private ctx: CollisionContext) {}
+
+  /**
+   * Wie viel Masse die Spinne gerade vor sich herschiebt.
+   *
+   * Wer mit dem Greifer durch einen Schrottberg pflügt, muss den Widerstand
+   * spüren: Gewicht und Reibung des verdrängten Materials summieren sich.
+   * Ohne das gleitet die Spinne durch den Haufen, als wäre er Luft — sie ist
+   * ja ein kinematischer Körper und wird von der Physik nicht gebremst.
+   */
+  plowMassKg(): number {
+    plowProbe ??= new RAPIER.Ball(PLOW_R);
+    this.ctx.grappleGroup.getWorldPosition(this.pos);
+    this.pos.y -= 1.35;
+    let masse = 0;
+    this.ctx.world.intersectionsWithShape(this.pos, IDENT_QUAT, plowProbe, (collider) => {
+      const b = collider.parent();
+      // Nie vorzeitig abbrechen — sonst bleibt der Rapier-Borrow offen
+      if (!b || !b.isDynamic()) return true;
+      // Was in der Spinne hängt, zählt separat als Traglast
+      if (this.ctx.grippedHandles.has(b.handle)) return true;
+      masse += b.mass();
+      return true;
+    });
+    return masse;
+  }
+
+  /**
+   * Faktor auf die Achsgeschwindigkeit durch verdrängtes Material.
+   * 1 = freie Luft, gegen 0,2 = tief im Haufen.
+   */
+  plowFactor(): number {
+    const m = this.plowMassKg();
+    return Math.max(0.14, 1 / (1 + m / PLOW_HALF_KG));
+  }
 
   /** Steht der Unterwagen in einem festen Bauwerk? Rein zweidimensional. */
   chassisHits(): boolean {
