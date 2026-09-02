@@ -240,6 +240,8 @@ class DeliveryVehicle {
 
   /** true, solange über den Preis verhandelt wird — der Fahrer wartet dann. */
   awaitingDeal = false;
+  /** Wird gerufen, wenn die Verhandlung in die Zeitgrenze läuft. */
+  onDealTimeout: (() => void) | null = null;
   /** Bruttowiegung erledigt; verhindert, dass sie sich wiederholt */
   private weighedIn = false;
 
@@ -968,6 +970,14 @@ class DeliveryVehicle {
           this.bruttoKg = this.cargoMassKg();
           this.onWeighIn?.(this.bruttoKg); // kann awaitingDeal setzen
         }
+        // Notausstieg: Bleibt die Antwort aus — weil der Spieler das Fenster
+        // übersieht oder wegklickt —, fährt der Fahrer nach einer halben
+        // Minute zum Marktpreis weiter. Ein wartender LKW darf den Betrieb
+        // nicht dauerhaft anhalten (Design-Fix 02.09.2026).
+        if (this.awaitingDeal && this.phaseT > 32) {
+          this.awaitingDeal = false;
+          this.onDealTimeout?.();
+        }
         if (this.weighedIn && !this.awaitingDeal) {
           this.phase = "approach";
           this.phaseT = 0;
@@ -1334,6 +1344,11 @@ export class VehicleManager {
   /** Verhandlung läuft: Das Fahrzeug wartet an der Waage. */
   set dealPending(v: boolean) {
     if (this.active) this.active.awaitingDeal = v;
+  }
+
+  /** Rückmeldung, wenn die Verhandlung in die Zeitgrenze läuft. */
+  set onDealTimeout(fn: () => void) {
+    if (this.active) this.active.onDealTimeout = fn;
   }
 
   /** Wer gerade an der Waage steht — für die Verhandlung. */

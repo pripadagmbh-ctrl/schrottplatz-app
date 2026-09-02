@@ -537,6 +537,11 @@ async function main(): Promise<void> {
       return;
     }
     vehicles.dealPending = true; // der Fahrer wartet, bis der Preis steht
+    vehicles.onDealTimeout = () => {
+      haggleEl.classList.remove("open");
+      preisFaktor = 1;
+      hud.toast(`${kunde.name} wartet nicht länger — es gilt der Marktpreis.`);
+    };
     zeigeVerhandlung(kunde, kg, rein);
   };
   vehicles.onWeighOut = (netKg) => {

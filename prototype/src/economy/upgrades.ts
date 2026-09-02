@@ -10,6 +10,8 @@
  */
 
 export type UpgradeId =
+  | "office"
+  | "hall"
   | "loader"
   | "dozer"
   | "forklift"
@@ -25,6 +27,8 @@ export interface Upgrade {
   priceEur: number;
   /** Erst kaufbar, wenn so viel umgeschlagen wurde (kg) */
   requiresTurnoverKg: number;
+  /** Muss vorher gekauft sein — die Halle braucht das Büro */
+  requires?: UpgradeId;
 }
 
 /**
@@ -33,6 +37,22 @@ export interface Upgrade {
  * damit sinnvoll voran.
  */
 export const UPGRADES: Upgrade[] = [
+  // --- Gebäude: aus dem Wiegehäuschen wird ein Betrieb ---
+  {
+    id: "office",
+    name: "Büro",
+    effect: "Marktkenntnis: mehr Verhandlungsspielraum und die Zusammensetzung gemischter Ladungen schon an der Waage",
+    priceEur: 9000,
+    requiresTurnoverKg: 15000,
+  },
+  {
+    id: "hall",
+    name: "Halle am Büro",
+    effect: "Unterstellplatz für Maschinen — erst damit lohnen sich Bulldozer, Stapler und Magnet",
+    priceEur: 28000,
+    requiresTurnoverKg: 50000,
+    requires: "office",
+  },
   {
     id: "loader",
     name: "Radlader",
@@ -46,6 +66,7 @@ export const UPGRADES: Upgrade[] = [
     effect: "Lambert schiebt losen Schrott zusammen und kehrt den Platz",
     priceEur: 18000,
     requiresTurnoverKg: 30000,
+    requires: "hall",
   },
   {
     id: "forklift",
@@ -53,6 +74,7 @@ export const UPGRADES: Upgrade[] = [
     effect: "Lambert stapelt Karossen und räumt Kleinteile schneller",
     priceEur: 22000,
     requiresTurnoverKg: 60000,
+    requires: "hall",
   },
   {
     id: "magnet",
@@ -60,6 +82,7 @@ export const UPGRADES: Upgrade[] = [
     effect: "Stahl lässt sich sauber vom Rest trennen — höhere Sortenreinheit",
     priceEur: 26000,
     requiresTurnoverKg: 90000,
+    requires: "hall",
   },
   {
     id: "boom",
@@ -90,9 +113,26 @@ export class UpgradeState {
     return this.owned.has(id);
   }
 
-  /** Ist es freigeschaltet? Erst ab genügend Umschlag bietet es der Händler an. */
+  /**
+   * Ist es freigeschaltet? Dafür muss genug umgeschlagen sein — und was
+   * einen Unterstellplatz braucht, gibt es erst mit der Halle.
+   */
   available(id: UpgradeId, turnoverKg: number): boolean {
-    return !this.has(id) && turnoverKg >= getUpgrade(id).requiresTurnoverKg;
+    if (this.has(id)) return false;
+    const u = getUpgrade(id);
+    if (u.requires && !this.has(u.requires)) return false;
+    return turnoverKg >= u.requiresTurnoverKg;
+  }
+
+  /** Warum es noch nicht geht — für die Anzeige im Kaufmenü. */
+  blockedBy(id: UpgradeId, turnoverKg: number): string | null {
+    if (this.has(id)) return null;
+    const u = getUpgrade(id);
+    if (u.requires && !this.has(u.requires)) return `braucht ${getUpgrade(u.requires).name}`;
+    if (turnoverKg < u.requiresTurnoverKg) {
+      return `ab ${(u.requiresTurnoverKg / 1000).toFixed(0)} t Umschlag`;
+    }
+    return null;
   }
 
   /** Kaufbar heißt: freigeschaltet und bezahlbar. */

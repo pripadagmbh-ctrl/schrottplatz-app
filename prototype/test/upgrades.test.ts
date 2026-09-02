@@ -13,15 +13,39 @@ describe("Ausbau des Platzes", () => {
     }
   });
 
-  it("staffelt Preise und Schwellen aufsteigend", () => {
-    for (let i = 1; i < UPGRADES.length; i++) {
-      expect(UPGRADES[i].priceEur, `${UPGRADES[i].name} teurer als davor`).toBeGreaterThan(
-        UPGRADES[i - 1].priceEur
-      );
-      expect(UPGRADES[i].requiresTurnoverKg).toBeGreaterThanOrEqual(
-        UPGRADES[i - 1].requiresTurnoverKg
-      );
+  it("staffelt jeden Strang für sich aufsteigend", () => {
+    // Zwei Stränge: die Gebäude (Büro, Halle) und die Maschinen. Innerhalb
+    // eines Strangs wird jede Stufe teurer und später freigeschaltet.
+    const gebaeude = UPGRADES.filter((u) => u.id === "office" || u.id === "hall");
+    const maschinen = UPGRADES.filter((u) => u.id !== "office" && u.id !== "hall");
+    for (const strang of [gebaeude, maschinen]) {
+      for (let i = 1; i < strang.length; i++) {
+        expect(strang[i].priceEur, `${strang[i].name} teurer als davor`).toBeGreaterThan(
+          strang[i - 1].priceEur
+        );
+        expect(strang[i].requiresTurnoverKg).toBeGreaterThanOrEqual(
+          strang[i - 1].requiresTurnoverKg
+        );
+      }
     }
+  });
+
+  it("gibt Maschinen mit Unterstellplatz erst nach der Halle frei", () => {
+    const s = new UpgradeState();
+    // Umschlag reicht, aber die Halle fehlt
+    expect(s.available("dozer", 999999), "ohne Halle kein Bulldozer").toBe(false);
+    expect(s.blockedBy("dozer", 999999)).toContain("Halle");
+    s.buy("office");
+    s.buy("hall");
+    expect(s.available("dozer", 999999), "mit Halle geht es").toBe(true);
+  });
+
+  it("gibt die Halle erst nach dem Büro frei", () => {
+    const s = new UpgradeState();
+    expect(s.available("hall", 999999)).toBe(false);
+    expect(s.blockedBy("hall", 999999)).toContain("Büro");
+    s.buy("office");
+    expect(s.available("hall", 999999)).toBe(true);
   });
 
   it("gibt den Radlader von Anfang an frei", () => {
@@ -30,11 +54,11 @@ describe("Ausbau des Platzes", () => {
     expect(s.available("dozer", 0), "der Bulldozer erst später").toBe(false);
   });
 
-  it("schaltet weitere Maschinen erst mit Umschlag frei", () => {
+  it("schaltet erst ab genügend Umschlag frei", () => {
     const s = new UpgradeState();
-    const dozer = getUpgrade("dozer");
-    expect(s.available("dozer", dozer.requiresTurnoverKg - 1)).toBe(false);
-    expect(s.available("dozer", dozer.requiresTurnoverKg)).toBe(true);
+    const office = getUpgrade("office");
+    expect(s.available("office", office.requiresTurnoverKg - 1)).toBe(false);
+    expect(s.available("office", office.requiresTurnoverKg)).toBe(true);
   });
 
   it("lässt nur kaufen, was bezahlbar ist", () => {

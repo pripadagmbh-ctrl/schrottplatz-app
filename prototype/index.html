@@ -223,6 +223,52 @@
       }
       #controls-menu .inv.on { background: rgba(240,180,41,0.75); color: #1a1c1e; }
       #controls-menu .warn { margin: 10px 0 0; font-size: 11px; color: #e08a5a; min-height: 15px; }
+
+      /* --- Dialoge: Abholung bestellen, Verhandeln, Platz ausbauen ---
+         Ein gemeinsamer Stil für alle drei. Sie waren zuvor ohne jede Regel
+         im Dokument und wurden dadurch unsichtbar hinter dem Bild gerendert:
+         Der Fahrer wartete auf eine Antwort, die niemand geben konnte. */
+      #pickup, #haggle, #shop {
+        display: none; position: fixed; inset: 0; z-index: 22;
+        background: rgba(12, 14, 16, 0.72);
+        align-items: center; justify-content: center;
+      }
+      #pickup.open, #haggle.open, #shop.open { display: flex; }
+      #pickup .panel, #haggle .panel, #shop .panel {
+        background: rgba(24, 27, 30, 0.97); border: 2px solid rgba(255,255,255,0.18);
+        border-radius: 14px; padding: 22px 26px; text-align: center;
+        min-width: 300px; max-width: 460px; max-height: 86vh; overflow-y: auto;
+        color: #e8e8e4; font-family: "Consolas", monospace;
+      }
+      #pickup h2, #haggle h2, #shop h2 {
+        margin: 0 0 6px; font-size: 19px; letter-spacing: 3px; color: #f0b429;
+      }
+      #pickup .sub, #haggle .sub, #shop .sub {
+        margin: 0 0 14px; font-size: 12px; line-height: 1.6; color: #9aa2a8;
+      }
+      #pickup button, #haggle button, #shop button {
+        display: block; width: 100%; margin: 7px 0; padding: 12px 16px; cursor: pointer;
+        background: rgba(46,52,57,0.95); color: #e8e8e4;
+        font: 600 14px "Consolas", monospace; border: 2px solid rgba(255,255,255,0.22);
+        border-radius: 9px; touch-action: manipulation;
+      }
+      #pickup button:hover, #haggle button:hover, #shop button:hover:not(:disabled),
+      #pickup button:active, #haggle button:active {
+        background: rgba(240,180,41,0.75); color: #1a1c1e;
+      }
+      #shop button { text-align: left; }
+      #shop button:disabled { opacity: 0.42; cursor: default; }
+      #shop button .preis, #pickup button .kg, #haggle button .eur {
+        float: right; color: #9aa2a8; font-weight: 400;
+      }
+      #shop button .preis { font-weight: 700; }
+      #shop button:hover:not(:disabled) .preis,
+      #pickup button:hover .kg, #haggle button:hover .eur { color: #3a3020; }
+      #shop button small {
+        display: block; margin-top: 3px; font-weight: 400; font-size: 11px; color: #9aa2a8;
+      }
+      #shop button:hover:not(:disabled) small { color: #3a3020; }
+      #shop-close, #pickup-cancel { text-align: center !important; margin-top: 14px !important; }
     </style>
   </head>
   <body>
