@@ -38,10 +38,13 @@ export const ROUTE_APPROACH: Array<[number, number]> = [
 ];
 export const ROUTE_IN_REV: Array<[number, number]> = [
   [0, 19],
-  [0, 9.5], // näher an den Abkippplatz — die Blockadeprüfung stoppt bei Bedarf
+  // 7,0 m: so nah, dass der Bagger die ganze Ladefläche bestreicht, und noch
+  // weit genug, dass die Blockadeprüfung (5,5 m um die Maschine) nicht
+  // dauernd anspricht.
+  [0, 7.0],
 ];
 export const ROUTE_OUT: Array<[number, number]> = [
-  [0, 9.5],
+  [0, 7.0],
   [0, 19],
   [-14, 18.5],
   [GATE_X, 24],
@@ -56,20 +59,19 @@ export const PICKUP_IN_FWD: Array<[number, number]> = [
 ];
 export const PICKUP_APPROACH: Array<[number, number]> = [
   [GATE_X, 24],
-  [-10, 22],
-  [16, 22],
-  [16, -13.5],
+  [-14, 18.5],
+  [3.5, 19],
 ];
 // Rückwärts nach Westen direkt neben die Presse — Heck (Container-Öffnung)
 // zeigt zur Schere, der Bagger lädt von dort um (Design-Fix 2026-08-29)
 export const PICKUP_IN_REV: Array<[number, number]> = [
-  [16, -13.5],
-  [8.5, -13.5],
+  [3.5, 19],
+  [3.5, 8.0],
 ];
 export const PICKUP_OUT: Array<[number, number]> = [
-  [8.5, -13.5],
-  [16, -13.5],
-  [16, 22],
+  [3.5, 8.0],
+  [3.5, 19],
+  [-14, 18.5],
   [GATE_X, 24],
   [GATE_X, 40],
 ];
@@ -110,7 +112,7 @@ const BED_HALF_W = 1.35;
  */
 export const WORK_ZONES: Array<[number, number, number]> = [
   [0, 9, 11], // Abkippplatz vor dem Bagger inkl. Halteposition
-  [11, -13.5, 9], // Verladeplatz südöstlich, südlich der Muldenreihe
+  [3.5, 10, 8], // Verladeplatz neben dem Abladeplatz, in Baggerreichweite
   [-9, 4, 10], // Stahlschrotthaufen — dorthin kippen die Kipper selbst ab
 ];
 /** Nach so langer Blockade fährt der Fahrer vorsichtig weiter (kein Deadlock) */
