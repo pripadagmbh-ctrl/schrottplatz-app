@@ -125,25 +125,43 @@ npx vitest run customers    # enthält den Ruf-Block
 
 ## 4. Ausbaustufen (`src/economy/upgrades.ts`)
 
-| Ausbau | Preis | ab Umschlag | Voraussetzung |
-| --- | --- | --- | --- |
-| Radlader | 12 000 € | — | — |
-| Büro | 9 000 € | 15 t | — |
-| Bulldozer | 18 000 € | 30 t | Halle |
-| Halle am Büro | 28 000 € | 50 t | Büro |
-| Stapler | 22 000 € | 60 t | Halle |
-| Magnet | 26 000 € | 90 t | Halle |
-| Baggerausbau | 34 000 € | 120 t | — |
-| Größere Presse | 42 000 € | 160 t | — |
+| Ausbau | Preis | ab Umschlag | Voraussetzung | Wirkung im Spiel |
+| --- | --- | --- | --- | --- |
+| Radlader | 12 000 € | — | — | Lambert fährt statt zu laufen |
+| Büro | 9 000 € | 15 t | — | **keine** |
+| Bulldozer | 18 000 € | 30 t | Halle | Lambert 1,4× |
+| Halle am Büro | 28 000 € | 50 t | Büro | **keine** |
+| Stapler | 22 000 € | 60 t | Halle | Lambert 1,4× (derselbe Bonus) |
+| Magnet | 26 000 € | 90 t | Halle | **keine** |
+| Baggerausbau | 34 000 € | 120 t | — | Bagger 1,35×, Traglast 1,5× |
+| Größere Presse | 42 000 € | 160 t | — | Ballen 1,6× |
 
 Kontountergrenze: **−1 500 €** (`CREDIT_LIMIT_EUR` in `account.ts`). Darunter
 liefert niemand mehr.
 
-> **Prüfauftrag:** Die Reihenfolge im Bericht ist nach Preis sortiert, die
-> Freischaltung aber nach Umschlag. Der Radlader kostet 12 000 € und ist ab
-> 0 t verfügbar, das Büro kostet 9 000 € und erst ab 15 t. Prüfe, ob das eine
-> sinnvolle Progression ergibt oder ob der Spieler den Radlader kauft, bevor
-> er weiß, wofür.
+> **Korrektur 03.09.2026.** Die Spalte *Wirkung* fehlte in der ersten Fassung
+> dieser Mappe, und der Werkstattbericht behauptete, die Gebäudekette trage
+> den Fortschritt „sichtbar". Das war falsch. Nachzuprüfen mit:
+>
+> ```bash
+> grep -rn '\.has("office")\|\.has("hall")\|\.has("magnet")' src --include=*.ts
+> ```
+>
+> Findet nichts. `world/office.ts` (Wiegehäuschen → Büro → Halle) ist gebaut,
+> wird aber nirgends importiert — auf dem Platz erscheint nichts. **Drei von
+> acht Stufen für zusammen 63 000 € sind wirkungslos**, Bulldozer und Stapler
+> sind Dubletten.
+
+> **Prüfauftrag:** Der Kaufeintrag „Büro" verspricht im Menü „Marktkenntnis:
+> mehr Verhandlungsspielraum und die Zusammensetzung gemischter Ladungen schon
+> an der Waage" (Feld `effect` in `upgrades.ts`). Der Text erscheint im Spiel,
+> die Funktion existiert nicht. Prüfe, ob es weitere `effect`-Texte gibt, die
+> mehr versprechen als der Code hält — das ist die gefährlichere Klasse von
+> Fehlern, weil sie den Spieler direkt betrifft.
+
+> **Prüfauftrag:** Die Reihenfolge ist nach Preis unstimmig. Der Radlader
+> kostet 12 000 € und ist ab 0 t verfügbar, das Büro kostet 9 000 € und erst
+> ab 15 t. Prüfe, ob das eine sinnvolle Progression ergibt.
 
 ---
 

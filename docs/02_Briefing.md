@@ -953,31 +953,42 @@ Fuhren (Faktor über 0,2). Ein Spielstand kann sich nicht totlaufen.
 
 ### 27.3 Der Platz wächst mit: Ausbaustufen
 
-`src/economy/upgrades.ts`, Gebäude in `src/world/office.ts`. Jede Stufe kostet
-mehr und wird erst ab einer Umschlagmenge angeboten — wer nur den jeweils
-nächsten Eintrag kauft, kommt sinnvoll voran.
+`src/economy/upgrades.ts`. Jede Stufe kostet mehr und wird erst ab einer
+Umschlagmenge angeboten.
 
-| Ausbau | Preis | ab Umschlag | setzt voraus |
-| --- | --- | --- | --- |
-| Radlader | 12.000 € | — | — |
-| Büro | 9.000 € | 15 t | — |
-| Bulldozer | 18.000 € | 30 t | Halle |
-| Halle am Büro | 28.000 € | 50 t | Büro |
-| Stapler | 22.000 € | 60 t | Halle |
-| Magnet | 26.000 € | 90 t | Halle |
-| Baggerausbau | 34.000 € | 120 t | — |
-| Größere Presse | 42.000 € | 160 t | — |
+> **Korrektur 03.09.2026.** Die frühere Fassung dieses Abschnitts beschrieb
+> eine Gebäudekette, die den Fortschritt „sichtbar trägt", und schrieb dem
+> Büro Marktkenntnis zu. **Beides ist nicht gebaut.** Der Fehler war, die
+> Existenz eines Moduls mit seiner Wirkung im Spiel zu verwechseln. Was
+> tatsächlich passiert, steht in der Spalte *Wirkung*.
 
-**Die Gebäudekette** ist der rote Faden: Aus dem Wiegehäuschen wird ein Büro,
-aus dem Büro ein Büro mit Halle. Das ist keine Kulisse — das Büro bringt
-Marktkenntnis (mehr Spielraum, und die Zusammensetzung gemischter Ladungen ist
-schon an der Waage zu sehen), und erst die Halle gibt den Maschinen einen
-Unterstellplatz. Ohne Halle kein Bulldozer, kein Stapler, kein Magnet. So
-hängt der sichtbare Ausbau des Platzes an derselben Kette wie der Zuwachs an
-Möglichkeiten.
+| Ausbau | Preis | ab Umschlag | setzt voraus | Wirkung im Spiel |
+| --- | --- | --- | --- | --- |
+| Radlader | 12.000 € | — | — | `staff.setLoader(true)` — Lambert fährt |
+| Büro | 9.000 € | 15 t | — | **keine** — schaltet nur die Halle frei |
+| Bulldozer | 18.000 € | 30 t | Halle | Lambert 1,4× schneller |
+| Halle am Büro | 28.000 € | 50 t | Büro | **keine** — schaltet nur weitere Einträge frei |
+| Stapler | 22.000 € | 60 t | Halle | Lambert 1,4× schneller (**derselbe Bonus wie Bulldozer**) |
+| Magnet | 26.000 € | 90 t | Halle | **keine** — wird nirgends abgefragt |
+| Baggerausbau | 34.000 € | 120 t | — | Bagger 1,35× schneller, Traglast 1,5× |
+| Größere Presse | 42.000 € | 160 t | — | Ballen 1,6× |
 
-Die Grundflächen der jeweils sichtbaren Stufe melden sich über `footprints()`
-bei der Hindernisprüfung an — was gebaut ist, ist auch im Weg.
+**Drei von acht Stufen für zusammen 63.000 € haben keine Wirkung.** Belegt:
+`grep '\.has("office")' `, `has("hall")` und `has("magnet")` finden im ganzen
+Quelltext keine einzige Abfrage. Bulldozer und Stapler geben denselben
+Bonus — den zweiten zu kaufen bringt nichts.
+
+`src/world/office.ts` (Wiegehäuschen → Büro → Büro mit Halle, drei Stufen,
+`setStage()`, `footprints()`) ist gebaut, wird aber **nirgends importiert**.
+Auf dem Platz erscheint nichts. Die Datei ist damit toter Code — brauchbar,
+aber nicht angeschlossen.
+
+Verschärfend: Der Kaufeintrag „Büro" verspricht dem Spieler im Menü
+ausdrücklich „Marktkenntnis: mehr Verhandlungsspielraum und die
+Zusammensetzung gemischter Ladungen schon an der Waage"
+(`upgrades.ts`, Feld `effect`). Der Text steht im Spiel, die Funktion nicht.
+**Das ist ein Versprechen an den Spieler, das nicht eingelöst wird**, und
+gehört vor jeder Veröffentlichung entweder gebaut oder aus dem Text entfernt.
 
 ### 27.4 Störfall: blockierte Fahrspuren
 
@@ -1018,3 +1029,24 @@ Damit ist die in 25.4 verlangte „geführte erste Viertelstunde" abgedeckt.
 - **Daniels Textblasen (26.1)** — vorgesehen für V1, noch nicht gebaut.
 - **Wiegescheine** für Gewerbe (26.2) sind als Ruf-Ereignis vorhanden, aber
   noch ohne eigene Spielhandlung.
+- **Büro, Halle und Magnet** (27.3) kosten Geld und bewirken nichts;
+  `world/office.ts` ist gebaut, aber nicht angeschlossen. Bulldozer und
+  Stapler geben denselben Bonus.
+
+### 27.8 Warnung an künftige Fassungen dieses Kapitels
+
+Die Korrektur in 27.3 entstand aus einem Fehler, der sich leicht wiederholt:
+**Ein Modul ist gebaut, hat Tests, wird im Bericht als erledigt geführt — und
+niemand ruft es auf.** Tests am Modul selbst fangen das nicht, weil sie das
+Modul ja direkt aufrufen.
+
+Bevor in diesem Kapitel etwas als fertig beschrieben wird, gehört geprüft, ob
+es im laufenden Spiel überhaupt ankommt:
+
+```bash
+grep -rn "NameDerKlasse" prototype/src --include=*.ts | grep -v "^.*/dieDatei.ts"
+```
+
+Findet das nur die Definition, ist es toter Code. Dasselbe gilt für
+Konstanten: `SORTING_BONUS_PER_KG` (`account.ts`) ist definiert, wird nirgends
+verwendet, und die Sortierprämie steht trotzdem in der README.

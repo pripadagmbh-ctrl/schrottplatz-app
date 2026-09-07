@@ -8,6 +8,49 @@ Sortiert nach Risiko für das Vorhaben, nicht nach Aufwand.
 
 ---
 
+## 0. Gebaut, aber nicht angeschlossen — BELEGTER FEHLER
+
+*Nachgetragen am 03.09.2026, gefunden von der v2-Analyse, von mir im Code
+bestätigt. Kein Zweifel, sondern ein Befund.*
+
+Drei der acht Ausbaustufen haben **keine Wirkung im Spiel**:
+
+```bash
+grep -rn '\.has("office")\|\.has("hall")\|\.has("magnet")' src --include=*.ts
+# findet nichts
+```
+
+Büro (9 000 €), Halle (28 000 €) und Magnet (26 000 €) — zusammen 63 000 € —
+schalten nur weitere Einträge im Kaufmenü frei. Bulldozer und Stapler geben
+denselben Bonus (Lambert 1,4×), der zweite Kauf bringt nichts.
+
+`src/world/office.ts` ist vollständig gebaut (drei Stufen, `setStage()`,
+`footprints()`) und wird **nirgends importiert**. Auf dem Platz erscheint
+nichts.
+
+Zusätzlich tot: `SORTING_BONUS_PER_KG` (`account.ts`) ist definiert und wird
+nie verwendet — die README verspricht die Sortierprämie trotzdem.
+
+**Warum das hier ganz oben steht:** Nicht wegen der Schwere, sondern wegen des
+Musters. Ich hatte all das als erledigt gemeldet — im Werkstattbericht sogar
+als „roten Faden", der den Fortschritt sichtbar trage. Der Fehler war, die
+Existenz eines Moduls mit seiner Wirkung im Spiel zu verwechseln. **Tests am
+Modul selbst fangen das nie**, weil sie das Modul direkt aufrufen. Erst der
+Blick von außen — wer ruft das eigentlich auf? — findet es.
+
+> **Prüfauftrag:** Such nach weiteren Fällen. Für jedes exportierte Symbol:
+> Gibt es außerhalb der eigenen Datei einen Aufruf? Besonders verdächtig sind
+> Module mit Tests, weil sie erledigt aussehen.
+
+**Der gefährlichere Teil:** Der Kaufeintrag „Büro" verspricht im Menü
+„Marktkenntnis: mehr Verhandlungsspielraum und die Zusammensetzung gemischter
+Ladungen schon an der Waage" (Feld `effect` in `upgrades.ts`). Dieser Text
+erscheint im Spiel. Der Spieler zahlt 9 000 € für eine zugesagte Funktion, die
+es nicht gibt. Das ist vor einer Veröffentlichung zu bauen oder aus dem Text
+zu streichen.
+
+---
+
 ## 1. Die Handy-Tauglichkeit ist unbelegt — Risiko: hoch
 
 Das Spiel soll in den Play Store. Gemessen wurde ausschließlich im

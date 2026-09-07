@@ -194,6 +194,21 @@
   }
   .notiz p { margin: 0; color: var(--ink-2); max-width: 70ch; }
 
+  /* Zurückgenommene Aussage aus einer früheren Fassung */
+  .korrektur {
+    border-left: 3px solid var(--krit); background: var(--krit-bg);
+    padding: 12px 16px; margin: 0 0 14px;
+  }
+  .korrektur h4 {
+    margin: 0 0 5px; font: 600 11px/1 "IBM Plex Mono", monospace;
+    letter-spacing: 0.12em; text-transform: uppercase; color: var(--krit);
+  }
+  .korrektur p { margin: 0; color: var(--ink-2); max-width: 70ch; font-size: 13px; }
+  .befund code {
+    font: 500 12px/1.4 "IBM Plex Mono", monospace;
+    background: var(--panel-2); padding: 1px 5px; border-radius: 3px;
+  }
+
   footer {
     margin-top: 44px; padding-top: 16px; border-top: 1px solid var(--line);
     font-size: 14px; color: var(--ink-3);
@@ -208,13 +223,22 @@
 
 <div class="wrap">
   <header>
-    <div class="eyebrow">Bestandsaufnahme · Stand 02.09.2026, abends</div>
+    <div class="eyebrow">Bestandsaufnahme · Stand 03.09.2026</div>
     <h1>Werkstattbericht Schrottplatz</h1>
     <p class="sub">Systematischer Durchgang durch alle Bausteine der App — technischer Zustand und
       gestalterischer Eindruck, jeweils mit den Aufgaben, die daraus folgen. Grundlage sind der
       aktuelle Code, frisch gemessene Laufzeiten und Bildschirmaufnahmen aus dem laufenden Spiel.
-      <strong>Seit der letzten Fassung ist die Kundschaft gebaut worden</strong> — der größte
-      Rückstand von damals ist abgearbeitet, und mit ihm fünf der sieben geplanten Punkte.</p>
+      Seit der vorletzten Fassung ist die Kundschaft gebaut worden.</p>
+    <div class="korrektur">
+      <h4>Diese Fassung nimmt zwei Aussagen zurück</h4>
+      <p>Eine unabhängige Durchsicht hat gezeigt, dass der Ausbau <strong>zur Hälfte Attrappe
+        ist</strong> — Büro, Halle und Magnet kosten zusammen 63 000 € und bewirken nichts. Die
+        vorige Fassung führte das als erledigt und nannte die Gebäudekette einen „roten Faden".
+        Ebenso war der Umschlag hier als „nacharbeiten" eingestuft; richtig ist
+        <strong>dringend</strong>. Der Fehler dahinter: Ich habe die Existenz eines Moduls mit
+        seiner Wirkung im Spiel verwechselt. Tests am Modul fangen das nicht — sie rufen es ja
+        selbst auf.</p>
+    </div>
   </header>
 
   <dl class="kpis">
@@ -249,12 +273,10 @@
         Anlieferfrequenz und Spielraum, versiegt aber nie ganz.</p>
     </div>
     <div class="fertig-zeile">
-      <h4>Zahlungsdruck und Ausbau</h4>
+      <h4>Zahlungsdruck</h4>
       <p>Das Konto rutscht nicht mehr folgenlos ins Minus: Ab −1 500 € liefert niemand mehr, bis
-        wieder Geld da ist. Acht Ausbaustufen von 9 000 € bis 42 000 €, gestaffelt nach
-        Umschlagmenge. Die Gebäudekette trägt den Fortschritt sichtbar — aus dem Wiegehäuschen
-        wird ein Büro, aus dem Büro ein Büro mit Halle, und erst die Halle gibt Bulldozer,
-        Stapler und Magnet einen Platz.</p>
+        wieder Geld da ist. Acht Ausbaustufen von 9 000 € bis 42 000 € stehen im Kaufmenü,
+        gestaffelt nach Umschlagmenge — aber nur fünf davon tun etwas, siehe unten.</p>
     </div>
     <div class="fertig-zeile">
       <h4>Geführter Einstieg</h4>
@@ -351,18 +373,44 @@
   <div class="system">
     <div class="system-head">
       <h3>Umschlag und Abrechnung</h3>
-      <span class="files">economy/shift.ts · account.ts · upgrades.ts</span>
-      <span class="zustand z-warn">nacharbeiten</span>
+      <span class="files">economy/shift.ts · account.ts · upgrades.ts · world/office.ts</span>
+      <span class="zustand z-krit">dringend</span>
     </div>
-    <p class="befund">Der Kreislauf trägt, das Geld hat eine Verwendung, und das Konto hat eine
-      Untergrenze bei −1 500 €. Damit sind beide Lücken des letzten Berichts zu. Geblieben ist
-      eine kleinere: Es gibt <strong>keinen Rückblick</strong>. Der Spieler sieht seinen
-      Kontostand, aber nie, was ein Tag gebracht hat — was kam rein, was ging raus, wofür lohnt
-      sich die Mühe. Bei einem Spiel, das über Sortenreinheit funktioniert, ist das die
-      Rückmeldung, die den Groschen fallen lässt.</p>
+    <div class="korrektur">
+      <h4>Korrektur vom 03.09.2026</h4>
+      <p>Die vorige Fassung führte den Ausbau hier als erledigt und nannte die Gebäudekette
+        einen „roten Faden, der den Fortschritt sichtbar trägt". <strong>Das war falsch.</strong>
+        Der Fehler war, die Existenz eines Moduls mit seiner Wirkung im Spiel zu verwechseln.
+        Gefunden hat es die v2-Analyse, nicht ich.</p>
+    </div>
+    <p class="befund">Das Konto hat eine Untergrenze bei −1 500 €, und der Kreislauf trägt.
+      Aber der Ausbau ist zur Hälfte Attrappe: <strong>Büro (9 000 €), Halle (28 000 €) und
+      Magnet (26 000 €) bewirken nichts</strong> — zusammen 63 000 €, die nur weitere Einträge
+      im Kaufmenü freischalten. <code>grep '.has("office")'</code> und dasselbe für
+      <code>hall</code> und <code>magnet</code> finden im ganzen Quelltext keine Abfrage.
+      <code>world/office.ts</code> ist vollständig gebaut und wird nirgends importiert — auf dem
+      Platz erscheint nichts. Bulldozer und Stapler geben denselben Bonus, der zweite Kauf ist
+      verlorenes Geld. Auch <code>SORTING_BONUS_PER_KG</code> ist definiert und wird nie
+      verwendet.</p>
+    <p class="befund">Schwerer wiegt, was der Spieler davon sieht: Der Kaufeintrag „Büro"
+      verspricht im Menü ausdrücklich <em>„Marktkenntnis: mehr Verhandlungsspielraum und die
+      Zusammensetzung gemischter Ladungen schon an der Waage"</em>. Der Text steht im Spiel, die
+      Funktion nicht. <strong>Das ist ein Versprechen, das Geld kostet und nicht eingelöst
+      wird</strong> — so darf nichts in einen Store.</p>
+    <p class="befund">Dahinter steht ein zweiter Befund derselben Analyse: Der Ankauf ist mit
+      <strong>0,16 €/kg pauschal für alles</strong> angesetzt, obwohl im Materialkatalog eigene
+      Ankaufspreise stehen, die ignoriert werden. Kupfer verkauft sich für 7,20 €/kg. Eine
+      sortenreine Kupferfuhre bringt damit rund 250 € Einkauf gegen 11 200 € Verkauf —
+      <strong>Faktor 45</strong>. Daneben bewegt das Verhandeln, für das 138 Zeilen und 15 Tests
+      entstanden sind, zweistellige Beträge. Es ist gebaut und wirtschaftlich bedeutungslos.</p>
+    <p class="befund">Und es fehlt weiterhin jeder <strong>Rückblick</strong>: Der Spieler sieht
+      seinen Kontostand, aber nie, was ein Tag gebracht hat. Bei einem Spiel, das über
+      Sortenreinheit funktioniert, ist das die Rückmeldung, die den Groschen fallen lässt.</p>
     <ul class="tasks">
+      <li><span class="tag code">Code</span><span>Büro, Halle und Magnet anschließen — oder die Einträge samt Versprechen aus dem Kaufmenü nehmen. Nichts verkaufen, was es nicht gibt.</span></li>
+      <li><span class="tag code">Code</span><span>Ankauf nach Material statt pauschal 0,16 €/kg. Ohne das ist die ganze Wirtschaft und damit auch das Verhandeln folgenlos.</span></li>
+      <li><span class="tag code">Code</span><span>Stapler vom Bulldozer unterscheiden — derzeit derselbe Bonus.</span></li>
       <li><span class="tag code">Code</span><span>Tagesabschluss mit Bilanz — Ankauf, Verkauf, Sortenreinheit je Fraktion, Wert des Platzes.</span></li>
-      <li><span class="tag code">Code</span><span>Sichtbar machen, was Sortieren einbringt: Erlös sortenrein gegen Erlös gemischt, nebeneinander.</span></li>
     </ul>
   </div>
 
@@ -392,18 +440,39 @@
       <span class="files">physics/ · world/scrapItems.ts</span>
       <span class="zustand z-krit">dringend</span>
     </div>
-    <p class="befund">Masse, Kontakte, Durchdringung und Verkanten stimmen, und das Gewichtsgefühl
-      ist da. Der Preis dafür steht in der Messung: Bei 218 Körpern kostet ein reiner
-      Physikschritt <strong>2,78 ms</strong>, mit Spiellogik 4,42 ms von 16,7 ms. Gegenüber
-      1,78 ms beim letzten Bericht ist das ein Aufschlag von 56 %, obwohl die Bündelung die
-      Teilezahl inzwischen deckelt — die schwereren Kontakte und die zusätzlichen
-      Kollisionsprüfungen kosten. <strong>Ein Mittelklasse-Handy rechnet drei- bis viermal
-      langsamer</strong>; damit wäre das Budget dort bereits gerissen. Diese Zahl ist jetzt das
-      größte Risiko vor der Veröffentlichung, und sie ist nur auf echter Hardware zu klären.</p>
+    <div class="korrektur">
+      <h4>Auch hier lag die vorige Fassung daneben</h4>
+      <p>Sie nannte die Physiklast „das größte Risiko vor der Veröffentlichung" und rechnete mit
+        einem Mittelklasse-Handy hoch, das drei- bis viermal langsamer rechnet. Inzwischen ist
+        auf iPad und iPhone mini gespielt worden: <strong>Der Bagger läuft flüssig, keine
+        Zeitlupe.</strong> Die Faustregel war auf die falsche Größe angewendet — der Engpass ist
+        das Zeichnen, nicht die Physik.</p>
+    </div>
+    <p class="befund">Masse, Kontakte, Durchdringung und Verkanten stimmen, und das
+      Gewichtsgefühl ist da. Die Messung im Desktop-Browser: Bei 218 Körpern kostet ein reiner
+      Physikschritt <strong>2,78 ms</strong>, mit Spiellogik 4,42 ms von 16,7 ms — gegenüber
+      1,78 ms beim vorletzten Bericht ein Aufschlag von 56 %. Auf echter Hardware ist das
+      trotzdem kein Problem.</p>
+    <p class="befund">Der wirkliche Engpass steht in der Analyse: <strong>3 139 Meshes, 1 281
+      Schattenwerfer, acht Lichter, kein Instancing</strong>, und im ganzen Projekt genau ein
+      <code>dispose()</code>. Das iPad wird beim Spielen warm und „könnte flüssiger laufen" —
+      und ein iPad ist deutlich stärker als das Zielgerät. Damit ist das Rendering-Paket nicht
+      optional. Allein die Betonlego-Umrandung sind rund 1 530 Meshes, die sich zu drei
+      zusammenfassen ließen.</p>
+    <p class="befund">Zwei weitere Befunde treffen genau das, was sich beim Spielen „unrund"
+      anfühlt. <strong>Die Spinne bremst an falschen Stellen:</strong> Der Pflügwiderstand summt
+      die Masse in einer Kugel von 1,45 m um den Greifer statt an echten Kontakten und bremst
+      deshalb schon beim Absenken von oben, bevor etwas berührt wird. <strong>Schrott hängt
+      falsch in der Spinne:</strong> Der Fixed Joint friert die zufällige Lage im Moment des
+      Zupackens ein, gefasst wird aber schon bei Berührung des nächstgelegenen
+      Oberflächenpunkts — bei einem langen Träger ist das ein Zipfel. Beides sind Logikfehler,
+      keine Engine-Grenzen.</p>
     <ul class="tasks">
-      <li><span class="tag code">Code</span><span>Lasttest auf einem echten Mittelklasse-Handy. Ohne diese Messung ist jede weitere Optimierung geraten.</span></li>
-      <li><span class="tag code">Code</span><span>Schlafende Körper härter aussortieren — 108 von 218 sind wach, das sind mehr als nötig.</span></li>
-      <li><span class="tag code">Code</span><span>Prüfen, ob die Bündelung früher greifen kann, ohne dass der Platz leer wirkt.</span></li>
+      <li><span class="tag code">Code</span><span>Betonlego und Umrandung zu wenigen Meshes zusammenfassen oder instanzieren — der größte Einzelposten.</span></li>
+      <li><span class="tag code">Code</span><span>Schattenwerfer eingrenzen; 1 281 sind weit mehr als nötig.</span></li>
+      <li><span class="tag code">Code</span><span>Pflügwiderstand aus echten Kontakten und nur in Bewegungsrichtung statt aus einer Kugel um den Greifer.</span></li>
+      <li><span class="tag code">Code</span><span>Gegriffenes kinematisch mitführen statt per Fixed Joint, mit definierter Haltepose.</span></li>
+      <li><span class="tag code">Code</span><span>Zahlen auf dem Gerät: Das Debug-Overlay hängt an F3 und ist auf dem Handy nicht aufrufbar.</span></li>
     </ul>
   </div>
 
@@ -428,45 +497,61 @@
     <div class="plan-row">
       <span class="num">1</span>
       <div>
-        <p>Lasttest auf echter Hardware</p>
-        <p class="warum">2,78 ms sind auf einem Handy schnell 11 ms. Alles Weitere ist Raten, solange das nicht gemessen ist — und es entscheidet, wie viel Spielraum für Inhalte bleibt.</p>
+        <p>Nichts verkaufen, was es nicht gibt</p>
+        <p class="warum">Büro, Halle und Magnet anschließen oder samt Versprechen aus dem Kaufmenü nehmen. Solange der Spieler 9 000 € für eine zugesagte Funktion zahlt, die nicht existiert, ist alles andere zweitrangig.</p>
       </div>
       <span class="aufwand">klein</span>
     </div>
     <div class="plan-row">
       <span class="num">2</span>
       <div>
-        <p>Tagesabschluss mit Bilanz</p>
-        <p class="warum">Die fehlende Rückmeldung auf die Kernmechanik. Wer nicht sieht, was Sortieren einbringt, sortiert nicht.</p>
+        <p>Wirtschaft schlüssig machen</p>
+        <p class="warum">Ankauf nach Material statt 0,16 €/kg pauschal. Bei Faktor 45 zwischen Ein- und Verkauf ist jede Entscheidung des Spielers folgenlos — auch das Verhandeln, das schon gebaut ist.</p>
       </div>
-      <span class="aufwand">mittel</span>
+      <span class="aufwand">klein</span>
     </div>
     <div class="plan-row">
       <span class="num">3</span>
       <div>
-        <p>Charakter-Briefing der Familien</p>
-        <p class="warum">Die Mechanik steht, die Figuren fehlen. Braucht deine Eingabe — danach sind Sprüche und graue Geschäfte Fleißarbeit.</p>
+        <p>Tagesabschluss mit Bilanz</p>
+        <p class="warum">Die fehlende Rückmeldung auf die Kernmechanik. Wer nicht sieht, was Sortieren einbringt, sortiert nicht. Setzt Punkt 2 voraus.</p>
       </div>
-      <span class="aufwand">wartet</span>
+      <span class="aufwand">mittel</span>
     </div>
     <div class="plan-row">
       <span class="num">4</span>
       <div>
-        <p>Bodenspuren und Gebrauchsspuren</p>
-        <p class="warum">Reine Optik, jederzeit einschiebbar. Steht seit zwei Berichten und macht am meisten aus, was den Platz benutzt aussehen lässt.</p>
+        <p>Rendering entlasten</p>
+        <p class="warum">3 139 Meshes, 1 281 Schattenwerfer. Das iPad wird warm, das Zielgerät ist schwächer. Betonlego zusammenfassen bringt allein rund 1 530 Meshes.</p>
       </div>
-      <span class="aufwand">klein</span>
+      <span class="aufwand">mittel</span>
     </div>
     <div class="plan-row">
       <span class="num">5</span>
       <div>
-        <p>Daniels Textblasen und Lamberts Lebenszeichen</p>
-        <p class="warum">Kleine Sachen mit großer Wirkung aufs Gefühl. Gut für zwischendurch.</p>
+        <p>Greifen und Bremsen richtigstellen</p>
+        <p class="warum">Pflügwiderstand aus echten Kontakten, Ladung kinematisch mitführen. Das ist das „unrunde" Gefühl beim Spielen — und es würde bei einem Umzug nach Unity mitreisen.</p>
+      </div>
+      <span class="aufwand">mittel</span>
+    </div>
+    <div class="plan-row">
+      <span class="num">6</span>
+      <div>
+        <p>Charakter-Briefing der Familien</p>
+        <p class="warum">Die Mechanik steht, die Figuren fehlen. Braucht deine Eingabe.</p>
+      </div>
+      <span class="aufwand">wartet</span>
+    </div>
+    <div class="plan-row">
+      <span class="num">7</span>
+      <div>
+        <p>Bodenspuren, Textblasen, Lebenszeichen</p>
+        <p class="warum">Reine Optik und Gefühl, jederzeit einschiebbar, wenn zwischendurch Luft ist.</p>
       </div>
       <span class="aufwand">klein</span>
     </div>
     <div class="plan-row">
-      <span class="num">6</span>
+      <span class="num">8</span>
       <div>
         <p>Android-Build und Store-Eintrag</p>
         <p class="warum">Zuletzt, wenn das Spiel steht. Entwicklerkonto einmalig 25 $.</p>
@@ -477,15 +562,18 @@
 
   <div class="notiz">
     <h4>Aus der Werkstatt</h4>
-    <p>Der teuerste Fehler dieser Runde war unsichtbar: Verhandlung und Abholung öffneten sich
-      nicht, Händler blieben auf der Waage stehen. Der Grund lag nicht im Ablauf, sondern darin,
-      dass für die drei Dialoge <strong>überhaupt keine Gestaltungsregeln existierten</strong> —
-      der Einfügepunkt, an den sie gehört hätten, war nie da. Sie standen also im Bild, unsichtbar,
-      während der Code korrekt lief. Gefunden über die berechneten Stile im Browser, nicht durch
-      Lesen. Seitdem gilt: Wenn etwas nicht erscheint, obwohl die Logik stimmt, wird zuerst
-      nachgesehen, ob es überhaupt Regeln zum Anzeigen gibt. Dazu ein Notausstieg — bleibt eine
-      Verhandlung 32 Sekunden unbeantwortet, fährt der Fahrer zum Marktpreis weiter. Der Betrieb
-      darf nie an einem offenen Fenster hängenbleiben.</p>
+    <p>Die Lehre dieser Runde ist unbequem, weil sie mich betrifft. Büro, Halle und Magnet waren
+      gebaut, hatten Tests, standen in zwei Berichten als erledigt — und wurden von niemandem
+      aufgerufen. <strong>Tests am Modul fangen so etwas nie</strong>, denn sie rufen das Modul
+      ja selbst auf; grün heißt nur „rechnet richtig", nicht „kommt im Spiel an". Gefunden hat es
+      eine Durchsicht von außen mit einer einzigen Frage: Wer ruft das eigentlich auf? Seitdem
+      gehört vor jede Fertigmeldung ein <code>grep</code> nach dem Symbol außerhalb seiner
+      eigenen Datei. Findet das nur die Definition, ist es toter Code.</p>
+    <p>Dasselbe Muster im Kleinen: <code>SORTING_BONUS_PER_KG</code> ist definiert, wird nie
+      verwendet — und die README verspricht die Sortierprämie trotzdem. Und im Größeren: Die
+      Verhandlung ist sauber gebaut und getestet, aber in einer Wirtschaft mit Faktor 45 zwischen
+      Ein- und Verkauf bewegt sie nichts. Breite ohne Verbindung. Deshalb steht in der Reihenfolge
+      jetzt oben, was Vorhandenes wirksam macht, statt Neues danebenzustellen.</p>
   </div>
 
   <footer>
