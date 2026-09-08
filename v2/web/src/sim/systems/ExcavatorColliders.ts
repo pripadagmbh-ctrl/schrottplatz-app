@@ -22,6 +22,9 @@ export class ExcavatorColliders implements System {
   private ex!: ExcavatorSystem;
   private chassis!: RAPIER.RigidBody; private boom!: RAPIER.RigidBody; private stick!: RAPIER.RigidBody; grapple!: RAPIER.RigidBody;
   private claws: RAPIER.Collider[] = [];
+  private raking: boolean | null = null;
+  /** Krallen-Kollider fuer Kontaktabfragen (GripSystem: „Zinke beruehrt Teil → gegriffen") */
+  get clawColliders(): readonly RAPIER.Collider[] { return this.claws; }
   private probe = new RAPIER.Ball(0.5);
   private plowRef = 800; private plowMin = 0.3;
   private boomLen = 0; stickLen = 0; palmY = 0;
@@ -47,7 +50,7 @@ export class ExcavatorColliders implements System {
     this.stick = kin(); w.createCollider(RAPIER.ColliderDesc.cuboid(sh[0]!, sh[1]!, sh[2]!).setCollisionGroups(COLLISION.excavator), this.stick);
     this.grapple = kin();
     w.createCollider(RAPIER.ColliderDesc.cylinder(Number(b["palmHalfHeight"]), Number(b["palmRadius"])).setTranslation(0, this.palmY, 0).setCollisionGroups(COLLISION.excavator), this.grapple);
-    for (let i = 0; i < CLAW_COUNT * 2; i++) this.claws.push(w.createCollider(RAPIER.ColliderDesc.capsule(0.16, 0.1).setCollisionGroups(COLLISION.excavator).setFriction(0.9), this.grapple));
+    for (let i = 0; i < CLAW_COUNT * 2; i++) this.claws.push(w.createCollider(RAPIER.ColliderDesc.capsule(0.16, 0.1).setCollisionGroups(COLLISION.excavator).setFriction(0.35), this.grapple));
     this.sync(ctx, 0);
   }
 
@@ -79,6 +82,10 @@ export class ExcavatorColliders implements System {
     this.grapple.setNextKinematicTranslation(p.grapplePos);
     this.grapple.setNextKinematicRotation(p.grappleQuat);
     this.updateClaws(p.splay);
+    // Krallen rechen nur mit OFFENER Spinne durch den Haufen; ab dem Schliessen (Schliessgrad ≥ clawRakeMaxClosure) beruehren
+    // sie lose Teile nicht mehr — eine kinematische Zinke, die durch ein Teil faehrt, schleudert es sonst weg (E-025).
+    const raking = s.grapple < Number(b["clawRakeMaxClosure"] ?? 0.1);
+    if (raking !== this.raking) { this.raking = raking; const g = raking ? COLLISION.excavator : COLLISION.clawsClosed; for (const c of this.claws) c.setCollisionGroups(g); }
     if (dt > 0) this.updatePlow(ctx, dt);
   }
 

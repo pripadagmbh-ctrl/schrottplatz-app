@@ -29,6 +29,7 @@ interface Held {
   /** Startpose relativ zur Spinne beim Zupacken (für die Interpolation) */
   fromPos: Vec3; fromRot: Quat;
   t: number; // 0..1 Haltepose erreicht
+
   /** Welthoehe beim Zupacken; solange die Spinne am Boden schliesst, bleibt das Teil dort (kein Hochsaugen durch den Bodenanschlag) */
   worldY0: number; settled: boolean; halfH: number;
 }
@@ -43,6 +44,9 @@ export class GripSystem implements System {
   private held: Held[] = [];
   private sensor = new RAPIER.Ball(1);
   private maxItems = 5; maxTotalKg = 3500; winStart = 0.6; winEnd = 0.98; holdPoseS = 0.15; releaseDown = 0.2;
+  /** Ab diesem Schliessgrad gilt: Zinke beruehrt ein Teil im Korb → gegriffen (statt es kinematisch wegzuschleudern) */
+  contactStart = 0.3;
+  private readonly touching = new Set<number>();
   private slipSwingFrac = 0.9; slipLoadFrac = 0.6; slipSwingS = 1.5; slipTimer = 0;
   private velHist: Vec3[] = []; velAvgSteps = 3;
   /** Rückmeldung fürs HUD: letzter Grund, warum nicht gegriffen wurde */
@@ -67,7 +71,7 @@ export class GripSystem implements System {
     const g = ctx.data.balancing.grip;
     this.maxItems = Number(g["maxItems"]); this.maxTotalKg = Number(g["maxTotalKg"]);
     this.sensor.radius = Number(g["sensorRadiusM"]);
-    this.winStart = Number(g["grabWindowStart"]); this.winEnd = Number(g["grabWindowEnd"]);
+    this.winStart = Number(g["grabWindowStart"]); this.winEnd = Number(g["grabWindowEnd"]); this.contactStart = Number(g["contactGrabStart"] ?? 0.3);
     this.holdPoseS = Number(g["holdPoseSeconds"]); this.releaseDown = Number(g["releaseDownwardMs"]);
     this.slipSwingFrac = Number(g["slipSwingFraction"]); this.slipLoadFrac = Number(g["slipLoadFraction"]); this.slipSwingS = Number(g["slipSwingSeconds"]);
     this.velAvgSteps = Number(g["releaseVelocityAvgSteps"] ?? 3);
@@ -90,7 +94,7 @@ export class GripSystem implements System {
     } else {
       // Greif-Magnet genau beim Beginn des Schließens (Flanke), nur mit leerer Spinne
       if (!this.wasClosing && this.held.length === 0) this.trySnap(ctx);
-      if (s.grapple >= this.winStart && s.grapple <= this.winEnd) this.tryGrab(ctx);
+      if (s.grapple >= this.contactStart && s.grapple <= this.winEnd) this.tryGrab(ctx);
     }
     this.wasClosing = this.ex.closing;
 
@@ -158,6 +162,11 @@ export class GripSystem implements System {
   private tryGrab(ctx: SimContext): void {
     if (this.held.length >= this.maxItems) { this.lastRefusal = "full"; return; }
     const p = this.ex.pose;
+    // Vor dem eigentlichen Greiffenster zaehlt nur, was eine Zinke gerade beruehrt (Kontakte des letzten Schritts):
+    // eine kinematische Zinke kann nicht gestoppt werden — schiebt sie durch ein Teil, fliegt es weg (iPad-Test 08.09.).
+    const early = ctx.world.excavator.grapple < this.winStart;
+    this.touching.clear();
+    if (early) for (const claw of this.cols.clawColliders) ctx.physics.world.intersectionsWithShape(claw.translation(), claw.rotation(), claw.shape, (other) => { const b = other.parent(); if (b) this.touching.add(b.handle); return true; }, undefined, COLLISION.loose);
     const candidates: { item: ScrapItem; body: RAPIER.RigidBody }[] = [];
     ctx.physics.world.intersectionsWithShape(p.sensorPos, { x: 0, y: 0, z: 0, w: 1 }, this.sensor, (col) => {
       const body = col.parent();
@@ -166,6 +175,7 @@ export class GripSystem implements System {
       if (!id) return true;
       const item = ctx.world.items.get(id);
       if (!item || item.state !== "loose") return true;
+      if (early && !this.touching.has(body.handle)) return true;
       const t = body.translation();
       if (this.insideBasket(t.x, t.y, t.z)) candidates.push({ item, body });
       return true;

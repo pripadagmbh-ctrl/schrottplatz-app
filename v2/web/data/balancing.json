@@ -67,10 +67,11 @@
     "cabLiftSpeedMs": 0.75,
     "groundClearanceM": 0.02,
     "_src2": "boomPivot/Kollider aus excavator.ts:29, 897-955; Spinne hängt grappleLink+palmOffsetY unter der Stielspitze; Sensor palmToSensor darunter",
-    "_tuning": "08.09.2026 Gerätetest PC: Oberwagen 40→36, Hauptarm 25→22,5 (leicht zu flink); Stiel 30 ok; Aufsetzen und Greifen gut; Spinne schließen 0,4→0,8 s, öffnen 0,3→0,5 s (zu schnell, Anheben wirkte unnatürlich), Haltepose 0,15→0,25 s; Rotator 45→90°/s, Raste 15→30° (zu langsam)"
+    "_tuning": "08.09.2026 Gerätetest PC: Oberwagen 40→36, Hauptarm 25→22,5 (leicht zu flink); Stiel 30 ok; Aufsetzen und Greifen gut; Spinne schließen 0,4→0,8 s, öffnen 0,3→0,5 s (zu schnell, Anheben wirkte unnatürlich), Haltepose 0,15→0,25 s; Rotator 45→90°/s, Raste 15→30° (zu langsam) clawRakeMaxClosure 0 = Krallen beruehren lose Teile nie (E-025); >0 = Rechen mit offener Spinne erlaubt, aber kinematische Zinken schleudern Teile weg.",
+    "clawRakeMaxClosure": 0.0
   },
   "grip": {
-    "maxItems": 5,
+    "maxItems": 12,
     "maxTotalKg": 3500,
     "sensorRadiusM": 1.05,
     "grabWindowStart": 0.6,
@@ -89,7 +90,8 @@
     "basketTopMarginM": 0.45,
     "basketBottomMarginM": 0.35,
     "releaseVelocityAvgSteps": 3,
-    "releaseGraceSeconds": 0.6
+    "releaseGraceSeconds": 0.6,
+    "contactGrabStart": 0.3
   },
   "economy": {
     "startMoneyEur": 5000,

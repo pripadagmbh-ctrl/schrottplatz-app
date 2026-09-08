@@ -168,8 +168,11 @@ export class ExcavatorSystem implements System {
    * hochgeschoben (bis maxLift); erst darüber hinaus wird der Arm geklemmt.
    */
   private resolveGroundClamp(s: ExcavatorState): void {
-    // Ab Kardangelenk = Stielspitze: Krallenspitzen oder — wenn tiefer — die Unterkante der Ladung (E-017)
-    const tipDepth = Math.max(clawTipDepth(this.splay(s)), this.carriedBottomM);
+    // Bezug ist die Spitzentiefe der OFFENEN Spinne (E-024, ersetzt E-013 teilweise): Beim Schliessen werden die Spitzen bis
+    // 0,34 m tiefer — frueher hob der Anschlag dann die ganze Spinne an („Hochbocken", geschlossen kam sie nicht mehr an den
+    // Haufen, Ladung fuhr mit hoch; iPad-Test 08.09.). Jetzt duerfen die Spitzen beim Schliessen in Boden/Haufen eintauchen,
+    // wie echte Zinken. Dazu die Unterkante einer mitgefuehrten Ladung (E-017).
+    const tipDepth = Math.max(clawTipDepth(CLAW_OPEN_SPLAY), this.carriedBottomM);
     const minTipY = tipDepth + Number(this.b["groundClearanceM"]);
     const maxLift = 0.6;
     let need = minTipY - this.tipY(s);
