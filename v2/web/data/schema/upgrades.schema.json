@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["upgrades"],
+  "properties": {
+    "upgrades": {
+      "type": "array", "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": ["id", "tier", "kind", "priceEur", "requiresStars", "effects"],
+        "properties": {
+          "tier": { "enum": ["MVP", "V1", "LATER"] },
+          "kind": { "enum": ["stage", "tool", "station"] },
+          "stage": { "enum": [2, 3] },
+          "priceEur": { "type": "number", "exclusiveMinimum": 0 },
+          "requiresStars": { "type": "integer", "minimum": 0 },
+          "requires": { "type": "string" },
+          "effects": { "type": "object" }
+        }
+      }
+    }
+  }
+}

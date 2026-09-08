@@ -1,0 +1,32 @@
+{
+  "$schema": "./schema/composites.schema.json",
+  "_comment": "Briefing Kap. 8. Werte aus prototype/src/dismantle/carDef.ts (SW). tool: grapple = Spinne, shear = Schere [V1].",
+  "composites": [
+    {
+      "id": "car_compact",
+      "tier": "MVP",
+      "buyPriceEur": 120,
+      "hull": { "materialId": "steel", "massKg": 600, "collider": "box", "half": [0.85, 0.55, 2.0], "yOffset": 0.55 },
+      "crushScales": [1, 0.76, 0.55],
+      "glassImpactDv": 4.5,
+      "crushImpactDv": 7,
+      "parts": [
+        { "id": "wheel_fl", "materialId": "tire_rim", "massKg": 25, "anchor": [-0.82, 0.33, 1.25], "grabRadius": 0.5, "tearSeconds": 1.2, "tool": "grapple", "requires": [], "blocksPress": false, "unlockDay": 1, "shape": { "kind": "wheel", "size": [0.33, 0.24] }, "color": "#1e2022" },
+        { "id": "wheel_fr", "materialId": "tire_rim", "massKg": 25, "anchor": [0.82, 0.33, 1.25], "grabRadius": 0.5, "tearSeconds": 1.2, "tool": "grapple", "requires": [], "blocksPress": false, "unlockDay": 1, "shape": { "kind": "wheel", "size": [0.33, 0.24] }, "color": "#1e2022" },
+        { "id": "wheel_rl", "materialId": "tire_rim", "massKg": 25, "anchor": [-0.82, 0.33, -1.25], "grabRadius": 0.5, "tearSeconds": 1.2, "tool": "grapple", "requires": [], "blocksPress": false, "unlockDay": 1, "shape": { "kind": "wheel", "size": [0.33, 0.24] }, "color": "#1e2022" },
+        { "id": "wheel_rr", "materialId": "tire_rim", "massKg": 25, "anchor": [0.82, 0.33, -1.25], "grabRadius": 0.5, "tearSeconds": 1.2, "tool": "grapple", "requires": [], "blocksPress": false, "unlockDay": 1, "shape": { "kind": "wheel", "size": [0.33, 0.24] }, "color": "#1e2022" },
+        { "id": "battery", "materialId": "battery", "massKg": 18, "anchor": [0.45, 0.75, 1.55], "grabRadius": 0.45, "tearSeconds": 0.8, "tool": "grapple", "requires": [], "blocksPress": true, "unlockDay": 2, "shape": { "kind": "box", "size": [0.26, 0.2, 0.17] }, "color": "#1e2124" },
+        { "id": "engine", "materialId": "steel", "massKg": 210, "anchor": [0, 0.62, 1.45], "grabRadius": 1.0, "tearSeconds": 2.6, "tool": "grapple", "requires": ["battery"], "blocksPress": true, "unlockDay": 5, "shape": { "kind": "box", "size": [0.9, 0.42, 0.7] }, "color": "#3e4247" },
+        { "id": "catalyst", "materialId": "catalyst", "massKg": 4, "anchor": [0, 0.25, 0.6], "grabRadius": 0.4, "tearSeconds": 1.0, "tool": "grapple", "requires": [], "blocksPress": false, "unlockDay": 8, "tier": "V1", "shape": { "kind": "cylinder", "size": [0.12, 0.12, 0.45] }, "color": "#f2f6f8" },
+        { "id": "tank", "materialId": "contaminant", "massKg": 12, "anchor": [0, 0.3, -1.1], "grabRadius": 0.5, "tearSeconds": 1.5, "tool": "shear", "requires": [], "blocksPress": true, "unlockDay": 8, "tier": "V1", "shape": { "kind": "box", "size": [0.7, 0.25, 0.5] }, "color": "#3a3a3a" },
+        { "id": "harness", "materialId": "cable", "massKg": 15, "anchor": [0, 0.7, 0.4], "grabRadius": 0.6, "tearSeconds": 2.0, "tool": "shear", "requires": ["engine"], "blocksPress": false, "unlockDay": 10, "tier": "V1", "shape": { "kind": "cylinder", "size": [0.3, 0.3, 0.25] }, "color": "#1d1f22" }
+      ],
+      "windows": [
+        { "id": "front", "anchor": [0, 1.0, 0.85], "size": [1.3, 0.5], "rotY": 0 },
+        { "id": "rear", "anchor": [0, 1.0, -1.22], "size": [1.3, 0.5], "rotY": 0 },
+        { "id": "left", "anchor": [-0.77, 0.98, -0.2], "size": [1.8, 0.44], "rotY": 1.5707963 },
+        { "id": "right", "anchor": [0.77, 0.98, -0.2], "size": [1.8, 0.44], "rotY": 1.5707963 }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,468 @@
+{
+  "$schema": "./schema/level.schema.json",
+  "_comment": "Briefing Kap. 12. Eine Wahrheit für Kollider, Zonen, Hindernisliste, Routen (Prototyp hatte drei: yard.ts, obstacles.ts, containers.ts). Koordinaten in m, +Z = Nord, Ursprung = Bagger-Standort. Boxen liegen im Bogen (Radius 8,5 m) um den Bagger, damit alle ohne Fahren erreichbar sind (Reichweite ≈ 9,75 m) — der Test data.test.ts prüft das.",
+  "id": "yard_v2",
+  "size": {
+    "w": 60,
+    "d": 45
+  },
+  "ground": {
+    "material": "concrete",
+    "color": "#b8ad9a"
+  },
+  "walls": [
+    {
+      "id": "south_w",
+      "from": [
+        -30,
+        -22.5
+      ],
+      "to": [
+        -4,
+        -22.5
+      ],
+      "height": 1.8,
+      "thickness": 0.6,
+      "style": "betonlego"
+    },
+    {
+      "id": "south_e",
+      "from": [
+        4,
+        -22.5
+      ],
+      "to": [
+        30,
+        -22.5
+      ],
+      "height": 1.8,
+      "thickness": 0.6,
+      "style": "betonlego"
+    },
+    {
+      "id": "north",
+      "from": [
+        -30,
+        22.5
+      ],
+      "to": [
+        30,
+        22.5
+      ],
+      "height": 1.8,
+      "thickness": 0.6,
+      "style": "betonlego"
+    },
+    {
+      "id": "west",
+      "from": [
+        -30,
+        -22.5
+      ],
+      "to": [
+        -30,
+        22.5
+      ],
+      "height": 1.8,
+      "thickness": 0.6,
+      "style": "fence"
+    },
+    {
+      "id": "east",
+      "from": [
+        30,
+        -22.5
+      ],
+      "to": [
+        30,
+        22.5
+      ],
+      "height": 1.8,
+      "thickness": 0.6,
+      "style": "fence"
+    }
+  ],
+  "gate": {
+    "x": 0,
+    "z": -22.5,
+    "halfWidth": 4
+  },
+  "weighbridge": {
+    "x": 0,
+    "z": -15,
+    "length": 10,
+    "width": 3.5
+  },
+  "buildings": [
+    {
+      "id": "hut",
+      "stage": 1,
+      "rect": {
+        "x": 5,
+        "z": -15,
+        "hw": 1.5,
+        "hd": 1.5
+      },
+      "height": 2.8,
+      "model": "hut"
+    },
+    {
+      "id": "office",
+      "stage": 2,
+      "rect": {
+        "x": -22,
+        "z": -16,
+        "hw": 4,
+        "hd": 3
+      },
+      "height": 3.2,
+      "model": "office"
+    },
+    {
+      "id": "hall",
+      "stage": 3,
+      "rect": {
+        "x": -22,
+        "z": -8,
+        "hw": 5,
+        "hd": 4
+      },
+      "height": 5.0,
+      "model": "hall"
+    }
+  ],
+  "containers": [
+    {
+      "id": "pile_steel",
+      "materialId": "steel",
+      "kind": "pile",
+      "stage": 1,
+      "rect": {
+        "x": 13,
+        "z": -2,
+        "hw": 4,
+        "hd": 4
+      },
+      "wallHeight": 1.8,
+      "openSide": "west"
+    },
+    {
+      "id": "box_va",
+      "materialId": "va",
+      "kind": "mulde",
+      "stage": 1,
+      "rect": {
+        "x": -7.36,
+        "z": 4.25,
+        "hw": 2,
+        "hd": 1.2
+      },
+      "wallHeight": 1.6,
+      "openSide": "south"
+    },
+    {
+      "id": "box_alu",
+      "materialId": "alu",
+      "kind": "mulde",
+      "stage": 1,
+      "rect": {
+        "x": -4.25,
+        "z": 7.36,
+        "hw": 2,
+        "hd": 1.2
+      },
+      "wallHeight": 1.6,
+      "openSide": "south"
+    },
+    {
+      "id": "box_copper",
+      "materialId": "copper",
+      "kind": "mulde",
+      "stage": 1,
+      "rect": {
+        "x": 0.0,
+        "z": 8.5,
+        "hw": 2,
+        "hd": 1.2
+      },
+      "wallHeight": 1.6,
+      "openSide": "south"
+    },
+    {
+      "id": "box_cable",
+      "materialId": "cable",
+      "kind": "mulde",
+      "stage": 1,
+      "rect": {
+        "x": 4.25,
+        "z": 7.36,
+        "hw": 2,
+        "hd": 1.2
+      },
+      "wallHeight": 1.6,
+      "openSide": "south"
+    },
+    {
+      "id": "box_contaminant",
+      "materialId": "contaminant",
+      "kind": "mulde",
+      "stage": 1,
+      "rect": {
+        "x": 7.36,
+        "z": 4.25,
+        "hw": 2,
+        "hd": 1.2
+      },
+      "wallHeight": 1.6,
+      "openSide": "south"
+    },
+    {
+      "id": "box_tires",
+      "materialId": "tire",
+      "kind": "mulde",
+      "stage": 2,
+      "rect": {
+        "x": -8.5,
+        "z": 0,
+        "hw": 1.2,
+        "hd": 2
+      },
+      "wallHeight": 1.6,
+      "openSide": "east"
+    },
+    {
+      "id": "box_ewaste",
+      "materialId": "ewaste",
+      "kind": "mulde",
+      "stage": 2,
+      "rect": {
+        "x": -8.5,
+        "z": -5,
+        "hw": 1.2,
+        "hd": 2
+      },
+      "wallHeight": 1.6,
+      "openSide": "east"
+    }
+  ],
+  "zones": [
+    {
+      "id": "intake",
+      "rect": {
+        "x": 0,
+        "z": -5,
+        "hw": 6,
+        "hd": 3
+      }
+    },
+    {
+      "id": "dismantle",
+      "rect": {
+        "x": -16,
+        "z": 2,
+        "hw": 4,
+        "hd": 3
+      }
+    },
+    {
+      "id": "press",
+      "rect": {
+        "x": -16,
+        "z": -6,
+        "hw": 2,
+        "hd": 1.5
+      }
+    },
+    {
+      "id": "toolswap",
+      "rect": {
+        "x": -22,
+        "z": -1,
+        "hw": 1.5,
+        "hd": 1.5
+      }
+    },
+    {
+      "id": "pickup",
+      "rect": {
+        "x": -4,
+        "z": 12.5,
+        "hw": 10,
+        "hd": 1.5
+      }
+    },
+    {
+      "id": "lane_block_check",
+      "rect": {
+        "x": -4,
+        "z": -5,
+        "hw": 2,
+        "hd": 2.5
+      }
+    }
+  ],
+  "routes": {
+    "deliver_in": [
+      [
+        0,
+        -27
+      ],
+      [
+        0,
+        -15
+      ],
+      [
+        -7,
+        -10
+      ],
+      [
+        -7,
+        -5
+      ]
+    ],
+    "deliver_out": [
+      [
+        -7,
+        -5
+      ],
+      [
+        -7,
+        -10
+      ],
+      [
+        0,
+        -15
+      ],
+      [
+        0,
+        -27
+      ]
+    ],
+    "lowloader_in": [
+      [
+        0,
+        -27
+      ],
+      [
+        0,
+        -15
+      ],
+      [
+        -12,
+        -9
+      ],
+      [
+        -16,
+        2
+      ]
+    ],
+    "lowloader_out": [
+      [
+        -16,
+        2
+      ],
+      [
+        -12,
+        -9
+      ],
+      [
+        0,
+        -15
+      ],
+      [
+        0,
+        -27
+      ]
+    ],
+    "pickup_in": [
+      [
+        0,
+        -27
+      ],
+      [
+        0,
+        -15
+      ],
+      [
+        -12,
+        -9
+      ],
+      [
+        -12,
+        12.5
+      ],
+      [
+        -4,
+        12.5
+      ]
+    ],
+    "pickup_out": [
+      [
+        -4,
+        12.5
+      ],
+      [
+        -12,
+        12.5
+      ],
+      [
+        -12,
+        -9
+      ],
+      [
+        0,
+        -15
+      ],
+      [
+        0,
+        -27
+      ]
+    ]
+  },
+  "spawns": {
+    "excavator": {
+      "x": 0,
+      "z": 0,
+      "heading": 0
+    },
+    "piles": [
+      {
+        "zoneId": "intake",
+        "count": 0
+      }
+    ]
+  },
+  "props": [
+    {
+      "model": "floodlight",
+      "at": [
+        [
+          -28,
+          20
+        ],
+        [
+          28,
+          20
+        ],
+        [
+          -28,
+          -20
+        ],
+        [
+          28,
+          -20
+        ]
+      ]
+    },
+    {
+      "model": "sign_feierabend",
+      "at": [
+        [
+          4.5,
+          -22
+        ]
+      ]
+    }
+  ],
+  "clearanceM": 1.4
+}

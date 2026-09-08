@@ -1,0 +1,36 @@
+{
+  "$schema": "./schema/controls.schema.json",
+  "_comment": "Briefing Kap. 5.2. Achsbelegung wie prototype/src/core/controlConfig.ts:47-54; Tastennamen im UI kommen aus dieser Datei, nie aus Literalen.",
+  "axes": {
+    "leftX": { "fn": "cab", "invert": false },
+    "leftY": { "fn": "boom", "invert": true },
+    "rightX": { "fn": "none", "invert": false },
+    "rightY": { "fn": "stick", "invert": true }
+  },
+  "deadzone": 0.12,
+  "keyboard": {
+    "cab": { "neg": "KeyQ", "pos": "KeyE" },
+    "boom": { "neg": "KeyF", "pos": "KeyR" },
+    "stick": { "neg": "KeyG", "pos": "KeyT" },
+    "drive": { "neg": "KeyS", "pos": "KeyW" },
+    "steer": { "neg": "KeyA", "pos": "KeyD" },
+    "grapple": "MouseLeft",
+    "rotator": "MouseWheel",
+    "cycleCamera": "KeyC",
+    "orderPickup": "KeyH",
+    "pause": "Escape",
+    "endDay": "Enter",
+    "debugOverlay": "F3"
+  },
+  "gamepad": {
+    "cab": { "axis": 0 }, "boom": { "axis": 1, "invert": true }, "stick": { "axis": 3, "invert": true },
+    "grapple": { "button": 7 }, "rotatorNeg": { "button": 4 }, "rotatorPos": { "button": 5 },
+    "driveMode": { "button": 0 }, "cycleCamera": { "button": 3 }, "pause": { "button": 9 }
+  },
+  "touch": {
+    "stickDiameterPx": 120, "stickKnobPx": 52, "stickDiameterCompactPx": 100,
+    "grabButtonPx": 76, "rotatorButtonPx": 48, "driveModeButtonPx": 56, "topButtonPx": 48,
+    "minTapTargetPx": 44, "floatingZoneFraction": 0.4,
+    "grabMode": "hold", "driveModeAutoExitS": 4
+  }
+}

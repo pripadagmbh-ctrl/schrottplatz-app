@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#1e2124" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%234fbf3f%27/%3E%3Crect x=%277%27 y=%2718%27 width=%2718%27 height=%277%27 fill=%27%231e2124%27/%3E%3Crect x=%2715%27 y=%276%27 width=%274%27 height=%2714%27 fill=%27%23f2b632%27/%3E%3C/svg%3E" />
+    <title>Bagerana</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #1e2124; color: #eef0ec; font-family: Inter, system-ui, sans-serif; }
+      body { height: 100dvh; touch-action: none; -webkit-user-select: none; user-select: none; }
+      #scene { display: block; width: 100%; height: 100%; }
+      #boot { position: fixed; inset: 0; display: grid; place-items: center; background: #1e2124; font-size: 18px; }
+      #debug-overlay { position: fixed; left: max(8px, env(safe-area-inset-left)); top: max(8px, env(safe-area-inset-top)); margin: 0; padding: 6px 8px; font: 12px/1.35 ui-monospace, Consolas, monospace; color: #eef0ec; background: rgba(20,22,24,.85); border-radius: 6px; pointer-events: none; z-index: 10; }
+      .fatal { padding: 24px; max-width: 900px; margin: 0 auto; }
+      .fatal h1 { color: #e0483a; font-size: 20px; }
+      .fatal pre { white-space: pre-wrap; font-size: 13px; }
+    </style>
+  </head>
+  <body>
+    <canvas id="scene"></canvas>
+    <div id="boot">Lädt …</div>
+    <script type="module" src="/src/app/main.ts"></script>
+  </body>
+</html>

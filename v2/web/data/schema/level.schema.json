@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["id", "size", "ground", "walls", "gate", "weighbridge", "buildings", "containers", "zones", "routes", "spawns", "clearanceM"],
+  "definitions": {
+    "vec2": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+    "rect": { "type": "object", "required": ["x", "z", "hw", "hd"], "properties": { "x": { "type": "number" }, "z": { "type": "number" }, "hw": { "type": "number", "exclusiveMinimum": 0 }, "hd": { "type": "number", "exclusiveMinimum": 0 } } }
+  },
+  "properties": {
+    "id": { "type": "string" },
+    "size": { "type": "object", "required": ["w", "d"] },
+    "ground": { "type": "object", "required": ["material", "color"] },
+    "walls": { "type": "array", "items": { "type": "object", "required": ["id", "from", "to", "height", "thickness", "style"], "properties": { "from": { "$ref": "#/definitions/vec2" }, "to": { "$ref": "#/definitions/vec2" }, "style": { "enum": ["betonlego", "fence", "concrete"] } } } },
+    "gate": { "type": "object", "required": ["x", "z", "halfWidth"] },
+    "weighbridge": { "type": "object", "required": ["x", "z", "length", "width"] },
+    "buildings": { "type": "array", "items": { "type": "object", "required": ["id", "stage", "rect", "height", "model"], "properties": { "stage": { "enum": [1, 2, 3] }, "rect": { "$ref": "#/definitions/rect" } } } },
+    "containers": { "type": "array", "minItems": 6, "items": { "type": "object", "required": ["id", "materialId", "kind", "stage", "rect", "wallHeight", "openSide"], "properties": { "kind": { "enum": ["pile", "mulde"] }, "stage": { "enum": [1, 2, 3] }, "rect": { "$ref": "#/definitions/rect" }, "openSide": { "enum": ["north", "south", "east", "west"] } } } },
+    "zones": { "type": "array", "items": { "type": "object", "required": ["id", "rect"], "properties": { "rect": { "$ref": "#/definitions/rect" } } } },
+    "routes": { "type": "object", "additionalProperties": { "type": "array", "minItems": 2, "items": { "$ref": "#/definitions/vec2" } } },
+    "spawns": { "type": "object", "required": ["excavator"] },
+    "props": { "type": "array" },
+    "clearanceM": { "type": "number", "minimum": 0 }
+  }
+}

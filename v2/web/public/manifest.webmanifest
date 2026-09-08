@@ -1,0 +1,11 @@
+{
+  "name": "Bagerana",
+  "short_name": "Bagerana",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#1e2124",
+  "theme_color": "#1e2124",
+  "icons": []
+}

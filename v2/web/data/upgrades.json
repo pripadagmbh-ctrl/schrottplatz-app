@@ -1,0 +1,11 @@
+{
+  "$schema": "./schema/upgrades.schema.json",
+  "_comment": "Briefing Kap. 10.4. Drei Stufen (Sterne UND Geld) ersetzen die 8 Upgrades des Prototyps (economy/upgrades.ts). Wirkungen als benannte Modifikatoren; main.ts:456-457 für speed/capacity.",
+  "upgrades": [
+    { "id": "stage2_office", "tier": "MVP", "kind": "stage", "stage": 2, "priceEur": 9000, "requiresStars": 10, "effects": { "deliveriesPerDay": 4, "showComposition": true, "pickupsParallel": 2 } },
+    { "id": "stage3_hall", "tier": "V1", "kind": "stage", "stage": 3, "priceEur": 20000, "requiresStars": 25, "requires": "stage2_office", "effects": { "deliveriesPerDay": 5, "speedFactor": 1.35, "capacityFactor": 1.5, "staffLoader": true } },
+    { "id": "tool_shear", "tier": "V1", "kind": "tool", "priceEur": 6000, "requiresStars": 10, "requires": "stage2_office", "effects": { "tool": "shear" } },
+    { "id": "tool_magnet", "tier": "V1", "kind": "tool", "priceEur": 8000, "requiresStars": 10, "requires": "stage2_office", "effects": { "tool": "magnet" } },
+    { "id": "press_large", "tier": "V1", "kind": "station", "priceEur": 12000, "requiresStars": 25, "requires": "stage3_hall", "effects": { "pressCapacityFactor": 1.6 } }
+  ]
+}

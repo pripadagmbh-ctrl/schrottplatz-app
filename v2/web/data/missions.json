@@ -1,0 +1,18 @@
+{
+  "$schema": "./schema/missions.schema.json",
+  "_comment": "Briefing Kap. 11.2. Drei Aufträge pro Tag aus diesem Pool, gewichtet, gefiltert nach fromDay/toDay und tier. Texte in i18n/*.json unter missions.<id>.",
+  "missions": [
+    { "id": "deliver_alu_small", "type": "deliver", "tier": "MVP", "params": { "materialId": "alu", "kg": 150, "minPurity": 0.9 }, "bonusEur": 100, "fromDay": 1, "toDay": 5, "weight": 3 },
+    { "id": "deliver_steel_medium", "type": "deliver", "tier": "MVP", "params": { "materialId": "steel", "kg": 1500, "minPurity": 0.9 }, "bonusEur": 150, "fromDay": 1, "weight": 3 },
+    { "id": "deliver_copper_small", "type": "deliver", "tier": "MVP", "params": { "materialId": "copper", "kg": 40, "minPurity": 0.95 }, "bonusEur": 200, "fromDay": 2, "weight": 2 },
+    { "id": "deliver_alu_large", "type": "deliver", "tier": "MVP", "params": { "materialId": "alu", "kg": 800, "minPurity": 0.9 }, "bonusEur": 300, "fromDay": 6, "weight": 2 },
+    { "id": "clear_intake", "type": "clear", "tier": "MVP", "params": { "zoneId": "intake", "maxLooseKg": 500 }, "bonusEur": 100, "fromDay": 1, "weight": 3 },
+    { "id": "clear_intake_strict", "type": "clear", "tier": "MVP", "params": { "zoneId": "intake", "maxLooseKg": 150 }, "bonusEur": 150, "fromDay": 8, "weight": 2 },
+    { "id": "customer_fast", "type": "customer", "tier": "MVP", "params": { "customerId": "hallmann", "maxMinutes": 3 }, "bonusEur": 150, "fromDay": 2, "weight": 2 },
+    { "id": "customer_fast_any", "type": "customer", "tier": "MVP", "params": { "maxMinutes": 4 }, "bonusEur": 120, "fromDay": 3, "weight": 2 },
+    { "id": "dismantle_engine", "type": "dismantle", "tier": "V1", "params": { "compositeDefId": "car_compact", "partId": "engine", "sellAs": "steel" }, "bonusEur": 200, "fromDay": 5, "weight": 2 },
+    { "id": "clean_day", "type": "clean", "tier": "V1", "params": { "maxWrongSorts": 0 }, "bonusEur": 150, "fromDay": 3, "weight": 1 }
+  ],
+  "perDay": 3,
+  "starsPerMission": 1
+}

@@ -1,0 +1,63 @@
+{
+  "$schema": "./schema/balancing.schema.json",
+  "_comment": "Briefing Kap. 4-6, 9, 10, 19. Alle Werte Startwerte (SW). Herkunft in den *_src-Feldern (prototype/src/...).",
+  "physics": {
+    "stepHz": 60, "maxCatchUpSteps": 2,
+    "solverIterations": 6, "internalPgsIterations": 1, "contactNaturalFrequency": 30,
+    "sleepLinearThreshold": 0.02, "sleepAngularThreshold": 0.05,
+    "spawnGapM": 0.08, "presimulateSteps": 120,
+    "_src": "physicsWorld.ts:16-21 hatte 12 Iterationen / 6 Reibungsiterationen / 40 Hz — QA A2 §5: zu steif, Haufen schlief nie. Rapier 0.20 kennt keine getrennten Reibungsiterationen mehr (numAdditionalFrictionIterations entfallen); internalPgsIterations = 1 ist der Standard."
+  },
+  "excavator": {
+    "driveMaxMs": 2.2, "steerRateRadS": 0.7, "steerMinFactor": 0.35,
+    "cabRateDegS": 40, "boomRateDegS": 25, "stickRateDegS": 30,
+    "boomMinDeg": 5, "boomMaxDeg": 62, "stickMinDeg": -140, "stickMaxDeg": -25,
+    "rotatorStepDeg": 15, "rotatorRateDegS": 45,
+    "closeTimeS": 0.4, "openTimeS": 0.3, "rampTimeS": 0.2,
+    "boomLenM": 5.2, "stickLenM": 4.0, "grappleLinkM": 0.55, "palmToSensorM": 0.75,
+    "loadFactorMin": 0.5, "loadFactorRefKg": 3500,
+    "pendulumLengthM": 1.5, "pendulumAccelCapMs2": 15,
+    "_src": "excavator.ts:27-59 (driveMax 1.4 → 2.2 nach Gerätetest 02.09.)"
+  },
+  "grip": {
+    "maxItems": 5, "maxTotalKg": 3500, "sensorRadiusM": 1.05,
+    "grabWindowStart": 0.6, "grabWindowEnd": 0.98, "minContactClaws": 2,
+    "holdPoseSeconds": 0.15, "releaseDownwardMs": 0.2,
+    "slipSwingFraction": 0.9, "slipLoadFraction": 0.6, "slipSwingSeconds": 1.5, "slipImpactDv": 3.0,
+    "plowMassRefKg": 800, "plowFactorMin": 0.3,
+    "_src": "gripSystem.ts:14-22; Briefing Kap. 6.2-6.4"
+  },
+  "economy": {
+    "startMoneyEur": 5000, "creditLimitEur": -1500, "creditPenaltyFactor": 1.2,
+    "fixedCostsPerDayEur": 150, "mixedBuyPricePerKg": 0.16, "sortingBonusPerKg": 0.05,
+    "purityExponent": 2, "purityGreen": 0.95, "purityYellow": 0.8,
+    "tradeFixedRate": 1.06,
+    "_src": "account.ts:16-34, purity.ts:26, main.ts:506"
+  },
+  "day": {
+    "deliveriesPerDay": { "0": 1, "1": 2, "2": 2, "3": 2, "4": 3, "stage2": 4, "stage3": 5 },
+    "deliveryIntervalS": [60, 90], "campaignDays": 30,
+    "unlockAfterDay": 3, "premiumPriceEur": 4.99,
+    "targetDayMinutes": [6, 10],
+    "_src": "Briefing Kap. 4.3 (Rückfrage 3: 6-10 min)"
+  },
+  "containers": {
+    "bookAfterRestS": 3, "keepVisibleCount": 6, "keepVisibleS": 20,
+    "muldeCapacityKg": 6000, "pileCapacityKg": 20000,
+    "pickupArrivalS": 45, "pickupLoadS": 6, "pickupPileLoadS": 12
+  },
+  "scrap": {
+    "maxLooseItems": 300, "bundleCount": 20, "maxAwakeBodies": 80,
+    "busyKg": 6000, "jamKg": 16000, "jamClearKg": 11000,
+    "_src": "shift.ts:17-21"
+  },
+  "customers": {
+    "privatePatienceS": 60, "tradePatienceS": 45, "tradeLeaveS": 180,
+    "privateMaxKg": 800, "tradeMaxKg": 3000,
+    "_src": "customers.ts:251"
+  },
+  "budgets": {
+    "drawCallsMobile": 250, "drawCallsDesktop": 400, "physicsMsMobile": 4, "fpsMobileMin": 30,
+    "lowQualityFpsThreshold": 28, "lowQualityDetectFrames": 120, "pixelRatioMax": 2
+  }
+}
