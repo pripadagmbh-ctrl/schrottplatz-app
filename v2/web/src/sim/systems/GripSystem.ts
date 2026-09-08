@@ -29,6 +29,8 @@ interface Held {
   /** Startpose relativ zur Spinne beim Zupacken (für die Interpolation) */
   fromPos: Vec3; fromRot: Quat;
   t: number; // 0..1 Haltepose erreicht
+  /** Welthoehe beim Zupacken; solange die Spinne am Boden schliesst, bleibt das Teil dort (kein Hochsaugen durch den Bodenanschlag) */
+  worldY0: number; settled: boolean; halfH: number;
 }
 
 export class GripSystem implements System {
@@ -107,6 +109,19 @@ export class GripSystem implements System {
       const item = ctx.world.items.get(h.id);
       if (!body || !item) continue;
       bottom = Math.max(bottom, p.grapplePos.y - (body.translation().y - this.worldHalfHeight(item.size, body.rotation())));
+      // Bodenanschlag schiebt die Spinne beim Schliessen bis 0,6 m hoch (E-013) — das Teil darf da nicht mitfahren
+      // (Patrick 08.09.: „Material fliegt den Greifer hoch"). Erst wenn geschlossen oder abgehoben: Lage einfrieren.
+      if (!h.settled) {
+        if (this.ex.groundContact && this.ex.closing && s.grapple < this.winEnd) {
+          h.localPos.y = h.worldY0 - p.grapplePos.y;
+        } else {
+          clawPoint(0, p.splay, CLAW_SEGMENTS, this.tip);
+          const cur = h.worldY0 - p.grapplePos.y;
+          h.localPos.y = Math.max(cur, this.tip.y + h.halfH); // nie unter den Spitzen haengen — es sitzt auf den Schalen auf
+          if (h.localPos.y - cur > 0.01) { h.fromPos = { x: 0, y: cur, z: 0 }; h.fromRot = { ...h.localRot }; h.t = 0; } // weich nachsetzen statt springen
+          h.settled = true;
+        }
+      }
       h.t = Math.min(1, h.t + dt / this.holdPoseS);
       const k = h.t * h.t * (3 - 2 * h.t); // weich
       const lx = h.fromPos.x + (h.localPos.x - h.fromPos.x) * k, ly = h.fromPos.y + (h.localPos.y - h.fromPos.y) * k, lz = h.fromPos.z + (h.localPos.z - h.fromPos.z) * k;
@@ -220,14 +235,11 @@ export class GripSystem implements System {
     // Haltepose: seitlich in die Korbmitte, Höhe behalten; Unterkante mindestens auf Höhe der geschlossenen Spitzen
     // (Patrick 08.09.: „Teile rutschen unnatürlich nach oben" — vorher wurde alles auf Sensorhöhe gezogen, 0,7 m über den Spitzen)
     const halfH = this.worldHalfHeight(item.size, r);
-    clawPoint(0, 0, CLAW_SEGMENTS, this.tip); // Spitzen bei geschlossener Spinne
-    const minY = this.tip.y + halfH;
-    const topY = CLAW_RING_Y - halfH; // nie in die Traverse hinein
-    const localPos: Vec3 = { x: 0, y: clamp(Math.max(fromPos.y, minY), Math.min(minY, topY), Math.max(minY, topY)), z: 0 };
+    const localPos: Vec3 = { x: 0, y: fromPos.y, z: 0 }; // Hoehe wird pro Schritt gefuehrt (worldY0 / settled), bis eingefroren
     body.setBodyType(RAPIER.RigidBodyType.KinematicPositionBased, true);
     for (let i = 0; i < body.numColliders(); i++) body.collider(i).setCollisionGroups(COLLISION.held);
     item.state = "held";
-    this.held.push({ id: item.id, handle: body.handle, massKg: body.mass(), localPos, localRot: { ...fromRot }, fromPos, fromRot, t: 0 });
+    this.held.push({ id: item.id, handle: body.handle, massKg: body.mass(), localPos, localRot: { ...fromRot }, fromPos, fromRot, t: 0, worldY0: t.y, settled: false, halfH });
     this.cols.heldHandles.add(body.handle);
     ctx.bus.emit("itemGrabbed", { itemId: item.id, kg: body.mass() });
   }

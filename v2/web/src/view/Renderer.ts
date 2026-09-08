@@ -141,7 +141,7 @@ export class Renderer {
   render(world: WorldState, alpha: number, frameDt: number, control?: ControlFrame): void {
     this.scrap.update(world, alpha);
     this.updateExcavator(alpha);
-    if (this.aim) this.aimRing.update(this.aim, frameDt);
+    if (this.aim) { this.aimRing.update(this.aim, frameDt); this.fills.updateAim(this.aim, frameDt); }
     this.vehicles.update(this.runs); this.fills.update(world);
     const m = this.modelPose;
     const cabin = this.rig.mode === "cabin";
