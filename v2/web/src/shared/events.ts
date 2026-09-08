@@ -18,6 +18,9 @@ export interface GameEvents {
   dayPhaseChanged: { day: number; phase: "morning" | "work" | "evening" | "ended" };
   missionCompleted: { missionId: string; bonusEur: number };
   moneyChanged: { deltaEur: number; totalEur: number; reason: string };
+  sortPointsChanged: { delta: number; total: number; itemId: ItemId; correct: boolean };
+  pickupOrdered: { containerId: ContainerId };
+  toast: { text: string; kind: "info" | "good" | "bad" };
   pressUsed: { compositeId: CompositeId; crushStage: number };
   upgradeBought: { upgradeId: string };
   saveRequested: { reason: "day" | "hidden" | "manual" | "interval" };

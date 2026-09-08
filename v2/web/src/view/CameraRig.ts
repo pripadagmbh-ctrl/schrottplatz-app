@@ -6,8 +6,10 @@ import * as THREE from "three";
  * die Orbit-Abweichung zum Oberwagen bleibt erhalten, bis er sie ändert.
  * M3: Draufsicht (Briefing Kap. 5.3: fast senkrecht, 25 m, 60° Pitch, folgt dem Oberwagen; Rückfrage M3-3).
  * Beim Umschalten werden Distanz/Pitch weich (0,4 s) überblendet, damit kein Schnitt entsteht.
- * Kabine (vorgezogen aus V1, iPad-Test 08.09.: aus 11 m Orbit sind die Teile zum Sortieren zu klein): Auge in der
- * Kabine, Blick folgt der Spinne weich (0,25 s) — der Fahrer schaut auf seine Last, nicht geradeaus.
+ * Kabine (vorgezogen aus V1, iPad-Test 08.09.: aus 11 m Orbit sind die Teile zum Sortieren zu klein) wie im
+ * Prototyp (orbitCamera.ts:47-72): starre Fahrersicht in Oberwagen-Richtung, leicht gesenkt (−0,22 rad), 80° Sichtfeld,
+ * Wischen dreht den Kopf (±120° / ±45°), Pinch stellt das Sichtfeld 60–95°. Dazu folgt der Kopf der Spinne sanft
+ * und nur teilweise (followFraction, followSeconds — Patrick 08.09.: „Nachführen ist cool, evtl. minimal starrer").
  */
 export type CameraMode = "orbit" | "top" | "cabin";
 
@@ -25,22 +27,34 @@ export class CameraRig {
   /** Ansicht wechseln: Orbit → Draufsicht → Kabine → Orbit. Orbit-Einstellungen bleiben für die Rückkehr erhalten. */
   cycle(): void { this.mode = this.mode === "orbit" ? "top" : this.mode === "top" ? "cabin" : "orbit"; }
 
-  private readonly look = new THREE.Vector3(); private lookInit = false;
+  private headYaw = 0; private headPitch = -0.22; private cabinFov = 80;
+  /** manueller Kopfversatz (Wischen) zusätzlich zur sanften Nachführung */
+  private headYawUser = 0; private headPitchUser = 0;
+  followFraction = 0.6; followSeconds = 0.4;
 
   update(dt: number, baseYaw: number, grapple: { x: number; y: number; z: number }, cab: { x: number; y: number; z: number }, orbit: { dx: number; dy: number }, zoom: number, eye?: { x: number; y: number; z: number }): void {
     const k = 1 - Math.exp(-dt / 0.4);
     if (this.mode === "cabin" && eye) {
-      // Kabine: Position = Auge, Blickpunkt = Spinne (weich), Zoom = Blickwinkel 40–70°
+      // Kabine: Auge in der Kabine, Blick = Oberwagen-Richtung + Kopfdrehung; three schaut entlang −Z, daher + π
       this.camera.position.set(eye.x, eye.y, eye.z);
-      this.tmp.set(grapple.x, grapple.y - 0.5, grapple.z);
-      if (!this.lookInit) { this.look.copy(this.tmp); this.lookInit = true; } else this.look.lerp(this.tmp, 1 - Math.exp(-dt / 0.25));
-      this.camera.lookAt(this.look);
-      this.camera.fov = THREE.MathUtils.clamp(this.camera.fov * Math.pow(1.08, zoom), 40, 70); this.camera.updateProjectionMatrix();
+      this.headYawUser = THREE.MathUtils.clamp(this.headYawUser - orbit.dx * 0.004, -2.1, 2.1);
+      this.headPitchUser = THREE.MathUtils.clamp(this.headPitchUser - orbit.dy * 0.004, -0.8, 0.8);
+      // Sanfte Nachführung: Richtung Auge → Spinne relativ zur Oberwagen-Achse, nur zum Teil und verzögert
+      const dx = grapple.x - eye.x, dy = grapple.y - 0.5 - eye.y, dz = grapple.z - eye.z;
+      let relYaw = Math.atan2(dx, dz) - baseYaw; relYaw = Math.atan2(Math.sin(relYaw), Math.cos(relYaw));
+      const relPitch = Math.atan2(dy, Math.hypot(dx, dz));
+      const kf = 1 - Math.exp(-dt / this.followSeconds);
+      this.headYaw += (relYaw * this.followFraction - this.headYaw) * kf;
+      this.headPitch += ((-0.22 * (1 - this.followFraction) + relPitch * this.followFraction) - this.headPitch) * kf;
+      this.camera.rotation.order = "YXZ";
+      this.camera.rotation.set(THREE.MathUtils.clamp(this.headPitch + this.headPitchUser, -1.2, 1.2), baseYaw + this.headYaw + this.headYawUser + Math.PI, 0);
+      this.cabinFov = THREE.MathUtils.clamp(this.cabinFov * Math.pow(1.08, zoom), 60, 95);
+      if (this.camera.fov !== this.cabinFov) { this.camera.fov = this.cabinFov; this.camera.updateProjectionMatrix(); }
       this.initialised = false; // Orbit-Ziel beim Zurückwechseln neu setzen (kein Schwenk aus der Kabine heraus)
       return;
     }
     if (this.camera.fov !== 50) { this.camera.fov = 50; this.camera.updateProjectionMatrix(); }
-    this.lookInit = false;
+    this.headYaw = 0; this.headPitch = -0.22; this.headYawUser = 0; this.headPitchUser = 0; // Kopf beim nächsten Einstieg wieder geradeaus
     if (this.mode === "orbit") {
       this.yawOffset -= orbit.dx * 0.005;
       this.orbitPitch = THREE.MathUtils.clamp(this.orbitPitch + orbit.dy * 0.005, this.minPitch, this.maxPitch);

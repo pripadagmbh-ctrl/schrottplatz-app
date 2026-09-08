@@ -7,7 +7,6 @@ import {
   CLAW_SEGMENTS,
   CLAW_SEG_BEND,
   CLAW_SEG_LEN,
-  clawPoint,
 } from "@/shared/clawGeometry";
 
 /**
@@ -541,7 +540,7 @@ export class ExcavatorModel {
   /**
    * Greifspinne (Umschlagbagger-Bauart), Ursprung = Stielspitze. Von oben nach
    * unten: Kardan-Gabeln, Rotatorgehäuse, Guss-Traverse, Gelenkring, fünf
-   * Sichelkrallen mit je einem Zylinder und der zentrale Eindringdorn.
+   * Sichelkrallen mit je einem Zylinder.
    *
    * Y-Offsets relativ zur Stielspitze (grappleLink = 0.55 wie im Prototyp):
    *   Stummel −0.05, obere Gabel −0.10, untere Gabel −0.30, Rotator −0.48,
@@ -579,11 +578,8 @@ export class ExcavatorModel {
     const ring = this.mesh(this.geo(new THREE.TorusGeometry(CLAW_RING_R, 0.075, 8, 22)), this.matEdge, g, 0, CLAW_RING_Y, 0);
     ring.rotation.x = Math.PI / 2;
 
-    // Zentraler Eindringdorn: Spitze endet knapp über dem Treffpunkt der geschlossenen Krallen
-    const closedTip = clawPoint(0, 0, CLAW_SEGMENTS, this.tmpA);
-    const spikeLen = Math.max(0.3, CLAW_RING_Y - closedTip.y - 0.2);
-    const spike = this.mesh(this.geo(new THREE.ConeGeometry(0.14, spikeLen, 4)), this.matEdge, g, 0, CLAW_RING_Y - spikeLen / 2 + 0.05, 0, true);
-    spike.rotation.x = Math.PI;
+    // Kein zentraler Eindringdorn mehr (Prototyp hatte einen): Patrick 08.09. „sieht aus wie ein Dolch, muss raus" —
+    // echte Mehrschalengreifer haben keinen, und er hatte weder Kollider noch Funktion.
 
     // Krallen: Kette gebogener Schalensegmente, zur Spitze verjüngt — Geometrien je Segment geteilt
     const segWidth = [0.4, 0.37, 0.33, 0.28, 0.22, 0.15];
@@ -597,7 +593,8 @@ export class ExcavatorModel {
       edgeGeos.push(this.geo(new THREE.BoxGeometry(w + 0.03, CLAW_SEG_LEN + 0.05, 0.045)));
     }
     const knuckleGeo = this.geo(new THREE.BoxGeometry(0.3, 0.18, 0.22));
-    const tipGeo = this.geo(new THREE.ConeGeometry(0.075, 0.24, 4));
+    // Stumpfe Schalenspitze statt 24-cm-Vierkantkegel (Patrick 08.09.: „zu spitz") — echte Sortiergreifer laufen wie ein Loeffelrand aus
+    const tipGeo = this.geo(new THREE.CylinderGeometry(0.03, 0.075, 0.14, 8));
     const barrelGeo = this.geo(new THREE.CylinderGeometry(0.066, 0.066, 1, 10));
     const rodGeo = this.geo(new THREE.CylinderGeometry(0.042, 0.042, 1, 8));
     const CYL_R = 0.42; // Anlenkkreis der Zylinder am Gehäuse
@@ -628,8 +625,7 @@ export class ExcavatorModel {
         parent.add(seg);
         parent = seg;
       }
-      const tip = this.mesh(tipGeo, this.matEdge, parent, 0, -CLAW_SEG_LEN - 0.08, 0);
-      tip.rotation.x = Math.PI;
+      this.mesh(tipGeo, this.matEdge, parent, 0, -CLAW_SEG_LEN - 0.04, 0);
 
       // Hydraulikzylinder: Traverse → Krallen-Lagerbock (im Spinnenraum)
       const barrel = this.mesh(barrelGeo, this.matMachine, g);

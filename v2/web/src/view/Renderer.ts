@@ -6,6 +6,9 @@ import { ScrapView } from "./ScrapView";
 import { ExcavatorModel, type ExcavatorPose as ModelPose } from "./ExcavatorModel";
 import { CameraRig } from "./CameraRig";
 import { AimRing } from "./AimRing";
+import { VehicleView } from "./VehicleView";
+import { ContainerFillView } from "./ContainerFillView";
+import type { VehicleRun } from "@/sim/systems/VehicleSystem";
 import type { AimState } from "@/sim/systems/AimSystem";
 import type { ExcavatorPose } from "@/sim/systems/ExcavatorSystem";
 import type { ControlFrame } from "@/sim/control/ControlFrame";
@@ -27,6 +30,8 @@ export class Renderer {
   readonly excavator: ExcavatorModel;
   readonly rig: CameraRig;
   readonly aimRing: AimRing;
+  readonly vehicles: VehicleView; readonly fills: ContainerFillView;
+  private runs: readonly VehicleRun[] = [];
   private aim: AimState | null = null;
   private readonly modelPose: ModelPose = { pos: { x: 0, y: 0, z: 0 }, heading: 0, cabYaw: 0, boomAngle: 0, stickAngle: 0, rotatorYaw: 0, splay: 0, cabLift: 0, outriggerDown: 0, bladeDown: 0, inputs: { cab: 0, boom: 0, stick: 0, grapple: 0 } };
   private readonly cabPos = { x: 0, y: 0, z: 0 };
@@ -80,7 +85,10 @@ export class Renderer {
       colors: { machine: "#4fbf3f", dark: "#1e2124", accent: "#f2b632" },
     });
     this.rig = new CameraRig(this.camera);
+    const assist = data.balancing.assist;
+    this.rig.followFraction = Number(assist["cabinFollowFraction"] ?? 0.6); this.rig.followSeconds = Number(assist["cabinFollowSeconds"] ?? 0.4);
     this.aimRing = new AimRing(this.scene, data.materials.materials);
+    this.vehicles = new VehicleView(this.scene); this.fills = new ContainerFillView(this.scene, data);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
     sun.shadow.camera.left = -25; sun.shadow.camera.right = 25; sun.shadow.camera.top = 25; sun.shadow.camera.bottom = -25; sun.shadow.camera.far = 80;
@@ -104,8 +112,8 @@ export class Renderer {
   private exState: WorldState["excavator"] | null = null; private exPose: ExcavatorPose | null = null; private exPrev: { x: number; y: number; z: number; heading: number; cab: number; boom: number; stick: number; rotator: number; splay: number; gx: number; gy: number; gz: number; swingX: number; swingZ: number } | null = null;
 
   /** Quellen für die Bagger-Darstellung merken; die Interpolation passiert pro Bild in render(). */
-  syncExcavator(world: WorldState, pose: ExcavatorPose, prev: typeof this.exPrev, control: ControlFrame, aim?: AimState): void {
-    this.exState = world.excavator; this.exPose = pose; this.exPrev = prev; if (aim) this.aim = aim;
+  syncExcavator(world: WorldState, pose: ExcavatorPose, prev: typeof this.exPrev, control: ControlFrame, aim?: AimState, runs?: readonly VehicleRun[]): void {
+    this.exState = world.excavator; this.exPose = pose; this.exPrev = prev; if (aim) this.aim = aim; if (runs) this.runs = runs;
     const m = this.modelPose;
     m.inputs.cab = control.cab; m.inputs.boom = control.boom; m.inputs.stick = control.stick; m.inputs.grapple = control.grapple;
   }
@@ -134,6 +142,7 @@ export class Renderer {
     this.scrap.update(world, alpha);
     this.updateExcavator(alpha);
     if (this.aim) this.aimRing.update(this.aim, frameDt);
+    this.vehicles.update(this.runs); this.fills.update(world);
     const m = this.modelPose;
     const cabin = this.rig.mode === "cabin";
     if (cabin !== this.firstPerson) { this.firstPerson = cabin; this.excavator.setFirstPerson(cabin); }
@@ -146,7 +155,7 @@ export class Renderer {
 
   dispose(): void {
     this.scrap.dispose();
-    this.aimRing.dispose();
+    this.aimRing.dispose(); this.vehicles.dispose(); this.fills.dispose();
     this.excavator.dispose();
     this.scene.traverse((o) => {
       if (o instanceof THREE.Mesh) { o.geometry.dispose(); const m = o.material; if (Array.isArray(m)) m.forEach((x) => x.dispose()); else m.dispose(); }

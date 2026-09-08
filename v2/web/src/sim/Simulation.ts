@@ -11,6 +11,8 @@ import { ExcavatorSystem } from "./systems/ExcavatorSystem";
 import { ExcavatorColliders } from "./systems/ExcavatorColliders";
 import { GripSystem } from "./systems/GripSystem";
 import { AimSystem } from "./systems/AimSystem";
+import { VehicleSystem } from "./systems/VehicleSystem";
+import { ContainerSystem } from "./systems/ContainerSystem";
 
 /**
  * Bündelt WorldState, PhysicsWorld, Level, Scheduler und EventBus zu einer kopflosen Simulation.
@@ -29,6 +31,8 @@ export class Simulation {
   readonly excavatorColliders = new ExcavatorColliders();
   readonly grip = new GripSystem();
   readonly aim: AimSystem;
+  readonly vehicles: VehicleSystem;
+  readonly containers: ContainerSystem;
   readonly dt: number;
   private readonly ctx: SimContext;
 
@@ -45,6 +49,8 @@ export class Simulation {
     };
     this.scrap = new ScrapSystem(this.level);
     this.aim = new AimSystem(this.level);
+    this.vehicles = new VehicleSystem(this.level);
+    this.containers = new ContainerSystem(this.level);
     this.registerDefaultSystems();
   }
 
@@ -52,9 +58,11 @@ export class Simulation {
   private registerDefaultSystems(): void {
     this.scheduler.register(this.excavator);          // input 10
     this.scheduler.register(this.excavatorColliders); // preStep 10
+    this.scheduler.register(this.vehicles);           // preStep 15
     this.scheduler.register(this.grip);               // preStep 20
     this.scheduler.register(this.scrap);              // postStep 10
     this.scheduler.register(this.aim);                // postStep 20
+    this.scheduler.register(this.containers);         // slow ×6
     this.scheduler.register(new HeartbeatSystem());   // postStep 1000
   }
 

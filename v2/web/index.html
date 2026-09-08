@@ -45,10 +45,12 @@
       /* Flache Querformate (iPhone mini quer: 375 px hoch): Debug-Box kompakter, damit sie nicht in FAHREN ragt */
       @media (max-height: 500px) {
         #debug-overlay { font-size: 10px; line-height: 1.2; padding: 4px 6px; }
-        #debug-box { grid-auto-flow: column; align-items: start; }
+        #debug-box { grid-auto-flow: column; align-items: end; top: auto; bottom: max(8px, env(safe-area-inset-bottom)); } /* unten links, damit FAHREN oben Platz hat */
         #debug-dump { min-height: 36px; font-size: 12px; padding: 0 10px; }
-        /* Rotator-Knöpfe tiefer, sonst treffen sie bei ~265 px (Safari-Leisten) den ⌖-Knopf (iPhone-Test 08.09.) */
-        #touch-layer #btn-drive, #touch-layer .rot { bottom: calc(var(--sab) + 46%); }
+        /* Von OBEN verankern: iOS-Safari zählt den unteren Rand hinter der Werkzeugleiste, Prozent-vom-Boden landet
+           ~70 px zu hoch und ↻ lag auf ⌖ (iPhone-Screenshot 08.09.). Unter der ⌖-Reihe (12 + 48 px) ist die Kante eindeutig. */
+        #touch-layer #btn-drive, #touch-layer .rot { bottom: auto; top: calc(var(--sat) + 72px); }
+        #touch-layer #btn-camera { top: calc(var(--sat) + 8px); }
         /* Chip nach oben: unten säße er auf dem Bagger */
         #grip-chip { bottom: auto; top: calc(env(safe-area-inset-top, 0px) + 68px); height: 36px; font-size: 13px; border-radius: 18px; }
       }
@@ -56,6 +58,22 @@
       #grip-chip { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom, 0px) + 40px); z-index: 6; height: 44px; box-sizing: border-box; padding: 0 16px; display: flex; align-items: center; gap: 8px; font: 600 15px Inter, system-ui, sans-serif; color: #eef0ec; background: rgba(20,22,24,.85); border-radius: 22px; border-left: 6px solid #eef0ec; white-space: nowrap; pointer-events: none; max-width: calc(100vw - 32px); overflow: hidden; text-overflow: ellipsis; }
       #grip-chip[data-state="ok"] { border-left-color: #4fbf3f; } #grip-chip[data-state="tolerated"] { border-left-color: #f2b632; } #grip-chip[data-state="wrong"] { border-left-color: #e0483a; }
       @media (max-width: 700px) { #grip-chip { font-size: 13px; padding: 0 12px; } }
+      /* HUD M4a: Konto + Punkte oben Mitte, Toasts darunter, Verkaufsliste */
+      #touch-layer .zone-cam { top: calc(var(--sat) + 72px); }
+      .hud-bar { position: fixed; left: 50%; transform: translateX(-50%); top: calc(env(safe-area-inset-top, 0px) + 8px); z-index: 7; display: flex; align-items: center; gap: 14px; height: 44px; padding: 0 14px; border-radius: 22px; background: rgba(20,22,24,.85); color: #eef0ec; font: 600 15px Inter, system-ui, sans-serif; white-space: nowrap; }
+      .hud-points { color: #f2b632; }
+      .hud-sell { min-height: 36px; padding: 0 12px; border: 0; border-radius: 14px; background: #4fbf3f; color: #1e2124; font: 600 13px Inter, system-ui, sans-serif; touch-action: manipulation; }
+      .hud-toasts { position: fixed; left: 50%; transform: translateX(-50%); top: calc(env(safe-area-inset-top, 0px) + 60px); z-index: 7; display: grid; gap: 4px; justify-items: center; pointer-events: none; }
+      .toast { padding: 4px 12px; border-radius: 12px; background: rgba(20,22,24,.8); color: #eef0ec; font: 600 13px Inter, system-ui, sans-serif; transition: opacity .3s; white-space: nowrap; }
+      .toast.good { background: rgba(79,191,63,.9); color: #1e2124; } .toast.bad { background: rgba(224,72,58,.9); } .toast.out { opacity: 0; }
+      .sell-panel { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 12; width: min(520px, calc(100vw - 32px)); max-height: 80vh; overflow: auto; background: rgba(20,22,24,.95); color: #eef0ec; border-radius: 12px; padding: 12px; font: 14px Inter, system-ui, sans-serif; }
+      .sell-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 600; margin-bottom: 8px; }
+      .sell-close { min-width: 44px; min-height: 44px; border: 0; border-radius: 8px; background: rgba(238,240,236,.1); color: #eef0ec; font-size: 18px; }
+      .sell-row { display: grid; grid-template-columns: 1.4fr .8fr .6fr .8fr auto; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid rgba(238,240,236,.1); }
+      .sell-row .ok { color: #4fbf3f; } .sell-row .warn { color: #f2b632; } .sell-row .bad { color: #e0483a; }
+      .sell-row button { min-height: 40px; padding: 0 12px; border: 0; border-radius: 8px; background: #f2b632; color: #1e2124; font-weight: 600; }
+      .sell-row button[disabled] { opacity: .35; }
+      @media (max-height: 500px) { .hud-bar { height: 30px; font-size: 13px; gap: 10px; } .hud-toasts { top: calc(env(safe-area-inset-top, 0px) + 44px); } #grip-chip { top: calc(env(safe-area-inset-top, 0px) + 44px + 30px); } }
       .fatal { padding: 24px; max-width: 900px; margin: 0 auto; }
       .fatal h1 { color: #e0483a; font-size: 20px; }
       .fatal pre { white-space: pre-wrap; font-size: 13px; }

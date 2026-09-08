@@ -2,7 +2,22 @@
 
 Jede Architektur- oder Design-Entscheidung mit Datum und Begründung, damit nichts zweimal diskutiert wird (CLAUDE.md). Neueste oben.
 
-## 2026-09-08 — M3: Touch und Kamera
+## 2026-09-08 — M4a: Anlieferung und Wirtschafts-Rückgrat (in Arbeit)
+
+| # | Entscheidung | Begründung | Alternative (verworfen) |
+|---|---|---|---|
+| E-019 | Kipper kippt im Stand, fährt dann **mit gekippter Mulde** los (`creepSpeedMs` über `creepDistanceM`) und senkt die Mulde erst auf den ersten Metern der Abfahrt | Patrick 08.09.: „gekippt abfahren, damit alles frei rutscht und nicht auf der Ladefläche bleibt" — wie ein echter Kipper; löst das Prototyp-Problem klebender Ladung | Kippen im Stand und warten (Prototyp) |
+| E-020 | Ladung liegt echt auf der Mulde: Regalpackung im Fahrzeugrahmen, Körper kinematisch mitgeführt (Gruppe VEHICLE), ab `releaseAngleDeg` (22°) dynamisch | Schauwert des Kipp-Moments; kinematisch = kein Wackeln während der Fahrt, kein Greifen von der Ladefläche | Teile erscheinen gescriptet auf der Fläche |
+| E-021 | Sortieren gibt **Punkte**, kein Geld (`sortPointsPerItem` 10 + 0,1/kg, Fehlwurf −10); Geld nur beim Verkauf mit Reinheit² | Patrick 08.09.: „fürs Vorsortieren Bonuspunkte, kein Geld; fürs Verkaufen zählt die Sortenreinheit". Tagespunkte sollen später Skills freischalten (M4b/V1). Briefing Kap. 10 „Sortierprämie" wird damit zu Punkten | Sortierprämie in € (Briefing) |
+| E-022 | Andocken rückwärts über eigene Route `deliver_dock`; Andockpunkt = Kippgelenk knapp innerhalb der Annahmefläche; Start-Haufen nur noch 40 Teile in der Ost-Hälfte (`intake_pile`) | Erster Wurf: Lkw rangierte mitten in den Start-Haufen und schob Teile weg; zweiter Wurf (Gelenk außerhalb) ließ die Ladung neben die Fläche fallen. Test: 12/12 Teile auf der Fläche | Vorwärts andocken (Ladung fällt hinter den Lkw, weg von der Fläche) |
+| E-023 | Verbuchung nach 3 s Ruhe im Container; verbuchte Teile bleiben als `booked` sichtbar (max. 6 / 20 s), dann Masse im Füllstand-Quader | Briefing Kap. 9.2/19.3; Fehlwürfe bis zur Verbuchung korrigierbar; Körperzahl bleibt klein | Teile für immer liegen lassen (Budget) |
+| — | Große Einzelformen bale, tank, washer, casting mit Auswahlgewicht ~0,1; `weight` je Form in materials.json; Ladung begrenzt Einzelteil auf 34 % der Fuhre (kein 1-t-Gussteil auf dem Privatanhänger) | Patrick 08.09.: „es fehlen die großen Brocken" | Alle Teile größer machen (verworfen: Maßstab) |
+| — | Kurze Scheiben (Felge, Coil, Reifen) mit Drehdämpfung 4,0 | Eine Alu-Felge trudelte wie eine Münze minutenlang (1,1 rad/s) und hielt per gemeinsamem Schlafen 128 Körper wach | Einzel-Sleep (E-012 verbietet es) |
+| — | Rückfrage M4-3 (Willi/Lambert in M4a?) unbeantwortet → **Annahme:** erst in M4b mit Tag 0 | — | — |
+
+Stand: VehicleSystem (Zustandsmaschine in/weighIn/dock/tipUp/creep/out/weighOut/pickupWait), ContainerSystem, Verkauf über Abholer, HUD (Konto, Punkte, Verkaufsliste, Toasts), VehicleView, Füllstand-Quader. Tests: `delivery.test.ts` (Fuhre Tor-zu-Tor, Geld auf den Cent, Verbuchung, Verkauf Reinheit²). Offen in M4a: Baggermodell mergen (Draw Calls 221–251), Gerätetest, Balancing der Fuhren (Stückzahl/kg), Auftrag „Kunde"-Zeitmessung.
+
+## 2026-09-08 — M3: Touch und Kamera — **abgenommen 08.09.2026** (Patrick, iPad + iPhone mini)
 
 | # | Entscheidung | Begründung | Alternative (verworfen) |
 |---|---|---|---|
@@ -16,6 +31,8 @@ Jede Architektur- oder Design-Entscheidung mit Datum und Begründung, damit nich
 | — | Layout-Test auf 4 Viewports (iPad quer, iPhone mini quer, 844×390, iPhone mini hoch) per CDP-Touch-Events; flache Querformate (< 500 px hoch) bekommen eine kompakte Debug-Box | Der Test fand die Überlappung FAHREN/Debug-Box bei 375 px Höhe sofort | Sichtprüfung auf dem Gerät allein |
 
 **Vorgemerkt für M4a (Patrick 08.09.):** sechs große Einzelformen in `materials.json` — Drahtballen (Kabel/Stahl), Tank (Stahl), Waschmaschine (vorerst Stahl, ab V1 Elektroschrott), Motorblock, Gussteil, Rad mit Reifen — etwa jedes zehnte Teil im Start-Haufen groß. Auto, Traktor, alter Lkw als Verbundteile in M5 (Kap. 8). Orbit-Standardabstand 11 → 8 m prüfen.
+
+Abnahme-Befunde 08.09.: Greif-Stick „perfekt", Fahrmodus-Ende ok, Bodenring-Ampel rot/gelb/grün ok, Pendel ok (Richtungswechsel gezähmt), Kabinenansicht „reicht zum Sortieren", Layout iPhone mini nach Fix ohne Überlappung. iPad: 60 fps, Physik 3,0 ms bei 286 wachen Körpern, 235 Draw Calls (siehe messungen/2026-09-08_ipad_m3.md). Nicht gemessen: 20-Teile-Aufgabe in Minuten.
 
 Messungen M3 (Node/Headless): 37 Sim-/Unit-Tests, 5 E2E; Snap-Test: Abstand 1,6 m → < 0,3 m in 0,25 s, Teil gegriffen. Offen nach M3: Gerätetest iPad/iPhone (Stick-Größen, Totzonen 0,3/0,6, Pendelstärke, Ring-Sichtbarkeit auf Beton), Aufprall-Abrutschregel (Kontakt-Events), Draw Calls des Baggermodells (M6), Snap-Schalter in den Einstellungen [V1].
 

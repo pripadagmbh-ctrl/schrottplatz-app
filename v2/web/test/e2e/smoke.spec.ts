@@ -26,12 +26,12 @@ test("leere Szene startet ohne Fehler und zeigt Messwerte", async ({ page }) => 
   // Headless-Software-Rendering schafft nur wenige Bilder; es zählt, dass die Simulation überhaupt läuft
   expect(stepped).toBeGreaterThan(10);
 
-  // M1: Start-Haufen liegt schlafend da; Draw Calls bleiben unter dem Desktop-Budget trotz 150 Teilen
+  // M1/M4a: Start-Haufen liegt schlafend da; Draw Calls bleiben unter dem Desktop-Budget
   const state = await page.evaluate(() => {
     const g = window.__bagerana!;
     return { items: g.sim.world.items.size, awake: g.sim.physics.stats().awake, drawCalls: g.renderer.drawCalls };
   });
-  expect(state.items).toBe(150);
+  expect(state.items).toBe(40); // M4a: kleiner Rest-Haufen (balancing.scrap.startPileCount); Nachschub kommt per Lkw
   expect(state.awake).toBeLessThanOrEqual(5);
   expect(state.drawCalls).toBeLessThanOrEqual(400);
 
@@ -39,7 +39,7 @@ test("leere Szene startet ohne Fehler und zeigt Messwerte", async ({ page }) => 
   await page.click("#debug-dump");
   await page.waitForTimeout(2500);
   const after = await page.evaluate(() => ({ items: window.__bagerana!.sim.world.items.size, step: window.__bagerana!.sim.world.step }));
-  expect(after.items).toBe(300);
+  expect(after.items).toBe(190);
   expect(after.step).toBeGreaterThan(stepped);
   expect(errors).toEqual([]);
 });

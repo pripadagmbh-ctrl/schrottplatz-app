@@ -47,6 +47,8 @@ for (const vp of viewports) {
       expect(overlaps(boxes[i]!, boxes[j]!), `${boxes[i]!.id} überlappt ${boxes[j]!.id}`).toBe(false);
     }
 
+    // Ab hier wie im Live-Build: Debug-Box aus (sie ist nur Dev und würde bei 265 px Höhe den Stick-Tipp abfangen)
+    if ("ignoreDebugBox" in vp) await page.keyboard.press("F3");
     // Stick erscheint unter dem Daumen (linke Zone) und liefert eine Achse an die Simulation
     const lx = Math.round(vp.width * 0.2), ly = Math.round(vp.height * 0.75);
     const cdp = await context.newCDPSession(page);
@@ -81,8 +83,9 @@ for (const vp of viewports) {
     expect(await mode(), "zwei Daumen ≠ Doppeltipp").toBe(m0);
 
     // Overlay aus → Box darf nicht mehr gezeichnet werden (iPhone-Befund 08.09.: display:grid schlug das hidden-Attribut)
-    await page.keyboard.press("F3"); await page.waitForTimeout(100);
-    expect(await page.locator("#debug-box").evaluate((el) => getComputedStyle(el).display)).toBe("none");
+    const disp = () => page.locator("#debug-box").evaluate((el) => getComputedStyle(el).display);
+    if ((await disp()) !== "none") { await page.keyboard.press("F3"); await page.waitForTimeout(100); }
+    expect(await disp()).toBe("none");
 
     expect(errors, "Seitenfehler").toEqual([]);
     await context.close();

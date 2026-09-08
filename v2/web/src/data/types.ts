@@ -12,6 +12,8 @@ export interface ShapeDef {
   id: string; collider: "box" | "cylinder" | "sphere" | "convex";
   sizeMin: [number, number, number]; sizeMax: [number, number, number];
   fill: number; materialIds: string[]; tris: number;
+  /** Auswahlgewicht beim zufaelligen Spawnen (Standard 1; 0 = nur gezielt) */
+  weight?: number;
 }
 export interface MaterialsFile { materials: MaterialDef[]; shapes: ShapeDef[]; }
 
@@ -45,9 +47,11 @@ export interface LevelDef {
   clearanceM: number;
 }
 
+export interface VehicleBody { cabLen: number; bedLen: number; bedW: number; wallH: number; floorY: number; wheelR: number; tareKg: number }
 export interface VehicleDef {
   id: string; routeIn: string; routeOut: string; speedMs: number; dumpSeconds: number;
   loadKgMin: number; loadKgMax: number; itemsMin: number; itemsMax: number; tier: Tier;
+  body: VehicleBody; routeDock?: string; tips: boolean;
 }
 export interface CustomerDef {
   id: string; displayName: string; kind: "private" | "trade" | "dealer"; hardness: 1 | 2 | 3 | 4 | 5;
@@ -89,6 +93,7 @@ export interface BalancingFile {
   customers: Record<string, number | string>;
   budgets: Record<string, number>;
   assist: Record<string, number | boolean | string>;
+  vehicles: Record<string, number | boolean | string>;
 }
 
 export type I18nFile = Record<string, unknown>;

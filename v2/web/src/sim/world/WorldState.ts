@@ -6,7 +6,7 @@ import type { Vec3, Quat } from "@/shared/math";
  * Verhalten, keine Three-Objekte — Systeme lesen und schreiben hier, Ansichten lesen Snapshots.
  * M0: Strukturen angelegt, noch leer befüllt. Systeme kommen ab M1.
  */
-export type ItemState = "loose" | "held" | "settling" | "booked";
+export type ItemState = "loose" | "held" | "settling" | "booked" | "onVehicle";
 
 export interface ScrapItem {
   id: ItemId; materialId: string; shapeId: string;
@@ -35,6 +35,8 @@ export interface DeliveryState {
   id: DeliveryId; customerId: string; vehicleId: string;
   phase: "approach" | "weighIn" | "inspect" | "toDump" | "dumping" | "weighOut" | "leave" | "done";
   grossKg: number; tareKg: number; priceEur: number; tStart: number;
+  /** sortenrein deklariert (Fraktionspreis) oder Mischfuhre (Pauschale) */
+  sorted: boolean; materialId: string | null;
 }
 export interface DayState {
   day: number; phase: "morning" | "work" | "evening" | "ended"; secondsInPhase: number;
@@ -43,6 +45,8 @@ export interface DayState {
 export interface EconomyState {
   moneyEur: number; starsTotal: number; premiumUnlocked: boolean; upgrades: string[];
   stats: { turnoverKg: number; correctSorts: number; wrongSorts: number; daysPlayed: number };
+  /** Sortierpunkte (M4a): richtiges Einsortieren gibt Punkte, kein Geld */
+  sortPoints: number;
 }
 
 export interface WorldState {
@@ -62,7 +66,7 @@ export function createWorldState(startMoneyEur: number, spawn: { x: number; z: n
     items: new Map(), containers: new Map(), composites: new Map(), deliveries: new Map(),
     excavator: { pos: { x: spawn.x, y: 0, z: spawn.z }, heading: spawn.heading, cab: 0, boom: 35 * Math.PI / 180, stick: -70 * Math.PI / 180, rotator: 0, grapple: 0, cabLift: 0, driveMode: false },
     day: { day: 0, phase: "morning", secondsInPhase: 0, deliveriesToday: 0, deliveriesDone: 0 },
-    economy: { moneyEur: startMoneyEur, starsTotal: 0, premiumUnlocked: false, upgrades: [], stats: { turnoverKg: 0, correctSorts: 0, wrongSorts: 0, daysPlayed: 0 } },
+    economy: { moneyEur: startMoneyEur, starsTotal: 0, premiumUnlocked: false, upgrades: [], stats: { turnoverKg: 0, correctSorts: 0, wrongSorts: 0, daysPlayed: 0 }, sortPoints: 0 },
     step: 0,
   };
 }

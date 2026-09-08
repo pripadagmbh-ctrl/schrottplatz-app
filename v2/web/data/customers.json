@@ -1,21 +1,347 @@
 {
   "$schema": "./schema/customers.schema.json",
-  "_comment": "Briefing Kap. 9, 13. Aus prototype/src/delivery/customers.ts gekürzt auf 3 Händlerfamilien + 3 Branchen (GDD v2 Kap. 13). Ton-Leitplanke: Milieu aus Beruf, Familie, Geschäft — nie Herkunft. hardness = wie oft eine Deklaration geschönt wird [V1].",
+  "_comment": "Briefing Kap. 9, 13. Aus prototype/src/delivery/customers.ts gekürzt auf 3 Händlerfamilien + 3 Branchen (GDD v2 Kap. 13). Ton-Leitplanke: Milieu aus Beruf, Familie, Geschäft — nie Herkunft. hardness = wie oft eine Deklaration geschönt wird [V1]. M4a: Fahrzeuggeometrie `body` (m; tareKg = Leergewicht), `routeDock` = Rueckwaerts-Andocken an die Annahmeflaeche, `tips` = kippt. Lkw-Fokus: Haendler ab Tag 0, Privatanhaenger seltener (Patrick 08.09.).",
   "vehicles": [
-    { "id": "trailer", "routeIn": "deliver_in", "routeOut": "deliver_out", "speedMs": 4.0, "dumpSeconds": 6, "loadKgMin": 100, "loadKgMax": 800, "itemsMin": 5, "itemsMax": 15, "tier": "MVP" },
-    { "id": "tipper", "routeIn": "deliver_in", "routeOut": "deliver_out", "speedMs": 3.5, "dumpSeconds": 10, "loadKgMin": 1500, "loadKgMax": 3000, "itemsMin": 15, "itemsMax": 30, "tier": "MVP" },
-    { "id": "lowloader", "routeIn": "lowloader_in", "routeOut": "lowloader_out", "speedMs": 3.0, "dumpSeconds": 12, "loadKgMin": 900, "loadKgMax": 1000, "itemsMin": 1, "itemsMax": 1, "tier": "MVP" },
-    { "id": "flatbed", "routeIn": "deliver_in", "routeOut": "deliver_out", "speedMs": 3.5, "dumpSeconds": 8, "loadKgMin": 500, "loadKgMax": 2000, "itemsMin": 10, "itemsMax": 25, "tier": "V1" },
-    { "id": "rolloff", "routeIn": "pickup_in", "routeOut": "pickup_out", "speedMs": 3.5, "dumpSeconds": 6, "loadKgMin": 0, "loadKgMax": 0, "itemsMin": 0, "itemsMax": 0, "tier": "MVP" }
+    {
+      "id": "trailer",
+      "routeIn": "deliver_in",
+      "routeOut": "deliver_out",
+      "speedMs": 4.0,
+      "dumpSeconds": 6,
+      "loadKgMin": 100,
+      "loadKgMax": 800,
+      "itemsMin": 5,
+      "itemsMax": 15,
+      "tier": "MVP",
+      "body": {
+        "cabLen": 1.2,
+        "bedLen": 3.0,
+        "bedW": 1.7,
+        "wallH": 0.5,
+        "floorY": 0.6,
+        "wheelR": 0.32,
+        "tareKg": 900
+      },
+      "routeDock": "deliver_dock",
+      "tips": true
+    },
+    {
+      "id": "tipper",
+      "routeIn": "deliver_in",
+      "routeOut": "deliver_out",
+      "speedMs": 3.5,
+      "dumpSeconds": 10,
+      "loadKgMin": 1500,
+      "loadKgMax": 3000,
+      "itemsMin": 15,
+      "itemsMax": 30,
+      "tier": "MVP",
+      "body": {
+        "cabLen": 2.2,
+        "bedLen": 5.0,
+        "bedW": 2.4,
+        "wallH": 1.0,
+        "floorY": 1.3,
+        "wheelR": 0.55,
+        "tareKg": 9000
+      },
+      "routeDock": "deliver_dock",
+      "tips": true
+    },
+    {
+      "id": "lowloader",
+      "routeIn": "lowloader_in",
+      "routeOut": "lowloader_out",
+      "speedMs": 3.0,
+      "dumpSeconds": 12,
+      "loadKgMin": 900,
+      "loadKgMax": 1000,
+      "itemsMin": 1,
+      "itemsMax": 1,
+      "tier": "MVP",
+      "body": {
+        "cabLen": 2.2,
+        "bedLen": 7.0,
+        "bedW": 2.5,
+        "wallH": 0.3,
+        "floorY": 0.9,
+        "wheelR": 0.5,
+        "tareKg": 11000
+      },
+      "tips": false
+    },
+    {
+      "id": "flatbed",
+      "routeIn": "deliver_in",
+      "routeOut": "deliver_out",
+      "speedMs": 3.5,
+      "dumpSeconds": 8,
+      "loadKgMin": 500,
+      "loadKgMax": 2000,
+      "itemsMin": 10,
+      "itemsMax": 25,
+      "tier": "V1",
+      "body": {
+        "cabLen": 2.2,
+        "bedLen": 5.5,
+        "bedW": 2.4,
+        "wallH": 0.4,
+        "floorY": 1.2,
+        "wheelR": 0.5,
+        "tareKg": 7000
+      },
+      "routeDock": "deliver_dock",
+      "tips": false
+    },
+    {
+      "id": "rolloff",
+      "routeIn": "pickup_in",
+      "routeOut": "pickup_out",
+      "speedMs": 3.5,
+      "dumpSeconds": 6,
+      "loadKgMin": 0,
+      "loadKgMax": 0,
+      "itemsMin": 0,
+      "itemsMax": 0,
+      "tier": "MVP",
+      "body": {
+        "cabLen": 2.2,
+        "bedLen": 6.0,
+        "bedW": 2.4,
+        "wallH": 0.2,
+        "floorY": 1.2,
+        "wheelR": 0.55,
+        "tareKg": 12000
+      },
+      "tips": false
+    }
   ],
   "customers": [
-    { "id": "private_generic", "displayName": "Privatkunde", "kind": "private", "hardness": 1, "vehicleIds": ["trailer"], "loadProfile": [{ "materialId": "steel", "share": 0.62 }, { "materialId": "alu", "share": 0.12 }, { "materialId": "copper", "share": 0.06 }, { "materialId": "cable", "share": 0.05 }, { "materialId": "wood", "share": 0.1 }, { "materialId": "rubble", "share": 0.05 }], "sortedProbability": 0.0, "patienceSeconds": 60, "fromDay": 0, "weight": 5 },
-    { "id": "baering", "displayName": "Willi Bäring, Schrotthandel", "kind": "dealer", "hardness": 5, "vehicleIds": ["tipper"], "loadProfile": [{ "materialId": "steel", "share": 0.7 }, { "materialId": "va", "share": 0.08 }, { "materialId": "alu", "share": 0.1 }, { "materialId": "copper", "share": 0.04 }, { "materialId": "contaminant", "share": 0.08 }], "sortedProbability": 0.3, "patienceSeconds": 45, "fromDay": 2, "weight": 2 },
-    { "id": "hardwig", "displayName": "Hardwig & Söhne", "kind": "dealer", "hardness": 4, "vehicleIds": ["tipper", "flatbed"], "loadProfile": [{ "materialId": "alu", "share": 0.4 }, { "materialId": "copper", "share": 0.15 }, { "materialId": "cable", "share": 0.25 }, { "materialId": "steel", "share": 0.15 }, { "materialId": "contaminant", "share": 0.05 }], "sortedProbability": 0.4, "patienceSeconds": 45, "fromDay": 4, "weight": 2 },
-    { "id": "zoellner", "displayName": "Zöllner Metalle", "kind": "dealer", "hardness": 3, "vehicleIds": ["tipper"], "loadProfile": [{ "materialId": "va", "share": 0.5 }, { "materialId": "steel", "share": 0.4 }, { "materialId": "contaminant", "share": 0.1 }], "sortedProbability": 0.5, "patienceSeconds": 45, "fromDay": 6, "weight": 2 },
-    { "id": "hallmann", "displayName": "Gießerei Hallmann", "kind": "trade", "hardness": 2, "vehicleIds": ["tipper"], "loadProfile": [{ "materialId": "steel", "share": 0.95 }, { "materialId": "rubble", "share": 0.05 }], "sortedProbability": 0.9, "patienceSeconds": 45, "fromDay": 1, "weight": 3 },
-    { "id": "rehm", "displayName": "Kfz-Werkstatt Rehm", "kind": "trade", "hardness": 2, "vehicleIds": ["lowloader"], "loadProfile": [], "compositeDefId": "car_compact", "sortedProbability": 1.0, "patienceSeconds": 45, "fromDay": 1, "weight": 2 },
-    { "id": "sander", "displayName": "Elektro Sander", "kind": "trade", "hardness": 2, "vehicleIds": ["trailer"], "loadProfile": [{ "materialId": "cable", "share": 0.6 }, { "materialId": "copper", "share": 0.25 }, { "materialId": "alu", "share": 0.1 }, { "materialId": "contaminant", "share": 0.05 }], "sortedProbability": 0.6, "patienceSeconds": 45, "fromDay": 2, "weight": 2 }
+    {
+      "id": "private_generic",
+      "displayName": "Privatkunde",
+      "kind": "private",
+      "hardness": 1,
+      "vehicleIds": [
+        "trailer"
+      ],
+      "loadProfile": [
+        {
+          "materialId": "steel",
+          "share": 0.62
+        },
+        {
+          "materialId": "alu",
+          "share": 0.12
+        },
+        {
+          "materialId": "copper",
+          "share": 0.06
+        },
+        {
+          "materialId": "cable",
+          "share": 0.05
+        },
+        {
+          "materialId": "wood",
+          "share": 0.1
+        },
+        {
+          "materialId": "rubble",
+          "share": 0.05
+        }
+      ],
+      "sortedProbability": 0.0,
+      "patienceSeconds": 60,
+      "fromDay": 0,
+      "weight": 2
+    },
+    {
+      "id": "baering",
+      "displayName": "Willi Bäring, Schrotthandel",
+      "kind": "dealer",
+      "hardness": 5,
+      "vehicleIds": [
+        "tipper"
+      ],
+      "loadProfile": [
+        {
+          "materialId": "steel",
+          "share": 0.7
+        },
+        {
+          "materialId": "va",
+          "share": 0.08
+        },
+        {
+          "materialId": "alu",
+          "share": 0.1
+        },
+        {
+          "materialId": "copper",
+          "share": 0.04
+        },
+        {
+          "materialId": "contaminant",
+          "share": 0.08
+        }
+      ],
+      "sortedProbability": 0.3,
+      "patienceSeconds": 45,
+      "fromDay": 0,
+      "weight": 3
+    },
+    {
+      "id": "hardwig",
+      "displayName": "Hardwig & Söhne",
+      "kind": "dealer",
+      "hardness": 4,
+      "vehicleIds": [
+        "tipper",
+        "flatbed"
+      ],
+      "loadProfile": [
+        {
+          "materialId": "alu",
+          "share": 0.4
+        },
+        {
+          "materialId": "copper",
+          "share": 0.15
+        },
+        {
+          "materialId": "cable",
+          "share": 0.25
+        },
+        {
+          "materialId": "steel",
+          "share": 0.15
+        },
+        {
+          "materialId": "contaminant",
+          "share": 0.05
+        }
+      ],
+      "sortedProbability": 0.4,
+      "patienceSeconds": 45,
+      "fromDay": 4,
+      "weight": 2
+    },
+    {
+      "id": "zoellner",
+      "displayName": "Zöllner Metalle",
+      "kind": "dealer",
+      "hardness": 3,
+      "vehicleIds": [
+        "tipper"
+      ],
+      "loadProfile": [
+        {
+          "materialId": "va",
+          "share": 0.5
+        },
+        {
+          "materialId": "steel",
+          "share": 0.4
+        },
+        {
+          "materialId": "contaminant",
+          "share": 0.1
+        }
+      ],
+      "sortedProbability": 0.5,
+      "patienceSeconds": 45,
+      "fromDay": 6,
+      "weight": 2
+    },
+    {
+      "id": "hallmann",
+      "displayName": "Gießerei Hallmann",
+      "kind": "trade",
+      "hardness": 2,
+      "vehicleIds": [
+        "tipper"
+      ],
+      "loadProfile": [
+        {
+          "materialId": "steel",
+          "share": 0.95
+        },
+        {
+          "materialId": "rubble",
+          "share": 0.05
+        }
+      ],
+      "sortedProbability": 0.9,
+      "patienceSeconds": 45,
+      "fromDay": 0,
+      "weight": 3
+    },
+    {
+      "id": "rehm",
+      "displayName": "Kfz-Werkstatt Rehm",
+      "kind": "trade",
+      "hardness": 2,
+      "vehicleIds": [
+        "lowloader"
+      ],
+      "loadProfile": [],
+      "compositeDefId": "car_compact",
+      "sortedProbability": 1.0,
+      "patienceSeconds": 45,
+      "fromDay": 1,
+      "weight": 2
+    },
+    {
+      "id": "sander",
+      "displayName": "Elektro Sander",
+      "kind": "trade",
+      "hardness": 2,
+      "vehicleIds": [
+        "trailer"
+      ],
+      "loadProfile": [
+        {
+          "materialId": "cable",
+          "share": 0.6
+        },
+        {
+          "materialId": "copper",
+          "share": 0.25
+        },
+        {
+          "materialId": "alu",
+          "share": 0.1
+        },
+        {
+          "materialId": "contaminant",
+          "share": 0.05
+        }
+      ],
+      "sortedProbability": 0.6,
+      "patienceSeconds": 45,
+      "fromDay": 2,
+      "weight": 2
+    }
   ],
-  "privateNames": ["Herr Albrecht", "Frau Brenner", "Herr Dörfler", "Familie Ewald", "Frau Gräber", "Herr Hollmann", "Frau Ilgner", "Herr Kaminski", "Frau Lorenz", "Herr Neumann", "Frau Oswald", "Herr Petrik", "Frau Reuter", "Herr Sattler", "Frau Thiele", "Herr Ulrich", "Frau Vogler", "Herr Wenzel"]
+  "privateNames": [
+    "Herr Albrecht",
+    "Frau Brenner",
+    "Herr Dörfler",
+    "Familie Ewald",
+    "Frau Gräber",
+    "Herr Hollmann",
+    "Frau Ilgner",
+    "Herr Kaminski",
+    "Frau Lorenz",
+    "Herr Neumann",
+    "Frau Oswald",
+    "Herr Petrik",
+    "Frau Reuter",
+    "Herr Sattler",
+    "Frau Thiele",
+    "Herr Ulrich",
+    "Frau Vogler",
+    "Herr Wenzel"
+  ]
 }

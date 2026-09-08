@@ -13,7 +13,8 @@ import { CLAW_OPEN_SPLAY, CLAW_RING_R, CLAW_RING_Y, CLAW_SEGMENTS, clawPoint } f
  *  1. Sensor-Kugel in der Korbmitte findet Kandidaten; nur was wirklich im Schalenkorb liegt, zählt (Korbgeometrie).
  *  2. Greiffenster: Schließgrad 0,6–0,98 und Spieler schließt.
  *  3. Gegriffenes Teil wird kinematisch, wechselt in Gruppe HELD (kollidiert mit Boden/Haufen, nie mit dem Bagger)
- *     und wandert in 0,15 s in die Haltepose (Mitte des Korbs, Ausrichtung relativ zur Spinne behalten).
+ *     und wandert in 0,25 s in die Haltepose: seitlich zentriert, Höhe bleibt (kein „Hochsaugen" — Gerätetest 08.09.),
+ *     höchstens so weit angehoben, dass die Unterkante auf den geschlossenen Krallenspitzen aufliegt.
  *  4. Loslassen: wieder dynamisch, Gruppe LOOSE, Geschwindigkeit der Spinne (Mittel der letzten Schritte) + etwas abwärts.
  *  5. Abrutsch-Regeln (Kap. 6.3): Überlast → kein Griff; Schwungwurf → Verlust nach 1,5 s. Aufprall-Regel folgt mit Kontakt-Events (M3).
  *  6. `itemRemoving` (Presse, Verkauf) löst den Griff sofort — der H1-Absturz des Prototyps.
@@ -216,8 +217,13 @@ export class GripSystem implements System {
     rotateVec(this.qInv, this.v, this.v);
     const fromPos: Vec3 = { x: this.v.x, y: this.v.y, z: this.v.z };
     const fromRot: Quat = quatMul(this.qInv, r, { x: 0, y: 0, z: 0, w: 1 });
-    // Haltepose: Teilmitte in die Korbmitte (Sensor), Ausrichtung beibehalten
-    const localPos: Vec3 = { x: 0, y: p.sensorPos.y - p.grapplePos.y, z: 0 };
+    // Haltepose: seitlich in die Korbmitte, Höhe behalten; Unterkante mindestens auf Höhe der geschlossenen Spitzen
+    // (Patrick 08.09.: „Teile rutschen unnatürlich nach oben" — vorher wurde alles auf Sensorhöhe gezogen, 0,7 m über den Spitzen)
+    const halfH = this.worldHalfHeight(item.size, r);
+    clawPoint(0, 0, CLAW_SEGMENTS, this.tip); // Spitzen bei geschlossener Spinne
+    const minY = this.tip.y + halfH;
+    const topY = CLAW_RING_Y - halfH; // nie in die Traverse hinein
+    const localPos: Vec3 = { x: 0, y: clamp(Math.max(fromPos.y, minY), Math.min(minY, topY), Math.max(minY, topY)), z: 0 };
     body.setBodyType(RAPIER.RigidBodyType.KinematicPositionBased, true);
     for (let i = 0; i < body.numColliders(); i++) body.collider(i).setCollisionGroups(COLLISION.held);
     item.state = "held";

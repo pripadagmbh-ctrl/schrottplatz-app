@@ -112,9 +112,26 @@ export class ScrapSystem implements System {
     return spawned;
   }
 
+  /** Form nach Auswahlgewicht (materials.json `weight`; grosse Einzelteile ~0,1, engine 0 = nur gezielt). */
   private pickShape(materialId: string, rng: Rng): ShapeDef | undefined {
-    const candidates = [...this.shapes.values()].filter((s) => s.materialIds.includes(materialId) && s.id !== "engine");
-    return candidates.length ? rng.pick(candidates) : undefined;
+    const candidates = [...this.shapes.values()].filter((s) => s.materialIds.includes(materialId) && (s.weight ?? 1) > 0);
+    return candidates.length ? rng.pickWeighted(candidates, (s) => s.weight ?? 1) : undefined;
+  }
+
+  /** Wie spawn(), aber Position/Rotation exakt und ohne eigene Formwahl — fuer Ladungen auf Fahrzeugen. */
+  spawnExact(materialId: string, shape: ShapeDef, size: [number, number, number], pos: { x: number; y: number; z: number }, rot: { x: number; y: number; z: number; w: number }): ScrapItem | null {
+    if (this.ctx.world.items.size >= this.maxLoose) return null;
+    const mat = this.materials.get(materialId); if (!mat) throw new Error(`Material unbekannt: ${materialId}`);
+    const massKg = Math.max(0.5, Math.round(volume(shape, size) * mat.densityKgM3 * shape.fill * 10) / 10);
+    return this.createItem({ materialId, shapeId: shape.id, size, massKg, pos, rot, origin: "delivery" });
+  }
+  /** Fuer Ladungsplanung: passende Form zum Material waehlen und bemessen. */
+  planShape(materialId: string, rng: Rng): { shape: ShapeDef; size: [number, number, number]; massKg: number } | null {
+    const mat = this.materials.get(materialId); if (!mat) return null;
+    const shape = this.pickShape(materialId, rng); if (!shape) return null;
+    const size: [number, number, number] = [0, 1, 2].map((i) => rng.range(shape.sizeMin[i] as number, shape.sizeMax[i] as number)) as [number, number, number];
+    const massKg = Math.max(0.5, Math.round(volume(shape, size) * mat.densityKgM3 * shape.fill * 10) / 10);
+    return { shape, size, massKg };
   }
 
   private createItem(d: Omit<SavedItem, "pos" | "rot"> & { pos: { x: number; y: number; z: number }; rot: { x: number; y: number; z: number; w: number } }): ScrapItem {
@@ -124,9 +141,12 @@ export class ScrapSystem implements System {
     const thin = Math.min(...d.size) < 0.1; // Bleche, Latten: CCD gegen Tunneln durch den Boden
     // Runde Formen sind Achtkant-Prismen (E-011) und bekommen zusätzlich etwas mehr Dämpfung.
     const round = shape.collider === "cylinder" || shape.collider === "sphere";
+    // Kurze Scheiben (Felge, Coil, Reifen) trudeln wie eine Muenze minutenlang auf der Kante und halten den ganzen
+    // Haufen wach (gemeinsames Schlafen, E-012) — sie bekommen deutlich mehr Drehdaempfung (Befund M4a, Seed 42).
+    const disc = round && d.size[2] < d.size[0] * 1.5;
     const body = w.createRigidBody(
       RAPIER.RigidBodyDesc.dynamic().setTranslation(d.pos.x, d.pos.y, d.pos.z).setRotation(d.rot)
-        .setLinearDamping(round ? 0.3 : 0.05).setAngularDamping(round ? 1.0 : 0.2).setCcdEnabled(thin),
+        .setLinearDamping(disc ? 0.6 : round ? 0.3 : 0.05).setAngularDamping(disc ? 4.0 : round ? 1.0 : 0.2).setCcdEnabled(thin),
     );
     const desc = colliderFor(shape, d.size).setMass(d.massKg).setFriction(0.7).setRestitution(0.05).setCollisionGroups(COLLISION.loose);
     w.createCollider(desc, body);

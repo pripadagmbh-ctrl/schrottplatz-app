@@ -42,7 +42,9 @@
           "sizeMax": { "type": "array", "items": { "type": "number", "exclusiveMinimum": 0 }, "minItems": 3, "maxItems": 3 },
           "fill": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
           "materialIds": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
-          "tris": { "type": "integer", "minimum": 8, "maximum": 1000 }
+          "tris": { "type": "integer", "minimum": 8, "maximum": 1000 },
+          "weight": { "type": "number", "minimum": 0 },
+          "_note": { "type": "string" }
         }
       }
     }

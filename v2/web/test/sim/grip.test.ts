@@ -58,7 +58,7 @@ describe("Greifen kinematisch", () => {
       sim.control.boom = -1; sim.run(60); sim.control.boom = 0;
       const heldBody = sim.physics.safeBody(item.bodyHandle)!;
       expect(item.state).toBe("held");
-      expect(heldBody.translation().y).toBeGreaterThan(0.2);
+      expect(heldBody.translation().y, "gehaltenes Teil über dem Boden (sitzt seit 08.09. auf Spitzenhöhe, nicht mehr auf Sensorhöhe)").toBeGreaterThan(0);
       sim.control.grapple = -1; sim.run(3);
       expect(item.state).toBe("loose");
       const v = heldBody.linvel(); const speed = Math.hypot(v.x, v.y, v.z);

@@ -1,6 +1,6 @@
 # Bagerana v2 — Spur A (Web)
 
-Neuaufbau nach `../docs/02_Briefing.md` (Kap. 17 Architektur, Kap. 22 Meilensteine). Stand: **M3 — Touch und Kamera** (Touch-Layout v2, Draufsicht, Bodenring, Griff-Info-Chip, Snap, Pendel).
+Neuaufbau nach `../docs/02_Briefing.md` (Kap. 17 Architektur, Kap. 22 Meilensteine). Stand: **M4a — Anlieferung und Wirtschaft** (Kundenfahrzeuge, Kippen, Verbuchung, Verkauf, HUD) — in Arbeit.
 
 ## Befehle
 
@@ -62,7 +62,7 @@ Physik-Erkenntnisse aus M1 (Details in `../docs/entscheidungen.md` E-010–E-012
 - `view/ExcavatorModel.ts` (aus dem Prototyp portiert, nur Darstellung), `view/CameraRig.ts` (Orbit hinter der Kabine, folgt dem Oberwagen), Schatten für Bagger.
 - Tests: 100× greifen/heben/schwenken/ablegen ohne Ausreißer · Bodenanschlag · Widerstand nur bei Kontakt · Überlast + H1 · Spreizung.
 
-Steuerung im Browser: **Q/E** Oberwagen · **R/F** Hauptarm · **T/G** Stiel · **W/S A/D** fahren · **linke Maustaste halten** greifen · **Mausrad** Rotator (Rasten) · **Y/X** Rotator (Dauer) · **V** Fahrmodus · **C** Ansicht (Orbit/Draufsicht) · **rechte/mittlere Maustaste ziehen** Kamera · **Shift+Rad** Zoom · **P** Haufen kippen · **F3** Overlay.
+Steuerung im Browser: **Q/E** Oberwagen · **R/F** Hauptarm · **T/G** Stiel · **W/S A/D** fahren · **linke Maustaste halten** greifen · **Mausrad** Rotator (Rasten) · **Y/X** Rotator (Dauer) · **V** Fahrmodus · **C** Ansicht (Orbit/Draufsicht) · **rechte/mittlere Maustaste ziehen** Kamera · **Shift+Rad** Zoom · **P** Haufen kippen · **K** Kunde rufen · **F3** Overlay.
 
 ## Was M3 enthält
 
@@ -74,6 +74,15 @@ Steuerung im Browser: **Q/E** Oberwagen · **R/F** Hauptarm · **T/G** Stiel · 
 - Schonfrist nach dem Loslassen (Gruppe `released`, 0,6 s) — behebt wegschießende Teile (E-018).
 - Tests: `test/sim/assist.test.ts` (Pendel, Snap, Zielhilfe) · `test/e2e/layout.spec.ts` (4 Viewports, Tippziele ≥ 44 px, keine Überlappung, Stick + Greifen per Touch).
 
+## Was M4a enthält
+
+- `sim/systems/VehicleSystem.ts` (preStep 15): Kundenfahrzeuge auf Routen aus `level_yard.json` (rein → Waage → rückwärts andocken → kippen → **gekippt losfahren** → Waage → raus), Ladung echt auf der Mulde (kinematisch, ab 22° dynamisch), Ankauf (Mischpreis / Fraktionspreis), Abholer (`requestPickup`) mit Verkauf kg × Preis × Reinheit². Werte in `balancing.vehicles`, Fahrzeuge in `customers.json` (`body`, `routeDock`, `tips`).
+- `sim/systems/ContainerSystem.ts` (slow ×6): Verbuchung nach 3 s Ruhe, Reinheit, **Sortierpunkte** statt Geld (E-021), verbuchte Teile bleiben kurz sichtbar.
+- Große Einzelformen (Drahtballen, Tank, Waschmaschine, Gussteil) mit Auswahlgewicht in `materials.json`.
+- `view/VehicleView.ts`, `view/ContainerFillView.ts`, `ui/Hud.ts` (Konto · Punkte · Verkaufen-Liste · Toasts).
+- Tasten: **K** Kunde rufen (Debug). Automatische Anlieferungen laufen im Arbeitsteil des Tages (`deliveriesPerDay`).
+- Test: `test/sim/delivery.test.ts`.
+
 ## Nächster Meilenstein
 
-**M4 — Anlieferung und Sortierung** (Briefing Kap. 22): Kundenfahrzeuge, Waage, Abkippen, Container-Zählung, Fehlwurf, Tagesablauf, Speicherstand.
+**M4b — Tag und Spiel**: Morgen/Feierabend, Morgen-Karte, drei Tagesaufträge mit Sternen, Fixkosten, Onboarding Tag 0 mit Willi/Lambert, Autosave + Export, Audio an Events.
