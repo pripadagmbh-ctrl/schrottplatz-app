@@ -56,9 +56,12 @@ describe("Pendel der Spinne", () => {
   });
 });
 
+/** Snap ist seit 08.09. standardmäßig aus — die Tests schalten ihn für sich ein. */
+function withSnap() { const d = loadGameData(); d.balancing.assist = { ...d.balancing.assist, snapEnabled: true }; return d; }
+
 describe("Greif-Magnet (Snap)", () => {
   it("gleitet auf ein einzelnes Teil knapp außerhalb des Korbs und greift es", () => {
-    const sim = new Simulation(loadGameData()); sim.init();
+    const sim = new Simulation(withSnap()); sim.init();
     const item = sim.scrap.spawn({ materialId: "steel", shapeId: "block", pos: { x: 0, y: 0.4, z: 8 } })!;
     sim.run(90);
     const t = sim.physics.safeBody(item.bodyHandle)!.translation();
@@ -79,7 +82,7 @@ describe("Greif-Magnet (Snap)", () => {
   });
 
   it("kein Snap bei zwei Kandidaten oder wenn schon ein Teil im Korb liegt", () => {
-    const sim = new Simulation(loadGameData()); sim.init();
+    const sim = new Simulation(withSnap()); sim.init();
     const a = sim.scrap.spawn({ materialId: "steel", shapeId: "block", pos: { x: 0, y: 0.4, z: 8 } })!;
     sim.scrap.spawn({ materialId: "steel", shapeId: "block", pos: { x: 0, y: 0.4, z: 8.8 } });
     sim.run(90);

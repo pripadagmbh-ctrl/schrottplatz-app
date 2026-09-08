@@ -5,9 +5,11 @@ import * as THREE from "three";
  * weich nachgeführt (Zeitkonstante 0,3 s). Spieler kann per Ziehen um den Bagger orbiten und per Rad zoomen;
  * die Orbit-Abweichung zum Oberwagen bleibt erhalten, bis er sie ändert.
  * M3: Draufsicht (Briefing Kap. 5.3: fast senkrecht, 25 m, 60° Pitch, folgt dem Oberwagen; Rückfrage M3-3).
- * Beim Umschalten werden Distanz/Pitch weich (0,4 s) überblendet, damit kein Schnitt entsteht. Kabine [V1].
+ * Beim Umschalten werden Distanz/Pitch weich (0,4 s) überblendet, damit kein Schnitt entsteht.
+ * Kabine (vorgezogen aus V1, iPad-Test 08.09.: aus 11 m Orbit sind die Teile zum Sortieren zu klein): Auge in der
+ * Kabine, Blick folgt der Spinne weich (0,25 s) — der Fahrer schaut auf seine Last, nicht geradeaus.
  */
-export type CameraMode = "orbit" | "top";
+export type CameraMode = "orbit" | "top" | "cabin";
 
 export class CameraRig {
   distance = 11; pitch = (24 * Math.PI) / 180; yawOffset = 0;
@@ -20,11 +22,25 @@ export class CameraRig {
 
   constructor(private readonly camera: THREE.PerspectiveCamera) {}
 
-  /** Ansicht wechseln: Orbit ↔ Draufsicht. Orbit-Einstellungen bleiben für die Rückkehr erhalten. */
-  cycle(): void { this.mode = this.mode === "orbit" ? "top" : "orbit"; }
+  /** Ansicht wechseln: Orbit → Draufsicht → Kabine → Orbit. Orbit-Einstellungen bleiben für die Rückkehr erhalten. */
+  cycle(): void { this.mode = this.mode === "orbit" ? "top" : this.mode === "top" ? "cabin" : "orbit"; }
 
-  update(dt: number, baseYaw: number, grapple: { x: number; y: number; z: number }, cab: { x: number; y: number; z: number }, orbit: { dx: number; dy: number }, zoom: number): void {
+  private readonly look = new THREE.Vector3(); private lookInit = false;
+
+  update(dt: number, baseYaw: number, grapple: { x: number; y: number; z: number }, cab: { x: number; y: number; z: number }, orbit: { dx: number; dy: number }, zoom: number, eye?: { x: number; y: number; z: number }): void {
     const k = 1 - Math.exp(-dt / 0.4);
+    if (this.mode === "cabin" && eye) {
+      // Kabine: Position = Auge, Blickpunkt = Spinne (weich), Zoom = Blickwinkel 40–70°
+      this.camera.position.set(eye.x, eye.y, eye.z);
+      this.tmp.set(grapple.x, grapple.y - 0.5, grapple.z);
+      if (!this.lookInit) { this.look.copy(this.tmp); this.lookInit = true; } else this.look.lerp(this.tmp, 1 - Math.exp(-dt / 0.25));
+      this.camera.lookAt(this.look);
+      this.camera.fov = THREE.MathUtils.clamp(this.camera.fov * Math.pow(1.08, zoom), 40, 70); this.camera.updateProjectionMatrix();
+      this.initialised = false; // Orbit-Ziel beim Zurückwechseln neu setzen (kein Schwenk aus der Kabine heraus)
+      return;
+    }
+    if (this.camera.fov !== 50) { this.camera.fov = 50; this.camera.updateProjectionMatrix(); }
+    this.lookInit = false;
     if (this.mode === "orbit") {
       this.yawOffset -= orbit.dx * 0.005;
       this.orbitPitch = THREE.MathUtils.clamp(this.orbitPitch + orbit.dy * 0.005, this.minPitch, this.maxPitch);

@@ -30,6 +30,7 @@ export class Renderer {
   private aim: AimState | null = null;
   private readonly modelPose: ModelPose = { pos: { x: 0, y: 0, z: 0 }, heading: 0, cabYaw: 0, boomAngle: 0, stickAngle: 0, rotatorYaw: 0, splay: 0, cabLift: 0, outriggerDown: 0, bladeDown: 0, inputs: { cab: 0, boom: 0, stick: 0, grapple: 0 } };
   private readonly cabPos = { x: 0, y: 0, z: 0 };
+  private readonly eye = new THREE.Vector3(); private firstPerson = false;
 
   constructor(canvas: HTMLCanvasElement, data: GameData, walls: readonly WallBox[], pixelRatioMax: number) {
     const level: LevelDef = data.level;
@@ -134,7 +135,10 @@ export class Renderer {
     this.updateExcavator(alpha);
     if (this.aim) this.aimRing.update(this.aim, frameDt);
     const m = this.modelPose;
-    this.rig.update(frameDt, m.heading + m.cabYaw, this.excavator.grappleGroup.position, this.cabPos, control?.camOrbit ?? { dx: 0, dy: 0 }, control?.camZoom ?? 0);
+    const cabin = this.rig.mode === "cabin";
+    if (cabin !== this.firstPerson) { this.firstPerson = cabin; this.excavator.setFirstPerson(cabin); }
+    if (cabin) this.excavator.cabinEyeWorld(this.eye);
+    this.rig.update(frameDt, m.heading + m.cabYaw, this.excavator.grappleGroup.position, this.cabPos, control?.camOrbit ?? { dx: 0, dy: 0 }, control?.camZoom ?? 0, cabin ? this.eye : undefined);
     this.renderer.render(this.scene, this.camera);
     this.drawCalls = this.renderer.info.render.calls;
     this.triangles = this.renderer.info.render.triangles;
