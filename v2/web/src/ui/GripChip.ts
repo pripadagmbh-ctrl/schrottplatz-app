@@ -34,10 +34,10 @@ export class GripChip {
     let text = "", state = "";
     if (a.heldCount > 0) {
       const sym = a.verdict === "ok" ? " ✓" : a.verdict === "tolerated" ? " !" : a.verdict === "wrong" ? " ✗" : "";
-      text = `${this.nameOf(a.heldMaterialId)} · ${Math.round(a.heldKg)} kg · ${this.euro(a.heldMaterialId)} · ${this.t("hud.grabInfo.held")}${sym}`;
+      text = [this.nameOf(a.heldMaterialId), `${Math.round(a.heldKg)} kg`, this.euro(a.heldMaterialId), this.t("hud.grabInfo.held") + sym].filter(Boolean).join(" · ");
       state = a.verdict;
     } else if (a.hoverItemId) {
-      text = `${this.nameOf(a.hoverMaterialId)} · ${Math.round(a.hoverKg)} kg · ${this.euro(a.hoverMaterialId)}`;
+      text = [this.nameOf(a.hoverMaterialId), `${Math.round(a.hoverKg)} kg`, this.euro(a.hoverMaterialId)].filter(Boolean).join(" · ");
       state = "item";
     }
     if (text === this.lastText && state === this.lastState) return;

@@ -104,6 +104,9 @@
     "compactMaxWidthPx": 700,
     "cameraOrbitSensitivity": 0.004,
     "pinchZoomSensitivity": 1.0,
-    "doubleTapMs": 300
+    "doubleTapMs": 300,
+    "doubleTapRadiusPx": 40,
+    "tapMaxMs": 250,
+    "tapMaxMovePx": 12
   }
 }

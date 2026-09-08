@@ -14,14 +14,18 @@
       body { height: 100dvh; touch-action: none; -webkit-user-select: none; user-select: none; }
       #scene { display: block; width: 100%; height: 100%; }
       #boot { position: fixed; inset: 0; display: grid; place-items: center; background: #1e2124; font-size: 18px; }
+      #debug-box[hidden] { display: none; } /* Autor-CSS „display: grid" würde das hidden-Attribut sonst überstimmen (iPhone-Test 08.09.) */
       #debug-box { position: fixed; left: max(8px, env(safe-area-inset-left)); top: max(8px, env(safe-area-inset-top)); z-index: 10; display: grid; gap: 6px; justify-items: start; }
       #debug-overlay { margin: 0; padding: 6px 8px; font: 12px/1.35 ui-monospace, Consolas, monospace; color: #eef0ec; background: rgba(20,22,24,.85); border-radius: 6px; pointer-events: none; }
       #debug-dump { min-height: 44px; padding: 0 14px; font: 600 14px Inter, system-ui, sans-serif; color: #1e2124; background: #f2b632; border: 0; border-radius: 6px; touch-action: manipulation; }
-      /* Touch-Layer (Briefing Kap. 5.2): root fängt nichts, nur die Kinder. Zonen = 40 % Breite, untere 55 % Höhe. */
+      /* Touch-Layer (Briefing Kap. 5.2): root fängt nichts, nur die Kinder. Zonen = 40 % Breite, vom Boden bis unter die Knopfleiste. */
       #touch-layer { position: fixed; inset: 0; z-index: 5; pointer-events: none;
         --sal: env(safe-area-inset-left, 0px); --sar: env(safe-area-inset-right, 0px); --sab: env(safe-area-inset-bottom, 0px); --sat: env(safe-area-inset-top, 0px); }
-      #touch-layer .zone { position: absolute; bottom: 0; width: 40%; height: 55%; pointer-events: auto; touch-action: none; }
+      /* Stick-Zonen: 40 % Breite, vom Boden bis unter die Knopfleiste (Knöpfe liegen darüber). Kamera nur im Mittelstreifen. */
+      #touch-layer .zone { position: absolute; bottom: 0; width: 40%; top: calc(var(--sat) + 72px); pointer-events: auto; touch-action: none; }
       #touch-layer .zone-left { left: 0; } #touch-layer .zone-right { right: 0; }
+      #touch-layer .zone-cam { left: 40%; width: 20%; top: calc(var(--sat) + 72px); }
+      #touch-layer .tbtn { z-index: 2; }
       #touch-layer .stick { position: absolute; width: var(--stick); height: var(--stick); border-radius: 50%; border: 2px solid rgba(238,240,236,.55); background: rgba(20,22,24,.35); pointer-events: none; }
       #touch-layer .stick .knob { position: absolute; left: calc(50% - var(--knob) / 2); top: calc(50% - var(--knob) / 2); width: var(--knob); height: var(--knob); border-radius: 50%; background: rgba(242,182,50,.9); box-shadow: 0 2px 6px rgba(0,0,0,.4); }
       #touch-layer #stick-right { border-color: rgba(79,191,63,.7); }
@@ -29,6 +33,7 @@
       #touch-layer .tbtn.active { background: #f2b632; color: #1e2124; }
       #touch-layer #btn-drive { width: var(--drive); height: var(--drive); left: calc(var(--sal) + 20px); bottom: calc(var(--sab) + 57%); font-size: 11px; }
       #touch-layer .rot { width: var(--rot); height: var(--rot); bottom: calc(var(--sab) + 57%); font-size: 22px; }
+      #touch-layer .zone-left::before, #touch-layer .zone-right::before { content: ""; position: absolute; inset: 8px; border-radius: 16px; border: 1px dashed rgba(238,240,236,.12); pointer-events: none; }
       #touch-layer #btn-rot-l { right: calc(var(--sar) + 20px + var(--rot) + 12px); }
       #touch-layer #btn-rot-r { right: calc(var(--sar) + 20px); }
       #touch-layer #btn-camera { width: 48px; height: 48px; right: calc(var(--sar) + 12px); top: calc(var(--sat) + 12px); font-size: 24px; }
@@ -40,7 +45,10 @@
         #debug-overlay { font-size: 10px; line-height: 1.2; padding: 4px 6px; }
         #debug-box { grid-auto-flow: column; align-items: start; }
         #debug-dump { min-height: 36px; font-size: 12px; padding: 0 10px; }
-        #touch-layer #btn-drive, #touch-layer .rot { bottom: calc(var(--sab) + 56%); }
+        /* Rotator-Knöpfe tiefer, sonst treffen sie bei ~265 px (Safari-Leisten) den ⌖-Knopf (iPhone-Test 08.09.) */
+        #touch-layer #btn-drive, #touch-layer .rot { bottom: calc(var(--sab) + 46%); }
+        /* Chip nach oben: unten säße er auf dem Bagger */
+        #grip-chip { bottom: auto; top: calc(env(safe-area-inset-top, 0px) + 68px); height: 36px; font-size: 13px; border-radius: 18px; }
       }
       /* Griff-Info-Chip (Kap. 14.1): unten Mitte, 44 px, über der Touch-Hilfe */
       #grip-chip { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom, 0px) + 40px); z-index: 6; height: 44px; box-sizing: border-box; padding: 0 16px; display: flex; align-items: center; gap: 8px; font: 600 15px Inter, system-ui, sans-serif; color: #eef0ec; background: rgba(20,22,24,.85); border-radius: 22px; border-left: 6px solid #eef0ec; white-space: nowrap; pointer-events: none; max-width: calc(100vw - 32px); overflow: hidden; text-overflow: ellipsis; }

@@ -10,6 +10,8 @@ const viewports = [
   { name: "iPad quer", width: 1180, height: 820, compact: false },
   { name: "iPhone mini quer", width: 812, height: 375, compact: false },
   { name: "Kompakt 390 quer", width: 844, height: 390, compact: false },
+  // Safari mit Leisten: Debug-Box (nur Dev) darf hier überlappen — im Live-Build ist sie unsichtbar
+  { name: "iPhone mini quer mit Safari-Leisten", width: 812, height: 265, compact: false, ignoreDebugBox: true },
   { name: "iPhone mini hoch", width: 375, height: 812, compact: true },
 ];
 
@@ -41,6 +43,7 @@ for (const vp of viewports) {
       expect(b.y + b.h, `${b.id} unten im Bild`).toBeLessThanOrEqual(vp.height);
     }
     for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+      if ("ignoreDebugBox" in vp && (boxes[i]!.id === "debug-box" || boxes[j]!.id === "debug-box")) continue;
       expect(overlaps(boxes[i]!, boxes[j]!), `${boxes[i]!.id} überlappt ${boxes[j]!.id}`).toBe(false);
     }
 
@@ -68,6 +71,18 @@ for (const vp of viewports) {
     const grapple = await page.evaluate(() => window.__bagerana?.sim.control.grapple ?? 0);
     expect(grapple, "Spinne schließt").toBeGreaterThan(0.3);
     await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+
+    // Doppeltipp: zwei Daumen nacheinander (links/rechts) dürfen NICHT wechseln. Der Positivfall steht in
+    // test/unit/tapdetector.test.ts — Headless braucht ~2 s pro Touch, ein echter 0,25-s-Tipp ist dort nicht möglich.
+    const mode = () => page.evaluate(() => window.__bagerana?.renderer.rig.mode);
+    const tap = async (x: number, y: number, id: number) => { await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y, id }] }); await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] }); };
+    const m0 = await mode();
+    await tap(lx, ly, 3); await page.waitForTimeout(60); await tap(rx, ry, 4); await page.waitForTimeout(700); // Headless rendert nur ~4 fps
+    expect(await mode(), "zwei Daumen ≠ Doppeltipp").toBe(m0);
+
+    // Overlay aus → Box darf nicht mehr gezeichnet werden (iPhone-Befund 08.09.: display:grid schlug das hidden-Attribut)
+    await page.keyboard.press("F3"); await page.waitForTimeout(100);
+    expect(await page.locator("#debug-box").evaluate((el) => getComputedStyle(el).display)).toBe("none");
 
     expect(errors, "Seitenfehler").toEqual([]);
     await context.close();
