@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import {
   CLAW_COUNT,
   CLAW_OPEN_SPLAY,
@@ -188,10 +189,61 @@ export class ExcavatorModel {
     this.buildArm();
     this.buildGrapple();
     this.buildHydraulics();
+    this.mergeStatic();
 
     scene.add(this.root);
     scene.add(this.grappleGroup);
   }
+
+  /**
+   * Draw Calls senken (Briefing Kap. 19; Messung M3: 235 Calls, Budget mobil 250, M4a bringt Lkw dazu):
+   * Innerhalb jeder Gruppe werden alle unbewegten Blatt-Meshes gleichen Materials zu EINEM Mesh verschmolzen —
+   * die Gruppe bewegt sich weiter als Ganzes (Oberwagen, Ausleger, Stiel, Krallensegmente), aber statt ~190 Meshes
+   * zeichnet die Karte ~35. Ausgenommen: alles, was update() einzeln bewegt oder ein-/ausblendet (Zylinder, Lenker, Fahrer).
+   */
+  private mergeStatic(): void {
+    const dynamic = new Set<THREE.Object3D>();
+    for (const h of this.hydraulics) { dynamic.add(h.barrel); dynamic.add(h.rod); }
+    for (const c of this.grappleCylinders) { dynamic.add(c.barrel); dynamic.add(c.rod); }
+    for (const l of this.cabLinks) dynamic.add(l.mesh);
+    for (const d of this.driverBody) d.traverse((o) => dynamic.add(o));
+    // Gruppen, die update() bewegt: alles darunter bis zur naechsten bewegten Gruppe ist relativ zu ihr starr
+    const animated = new Set<THREE.Object3D>([this.root, this.grappleGroup, this.cabGroup, this.cabLiftGroup, this.boomGroup, this.stickGroup, this.bladeGroup, ...this.outriggerFeet, ...this.fingerPivots]);
+    if (this.joyLeft) animated.add(this.joyLeft); if (this.joyRight) animated.add(this.joyRight);
+    let before = 0, after = 0;
+    const inv = new THREE.Matrix4(), rel = new THREE.Matrix4();
+    for (const g of animated) {
+      const buckets = new Map<string, { mat: THREE.Material; shadow: boolean; meshes: THREE.Mesh[] }>();
+      const visit = (o: THREE.Object3D) => {
+        for (const child of o.children) {
+          if (animated.has(child) || dynamic.has(child)) continue;
+          if (child instanceof THREE.Mesh) {
+            const mat = child.material as THREE.Material; const key = `${mat.uuid}|${child.castShadow ? 1 : 0}`;
+            const b = buckets.get(key) ?? { mat, shadow: child.castShadow, meshes: [] }; b.meshes.push(child); buckets.set(key, b);
+          }
+          visit(child);
+        }
+      };
+      visit(g);
+      g.updateWorldMatrix(true, true);
+      inv.copy(g.matrixWorld).invert();
+      for (const b of buckets.values()) {
+        if (b.meshes.length < 2) continue;
+        before += b.meshes.length; after += 1;
+        const parts = b.meshes.map((m) => { rel.multiplyMatrices(inv, m.matrixWorld); const gg = (m.geometry as THREE.BufferGeometry).clone(); gg.applyMatrix4(rel); return gg; });
+        const merged = mergeGeometries(parts, false);
+        for (const p of parts) p.dispose();
+        if (!merged) continue;
+        this.geometries.push(merged);
+        for (const m of b.meshes) m.removeFromParent();
+        const mesh = new THREE.Mesh(merged, b.mat); mesh.castShadow = b.shadow; mesh.name = "merged";
+        g.add(mesh);
+      }
+    }
+    this.mergedStats = { before, after };
+  }
+  /** Fuer Tests/Overlay: wie viele Meshes verschmolzen wurden */
+  mergedStats = { before: 0, after: 0 };
 
   // ---------- Hilfen für Ressourcenverwaltung ----------
 

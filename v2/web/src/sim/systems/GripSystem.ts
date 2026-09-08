@@ -108,7 +108,10 @@ export class GripSystem implements System {
       const body = ctx.physics.safeBody(h.handle);
       const item = ctx.world.items.get(h.id);
       if (!body || !item) continue;
-      bottom = Math.max(bottom, p.grapplePos.y - (body.translation().y - this.worldHalfHeight(item.size, body.rotation())));
+      // Nur eingefrorene (mitgefuehrte) Ladung zaehlt fuer den Bodenanschlag — ein Teil, das beim Schliessen noch am Boden
+      // liegt, wuerde sonst als „unter dem Boden haengend" gelten und den Arm nach oben treiben (Patrick 08.09.: Ausleger faehrt
+      // von selbst hoch, Teile fliegen geisterhaft nach).
+      if (h.settled) bottom = Math.max(bottom, p.grapplePos.y - (body.translation().y - this.worldHalfHeight(item.size, body.rotation())));
       // Bodenanschlag schiebt die Spinne beim Schliessen bis 0,6 m hoch (E-013) — das Teil darf da nicht mitfahren
       // (Patrick 08.09.: „Material fliegt den Greifer hoch"). Erst wenn geschlossen oder abgehoben: Lage einfrieren.
       if (!h.settled) {

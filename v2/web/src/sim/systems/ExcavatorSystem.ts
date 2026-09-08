@@ -174,8 +174,10 @@ export class ExcavatorSystem implements System {
     const maxLift = 0.6;
     let need = minTipY - this.tipY(s);
     this.groundLift = clamp(need, 0, maxLift);
+    // Pro Schritt hoechstens so viel Armbewegung wie der Fahrer selbst in 3 Schritten schafft — kein Hochschnellen
     let clamped = false, guard = 0;
-    while (this.tipY(s) + maxLift < minTipY && guard++ < 80) {
+    const maxIter = Math.max(2, Math.round((Math.max(this.boomRate, this.stickRate) * 3 / 60) / 0.004));
+    while (this.tipY(s) + maxLift < minTipY && guard++ < maxIter) {
       clamped = true;
       const total = s.boom + s.stick;
       const dStick = this.stickLen * Math.cos(total);
