@@ -12,6 +12,9 @@ export interface ScrapItem {
   id: ItemId; materialId: string; shapeId: string;
   size: [number, number, number]; massKg: number;
   pos: Vec3; rot: Quat;
+  /** Pose des vorherigen Physikschritts — für die Render-Interpolation */
+  prevPos: Vec3; prevRot: Quat;
+  sleeping: boolean;
   bodyHandle?: number;
   state: ItemState;
   compositeId?: CompositeId;

@@ -19,7 +19,7 @@
   "shapes": [
     { "id": "beam", "collider": "box", "sizeMin": [0.15, 0.15, 1.2], "sizeMax": [0.3, 0.3, 3.0], "fill": 0.35, "materialIds": ["steel", "va"], "tris": 36 },
     { "id": "pipe", "collider": "cylinder", "sizeMin": [0.05, 0.05, 0.8], "sizeMax": [0.12, 0.12, 2.2], "fill": 0.25, "materialIds": ["steel", "copper", "va", "alu"], "tris": 64 },
-    { "id": "sheet", "collider": "box", "sizeMin": [0.6, 0.02, 0.6], "sizeMax": [1.6, 0.04, 1.2], "fill": 1.0, "materialIds": ["steel", "alu"], "tris": 12 },
+    { "id": "sheet", "collider": "box", "sizeMin": [0.6, 0.03, 0.6], "sizeMax": [1.6, 0.05, 1.2], "fill": 1.0, "materialIds": ["steel", "alu"], "tris": 12 },
     { "id": "block", "collider": "box", "sizeMin": [0.3, 0.3, 0.3], "sizeMax": [0.9, 0.5, 0.7], "fill": 0.7, "materialIds": ["steel", "rubble"], "tris": 12 },
     { "id": "sink", "collider": "box", "sizeMin": [0.5, 0.18, 0.4], "sizeMax": [0.9, 0.22, 0.55], "fill": 0.08, "materialIds": ["va"], "tris": 120 },
     { "id": "rim", "collider": "cylinder", "sizeMin": [0.18, 0.18, 0.15], "sizeMax": [0.24, 0.24, 0.22], "fill": 0.3, "materialIds": ["alu"], "tris": 96 },

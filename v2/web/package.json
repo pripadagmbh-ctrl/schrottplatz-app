@@ -1,7 +1,7 @@
 {
   "name": "bagerana-web",
   "private": true,
-  "version": "2.0.0-m0",
+  "version": "2.0.0-m3",
   "type": "module",
   "description": "Bagerana v2 — Spur A (Web): TypeScript, Vite, Three.js, Rapier",
   "scripts": {

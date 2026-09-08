@@ -1,16 +1,87 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
-  "required": ["axes", "deadzone", "keyboard", "gamepad", "touch"],
+  "required": [
+    "axes",
+    "deadzone",
+    "keyboard",
+    "gamepad",
+    "touch"
+  ],
   "properties": {
     "axes": {
-      "type": "object", "required": ["leftX", "leftY", "rightX", "rightY"],
-      "additionalProperties": { "type": "object", "required": ["fn", "invert"], "properties": { "fn": { "enum": ["boom", "stick", "cab", "grapple", "rotator", "none"] }, "invert": { "type": "boolean" } } }
+      "type": "object",
+      "required": [
+        "leftX",
+        "leftY",
+        "rightX",
+        "rightY"
+      ],
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "fn",
+          "invert"
+        ],
+        "properties": {
+          "fn": {
+            "enum": [
+              "boom",
+              "stick",
+              "cab",
+              "grapple",
+              "rotator",
+              "none"
+            ]
+          },
+          "invert": {
+            "type": "boolean"
+          }
+        }
+      }
     },
-    "deadzone": { "type": "number", "minimum": 0, "maximum": 0.5 },
-    "keyboard": { "type": "object", "required": ["cab", "boom", "stick", "drive", "steer", "grapple", "pause", "cycleCamera"] },
-    "gamepad": { "type": "object" },
-    "touch": { "type": "object", "required": ["stickDiameterPx", "grabButtonPx", "minTapTargetPx", "grabMode"],
-      "properties": { "minTapTargetPx": { "type": "integer", "minimum": 44 }, "grabMode": { "enum": ["hold", "toggle"] } } }
+    "deadzone": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 0.5
+    },
+    "keyboard": {
+      "type": "object",
+      "required": [
+        "cab",
+        "boom",
+        "stick",
+        "drive",
+        "steer",
+        "grapple",
+        "pause",
+        "cycleCamera"
+      ]
+    },
+    "gamepad": {
+      "type": "object"
+    },
+    "touch": {
+      "type": "object",
+      "required": [
+        "stickDiameterPx",
+        "grabButtonPx",
+        "minTapTargetPx",
+        "grabMode"
+      ],
+      "properties": {
+        "minTapTargetPx": {
+          "type": "integer",
+          "minimum": 44
+        },
+        "grabMode": {
+          "enum": [
+            "hold",
+            "toggle",
+            "stick"
+          ]
+        }
+      }
+    }
   }
 }

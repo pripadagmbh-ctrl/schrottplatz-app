@@ -1,6 +1,6 @@
 # Bagerana v2 — Spur A (Web)
 
-Neuaufbau nach `../docs/02_Briefing.md` (Kap. 17 Architektur, Kap. 22 Meilensteine). Stand: **M0 — Gerüst und Messbasis**.
+Neuaufbau nach `../docs/02_Briefing.md` (Kap. 17 Architektur, Kap. 22 Meilensteine). Stand: **M3 — Touch und Kamera** (Touch-Layout v2, Draufsicht, Bodenring, Griff-Info-Chip, Snap, Pendel).
 
 ## Befehle
 
@@ -40,6 +40,40 @@ Ein Import von `three` oder `window` in `src/sim/` ist ein Lint-Fehler. Ein Impo
 - GameLoop mit Akkumulator und Interpolationsfaktor.
 - Playwright-Rauchtest: Seite lädt, Overlay zeigt fps, keine Konsolenfehler, ≤ 400 Draw Calls.
 
+## Was M1 enthält
+
+- `sim/world/Level.ts`: statische Kollider (Boden, 5 Wände, Muldenwände) und Zonen aus `level_yard.json` — dieselben Kästen zeichnet die Ansicht.
+- `sim/world/collisionGroups.ts`: Bitmasken für Statik, lose Teile, Bagger, gehaltene Teile, Fahrzeuge.
+- `PhysicsWorld`: Body-Registry `handle ↔ ItemId`, gesammeltes Entfernen nach `itemRemoving`.
+- `sim/systems/ScrapSystem.ts`: Spawner (Formen aus `materials.json`, Masse = Volumen × Dichte × Füllgrad), Regalpackung ohne Überlappung, Deckel 300, Schlafhilfe (gemeinsam, nie einzeln), Save/Load mit Prüfung je Eintrag.
+- `Simulation.settle()`: Vorsimulation bis Ruhe, dann schlafen — kein Bild beginnt mit 150 wachen Körpern.
+- `view/ScrapView.ts`: ein `InstancedMesh` je Form, Farbe je Fraktion, Interpolation zwischen Physikschritten.
+- Debug-Knopf „Haufen kippen" (Taste P): 150 weitere Teile fallen live — Physik-ms auf dem Gerät messen.
+- Wächter-Tests: 150 Teile schlafen in 600 Schritten bei < 0,3 ms/Schritt · Fuzz 6 000 Schritte ohne Ausreißer > 20 m/s · Entfernen über Registry · Save-Roundtrip mit kaputten Einträgen · Level-Geometrie.
+
+Physik-Erkenntnisse aus M1 (Details in `../docs/entscheidungen.md` E-010–E-012): überlappende Spawns und perfekte Zylinder waren die Ursachen für nie schlafende Haufen; Körper einzeln schlafen zu legen drückt Teile durch den Boden.
+
+## Was M2 enthält
+
+- `sim/systems/ExcavatorSystem.ts` (Phase input): Fahrwerk, Lenkung, Oberwagen, Hauptarm, Stiel, Rotator, Spinne — Rampen, Lastfaktor, Bodenanschlag; Vorwärtskinematik liefert `pose` (Stielspitze, Spinne, Sensor). Zahlen aus `balancing.excavator`.
+- `sim/systems/ExcavatorColliders.ts` (preStep 10): kinematische Körper für Unterwagen, Hauptarm, Stiel, Spinne (Traverse + 10 Krallen-Kapseln aus `shared/clawGeometry.ts`); Pflügsonde an den Krallenspitzen in Bewegungsrichtung → `plowFactor`.
+- `sim/systems/GripSystem.ts` (preStep 20): Sensor + Korbgeometrie, Greiffenster 0,6–0,98, gehaltene Teile kinematisch in Gruppe HELD, Haltepose in 0,15 s, Loslassen mit Spinnengeschwindigkeit, Überlast- und Schwungwurf-Regel, `itemRemoving` löst den Griff.
+- `app/input/KeyboardMouseAdapter.ts`: Q/E R/F T/G W/S A/D, LMB greifen, Rad Rotator, MMB/RMB Orbit, Shift+Rad Zoom — Belegung aus `controls.json`.
+- `view/ExcavatorModel.ts` (aus dem Prototyp portiert, nur Darstellung), `view/CameraRig.ts` (Orbit hinter der Kabine, folgt dem Oberwagen), Schatten für Bagger.
+- Tests: 100× greifen/heben/schwenken/ablegen ohne Ausreißer · Bodenanschlag · Widerstand nur bei Kontakt · Überlast + H1 · Spreizung.
+
+Steuerung im Browser: **Q/E** Oberwagen · **R/F** Hauptarm · **T/G** Stiel · **W/S A/D** fahren · **linke Maustaste halten** greifen · **Mausrad** Rotator (Rasten) · **Y/X** Rotator (Dauer) · **V** Fahrmodus · **C** Ansicht (Orbit/Draufsicht) · **rechte/mittlere Maustaste ziehen** Kamera · **Shift+Rad** Zoom · **P** Haufen kippen · **F3** Overlay.
+
+## Was M3 enthält
+
+- `app/input/TouchAdapter.ts` + `InputMapper.ts`: zwei floating Sticks (links: Oberwagen/Hauptarm, rechts: Stiel/Spinne — rechts = schließen, links = öffnen, asymmetrische Totzonen 0,3/0,6), FAHREN-Toggle (Auto-Ende nach 4 s), ↺ ↻ Rotator halten, ⌖ Ansicht; freie Fläche: Wischen = Orbit, Pinch = Zoom, Doppeltipp = Ansicht. Safe-Area über `env()`, Kompaktlayout < 700 px. Alle Werte in `controls.touch`.
+- `sim/systems/AimSystem.ts` (postStep 20): Strahl unter dem Sensor → Teil/Container, Urteil `neutral | item | ok | tolerated | wrong`, Ladungsinfo. `view/AimRing.ts` zeichnet den Bodenring, `ui/GripChip.ts` den Chip (Fraktion · kg · €-Stufe · ✓/!/✗).
+- Greif-Magnet (Snap) in `GripSystem.trySnap` + `ExcavatorSystem.applySnap`: Ein-Freiheitsgrad-IK für Gieren und Reichweite, 0,25 s, `balancing.assist`.
+- Pendel in `ExcavatorSystem.integratePendulum`: neigt Spinne, Kollider, Sensor und Ladung; Bodenkontakt beruhigt.
+- `view/CameraRig.ts`: Orbit ↔ Draufsicht (25 m, 60°), weiche Überblendung.
+- Schonfrist nach dem Loslassen (Gruppe `released`, 0,6 s) — behebt wegschießende Teile (E-018).
+- Tests: `test/sim/assist.test.ts` (Pendel, Snap, Zielhilfe) · `test/e2e/layout.spec.ts` (4 Viewports, Tippziele ≥ 44 px, keine Überlappung, Stick + Greifen per Touch).
+
 ## Nächster Meilenstein
 
-**M1 — Kopflose Simulation** (Briefing Kap. 22): ScrapSystem mit Spawner, Vorsimulation, Sleep-Wächter-Test „150 Teile, 600 Schritte, alle schlafen, < 0,3 ms/Schritt", Fuzz-Test.
+**M4 — Anlieferung und Sortierung** (Briefing Kap. 22): Kundenfahrzeuge, Waage, Abkippen, Container-Zählung, Fehlwurf, Tagesablauf, Speicherstand.

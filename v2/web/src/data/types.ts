@@ -88,6 +88,7 @@ export interface BalancingFile {
   scrap: Record<string, number | string>;
   customers: Record<string, number | string>;
   budgets: Record<string, number>;
+  assist: Record<string, number | boolean | string>;
 }
 
 export type I18nFile = Record<string, unknown>;

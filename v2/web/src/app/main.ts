@@ -4,7 +4,10 @@ import { Simulation } from "@/sim/Simulation";
 import { debugSnapshot } from "@/sim/snapshot/Snapshot";
 import { Renderer } from "@/view/Renderer";
 import { DebugOverlay } from "@/ui/DebugOverlay";
+import { GripChip } from "@/ui/GripChip";
 import { GameLoop } from "./GameLoop";
+import { InputMapper } from "./input/InputMapper";
+import { resetControlFrame } from "@/sim/control/ControlFrame";
 
 /**
  * Bootstrap (< 150 Zeilen, Architektur Kap. 3): Daten laden → Simulation → Renderer → Loop.
@@ -30,18 +33,42 @@ async function boot(): Promise<void> {
   const sim = new Simulation(data);
   sim.init();
 
-  const renderer = new Renderer(canvas, data.level, Number(data.balancing.budgets["pixelRatioMax"]));
-  const overlay = new DebugOverlay(document.body, data.i18n as Record<string, unknown>);
+  // M1: Start-Haufen auf der Annahmefläche, vorsimuliert und schlafend (Briefing Kap. 6.5)
+  const pileCount = Number(data.balancing.scrap["startPileCount"] ?? 150);
+  sim.scrap.spawnPile("intake", pileCount, 42);
+  sim.settle();
+
+  const renderer = new Renderer(canvas, data, sim.level.boxes, Number(data.balancing.budgets["pixelRatioMax"]));
+  let pileSeed = 100;
+  const dumpPile = () => { sim.scrap.spawnPile("intake", 150, pileSeed++); };
+  const overlay = new DebugOverlay(document.body, data.i18n as Record<string, unknown>, { dumpPile });
+  const chip = new GripChip(document.body, data.i18n as Record<string, unknown>, data.materials.materials);
+
+  const ex = data.balancing.excavator as Record<string, number>;
+  const input = new InputMapper(canvas, document.body, data.controls, Number(ex["rotatorStepDeg"]), Number(ex["rotatorRateDegS"]));
+  const camFrame = { camOrbit: { dx: 0, dy: 0 }, camZoom: 0 };
 
   const loop = new GameLoop(sim.dt, data.balancing.physics.maxCatchUpSteps, {
-    simStep: () => sim.step(),
+    simStep: (dt) => {
+      input.fill(sim.control, dt, sim.world.excavator.grapple);
+      if (sim.control.actions.has("toggleDriveMode")) sim.world.excavator.driveMode = !sim.world.excavator.driveMode;
+      // Kamera-Eingaben pro Bild sammeln — sie gehen an die Ansicht, nicht an die Simulation
+      camFrame.camOrbit.dx += sim.control.camOrbit.dx; camFrame.camOrbit.dy += sim.control.camOrbit.dy; camFrame.camZoom += sim.control.camZoom;
+      if (sim.control.actions.has("toggleDebug")) overlay.toggle();
+      if (sim.control.actions.has("cycleCamera")) renderer.rig.cycle();
+      sim.step();
+      renderer.syncExcavator(sim.world, sim.excavator.pose, sim.excavator.prev, sim.control, sim.aim.state);
+      chip.update(sim.aim.state);
+    },
     render: (alpha, frameDt) => {
-      renderer.render(alpha, frameDt);
-      overlay.update({ ...debugSnapshot(sim.world, sim.physics), fps: loop.fps, frameMs: loop.frameMs, drawCalls: renderer.drawCalls, tris: renderer.triangles, dropped: loop.droppedSteps, version: VERSION });
+      renderer.render(sim.world, alpha, frameDt, { ...sim.control, camOrbit: camFrame.camOrbit, camZoom: camFrame.camZoom });
+      camFrame.camOrbit.dx = 0; camFrame.camOrbit.dy = 0; camFrame.camZoom = 0;
+      overlay.update({ ...debugSnapshot(sim.world, sim.physics), fps: loop.fps, frameMs: loop.frameMs, drawCalls: renderer.drawCalls, tris: renderer.triangles, dropped: loop.droppedSteps, version: VERSION, held: sim.grip.count, heldKg: sim.grip.totalMassKg, closure: sim.world.excavator.grapple, plow: sim.excavator.plowFactor });
     },
   });
 
-  document.addEventListener("keydown", (e) => { if (e.code === "F3") { e.preventDefault(); overlay.toggle(); } });
+  document.addEventListener("keydown", (e) => { if (e.code === "KeyP" && !e.repeat) dumpPile(); });
+  document.addEventListener("visibilitychange", () => { if (document.hidden) resetControlFrame(sim.control); });
   document.addEventListener("visibilitychange", () => { loop.paused = document.hidden; });
   window.addEventListener("resize", () => renderer.resize());
 

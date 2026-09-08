@@ -25,7 +25,7 @@ describe("Kopflose Simulation", () => {
     sim.init();
     const w = sim.physics.world;
     w.createCollider(RAPIER.ColliderDesc.cuboid(30, 0.5, 22.5).setTranslation(0, -0.5, 0));
-    const body = w.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(0, 3, 0));
+    const body = w.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(12, 3, -12));
     w.createCollider(RAPIER.ColliderDesc.cuboid(0.25, 0.25, 0.25).setMass(40), body);
     sim.run(600); // 10 s
     const b = sim.physics.safeBody(body.handle)!;

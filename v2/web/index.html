@@ -14,7 +14,38 @@
       body { height: 100dvh; touch-action: none; -webkit-user-select: none; user-select: none; }
       #scene { display: block; width: 100%; height: 100%; }
       #boot { position: fixed; inset: 0; display: grid; place-items: center; background: #1e2124; font-size: 18px; }
-      #debug-overlay { position: fixed; left: max(8px, env(safe-area-inset-left)); top: max(8px, env(safe-area-inset-top)); margin: 0; padding: 6px 8px; font: 12px/1.35 ui-monospace, Consolas, monospace; color: #eef0ec; background: rgba(20,22,24,.85); border-radius: 6px; pointer-events: none; z-index: 10; }
+      #debug-box { position: fixed; left: max(8px, env(safe-area-inset-left)); top: max(8px, env(safe-area-inset-top)); z-index: 10; display: grid; gap: 6px; justify-items: start; }
+      #debug-overlay { margin: 0; padding: 6px 8px; font: 12px/1.35 ui-monospace, Consolas, monospace; color: #eef0ec; background: rgba(20,22,24,.85); border-radius: 6px; pointer-events: none; }
+      #debug-dump { min-height: 44px; padding: 0 14px; font: 600 14px Inter, system-ui, sans-serif; color: #1e2124; background: #f2b632; border: 0; border-radius: 6px; touch-action: manipulation; }
+      /* Touch-Layer (Briefing Kap. 5.2): root fängt nichts, nur die Kinder. Zonen = 40 % Breite, untere 55 % Höhe. */
+      #touch-layer { position: fixed; inset: 0; z-index: 5; pointer-events: none;
+        --sal: env(safe-area-inset-left, 0px); --sar: env(safe-area-inset-right, 0px); --sab: env(safe-area-inset-bottom, 0px); --sat: env(safe-area-inset-top, 0px); }
+      #touch-layer .zone { position: absolute; bottom: 0; width: 40%; height: 55%; pointer-events: auto; touch-action: none; }
+      #touch-layer .zone-left { left: 0; } #touch-layer .zone-right { right: 0; }
+      #touch-layer .stick { position: absolute; width: var(--stick); height: var(--stick); border-radius: 50%; border: 2px solid rgba(238,240,236,.55); background: rgba(20,22,24,.35); pointer-events: none; }
+      #touch-layer .stick .knob { position: absolute; left: calc(50% - var(--knob) / 2); top: calc(50% - var(--knob) / 2); width: var(--knob); height: var(--knob); border-radius: 50%; background: rgba(242,182,50,.9); box-shadow: 0 2px 6px rgba(0,0,0,.4); }
+      #touch-layer #stick-right { border-color: rgba(79,191,63,.7); }
+      #touch-layer .tbtn { position: absolute; pointer-events: auto; touch-action: none; min-width: 44px; min-height: 44px; border: 0; border-radius: 50%; color: #eef0ec; background: rgba(20,22,24,.7); font: 600 14px Inter, system-ui, sans-serif; display: grid; place-items: center; -webkit-tap-highlight-color: transparent; }
+      #touch-layer .tbtn.active { background: #f2b632; color: #1e2124; }
+      #touch-layer #btn-drive { width: var(--drive); height: var(--drive); left: calc(var(--sal) + 20px); bottom: calc(var(--sab) + 57%); font-size: 11px; }
+      #touch-layer .rot { width: var(--rot); height: var(--rot); bottom: calc(var(--sab) + 57%); font-size: 22px; }
+      #touch-layer #btn-rot-l { right: calc(var(--sar) + 20px + var(--rot) + 12px); }
+      #touch-layer #btn-rot-r { right: calc(var(--sar) + 20px); }
+      #touch-layer #btn-camera { width: 48px; height: 48px; right: calc(var(--sar) + 12px); top: calc(var(--sat) + 12px); font-size: 24px; }
+      #touch-layer .hint { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(var(--sab) + 10px); padding: 4px 10px; font-size: 12px; color: rgba(238,240,236,.75); background: rgba(20,22,24,.5); border-radius: 6px; white-space: nowrap; }
+      #touch-layer.compact .hint { display: none; }
+      #touch-layer.compact #btn-drive, #touch-layer.compact .rot { bottom: calc(var(--sab) + 60%); }
+      /* Flache Querformate (iPhone mini quer: 375 px hoch): Debug-Box kompakter, damit sie nicht in FAHREN ragt */
+      @media (max-height: 500px) {
+        #debug-overlay { font-size: 10px; line-height: 1.2; padding: 4px 6px; }
+        #debug-box { grid-auto-flow: column; align-items: start; }
+        #debug-dump { min-height: 36px; font-size: 12px; padding: 0 10px; }
+        #touch-layer #btn-drive, #touch-layer .rot { bottom: calc(var(--sab) + 56%); }
+      }
+      /* Griff-Info-Chip (Kap. 14.1): unten Mitte, 44 px, über der Touch-Hilfe */
+      #grip-chip { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom, 0px) + 40px); z-index: 6; height: 44px; box-sizing: border-box; padding: 0 16px; display: flex; align-items: center; gap: 8px; font: 600 15px Inter, system-ui, sans-serif; color: #eef0ec; background: rgba(20,22,24,.85); border-radius: 22px; border-left: 6px solid #eef0ec; white-space: nowrap; pointer-events: none; max-width: calc(100vw - 32px); overflow: hidden; text-overflow: ellipsis; }
+      #grip-chip[data-state="ok"] { border-left-color: #4fbf3f; } #grip-chip[data-state="tolerated"] { border-left-color: #f2b632; } #grip-chip[data-state="wrong"] { border-left-color: #e0483a; }
+      @media (max-width: 700px) { #grip-chip { font-size: 13px; padding: 0 12px; } }
       .fatal { padding: 24px; max-width: 900px; margin: 0 auto; }
       .fatal h1 { color: #e0483a; font-size: 20px; }
       .fatal pre { white-space: pre-wrap; font-size: 13px; }

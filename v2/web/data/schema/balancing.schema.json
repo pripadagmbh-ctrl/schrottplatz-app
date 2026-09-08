@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
-  "required": ["physics", "excavator", "grip", "economy", "day", "containers", "scrap", "customers", "budgets"],
+  "required": ["physics", "excavator", "grip", "economy", "day", "containers", "scrap", "customers", "budgets", "assist"],
   "properties": {
     "physics": { "type": "object", "required": ["stepHz", "maxCatchUpSteps", "solverIterations", "internalPgsIterations", "contactNaturalFrequency", "sleepLinearThreshold", "sleepAngularThreshold", "spawnGapM", "presimulateSteps"],
       "properties": { "stepHz": { "enum": [60] }, "maxCatchUpSteps": { "type": "integer", "minimum": 1, "maximum": 5 }, "solverIterations": { "type": "integer", "minimum": 1, "maximum": 16 } } },
@@ -15,6 +15,8 @@
     "containers": { "type": "object", "required": ["bookAfterRestS", "keepVisibleCount", "muldeCapacityKg", "pileCapacityKg", "pickupArrivalS"] },
     "scrap": { "type": "object", "required": ["maxLooseItems", "bundleCount", "maxAwakeBodies", "busyKg", "jamKg", "jamClearKg"] },
     "customers": { "type": "object", "required": ["privatePatienceS", "tradePatienceS", "privateMaxKg", "tradeMaxKg"] },
-    "budgets": { "type": "object", "required": ["drawCallsMobile", "drawCallsDesktop", "physicsMsMobile", "fpsMobileMin", "pixelRatioMax"] }
+    "budgets": { "type": "object", "required": ["drawCallsMobile", "drawCallsDesktop", "physicsMsMobile", "fpsMobileMin", "pixelRatioMax"] },
+    "assist": { "type": "object", "required": ["snapEnabled", "snapRadiusM", "snapSeconds", "aimRayMaxM", "pendulumLengthM", "pendulumAccelCapMs2", "pendulumDampingLight", "pendulumDampingHeavy", "pendulumHeavyRefKg", "pendulumMaxRad"],
+      "properties": { "snapRadiusM": { "type": "number", "minimum": 0, "maximum": 2 }, "snapSeconds": { "type": "number", "exclusiveMinimum": 0 }, "pendulumMaxRad": { "type": "number", "minimum": 0, "maximum": 1 } } }
   }
 }

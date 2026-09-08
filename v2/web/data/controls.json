@@ -2,35 +2,108 @@
   "$schema": "./schema/controls.schema.json",
   "_comment": "Briefing Kap. 5.2. Achsbelegung wie prototype/src/core/controlConfig.ts:47-54; Tastennamen im UI kommen aus dieser Datei, nie aus Literalen.",
   "axes": {
-    "leftX": { "fn": "cab", "invert": false },
-    "leftY": { "fn": "boom", "invert": true },
-    "rightX": { "fn": "none", "invert": false },
-    "rightY": { "fn": "stick", "invert": true }
+    "leftX": {
+      "fn": "cab",
+      "invert": false
+    },
+    "leftY": {
+      "fn": "boom",
+      "invert": true
+    },
+    "rightX": {
+      "fn": "grapple",
+      "invert": false
+    },
+    "rightY": {
+      "fn": "stick",
+      "invert": true
+    }
   },
   "deadzone": 0.12,
   "keyboard": {
-    "cab": { "neg": "KeyQ", "pos": "KeyE" },
-    "boom": { "neg": "KeyF", "pos": "KeyR" },
-    "stick": { "neg": "KeyG", "pos": "KeyT" },
-    "drive": { "neg": "KeyS", "pos": "KeyW" },
-    "steer": { "neg": "KeyA", "pos": "KeyD" },
+    "cab": {
+      "neg": "KeyQ",
+      "pos": "KeyE"
+    },
+    "boom": {
+      "neg": "KeyF",
+      "pos": "KeyR"
+    },
+    "stick": {
+      "neg": "KeyG",
+      "pos": "KeyT"
+    },
+    "drive": {
+      "neg": "KeyS",
+      "pos": "KeyW"
+    },
+    "steer": {
+      "neg": "KeyA",
+      "pos": "KeyD"
+    },
     "grapple": "MouseLeft",
-    "rotator": "MouseWheel",
+    "rotator": {
+      "neg": "KeyZ",
+      "pos": "KeyX"
+    },
     "cycleCamera": "KeyC",
     "orderPickup": "KeyH",
     "pause": "Escape",
     "endDay": "Enter",
-    "debugOverlay": "F3"
+    "debugOverlay": "F3",
+    "_rotatorNote": "e.code ist physisch (US-Layout): KeyZ ist auf der deutschen Tastatur die Taste Y. Gewünscht: Y = links, X = rechts drehen. Mausrad bleibt als Rasten-Alternative.",
+    "toggleDriveMode": "KeyV"
   },
   "gamepad": {
-    "cab": { "axis": 0 }, "boom": { "axis": 1, "invert": true }, "stick": { "axis": 3, "invert": true },
-    "grapple": { "button": 7 }, "rotatorNeg": { "button": 4 }, "rotatorPos": { "button": 5 },
-    "driveMode": { "button": 0 }, "cycleCamera": { "button": 3 }, "pause": { "button": 9 }
+    "cab": {
+      "axis": 0
+    },
+    "boom": {
+      "axis": 1,
+      "invert": true
+    },
+    "stick": {
+      "axis": 3,
+      "invert": true
+    },
+    "grapple": {
+      "button": 7
+    },
+    "rotatorNeg": {
+      "button": 4
+    },
+    "rotatorPos": {
+      "button": 5
+    },
+    "driveMode": {
+      "button": 0
+    },
+    "cycleCamera": {
+      "button": 3
+    },
+    "pause": {
+      "button": 9
+    }
   },
   "touch": {
-    "stickDiameterPx": 120, "stickKnobPx": 52, "stickDiameterCompactPx": 100,
-    "grabButtonPx": 76, "rotatorButtonPx": 48, "driveModeButtonPx": 56, "topButtonPx": 48,
-    "minTapTargetPx": 44, "floatingZoneFraction": 0.4,
-    "grabMode": "hold", "driveModeAutoExitS": 4
+    "stickDiameterPx": 120,
+    "stickKnobPx": 52,
+    "stickDiameterCompactPx": 100,
+    "grabButtonPx": 76,
+    "rotatorButtonPx": 48,
+    "driveModeButtonPx": 56,
+    "topButtonPx": 48,
+    "minTapTargetPx": 44,
+    "floatingZoneFraction": 0.4,
+    "grabMode": "stick",
+    "driveModeAutoExitS": 4,
+    "_grabNote": "Rechter Stick X: rechts = schließen, links = öffnen; neutral = halten. Asymmetrische Totzone: Schließen ab 0,3, Öffnen erst ab 0,6 (Rückfrage M3-1: mehr Toleranz fürs Öffnen). Halten/Toggle-Knopf als Einstellung [V1].",
+    "grapCloseDeadzone": 0.3,
+    "grapOpenDeadzone": 0.6,
+    "stickCrossDamping": 0.35,
+    "compactMaxWidthPx": 700,
+    "cameraOrbitSensitivity": 0.004,
+    "pinchZoomSensitivity": 1.0,
+    "doubleTapMs": 300
   }
 }

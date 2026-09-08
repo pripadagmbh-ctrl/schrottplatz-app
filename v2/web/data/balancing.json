@@ -2,62 +2,181 @@
   "$schema": "./schema/balancing.schema.json",
   "_comment": "Briefing Kap. 4-6, 9, 10, 19. Alle Werte Startwerte (SW). Herkunft in den *_src-Feldern (prototype/src/...).",
   "physics": {
-    "stepHz": 60, "maxCatchUpSteps": 2,
-    "solverIterations": 6, "internalPgsIterations": 1, "contactNaturalFrequency": 30,
-    "sleepLinearThreshold": 0.02, "sleepAngularThreshold": 0.05,
-    "spawnGapM": 0.08, "presimulateSteps": 120,
-    "_src": "physicsWorld.ts:16-21 hatte 12 Iterationen / 6 Reibungsiterationen / 40 Hz — QA A2 §5: zu steif, Haufen schlief nie. Rapier 0.20 kennt keine getrennten Reibungsiterationen mehr (numAdditionalFrictionIterations entfallen); internalPgsIterations = 1 ist der Standard."
+    "stepHz": 60,
+    "maxCatchUpSteps": 2,
+    "solverIterations": 6,
+    "internalPgsIterations": 1,
+    "contactNaturalFrequency": 30,
+    "sleepLinearThreshold": 0.06,
+    "sleepAngularThreshold": 0.12,
+    "spawnGapM": 0.08,
+    "presimulateSteps": 600,
+    "_src": "physicsWorld.ts:16-21 hatte 12 Iterationen / 6 Reibungsiterationen / 40 Hz — QA A2 §5: zu steif, Haufen schlief nie. Rapier 0.20 kennt keine getrennten Reibungsiterationen mehr (numAdditionalFrictionIterations entfallen); internalPgsIterations = 1 ist der Standard.",
+    "_sleep": "Schlafhilfe legt alle losen Körper gemeinsam schlafen, wenn 3 Prüfungen (je 10 Schritte) lang alle unter den Schwellen liegen (E-012). Runde Formen sind Achtkant-Prismen mit Dämpfung 0,3/1,0 (E-011)."
   },
   "excavator": {
-    "driveMaxMs": 2.2, "steerRateRadS": 0.7, "steerMinFactor": 0.35,
-    "cabRateDegS": 40, "boomRateDegS": 25, "stickRateDegS": 30,
-    "boomMinDeg": 5, "boomMaxDeg": 62, "stickMinDeg": -140, "stickMaxDeg": -25,
-    "rotatorStepDeg": 15, "rotatorRateDegS": 45,
-    "closeTimeS": 0.4, "openTimeS": 0.3, "rampTimeS": 0.2,
-    "boomLenM": 5.2, "stickLenM": 4.0, "grappleLinkM": 0.55, "palmToSensorM": 0.75,
-    "loadFactorMin": 0.5, "loadFactorRefKg": 3500,
-    "pendulumLengthM": 1.5, "pendulumAccelCapMs2": 15,
-    "_src": "excavator.ts:27-59 (driveMax 1.4 → 2.2 nach Gerätetest 02.09.)"
+    "driveMaxMs": 2.2,
+    "steerRateRadS": 0.7,
+    "steerMinFactor": 0.35,
+    "cabRateDegS": 36,
+    "boomRateDegS": 22.5,
+    "stickRateDegS": 30,
+    "boomMinDeg": 5,
+    "boomMaxDeg": 62,
+    "stickMinDeg": -140,
+    "stickMaxDeg": -25,
+    "rotatorStepDeg": 30,
+    "rotatorRateDegS": 90,
+    "closeTimeS": 0.8,
+    "openTimeS": 0.5,
+    "rampTimeS": 0.2,
+    "boomLenM": 5.2,
+    "stickLenM": 4.0,
+    "grappleLinkM": 0.55,
+    "palmToSensorM": 0.75,
+    "loadFactorMin": 0.5,
+    "loadFactorRefKg": 3500,
+    "pendulumLengthM": 1.5,
+    "pendulumAccelCapMs2": 15,
+    "_src": "excavator.ts:27-59 (driveMax 1.4 → 2.2 nach Gerätetest 02.09.)",
+    "boomPivot": [
+      0,
+      2.55,
+      0.55
+    ],
+    "chassisHalf": [
+      1.2,
+      0.75,
+      2.2
+    ],
+    "chassisCenterY": 1.15,
+    "boomHalf": [
+      0.21,
+      0.31,
+      2.5
+    ],
+    "stickHalf": [
+      0.16,
+      0.225,
+      1.9
+    ],
+    "palmOffsetY": 0.2,
+    "palmRadius": 0.5,
+    "palmHalfHeight": 0.22,
+    "cabLiftMaxM": 2.6,
+    "cabLiftSpeedMs": 0.75,
+    "groundClearanceM": 0.02,
+    "_src2": "boomPivot/Kollider aus excavator.ts:29, 897-955; Spinne hängt grappleLink+palmOffsetY unter der Stielspitze; Sensor palmToSensor darunter",
+    "_tuning": "08.09.2026 Gerätetest PC: Oberwagen 40→36, Hauptarm 25→22,5 (leicht zu flink); Stiel 30 ok; Aufsetzen und Greifen gut; Spinne schließen 0,4→0,8 s, öffnen 0,3→0,5 s (zu schnell, Anheben wirkte unnatürlich), Haltepose 0,15→0,25 s; Rotator 45→90°/s, Raste 15→30° (zu langsam)"
   },
   "grip": {
-    "maxItems": 5, "maxTotalKg": 3500, "sensorRadiusM": 1.05,
-    "grabWindowStart": 0.6, "grabWindowEnd": 0.98, "minContactClaws": 2,
-    "holdPoseSeconds": 0.15, "releaseDownwardMs": 0.2,
-    "slipSwingFraction": 0.9, "slipLoadFraction": 0.6, "slipSwingSeconds": 1.5, "slipImpactDv": 3.0,
-    "plowMassRefKg": 800, "plowFactorMin": 0.3,
-    "_src": "gripSystem.ts:14-22; Briefing Kap. 6.2-6.4"
+    "maxItems": 5,
+    "maxTotalKg": 3500,
+    "sensorRadiusM": 1.05,
+    "grabWindowStart": 0.6,
+    "grabWindowEnd": 0.98,
+    "minContactClaws": 2,
+    "holdPoseSeconds": 0.25,
+    "releaseDownwardMs": 0.2,
+    "slipSwingFraction": 0.9,
+    "slipLoadFraction": 0.6,
+    "slipSwingSeconds": 1.5,
+    "slipImpactDv": 3.0,
+    "plowMassRefKg": 800,
+    "plowFactorMin": 0.3,
+    "_src": "gripSystem.ts:14-22; Briefing Kap. 6.2-6.4",
+    "basketMarginM": 0.45,
+    "basketTopMarginM": 0.45,
+    "basketBottomMarginM": 0.35,
+    "releaseVelocityAvgSteps": 3,
+    "releaseGraceSeconds": 0.6
   },
   "economy": {
-    "startMoneyEur": 5000, "creditLimitEur": -1500, "creditPenaltyFactor": 1.2,
-    "fixedCostsPerDayEur": 150, "mixedBuyPricePerKg": 0.16, "sortingBonusPerKg": 0.05,
-    "purityExponent": 2, "purityGreen": 0.95, "purityYellow": 0.8,
+    "startMoneyEur": 5000,
+    "creditLimitEur": -1500,
+    "creditPenaltyFactor": 1.2,
+    "fixedCostsPerDayEur": 150,
+    "mixedBuyPricePerKg": 0.16,
+    "sortingBonusPerKg": 0.05,
+    "purityExponent": 2,
+    "purityGreen": 0.95,
+    "purityYellow": 0.8,
     "tradeFixedRate": 1.06,
     "_src": "account.ts:16-34, purity.ts:26, main.ts:506"
   },
   "day": {
-    "deliveriesPerDay": { "0": 1, "1": 2, "2": 2, "3": 2, "4": 3, "stage2": 4, "stage3": 5 },
-    "deliveryIntervalS": [60, 90], "campaignDays": 30,
-    "unlockAfterDay": 3, "premiumPriceEur": 4.99,
-    "targetDayMinutes": [6, 10],
+    "deliveriesPerDay": {
+      "0": 1,
+      "1": 2,
+      "2": 2,
+      "3": 2,
+      "4": 3,
+      "stage2": 4,
+      "stage3": 5
+    },
+    "deliveryIntervalS": [
+      60,
+      90
+    ],
+    "campaignDays": 30,
+    "unlockAfterDay": 3,
+    "premiumPriceEur": 4.99,
+    "targetDayMinutes": [
+      6,
+      10
+    ],
     "_src": "Briefing Kap. 4.3 (Rückfrage 3: 6-10 min)"
   },
   "containers": {
-    "bookAfterRestS": 3, "keepVisibleCount": 6, "keepVisibleS": 20,
-    "muldeCapacityKg": 6000, "pileCapacityKg": 20000,
-    "pickupArrivalS": 45, "pickupLoadS": 6, "pickupPileLoadS": 12
+    "bookAfterRestS": 3,
+    "keepVisibleCount": 6,
+    "keepVisibleS": 20,
+    "muldeCapacityKg": 6000,
+    "pileCapacityKg": 20000,
+    "pickupArrivalS": 45,
+    "pickupLoadS": 6,
+    "pickupPileLoadS": 12
   },
   "scrap": {
-    "maxLooseItems": 300, "bundleCount": 20, "maxAwakeBodies": 80,
-    "busyKg": 6000, "jamKg": 16000, "jamClearKg": 11000,
-    "_src": "shift.ts:17-21"
+    "maxLooseItems": 300,
+    "bundleCount": 20,
+    "maxAwakeBodies": 80,
+    "busyKg": 6000,
+    "jamKg": 16000,
+    "jamClearKg": 11000,
+    "_src": "shift.ts:17-21",
+    "startPileCount": 150
   },
   "customers": {
-    "privatePatienceS": 60, "tradePatienceS": 45, "tradeLeaveS": 180,
-    "privateMaxKg": 800, "tradeMaxKg": 3000,
+    "privatePatienceS": 60,
+    "tradePatienceS": 45,
+    "tradeLeaveS": 180,
+    "privateMaxKg": 800,
+    "tradeMaxKg": 3000,
     "_src": "customers.ts:251"
   },
   "budgets": {
-    "drawCallsMobile": 250, "drawCallsDesktop": 400, "physicsMsMobile": 4, "fpsMobileMin": 30,
-    "lowQualityFpsThreshold": 28, "lowQualityDetectFrames": 120, "pixelRatioMax": 2
+    "drawCallsMobile": 250,
+    "drawCallsDesktop": 400,
+    "physicsMsMobile": 4,
+    "fpsMobileMin": 30,
+    "lowQualityFpsThreshold": 28,
+    "lowQualityDetectFrames": 120,
+    "pixelRatioMax": 2
+  },
+  "assist": {
+    "_comment": "M3: Zielhilfen (Briefing Kap. 5.4, 14). Pendel aus prototype excavator.ts:1314-1346. Snap-Radius wird ab Korbrand gemessen (E-016).",
+    "snapEnabled": true,
+    "snapRadiusM": 0.5,
+    "snapSeconds": 0.25,
+    "aimRayMaxM": 14.0,
+    "pendulumLengthM": 1.5,
+    "pendulumAccelCapMs2": 15,
+    "pendulumDampingLight": 2.4,
+    "pendulumDampingHeavy": 0.9,
+    "pendulumHeavyRefKg": 2000,
+    "pendulumMaxRad": 0.45,
+    "pendulumGroundDampPos": 0.75,
+    "pendulumGroundDampVel": 0.5
   }
 }
