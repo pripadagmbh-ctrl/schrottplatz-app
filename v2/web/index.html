@@ -12,7 +12,9 @@
     <style>
       html, body { margin: 0; height: 100%; overflow: hidden; background: #1e2124; color: #eef0ec; font-family: Inter, system-ui, sans-serif; }
       body { height: 100dvh; touch-action: none; -webkit-user-select: none; user-select: none; }
-      #scene { display: block; width: 100%; height: 100%; }
+      /* iOS-Safari zoomt bei Doppeltipp/Pinch die Seite — nur touch-action:none auf JEDEM Element verhindert das (iPad-Test 08.09.) */
+      body * { touch-action: none; -webkit-touch-callout: none; }
+      #scene { display: block; width: 100%; height: 100%; touch-action: none; }
       #boot { position: fixed; inset: 0; display: grid; place-items: center; background: #1e2124; font-size: 18px; }
       #debug-box[hidden] { display: none; } /* Autor-CSS „display: grid" würde das hidden-Attribut sonst überstimmen (iPhone-Test 08.09.) */
       #debug-box { position: fixed; left: max(8px, env(safe-area-inset-left)); top: max(8px, env(safe-area-inset-top)); z-index: 10; display: grid; gap: 6px; justify-items: start; }

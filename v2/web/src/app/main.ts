@@ -68,6 +68,11 @@ async function boot(): Promise<void> {
   });
 
   document.addEventListener("keydown", (e) => { if (e.code === "KeyP" && !e.repeat) dumpPile(); });
+  // iOS-Safari: Seiten-Zoom per Doppeltipp/Pinch unterbinden (zweiter Gürtel zu touch-action:none). Nicht-passiv, sonst wirkt preventDefault nicht.
+  let lastTouchEnd = 0;
+  document.addEventListener("touchend", (e) => { const now = Date.now(); if (now - lastTouchEnd < 350) e.preventDefault(); lastTouchEnd = now; }, { passive: false });
+  document.addEventListener("gesturestart", (e) => e.preventDefault(), { passive: false });
+  document.addEventListener("dblclick", (e) => e.preventDefault());
   document.addEventListener("visibilitychange", () => { if (document.hidden) resetControlFrame(sim.control); });
   document.addEventListener("visibilitychange", () => { loop.paused = document.hidden; });
   window.addEventListener("resize", () => renderer.resize());
