@@ -1,8 +1,11 @@
 /**
  * Touch-Steuerung für Tablet und Smartphone (Briefing Kap. 5.1).
- * Aufteilung (Design 2026-08-29):
- *   linker Stick   — X: Oberwagen drehen, Y: Hauptarm heben/senken
- *   rechter Stick  — X: Spinne öffnen/schließen, Y: Ausleger heran/weg
+ * Aufteilung (Design 2026-08-29, Sticks überarbeitet 2026-09-09):
+ *   linke Bildhälfte  — X: Oberwagen drehen, Y: Hauptarm heben/senken
+ *   rechte Bildhälfte — X: Spinne öffnen/schließen, Y: Ausleger heran/weg
+ *   Beide Sticks schweben: Sie sind unsichtbar, erscheinen unter dem Daumen, wo
+ *   er aufsetzt, und verschwinden beim Loslassen — kein Zielen auf feste Kreise
+ *   mehr (Vorbild Bagerana/v2). Maßgeblich ist die Bildhälfte, nicht der Ort.
  *   (alle vier Achsen sind im Steuerungsmenü frei belegbar)
  *   ↺ / ↻          — Spinne links bzw. rechts drehen (Rotator)
  *   Fadenkreuz     — nur Fahren: vor/zurück und links/rechts lenken (simultan)
@@ -30,7 +33,12 @@ interface StickState {
   baseY: number;
   dx: number;
   dy: number;
+  pad: HTMLElement;
   knob: HTMLElement;
+  /** Zeitpunkt des Aufsetzens — entscheidet, ob daraus ein Tipp wird */
+  downT: number;
+  /** Wieviel px der Knopf im Kreis wandern darf — aus der Kreisgröße gemessen */
+  travel: number;
 }
 
 const RADIUS = 62; // px bis Vollausschlag
@@ -40,6 +48,12 @@ const PRESSURE_GRAB = 0.55;
 const TILT_FULL = 22;
 /** Totzone der Spinnenachse — schützt vor ungewolltem Öffnen beim Baggern */
 const GRAPPLE_DEADZONE = 0.38;
+/** Ein Aufsetzen zählt nur als Tipp, wenn es kürzer dauert und der Finger kaum wandert */
+const TAP_MAX_MS = 250;
+const TAP_MAX_MOVE = 12;
+/** Zwei Tipps am selben Ort binnen dieser Zeit = Doppeltipp (Ansicht wechseln) */
+const DOUBLE_TAP_MS = 320;
+const DOUBLE_TAP_RADIUS = 60;
 
 const clamp1 = (v: number): number => Math.max(-1, Math.min(1, v));
 
@@ -68,6 +82,8 @@ export class TouchControls {
   private tiltDrive = 0;
   private tiltSteer = 0;
   private lastTap = 0;
+  private lastTapX = 0;
+  private lastTapY = 0;
 
   constructor(canvas: HTMLElement) {
     this.active = matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0;
@@ -78,8 +94,9 @@ export class TouchControls {
       return;
     }
     root.style.display = "block";
-    this.left = this.makeStick("touch-left");
-    this.right = this.makeStick("touch-right");
+    this.left = this.makeStick("touch-left", "zone-left");
+    this.right = this.makeStick("touch-right", "zone-right");
+    this.bindSafety();
     this.bindHold("btn-fwd", "fwd");
     this.bindHold("btn-back", "back");
     this.bindHold("btn-left", "left");
@@ -151,44 +168,127 @@ export class TouchControls {
     );
   }
 
-  private makeStick(id: string): StickState | null {
-    const pad = document.getElementById(id);
-    if (!pad) return null;
+  /**
+   * Schwebender Stick: Aufsetzfläche ist die halbe Bildbreite. Wo der Daumen
+   * landet, wird der Kreis hingesetzt und eingeblendet; beim Loslassen
+   * verschwindet er. Nullpunkt ist der Aufsetzpunkt, nicht die Kreismitte —
+   * dadurch springt nichts, egal wo der Finger aufkommt. Den Zeiger fängt die
+   * Zone ein, damit der Stick weiterläuft, wenn der Daumen über den Kreisrand
+   * oder in die andere Bildhälfte wandert.
+   */
+  private makeStick(padId: string, zoneId: string): StickState | null {
+    const pad = document.getElementById(padId);
+    const zone = document.getElementById(zoneId);
+    if (!pad || !zone) return null;
     const knob = pad.querySelector<HTMLElement>(".knob")!;
-    const st: StickState = { id: null, baseX: 0, baseY: 0, dx: 0, dy: 0, knob };
-    pad.addEventListener(
+    const st: StickState = {
+      id: null, baseX: 0, baseY: 0, dx: 0, dy: 0, pad, knob, travel: 0, downT: 0,
+    };
+    zone.addEventListener(
       "pointerdown",
       (e) => {
+        if (st.id !== null) return; // ein Finger je Bildhälfte
         st.id = e.pointerId;
-        const r = pad.getBoundingClientRect();
-        st.baseX = r.left + r.width / 2;
-        st.baseY = r.top + r.height / 2;
-        pad.setPointerCapture(e.pointerId);
+        st.baseX = e.clientX;
+        st.baseY = e.clientY;
+        st.dx = 0;
+        st.dy = 0;
+        st.downT = performance.now();
+        pad.hidden = false;
+        pad.style.left = `${e.clientX}px`;
+        pad.style.top = `${e.clientY}px`;
+        // Erst nach dem Einblenden messen — versteckt ist die Breite 0.
+        st.travel = Math.max(0, pad.offsetWidth / 2 - knob.offsetWidth / 2 - 2);
+        knob.style.transform = "translate(0,0)";
+        zone.setPointerCapture(e.pointerId);
+        this.checkPressure(e);
         e.preventDefault();
       },
       { passive: false }
     );
-    pad.addEventListener(
+    zone.addEventListener(
       "pointermove",
       (e) => {
         if (st.id !== e.pointerId) return;
-        st.dx = Math.max(-1, Math.min(1, (e.clientX - st.baseX) / RADIUS));
-        st.dy = Math.max(-1, Math.min(1, (e.clientY - st.baseY) / RADIUS));
-        knob.style.transform = `translate(${st.dx * RADIUS * 0.6}px, ${st.dy * RADIUS * 0.6}px)`;
+        st.dx = clamp1((e.clientX - st.baseX) / RADIUS);
+        st.dy = clamp1((e.clientY - st.baseY) / RADIUS);
+        knob.style.transform = `translate(${st.dx * st.travel}px, ${st.dy * st.travel}px)`;
+        this.checkPressure(e);
         e.preventDefault();
       },
       { passive: false }
     );
-    const end = (e: PointerEvent): void => {
+    zone.addEventListener("pointerup", (e) => {
       if (st.id !== e.pointerId) return;
-      st.id = null;
-      st.dx = 0;
-      st.dy = 0;
-      knob.style.transform = "translate(0,0)";
+      const dauer = performance.now() - st.downT;
+      const weg = Math.hypot(e.clientX - st.baseX, e.clientY - st.baseY);
+      if (dauer < TAP_MAX_MS && weg < TAP_MAX_MOVE) this.registerTap(e.clientX, e.clientY);
+      TouchControls.resetStick(st);
+      this.pressureGrab = false;
+    });
+    const abbruch = (e: PointerEvent): void => {
+      if (st.id !== e.pointerId) return;
+      TouchControls.resetStick(st);
+      this.pressureGrab = false;
     };
-    pad.addEventListener("pointerup", end);
-    pad.addEventListener("pointercancel", end);
+    zone.addEventListener("pointercancel", abbruch);
+    // Verliert die Zone den Zeiger (Systemgeste, App-Wechsel), bliebe der Stick sonst stehen
+    zone.addEventListener("lostpointercapture", abbruch);
     return st;
+  }
+
+  /** Stick auf Null stellen und ausblenden. */
+  private static resetStick(st: StickState): void {
+    st.id = null;
+    st.dx = 0;
+    st.dy = 0;
+    st.knob.style.transform = "translate(0,0)";
+    st.pad.hidden = true;
+  }
+
+  /**
+   * Doppeltipp = Ansicht wechseln. Die Ortsprüfung ist wichtig, seit die Sticks
+   * überall aufsetzen dürfen: ohne sie gälten linker und rechter Daumen kurz
+   * nacheinander als Doppeltipp und die Kamera spränge beim Baggern ständig um.
+   */
+  private registerTap(x: number, y: number): void {
+    const now = performance.now();
+    const nah = Math.hypot(x - this.lastTapX, y - this.lastTapY) < DOUBLE_TAP_RADIUS;
+    if (now - this.lastTap < DOUBLE_TAP_MS && nah) {
+      this.pressed.add("KeyC");
+      this.lastTap = 0;
+      return;
+    }
+    this.lastTap = now;
+    this.lastTapX = x;
+    this.lastTapY = y;
+  }
+
+  /**
+   * Sicherung gegen „Geister-Zeiger": Verschluckt der Browser ein pointerup
+   * (Systemgeste, App-Wechsel, abgebrochene Mehrfingergeste), bliebe die
+   * Bildhälfte mit der alten Zeiger-ID belegt und nähme keinen neuen Finger
+   * mehr an. Deshalb: kein Finger mehr auf dem Glas → alles loslassen.
+   */
+  private bindSafety(): void {
+    const allesLos = (e: Event): void => {
+      if ((e as TouchEvent).touches.length === 0) this.releaseAll();
+    };
+    document.addEventListener("touchend", allesLos, { passive: true });
+    document.addEventListener("touchcancel", allesLos, { passive: true });
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) this.releaseAll();
+    });
+  }
+
+  /** Beide Sticks, alle Halteknöpfe und das Druck-Greifen loslassen. */
+  releaseAll(): void {
+    for (const st of [this.left, this.right]) if (st) TouchControls.resetStick(st);
+    this.held.clear();
+    this.pressureGrab = false;
+    for (const id of ["btn-fwd", "btn-back", "btn-left", "btn-right", "btn-rot-l", "btn-rot-r"]) {
+      document.getElementById(id)?.classList.remove("down");
+    }
   }
 
   private bindHold(id: string, key: string): void {
@@ -401,27 +501,25 @@ export class TouchControls {
   }
 
   /**
-   * Freie Fläche: fester Druck greift (sofern das Gerät Druck meldet),
-   * Doppeltipp wechselt die Ansicht.
+   * Druckmessung fürs Greifen. Geräte ohne Kraftsensor melden konstant 0 oder
+   * 0,5 — erst ein anderer Wert beweist, dass echter Druck ankommt.
+   */
+  private checkPressure(e: PointerEvent): void {
+    if (e.pointerType !== "touch") return;
+    if (e.pressure > 0 && e.pressure !== 0.5) this.pressureSupported = true;
+    this.pressureGrab = this.pressureSupported && e.pressure >= PRESSURE_GRAB;
+  }
+
+  /**
+   * Die Leinwand selbst bekommt auf Touchgeräten kaum noch Zeiger — die beiden
+   * Stick-Zonen liegen darüber, seit die Sticks überall aufsetzen dürfen. Die
+   * Bindung bleibt für den Rest: Druck greift auch dann, wenn ein Finger doch
+   * einmal direkt auf der Leinwand landet (Zonen ausgeblendet, Maus mit Stift).
+   * Doppeltipp und Sticks laufen über die Zonen.
    */
   private bindCanvas(canvas: HTMLElement): void {
-    const check = (e: PointerEvent): void => {
-      if (e.pointerType !== "touch") return;
-      // Geräte ohne Kraftsensor melden konstant 0 oder 0.5
-      if (e.pressure > 0 && e.pressure !== 0.5) this.pressureSupported = true;
-      this.pressureGrab = this.pressureSupported && e.pressure >= PRESSURE_GRAB;
-    };
-    canvas.addEventListener("pointerdown", (e) => {
-      check(e);
-      const now = performance.now();
-      if (now - this.lastTap < 320) {
-        this.pressed.add("KeyC"); // Doppeltipp → Ansicht wechseln
-        this.lastTap = 0;
-      } else {
-        this.lastTap = now;
-      }
-    });
-    canvas.addEventListener("pointermove", check);
+    canvas.addEventListener("pointerdown", (e) => this.checkPressure(e));
+    canvas.addEventListener("pointermove", (e) => this.checkPressure(e));
     const clear = (): void => {
       this.pressureGrab = false;
     };
