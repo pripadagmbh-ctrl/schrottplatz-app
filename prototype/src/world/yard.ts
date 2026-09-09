@@ -574,9 +574,11 @@ export class Yard {
     const BH = 0.6;
     const BT = 0.6;
     const ROWS = 3;
-    const cols = [0x9b9b94, 0x92928b, 0xa4a49c].map(
-      (c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.95 })
-    );
+    // Die Umrandung besteht aus 498 Bloecken mit je zwei Nieten — rund 1.500
+    // Meshes, und jedes einzeln gezeichnet war der groesste Posten in der
+    // Bildzeit (iPad: 34 ms je Bild). Als InstancedMesh sind es zwei Zeichenrufe.
+    // Die Farbe kommt je Exemplar dazu, damit die Blockreihe gescheckt bleibt.
+    const farben = [0x9b9b94, 0x92928b, 0xa4a49c].map((c) => new THREE.Color(c));
     const blockGeo = new THREE.BoxGeometry(BL, BH, BT);
     const studGeo = new THREE.CylinderGeometry(0.13, 0.13, 0.09, 8);
     const wallBody = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
@@ -584,18 +586,25 @@ export class Yard {
     const hz = YARD_D / 2;
     let n = 0;
 
+    const bloecke: Array<{ m: THREE.Matrix4; f: THREE.Color }> = [];
+    const nieten: Array<{ m: THREE.Matrix4; f: THREE.Color }> = [];
+    const block = new THREE.Object3D();
+    const niete = new THREE.Object3D();
+
     const place = (x: number, z: number, alongX: boolean): void => {
       for (let r = 0; r < ROWS; r++) {
-        const b = new THREE.Mesh(blockGeo, cols[n++ % 3]);
-        b.position.set(x, BH / 2 + r * BH, z);
-        if (!alongX) b.rotation.y = Math.PI / 2;
-        b.castShadow = true;
-        b.receiveShadow = true;
-        scene.add(b);
+        const f = farben[n++ % 3]!;
+        block.position.set(x, BH / 2 + r * BH, z);
+        block.rotation.set(0, alongX ? 0 : Math.PI / 2, 0);
+        block.updateMatrix();
+        bloecke.push({ m: block.matrix.clone(), f });
         for (const s of [-0.45, 0.45]) {
-          const stud = new THREE.Mesh(studGeo, b.material);
-          stud.position.set(alongX ? s : 0, BH / 2 + 0.045, alongX ? 0 : s);
-          b.add(stud);
+          niete.position.set(alongX ? s : 0, BH / 2 + 0.045, alongX ? 0 : s);
+          niete.updateMatrix();
+          // Block-Matrix mal lokale Matrix — genau die Rechnung, die vorher die
+          // Eltern-Kind-Beziehung gemacht hat. So sitzt jede Niete auf den
+          // Millimeter dort, wo sie vorher sass.
+          nieten.push({ m: block.matrix.clone().multiply(niete.matrix), f });
         }
       }
     };
@@ -610,6 +619,26 @@ export class Yard {
       place(-hx, z, false);
       place(hx, z, false);
     }
+
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95 });
+    const bauen = (geo: THREE.BufferGeometry, liste: Array<{ m: THREE.Matrix4; f: THREE.Color }>): void => {
+      const im = new THREE.InstancedMesh(geo, wallMat, liste.length);
+      liste.forEach((e, i) => {
+        im.setMatrixAt(i, e.m);
+        im.setColorAt(i, e.f);
+      });
+      im.instanceMatrix.needsUpdate = true;
+      if (im.instanceColor) im.instanceColor.needsUpdate = true;
+      im.castShadow = true;
+      im.receiveShadow = true;
+      // Die Umrandung laeuft um den ganzen Platz und ist praktisch immer
+      // teilweise im Bild; die Huellkugel umspannt alles, Aussortieren brachte
+      // nichts und koennte bei Instanzen sogar faelschlich wegblenden.
+      im.frustumCulled = false;
+      scene.add(im);
+    };
+    bauen(blockGeo, bloecke);
+    bauen(studGeo, nieten);
 
     // Kollider als durchgehende Quader (Einfahrt ausgespart)
     const wallH = ROWS * BH;

@@ -129,27 +129,36 @@ class GameContainer {
       // Fünf Grautöne statt drei: schon das lässt die Wand gebraucht
       // wirken, weil Blöcke aus verschiedenen Chargen nebeneinanderstehen.
       // Kostet nichts — die Materialien werden ohnehin geteilt.
-      const concrete = [0x9b9b94, 0x8d8d86, 0xa4a49c, 0x94908a, 0xaaa89f].map(
-        (col) => new THREE.MeshStandardMaterial({ color: col, roughness: 0.98 })
+      // Fuenf Grautoene als Exemplarfarben statt fuenf Materialien: Jede Mulde
+      // stand vorher mit ein paar hundert einzeln gezeichneten Bloecken und
+      // doppelt so vielen Nieten im Bild. Als zwei InstancedMesh je Mulde sind
+      // es zwei Zeichenrufe — das Aussehen bleibt Block fuer Block dasselbe.
+      const farben = [0x9b9b94, 0x8d8d86, 0xa4a49c, 0x94908a, 0xaaa89f].map(
+        (col) => new THREE.Color(col)
       );
       const blockGeo = new THREE.BoxGeometry(BLOCK_L, BLOCK_H, BLOCK_T);
       const studGeo = new THREE.CylinderGeometry(0.13, 0.13, 0.09, 10);
+      const bloecke: Array<{ m: THREE.Matrix4; f: THREE.Color }> = [];
+      const nieten: Array<{ m: THREE.Matrix4; f: THREE.Color }> = [];
+      const block = new THREE.Object3D();
+      const niete = new THREE.Object3D();
       let bi = 0;
       const placeBlock = (x: number, y: number, z: number, alongX: boolean): void => {
-        const b = new THREE.Mesh(blockGeo, concrete[bi % 5]);
+        const f = farben[bi % 5]!;
         // Jeder Block sitzt ein wenig anders — von Hand mit dem Stapler
         // gesetzt, nicht gegossen. Reiner Aufbau, keine Laufzeitkosten.
         const j = (n: number): number => (((bi * 9301 + n * 49297) % 233280) / 233280 - 0.5);
-        b.position.set(x + j(1) * 0.05, y + j(2) * 0.02, z + j(3) * 0.05);
-        b.rotation.set(j(4) * 0.02, (alongX ? 0 : Math.PI / 2) + j(5) * 0.035, j(6) * 0.018);
+        block.position.set(x + j(1) * 0.05, y + j(2) * 0.02, z + j(3) * 0.05);
+        block.rotation.set(j(4) * 0.02, (alongX ? 0 : Math.PI / 2) + j(5) * 0.035, j(6) * 0.018);
+        block.updateMatrix();
         bi++;
-        b.castShadow = true;
-        b.receiveShadow = true;
-        group.add(b);
+        bloecke.push({ m: block.matrix.clone(), f });
         for (const s of [-0.4, 0.4]) {
-          const stud = new THREE.Mesh(studGeo, b.material);
-          stud.position.set(alongX ? s : 0, BLOCK_H / 2 + 0.045, alongX ? 0 : s);
-          b.add(stud);
+          niete.position.set(alongX ? s : 0, BLOCK_H / 2 + 0.045, alongX ? 0 : s);
+          niete.updateMatrix();
+          // Block-Matrix mal lokale Matrix — dieselbe Rechnung wie vorher die
+          // Eltern-Kind-Beziehung, also sitzt jede Niete unveraendert
+          nieten.push({ m: block.matrix.clone().multiply(niete.matrix), f });
         }
       };
       // Wände: Ostseite + Nord + Süd. Die WESTseite bleibt offen — dorthin
@@ -168,6 +177,26 @@ class GameContainer {
           }
         }
       }
+      const wandMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.98 });
+      const bauen = (
+        geo: THREE.BufferGeometry,
+        liste: Array<{ m: THREE.Matrix4; f: THREE.Color }>
+      ): void => {
+        if (liste.length === 0) return;
+        const im = new THREE.InstancedMesh(geo, wandMat, liste.length);
+        liste.forEach((e, i) => {
+          im.setMatrixAt(i, e.m);
+          im.setColorAt(i, e.f);
+        });
+        im.instanceMatrix.needsUpdate = true;
+        if (im.instanceColor) im.instanceColor.needsUpdate = true;
+        im.castShadow = true;
+        im.receiveShadow = true;
+        group.add(im);
+      };
+      bauen(blockGeo, bloecke);
+      bauen(studGeo, nieten);
+
       // Öffnung nach Norden: die ganze Mulde wird gedreht, statt die
       // Wandlogik zu verdoppeln
       if (cfg.facing === "north") group.rotation.y = Math.PI / 2;
