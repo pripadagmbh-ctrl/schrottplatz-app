@@ -4,13 +4,24 @@
     {
       "name": "prototype",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "prototype"],
-      "port": 5173
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "prototype"
+      ],
+      "port": 5173,
+      "autoPort": true
     },
     {
       "name": "v2",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "v2/web"],
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "v2/web"
+      ],
       "port": 5174
     }
   ]
