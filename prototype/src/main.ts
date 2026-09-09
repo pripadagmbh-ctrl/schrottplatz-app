@@ -143,6 +143,12 @@ async function main(): Promise<void> {
         );
       });
     }
+    // Erst jetzt setzen lassen, wenn alles Anfaengliche steht — Haufen, Autos
+    // und Bergschrott. Frueher waere sinnlos: die spaeter gespawnten Teile
+    // fallen in den Haufen und wecken ihn sofort wieder. So beginnt das erste
+    // Bild mit einem Platz, der bereits liegt, statt mit zurechtrutschendem
+    // Schrott.
+    items.settle(physics.world);
   }
   const vehicles = new VehicleManager(scene, physics.world, items, composites);
   const press = new PressManager(scene, physics.world, items, composites);
@@ -670,6 +676,10 @@ async function main(): Promise<void> {
     }
     physics.step();
     items.clampSpeeds();
+    // Haufen zur Ruhe bringen: Ohne die Schlafhilfe bleiben rund drei Viertel
+    // der Teile dauerhaft wach und kosten jeden Frame Rechenzeit (gemessen:
+    // 89 von 118 nach 30 s). Teile am Greifer bleiben ausgenommen.
+    items.settleSleep(FIXED_DT, excavator.grappleBody.translation());
     composites.update();
     fence.update();
     vehicles.update(FIXED_DT);

@@ -78,6 +78,58 @@ export function maxSpeedFor(massKg: number): number {
   return Math.min(5.5, Math.max(0.55, 19 / Math.sqrt(Math.max(massKg, 1))));
 }
 
+/**
+ * Achtkant-Prisma statt Zylinder (v2 E-011).
+ *
+ * Rapier kennt keinen Rollwiderstand. Ein mathematisch perfekter Zylinder rollt
+ * deshalb endlos weiter — v2 mass 0,45 m/s noch nach 40 s, auch mit hoher
+ * Daempfung. Acht Kanten stoppen das von selbst und sehen an verbeultem
+ * Altmetall ohnehin richtiger aus. Das Mesh bleibt 14-seitig, nur der Kollider
+ * bekommt Ecken; die Masse wird ohnehin per setMass gesetzt.
+ */
+function achtkant(radius: number, halbHoehe: number): RAPIER.ColliderDesc {
+  const punkte: number[] = [];
+  for (let i = 0; i < 8; i++) {
+    const a = ((i + 0.5) / 8) * Math.PI * 2;
+    const x = Math.cos(a) * radius;
+    const z = Math.sin(a) * radius;
+    punkte.push(x, halbHoehe, z, x, -halbHoehe, z);
+  }
+  return (
+    RAPIER.ColliderDesc.convexHull(new Float32Array(punkte)) ??
+    RAPIER.ColliderDesc.cylinder(halbHoehe, radius)
+  );
+}
+
+/**
+ * Drehdaempfung. Kurze runde Teile — Felge, Coil, Reifen — trudeln sonst wie
+ * eine Muenze auf dem Tisch minutenlang aus und halten ueber die gemeinsame
+ * Schlafregel den ganzen Haufen wach (v2 mass 128 Koerper).
+ */
+function dampAngFuer(shape: ScrapShape, massKg: number): number {
+  const rund =
+    shape.kind === "torus" ||
+    shape.kind === "wire" ||
+    (shape.kind === "cyl" && shape.dims[1] <= shape.dims[0] * 2.5);
+  return rund ? Math.max(dampAng(massKg), 4.0) : dampAng(massKg);
+}
+
+/** Luft zwischen zwei Teilen beim Setzen (v2: spawnGapM). */
+const SPAWN_ABSTAND = 0.06;
+
+/**
+ * Radius der Umkugel einer Form. Beim Spawn wird jedes Teil zufaellig verdreht,
+ * darum ist die Kugel das richtige Mass — ein Quader ragt in der Diagonale
+ * weiter als seine laengste Kante halbiert.
+ */
+export function umkugelRadius(shape: ScrapShape): number {
+  const d = shape.dims;
+  if (shape.kind === "box") return Math.hypot(d[0], d[1], d[2]) / 2;
+  if (shape.kind === "cyl") return Math.hypot(d[0], d[1] / 2);
+  if (shape.kind === "torus") return d[0] + d[1];
+  return d[0];
+}
+
 export function dampLin(massKg: number): number {
   return Math.min(0.45, Math.max(0.02, 8 / Math.max(massKg, 1)));
 }
@@ -268,11 +320,46 @@ export interface ScrapItem {
   composition?: Array<{ materialId: string; massKg: number }>;
 }
 
+/**
+ * Schwellen der Schlafhilfe. Rapiers eigene Werte (0,4 m/s) sind nicht
+ * einstellbar und greifen erst, wenn eine ganze Kontakt-Insel ruht — bei einem
+ * Haufen ist das nie der Fall, weil immer irgendwo ein Teil zittert.
+ */
+/**
+ * Die Werte aus v2 (0,06 / 0,12) passen dort zu weichen Kontakten (6 Iterationen,
+ * Frequenz 30). Der Prototyp rechnet bewusst haerter (12 Iterationen, Frequenz 40,
+ * zugelassener Fehler 0,001), damit Teile nicht ineinander einsinken — das
+ * erzeugt aber ein Grundrauschen: gemessen bleiben einzelne Teile dauerhaft bei
+ * rund 0,007 m/s und 0,25 rad/s stehen, ohne sich wirklich zu bewegen. Die
+ * Schwellen liegen darum ueber diesem Rauschen und nicht darunter.
+ */
+const SCHLAF_LIN = 0.09; // m/s
+const SCHLAF_ANG = 0.45; // rad/s
+/** So oft hintereinander muss alles unter den Schwellen liegen (à 0,25 s). */
+const SCHLAF_PRUEFUNGEN = 4;
+/**
+ * Anteil der Teile, der still liegen muss, damit der Stapel schlafen geht.
+ * Gemessen: bei Einstimmigkeit schlief je nach Haufen gar nichts, weil immer
+ * genau ein (wechselndes) Teil zuckte.
+ */
+const SCHLAF_MEHRHEIT = 0.92;
+/**
+ * Darueber ist es echte Bewegung — etwas faellt, rollt oder wird getragen.
+ * Ein einziges solches Teil haelt den ganzen Haufen wach, und das ist richtig so.
+ */
+const BEWEGUNG_LIN = 0.5; // m/s
+const BEWEGUNG_ANG = 2.5; // rad/s
+const SCHLAF_TAKT_S = 0.25;
+/** Teile so nah an der Spinne bleiben wach (v2 E-041: schlafend durch den Boden gesackt). */
+const SCHLAF_ABSTAND_SPINNE = 3.0;
+
 export class ItemManager {
   readonly items: ScrapItem[] = [];
   private byHandle = new Map<number, ScrapItem>();
   private highlighted: ScrapItem | null = null;
   private nextId = 0;
+  private schlafUhr = 0;
+  private schlafZaehler = 0;
 
   constructor(
     private scene: THREE.Scene,
@@ -302,6 +389,88 @@ export class ItemManager {
     return item;
   }
 
+  /**
+   * Schlafhilfe (v2 E-012): legt lose Körper **nur gemeinsam** schlafen.
+   *
+   * Einzeln schlafen zu legen klingt naheliegend, zerstört aber den Haufen: Ein
+   * Körper unter Last, den man allein stilllegt, verliert den Kontakt zum Boden
+   * und sinkt durch den Platz. Deshalb die Alles-oder-nichts-Regel — erst wenn
+   * jedes lose Teil drei Prüfungen lang unter den Schwellen liegt, schlafen alle
+   * zusammen ein. Danach weckt sie jede Berührung von selbst wieder.
+   *
+   * `spinnePos` schützt die Umgebung des Greifers: Teile dort bleiben wach,
+   * sonst sackt ein „schlafendes" Teil unter der arbeitenden Spinne weg.
+   */
+  settleSleep(dt: number, spinnePos?: { x: number; y: number; z: number }): void {
+    this.schlafUhr += dt;
+    if (this.schlafUhr < SCHLAF_TAKT_S) return;
+    this.schlafUhr = 0;
+
+    const kandidaten: RAPIER.RigidBody[] = [];
+    let still = 0;
+    for (const item of this.items) {
+      const b = item.body;
+      if (!b.isDynamic()) continue; // auf der Mulde mitgefuehrte Teile sind kinematisch
+      if (spinnePos) {
+        const t = b.translation();
+        const d = Math.hypot(t.x - spinnePos.x, t.y - spinnePos.y, t.z - spinnePos.z);
+        // Teile am Greifer bleiben aussen vor — sie schlafen nicht mit ein, und
+        // ihre Bewegung darf den Rest des Haufens nicht wachhalten. Sonst
+        // schliefe nie etwas, weil die Spinne fast immer ueber dem Haufen steht.
+        if (d < SCHLAF_ABSTAND_SPINNE) continue;
+      }
+      if (b.isSleeping()) continue;
+      const v = b.linvel();
+      const w = b.angvel();
+      const lin = Math.hypot(v.x, v.y, v.z);
+      const ang = Math.hypot(w.x, w.y, w.z);
+
+      // Echte Bewegung: etwas faellt, rollt oder wird getragen. Dann schlaeft
+      // niemand — der Haufen ist in Arbeit.
+      if (lin > BEWEGUNG_LIN || ang > BEWEGUNG_ANG) {
+        this.schlafZaehler = 0;
+        return;
+      }
+      kandidaten.push(b);
+      if (lin <= SCHLAF_LIN && ang <= SCHLAF_ANG) still++;
+    }
+
+    if (kandidaten.length === 0) return;
+    // Mehrheitsregel statt Einstimmigkeit: Gemessen ist bei jeder Pruefung genau
+    // ein Teil ueber der Schwelle — aber jedes Mal ein anderes. Die Restenergie
+    // wandert durch den Stapel, also wird nie alles gleichzeitig still, und mit
+    // Einstimmigkeit schlief je nach Haufen gar nichts (bis 98 von 113 wach).
+    // E-012 verbietet, ein *einzelnes* Teil unter Last schlafen zu legen; hier
+    // geht der ganze Stapel gemeinsam schlafen, die Zucker eingeschlossen.
+    if (still / kandidaten.length < SCHLAF_MEHRHEIT) {
+      this.schlafZaehler = 0;
+      return;
+    }
+    if (++this.schlafZaehler < SCHLAF_PRUEFUNGEN) return;
+    this.schlafZaehler = 0;
+    for (const b of kandidaten) {
+      // Restgeschwindigkeit vorher wegnehmen, sonst traegt ein Zucker seinen
+      // Schwung mit in den Schlaf und stoesst beim Aufwachen den Nachbarn an.
+      b.setLinvel({ x: 0, y: 0, z: 0 }, false);
+      b.setAngvel({ x: 0, y: 0, z: 0 }, false);
+      b.sleep();
+    }
+  }
+
+  /**
+   * Vorsimulation: den Haufen sich setzen lassen, bevor das erste Bild steht.
+   * Ohne das beginnt jede Partie mit einem zappelnden Berg, und der Spieler
+   * sieht die Teile erst zurechtrutschen (v2: `Simulation.settle()`).
+   */
+  settle(world: RAPIER.World, schritte = 240): void {
+    for (let i = 0; i < schritte; i++) {
+      world.step();
+      this.settleSleep(1 / 60);
+    }
+    for (const item of this.items) if (item.body.isDynamic()) item.body.sleep();
+    this.syncMeshes();
+  }
+
   /** Teil aus Form-Spec erzeugen (Haufen, Ladung, Save-Restore). */
   spawnScrap(
     materialId: string,
@@ -328,7 +497,7 @@ export class ItemManager {
         geo.rotateX(Math.PI / 2); // langes Rohr, liegend
         collider = RAPIER.ColliderDesc.cuboid(r, r, len / 2);
       } else {
-        collider = RAPIER.ColliderDesc.cylinder(len / 2, r); // Felge/Scheibe
+        collider = achtkant(r, len / 2); // Felge/Scheibe
       }
     } else if (shape.kind === "torus") {
       const [r, tube] = shape.dims;
@@ -342,7 +511,7 @@ export class ItemManager {
               g.rotateX(Math.PI / 2);
               return g;
             })();
-      collider = RAPIER.ColliderDesc.cylinder(tube, r + tube);
+      collider = achtkant(r + tube, tube);
     } else {
       // Drahtknäuel: verrauschte Kugel im Wireframe liest sich als Maschendraht
       const [r] = shape.dims;
@@ -352,7 +521,14 @@ export class ItemManager {
         const n = 0.75 + Math.random() * 0.45;
         pos.setXYZ(i, pos.getX(i) * n, pos.getY(i) * n, pos.getZ(i) * n);
       }
-      collider = RAPIER.ColliderDesc.ball(r * 0.95);
+      // Kollider aus genau den verbeulten Ecken, die man auch sieht. Als glatte
+      // Kugel rollte das Knaeuel endlos weiter (gemessen: 0,44 m/s nach 10 s bei
+      // 150 kg) und hielt ueber die gemeinsame Schlafregel den ganzen Haufen
+      // wach — dieselbe Ursache wie bei den Zylindern, E-011. Federn darf es
+      // weiterhin, die Restitution bleibt.
+      collider =
+        RAPIER.ColliderDesc.convexHull(pos.array as Float32Array) ??
+        RAPIER.ColliderDesc.ball(r * 0.95);
     }
     const isWire = shape.kind === "wire";
     const mesh = new THREE.Mesh(
@@ -383,7 +559,7 @@ export class ItemManager {
         // Teilen ihr Gewicht — ein Motorblock kam so schnell zur Ruhe wie ein
         // Blech. Leichtes bremst stark, Schweres behält seinen Schwung.
         .setLinearDamping(dampLin(massKg))
-        .setAngularDamping(dampAng(massKg))
+        .setAngularDamping(dampAngFuer(shape, massKg))
         // Ohne durchgehende Prüfung schlagen schnelle Teile durch Boden,
         // Bordwände und Bagger hindurch
         .setCcdEnabled(true)
@@ -420,24 +596,29 @@ export class ItemManager {
     const placed: Array<{ x: number; y: number; z: number; r: number }> = [];
     const specs = randomCargo(count, 0.45);
     for (const s of specs) {
-      const dims = s.shape.dims;
-      const half = s.shape.kind === "wire" ? dims[0] : Math.max(...dims) / 2;
-      // Nur so viel Abstand, dass beim Spawn nichts klemmt. Beim Setzen
-      // rutschen und verkanten die Teile dann ineinander — genau so, wie ein
-      // gewachsener Schrottberg aussieht.
-      const r = half + 0.04;
+      // Umkugel, nicht halbe Kantenlaenge: Ein Teil wird zufaellig verdreht
+      // gesetzt, also zaehlt der groesste Abstand von der Mitte zur Ecke. Die
+      // alte Rechnung (max(dims)/2) war bei jeder Kiste zu klein — bei einem
+      // 1,2-m-Blech um 40 % —, deshalb klemmten Teile trotz Pruefung
+      // ineinander und der Solver trieb sie auseinander (v2 E-010).
+      const r = umkugelRadius(s.shape) + SPAWN_ABSTAND;
       let spot: { x: number; y: number; z: number; r: number } | null = null;
-      for (let layer = 0; layer < 14 && !spot; layer++) {
+      // Mehr Lagen und Versuche als frueher: seit der Abstand ehrlich gerechnet
+      // wird, braucht dieselbe Teilezahl mehr Raum. Mit den alten 14 Lagen
+      // blieben 69 von 150 Teilen auf der Strecke.
+      for (let layer = 0; layer < 24 && !spot; layer++) {
         const y = 0.5 + layer * 0.62;
         // innen dichter, außen weiter — das ergibt die Kegelform eines Haufens
-        const maxRad = spread * (1 - layer * 0.055);
-        for (let attempt = 0; attempt < 40; attempt++) {
+        const maxRad = spread * (1 - layer * 0.03);
+        for (let attempt = 0; attempt < 90; attempt++) {
           const a = Math.random() * Math.PI * 2;
           const rad = Math.sqrt(Math.random()) * maxRad;
           const x = pileCenter.x + Math.cos(a) * rad;
           const z = pileCenter.z + Math.sin(a) * rad;
+          // echter Abstand: der Faktor 1,2 auf der Hochachse hat den Abstand
+          // groesser gerechnet, als er war, und Ueberlappungen durchgelassen
           const clash = placed.some(
-            (p) => Math.hypot(p.x - x, (p.y - y) * 1.2, p.z - z) < p.r + r
+            (p) => Math.hypot(p.x - x, p.y - y, p.z - z) < p.r + r
           );
           if (!clash) {
             spot = { x, y, z, r };
