@@ -2,14 +2,15 @@ import * as THREE from "three";
 import { Input } from "./core/input";
 import { TouchControls } from "./core/touch";
 import { DebugOverlay } from "./core/debugOverlay";
+import { AimRing } from "./excavator/aimRing";
 import { EventBus } from "./core/events";
 import { initPhysics, PhysicsWorld } from "./physics/physicsWorld";
 import { GripSystem } from "./physics/gripSystem";
 import { Excavator } from "./excavator/excavator";
 import { OrbitCamera } from "./excavator/orbitCamera";
 import { Yard } from "./world/yard";
-import { ItemManager } from "./world/scrapItems";
-import { ContainerManager } from "./world/containers";
+import { ItemManager, type ScrapItem } from "./world/scrapItems";
+import { ContainerManager, type AmpelState } from "./world/containers";
 import { AudioManager } from "./audio/audioManager";
 import { Hud } from "./ui/hud";
 import { Particles } from "./world/particles";
@@ -199,6 +200,7 @@ async function main(): Promise<void> {
   const grip = new GripSystem(physics.world, excavator.grappleBody);
   const orbit = new OrbitCamera(window.innerWidth / window.innerHeight);
   const debug = new DebugOverlay();
+  const aimRing = new AimRing(scene);
   const audio = new AudioManager();
   const hud = new Hud();
   const particles = new Particles(scene);
@@ -842,6 +844,10 @@ async function main(): Promise<void> {
 
     // --- HUD, Highlight, Ampel, Audio (pro Render-Frame) ---
     excavator.getSensorPosition(sensorPos);
+    // Der Bodenring bekommt dasselbe Urteil wie die Griff-Info: die Ampel der
+    // Mulde darunter, sonst die Fraktionsfarbe des anvisierten Teils.
+    let ringAmpel: AmpelState | null = null;
+    let ringItem: ScrapItem | null = null;
     if (grip.grippedCount > 0) {
       items.setHighlight(null);
       const carried = grip.grippedBodies
@@ -852,6 +858,7 @@ async function main(): Promise<void> {
         sensorPos.z,
         carried.map((i) => i.materialId)
       );
+      ringAmpel = hover?.ampel ?? null;
       hud.showCarry(carried, hover);
     } else {
       containers.updateHover(sensorPos.x, sensorPos.z, []);
@@ -867,6 +874,7 @@ async function main(): Promise<void> {
         } else {
           const target = items.findNearest(sensorPos, 1.2);
           items.setHighlight(target);
+          ringItem = target;
           hud.showTarget(target);
         }
       } else {
@@ -874,6 +882,17 @@ async function main(): Promise<void> {
         hud.showClosedEmpty();
       }
     }
+    aimRing.update({
+      world: physics.world,
+      sensorPos,
+      splay: excavator.splay,
+      selfHandles: excavator.selfHandles,
+      grippedHandles: excavator.grippedHandles,
+      hoverItem: ringItem,
+      ampel: ringAmpel,
+      dt: frameDt,
+    });
+
     looseTimer += frameDt;
     if (looseTimer > 0.25) {
       looseKg = measureLoose();

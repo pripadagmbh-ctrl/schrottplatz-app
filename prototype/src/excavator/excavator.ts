@@ -157,6 +157,8 @@ export class Excavator {
    * deshalb wird die Achsbewegung bei Überlappung zurückgenommen.
    */
   obstacleBodies: Set<number> = new Set();
+  /** Die eigenen Koerper des Baggers — ein Zielstrahl darf sie nicht treffen. */
+  readonly selfHandles: Set<number> = new Set();
   /** true, solange der Arm gegen ein Fahrzeug drückt (fürs HUD/Audio) */
   armBlocked = false;
 
@@ -941,6 +943,9 @@ export class Excavator {
       getStaffPos: () => this.getStaffPos?.() ?? null,
     });
 
+    for (const b of [this.chassisBody, this.bladeBody, this.boomBody, this.stickBody]) {
+      this.selfHandles.add(b.handle);
+    }
     this.grappleBody = world.createRigidBody(
       RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(0, 5, 0)
     );
@@ -948,6 +953,7 @@ export class Excavator {
       RAPIER.ColliderDesc.cylinder(0.22, 0.5).setTranslation(0, -GRAPPLE_LINK - 0.2, 0),
       this.grappleBody
     );
+    this.selfHandles.add(this.grappleBody.handle);
     // Die Krallen bekommen eigene Kollider — je zwei Kapseln bilden die Sichel
     // grob nach. Ohne sie fuhr die Spinne sichtbar durch Schrottteile hindurch.
     for (let i = 0; i < CLAW_COUNT * 2; i++) {
@@ -1186,6 +1192,11 @@ export class Excavator {
    * zusammen — es sei denn, es liegt Material darin: dann bleibt die Spinne
    * so weit offen, wie die Ladung Platz braucht.
    */
+  /** Aktuelle Spreizung — die Zielhilfe braucht sie fuer den Ringdurchmesser. */
+  get splay(): number {
+    return this.currentSplay();
+  }
+
   private currentSplay(): number {
     const minSplay = Math.min(
       0.5,
