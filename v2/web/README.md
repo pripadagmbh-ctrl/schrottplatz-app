@@ -1,6 +1,8 @@
 # Bagerana v2 — Spur A (Web)
 
-Neuaufbau nach `../docs/02_Briefing.md` (Kap. 17 Architektur, Kap. 22 Meilensteine). Stand: **M5b — Presse** (E-048–E-050), auf Basis M5a und Spinne Schritt 1 (E-043–E-046). Spinne 2.0 (E-038) wurde am 09.09. zurückgenommen (E-042); die Steuerung bleibt kinematisch, Physik kommt nur als Wirkung dazu, in einzeln abgenommenen Schritten.
+Neuaufbau nach `../docs/02_Briefing.md` (Kap. 17 Architektur, Kap. 22 Meilensteine). Stand: **M6 — Ausbau** (E-062–E-068), auf Basis M5b (Presse) und Spinne Schritt 1 (E-043–E-046). Spinne 2.0 (E-038) wurde am 09.09. zurückgenommen (E-042); die Steuerung bleibt kinematisch, Physik kommt nur als Wirkung dazu, in einzeln abgenommenen Schritten.
+
+**Ausbau (M6):** Am Feierabend lässt sich der Platz ausbauen — bezahlt wird mit Sternen *und* Geld. Die erste Stufe ist das **Büro** (9 000 €, ★ 10): mehr Kundschaft am Tag, zwei Abholer gleichzeitig, und an der Waage steht, was in einer Mischfuhre steckt. Das Wiegehäuschen weicht dabei sichtbar dem Bürogebäude. Halle, Schere, Magnet und große Presse sind vorbereitet, aber als `tier: V1` noch nicht im Verkauf.
 
 **Platz (E-059, nach Prototyp-Vorlage):** Bagger im Zentrum, links der offene Stahlhaufen, rechts die Betonlego-Reihe (Edelstahl, Alu, Kupfer, Kabel — dreiseitig, offen zum Bagger) und dahinter Rücken an Rücken E-Schrott, Reifen und Störstoff. Im Süden Presse und Ballenlager, im Norden die Annahme; Tor und Waage am Nordrand. Auf der Annahme bleibt ein Grundstock liegen (E-057).
 
