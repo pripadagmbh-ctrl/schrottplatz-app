@@ -5,7 +5,7 @@ import type { ScrapItem } from "@/sim/world/WorldState";
 import type { ItemId } from "@/shared/ids";
 import { RAPIER } from "@/sim/world/PhysicsWorld";
 import { COLLISION } from "@/sim/world/collisionGroups";
-import { clamp, quatConj, quatMul, rotateVec, slerp, type Quat, type Vec3 } from "@/shared/math";
+import { clamp, quatConj, quatMul, rotateVec, type Quat, type Vec3 } from "@/shared/math";
 import { CLAW_OPEN_SPLAY, CLAW_RING_R, CLAW_RING_Y, CLAW_SEGMENTS, clawPoint } from "@/shared/clawGeometry";
 
 /**
@@ -58,7 +58,7 @@ export class GripSystem implements System {
   snapCount = 0;
   private graceS = 0.6; private released: { handle: number; t: number }[] = [];
   // Temporär
-  private q: Quat = { x: 0, y: 0, z: 0, w: 1 }; private qInv: Quat = { x: 0, y: 0, z: 0, w: 1 }; private qOut: Quat = { x: 0, y: 0, z: 0, w: 1 };
+  private q: Quat = { x: 0, y: 0, z: 0, w: 1 }; private qInv: Quat = { x: 0, y: 0, z: 0, w: 1 };
   private v: Vec3 = { x: 0, y: 0, z: 0 }; private tip: Vec3 = { x: 0, y: 0, z: 0 };
   private ctx!: SimContext;
 
@@ -108,37 +108,19 @@ export class GripSystem implements System {
       else this.slipTimer = Math.max(0, this.slipTimer - dt);
     }
 
-    // Gehaltene Teile mitführen (Haltepose interpolieren); dabei Unterkante der Ladung für den Bodenanschlag messen
+    // Gehaltene Teile mitfuehren: Spinne 2.0 (E-038) — ein Teil bleibt, wo es beim Zupacken lag (relativ zur Spinne
+    // eingefroren), es wird NICHT in die Korbmitte gezogen (Patrick 09.09.: „Materialien werden zusammengesogen").
+    // Nur die Unterkante der Ladung wird fuer den Bodenanschlag gemessen.
     let bottom = 0;
     for (const h of this.held) {
       const body = ctx.physics.safeBody(h.handle);
       const item = ctx.world.items.get(h.id);
       if (!body || !item) continue;
-      // Nur eingefrorene (mitgefuehrte) Ladung zaehlt fuer den Bodenanschlag — ein Teil, das beim Schliessen noch am Boden
-      // liegt, wuerde sonst als „unter dem Boden haengend" gelten und den Arm nach oben treiben (Patrick 08.09.: Ausleger faehrt
-      // von selbst hoch, Teile fliegen geisterhaft nach).
-      if (h.settled) bottom = Math.max(bottom, p.grapplePos.y - (body.translation().y - this.worldHalfHeight(item.size, body.rotation())));
-      // Bodenanschlag schiebt die Spinne beim Schliessen bis 0,6 m hoch (E-013) — das Teil darf da nicht mitfahren
-      // (Patrick 08.09.: „Material fliegt den Greifer hoch"). Erst wenn geschlossen oder abgehoben: Lage einfrieren.
-      if (!h.settled) {
-        if (this.ex.groundContact && this.ex.closing && s.grapple < this.winEnd) {
-          h.localPos.y = h.worldY0 - p.grapplePos.y;
-        } else {
-          clawPoint(0, p.splay, CLAW_SEGMENTS, this.tip);
-          const cur = h.worldY0 - p.grapplePos.y;
-          h.localPos.y = Math.max(cur, this.tip.y + h.halfH); // nie unter den Spitzen haengen — es sitzt auf den Schalen auf
-          if (h.localPos.y - cur > 0.01) { h.fromPos = { x: 0, y: cur, z: 0 }; h.fromRot = { ...h.localRot }; h.t = 0; } // weich nachsetzen statt springen
-          h.settled = true;
-        }
-      }
-      h.t = Math.min(1, h.t + dt / this.holdPoseS);
-      const k = h.t * h.t * (3 - 2 * h.t); // weich
-      const lx = h.fromPos.x + (h.localPos.x - h.fromPos.x) * k, ly = h.fromPos.y + (h.localPos.y - h.fromPos.y) * k, lz = h.fromPos.z + (h.localPos.z - h.fromPos.z) * k;
-      slerp(h.fromRot, h.localRot, k, this.qOut);
-      this.v.x = lx; this.v.y = ly; this.v.z = lz;
+      bottom = Math.max(bottom, p.grapplePos.y - (body.translation().y - this.worldHalfHeight(item.size, body.rotation())));
+      this.v.x = h.localPos.x; this.v.y = h.localPos.y; this.v.z = h.localPos.z;
       rotateVec(p.grappleQuat, this.v, this.v);
       body.setNextKinematicTranslation({ x: p.grapplePos.x + this.v.x, y: p.grapplePos.y + this.v.y, z: p.grapplePos.z + this.v.z });
-      quatMul(p.grappleQuat, this.qOut, this.q);
+      quatMul(p.grappleQuat, h.localRot, this.q);
       body.setNextKinematicRotation(this.q);
     }
     this.ex.carriedMassKg = this.totalMassKg; this.ex.carriedCount = this.held.length; this.ex.carriedBottomM = bottom;
@@ -264,14 +246,17 @@ export class GripSystem implements System {
     rotateVec(this.qInv, this.v, this.v);
     const fromPos: Vec3 = { x: this.v.x, y: this.v.y, z: this.v.z };
     const fromRot: Quat = quatMul(this.qInv, r, { x: 0, y: 0, z: 0, w: 1 });
-    // Haltepose: seitlich in die Korbmitte, Höhe behalten; Unterkante mindestens auf Höhe der geschlossenen Spitzen
-    // (Patrick 08.09.: „Teile rutschen unnatürlich nach oben" — vorher wurde alles auf Sensorhöhe gezogen, 0,7 m über den Spitzen)
+    // Haltepose = Lage beim Zupacken. Nur was mit dem Schwerpunkt ausserhalb des geschlossenen Korbs laege, wird bis zum
+    // Korbrand nachgezogen (nicht zur Mitte), und nichts haengt unter den geschlossenen Spitzen.
     const halfH = this.worldHalfHeight(item.size, r);
-    const localPos: Vec3 = { x: 0, y: fromPos.y, z: 0 }; // Hoehe wird pro Schritt gefuehrt (worldY0 / settled), bis eingefroren
+    clawPoint(0, 0, CLAW_SEGMENTS, this.tip);
+    const rimR = Math.max(this.tip.z, CLAW_RING_R) + Number(ctx.data.balancing.grip["basketMarginM"]) * 0.5;
+    const rad = Math.hypot(fromPos.x, fromPos.z);
+    const localPos: Vec3 = { x: rad > rimR ? fromPos.x * (rimR / rad) : fromPos.x, y: Math.max(fromPos.y, this.tip.y + halfH * 0.5), z: rad > rimR ? fromPos.z * (rimR / rad) : fromPos.z };
     body.setBodyType(RAPIER.RigidBodyType.KinematicPositionBased, true);
     for (let i = 0; i < body.numColliders(); i++) body.collider(i).setCollisionGroups(COLLISION.held);
     item.state = "held";
-    this.held.push({ id: item.id, handle: body.handle, massKg: body.mass(), localPos, localRot: { ...fromRot }, fromPos, fromRot, t: 0, worldY0: t.y, settled: false, halfH });
+    this.held.push({ id: item.id, handle: body.handle, massKg: body.mass(), localPos, localRot: { ...fromRot }, fromPos, fromRot, t: 1, worldY0: t.y, settled: true, halfH });
     this.cols.heldHandles.add(body.handle);
     ctx.bus.emit("itemGrabbed", { itemId: item.id, kg: body.mass() });
   }

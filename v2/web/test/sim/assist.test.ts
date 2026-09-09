@@ -32,7 +32,7 @@ function aimSensorAt(sim: Simulation, x: number, y: number, z: number): void {
 describe("Pendel der Spinne", () => {
   it("schwingt beim Schwenken aus, bleibt unter der Kappung und beruhigt sich nach dem Stopp", () => {
     const sim = new Simulation(loadGameData()); sim.init();
-    aimSensorAt(sim, 0, 2.5, 8);
+    aimSensorAt(sim, 0, 3.6, 8); // hoch genug, dass die offenen Krallen nicht die Boxwaende streifen (Spinne 2.0 kollidiert echt)
     sim.run(30);
     sim.control.cab = 1; sim.run(120); // 2 s schwenken
     const p = sim.excavator.pose;
@@ -48,7 +48,7 @@ describe("Pendel der Spinne", () => {
 
   it("Teleport (Laden/Spawn) erzeugt keinen Riesenimpuls", () => {
     const sim = new Simulation(loadGameData()); sim.init();
-    aimSensorAt(sim, 0, 2.5, 8); sim.run(5);
+    aimSensorAt(sim, 0, 3.6, 8); sim.run(5);
     sim.world.excavator.cab = Math.PI; sim.run(1); // harter Sprung
     const p = sim.excavator.pose;
     expect(Math.hypot(p.swingX, p.swingZ)).toBeLessThan(0.05);
@@ -62,29 +62,31 @@ function withSnap() { const d = loadGameData(); d.balancing.assist = { ...d.bala
 describe("Greif-Magnet (Snap)", () => {
   it("gleitet auf ein einzelnes Teil knapp außerhalb des Korbs und greift es", () => {
     const sim = new Simulation(withSnap()); sim.init();
-    const item = sim.scrap.spawn({ materialId: "steel", shapeId: "block", pos: { x: 0, y: 0.4, z: 8 } })!;
+    const item = sim.scrap.spawn({ materialId: "steel", shapeId: "block", pos: { x: 0, y: 0.4, z: -6 } })!; // freie Flaeche (z = 8 laege in der Kupferbox — Spinne 2.0 kollidiert mit deren Waenden)
     sim.run(90);
     const t = sim.physics.safeBody(item.bodyHandle)!.translation();
     // Korb 1,6 m seitlich neben das Teil setzen (Korbrand ≈ 1,3 m + Snap 0,5 m)
     sim.world.excavator.grapple = 0;
-    aimSensorAt(sim, t.x + 1.6, t.y + 0.3, t.z);
+    // Spinne 2.0: knapp ueber dem Boden (eine aufgesetzte Spinne laesst sich nur schwer seitlich ziehen — wie in echt)
+    aimSensorAt(sim, t.x + 1.6, t.y + 0.9, t.z);
     const before = Math.hypot(sim.excavator.pose.sensorPos.x - t.x, sim.excavator.pose.sensorPos.z - t.z);
     sim.control.grapple = 1; sim.run(2);
     expect(sim.grip.snapCount, "Snap ausgelöst").toBe(1);
     expect(sim.excavator.snapping).toBe(true);
     sim.run(30); // > 0,25 s
     expect(sim.excavator.snapping).toBe(false);
+    sim.run(60); // der dynamische Koerper folgt dem Arm mit Feder-Verzoegerung
     const after = Math.hypot(sim.excavator.pose.sensorPos.x - t.x, sim.excavator.pose.sensorPos.z - t.z);
-    expect(after, `Abstand vorher ${before.toFixed(2)} m`).toBeLessThan(0.3);
-    sim.run(60);
+    expect(after, `Abstand vorher ${before.toFixed(2)} m`).toBeLessThan(0.35);
+    sim.control.grapple = 0; sim.control.boom = -1; sim.run(45); sim.control.boom = 0; sim.control.grapple = 1; sim.run(90); // absenken, zupacken
     expect(sim.grip.heldIds).toContain(item.id);
     sim.dispose();
   });
 
   it("kein Snap bei zwei Kandidaten oder wenn schon ein Teil im Korb liegt", () => {
     const sim = new Simulation(withSnap()); sim.init();
-    const a = sim.scrap.spawn({ materialId: "steel", shapeId: "block", pos: { x: 0, y: 0.4, z: 8 } })!;
-    sim.scrap.spawn({ materialId: "steel", shapeId: "block", pos: { x: 0, y: 0.4, z: 8.8 } });
+    const a = sim.scrap.spawn({ materialId: "steel", shapeId: "block", pos: { x: 0, y: 0.4, z: -6 } })!;
+    sim.scrap.spawn({ materialId: "steel", shapeId: "block", pos: { x: 0, y: 0.4, z: -5.2 } });
     sim.run(90);
     const t = sim.physics.safeBody(a.bodyHandle)!.translation();
     sim.world.excavator.grapple = 0;
@@ -98,7 +100,7 @@ describe("Greif-Magnet (Snap)", () => {
 describe("Zielhilfe (AimSystem)", () => {
   it("meldet das Teil unter der Spinne, dann Ampel über dem Container", () => {
     const sim = new Simulation(loadGameData()); sim.init();
-    const item = sim.scrap.spawn({ materialId: "copper", shapeId: "pipe", pos: { x: 0, y: 0.4, z: 7 } })!;
+    const item = sim.scrap.spawn({ materialId: "copper", shapeId: "pipe", pos: { x: 0, y: 0.4, z: -6 } })!;
     sim.run(90);
     const t = sim.physics.safeBody(item.bodyHandle)!.translation();
     sim.world.excavator.grapple = 0;

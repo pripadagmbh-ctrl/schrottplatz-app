@@ -64,7 +64,8 @@ export class PhysicsWorld {
   /** Statistik fürs Debug-Overlay und die Wächter-Tests — zählt nur dynamische Körper (Bagger und Lkw sind kinematisch, immer „wach"). */
   stats(): { bodies: number; awake: number; stepMs: number } {
     let bodies = 0, awake = 0;
-    this.world.bodies.forEach((b) => { if (!b.isDynamic()) return; bodies++; if (!b.isSleeping()) awake++; });
+    // nur Schrottteile zaehlen — der dynamische Spinnenkoerper (E-038) schlaeft nie und ist kein Budget-Posten
+    this.world.bodies.forEach((b) => { if (!b.isDynamic() || !this.handleToItem.has(b.handle)) return; bodies++; if (!b.isSleeping()) awake++; });
     return { bodies, awake, stepMs: this.lastStepMs };
   }
 

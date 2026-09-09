@@ -14,7 +14,6 @@ import type { AimState } from "@/sim/systems/AimSystem";
 import type { ExcavatorPose } from "@/sim/systems/ExcavatorSystem";
 import type { ControlFrame } from "@/sim/control/ControlFrame";
 
-const AXIS_Y = new THREE.Vector3(0, 1, 0);
 
 /**
  * Leere Szene für M0: Boden in Platzgröße, Himmelsverlauf als Hintergrundfarbe, Sonne + Hemisphäre,
@@ -110,8 +109,8 @@ export class Renderer {
   /** Bagger-Pose aus der Simulation übernehmen (Kinematik läuft mit 60 Hz; Interpolation kommt mit dem Pendel in M3). */
   private readonly gPos = { x: 0, y: 0, z: 0 };
   private readonly gQuat = { x: 0, y: 0, z: 0, w: 1 };
-  private readonly qYaw = new THREE.Quaternion(); private readonly qTilt = new THREE.Quaternion(); private readonly eTilt = new THREE.Euler();
-  private exState: WorldState["excavator"] | null = null; private exPose: ExcavatorPose | null = null; private exPrev: { x: number; y: number; z: number; heading: number; cab: number; boom: number; stick: number; rotator: number; splay: number; gx: number; gy: number; gz: number; swingX: number; swingZ: number } | null = null;
+  private readonly qYaw = new THREE.Quaternion(); private readonly qTilt = new THREE.Quaternion();
+  private exState: WorldState["excavator"] | null = null; private exPose: ExcavatorPose | null = null; private exPrev: { x: number; y: number; z: number; heading: number; cab: number; boom: number; stick: number; rotator: number; splay: number; gx: number; gy: number; gz: number; swingX: number; swingZ: number; gqx: number; gqy: number; gqz: number; gqw: number } | null = null;
 
   /** Quellen für die Bagger-Darstellung merken; die Interpolation passiert pro Bild in render(). */
   syncExcavator(world: WorldState, pose: ExcavatorPose, prev: typeof this.exPrev, control: ControlFrame, aim?: AimState, runs?: readonly VehicleRun[]): void {
@@ -130,12 +129,10 @@ export class Renderer {
     m.heading = L(v.heading, s.heading); m.cabYaw = L(v.cab, s.cab); m.boomAngle = L(v.boom, s.boom); m.stickAngle = L(v.stick, s.stick); m.rotatorYaw = L(v.rotator, s.rotator);
     m.splay = L(v.splay, p.splay); m.cabLift = s.cabLift;
     this.gPos.x = L(v.gx, p.grapplePos.x); this.gPos.y = L(v.gy, p.grapplePos.y); this.gPos.z = L(v.gz, p.grapplePos.z);
-    // Spinne: Gieren zuerst, dann Pendelneigung um Weltachsen (gleiche Reihenfolge wie ExcavatorSystem.computePose)
-    const yaw = m.heading + m.cabYaw + m.rotatorYaw;
-    this.qYaw.setFromAxisAngle(AXIS_Y, yaw);
-    this.eTilt.set(L(v.swingX, p.swingX), 0, L(v.swingZ, p.swingZ), "XYZ");
-    this.qTilt.setFromEuler(this.eTilt).multiply(this.qYaw);
-    this.gQuat.x = this.qTilt.x; this.gQuat.y = this.qTilt.y; this.gQuat.z = this.qTilt.z; this.gQuat.w = this.qTilt.w;
+    // Spinne 2.0: Orientierung kommt vom dynamischen Koerper — zwischen den Schritten slerpen
+    this.qYaw.set(v.gqx, v.gqy, v.gqz, v.gqw); this.qTilt.set(p.grappleQuat.x, p.grappleQuat.y, p.grappleQuat.z, p.grappleQuat.w);
+    this.qYaw.slerp(this.qTilt, a);
+    this.gQuat.x = this.qYaw.x; this.gQuat.y = this.qYaw.y; this.gQuat.z = this.qYaw.z; this.gQuat.w = this.qYaw.w;
     this.excavator.update(m, this.gPos, this.gQuat);
     this.cabPos.x = m.pos.x; this.cabPos.y = m.pos.y + 2.6; this.cabPos.z = m.pos.z;
   }

@@ -275,7 +275,17 @@ export class VehicleSystem implements System {
     // Automatische Anlieferungen im Arbeitsteil des Tages
     if (this.v["autoDeliveries"] && ctx.world.day.phase === "work" && !this.active) {
       const perDay = this.deliveriesPerDay(ctx.world.day.day);
-      if (ctx.world.day.deliveriesToday < perDay) { this.nextAutoS -= dt; if (this.nextAutoS <= 0) { this.requestDelivery(); const [a, b] = ctx.data.balancing.day.deliveryIntervalS; this.nextAutoS = this.rng.range(a, b); } }
+      if (ctx.world.day.deliveriesToday < perDay) {
+        this.nextAutoS -= dt;
+        if (this.nextAutoS <= 0) {
+          // M5: am `firstWreckDay` ist die erste Fuhre garantiert der Tieflader mit dem Wrack (sonst nur 20 % Zufall — Patrick 09.09.: „kam kein Tieflader an Tag 1")
+          const wreckDay = Number(ctx.data.balancing.composites["firstWreckDay"] ?? 1);
+          const wreckCustomer = ctx.data.customers.customers.find((c) => c.compositeDefId && c.fromDay <= ctx.world.day.day);
+          const forceWreck = ctx.world.day.day === wreckDay && ctx.world.day.deliveriesToday === 0 && wreckCustomer && ctx.world.composites.size === 0;
+          this.requestDelivery(forceWreck ? wreckCustomer.id : undefined);
+          const [a, b] = ctx.data.balancing.day.deliveryIntervalS; this.nextAutoS = this.rng.range(a, b);
+        }
+      }
     }
     for (let i = this.runs.length - 1; i >= 0; i--) {
       const run = this.runs[i]!;

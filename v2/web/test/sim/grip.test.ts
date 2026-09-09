@@ -30,6 +30,8 @@ function aimSensorAt(sim: Simulation, x: number, y: number, z: number): void {
   const boom = Math.atan2(height, reach) - Math.atan2(stickLen * Math.sin(stick), boomLen + stickLen * Math.cos(stick));
   s.boom = boom; s.stick = stick;
   sim.excavator.computePose(s);
+  sim.excavator.resetPendulum(); // Spinne 2.0: der dynamische Spinnenkoerper wird an den teleportierten Arm gesetzt
+  sim.run(20); // Feder setzt sich
 }
 
 describe("Greifen kinematisch", () => {
@@ -50,7 +52,7 @@ describe("Greifen kinematisch", () => {
       sim.world.excavator.grapple = 0; sim.control.grapple = 0;
       aimSensorAt(sim, t.x, t.y + 0.3, t.z);
       sim.control.grapple = 1; sim.run(45); // 0,75 s schließen
-      if (!sim.grip.heldIds.includes(item.id)) { sim.control.grapple = -1; sim.run(30); sim.scrap.requestRemove(item.id, "cleanup"); sim.run(2); continue; }
+      if (!sim.grip.heldIds.includes(item.id)) { if (process.env["GRIP_DBG"]) { const b2 = sim.physics.safeBody(item.bodyHandle)!.translation(); const sp = sim.excavator.pose.sensorPos; console.log("miss", i, shape, "item", b2.x.toFixed(2), b2.y.toFixed(2), b2.z.toFixed(2), "sensor", sp.x.toFixed(2), sp.y.toFixed(2), sp.z.toFixed(2), "refusal", sim.grip.lastRefusal, "held", sim.grip.count); } sim.control.grapple = -1; sim.run(30); sim.scrap.requestRemove(item.id, "cleanup"); sim.run(2); continue; }
       grabbed++;
       // heben 3 m, 180° schwenken, ablegen — alles über den ControlFrame
       sim.control.boom = 1; sim.run(90); sim.control.boom = 0;

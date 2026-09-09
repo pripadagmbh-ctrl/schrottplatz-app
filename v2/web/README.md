@@ -1,6 +1,6 @@
 # Bagerana v2 — Spur A (Web)
 
-Neuaufbau nach `../docs/02_Briefing.md` (Kap. 17 Architektur, Kap. 22 Meilensteine). Stand: **M5a — Verbundteile: Zerlegen** (Pkw vom Tieflader, Baugruppen abreißen) — gebaut, Gerätetest offen.
+Neuaufbau nach `../docs/02_Briefing.md` (Kap. 17 Architektur, Kap. 22 Meilensteine). Stand: **Spinne 2.0, Lieferung 1** (Spinne als dynamischer Körper an Feder, E-038) auf M5a — gebaut, Gerätetest offen.
 
 ## Befehle
 
@@ -93,6 +93,12 @@ Steuerung im Browser: **Q/E** Oberwagen · **R/F** Hauptarm · **T/G** Stiel · 
 - `view/audio/AudioSystem.ts`: synthetische Sounds an Events, Freigabe nach erster Geste, **M** stumm.
 - Neues Spiel startet leer (E-029); `?pile` in der URL legt den 40er-Haufen (Dev), **P** kippt 150 weitere.
 - Test: `test/sim/day.test.ts`; Rauchtest prüft Morgen-Karte, Feierabend, Autosave über Neuladen.
+
+## Spinne 2.0 (E-038 bis E-041)
+
+- `ExcavatorColliders`: Spinne = dynamischer Rapier-Körper (900 kg) an Feder-Dämpfer zum Stiel-Kardan, Gier-Drehmoment, Aufricht-Moment, Kappungen (`balancing.grapple`). `GrapplePoseSystem` (postStep 5) schreibt die Körperpose nach `ExcavatorSystem.pose`.
+- Bodenanschlag über Federkompression (`maxCompressionM`), Haltepose ohne Zentrieren (E-039), Zwangsschlaf mit Spinnen-Ausnahme (E-041).
+- Tests: `test/sim/grapple2.test.ts` (Beton, Haufen, Pendel); alte Tests auf freie Flächen verlegt.
 
 ## Was M5a enthält
 

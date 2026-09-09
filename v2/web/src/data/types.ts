@@ -98,6 +98,8 @@ export interface BalancingFile {
   tutorial: Record<string, number | string>;
   /** M5: Zerlegung (Briefing Kap. 8) */
   composites: Record<string, number | string>;
+  /** Spinne 2.0: dynamischer Spinnenkoerper (E-038) */
+  grapple: Record<string, number | string>;
 }
 
 export type I18nFile = Record<string, unknown>;

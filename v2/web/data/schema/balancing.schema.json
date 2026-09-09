@@ -14,7 +14,8 @@
     "assist",
     "vehicles",
     "tutorial",
-    "composites"
+    "composites",
+    "grapple"
   ],
   "properties": {
     "physics": {
@@ -249,7 +250,29 @@
         "rotatorFactor",
         "engageWindowStart",
         "disengageRadiusM",
-        "unloadOffsetM"
+        "unloadOffsetM",
+        "firstWreckDay"
+      ]
+    },
+    "grapple": {
+      "type": "object",
+      "required": [
+        "massKg",
+        "springNPerM",
+        "damperNsPerM",
+        "maxForceN",
+        "yawTorqueNm",
+        "yawDampingNms",
+        "linearDamping",
+        "angularDamping",
+        "maxCompressionM",
+        "contactCompressionM",
+        "clawFriction",
+        "clawRestitution",
+        "uprightTorqueNm",
+        "tiltDampingNms",
+        "maxSpeedMs",
+        "maxAngularRadS"
       ]
     }
   }

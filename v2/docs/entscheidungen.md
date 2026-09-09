@@ -2,6 +2,19 @@
 
 Jede Architektur- oder Design-Entscheidung mit Datum und Begründung, damit nichts zweimal diskutiert wird (CLAUDE.md). Neueste oben.
 
+## 2026-09-09 — Spinne 2.0, Lieferung 1: Physik (gebaut, Gerätetest offen)
+
+| # | Entscheidung | Begründung | Alternative (verworfen) |
+|---|---|---|---|
+| E-038 | Die Spinne ist ein **dynamischer Körper** (900 kg, Traverse + 10 Krallen-Kapseln) an einer **Feder-Dämpfer-Aufhängung** am Kardanpunkt des Stiels (k 180 kN/m, c 26 kNs/m, Kraft gekappt 22 kN — waagerecht und senkrecht getrennt), Gieren per Drehmoment zum Sollwinkel, Aufricht-Moment 60 kNm/rad gegen Überschlagen; alle Werte SW in `balancing.grapple`. Bodenanschlag = Federkompression: der Arm darf höchstens 6 cm unter den Kardan-Ist, sonst wird er angehoben | Patrick 09.09.: „Kernstück des Spiels, viel realistischer: nicht eintauchen, nichts zusammensaugen". Ein kinematischer Körper ist unendlich schwer und kann nur teleportieren — daher alle bisherigen Flicken (E-013, E-017, E-024, E-025). Jetzt stützt sich die Spinne physikalisch auf Beton und Haufen ab, pendelt echt und schiebt Teile mit endlicher Kraft. Messung: Beton-Spitzen ≥ −5 cm bei Dauerdruck, Schließen hebt 0,2–0,35 m (Geometrie der Sichel), Pendel ≤ 0,3 rad, 100er-Griff-Test 94 %, 150er-Haufen 6,5 Teile/Griff | Kinematik + Strahlen unter jeder Zinke (bleibt Teleport) |
+| E-039 | Haltepose = Lage beim Zupacken, relativ zur Spinne eingefroren; nur Schwerpunkte außerhalb des geschlossenen Korbs werden bis zum Korbrand nachgezogen, nie zur Mitte | „Zusammensaugen" war die 0,25-s-Interpolation in die Korbmitte | Beibehalten |
+| E-040 | Sicherheitsnetze am Spinnenkörper: Geschwindigkeit ≤ 4 m/s, Drehrate ≤ 6 rad/s; Teleport (Laden, Tests) nie unter Bodenhöhe der Spitzen, danach Arm sofort geklemmt | Kontaktkorrekturen (Kralle im Teil, Teil verkeilt) schleuderten den Körper sonst 10 m hoch (100er-Test) | Kleinere Schrittweite |
+| E-041 | Gemeinsames Schlafen (E-012) lässt Teile im Umkreis 3 m der Spinne aus | Ein per `sleep()` erzwungen schlafendes Teil in der Insel des nie schlafenden Spinnenkörpers fiel „schlafend" durch den Boden (Coil bei −0,63 m) | Spinne schlafen lassen (dann hängt sie beim Aufwachen) |
+| — | `clawTipDipMaxM` und der Rechen-Schalter `clawRakeMaxClosure` sind ohne Wirkung; Kollisionsgruppe `grapple` (Boden, lose Teile, Fahrzeuge; nie die Ladung) | ersetzt durch echte Physik | — |
+| — | Bekannte Nebenwirkung: Tests/Spawns in Boxen oder an Wänden verhaken jetzt echt (alte Tests lagen in der Kupferbox) | Realismus | — |
+
+Lieferung 2 (offen): Funken/Staub an den Spitzen bei Bodenkontakt und Bewegung, Kratz-/Hydraulik-/Motor-Geräusche, Aufprall-Klong über Kontakt-Events.
+
 ## 2026-09-09 — M5a: Verbundteile — Zerlegen (gebaut, Gerätetest offen)
 
 | # | Entscheidung | Begründung | Alternative (verworfen) |
