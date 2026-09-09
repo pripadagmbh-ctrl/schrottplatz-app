@@ -10,8 +10,11 @@ import * as THREE from "three";
  * Prototyp (orbitCamera.ts:47-72): starre Fahrersicht in Oberwagen-Richtung, leicht gesenkt (−0,22 rad), 80° Sichtfeld,
  * Wischen dreht den Kopf (±120° / ±45°), Pinch stellt das Sichtfeld 60–95°. Dazu folgt der Kopf der Spinne sanft
  * und nur teilweise (followFraction, followSeconds — Patrick 08.09.: „Nachführen ist cool, evtl. minimal starrer").
+ * 09.09. (Patrick: „denk an die Perspektiven wie beim Prototypen"): Seitenansicht zurück (Prototyp orbitCamera.ts:95-103:
+ * rechtwinklig zur Blickrichtung, 15 m seitlich, 6,5 m hoch) und Orbit standardmäßig **fest im Raum** wie im Prototyp —
+ * dreht nicht mit dem Oberwagen; `followCab` schaltet das Mitdrehen (Briefing-Variante) zu.
  */
-export type CameraMode = "orbit" | "top" | "cabin";
+export type CameraMode = "orbit" | "top" | "cabin" | "side";
 
 export class CameraRig {
   distance = 11; pitch = (24 * Math.PI) / 180; yawOffset = 0;
@@ -21,11 +24,15 @@ export class CameraRig {
   private readonly target = new THREE.Vector3(); private readonly tmp = new THREE.Vector3();
   private readonly minDist = 3; maxDist = 18; minPitch = (5 * Math.PI) / 180; maxPitch = (75 * Math.PI) / 180;
   private initialised = false;
+  /** Orbit dreht mit dem Oberwagen (Briefing) — aus = feste Blickrichtung wie im Prototyp */
+  followCab = false;
+  private worldYaw = Number.NaN;
+  readonly sideDistance = Math.hypot(15, 6.5); readonly sidePitch = Math.atan2(6.5, 15);
 
   constructor(private readonly camera: THREE.PerspectiveCamera) {}
 
-  /** Ansicht wechseln: Orbit → Draufsicht → Kabine → Orbit. Orbit-Einstellungen bleiben für die Rückkehr erhalten. */
-  cycle(): void { this.mode = this.mode === "orbit" ? "top" : this.mode === "top" ? "cabin" : "orbit"; }
+  /** Ansicht wechseln: Orbit → Draufsicht → Kabine → Seite → Orbit. Orbit-Einstellungen bleiben für die Rückkehr erhalten. */
+  cycle(): void { this.mode = this.mode === "orbit" ? "top" : this.mode === "top" ? "cabin" : this.mode === "cabin" ? "side" : "orbit"; }
 
   private headYaw = 0; private headPitch = -0.22; private cabinFov = 80;
   /** manueller Kopfversatz (Wischen) zusätzlich zur sanften Nachführung */
@@ -55,11 +62,17 @@ export class CameraRig {
     }
     if (this.camera.fov !== 50) { this.camera.fov = 50; this.camera.updateProjectionMatrix(); }
     this.headYaw = 0; this.headPitch = -0.22; this.headYawUser = 0; this.headPitchUser = 0; // Kopf beim nächsten Einstieg wieder geradeaus
+    // Blickrichtung: fest im Raum (Prototyp) oder hinter dem Oberwagen (Briefing). Wischen dreht in beiden Fällen.
+    if (Number.isNaN(this.worldYaw)) this.worldYaw = baseYaw + Math.PI;
     if (this.mode === "orbit") {
-      this.yawOffset -= orbit.dx * 0.005;
+      if (this.followCab) this.yawOffset -= orbit.dx * 0.005; else this.worldYaw -= orbit.dx * 0.005;
       this.orbitPitch = THREE.MathUtils.clamp(this.orbitPitch + orbit.dy * 0.005, this.minPitch, this.maxPitch);
       this.orbitDistance = THREE.MathUtils.clamp(this.orbitDistance * Math.pow(1.12, zoom), this.minDist, this.maxDist);
       this.pitch += (this.orbitPitch - this.pitch) * k; this.distance += (this.orbitDistance - this.distance) * k;
+    } else if (this.mode === "side") {
+      // Seite: rechtwinklig zur Orbit-Blickrichtung, flach — Auslegerhöhe und Greiferabstand gut abschätzbar (Prototyp)
+      this.pitch += (this.sidePitch - this.pitch) * k;
+      this.distance += (this.sideDistance - this.distance) * k;
     } else {
       // Draufsicht: feste Höhe und Neigung, Gesten wirken nicht; Kamera steht hinter dem Oberwagen
       this.yawOffset += (0 - this.yawOffset) * k;
@@ -70,7 +83,8 @@ export class CameraRig {
     this.tmp.set(cab.x * 0.35 + grapple.x * 0.65, cab.y * 0.35 + grapple.y * 0.65 + 0.5, cab.z * 0.35 + grapple.z * 0.65);
     if (!this.initialised) { this.target.copy(this.tmp); this.initialised = true; }
     else this.target.lerp(this.tmp, 1 - Math.exp(-dt / 0.3));
-    const yaw = baseYaw + Math.PI + this.yawOffset; // hinter der Kabine
+    const orbitYaw = this.followCab || this.mode === "top" ? baseYaw + Math.PI + this.yawOffset : this.worldYaw;
+    const yaw = this.mode === "side" ? orbitYaw + Math.PI / 2 : orbitYaw;
     const cp = Math.cos(this.pitch);
     this.camera.position.set(
       this.target.x + Math.sin(yaw) * cp * this.distance,

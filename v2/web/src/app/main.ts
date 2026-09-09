@@ -60,8 +60,10 @@ async function boot(): Promise<void> {
     onStart: () => sim.day.startDay(), onNext: () => sim.day.nextDay(), onRestart: () => void persistence.restart(),
     onExport: () => persistence.export(), onImport: (f) => void persistence.import(f).then((ok) => { if (!ok) sim.bus.emit("toast", { text: "Datei ist kein Spielstand", kind: "bad" }); }),
   });
-  const menu = new MenuPanel(document.body, data.i18n as Record<string, unknown>, audio.muted, {
+  try { renderer.rig.followCab = localStorage.getItem("bagerana.followCab") === "1"; } catch { /* Standard: fest wie Prototyp */ }
+  const menu = new MenuPanel(document.body, data.i18n as Record<string, unknown>, audio.muted, renderer.rig.followCab, {
     onNewGame: () => void persistence.restart(), onExport: () => persistence.export(), onToggleMute: () => audio.toggleMute(),
+    onToggleFollowCab: () => { const v = !renderer.rig.followCab; renderer.rig.followCab = v; try { localStorage.setItem("bagerana.followCab", v ? "1" : "0"); } catch { /* egal */ } return v; },
     onImport: (f) => void persistence.import(f).then((ok) => { if (!ok) sim.bus.emit("toast", { text: "Datei ist kein Spielstand", kind: "bad" }); }),
   });
   const banner = new TutorialBanner(document.body, data.i18n as Record<string, unknown>, () => sim.tutorial.skip());

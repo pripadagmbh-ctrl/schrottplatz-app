@@ -61,6 +61,16 @@ test("leere Szene startet ohne Fehler und zeigt Messwerte", async ({ page }) => 
   await expect(page.locator(".sheet h2")).toHaveText(/Feierabend — Tag 0/);
   const restored = await page.evaluate(() => ({ money: window.__bagerana!.sim.world.economy.moneyEur, items: window.__bagerana!.sim.world.items.size, tut: window.__bagerana!.sim.tutorial.state.finished }));
   expect(restored.money).toBe(money); expect(restored.items).toBe(194); expect(restored.tut).toBe(true);
+  // Menue: oeffnen, schliessen — und wirklich weg (display:none), nicht nur hidden-Attribut (iPad 09.09.: Menue verschwand nicht)
+  await page.locator("#btn-menu").dispatchEvent("pointerup");
+  await expect(page.locator(".menu-panel")).toBeVisible();
+  await page.locator(".menu-panel .sell-close").dispatchEvent("pointerup");
+  expect(await page.locator(".menu-panel").evaluate((el) => getComputedStyle(el).display)).toBe("none");
+  // Vier Ansichten im Kreis (Prototyp, E-032): orbit → top → cabin → side → orbit
+  const modes: string[] = [];
+  for (let i = 0; i < 4; i++) { modes.push(await page.evaluate(() => window.__bagerana!.renderer.rig.mode)); await page.evaluate(() => window.__bagerana!.renderer.rig.cycle()); }
+  expect(modes).toEqual(["orbit", "top", "cabin", "side"]);
+  expect(await page.evaluate(() => window.__bagerana!.renderer.rig.mode)).toBe("orbit");
   // Naechster Tag: drei Auftraege auf der Morgen-Karte
   await page.locator(".sheet button[data-act='next']").dispatchEvent("pointerup");
   await expect(page.locator(".sheet h2")).toHaveText(/Tag 1/);
