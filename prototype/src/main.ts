@@ -960,6 +960,8 @@ async function main(): Promise<void> {
       dynAwake: counts.dynAwake,
       gripped: grip.grippedCount,
       grippedKg: grip.totalMassKg,
+      calls: renderer.info.render.calls,
+      tris: renderer.info.render.triangles,
     });
 
     input.endFrame();

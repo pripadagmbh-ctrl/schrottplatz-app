@@ -24,6 +24,9 @@ export class DebugOverlay {
       dynAwake: number;
       gripped: number;
       grippedKg: number;
+      /** renderer.info.render — was die Grafikkarte je Bild wirklich zu tun bekommt */
+      calls: number;
+      tris: number;
     }
   ): void {
     const fps = 1 / Math.max(frameDt, 1e-4);
@@ -38,6 +41,7 @@ export class DebugOverlay {
       `Koerper: ${stats.bodies} (wach: ${stats.awake})<br />` +
       // Die aussagekraeftige Zeile: nur bewegliche Teile koennen ueberhaupt schlafen
       `Beweglich: ${stats.dynamic} (wach: ${stats.dynAwake})<br />` +
+      `Zeichenrufe: ${stats.calls} · ${(stats.tris / 1000).toFixed(0)}k Dreiecke<br />` +
       `Gegriffen: ${stats.gripped} Obj / ${stats.grippedKg.toFixed(0)} kg`;
   }
 }
