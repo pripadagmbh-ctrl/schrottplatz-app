@@ -12,6 +12,7 @@
  *   Greifen        — über den rechten Stick (oder festen Fingerdruck)
  *   Extras         — Doppeltipp wechselt die Ansicht, Kippen ersetzt das Fadenkreuz
  *   Rädchen        — die übrigen Funktionen, endlos drehbar
+ *   Fünf Finger    — Debug-Overlay ein/aus (auf dem Tablet gibt es keine F3-Taste)
  */
 import { type ControlConfig, type AxisId, loadConfig } from "./controlConfig";
 
@@ -99,6 +100,7 @@ export class TouchControls {
     this.left = this.makeStick("touch-left", "zone-left");
     this.right = this.makeStick("touch-right", "zone-right");
     this.bindSafety();
+    this.bindDebugGeste();
     this.bindHold("btn-fwd", "fwd");
     this.bindHold("btn-back", "back");
     this.bindHold("btn-left", "left");
@@ -264,6 +266,26 @@ export class TouchControls {
     this.lastTap = now;
     this.lastTapX = x;
     this.lastTapY = y;
+  }
+
+  /**
+   * Fünf Finger gleichzeitig schalten das Debug-Overlay um. Am Rechner liegt es
+   * auf F3 — die hat ein Tablet nicht, und ohne die Zahlen laesst sich auf dem
+   * Geraet nichts nachmessen. Fuenf Finger deshalb, weil kein Spielgriff so
+   * viele braucht: mit zweien steuert man, mit dreien verrutscht man mal.
+   */
+  private bindDebugGeste(): void {
+    document.addEventListener(
+      "touchstart",
+      (e) => {
+        if (e.touches.length >= 5) {
+          this.pressed.add("F3");
+          TouchControls.vibrate(30);
+          this.releaseAll(); // die fuenf Finger sollen nichts am Bagger verstellen
+        }
+      },
+      { passive: true }
+    );
   }
 
   /**

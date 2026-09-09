@@ -766,7 +766,7 @@ async function main(): Promise<void> {
       signage.setVisible(labelsOn);
       hud.toast(labelsOn ? "Markierungen an" : "Markierungen aus");
     }
-    if (input.wasPressed("F3")) debug.toggle();
+    if (input.wasPressed("F3") || touch.consumePress("F3")) debug.toggle();
     if (input.wasPressed("KeyH")) {
       helpEl.style.display = helpEl.style.display === "none" ? "block" : "none";
     }
