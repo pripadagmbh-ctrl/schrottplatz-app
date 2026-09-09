@@ -23,6 +23,18 @@
         "v2/web"
       ],
       "port": 5174
+    },
+    {
+      "name": "prototype-build",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "preview",
+        "--prefix",
+        "prototype"
+      ],
+      "port": 4173,
+      "autoPort": true
     }
   ]
 }
