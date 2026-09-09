@@ -103,7 +103,7 @@
       @media (max-height: 500px) { .tut { top: calc(env(safe-area-inset-top, 0px) + 44px + 30px + 40px); width: min(460px, 44vw); font-size: 12px; padding: 6px 10px; } .hud-missions { top: calc(env(safe-area-inset-top, 0px) + 40px); } .hud-end, .hud-sell { min-height: 26px; font-size: 12px; } }
       /* Menue ☰ links neben ⌖ */
       .menu-btn { position: fixed; z-index: 6; width: 48px; height: 48px; right: calc(env(safe-area-inset-right, 0px) + 12px + 48px + 10px); top: calc(env(safe-area-inset-top, 0px) + 12px); border: 0; border-radius: 50%; color: #eef0ec; background: rgba(20,22,24,.7); font-size: 22px; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
-      .menu-panel { display: grid; gap: 8px; }
+      .menu-panel { display: grid; gap: 8px; } .menu-panel[hidden] { display: none; } /* display:grid wuerde hidden sonst ueberstimmen (wie Debug-Box 08.09.) */
       .menu-item { min-height: 44px; padding: 0 14px; border: 0; border-radius: 10px; background: rgba(238,240,236,.12); color: #eef0ec; font: 600 15px Inter, system-ui, sans-serif; text-align: left; touch-action: manipulation; }
       .menu-item.danger { background: #e0483a; color: #eef0ec; }
       @media (max-height: 500px) { .menu-btn { top: calc(env(safe-area-inset-top, 0px) + 8px); } }
