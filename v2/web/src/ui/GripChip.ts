@@ -1,6 +1,7 @@
 import type { AimState } from "@/sim/systems/AimSystem";
 import type { MaterialDef } from "@/data/types";
 import { euroIndicator } from "@/shared/pricing";
+import { partName } from "@/sim/systems/CompositeSystem";
 
 /**
  * Griff-Info-Chip (Briefing Kap. 14.1): unten Mitte, 44 px hoch. Zeigt Fraktion · kg · €-Stufe des Teils unter
@@ -30,9 +31,12 @@ export class GripChip {
     const e = euroIndicator(m.sellPricePerKg); return e === "fee" ? this.t("hud.grabInfo.fee") : e;
   }
 
-  update(a: AimState): void {
+  update(a: AimState, engaged?: { partId: string; kg: number; progress: number; blockedBy: string | null } | null): void {
     let text = "", state = "";
-    if (a.heldCount > 0) {
+    if (engaged) { // M5: Baugruppe gefasst
+      text = engaged.blockedBy ? `${partName(engaged.partId)} · ${engaged.kg} kg · erst ${partName(engaged.blockedBy)} ab` : `${partName(engaged.partId)} · ${engaged.kg} kg · ${engaged.progress > 0 ? `reißt ${Math.round(engaged.progress * 100)} %` : "ziehen!"}`;
+      state = engaged.blockedBy ? "wrong" : "tolerated";
+    } else if (a.heldCount > 0) {
       const sym = a.verdict === "ok" ? " ✓" : a.verdict === "tolerated" ? " !" : a.verdict === "wrong" ? " ✗" : "";
       text = [this.nameOf(a.heldMaterialId), `${Math.round(a.heldKg)} kg`, this.euro(a.heldMaterialId), this.t("hud.grabInfo.held") + sym].filter(Boolean).join(" · ");
       state = a.verdict;

@@ -13,7 +13,8 @@
     "budgets",
     "assist",
     "vehicles",
-    "tutorial"
+    "tutorial",
+    "composites"
   ],
   "properties": {
     "physics": {
@@ -239,6 +240,16 @@
         "lesson3NeedShare",
         "inputHoldS",
         "driveDistanceM"
+      ]
+    },
+    "composites": {
+      "type": "object",
+      "required": [
+        "pullThreshold",
+        "rotatorFactor",
+        "engageWindowStart",
+        "disengageRadiusM",
+        "unloadOffsetM"
       ]
     }
   }

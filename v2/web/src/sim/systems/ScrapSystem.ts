@@ -1,7 +1,7 @@
 import type { System, SimContext } from "./System";
 import type { ScrapItem } from "@/sim/world/WorldState";
 import type { MaterialDef, ShapeDef } from "@/data/types";
-import type { ItemId } from "@/shared/ids";
+import type { ItemId, CompositeId } from "@/shared/ids";
 import { nextId } from "@/shared/ids";
 import { Rng } from "@/shared/rng";
 import { RAPIER } from "@/sim/world/PhysicsWorld";
@@ -119,11 +119,20 @@ export class ScrapSystem implements System {
   }
 
   /** Wie spawn(), aber Position/Rotation exakt und ohne eigene Formwahl — fuer Ladungen auf Fahrzeugen. */
-  spawnExact(materialId: string, shape: ShapeDef, size: [number, number, number], pos: { x: number; y: number; z: number }, rot: { x: number; y: number; z: number; w: number }): ScrapItem | null {
+  spawnExact(materialId: string, shape: ShapeDef, size: [number, number, number], pos: { x: number; y: number; z: number }, rot: { x: number; y: number; z: number; w: number }, opts?: { massKg?: number; compositeId?: CompositeId }): ScrapItem | null {
     if (this.ctx.world.items.size >= this.maxLoose) return null;
     const mat = this.materials.get(materialId); if (!mat) throw new Error(`Material unbekannt: ${materialId}`);
-    const massKg = Math.max(0.5, Math.round(volume(shape, size) * mat.densityKgM3 * shape.fill * 10) / 10);
-    return this.createItem({ materialId, shapeId: shape.id, size, massKg, pos, rot, origin: "delivery" });
+    const massKg = opts?.massKg ?? Math.max(0.5, Math.round(volume(shape, size) * mat.densityKgM3 * shape.fill * 10) / 10);
+    const item = this.createItem({ materialId, shapeId: shape.id, size, massKg, pos, rot, origin: "delivery" });
+    if (opts?.compositeId) item.compositeId = opts.compositeId;
+    return item;
+  }
+  shape(id: string): ShapeDef | undefined { return this.shapes.get(id); }
+  /** Masse eines Teils nachtraeglich setzen (M5: Rumpf verliert abgerissene Baugruppen). */
+  setMass(item: ScrapItem, massKg: number): void {
+    item.massKg = massKg;
+    const body = item.bodyHandle !== undefined ? this.ctx.physics.safeBody(item.bodyHandle) : null;
+    if (body) for (let i = 0; i < body.numColliders(); i++) body.collider(i).setMass(massKg);
   }
   /** Fuer Ladungsplanung: passende Form zum Material waehlen und bemessen. */
   planShape(materialId: string, rng: Rng): { shape: ShapeDef; size: [number, number, number]; massKg: number } | null {

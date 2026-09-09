@@ -216,5 +216,13 @@
     "inputHoldS": 1.0,
     "driveDistanceM": 3.0,
     "_src": "M4b (SW) nach E-026: drei Lektionen, blockierende Schritte"
+  },
+  "composites": {
+    "pullThreshold": 0.5,
+    "rotatorFactor": 1.8,
+    "engageWindowStart": 0.3,
+    "disengageRadiusM": 0.4,
+    "unloadOffsetM": 2.2,
+    "_src": "Briefing Kap. 8.1 (SW): Timer laeuft bei Zugkraft > 0,5; Rotator zaehlt x1,8; Tieflader setzt das Wrack seitlich ab (Annahme M5)"
   }
 }

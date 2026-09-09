@@ -96,6 +96,8 @@ export interface BalancingFile {
   vehicles: Record<string, number | boolean | string>;
   /** M4b: Tutorial-Startwerte (E-026) */
   tutorial: Record<string, number | string>;
+  /** M5: Zerlegung (Briefing Kap. 8) */
+  composites: Record<string, number | string>;
 }
 
 export type I18nFile = Record<string, unknown>;

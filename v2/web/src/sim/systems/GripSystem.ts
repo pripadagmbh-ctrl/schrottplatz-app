@@ -51,6 +51,8 @@ export class GripSystem implements System {
   private velHist: Vec3[] = []; velAvgSteps = 3;
   /** Rückmeldung fürs HUD: letzter Grund, warum nicht gegriffen wurde */
   lastRefusal: "none" | "tooHeavy" | "full" = "none";
+  /** M5: solange das CompositeSystem eine Baugruppe haelt, greift die Spinne nichts anderes */
+  blocked = false;
   private wasClosing = false; private snapRadius = 0.5; private snapBall = new RAPIER.Ball(1);
   /** Zähler für Tests: wie oft der Greif-Magnet ausgelöst hat */
   snapCount = 0;
@@ -94,7 +96,7 @@ export class GripSystem implements System {
     } else {
       // Greif-Magnet genau beim Beginn des Schließens (Flanke), nur mit leerer Spinne
       if (!this.wasClosing && this.held.length === 0) this.trySnap(ctx);
-      if (s.grapple >= this.contactStart && s.grapple <= this.winEnd) this.tryGrab(ctx);
+      if (!this.blocked && s.grapple >= this.contactStart && s.grapple <= this.winEnd) this.tryGrab(ctx);
     }
     this.wasClosing = this.ex.closing;
 
@@ -177,7 +179,7 @@ export class GripSystem implements System {
       if (!item || item.state !== "loose") return true;
       if (early && !this.touching.has(body.handle)) return true;
       const t = body.translation();
-      if (this.insideBasket(t.x, t.y, t.z)) candidates.push({ item, body });
+      if (item.compositeId ? this.overHull(item) : this.insideBasket(t.x, t.y, t.z)) candidates.push({ item, body });
       return true;
     }, undefined, COLLISION.loose);
     // Nächstes zum Sensor zuerst
@@ -216,6 +218,14 @@ export class GripSystem implements System {
     if (inside === 0 && outside === 1 && !composite) { this.ex.beginSnap(tx, tz); this.snapCount++; }
   }
 
+  /** M5: Ein Rumpf passt in keinen Korb — er gilt als gefasst, wenn der Sensor ueber seinem Grundriss liegt (Spinne umschliesst das Dach). */
+  private overHull(item: ScrapItem): boolean {
+    const p = this.ex.pose;
+    this.v.x = p.sensorPos.x - item.pos.x; this.v.y = p.sensorPos.y - item.pos.y; this.v.z = p.sensorPos.z - item.pos.z;
+    rotateVec(quatConj(item.rot, this.qInv), this.v, this.v);
+    return Math.abs(this.v.x) <= item.size[0] / 2 + 0.3 && Math.abs(this.v.z) <= item.size[2] / 2 + 0.3 && this.v.y >= -item.size[1] / 2 && this.v.y <= item.size[1] / 2 + 0.9;
+  }
+
   private insideBasketHeight(y: number): boolean {
     const p = this.ex.pose, g = this.ctx.data.balancing.grip;
     const rel = y - p.grapplePos.y;
@@ -232,10 +242,19 @@ export class GripSystem implements System {
     const tipY = this.tip.y, tipR = Math.max(this.tip.z, 0);
     if (this.v.y > CLAW_RING_Y + Number(g["basketTopMarginM"]) || this.v.y < tipY - Number(g["basketBottomMarginM"])) return false;
     const t = clamp((CLAW_RING_Y - this.v.y) / Math.max(CLAW_RING_Y - tipY, 0.01), 0, 1);
-    const r = CLAW_RING_R + (tipR - CLAW_RING_R) * t + Number(g["basketMarginM"]);
+    // Seitliche Luft schrumpft mit dem Schliessgrad: eine fast geschlossene Spinne darf nur fassen, was wirklich zwischen
+    // den Zinken liegt — sonst „fliegen" Teile neben der Spinne in den Korb (iPad-Test 09.09.)
+    const margin = Number(g["basketMarginM"]) * (1 - this.ctx.world.excavator.grapple);
+    const r = CLAW_RING_R + (tipR - CLAW_RING_R) * t + margin;
     return Math.hypot(this.v.x, this.v.z) <= r;
   }
 
+  /** M5: abgerissene Baugruppe landet direkt in der Spinne. */
+  forceGrab(itemId: ItemId): boolean {
+    const item = this.ctx.world.items.get(itemId); if (!item || item.bodyHandle === undefined) return false;
+    const body = this.ctx.physics.safeBody(item.bodyHandle); if (!body) return false;
+    this.grab(this.ctx, item, body); return true;
+  }
   private grab(ctx: SimContext, item: ScrapItem, body: RAPIER.RigidBody): void {
     const p = this.ex.pose;
     // Startpose relativ zur Spinne

@@ -51,6 +51,8 @@ export class ContainerSystem implements System {
     const lin2 = ctx.data.balancing.physics.sleepLinearThreshold ** 2 * 4; // etwas grosszuegiger als die Schlafschwelle
     for (const item of ctx.world.items.values()) {
       if (item.state !== "loose" || item.bodyHandle === undefined) { this.rest.delete(item.id); continue; }
+      // M5: Ein Rumpf mit angebauten Baugruppen wird nicht verbucht (Batterie im Stahlhaufen) — erst zerlegen
+      if (item.compositeId) { const st = ctx.world.composites.get(item.compositeId); if (st && st.remainingParts.length) { this.rest.delete(item.id); continue; } }
       const cid = this.level.containerAt(item.pos.x, item.pos.z);
       if (!cid) { this.rest.delete(item.id); continue; }
       const body = ctx.physics.safeBody(item.bodyHandle); if (!body) continue;

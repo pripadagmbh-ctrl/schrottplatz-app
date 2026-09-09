@@ -1,6 +1,6 @@
 # Bagerana v2 — Spur A (Web)
 
-Neuaufbau nach `../docs/02_Briefing.md` (Kap. 17 Architektur, Kap. 22 Meilensteine). Stand: **M4b — Tag und Spiel** (Tagesstruktur, Aufträge, Einweisung, Autosave, erste Sounds) — gebaut, Gerätetest offen.
+Neuaufbau nach `../docs/02_Briefing.md` (Kap. 17 Architektur, Kap. 22 Meilensteine). Stand: **M5a — Verbundteile: Zerlegen** (Pkw vom Tieflader, Baugruppen abreißen) — gebaut, Gerätetest offen.
 
 ## Befehle
 
@@ -94,6 +94,13 @@ Steuerung im Browser: **Q/E** Oberwagen · **R/F** Hauptarm · **T/G** Stiel · 
 - Neues Spiel startet leer (E-029); `?pile` in der URL legt den 40er-Haufen (Dev), **P** kippt 150 weitere.
 - Test: `test/sim/day.test.ts`; Rauchtest prüft Morgen-Karte, Feierabend, Autosave über Neuladen.
 
+## Was M5a enthält
+
+- `sim/systems/CompositeSystem.ts` (preStep 18): Wrack = Rumpf-Schrottteil (`hull_car`) + Anker-Baugruppen aus `composites.json`; Fassen im `grabRadius`, Arm-Sperre, Zugkraft aus Achseingaben, Abriss nach `tearSeconds`, Reihenfolge über `requires` (E-033–E-035). Werte in `balancing.composites`.
+- Tieflader (Kunde Rehm, ab Tag 1): bringt den Pkw, setzt ihn seitlich im Zerlegebereich ab, fährt rückwärts hinaus (E-036); Pauschale 120 €.
+- `view/CompositeView.ts` (Baugruppen am Rumpf), Chip „Motor · 210 kg · reißt 60 %" bzw. „erst Batterie ab", Reiß-Sound.
+- Test: `test/sim/composite.test.ts` (Motor 2,4–3,0 s, Massen auf 210 kg genau, Reihenfolge, Tieflader Tor-zu-Tor).
+
 ## Nächster Meilenstein
 
-**M5 — Verbundteile**: Pkw/Traktor/Lkw als zerlegbare Objekte (Motor, Kat, Batterie, Reifen, Tank, Kabelbaum), Presse, Auftragstyp dismantle.
+**M5b — Presse und Zerlege-Auftrag**: Pkw/Traktor/Lkw als zerlegbare Objekte (Motor, Kat, Batterie, Reifen, Tank, Kabelbaum), Presse, Auftragstyp dismantle.

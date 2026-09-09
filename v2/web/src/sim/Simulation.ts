@@ -16,6 +16,7 @@ import { ContainerSystem } from "./systems/ContainerSystem";
 import { DaySystem } from "./systems/DaySystem";
 import { MissionSystem } from "./systems/MissionSystem";
 import { TutorialSystem } from "./systems/TutorialSystem";
+import { CompositeSystem } from "./systems/CompositeSystem";
 
 /**
  * Bündelt WorldState, PhysicsWorld, Level, Scheduler und EventBus zu einer kopflosen Simulation.
@@ -33,6 +34,7 @@ export class Simulation {
   readonly excavator = new ExcavatorSystem();
   readonly excavatorColliders = new ExcavatorColliders();
   readonly grip = new GripSystem();
+  readonly composites = new CompositeSystem();
   readonly aim: AimSystem;
   readonly vehicles: VehicleSystem;
   readonly containers: ContainerSystem;
@@ -67,6 +69,7 @@ export class Simulation {
     this.scheduler.register(this.excavator);          // input 10
     this.scheduler.register(this.excavatorColliders); // preStep 10
     this.scheduler.register(this.vehicles);           // preStep 15
+    this.scheduler.register(this.composites);         // preStep 18
     this.scheduler.register(this.grip);               // preStep 20
     this.scheduler.register(this.scrap);              // postStep 10
     this.scheduler.register(this.aim);                // postStep 20

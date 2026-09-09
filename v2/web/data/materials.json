@@ -477,6 +477,27 @@
       "tris": 40,
       "weight": 0.1,
       "_note": "Gussteil/Getriebegehaeuse 400-1200 kg"
+    },
+    {
+      "id": "hull_car",
+      "collider": "box",
+      "sizeMin": [
+        1.7,
+        1.1,
+        4.0
+      ],
+      "sizeMax": [
+        1.7,
+        1.1,
+        4.0
+      ],
+      "fill": 0.01,
+      "materialIds": [
+        "steel"
+      ],
+      "tris": 12,
+      "weight": 0,
+      "_note": "M5: Pkw-Rumpf (Verbundteil), nur gezielt gespawnt; Masse kommt aus composites.json"
     }
   ]
 }

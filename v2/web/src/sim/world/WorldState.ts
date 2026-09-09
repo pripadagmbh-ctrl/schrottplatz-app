@@ -26,6 +26,8 @@ export interface ContainerState {
 export interface CompositeState {
   id: CompositeId; defId: string; pos: Vec3; rot: Quat; crushStage: 0 | 1 | 2;
   remainingParts: string[]; hullMassKg: number; bodyHandle?: number;
+  /** M5: der Rumpf ist ein normales Schrottteil (Form hull_*) */
+  hullItemId: ItemId;
 }
 export interface ExcavatorState {
   pos: Vec3; heading: number; cab: number; boom: number; stick: number; rotator: number;
@@ -37,6 +39,8 @@ export interface DeliveryState {
   grossKg: number; tareKg: number; priceEur: number; tStart: number;
   /** sortenrein deklariert (Fraktionspreis) oder Mischfuhre (Pauschale) */
   sorted: boolean; materialId: string | null;
+  /** M5: Wrack-Lieferung (Pauschalpreis) */
+  compositeDefId?: string;
 }
 export interface DayState {
   day: number; phase: "morning" | "work" | "evening" | "ended"; secondsInPhase: number;

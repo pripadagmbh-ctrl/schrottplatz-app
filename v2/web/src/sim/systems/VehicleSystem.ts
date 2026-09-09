@@ -1,5 +1,6 @@
 import type { System, SimContext } from "./System";
 import type { ScrapSystem } from "./ScrapSystem";
+import type { CompositeSystem } from "./CompositeSystem";
 import type { CustomerDef, VehicleDef } from "@/data/types";
 import type { DeliveryState } from "@/sim/world/WorldState";
 import type { DeliveryId, ItemId } from "@/shared/ids";
@@ -42,7 +43,7 @@ export class VehicleSystem implements System {
   readonly order = 15;
 
   readonly runs: VehicleRun[] = [];
-  private ctx!: SimContext; private scrap!: ScrapSystem;
+  private ctx!: SimContext; private scrap!: ScrapSystem; private composites!: CompositeSystem;
   private v!: Record<string, number | boolean | string>;
   private rng = new Rng(7);
   private nextAutoS = 0;
@@ -54,7 +55,7 @@ export class VehicleSystem implements System {
   constructor(private readonly level: Level) {}
 
   init(ctx: SimContext): void {
-    this.ctx = ctx; this.scrap = ctx.get<ScrapSystem>("scrap");
+    this.ctx = ctx; this.scrap = ctx.get<ScrapSystem>("scrap"); this.composites = ctx.get<CompositeSystem>("composites");
     this.v = ctx.data.balancing.vehicles;
     this.nextAutoS = Number(this.v["firstDeliveryDelayS"] ?? 8);
   }
@@ -66,10 +67,12 @@ export class VehicleSystem implements System {
   /** `forceSorted` (M4b-Tutorial): sortenrein erzwingen statt wuerfeln. */
   requestDelivery(customerId?: string, forceSorted?: boolean): VehicleRun | null {
     const day = this.ctx.world.day.day;
-    const pool = this.ctx.data.customers.customers.filter((c) => c.fromDay <= day && !c.compositeDefId && this.ctx.data.customers.vehicles.find((v) => c.vehicleIds.includes(v.id) && v.tier === "MVP" && v.tips));
+    const vehicleOk = (c: CustomerDef) => this.ctx.data.customers.vehicles.some((v) => c.vehicleIds.includes(v.id) && v.tier === "MVP" && (v.tips || !!c.compositeDefId));
+    const wreckOnYard = this.ctx.world.composites.size > 0; // M5 (Annahme): hoechstens ein Wrack auf dem Platz
+    const pool = this.ctx.data.customers.customers.filter((c) => c.fromDay <= day && vehicleOk(c) && (!c.compositeDefId || (!wreckOnYard && this.composites.def(c.compositeDefId)?.tier === "MVP")));
     const customer = customerId ? this.ctx.data.customers.customers.find((c) => c.id === customerId) : pool.length ? this.rng.pickWeighted(pool, (c) => c.weight) : undefined;
     if (!customer) return null;
-    const vehicleId = customer.vehicleIds.find((id) => this.ctx.data.customers.vehicles.find((v) => v.id === id && v.tier === "MVP" && v.tips)) ?? customer.vehicleIds[0]!;
+    const vehicleId = customer.vehicleIds.find((id) => this.ctx.data.customers.vehicles.find((v) => v.id === id && v.tier === "MVP" && (v.tips || !!customer.compositeDefId))) ?? customer.vehicleIds[0]!;
     const def = this.ctx.data.customers.vehicles.find((v) => v.id === vehicleId)!;
     const sorted = forceSorted ?? this.rng.next() < customer.sortedProbability;
     const dominant = [...customer.loadProfile].sort((a, b) => b.share - a.share)[0]?.materialId ?? null;
@@ -78,8 +81,9 @@ export class VehicleSystem implements System {
       grossKg: 0, tareKg: def.body.tareKg, priceEur: 0, tStart: this.ctx.world.step, sorted, materialId: sorted ? dominant : null,
     };
     this.ctx.world.deliveries.set(delivery.id, delivery);
+    if (customer.compositeDefId) { delivery.compositeDefId = customer.compositeDefId; delivery.sorted = false; delivery.materialId = null; }
     const run = this.spawnRun(delivery, def, customer);
-    this.loadCargo(run, customer, sorted, dominant);
+    if (customer.compositeDefId) this.loadComposite(run, customer.compositeDefId); else this.loadCargo(run, customer, sorted, dominant);
     this.ctx.world.day.deliveriesToday += 1;
     return run;
   }
@@ -219,6 +223,39 @@ export class VehicleSystem implements System {
     run.delivery.grossKg = b.tareKg + kg;
   }
 
+  /** M5: Wrack auf dem Tieflader — ein Rumpf-Teil, kinematisch mitgefuehrt wie jede Ladung. */
+  private loadComposite(run: VehicleRun, defId: string): void {
+    const b = run.def.body;
+    const local: Vec3 = { x: 0, y: b.floorY, z: b.bedLen / 2 };
+    this.toWorld(run, local, true, this.tmp);
+    const st = this.composites.spawn(defId, this.tmp, run.heading); if (!st) return;
+    const item = this.ctx.world.items.get(st.hullItemId)!; const body = this.ctx.physics.safeBody(item.bodyHandle!)!;
+    body.setBodyType(RAPIER.RigidBodyType.KinematicPositionBased, false);
+    for (let c = 0; c < body.numColliders(); c++) body.collider(c).setCollisionGroups(COLLISION.vehicle);
+    item.state = "onVehicle";
+    const def = this.composites.def(defId)!;
+    run.loads.push({ itemId: item.id, handle: item.bodyHandle!, local: { x: 0, y: b.floorY + def.hull.yOffset, z: b.bedLen / 2 }, localRot: { x: 0, y: 0, z: 0, w: 1 }, massKg: item.massKg });
+    run.delivery.grossKg = b.tareKg + item.massKg;
+  }
+
+  /** Tieflader kippt nicht: Wrack wird seitlich neben dem Fahrzeug abgesetzt (Annahme M5: Kran gedacht, kein Rampen-Abrollen). */
+  private unloadBeside(run: VehicleRun): void {
+    const b = run.def.body, off = Number(this.ctx.data.balancing.composites["unloadOffsetM"] ?? 2.2);
+    for (const l of run.loads) {
+      const body = this.ctx.physics.safeBody(l.handle); const item = this.ctx.world.items.get(l.itemId);
+      if (!body || !item) continue;
+      const local: Vec3 = { x: -(b.bedW / 2 + off), y: item.size[1] / 2 + 0.05, z: l.local.z };
+      this.toWorld(run, local, false, this.tmp);
+      body.setBodyType(RAPIER.RigidBodyType.Dynamic, true);
+      body.setTranslation({ x: this.tmp.x, y: this.tmp.y, z: this.tmp.z }, true); body.setRotation(this.frameQuat(run, false, this.q), true);
+      body.setLinvel({ x: 0, y: 0, z: 0 }, true); body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      for (let i = 0; i < body.numColliders(); i++) body.collider(i).setCollisionGroups(COLLISION.loose);
+      item.state = "loose";
+    }
+    this.ctx.bus.emit("vehicleDumped", { deliveryId: run.delivery.id, itemCount: run.loads.length });
+    run.loads.length = 0;
+  }
+
   private releaseCargo(run: VehicleRun): void {
     const c = Math.cos(run.heading), s = Math.sin(run.heading);
     for (const l of run.loads) {
@@ -275,6 +312,13 @@ export class VehicleSystem implements System {
         break;
       }
       case "tipUp": {
+        if (!run.def.tips) { // Tieflader: Wartezeit, dann absetzen, ohne Kippen und ohne Kriechen
+          run.timer += dt;
+          if (run.loads.length && run.timer >= run.def.dumpSeconds * 0.5) this.unloadBeside(run);
+          // Rueckwaerts auf der eigenen Spur hinaus (erstes Teilstueck): Wenden im Zerlegebereich fegte das Wrack 20 m weit weg (Test M5)
+          if (run.timer >= run.def.dumpSeconds) { run.path = [{ ...run.pos }, ...this.route(run.def.routeOut).slice(1)]; run.seg = 0; run.reverse = true; run.scaleIdx = this.scaleIndex(run.path); run.stage = "out"; run.lowerLeft = 0; d.phase = "weighOut"; }
+          break;
+        }
         const target = deg(Number(v["tipAngleDeg"]));
         run.bedAngle = Math.min(target, run.bedAngle + (target / run.def.dumpSeconds) * dt);
         if (run.loads.length && run.bedAngle >= deg(Number(v["releaseAngleDeg"]))) this.releaseCargo(run);
@@ -292,9 +336,9 @@ export class VehicleSystem implements System {
         break;
       }
       case "out": {
-        // Mulde auf den ersten Metern senken
+        if (run.reverse && run.seg >= 1) run.reverse = false; // Tieflader: ab dem ersten Wegpunkt wieder vorwaerts
         if (run.bedAngle > 0) { run.bedAngle = Math.max(0, run.bedAngle - (deg(Number(v["tipAngleDeg"])) / Math.max(0.1, run.lowerLeft)) * dt); }
-        const arrived = this.follow(run, dt, run.bedAngle > 0 ? run.def.speedMs * 0.5 : run.def.speedMs);
+        const arrived = this.follow(run, dt, run.bedAngle > 0 || run.reverse ? run.def.speedMs * 0.5 : run.def.speedMs);
         if (run.seg === run.scaleIdx && this.atWaypoint(run) && d.phase === "weighOut" && run.def.id !== "rolloff") {
           run.stage = "weighOut"; run.timer = Number(v["scaleStopS"]);
         } else if (arrived) { run.stage = "done"; }
@@ -342,6 +386,7 @@ export class VehicleSystem implements System {
     let perKg = Number(econ["mixedBuyPricePerKg"]);
     if (d.sorted && d.materialId) { const m = this.ctx.data.materials.materials.find((x) => x.id === d.materialId); if (m) perKg = m.buyPricePerKg; }
     d.priceEur = Math.round(netKg * perKg * 100) / 100;
+    if (d.compositeDefId) d.priceEur = this.composites.def(d.compositeDefId)?.buyPriceEur ?? d.priceEur; // Wrack: Pauschale (Briefing 8.3)
   }
   private pay(run: VehicleRun): void {
     const d = run.delivery; if (d.priceEur <= 0) return;

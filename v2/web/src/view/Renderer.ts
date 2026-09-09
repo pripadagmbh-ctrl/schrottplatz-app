@@ -7,6 +7,7 @@ import { ExcavatorModel, type ExcavatorPose as ModelPose } from "./ExcavatorMode
 import { CameraRig } from "./CameraRig";
 import { AimRing } from "./AimRing";
 import { VehicleView } from "./VehicleView";
+import { CompositeView } from "./CompositeView";
 import { ContainerFillView } from "./ContainerFillView";
 import type { VehicleRun } from "@/sim/systems/VehicleSystem";
 import type { AimState } from "@/sim/systems/AimSystem";
@@ -26,7 +27,7 @@ export class Renderer {
   readonly camera: THREE.PerspectiveCamera;
   drawCalls = 0; triangles = 0;
   private readonly ground: THREE.Mesh;
-  readonly scrap: ScrapView;
+  readonly scrap: ScrapView; private readonly compositeView: CompositeView;
   readonly excavator: ExcavatorModel;
   readonly rig: CameraRig;
   readonly aimRing: AimRing;
@@ -79,6 +80,7 @@ export class Renderer {
     });
     this.scene.add(im);
     this.scrap = new ScrapView(this.scene, data, Number(data.balancing.scrap["maxLooseItems"]) + 50);
+    this.compositeView = new CompositeView(this.scene, data.composites.composites);
     const ex = data.balancing.excavator as Record<string, number | number[]>;
     this.excavator = new ExcavatorModel(this.scene, {
       boomLen: Number(ex["boomLenM"]), stickLen: Number(ex["stickLenM"]), boomPivot: ex["boomPivot"] as [number, number, number], grappleLink: Number(ex["grappleLinkM"]),
@@ -140,6 +142,7 @@ export class Renderer {
 
   render(world: WorldState, alpha: number, frameDt: number, control?: ControlFrame): void {
     this.scrap.update(world, alpha);
+    this.compositeView.update(world, alpha);
     this.updateExcavator(alpha);
     if (this.aim) { this.aimRing.update(this.aim, frameDt); this.fills.updateAim(this.aim, frameDt); }
     this.vehicles.update(this.runs); this.fills.update(world);

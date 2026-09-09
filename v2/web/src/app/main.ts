@@ -84,7 +84,7 @@ async function boot(): Promise<void> {
       if (sim.control.actions.has("cycleCamera")) renderer.rig.cycle();
       sim.step();
       renderer.syncExcavator(sim.world, sim.excavator.pose, sim.excavator.prev, sim.control, sim.aim.state, sim.vehicles.runs);
-      chip.update(sim.aim.state);
+      chip.update(sim.aim.state, sim.composites.engagedInfo());
       hud.update(sim.world, sim.vehicles.runs.some((r) => r.def.id === "rolloff"), sim.missions.active, sim.day.deliveriesFinished);
       sheet.update(); banner.update(sim.tutorial.state, performance.now()); persistence.tick(dt);
     },

@@ -2,6 +2,19 @@
 
 Jede Architektur- oder Design-Entscheidung mit Datum und Begründung, damit nichts zweimal diskutiert wird (CLAUDE.md). Neueste oben.
 
+## 2026-09-09 — M5a: Verbundteile — Zerlegen (gebaut, Gerätetest offen)
+
+| # | Entscheidung | Begründung | Alternative (verworfen) |
+|---|---|---|---|
+| E-033 | Der Rumpf eines Wracks ist ein **normales Schrottteil** (Form `hull_car`, Masse = Rumpf + noch angebaute Baugruppen); Baugruppen sind Anker ohne eigenen Körper (`CompositeState.remainingParts`) | Greifen, Tragen, Speichern, Verbuchen laufen über die vorhandenen Wege; ein neues Wrack braucht nur einen Datensatz in `composites.json` (Briefing 8.1) | Eigener Rumpf-Körper mit Sonderpfaden |
+| E-034 | Abriss: Spinne schließt mit dem Sensor im `grabRadius` einer Baugruppe → **Arm steht** (`lockArm`), Eingabe wird als Zugkraft gewertet (stärkste Achse, Rotator × 1,8); Timer läuft bei Zugkraft > 0,5; bei `tearSeconds` reißt die Baugruppe und liegt sofort in der Spinne. Falsche Reihenfolge: gefasst, Timer steht, Chip sagt „erst Batterie ab" | Briefing 8.1 Schritte 1–5; Arm-Sperre statt echter Kraftsimulation — kinematische Arme haben keine Kraft, und ein weglaufender Arm würde den Griff sofort verlieren. Sim-Test: Motor löst sich in 2,4–3,0 s bei Zugkraft 1,0, Rumpf 210 kg leichter | Joint zwischen Spinne und Rumpf mit Bruchkraft |
+| E-035 | Rumpf **greifbar und tragbar** (Annahme M5-1: 930 kg < maxTotalKg 3500); für Rümpfe gilt statt Korb-Prüfung „Sensor über dem Grundriss" | Ein 4-m-Wrack passt in keinen Korb; ohne Tragen wird der Weg Annahme → Presse zur Geduldsprobe | Nur schieben |
+| E-036 | Tieflader (Rehm) setzt das Wrack nach der halben Wartezeit **seitlich** ab (`unloadOffsetM` 2,2, SW) und fährt **rückwärts** auf der eigenen Spur hinaus | Kein Kippen, keine Rampen-Physik; beim Wenden im Zerlegebereich fegte der kinematische Lkw das Wrack 20 m weit (Test) | Rampe + Abrollen |
+| E-037 | Höchstens **ein Wrack auf dem Platz** (kein zweiter Tieflader, solange ein Rumpf existiert); Ankauf pauschal `buyPriceEur` 120 €; Rumpf mit Baugruppen wird **nicht verbucht** (erst zerlegen) | Briefing 8.3 („kein Farm-Objekt", Batterie nie im Stahlhaufen) | Kilopreis, freie Anzahl |
+| — | Korbluft (`basketMarginM`) schrumpft mit dem Schließgrad auf 0 | Patrick 09.09.: „Teile fliegen bei geschlossener Spinne in den Greifer hinein, obwohl diese nur daneben steht" — die fast geschlossene Spinne fasste noch 0,45 m neben den Zinken | Feste Luft (E-025-Stand) |
+
+Offen für M5b: Presse (Station, Knopf, Paket 1,6 × 0,8 × 0,6), Auftragstyp `dismantle`, Scheiben/Partikel [V1], Traktor/Lkw als weitere Datensätze.
+
 ## 2026-09-08 — M4b: Tag und Spiel (gebaut, Gerätetest offen)
 
 | # | Entscheidung | Begründung | Alternative (verworfen) |

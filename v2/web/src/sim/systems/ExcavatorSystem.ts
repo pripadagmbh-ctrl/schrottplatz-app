@@ -118,6 +118,7 @@ export class ExcavatorSystem implements System {
 
     // --- Oberwagen / Hauptarm / Stiel mit Lastfaktor ---
     if (this.snapT > 0) this.applySnap(s, dt);
+    else if (this.lockArm) { this.cabVel = 0; this.boomVel = 0; this.stickVel = 0; } // M5: Spinne haengt an einer Baugruppe — Arm steht, Eingabe wird als Zugkraft gewertet
     else {
       this.cabVel = ramp(this.cabVel, clamp(c.cab, -1, 1) * this.cabMax * lf, (this.cabMax / rampT) * dt);
       s.cab += this.cabVel * dt;
@@ -158,6 +159,8 @@ export class ExcavatorSystem implements System {
     return this.boomPivot[1] + this.boomLen * Math.sin(s.boom) + this.stickLen * Math.sin(s.boom + s.stick);
   }
 
+  /** M5: Arm gesperrt, solange eine Baugruppe gefasst ist (CompositeSystem). */
+  lockArm = false;
   /** Wie weit die Spinne gerade auf dem Boden aufsitzt und am Kardan hochgeschoben wird (m). */
   groundLift = 0;
 

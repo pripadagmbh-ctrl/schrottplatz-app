@@ -21,6 +21,7 @@ export class AudioSystem {
     bus.on("vehicleDumped", () => this.noise(0.5, 0.35));
     bus.on("dayPhaseChanged", ({ phase }) => { if (phase === "evening") this.chime([440, 554, 659], 0.16); if (phase === "work") this.chime([392, 523], 0.12); });
     bus.on("missionCompleted", () => this.chime([659, 784, 988, 1319], 0.09));
+    bus.on("partTorn", ({ kg }) => { this.noise(0.4, 0.5); this.tone(90, 0.3, "sawtooth", Math.min(0.35, 0.15 + kg / 600)); });
   }
 
   /** Beim ersten Nutzer-Input rufen. */
