@@ -11,7 +11,7 @@
         "type": "object",
         "required": ["id", "type", "tier", "params", "bonusEur", "fromDay", "weight"],
         "properties": {
-          "type": { "enum": ["deliver", "clear", "customer", "dismantle", "clean"] },
+          "type": { "enum": ["deliver", "clear", "customer", "dismantle", "press", "clean"] },
           "tier": { "enum": ["MVP", "V1", "LATER"] },
           "bonusEur": { "type": "number", "minimum": 0 },
           "fromDay": { "type": "integer", "minimum": 0 },

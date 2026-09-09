@@ -2,6 +2,22 @@
 
 Jede Architektur- oder Design-Entscheidung mit Datum und Begründung, damit nichts zweimal diskutiert wird (CLAUDE.md). Neueste oben.
 
+## 2026-09-09 — M6 Schritt 1: Zerlege- und Presse-Auftrag (gebaut, Gerätetest offen)
+
+Das Wrack lag seit E-047 ab Tag 1 auf dem Platz, ohne dass ein Auftrag dazu aufforderte. Grund: `dismantle_engine` stand auf `tier: V1` und `fromDay: 5`. Gezogen werden nur MVP-Aufträge, und die Gratis-Tage enden nach `unlockAfterDay` (3) — der Auftrag war **doppelt unerreichbar**. Patrick 09.09.: „baue Spiel zu Ende"; damit ist die in E-047 offen gelassene Entscheidung getroffen.
+
+| # | Entscheidung | Begründung | Alternative (verworfen) |
+|---|---|---|---|
+| E-051 | `dismantle_engine` wird **MVP, ab Tag 2**; neuer Auftrag `press_car` (250 €) **ab Tag 3** | Der Meilensteinplan (Kap. 22) sieht für M6 ohnehin einen „Presse-Auftrag Tag 3" vor. Tieflader ab Tag 1, Zerlegen Tag 2, Pressen Tag 3 — die drei Tage bauen aufeinander auf, und M5 bekommt im MVP endlich einen Zweck | (a) Tieflader erst ab Tag 5 kommen lassen — nähme dem MVP den ganzen M5-Inhalt; (b) alles lassen — das Auto bleibt Deko |
+| E-052 | Der Auftrag gilt als erfüllt, **sobald der Motor ab ist** — nicht erst beim Verkauf. Der Anzeigetext wurde entsprechend von „reiß ihn raus und verkauf ihn als Stahl" auf „Reiß den Motor aus dem Wrack" gekürzt | Zwei Bedingungen in einem Auftrag sind auf einer Handy-Karte nicht ablesbar, und das Verkaufen deckt bereits der `deliver`-Auftrag ab. Text und Prüfung sagen jetzt dasselbe | Erfüllung erst beim Verkauf des Motors |
+| E-053 | `supported()` prüft bei `dismantle`/`press`, ob bis zu diesem Tag überhaupt ein Kunde das Wrack liefert (`customers.compositeDefId`), und ob das Teil schon freigeschaltet ist (`unlockDay`) | Sonst kann wieder ein Auftrag gezogen werden, den niemand erfüllen kann. Die Prüfung liest die Daten, statt den Tag hart zu setzen | Feste Tageszahl im Code |
+
+**Neue Wächter-Sorte (`test/sim/mission_m6.test.ts`):** Die Tests prüfen nicht Mechanik, sondern **Erreichbarkeit** — bekommt der Spieler das überhaupt zu Gesicht? Genau das fanden Modultests nicht: Tieflader, Zerlegen und Presse waren einzeln gebaut und getestet, nur verband sie nichts. Geprüft wird jetzt: kein MVP-Auftrag startet nach dem letzten Kampagnentag; die Gratis-Tage haben jeden Tag volle `perDay` Aufträge im Topf; Zerlegen und Pressen liegen in den Gratis-Tagen; kein Auftrag verlangt ein Wrack vor der ersten Lieferung.
+
+Beim Schreiben fiel auf, dass zwei weitere MVP-Aufträge (`deliver_alu_large` ab Tag 6, `clear_intake_strict` ab Tag 8) hinter Tag 3 liegen. Das ist **kein Fehler** — sie sind Inhalt für zahlende Spieler, die Kampagne läuft 30 Tage. Der Wächter wurde entsprechend korrigiert, nicht die Daten.
+
+Auf dem Gerät zu prüfen: Steht an Tag 2 „Reiß den Motor aus dem Wrack" auf der Morgen-Karte, und springt der Stern, sobald der Motor fällt?
+
 ## 2026-09-09 — M5b: Presse (gebaut, Gerätetest offen)
 
 Der Rumpf wird in die Presse gelegt und über das Menü ausgelöst; sie quetscht in drei Stufen zu einem Stahlpaket. Baugruppen, die laut `composites.json` `blocksPress` tragen (Batterie, Motor), verhindern das.

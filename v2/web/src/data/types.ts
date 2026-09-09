@@ -61,7 +61,7 @@ export interface CustomerDef {
 export interface CustomersFile { vehicles: VehicleDef[]; customers: CustomerDef[]; privateNames: string[]; }
 
 export interface MissionDef {
-  id: string; type: "deliver" | "clear" | "customer" | "dismantle" | "clean"; tier: Tier;
+  id: string; type: "deliver" | "clear" | "customer" | "dismantle" | "press" | "clean"; tier: Tier;
   params: Record<string, number | string>; bonusEur: number; fromDay: number; toDay?: number; weight: number;
 }
 export interface MissionsFile { missions: MissionDef[]; perDay: number; starsPerMission: number; }

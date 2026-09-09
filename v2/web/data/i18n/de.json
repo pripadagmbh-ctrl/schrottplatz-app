@@ -57,7 +57,8 @@
     "clear_intake_strict": "Annahmefläche am Abend unter {kg} kg lose",
     "customer_fast": "Fertige {customer} in unter {minutes} min ab",
     "customer_fast_any": "Fertige einen Kunden in unter {minutes} min ab",
-    "dismantle_engine": "Reiß den Motor aus dem Wrack, verkauf ihn als Stahl",
+    "dismantle_engine": "Reiß den Motor aus dem Wrack",
+    "press_car": "Press ein Wrack zum Paket",
     "clean_day": "Kein Fehlwurf heute"
   },
   "menu": {

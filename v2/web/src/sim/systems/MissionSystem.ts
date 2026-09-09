@@ -11,7 +11,14 @@ import { Rng } from "@/shared/rng";
  *  deliver  — heute verkaufte kg des Materials mit Reinheit ≥ minPurity (je Verkauf gezaehlt) erreichen `kg`
  *  clear    — beim Feierabend liegen in der Zone hoechstens `maxLooseKg` lose
  *  customer — ein Kunde (bestimmter oder beliebiger) ist in ≤ maxMinutes vom Tor bis Tor durch
+ *  dismantle— das benannte Teil (`partId`) ist vom Wrack abgerissen (M6, Tag 2)
+ *  press    — ein Rumpf ist zum Paket gepresst (M6, Tag 3)
  * Erfuellt → Bonus (DaySystem.addBonus), ein Stern, `missionCompleted`. Tag 0 (Tutorial) hat keine Auftraege.
+ *
+ * dismantle und press setzen voraus, dass an dem Tag ueberhaupt ein Wrack auf dem Platz liegt — der Tieflader
+ * kommt ab Tag 1 (customers.json, Kunde `rehm`). `supported()` prueft das, damit nie ein Auftrag gezogen wird,
+ * den der Spieler gar nicht erfuellen kann. Genau daran ist der Zerlege-Auftrag vorher gescheitert: Er stand
+ * auf `fromDay: 5`, der MVP endet aber nach Tag 3 — er wurde nie ausgespielt (Entscheidung 09.09., E-047).
  */
 export interface ActiveMission { def: MissionDef; progress: number; target: number; done: boolean }
 
@@ -48,6 +55,18 @@ export class MissionSystem implements System {
         if ((who === undefined || who === d.customerId) && secondsOnSite <= Number(p["maxMinutes"]) * 60) { m.progress = 1; this.check(m); }
       }
     });
+    ctx.bus.on("partTorn", ({ partId }) => {
+      for (const m of this.active) {
+        if (m.done || m.def.type !== "dismantle") continue;
+        if (m.def.params["partId"] === partId) { m.progress = 1; this.check(m); }
+      }
+    });
+    ctx.bus.on("pressDone", () => {
+      for (const m of this.active) {
+        if (m.done || m.def.type !== "press") continue;
+        m.progress = 1; this.check(m);
+      }
+    });
   }
 
   /** Auftraege des Tages ziehen; Tag 0 bleibt leer (Tutorial). */
@@ -69,7 +88,20 @@ export class MissionSystem implements System {
     if (m.type === "deliver") return this.ctx.data.level.containers.some((c) => c.materialId === m.params["materialId"]);
     if (m.type === "clear") return this.ctx.data.level.zones.some((z) => z.id === m.params["zoneId"]);
     if (m.type === "customer") { const who = m.params["customerId"]; return who === undefined || this.ctx.data.customers.customers.some((c) => c.id === who && c.fromDay <= this.rolledDay); }
+    if (m.type === "dismantle" || m.type === "press") {
+      // Es muss die Wrack-Vorlage geben und der Tieflader muss sie schon gebracht haben koennen
+      const def = this.ctx.data.composites.composites.find((c) => c.id === m.params["compositeDefId"]);
+      if (!def || def.tier === "V1") return false;
+      if (!this.wreckPossibleBy(String(m.params["compositeDefId"]), this.rolledDay)) return false;
+      if (m.type !== "dismantle") return true;
+      return def.parts.some((p) => p.id === m.params["partId"] && p.unlockDay <= this.rolledDay);
+    }
     return false;
+  }
+
+  /** Bringt bis zu diesem Tag ueberhaupt ein Kunde dieses Wrack? (customers.json, Feld `compositeDefId`) */
+  private wreckPossibleBy(compositeDefId: string, day: number): boolean {
+    return this.ctx.data.customers.customers.some((c) => c.fromDay <= day && c.compositeDefId === compositeDefId);
   }
   private targetOf(def: MissionDef): number {
     if (def.type === "deliver") return Number(def.params["kg"]);

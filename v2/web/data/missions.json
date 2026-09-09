@@ -10,7 +10,8 @@
     { "id": "clear_intake_strict", "type": "clear", "tier": "MVP", "params": { "zoneId": "intake", "maxLooseKg": 150 }, "bonusEur": 150, "fromDay": 8, "weight": 2 },
     { "id": "customer_fast", "type": "customer", "tier": "MVP", "params": { "customerId": "hallmann", "maxMinutes": 3 }, "bonusEur": 150, "fromDay": 2, "weight": 2 },
     { "id": "customer_fast_any", "type": "customer", "tier": "MVP", "params": { "maxMinutes": 4 }, "bonusEur": 120, "fromDay": 3, "weight": 2 },
-    { "id": "dismantle_engine", "type": "dismantle", "tier": "V1", "params": { "compositeDefId": "car_compact", "partId": "engine", "sellAs": "steel" }, "bonusEur": 200, "fromDay": 5, "weight": 2 },
+    { "id": "dismantle_engine", "type": "dismantle", "tier": "MVP", "params": { "compositeDefId": "car_compact", "partId": "engine", "sellAs": "steel" }, "bonusEur": 200, "fromDay": 2, "weight": 3 },
+    { "id": "press_car", "type": "press", "tier": "MVP", "params": { "compositeDefId": "car_compact" }, "bonusEur": 250, "fromDay": 3, "weight": 3 },
     { "id": "clean_day", "type": "clean", "tier": "V1", "params": { "maxWrongSorts": 0 }, "bonusEur": 150, "fromDay": 3, "weight": 1 }
   ],
   "perDay": 3,
