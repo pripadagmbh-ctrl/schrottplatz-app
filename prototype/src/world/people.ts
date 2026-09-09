@@ -203,10 +203,12 @@ export class StaffManager {
    * räumt er auch schwere Brocken von der Fahrspur.
    */
   get tragkraft(): number {
-    return this.hasLoader ? 900 : 60;
+    return (this.hasLoader ? 900 : 60) * (this.getLiftBonus?.() ?? 1);
   }
-  /** Tempofaktor aus Bulldozer und Stapler — von main gesetzt */
+  /** Tempofaktor aus dem Bulldozer — von main gesetzt */
   getSpeedBonus: (() => number) | null = null;
+  /** Traglastfaktor aus dem Stapler — von main gesetzt */
+  getLiftBonus: (() => number) | null = null;
 
   /** Radlader vorhanden? Wird vom Upgrade-System gesetzt. */
   private _hasLoader = false;
@@ -653,7 +655,9 @@ export class StaffManager {
     let best: (typeof this.items.items)[number] | null = null;
     let bestD = Infinity;
     for (const it of this.items.items) {
-      if (it.massKg > 60) continue;
+      // Was er heben kann, hängt am Ausbau: von Hand nur Kleinteile, mit
+      // Stapler auch schwerere Stücke, mit Radlader ganze Brocken.
+      if (it.massKg > this.tragkraft) continue;
       const ziel = StaffManager.BOX_FOR_MATERIAL[it.materialId];
       if (!ziel) continue;
       if (!it.body.isValid() || !it.body.isDynamic()) continue;

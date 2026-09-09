@@ -472,8 +472,9 @@ async function main(): Promise<void> {
       buero.setStage(ausbau.has("hall") ? "hall" : "office");
       setzeGebaeudeHindernisse(buero.footprints());
     }
-    // dozer, forklift, magnet, boom und press wirken über Abfragen an
-    // anderer Stelle — hier ist nichts einzuschalten
+    if (id === "magnet") account.hasMagnet = true;
+    // dozer, forklift, boom und press wirken über Abfragen an anderer
+    // Stelle — hier ist nichts einzuschalten
   };
   for (const u of UPGRADES) if (ausbau.has(u.id)) wendeAn(u.id);
   // Baggerausbau und größere Presse wirken über diese Abfragen

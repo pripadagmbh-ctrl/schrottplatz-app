@@ -1,6 +1,13 @@
 import { describe, it, expect } from "vitest";
 import * as THREE from "three";
-import { STATIC_OBSTACLES, hitsObstacle, slideAround } from "../src/world/obstacles";
+import {
+  STATIC_OBSTACLES,
+  BUILDING_HUT,
+  hitsObstacle,
+  slideAround,
+  setBuildingObstacles,
+} from "../src/world/obstacles";
+import { WEIGH_X, WEIGH_Z } from "../src/world/yard";
 import {
   CLAW_OPEN_SPLAY,
   CLAW_SEGMENTS,
@@ -50,9 +57,26 @@ describe("Feste Bauten", () => {
 
   it("führt die erwarteten Bauwerke", () => {
     const labels = STATIC_OBSTACLES.map((o) => o.label).join(" ");
-    for (const pflicht of ["Südwand", "Westwand", "Ostwand", "Schere", "Wiegehäuschen", "Kaffeebude"]) {
+    for (const pflicht of ["Südwand", "Westwand", "Ostwand", "Schere", "Kaffeebude"]) {
       expect(labels, `${pflicht} fehlt in der Hindernisliste`).toContain(pflicht);
     }
+  });
+
+  it("stellt das Wiegehäuschen von Anfang an in den Weg", () => {
+    // Es steht nicht in der festen Liste, weil es beim Ausbau dem Büro
+    // weicht. Geprüft wird deshalb die Wirkung, nicht der Listeneintrag.
+    const treffer = hitsObstacle(WEIGH_X - 4.6, WEIGH_Z, 0);
+    expect(treffer?.label).toBe("Wiegehäuschen");
+  });
+
+  it("übernimmt den größeren Grundriss, sobald das Büro steht", () => {
+    setBuildingObstacles([
+      { x: WEIGH_X - 4.6, z: WEIGH_Z, hw: 3.85, hd: 2.45, top: 4.2, label: "Betriebsgebäude" },
+    ]);
+    // Drei Meter neben der Hausmitte: am Häuschen noch frei, am Büro belegt
+    expect(hitsObstacle(WEIGH_X - 4.6 + 3.0, WEIGH_Z, 0)?.label).toBe("Betriebsgebäude");
+    setBuildingObstacles(BUILDING_HUT);
+    expect(hitsObstacle(WEIGH_X - 4.6 + 3.0, WEIGH_Z, 0)).toBeNull();
   });
 
   it("lässt die Einfahrt offen", () => {

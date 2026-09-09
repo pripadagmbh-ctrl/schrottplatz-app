@@ -110,11 +110,11 @@ export const BUILDING_HUT: Obstacle[] = [
 ];
 
 /**
- * Bauwerke, die erst im Laufe des Spiels entstehen — Büro und Halle wachsen
- * aus dem Wiegehäuschen heraus. Sie werden beim Ausbau gesetzt und ersetzen
- * dabei die vorherige Liste.
+ * Bauwerke, die sich im Laufe des Spiels ändern: Aus dem Wiegehäuschen wird
+ * ein Büro, später mit Halle daneben. Zu Beginn gilt das Häuschen — so ist
+ * die Einfahrt auch ohne Ausbau richtig verstellt.
  */
-let dynamicObstacles: Obstacle[] = [];
+let dynamicObstacles: Obstacle[] = BUILDING_HUT;
 
 /** Gebäude-Hindernisse austauschen (Ausbaustufe geändert). */
 export function setBuildingObstacles(list: Obstacle[]): void {
