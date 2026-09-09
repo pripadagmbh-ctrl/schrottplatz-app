@@ -10,6 +10,21 @@ import { CLAW_COUNT, CLAW_SEGMENTS, clawPoint, clawTipDepth, clawTipRadius } fro
  * (Traverse + 10 Krallen-Kapseln) folgen jeden Schritt der Kinematik. Die Krallen bleiben beim Tragen
  * AKTIV — die Ladung ist über die Kollisionsgruppe HELD für sie unsichtbar (E-008), nicht abgeschaltet.
  *
+ * Zinken-Kontakt (E-043, Spinne-Schritt 1): Die Zinken bleiben kinematisch (Daumen = Spinne, keine Feder), beruehren
+ * lose Teile aber „weich": Ein Teil, das eine bewegte Zinke ueberlappt, bekommt einen begrenzten KRAFTSTOSS in
+ * Zinkenrichtung — es wird geschoben, nicht geschleudert — und die Schliessbewegung wird nach geschobener Masse
+ * gebremst (clawLoadFactor). Die Kollisionsgruppe der Krallen bleibt ohne LOOSE (E-025), der Schub ersetzt den Stoss.
+ * Drei Regeln aus der Messung vom 09.09., jede gegen einen konkreten Fehlschlag:
+ *   1. Treffer erst sammeln, dann anwenden — waehrend intersectionsWithShape laeuft, ist die Koerperliste
+ *      ausgeliehen; ein Schreibzugriff im Callback verletzt den Zustand (Teile im Boden, 111 m/s, Absturz im dispose).
+ *   2. Impuls statt setLinvel — ein gesetzter Geschwindigkeitswert ueberschreibt den Kontaktloeser, eingeklemmtes
+ *      Material wird sonst durch seine Nachbarn und den Boden gedrueckt.
+ *   3. Deckel auf das Gesamttempo — zehn Zinken zeigen in zehn Richtungen; ein Teil, das entlang jeder einzelnen
+ *      noch „langsam" ist, schaukelt sich sonst ueber die Schritte auf (196 m/s).
+ * Nicht geschoben werden: getragene Teile, Rumpfe von Wracks (die fuehrt das CompositeSystem per Zug).
+ * BEWUSST OFFEN: Taucht die Spinne dauerhaft IN einen Haufen ein, schleudern die kinematischen Koerper weiter
+ * Material weg (gemessen auch ohne diesen Schub). Dagegen hilft erst das Aufsetzen per Strahlen — Schritt 2.
+ *
  * Pflügwiderstand: Eine Sonde in Bewegungsrichtung der Spinne (nur wenn sie sich bewegt) summiert die Masse
  * der losen Teile, in die sie hineinfährt → Faktor auf die Armachsen. Senkt man die offene Spinne über einen
  * Haufen, gibt es keinen Widerstand bis zum Kontakt (Gerätetest 02.09., Befund 3).
@@ -35,6 +50,13 @@ export class ExcavatorColliders implements System {
   /** Handles der gerade gehaltenen Teile — die zählen nicht als Widerstand */
   heldHandles = new Set<number>();
   lastPlowMassKg = 0;
+  /** Zinken-Kontakt: Mittelpunkte der Kapseln im vorigen Schritt (Welt), fuer die Zinkengeschwindigkeit */
+  private prevMid: Vec3[] = []; private prevMidInit = false;
+  lastPushedKg = 0;
+  /** Treffer eines Schritts (wiederverwendet, keine Allokation): Handle + Zinkenrichtung + Zinkentempo */
+  private hits: { h: number; dx: number; dy: number; dz: number; mag: number }[] = [];
+  private hullHandles = new Set<number>();
+  private cc!: Record<string, number | string>;
 
   init(ctx: SimContext): void {
     this.ex = ctx.get<ExcavatorSystem>("excavator");
@@ -51,6 +73,8 @@ export class ExcavatorColliders implements System {
     this.grapple = kin();
     w.createCollider(RAPIER.ColliderDesc.cylinder(Number(b["palmHalfHeight"]), Number(b["palmRadius"])).setTranslation(0, this.palmY, 0).setCollisionGroups(COLLISION.excavator), this.grapple);
     for (let i = 0; i < CLAW_COUNT * 2; i++) this.claws.push(w.createCollider(RAPIER.ColliderDesc.capsule(0.16, 0.1).setCollisionGroups(COLLISION.excavator).setFriction(0.35), this.grapple));
+    this.cc = ctx.data.balancing.clawContact;
+    for (let i = 0; i < CLAW_COUNT * 2; i++) this.prevMid.push({ x: 0, y: 0, z: 0 });
     this.sync(ctx, 0);
   }
 
@@ -86,7 +110,70 @@ export class ExcavatorColliders implements System {
     // sie lose Teile nicht mehr — eine kinematische Zinke, die durch ein Teil faehrt, schleudert es sonst weg (E-025).
     const raking = s.grapple < Number(b["clawRakeMaxClosure"] ?? 0.1);
     if (raking !== this.raking) { this.raking = raking; const g = raking ? COLLISION.excavator : COLLISION.clawsClosed; for (const c of this.claws) c.setCollisionGroups(g); }
-    if (dt > 0) this.updatePlow(ctx, dt);
+    if (dt > 0) { this.pushLoose(ctx, dt); this.updatePlow(ctx, dt); }
+  }
+
+  /**
+   * Weicher Zinken-Kontakt (E-043): fuer jede Kapsel die Bewegung seit dem letzten Schritt bestimmen; lose Teile, die sie
+   * ueberlappt, bekommen diese Geschwindigkeit (auf pushMaxMs gekappt, nur die Komponente in Zinkenrichtung, nie nach unten
+   * unter Bodenniveau). Die geschobene Masse bremst das Schliessen: Faktor 1 − kg/brakeRefKg, mindestens brakeMin.
+   * Bewusst kinematisch: der Daumen bleibt die Spinne; ein Teil, das nicht ausweichen kann, wird ueberlappt statt gequetscht.
+   */
+  private pushLoose(ctx: SimContext, dt: number): void {
+    const w = ctx.physics.world; const c = this.cc;
+    const vMax = Number(c["pushMaxMs"] ?? 1.5), minMove = Number(c["minClawSpeedMs"] ?? 0.05);
+    let pushedKg = 0;
+    const seen = new Set<number>();
+    // Treffer erst SAMMELN, danach anwenden: Waehrend intersectionsWithShape laeuft, ist die Koerperliste an Rapier
+    // ausgeliehen; ein Schreibzugriff im Callback verletzt den Zustand (Messung 09.09.: Teile im Boden, 111 m/s,
+    // "attempted to take ownership of Rust value while it was borrowed" beim dispose).
+    const hits = this.hits; hits.length = 0;
+    // Rumpfe von Wracks bleiben aussen vor: Eine Spinne schiebt kein 900-kg-Auto, und wer daran zerrt, wird vom
+    // CompositeSystem gefuehrt (Zug statt Schub). Sonst verschoebe der Zinken-Kontakt das Abreissen von Baugruppen.
+    const hulls = this.hullHandles; hulls.clear();
+    for (const st of ctx.world.composites.values()) { const it = ctx.world.items.get(st.hullItemId); if (it?.bodyHandle !== undefined) hulls.add(it.bodyHandle); }
+    for (let i = 0; i < this.claws.length; i++) {
+      const col = this.claws[i]!; const t = col.translation(); const prev = this.prevMid[i]!;
+      if (this.prevMidInit) {
+        let vx = (t.x - prev.x) / dt, vy = (t.y - prev.y) / dt, vz = (t.z - prev.z) / dt;
+        const sp = Math.hypot(vx, vy, vz);
+        if (sp > minMove && sp < 30) { // Teleport (Laden, Tests) schiebt nichts
+          if (sp > vMax) { vx *= vMax / sp; vy *= vMax / sp; vz *= vMax / sp; }
+          const mag = Math.hypot(vx, vy, vz), dx = vx / mag, dy = vy / mag, dz = vz / mag;
+          w.intersectionsWithShape(t, col.rotation(), col.shape, (other) => {
+            const b = other.parent(); if (!b || !b.isDynamic() || seen.has(b.handle) || this.heldHandles.has(b.handle) || hulls.has(b.handle)) return true;
+            if (!ctx.physics.itemOf(b.handle)) return true;
+            seen.add(b.handle); pushedKg += b.mass();
+            hits.push({ h: b.handle, dx, dy, dz, mag });
+            return true;
+          }, undefined, (GROUP.LOOSE << 16) | GROUP.LOOSE);
+        }
+      }
+      prev.x = t.x; prev.y = t.y; prev.z = t.z;
+    }
+    const gain = Number(c["pushGain"] ?? 0.35);
+    for (const hit of hits) {
+      const b = ctx.physics.safeBody(hit.h); if (!b) continue;
+      const v = b.linvel();
+      // Nur nachschieben, wenn das Teil in Zinkenrichtung langsamer ist als die Zinke. IMPULS statt setLinvel: ein
+      // gesetzter Geschwindigkeitswert ueberschreibt jeden Schritt das Ergebnis des Kontaktloesers, eingeklemmtes
+      // Material wird dann durch seine Nachbarn gedrueckt. Ein Kraftstoss laesst den Loeser gegenhalten — Material,
+      // das nicht ausweichen kann, bleibt liegen und bremst stattdessen das Schliessen (clawLoadFactor).
+      // Deckel auf das GESAMTTEMPO, nicht nur auf die Komponente entlang dieser Zinke: zehn Zinken zeigen in zehn
+      // Richtungen, und ein Teil, das entlang jeder einzelnen noch „langsam" ist, wuerde sich sonst ueber die Schritte
+      // aufschaukeln (Messung 09.09.: 196 m/s im Haufen).
+      if (Math.hypot(v.x, v.y, v.z) > vMax * Number(c["pushSpeedCapFactor"] ?? 1.5)) continue;
+      const along = v.x * hit.dx + v.y * hit.dy + v.z * hit.dz;
+      if (along >= hit.mag) continue;
+      const dv = Math.min(hit.mag - along, vMax) * gain, m = b.mass();
+      let iy = hit.dy * dv * m;
+      if (iy < 0 && b.translation().y < 0.35) iy = 0; // knapp ueber dem Boden nie nach unten stossen
+      b.applyImpulse({ x: hit.dx * dv * m, y: iy, z: hit.dz * dv * m }, true);
+    }
+    this.prevMidInit = true;
+    this.lastPushedKg = pushedKg;
+    const target = clamp(1 - pushedKg / Number(c["brakeRefKg"] ?? 600), Number(c["brakeMin"] ?? 0.35), 1);
+    this.ex.clawLoadFactor += (target - this.ex.clawLoadFactor) * Math.min(dt * 8, 1);
   }
 
   /** Je zwei Kapseln bilden die Sichel jeder Kralle nach (excavator.ts:964-985). clawPoint rechnet ab Kardangelenk (CLAW_RING_Y). */

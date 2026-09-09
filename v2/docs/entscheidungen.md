@@ -2,6 +2,22 @@
 
 Jede Architektur- oder Design-Entscheidung mit Datum und Begründung, damit nichts zweimal diskutiert wird (CLAUDE.md). Neueste oben.
 
+## 2026-09-09 — Spinne Schritt 1: weicher Zinken-Kontakt (gebaut, Gerätetest offen)
+
+Nach der Rücknahme von Spinne 2.0 (E-042) bleibt die Steuerung **kinematisch**; Physik kommt nur noch als *Wirkung* dazu, in einzeln abgenommenen Schritten. Schritt 1 ist der Kontakt der Zinken mit losem Material.
+
+| # | Entscheidung | Begründung | Alternative (verworfen) |
+|---|---|---|---|
+| E-043 | Bewegte Zinken geben losen Teilen, die sie überlappen, einen **Kraftstoß** in Zinkenrichtung (höchstens `pushMaxMs` 1,5 m/s, davon Anteil `pushGain` 0,35 — alle SW); die geschobene Masse **bremst das Schließen** (`clawLoadFactor`, bis `brakeMin` 0,35 bei `brakeRefKg` 600 kg). Die Krallen bleiben ohne Kollision mit losem Material (E-025 gilt weiter) — der Schub ersetzt den Stoß | Patrick 09.09.: Material soll geschoben, nicht geschleudert oder „zusammengesogen" werden, und schweres Material soll spürbar sein. Ein Kraftstoß erlaubt dem Kontaktlöser gegenzuhalten: eingeklemmtes Material weicht nicht aus, sondern bremst die Spinne | Krallen wieder mit losem Material kollidieren lassen (E-025 hatte genau das verworfen: kinematische Zinke = unendliche Masse, schleudert) |
+| E-044 | Treffer werden erst **gesammelt** und nach der Abfrage angewendet | Während `intersectionsWithShape` läuft, ist Rapiers Körperliste ausgeliehen. Ein Schreibzugriff im Callback verletzt den Zustand: Messung 09.09. ergab 44 von 150 Teilen unter dem Boden, Geschosse mit 111 m/s und einen Absturz beim `dispose` („attempted to take ownership of Rust value while it was borrowed") | Direkt im Callback schreiben (war die erste Fassung) |
+| E-045 | **Impuls statt `setLinvel`**, plus Deckel auf das Gesamttempo (`pushSpeedCapFactor` 1,5 × `pushMaxMs`, SW) | Ein gesetzter Geschwindigkeitswert überschreibt jeden Schritt das Ergebnis des Kontaktlösers — Material pflügt sich dann durch seine Nachbarn und den Boden. Und weil zehn Zinken in zehn Richtungen zeigen, reicht eine Grenze *je Zinkenrichtung* nicht: ein Teil, das entlang jeder einzelnen noch langsam ist, schaukelte sich über die Schritte auf 196 m/s auf | Nur die Komponente entlang der Zinke begrenzen |
+| E-046 | **Rümpfe von Wracks** werden nie geschoben und zählen nicht in die Bremse | Eine Spinne schiebt kein 900-kg-Auto; wer daran zerrt, wird vom CompositeSystem per Zug geführt (E-035). Ohne die Ausnahme verschob der Schub das Abreißen der Baugruppen (Motor-Test riss die Batterie) | Schub nach Masse abschwächen (löst die Reihenfolge im Zerlegen nicht) |
+| — | **Bewusst offen:** Taucht die Spinne dauerhaft *in* einen Haufen ein, schleudern die kinematischen Körper weiterhin Material weg. Gemessen 09.09.: das passiert auch **ohne** diesen Schub (131 m/s bei reiner Bremse, 9,9 m/s im Normalbetrieb) — es ist ein Altbestand, kein Rückschritt | Dagegen hilft nur, das Eintauchen selbst zu verhindern: Aufsetzen per Strahlen unter jeder Zinke = Schritt 2 | Jetzt schon nachbessern (verschöbe zwei Wirkungen in einen Abnahmeschritt) |
+
+Abnahmekriterien (Tests `test/sim/clawcontact.test.ts`): Ein Teil am Korbrand wird beim Schließen nach innen geschoben (≥ 0,15 m) oder gegriffen, dabei nie schneller als 3 m/s, nie im Boden, nie vom Platz, und der Schließfaktor sinkt unter 1. Ein Griff auf einen 60-Teile-Haufen: kein Teil über 6 m/s, keines im Boden, keines vom Platz, mindestens ein Teil gefasst.
+
+Auf dem Gerät zu prüfen: Fühlt sich schweres Material beim Schließen spürbar schwerer an, und wird Material am Korbrand hineingeschoben statt weggeschossen?
+
 ## 2026-09-09 — Spinne 2.0, Lieferung 1 — **zurückgenommen** (Patrick, iPad-Test 09.09.)
 
 | # | Entscheidung | Begründung | Alternative (verworfen) |

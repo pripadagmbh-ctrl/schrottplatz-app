@@ -33,6 +33,8 @@ export class ExcavatorSystem implements System {
   driveVel = 0; cabVel = 0; boomVel = 0; stickVel = 0;
   /** von außen gesetzt (GripSystem, ExcavatorColliders) */
   carriedMassKg = 0; carriedCount = 0; plowFactor = 1;
+  /** Zinken-Kontakt (E-043): Schliessbremse 0..1, von ExcavatorColliders gesetzt — Zinken, die Teile schieben, schliessen langsamer */
+  clawLoadFactor = 1;
   /** Tiefe des untersten Punkts der Ladung unter dem Kardan (m), vom GripSystem gesetzt; 0 = leer */
   carriedBottomM = 0;
   /** Bodenkontakt der Krallen (für Audio/HUD) */
@@ -133,7 +135,7 @@ export class ExcavatorSystem implements System {
     // Während des Snaps wartet die Spinne (Briefing: „gleiten … bevor die Spinne schließt"), bleibt aber im Zustand „schließt".
     const closeT = Number(b["closeTimeS"]), openT = Number(b["openTimeS"]);
     const g = clamp(c.grapple, -1, 1);
-    const rate = this.snapT > 0 && g > 0 ? 0 : g > 0 ? (g * dt) / closeT : g < 0 ? (g * dt) / openT : 0;
+    const rate = this.snapT > 0 && g > 0 ? 0 : g > 0 ? (g * dt * this.clawLoadFactor) / closeT : g < 0 ? (g * dt) / openT : 0;
     s.grapple = clamp(s.grapple + rate, 0, 1);
     if (g !== 0) this.grappleHold = g > 0;
     this.closing = g > 0 || (this.grappleHold && s.grapple > 0.5);

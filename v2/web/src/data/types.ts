@@ -98,6 +98,8 @@ export interface BalancingFile {
   tutorial: Record<string, number | string>;
   /** M5: Zerlegung (Briefing Kap. 8) */
   composites: Record<string, number | string>;
+  /** Spinne Schritt 1 (E-043): weicher Zinken-Kontakt */
+  clawContact: Record<string, number | string>;
 }
 
 export type I18nFile = Record<string, unknown>;

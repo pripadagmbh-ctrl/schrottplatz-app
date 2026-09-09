@@ -1,6 +1,8 @@
 # Bagerana v2 — Spur A (Web)
 
-Neuaufbau nach `../docs/02_Briefing.md` (Kap. 17 Architektur, Kap. 22 Meilensteine). Stand: **M5a — Verbundteile: Zerlegen** (Pkw vom Tieflader, Baugruppen abreißen) — gebaut, Gerätetest offen. Spinne 2.0 (E-038) wurde am 09.09. zurückgenommen (E-042).
+Neuaufbau nach `../docs/02_Briefing.md` (Kap. 17 Architektur, Kap. 22 Meilensteine). Stand: **Spinne Schritt 1 — weicher Zinken-Kontakt** (E-043–E-046) auf Basis M5a. Spinne 2.0 (E-038) wurde am 09.09. zurückgenommen (E-042); die Steuerung bleibt kinematisch, Physik kommt nur als Wirkung dazu, in einzeln abgenommenen Schritten.
+
+**Offen:** Am Pkw-Wrack lässt sich nichts abreißen (Patrick, iPad 09.09.) — M5a-Zerlegen ist auf seinen Wunsch zurückgestellt, nicht behoben. Als Nächstes Spinne Schritt 2: Aufsetzen auf Haufen und Boden per Strahlen unter jeder Zinke, damit die Spinne nicht mehr eintaucht.
 
 ## Befehle
 

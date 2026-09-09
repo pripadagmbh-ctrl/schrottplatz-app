@@ -14,7 +14,8 @@
     "assist",
     "vehicles",
     "tutorial",
-    "composites"
+    "composites",
+    "clawContact"
   ],
   "properties": {
     "physics": {
@@ -251,6 +252,17 @@
         "disengageRadiusM",
         "unloadOffsetM",
         "firstWreckDay"
+      ]
+    },
+    "clawContact": {
+      "type": "object",
+      "required": [
+        "pushMaxMs",
+        "minClawSpeedMs",
+        "pushGain",
+        "pushSpeedCapFactor",
+        "brakeRefKg",
+        "brakeMin"
       ]
     }
   }
