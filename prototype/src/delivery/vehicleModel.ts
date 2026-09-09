@@ -15,6 +15,8 @@ import { BED_HALF_W } from "./routes";
 export interface VehicleModelContext {
   kind: string;
   bedLen: number;
+  /** Schrotthändler fahren ihren eigenen Ladekran mit */
+  withCrane?: boolean;
   group: THREE.Group;
   bedGroup: THREE.Group;
   world: RAPIER.World;
@@ -25,6 +27,85 @@ export interface VehicleModelContext {
 /** Die beweglichen Teile, die der Ablauf danach ansteuert. */
 export interface VehicleModelParts {
   tailGate: { hinge: THREE.Group; mesh: THREE.Mesh; body: RAPIER.RigidBody } | null;
+  /** Drehbare Kransäule — der Ablauf schwenkt sie beim Andocken zur Seite */
+  crane: THREE.Group | null;
+}
+
+/**
+ * Ladekran hinter dem Fahrerhaus, wie ihn Schrotthändler auf dem LKW haben.
+ *
+ * Er lädt nichts ab — das macht der Spieler. Er steht da, weil ein
+ * Schrotthändler ohne Kran nicht nach Schrotthändler aussieht. Beim Andocken
+ * schwenkt der Ausleger zur Seite, damit er nicht über der Ladefläche hängt und
+ * dem Baggerfahrer im Weg ist.
+ *
+ * Zurückgegeben wird die Säule: Alles darüber dreht mit, der Sockel bleibt stehen.
+ */
+function buildCrane(v: VehicleModelContext, dark: THREE.MeshStandardMaterial): THREE.Group {
+  const stahl = new THREE.MeshStandardMaterial({ color: 0x6d7276, roughness: 0.7, metalness: 0.5 });
+  const gelb = new THREE.MeshStandardMaterial({ color: 0xc9a227, roughness: 0.6, metalness: 0.3 });
+  // Sockel: sitzt fest auf dem Rahmen, direkt hinter der Kabine
+  const sockelZ = v.bedLen / 2 + 0.05;
+  const sockel = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.34, 0.7), dark);
+  sockel.position.set(0, 1.05, sockelZ);
+  sockel.castShadow = true;
+  v.group.add(sockel);
+  // Zwei Abstützungen seitlich — ohne die steht kein Kran auf einem LKW
+  for (const sx of [-1, 1]) {
+    const stuetze = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.5, 0.22), stahl);
+    stuetze.position.set(sx * 1.05, 0.95, sockelZ);
+    v.group.add(stuetze);
+    const fuss = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.2, 0.1, 8), dark);
+    fuss.position.set(sx * 1.05, 0.72, sockelZ);
+    v.group.add(fuss);
+  }
+
+  const saeule = new THREE.Group();
+  saeule.position.set(0, 1.22, sockelZ);
+  v.group.add(saeule);
+  const turm = new THREE.Mesh(new THREE.BoxGeometry(0.46, 1.15, 0.46), gelb);
+  turm.position.y = 0.58;
+  turm.castShadow = true;
+  saeule.add(turm);
+
+  // Hauptausleger: schräg nach hinten über die Ladefläche, wie im Transportzustand
+  const ausleger = new THREE.Group();
+  ausleger.position.y = 1.05;
+  ausleger.rotation.x = 0.42;
+  saeule.add(ausleger);
+  const arm1 = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 2.5), gelb);
+  arm1.position.z = -1.15;
+  arm1.castShadow = true;
+  ausleger.add(arm1);
+  // Knickarm: eingeklappt, zeigt wieder nach unten — so fahren die Dinger herum
+  const knick = new THREE.Group();
+  knick.position.z = -2.3;
+  knick.rotation.x = -1.15;
+  ausleger.add(knick);
+  const arm2 = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.24, 1.9), gelb);
+  arm2.position.z = -0.9;
+  arm2.castShadow = true;
+  knick.add(arm2);
+  // Hydraulikzylinder am Hauptarm — das Detail, das den Kran erst glaubhaft macht
+  const zylinder = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 1.3, 8), stahl);
+  zylinder.rotation.x = Math.PI / 2 - 0.25;
+  zylinder.position.set(0, -0.26, -0.75);
+  ausleger.add(zylinder);
+  // Kleiner Sortiergreifer an der Spitze
+  const greifer = new THREE.Group();
+  greifer.position.z = -1.75;
+  knick.add(greifer);
+  const kopf = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.22, 8), stahl);
+  greifer.add(kopf);
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2;
+    const schale = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.42, 0.14), dark);
+    schale.position.set(Math.cos(a) * 0.17, -0.28, Math.sin(a) * 0.17);
+    schale.rotation.z = -Math.cos(a) * 0.45;
+    schale.rotation.x = Math.sin(a) * 0.45;
+    greifer.add(schale);
+  }
+  return saeule;
 }
 
 function buildCarAndTrailer(
@@ -139,7 +220,7 @@ export function buildVehicleModel(v: VehicleModelContext): VehicleModelParts {
   const bedMat = new THREE.MeshStandardMaterial({ color: 0x5c6166, roughness: 0.7, metalness: 0.4 });
 
   // Was der Ablauf danach ansteuert, wird hier gesammelt und zurückgegeben
-  const teile: VehicleModelParts = { tailGate: null };
+  const teile: VehicleModelParts = { tailGate: null, crane: null };
 
   if (v.kind === "pkw") {
     buildCarAndTrailer(v, paint, dark, bedMat);
@@ -265,6 +346,8 @@ export function buildVehicleModel(v: VehicleModelContext): VehicleModelParts {
       }
     }
   }
+
+  if (v.withCrane) teile.crane = buildCrane(v, dark);
 
   return teile;
 }

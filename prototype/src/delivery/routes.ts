@@ -135,3 +135,5 @@ export const TIP_ANGLE = THREE.MathUtils.degToRad(58); // (SW) steil genug für 
  */
 export const TIP_CREEP_M = 3.2;
 export const TIP_CREEP_SPEED = 1.1; // m/s — Schritttempo, damit man das Abrutschen sieht
+/** Wie weit der Händlerkran beim Andocken zur Seite schwenkt (aus dem Weg). */
+export const CRANE_SWING = THREE.MathUtils.degToRad(78);

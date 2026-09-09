@@ -44,6 +44,7 @@ import {
   TIP_ANGLE,
   TIP_CREEP_M,
   TIP_CREEP_SPEED,
+  CRANE_SWING,
 } from "./routes";
 
 type Phase =
@@ -88,6 +89,10 @@ class DeliveryVehicle {
   private phaseT = 0;
   private tip = 0;
   cargo: Cargo = { items: [], car: null };
+  /** Ladekran der Händler — nur Bild, schwenkt beim Andocken zur Seite */
+  private crane: THREE.Group | null = null;
+  private craneSide = 1;
+  private craneSwing = 0;
   /** Restweg des gekippten Anziehens (Phase tipCreep) */
   private creepLeft = 0;
   /** true, solange die Mulde waehrend der Abfahrt noch heruntergefahren wird */
@@ -265,6 +270,11 @@ class DeliveryVehicle {
     const teile = buildVehicleModel({
       kind: this.kind,
       bedLen: this.bedLen,
+      // Schrotthändler fahren ihren eigenen Ladekran mit — Gewerbe und
+      // Privatleute nicht. Der Kran laedt nichts ab, er gehoert zum Bild.
+      withCrane:
+        this.customer?.group === "haendler" &&
+        (this.kind === "kipper" || this.kind === "pritsche"),
       group: this.group,
       bedGroup: this.bedGroup,
       world: this.world,
@@ -272,6 +282,10 @@ class DeliveryVehicle {
       tailGate: null,
     });
     this.tailGate = teile.tailGate;
+    this.crane = teile.crane;
+    // Zu welcher Seite geschwenkt wird, entscheidet das Fahrzeug einmal —
+    // sonst schwenken alle gleich und es sieht nach Choreografie aus.
+    this.craneSide = Math.random() < 0.5 ? -1 : 1;
     scene.add(this.group);
     this.chassisBody = world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased());
     // Oberkante MUSS unter dem Muldenboden (0,99 m) liegen UND das Chassis darf
@@ -820,6 +834,21 @@ class DeliveryVehicle {
         }
         if (this.routeS >= this.routeLength(this.routeOut)) this.done = true;
         break;
+    }
+
+    // Ladekran: beim Andocken zur Seite schwenken, damit der Ausleger nicht ueber
+    // der Ladeflaeche haengt und dem Baggerfahrer die Sicht und den Weg nimmt.
+    if (this.crane) {
+      const amPlatz =
+        this.phase === "pauseBeforeUnload" ||
+        this.phase === "waitUnload" ||
+        this.phase === "waitLoad" ||
+        this.phase === "tipping" ||
+        this.phase === "tipHold";
+      const ziel = amPlatz ? this.craneSide * CRANE_SWING : 0;
+      // Langsam: ein Kran schwenkt nicht, er dreht sich gemaechlich
+      this.craneSwing += THREE.MathUtils.clamp(ziel - this.craneSwing, -dt * 0.5, dt * 0.5);
+      this.crane.rotation.y = this.craneSwing;
     }
 
     // Nach dem gekippten Anziehen sinkt die Mulde waehrend der Abfahrt, nicht im

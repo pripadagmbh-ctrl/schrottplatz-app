@@ -30,21 +30,25 @@ const BAUARTEN: Array<[string, number]> = [
   ["pkw", 2.4],
 ];
 
-function bauen(kind: string, bedLen: number): VehicleModelContext {
+function bauen(kind: string, bedLen: number, withCrane = false): VehicleModelContext {
   const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
   const ctx: VehicleModelContext = {
     kind,
     bedLen,
+    withCrane,
     group: new THREE.Group(),
     bedGroup: new THREE.Group(),
     world,
     sideWalls: [],
     tailGate: null,
   };
-  buildVehicleModel(ctx);
+  teileVomBau = buildVehicleModel(ctx);
   ctx.group.updateWorldMatrix(true, true);
   return ctx;
 }
+
+/** Ergebnis des letzten Bauvorgangs — der Kran kommt nur hierüber zurück. */
+let teileVomBau: ReturnType<typeof buildVehicleModel>;
 
 describe("Anlieferfahrzeuge", () => {
   for (const [kind, bedLen] of BAUARTEN) {
@@ -76,6 +80,37 @@ describe("Anlieferfahrzeuge", () => {
       expect(meshes, `${kind}: nur ${meshes} Meshes`).toBeGreaterThan(5);
     });
   }
+
+  it("ohne Händler kein Kran", () => {
+    bauen("kipper", 6.0, false);
+    expect(teileVomBau.crane).toBeNull();
+  });
+
+  it("der Händlerkran steht auf dem Fahrzeug, nicht im Boden", () => {
+    const v = bauen("kipper", 6.0, true);
+    const kran = teileVomBau.crane;
+    expect(kran, "Kran wurde nicht gebaut").not.toBeNull();
+    v.group.updateWorldMatrix(true, true);
+    const box = new THREE.Box3().setFromObject(kran!);
+    // Der Kran sitzt auf dem Rahmen — nichts davon darf unter den LKW ragen
+    expect(box.min.y, `Kran reicht bis y=${box.min.y.toFixed(2)}`).toBeGreaterThan(0.8);
+    // ... und er soll ein LKW-Kran bleiben, kein Baukran
+    expect(box.max.y, `Kran ${box.max.y.toFixed(2)} m hoch`).toBeLessThan(4.0);
+    // Eingeklappt liegt der Ausleger über der Ladefläche, also hinter der Säule
+    expect(box.min.z, "Ausleger zeigt nach hinten über die Fläche").toBeLessThan(2.0);
+  });
+
+  it("das Schwenken bringt den Ausleger zur Seite", () => {
+    const v = bauen("kipper", 6.0, true);
+    const kran = teileVomBau.crane!;
+    v.group.updateWorldMatrix(true, true);
+    const vorher = new THREE.Box3().setFromObject(kran).getCenter(new THREE.Vector3());
+    kran.rotation.y = THREE.MathUtils.degToRad(78);
+    v.group.updateWorldMatrix(true, true);
+    const nachher = new THREE.Box3().setFromObject(kran).getCenter(new THREE.Vector3());
+    // Quer versetzt statt nur gedreht: der Ausleger hängt danach neben dem LKW
+    expect(Math.abs(nachher.x - vorher.x), "Ausleger bleibt über der Fläche stehen").toBeGreaterThan(0.8);
+  });
 
   it("der PKW-Anhänger trägt seine Ladung dort, wo der Boden ist", () => {
     const v = bauen("pkw", 2.4);
