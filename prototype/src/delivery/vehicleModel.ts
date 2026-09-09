@@ -102,6 +102,17 @@ v: VehicleModelContext,
   deichsel.position.set(0, 0.66, v.bedLen + 0.85);
   v.group.add(deichsel);
 
+  // Die Ladeflaeche des Anhaengers. Ohne diese zwei Zeilen blieb `bedGroup` im
+  // Weltursprung haengen und wurde nie ans Fahrzeug gehaengt — der Rumpf der
+  // Funktion setzt sie erst weiter unten, und fuer den PKW wird vorher
+  // zurueckgesprungen. Die Ladung wird ueber `bedGroup.localToWorld()`
+  // platziert, landete also mitten auf dem Platz statt auf dem Anhaenger:
+  // Der Privatmann kam sichtbar ohne Schrott an und liess sich nicht abladen.
+  // Hoehe = Oberkante des Anhaengerbodens (0,86 + halbe Dicke), z = 0, weil der
+  // Boden hier von 0 bis bedLen reicht (beim LKW liegt er um bedLen/2 versetzt).
+  v.bedGroup.position.set(0, 0.9, 0);
+  v.group.add(v.bedGroup);
+
   // Räder: zwei am Anhänger, vier am Zugfahrzeug
   const radGeo = new THREE.CylinderGeometry(0.33, 0.33, 0.22, 12);
   radGeo.rotateZ(Math.PI / 2);

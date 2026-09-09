@@ -274,6 +274,15 @@ class DeliveryVehicle {
       RAPIER.ColliderDesc.cuboid(1.1, 0.42, (this.bedLen + 1.6) / 2).setTranslation(0, 0.5, 0.8),
       this.chassisBody
     );
+    if (kind === "pkw") {
+      // Das Zugfahrzeug steht vor dem Anhaenger und war bisher ohne Kollider —
+      // der Baggerarm fuhr hindurch. Masse und Lage nach dem Modell
+      // (Mitte bei bedLen/2 + 2,6, Laenge bis 5 m).
+      world.createCollider(
+        RAPIER.ColliderDesc.cuboid(0.95, 0.8, 2.5).setTranslation(0, 0.9, this.bedLen / 2 + 2.6),
+        this.chassisBody
+      );
+    }
     this.bedBody = world.createRigidBody(
       RAPIER.RigidBodyDesc.kinematicPositionBased().setCcdEnabled(true)
     );
