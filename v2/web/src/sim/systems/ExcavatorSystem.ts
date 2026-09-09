@@ -172,7 +172,10 @@ export class ExcavatorSystem implements System {
     // 0,34 m tiefer — frueher hob der Anschlag dann die ganze Spinne an („Hochbocken", geschlossen kam sie nicht mehr an den
     // Haufen, Ladung fuhr mit hoch; iPad-Test 08.09.). Jetzt duerfen die Spitzen beim Schliessen in Boden/Haufen eintauchen,
     // wie echte Zinken. Dazu die Unterkante einer mitgefuehrten Ladung (E-017).
-    const tipDepth = Math.max(clawTipDepth(CLAW_OPEN_SPLAY), this.carriedBottomM);
+    // Nachjustiert 09.09. (iPad: „Spinne versinkt im Boden"): Bezug ist die AKTUELLE Spreizung, die Spitzen duerfen aber
+    // hoechstens clawTipDipMaxM tiefer als der Boden — geschlossen hebt sich die Spinne also nur um (0,34 − dip) m statt 0,34.
+    const dip = Number(this.b["clawTipDipMaxM"] ?? 0.1);
+    const tipDepth = Math.max(clawTipDepth(CLAW_OPEN_SPLAY), clawTipDepth(this.splay(s)) - dip, this.carriedBottomM);
     const minTipY = tipDepth + Number(this.b["groundClearanceM"]);
     const maxLift = 0.6;
     let need = minTipY - this.tipY(s);

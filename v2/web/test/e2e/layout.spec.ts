@@ -35,7 +35,7 @@ for (const vp of viewports) {
     expect(await page.locator("#touch-layer").evaluate((el) => el.classList.contains("compact"))).toBe(vp.compact);
 
     const boxes: Box[] = await page.evaluate(() =>
-      ["btn-drive", "btn-rot-l", "btn-rot-r", "btn-camera", "tut-skip", "debug-box"].map((id) => {
+      ["btn-drive", "btn-rot-l", "btn-rot-r", "btn-camera", "btn-menu", "tut-skip", "debug-box"].map((id) => {
         const r = document.getElementById(id)!.getBoundingClientRect();
         return { id, x: r.x, y: r.y, w: r.width, h: r.height };
       }));

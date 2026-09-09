@@ -73,7 +73,16 @@ export class TouchAdapter {
       on(zone, "pointerdown", (e) => { const s = zone.dataset["zone"] === "left" ? this.left : this.right; if (s.pointerId !== null) return; this.beginStick(s, e); zone.setPointerCapture(e.pointerId); e.preventDefault(); });
       on(zone, "pointermove", (e) => this.moveStick(e));
       on(zone, "pointerup", (e) => this.endStick(e)); on(zone, "pointercancel", (e) => this.endStick(e));
+      on(zone, "lostpointercapture", (e) => this.endStick(e));
     }
+    // Sicherung gegen „Geister-Zeiger" (iPad-Test 09.09.: linker Stick blieb stehen, Oberwagen liess sich nicht mehr drehen):
+    // Verpasst Safari ein pointerup (Systemgeste, App-Wechsel, Multitouch-Abbruch), bliebe der Stick mit alter Zeiger-ID
+    // belegt und ignorierte jeden neuen Finger. Deshalb: kein Finger mehr auf dem Glas → alles loslassen. Das Touch-Ereignis
+    // zaehlt die echten Finger, unabhaengig von der Pointer-Buchfuehrung.
+    const docOn = (ev: string, fn: (e: Event) => void) => { document.addEventListener(ev, fn, { passive: true }); this.unsubs.push(() => document.removeEventListener(ev, fn)); };
+    const allUp = (e: Event) => { if ((e as TouchEvent).touches.length === 0) this.releaseAll(); };
+    docOn("touchend", allUp); docOn("touchcancel", allUp);
+    docOn("visibilitychange", () => { if (document.hidden) this.releaseAll(); });
     const hold = (id: string, set: (v: boolean) => void) => { const b = this.root.querySelector<HTMLElement>(`#${id}`)!; on(b, "pointerdown", (e) => { set(true); b.setPointerCapture(e.pointerId); e.preventDefault(); }); on(b, "pointerup", () => set(false)); on(b, "pointercancel", () => set(false)); };
     hold("btn-rot-l", (v) => (this.rotL = v)); hold("btn-rot-r", (v) => (this.rotR = v));
     const drive = this.root.querySelector<HTMLElement>("#btn-drive")!;
@@ -114,6 +123,11 @@ export class TouchAdapter {
     const s = this.left.pointerId === e.pointerId ? this.left : this.right.pointerId === e.pointerId ? this.right : null;
     if (!s) return;
     s.pointerId = null; s.x = 0; s.y = 0; s.el.hidden = true;
+  }
+  /** Alle Sticks, Halteknoepfe und Kamera-Zeiger loslassen (kein Finger mehr auf dem Glas / Seite versteckt). */
+  releaseAll(): void {
+    for (const s of [this.left, this.right]) { s.pointerId = null; s.x = 0; s.y = 0; s.el.hidden = true; }
+    this.rotL = false; this.rotR = false; this.freePointers.clear(); this.pinchDist = 0;
   }
   private setDrive(v: boolean): void { this.driveMode = v; this.driveIdleS = 0; this.root.querySelector("#btn-drive")!.classList.toggle("active", v); }
 

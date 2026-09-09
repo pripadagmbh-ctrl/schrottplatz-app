@@ -9,6 +9,7 @@ import { Hud } from "@/ui/Hud";
 import { DaySheet } from "@/ui/DaySheet";
 import { TutorialBanner } from "@/ui/TutorialBanner";
 import { BrokenSaveDialog } from "@/ui/BrokenSaveDialog";
+import { MenuPanel } from "@/ui/MenuPanel";
 import { AudioSystem } from "@/view/audio/AudioSystem";
 import { Persistence } from "./Persistence";
 import { GameLoop } from "./GameLoop";
@@ -59,6 +60,10 @@ async function boot(): Promise<void> {
     onStart: () => sim.day.startDay(), onNext: () => sim.day.nextDay(), onRestart: () => void persistence.restart(),
     onExport: () => persistence.export(), onImport: (f) => void persistence.import(f).then((ok) => { if (!ok) sim.bus.emit("toast", { text: "Datei ist kein Spielstand", kind: "bad" }); }),
   });
+  const menu = new MenuPanel(document.body, data.i18n as Record<string, unknown>, audio.muted, {
+    onNewGame: () => void persistence.restart(), onExport: () => persistence.export(), onToggleMute: () => audio.toggleMute(),
+    onImport: (f) => void persistence.import(f).then((ok) => { if (!ok) sim.bus.emit("toast", { text: "Datei ist kein Spielstand", kind: "bad" }); }),
+  });
   const banner = new TutorialBanner(document.body, data.i18n as Record<string, unknown>, () => sim.tutorial.skip());
   if (persistence.service.broken) new BrokenSaveDialog(document.body, data.i18n as Record<string, unknown>, { onRestart: () => void persistence.restart(), onImport: (f) => void persistence.import(f) });
 
@@ -69,7 +74,7 @@ async function boot(): Promise<void> {
   const loop = new GameLoop(sim.dt, data.balancing.physics.maxCatchUpSteps, {
     simStep: (dt) => {
       input.fill(sim.control, dt, sim.world.excavator.grapple);
-      if (sheet.open) resetControlFrame(sim.control); // Karte offen: Bagger steht
+      if (sheet.open || menu.open) resetControlFrame(sim.control); // Karte oder Menue offen: Bagger steht
       if (sim.control.actions.has("toggleDriveMode")) sim.world.excavator.driveMode = !sim.world.excavator.driveMode;
       // Kamera-Eingaben pro Bild sammeln — sie gehen an die Ansicht, nicht an die Simulation
       camFrame.camOrbit.dx += sim.control.camOrbit.dx; camFrame.camOrbit.dy += sim.control.camOrbit.dy; camFrame.camZoom += sim.control.camZoom;
