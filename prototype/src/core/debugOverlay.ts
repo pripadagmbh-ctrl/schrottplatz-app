@@ -4,6 +4,8 @@ export class DebugOverlay {
   visible = false;
   private fpsSmoothed = 60;
   private lastUpdate = 0;
+  private physGeglaettet = 0;
+  private bildGeglaettet = 0;
 
   constructor() {
     this.el = document.getElementById("debug")!;
@@ -27,10 +29,16 @@ export class DebugOverlay {
       /** renderer.info.render — was die Grafikkarte je Bild wirklich zu tun bekommt */
       calls: number;
       tris: number;
+      /** reine Arbeitszeit, unabhaengig vom 60/30-Riegel der Bildsynchronisation */
+      msPhysik: number;
+      msBild: number;
     }
   ): void {
     const fps = 1 / Math.max(frameDt, 1e-4);
     this.fpsSmoothed += (fps - this.fpsSmoothed) * 0.05;
+    // Arbeitszeiten schwanken je Bild stark — geglaettet sind sie ablesbar
+    this.physGeglaettet += (stats.msPhysik - this.physGeglaettet) * 0.08;
+    this.bildGeglaettet += (stats.msBild - this.bildGeglaettet) * 0.08;
     if (!this.visible) return;
     const now = performance.now();
     if (now - this.lastUpdate < 250) return;
@@ -42,6 +50,7 @@ export class DebugOverlay {
       // Die aussagekraeftige Zeile: nur bewegliche Teile koennen ueberhaupt schlafen
       `Beweglich: ${stats.dynamic} (wach: ${stats.dynAwake})<br />` +
       `Zeichenrufe: ${stats.calls} · ${(stats.tris / 1000).toFixed(0)}k Dreiecke<br />` +
+      `Arbeit: Physik ${this.physGeglaettet.toFixed(1)} ms · Bild ${this.bildGeglaettet.toFixed(1)} ms<br />` +
       `Gegriffen: ${stats.gripped} Obj / ${stats.grippedKg.toFixed(0)} kg`;
   }
 }

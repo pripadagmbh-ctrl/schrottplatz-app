@@ -732,6 +732,8 @@ async function main(): Promise<void> {
 
   // --- Hauptschleife ---
   let accumulator = 0;
+  let msPhysik = 0;
+  let msBild = 0;
   let lastTime = performance.now();
   let frameCount = 0;
   let labelsOn = true; // Zonen-Schilder sichtbar
@@ -810,11 +812,17 @@ async function main(): Promise<void> {
 
     accumulator += frameDt;
     let steps = 0;
+    // Reine Arbeitszeit messen, nicht den Bildabstand: Safari synchronisiert auf
+    // 60 Hz und faellt auf glatte 30 zurueck, sobald 16,7 ms nicht reichen.
+    // frameDt zeigt dann 34,0 ms, egal ob die Arbeit 18 oder 33 ms dauert —
+    // jede Verbesserung bliebe unsichtbar, bis sie die Schwelle unterbietet.
+    const tPhysik = performance.now();
     while (accumulator >= FIXED_DT && steps < MAX_STEPS_PER_FRAME) {
       stepOnce();
       accumulator -= FIXED_DT;
       steps++;
     }
+    msPhysik = performance.now() - tPhysik;
     if (steps === MAX_STEPS_PER_FRAME) accumulator = 0;
 
     items.syncMeshes();
@@ -828,7 +836,9 @@ async function main(): Promise<void> {
         return excavator.cabinBaseYaw;
       }
     );
+    const tBild = performance.now();
     renderer.render(scene, orbit.camera);
+    msBild = performance.now() - tBild;
 
     // --- HUD, Highlight, Ampel, Audio (pro Render-Frame) ---
     excavator.getSensorPosition(sensorPos);
@@ -962,6 +972,8 @@ async function main(): Promise<void> {
       grippedKg: grip.totalMassKg,
       calls: renderer.info.render.calls,
       tris: renderer.info.render.triangles,
+      msPhysik,
+      msBild,
     });
 
     input.endFrame();
