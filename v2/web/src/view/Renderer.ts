@@ -83,7 +83,12 @@ export class Renderer {
     this.scrap = new ScrapView(this.scene, data, Number(data.balancing.scrap["maxLooseItems"]) + 50);
     this.compositeView = new CompositeView(this.scene, data.composites.composites);
     const pz = level.zones.find((z) => z.id === "press");
-    if (pz) this.pressView = new PressView(this.scene, pz.rect);
+    if (pz) {
+      const pb = data.balancing.press;
+      this.pressView = new PressView(this.scene, pz.rect, {
+        innerW: Number(pb["innerW"]), innerD: Number(pb["innerD"]), wallH: Number(pb["wallH"]), plateT: Number(pb["plateT"]),
+      });
+    }
     const ex = data.balancing.excavator as Record<string, number | number[]>;
     this.excavator = new ExcavatorModel(this.scene, {
       boomLen: Number(ex["boomLenM"]), stickLen: Number(ex["stickLenM"]), boomPivot: ex["boomPivot"] as [number, number, number], grappleLink: Number(ex["grappleLinkM"]),
@@ -144,11 +149,11 @@ export class Renderer {
   }
 
   /** Zustand der Presse fuer die Anzeige (Stempel, Warnlampe) — wird von der App vor render() gesetzt. */
-  press = { progress: 0, running: false, blocked: false };
+  press = { lidAngle: 2.65, ramX: 0, running: false, blocked: false };
   private pressView: PressView | null = null;
 
   render(world: WorldState, alpha: number, frameDt: number, control?: ControlFrame): void {
-    this.pressView?.update(this.press.progress, this.press.running, this.press.blocked);
+    this.pressView?.update(this.press.lidAngle, this.press.ramX, this.press.running, this.press.blocked);
     this.scrap.update(world, alpha);
     this.compositeView.update(world, alpha);
     this.updateExcavator(alpha);

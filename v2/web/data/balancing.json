@@ -237,12 +237,23 @@
     "_src": "Spinne Schritt 1 (E-043, alle SW): Zinken schieben lose Teile mit hoechstens pushMaxMs (Kraftstoss, Anteil pushGain); wer schon schneller als pushMaxMs*pushSpeedCapFactor ist, bekommt keinen Schub mehr (Aufschaukeln, Messung 09.09.); geschobene Masse bremst das Schliessen bis brakeMin"
   },
   "press": {
-    "stageSeconds": 1.2,
-    "packHalf": [
-      0.8,
-      0.3,
-      0.4
+    "innerW": 6.0,
+    "innerD": 2.8,
+    "wallH": 1.9,
+    "plateT": 0.3,
+    "lidOpenAngle": 2.65,
+    "lidTimeS": 1.6,
+    "ramFwdTimeS": 3.0,
+    "ramHoldTimeS": 0.9,
+    "ramBackTimeS": 2.0,
+    "baleThicknessBase": 0.4,
+    "baleThicknessPerItem": 0.14,
+    "baleThicknessPerCar": 1.4,
+    "baleHalf": [
+      0.75,
+      0.42,
+      0.6
     ],
-    "_src": "Briefing Kap. 8.3: Paket 1,6 x 0,8 x 0,6 m (hier als Halbmasse 0,8/0,3/0,4). stageSeconds 1,2 (SW) — drei Quetschstufen, zusammen 3,6 s"
+    "_src": "Paketierpresse nach Prototyp `world/press.ts` (Design 29.08./02.09.2026): Muldenmasse dort 10 x 4 m — hier auf 6 x 2,8 m gekuerzt, damit die Einfuellkante vom Standplatz aus erreichbar bleibt (E-048). Zeiten, Klappenwinkel 2,65 rad und die Paketdicken-Formel unveraendert aus dem Prototyp uebernommen; baleHalf (SW) ist die Paketgroesse in v2"
   }
 }

@@ -89,7 +89,7 @@ async function boot(): Promise<void> {
       hud.update(sim.world, sim.vehicles.runs.some((r) => r.def.id === "rolloff"), sim.missions.active, sim.day.deliveriesFinished);
       sheet.update(); banner.update(sim.tutorial.state, performance.now()); persistence.tick(dt);
       const ps = sim.press.status();
-      renderer.press = { progress: ps.progress, running: ps.running, blocked: ps.loaded && ps.blockedBy.length > 0 };
+      renderer.press = { lidAngle: ps.lidAngle, ramX: ps.ramX, running: ps.running, blocked: ps.blockedBy.length > 0 };
       if (menu.open) menu.setPress(ps); // Knopftext nur solange das Menue sichtbar ist
     },
     render: (alpha, frameDt) => {

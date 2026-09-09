@@ -42,7 +42,7 @@ function aimAt(sim: Simulation, target: { x: number; y: number; z: number }, par
 describe("Verbundteile (CompositeSystem)", () => {
   it("Motor: Batterie zuerst, dann 2,4–3,0 s Zug → Stahlteil 210 kg in der Spinne, Rumpf 210 kg leichter", () => {
     const sim = newSim();
-    const st = sim.composites.spawn("car_compact", { x: 0, y: 0, z: 5 }, 0)!;
+    const st = sim.composites.spawn("car_compact", { x: 0, y: 0, z: -7 }, 0)!; // frei, seit die Presse noerdlich bei z 4,6 steht (E-052)
     sim.run(120); // setzen
     const hull = sim.world.items.get(st.hullItemId)!;
     const def = sim.composites.def("car_compact")!;

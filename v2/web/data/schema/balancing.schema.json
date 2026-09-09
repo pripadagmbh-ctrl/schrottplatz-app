@@ -278,8 +278,13 @@
     "press": {
       "type": "object",
       "required": [
-        "stageSeconds",
-        "packHalf"
+        "innerW",
+        "innerD",
+        "wallH",
+        "lidTimeS",
+        "ramFwdTimeS",
+        "ramBackTimeS",
+        "baleHalf"
       ]
     }
   }

@@ -7,7 +7,7 @@ import { makeT } from "./format";
  */
 export interface MenuActions { onNewGame(): void; onExport(): void; onImport(file: File): void; onToggleMute(): boolean; onToggleFollowCab(): boolean; onPress(): void }
 /** Zustand der Presse, wie ihn das Menue anzeigt (M5b) — kommt aus PressSystem.status(). */
-export interface PressMenuState { loaded: boolean; ready: boolean; blockedBy: string[]; running: boolean }
+export interface PressMenuState { items: number; wrecks: number; ready: boolean; blockedBy: string[]; running: boolean }
 
 export class MenuPanel {
   private readonly panel: HTMLElement; private readonly newBtn: HTMLButtonElement; private readonly muteBtn: HTMLButtonElement;
@@ -23,7 +23,7 @@ export class MenuPanel {
     const mk = (label: string) => { const b = document.createElement("button"); b.type = "button"; b.className = "menu-item"; b.textContent = label; return b; };
     this.newBtn = mk(t("menu.newGame")); const exp = mk(t("menu.export")); const imp = mk(t("menu.import")); this.muteBtn = mk("");
     this.setMute(muted); this.camBtn = mk(""); this.setFollow(followCab);
-    this.pressBtn = mk(""); this.setPress({ loaded: false, ready: false, blockedBy: [], running: false });
+    this.pressBtn = mk(""); this.setPress({ items: 0, wrecks: 0, ready: false, blockedBy: [], running: false });
     const file = document.createElement("input"); file.type = "file"; file.accept = "application/json,.json"; file.hidden = true;
     this.panel.append(head, this.pressBtn, this.newBtn, exp, imp, this.muteBtn, this.camBtn, file);
     this.pressBtn.addEventListener("pointerup", () => { if (!this.pressBtn.disabled) { this.actions.onPress(); this.panel.hidden = true; } });
@@ -53,15 +53,16 @@ export class MenuPanel {
    * Ein gesperrter Knopf ohne Begruendung laesst den Spieler raten (Briefing Kap. 14).
    */
   setPress(s: PressMenuState): void {
-    const key = `${s.loaded}:${s.ready}:${s.running}:${s.blockedBy.join(",")}`;
+    const key = `${s.items}:${s.wrecks}:${s.ready}:${s.running}:${s.blockedBy.join(",")}`;
     if (key === this.pressKey) return; this.pressKey = key;
     const namen: Record<string, string> = { battery: "Starterbatterie", engine: "Motor", tank: "Tank" };
     this.pressBtn.disabled = !s.ready || s.running;
     this.pressBtn.classList.toggle("dim", this.pressBtn.disabled);
+    const menge = s.wrecks ? `${s.items} Teile + ${s.wrecks} Wrack` : `${s.items} Teile`;
     if (s.running) this.pressBtn.textContent = "🗜️ Presse läuft …";
-    else if (!s.loaded) this.pressBtn.textContent = "🗜️ Presse auslösen — kein Wrack in der Presse";
+    else if (s.items + s.wrecks === 0) this.pressBtn.textContent = "🗜️ Presse auslösen — Mulde ist leer";
     else if (s.blockedBy.length) this.pressBtn.textContent = `🗜️ Presse verweigert — erst ausbauen: ${s.blockedBy.map((b) => namen[b] ?? b).join(", ")}`;
-    else this.pressBtn.textContent = "🗜️ Presse auslösen";
+    else this.pressBtn.textContent = `🗜️ Presse auslösen (${menge})`;
   }
 
   get open(): boolean { return !this.panel.hidden; }

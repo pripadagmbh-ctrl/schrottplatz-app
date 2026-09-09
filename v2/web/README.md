@@ -2,7 +2,7 @@
 
 Neuaufbau nach `../docs/02_Briefing.md` (Kap. 17 Architektur, Kap. 22 Meilensteine). Stand: **M5b — Presse** (E-048–E-050), auf Basis M5a und Spinne Schritt 1 (E-043–E-046). Spinne 2.0 (E-038) wurde am 09.09. zurückgenommen (E-042); die Steuerung bleibt kinematisch, Physik kommt nur als Wirkung dazu, in einzeln abgenommenen Schritten.
 
-**Presse (M5b):** Rumpf in die Presse legen, im Menü ☰ „Presse auslösen“ — drei Quetschstufen, dann ein Stahlpaket. Sie verweigert, solange Batterie oder Motor dranhängen, und sagt welches Teil im Weg ist. Sie steht in Reichweite des Baggers (E-048), nicht im Westen wie im Briefing.
+**Paketierpresse (M5b, nach Prototyp-Vorbild):** Mulde nördlich vom Bagger — losen Schrott mit der Spinne einfüllen, im Menü ☰ „Presse auslösen“: Deckelklappen schließen, der Stempel fährt längs durch und presst alles zu einem Paket. Sortenrein eingefüllt gibt ein sauberes Paket; ein Wrack mit Batterie oder Motor blockiert (E-052 bis E-055).
 
 **Zuletzt behoben (E-047):** Das Wrack lag 20,8 m vom Bagger entfernt im Zerlegebereich und war bei 9,2 m Reichweite unerreichbar. Der Tieflader hält jetzt an der Annahme und setzt es 7,2 m neben dem Bagger ab. Der Zerlegebereich steht dafür vorerst leer.
 
@@ -109,19 +109,4 @@ Steuerung im Browser: **Q/E** Oberwagen · **R/F** Hauptarm · **T/G** Stiel · 
 
 ## Nächster Meilenstein
 
-**Zuerst: M5 auf dem iPad abnehmen.** Der Meilensteinplan (Briefing Kap. 22) sagt, kein
-Meilenstein gilt als fertig, bevor Patrick das Abnahmekriterium auf dem Gerät geprüft hat. Für
-M5 lautet es: *ein Auto in unter 4 Minuten zerlegen, ohne Anleitung; die Presse verweigert mit
-Batterie.* Beide Änderungen vom 09.09. (Wrack-Ablage E-047, Presse E-048–E-050) sind
-gebaut und getestet, aber noch nicht auf dem Gerät gesehen.
-
-Danach **M6 — Vertical Slice Tag 0–3**: Tage 2–3 mit Kipper-Fuhren, Auftrag „Kunde",
-Presse-Auftrag Tag 3, Auto-Vorschau, Unlock-Karte (Attrappe), Stilpass 1 (Palette ΔE-geprüft,
-ACES, envMap, Kontaktschatten, Piktogramme, Schriften), Qualitätsstufen, Balancing-Runde.
-Abnahme: drei Tester spielen Tag 0–3 in 25–40 min, Konto Ende Tag 3 zwischen 5 500 und
-7 500 €, iPad ≥ 55 fps und nicht warm.
-
-**Offene Entscheidung vor M6:** Der Auftrag „Motor ausbauen" (`dismantle_engine`) steht auf
-`tier: V1`, `fromDay: 5` — im MVP wird er nie ausgespielt. Das Wrack liegt damit ab Tag 1 auf
-dem Platz, ohne dass ein Auftrag dazu auffordert. Entweder den Auftrag in den MVP ziehen
-(Umfang wächst) oder den Tieflader erst später kommen lassen. Das ist Patricks Entscheidung.
+**M5b — Presse und Zerlege-Auftrag**: Pkw/Traktor/Lkw als zerlegbare Objekte (Motor, Kat, Batterie, Reifen, Tank, Kabelbaum), Presse, Auftragstyp dismantle.

@@ -2,38 +2,40 @@
 
 Jede Architektur- oder Design-Entscheidung mit Datum und Begründung, damit nichts zweimal diskutiert wird (CLAUDE.md). Neueste oben.
 
+## 2026-09-09 — M5b: Paketierpresse nach Prototyp-Vorbild (gebaut, Gerätetest offen)
+
+Die erste v2-Fassung (Stempel von oben, nur für Wracks) ging am Kern vorbei — Patrick 09.09.: „die Presse ist ja Käse, schau im Originalspiel nach". Der Prototyp (`prototype/src/world/press.ts`, Design 29.08./02.09.2026) hat eine **Paketierpresse**: eine oben offene Mulde, in die mit der Spinne **loser Schrott** eingefüllt wird. Genau das konnte meine Fassung nicht.
+
+| # | Entscheidung | Begründung | Alternative (verworfen) |
+|---|---|---|---|
+| E-052 | Presse als **Mulde mit zwei Deckelklappen und Längsstempel**, Ablauf und Zahlen aus dem Prototyp übernommen: Klappen schließen (1,6 s) → Stempel fährt längs gegen die linke Stirnwand (3,0 s) → halten (0,9 s) → zurück (2,0 s) → Klappen auf (1,6 s); zugeschlagen wird auf halbem Stempelweg | Der Prototyp ist die vereinbarte Referenz, und seine Bauart trägt das eigentliche Spiel: aus losem Schrott Pakete machen. Ein Stempel von oben kann das nicht | Eigene Bauform beibehalten |
+| E-053 | **Klemmschutz statt echter Verformung** (Prototyp Kap. 6): Die Klappen halten über der Materialoberkante an (`lidLimit` aus der Schütthöhe), die Endposition des Stempels wächst mit der Menge (0,4 m + 0,14 m je Teil + 1,4 m je Wrack). Beide Werkzeuge sind kinematisch | Es wird nie mehr hineingedrückt, als hineinpasst — nichts verkeilt sich gegen eine Wand. Das Plattdrücken ist ein Zustandswechsel der Teile, keine Verformung; das spart Rechenzeit und sieht gleich aus | Material wirklich verformen |
+| E-054 | **Alles in der Kammer wird zu EINEM Paket**; das Material der schwersten Fraktion gibt dem Paket Namen und Farbe, die Reinheit wird gemeldet (`pressDone.purity`) | Prototyp-Regel: die Presse sortiert nicht. Wer sortenrein einlegt, bekommt ein sauberes Paket — daraus wird später der Preisunterschied. Der Ton unterscheidet schon jetzt: voller Akkord bei sortenrein, kurzer bei gemischt | Presse sortiert selbst |
+| E-055 | Mulde auf **6 × 2,8 m gekürzt** (Prototyp: 10 × 4 m) und **nördlich vom Bagger** bei 0/4,6 platziert statt südwestlich | Auf unserem Platz muss sie ohne Fahren zu befüllen sein (E-048); zwischen den Sortierboxen (Bogen r = 8,5 m aus E-006) ist das die einzige freie Fläche dieser Größe. Ein Test wacht darüber, dass die Muldenmitte in Reichweite bleibt | Originalmaße und Originalposition (dann nur mit Fahren erreichbar) |
+
+Abnahmekriterien (`test/sim/press.test.ts`, 6 Tests): Loser Schrott wird zu einem Paket, Masse bleibt erhalten; gemischt eingefüllt sinkt die Reinheit und das schwerste Material gewinnt; ein Wrack mit Batterie oder Motor blockiert und die Presse nennt das Teil; ein ausgebautes Wrack wird mitgepresst (700 kg); leere Mulde startet nicht; die Mulde ist vom Standplatz aus erreichbar.
+
+Auf dem Gerät zu prüfen: Ein paar Teile in die Mulde werfen, Menü ☰ → „Presse auslösen" — schließen die Klappen sichtbar, fährt der Stempel durch, liegt danach ein Paket drin? Und ist die Presse an dieser Stelle im Weg, wenn du in die Sortierboxen dahinter ablegst?
+
 ## 2026-09-09 — M6 Schritt 1: Zerlege- und Presse-Auftrag (gebaut, Gerätetest offen)
 
 Das Wrack lag seit E-047 ab Tag 1 auf dem Platz, ohne dass ein Auftrag dazu aufforderte. Grund: `dismantle_engine` stand auf `tier: V1` und `fromDay: 5`. Gezogen werden nur MVP-Aufträge, und die Gratis-Tage enden nach `unlockAfterDay` (3) — der Auftrag war **doppelt unerreichbar**. Patrick 09.09.: „baue Spiel zu Ende"; damit ist die in E-047 offen gelassene Entscheidung getroffen.
 
+> **Umnummeriert.** Diese drei Entscheidungen wurden als E-051 bis E-053 committet (d01c928), während parallel in einer zweiten Sitzung die Paketierpresse als E-052 bis E-055 entstand. Um die Kollision aufzulösen, heißen sie hier **E-056 bis E-058**; die Commit-Nachricht von d01c928 nennt noch die alten Nummern.
+
 | # | Entscheidung | Begründung | Alternative (verworfen) |
 |---|---|---|---|
-| E-051 | `dismantle_engine` wird **MVP, ab Tag 2**; neuer Auftrag `press_car` (250 €) **ab Tag 3** | Der Meilensteinplan (Kap. 22) sieht für M6 ohnehin einen „Presse-Auftrag Tag 3" vor. Tieflader ab Tag 1, Zerlegen Tag 2, Pressen Tag 3 — die drei Tage bauen aufeinander auf, und M5 bekommt im MVP endlich einen Zweck | (a) Tieflader erst ab Tag 5 kommen lassen — nähme dem MVP den ganzen M5-Inhalt; (b) alles lassen — das Auto bleibt Deko |
-| E-052 | Der Auftrag gilt als erfüllt, **sobald der Motor ab ist** — nicht erst beim Verkauf. Der Anzeigetext wurde entsprechend von „reiß ihn raus und verkauf ihn als Stahl" auf „Reiß den Motor aus dem Wrack" gekürzt | Zwei Bedingungen in einem Auftrag sind auf einer Handy-Karte nicht ablesbar, und das Verkaufen deckt bereits der `deliver`-Auftrag ab. Text und Prüfung sagen jetzt dasselbe | Erfüllung erst beim Verkauf des Motors |
-| E-053 | `supported()` prüft bei `dismantle`/`press`, ob bis zu diesem Tag überhaupt ein Kunde das Wrack liefert (`customers.compositeDefId`), und ob das Teil schon freigeschaltet ist (`unlockDay`) | Sonst kann wieder ein Auftrag gezogen werden, den niemand erfüllen kann. Die Prüfung liest die Daten, statt den Tag hart zu setzen | Feste Tageszahl im Code |
+| E-056 | `dismantle_engine` wird **MVP, ab Tag 2**; neuer Auftrag `press_car` (250 €) **ab Tag 3** | Der Meilensteinplan (Kap. 22) sieht für M6 ohnehin einen „Presse-Auftrag Tag 3" vor. Tieflader ab Tag 1, Zerlegen Tag 2, Pressen Tag 3 — die drei Tage bauen aufeinander auf, und M5 bekommt im MVP endlich einen Zweck | (a) Tieflader erst ab Tag 5 kommen lassen — nähme dem MVP den ganzen M5-Inhalt; (b) alles lassen — das Auto bleibt Deko |
+| E-057 | Der Auftrag gilt als erfüllt, **sobald der Motor ab ist** — nicht erst beim Verkauf. Der Anzeigetext wurde entsprechend gekürzt auf „Reiß den Motor aus dem Wrack" | Zwei Bedingungen in einem Auftrag sind auf einer Handy-Karte nicht ablesbar, und das Verkaufen deckt bereits der `deliver`-Auftrag ab. Text und Prüfung sagen jetzt dasselbe | Erfüllung erst beim Verkauf des Motors |
+| E-058 | `supported()` prüft bei `dismantle`/`press`, ob bis zu diesem Tag überhaupt ein Kunde das Wrack liefert (`customers.compositeDefId`), und ob das Teil freigeschaltet ist (`unlockDay`) | Sonst kann wieder ein Auftrag gezogen werden, den niemand erfüllen kann. Die Prüfung liest die Daten, statt den Tag hart zu setzen | Feste Tageszahl im Code |
 
-**Neue Wächter-Sorte (`test/sim/mission_m6.test.ts`):** Die Tests prüfen nicht Mechanik, sondern **Erreichbarkeit** — bekommt der Spieler das überhaupt zu Gesicht? Genau das fanden Modultests nicht: Tieflader, Zerlegen und Presse waren einzeln gebaut und getestet, nur verband sie nichts. Geprüft wird jetzt: kein MVP-Auftrag startet nach dem letzten Kampagnentag; die Gratis-Tage haben jeden Tag volle `perDay` Aufträge im Topf; Zerlegen und Pressen liegen in den Gratis-Tagen; kein Auftrag verlangt ein Wrack vor der ersten Lieferung.
+**Neue Wächter-Sorte (`test/sim/mission_m6.test.ts`):** Die Tests prüfen nicht Mechanik, sondern **Erreichbarkeit** — bekommt der Spieler das überhaupt zu Gesicht? Genau das fanden Modultests nicht: Tieflader, Zerlegen und Presse waren einzeln gebaut und getestet, nur verband sie nichts. Geprüft wird: kein MVP-Auftrag startet nach dem letzten Kampagnentag; die Gratis-Tage haben jeden Tag volle `perDay` Aufträge im Topf; Zerlegen und Pressen liegen in den Gratis-Tagen; kein Auftrag verlangt ein Wrack vor der ersten Lieferung.
 
-Beim Schreiben fiel auf, dass zwei weitere MVP-Aufträge (`deliver_alu_large` ab Tag 6, `clear_intake_strict` ab Tag 8) hinter Tag 3 liegen. Das ist **kein Fehler** — sie sind Inhalt für zahlende Spieler, die Kampagne läuft 30 Tage. Der Wächter wurde entsprechend korrigiert, nicht die Daten.
+Beim Schreiben fiel auf, dass zwei weitere MVP-Aufträge (`deliver_alu_large` ab Tag 6, `clear_intake_strict` ab Tag 8) hinter Tag 3 liegen. Das ist **kein Fehler** — sie sind Inhalt für zahlende Spieler, die Kampagne läuft 30 Tage. Der Wächter wurde korrigiert, nicht die Daten.
+
+**Offen durch die neue Presse:** `press_car` heißt „Press ein Wrack zum Paket", erfüllt sich aber bei jedem `pressDone` — seit E-052 also auch beim Pressen von losem Schrott. Text und Prüfung müssen wieder zusammengeführt werden, sobald die Paketierpresse steht.
 
 Auf dem Gerät zu prüfen: Steht an Tag 2 „Reiß den Motor aus dem Wrack" auf der Morgen-Karte, und springt der Stern, sobald der Motor fällt?
-
-## 2026-09-09 — M5b: Presse (gebaut, Gerätetest offen)
-
-Der Rumpf wird in die Presse gelegt und über das Menü ausgelöst; sie quetscht in drei Stufen zu einem Stahlpaket. Baugruppen, die laut `composites.json` `blocksPress` tragen (Batterie, Motor), verhindern das.
-
-| # | Entscheidung | Begründung | Alternative (verworfen) |
-|---|---|---|---|
-| E-048 | Die Presse steht **in Reichweite des Baggers** (Zone `press` von −16/−6 auf 6,8/1,2 verlegt, 7 m vom Standplatz) statt wie im Briefing Kap. 12 im Westen neben dem Zerlegebereich | Patrick 09.09.: derselbe Grund wie beim Wrack (E-047) — ein 600-kg-Rumpf 17 m weit zu transportieren hieße fahren, und genau daran ist das Zerlegen schon einmal gescheitert. Der Platz bleibt so von einer Position aus bedienbar (im Geiste von E-006). Gesichert durch einen Test, der die Reichweite prüft | Presse bleibt West, Spieler fährt mit dem Wrack hin (abgelehnt); Standort erst nach einem Fahrtest entscheiden (abgelehnt) |
-| E-049 | Gequetscht wird über die **Höhe des Rumpf-Teils** (`size[1]` × `crushScales`), nicht über eine eigene Anzeige-Skalierung. Der Kollider bleibt in Originalgröße | Anzeige und Simulation lesen damit dieselbe Zahl — keine zweite Wahrheit, die auseinanderlaufen kann. Ein mitschrumpfender Kollider brachte im Test nur Zittern; der Rumpf liegt während des Pressens ohnehin still, also ist die Verformung bewusst gefaked (Briefing Kap. 6 „was wird gefaked") | Kollider mitschrumpfen; eigene Mesh-Skalierung nur in der Anzeige |
-| E-050 | Der Menüknopf **nennt immer den Grund**, wenn er nicht geht: „kein Wrack in der Presse" bzw. „erst ausbauen: Starterbatterie, Motor". Verweigerung zusätzlich als kurze Warnhupe, nie als Fehlerpiepsen | Ein grau gesetzter Knopf ohne Begründung lässt den Spieler raten — genau die Sackgasse, die beim unerreichbaren Wrack entstanden ist (Briefing Kap. 14/15) | Knopf einfach sperren |
-| — | Das Paket wiegt Rumpf **plus alles, was noch dranhängt** (Räder, Kat) | Wer die Räder dranlässt, presst sie mit ein und verschenkt den Störstoff-Erlös — das Briefing will genau diesen Anreiz (Kap. 8.3: „Zerlegen lohnt, Pfusch kostet") | Nur den Rumpf verwerten |
-
-Abnahmekriterien (`test/sim/press.test.ts`, 4 Tests): Verweigerung mit Batterie und Motor samt Nennung des blockierenden Teils; Pressen ohne diese Teile ergibt in 3,6 s ein Stahlpaket von 700 kg (600 kg Rumpf + 4 × 25 kg Räder), das Wrack verschwindet; ein Rumpf außerhalb der Zone wird nicht gepresst; die Presse liegt in Reichweite.
-
-| E-051 | Die Presse ist **orange** (Maschinenfarbe), 3,2 m hoch und ragt über die Muldenwände | Erste Fassung war betongrau wie die Sortiermulden — Patrick 09.09.: „ich sehe keine Presse". Sie war gezeichnet (in der Szene nachgewiesen), ging aber zwischen den grauen Mulden unter. Briefing Kap. 16: Farbe trennt Stationen von Lagerflächen | Beschriftungsschild; Presse größer, aber grau |
-
-Auf dem Gerät zu prüfen: Rumpf in die Presse legen, Menü öffnen — steht dort der richtige Grund, wenn die Batterie noch drin ist? Und sieht man den Stempel herunterfahren?
 
 ## 2026-09-09 — Wrack war unerreichbar: Ablage an der Annahme (gebaut, Gerätetest offen)
 
