@@ -2,7 +2,24 @@
 
 Jede Architektur- oder Design-Entscheidung mit Datum und Begründung, damit nichts zweimal diskutiert wird (CLAUDE.md). Neueste oben.
 
-## 2026-09-09 — Spinne Schritt 1: weicher Zinken-Kontakt (gebaut, Gerätetest offen)
+## 2026-09-09 — Wrack war unerreichbar: Ablage an der Annahme (gebaut, Gerätetest offen)
+
+Patrick auf dem iPad: „es lässt sich mit dem Pkw nichts machen". Der Fehler lag **nicht** in der Zerlege-Mechanik — die ist getestet und funktioniert — sondern eine Stufe davor, in der Anlieferung.
+
+**Messung 09.09.:** Der Tieflader setzte das Wrack am Ende seiner Route im Zerlegebereich ab, bei x = −20,4 / z = 4,1. Der Bagger steht bei (0,0) und reicht 9,2 m weit. Abstand: **20,8 m**. Der Spieler sieht das Auto, kommt aber nicht heran; er müsste erst hinfahren, ohne dass ihm das jemand sagt. Stellt man den Bagger daneben, greift das Zerlegen sofort.
+
+| # | Entscheidung | Begründung | Alternative (verworfen) |
+|---|---|---|---|
+| E-047 | Der Tieflader hält auf der Zufahrt an der **Annahme** (Route `lowloader_in` endet bei 0/−7 statt −16/2) und setzt das Wrack **zur Platzmitte hin** ab (`unloadSide` = right, `unloadOffsetM` 5,0 — beides SW). Ergebnis: Wrack bei 6,3/−3,6, **7,2 m** vom Bagger, ohne Fahren erreichbar, außerhalb der Schüttzone der Kipper | Patrick 09.09. auf die Frage nach der Ablage: „Wrack neben den Bagger". Der Weg über die Zufahrt braucht kein Manöver quer über den Platz und kein Wenden | (a) Bagger fährt zum Zerlegeplatz — abgelehnt; (b) Zerlegeplatz näher heranrücken — abgelehnt; (c) Tieflader dockt wie die Kipper an (`deliver_dock`) — gemessen: der 7-m-Tieflader kommt mit dem Rückwärtsmanöver nicht zurecht, das Wrack landete 26 m weit weg |
+| — | **Folge, bewusst in Kauf genommen:** Der Zerlegebereich auf dem Platz (Briefing Kap. 12) steht damit leer | Wieder einbinden, wenn Presse und Schere dazukommen (M5b) | Zonenkonzept jetzt anpassen |
+| — | **Erkenntnis Platzlayout:** Ein 7-m-Tieflader kann nicht direkt neben dem Bagger halten, ohne in den Sortierboxen zu stehen — der Bogen aus E-006 (Radius 8,5 m) lässt dafür keine Lücke. Deshalb hält er auf der Zufahrt und setzt 5 m seitlich ab (gedachter Kran, Annahme aus M5) | Messung 09.09. | Boxen verschieben |
+| — | **Testlücke geschlossen:** Neuer Wächter `Wrack-Anlieferung` in `composite.test.ts` prüft die Kette Anlieferung → Ablage. Genau hier war nichts abgedeckt: die Mechanik war getestet, der Weg dorthin nicht | Der Fehler wäre sonst wieder unbemerkt geblieben | — |
+
+Abnahmekriterium: An Tag 1 (dem zweiten Spieltag — Tag 0 ist der Einweisungstag ohne Anlieferungen) bringt der Tieflader den Pkw, setzt ihn an der Annahme ab, und der Bagger erreicht ihn vom Standplatz aus, ohne zu fahren.
+
+**Offen und bewusst nicht mitgeändert:** Der Auftrag „Motor ausbauen" (`dismantle_engine`) steht auf `tier: V1` und `fromDay: 5` — er wird im MVP gar nicht ausgespielt. Das Wrack liegt also ab Tag 1 auf dem Platz, ohne dass ein Auftrag dazu auffordert. Das zu ändern hieße, den MVP-Umfang zu erweitern; Entscheidung liegt bei Patrick.
+
+## 2026-09-09 — Spinne Schritt 1: weicher Zinken-Kontakt (auf dem iPad abgenommen)
 
 Nach der Rücknahme von Spinne 2.0 (E-042) bleibt die Steuerung **kinematisch**; Physik kommt nur noch als *Wirkung* dazu, in einzeln abgenommenen Schritten. Schritt 1 ist der Kontakt der Zinken mit losem Material.
 
@@ -16,7 +33,7 @@ Nach der Rücknahme von Spinne 2.0 (E-042) bleibt die Steuerung **kinematisch**;
 
 Abnahmekriterien (Tests `test/sim/clawcontact.test.ts`): Ein Teil am Korbrand wird beim Schließen nach innen geschoben (≥ 0,15 m) oder gegriffen, dabei nie schneller als 3 m/s, nie im Boden, nie vom Platz, und der Schließfaktor sinkt unter 1. Ein Griff auf einen 60-Teile-Haufen: kein Teil über 6 m/s, keines im Boden, keines vom Platz, mindestens ein Teil gefasst.
 
-Auf dem Gerät zu prüfen: Fühlt sich schweres Material beim Schließen spürbar schwerer an, und wird Material am Korbrand hineingeschoben statt weggeschossen?
+Gerätetest 09.09. (Patrick): „sieht ok aus" — abgenommen. **Die Spinne wird danach zurückgestellt**: Schritt 2 (Aufsetzen per Strahlen gegen das Eintauchen) und die Lieferung Funken/Staub/Geräusche bleiben geplant, aber ohne Termin. Damit ist bewusst offen, dass die Spinne weiter in Haufen eintaucht und dabei Material wegschleudert.
 
 ## 2026-09-09 — Spinne 2.0, Lieferung 1 — **zurückgenommen** (Patrick, iPad-Test 09.09.)
 

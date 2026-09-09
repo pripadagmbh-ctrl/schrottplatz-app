@@ -222,9 +222,10 @@
     "rotatorFactor": 1.8,
     "engageWindowStart": 0.3,
     "disengageRadiusM": 0.4,
-    "unloadOffsetM": 2.2,
-    "_src": "Briefing Kap. 8.1 (SW): Timer laeuft bei Zugkraft > 0,5; Rotator zaehlt x1,8; Tieflader setzt das Wrack seitlich ab (Annahme M5)",
-    "firstWreckDay": 1
+    "unloadOffsetM": 5.0,
+    "_src": "Briefing Kap. 8.1 (SW): Timer laeuft bei Zugkraft > 0,5; Rotator zaehlt x1,8; Tieflader setzt das Wrack seitlich ab (Annahme M5) | Ablage (E-047, 09.09.): unloadSide=right + unloadOffsetM 5,0 (SW) setzen das Wrack an der Annahme neben dem Tieflader ab, 4,9-7,2 m vom Bagger — vorher lag es im Zerlegebereich 20,8 m weg bei 9,2 m Reichweite und war unerreichbar (Patrick, iPad 09.09.)",
+    "firstWreckDay": 1,
+    "unloadSide": "right"
   },
   "clawContact": {
     "pushMaxMs": 1.5,

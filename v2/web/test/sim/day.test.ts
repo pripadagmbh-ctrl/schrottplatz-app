@@ -15,6 +15,10 @@ beforeAll(async () => { await initPhysics(); });
 
 function newSim() {
   const d = loadGameData();
+  // Keine automatischen Anlieferungen: sonst haengen die Geldpruefungen am Zufall bzw. am Ankaufspreis des Wracks,
+  // das seit 09.09. schneller an der Annahme steht (kuerzere Tieflader-Route). loadGameData teilt das Objekt zwischen
+  // Tests, deshalb wird der Wert hier ausdruecklich gesetzt.
+  d.balancing.vehicles = { ...d.balancing.vehicles, autoDeliveries: false };
   const sim = new Simulation(d); sim.init();
   return sim;
 }

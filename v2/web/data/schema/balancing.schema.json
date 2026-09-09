@@ -251,8 +251,17 @@
         "engageWindowStart",
         "disengageRadiusM",
         "unloadOffsetM",
+        "unloadSide",
         "firstWreckDay"
-      ]
+      ],
+      "properties": {
+        "unloadSide": {
+          "enum": [
+            "left",
+            "right"
+          ]
+        }
+      }
     },
     "clawContact": {
       "type": "object",

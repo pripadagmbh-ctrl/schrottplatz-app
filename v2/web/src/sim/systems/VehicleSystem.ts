@@ -241,10 +241,13 @@ export class VehicleSystem implements System {
   /** Tieflader kippt nicht: Wrack wird seitlich neben dem Fahrzeug abgesetzt (Annahme M5: Kran gedacht, kein Rampen-Abrollen). */
   private unloadBeside(run: VehicleRun): void {
     const b = run.def.body, off = Number(this.ctx.data.balancing.composites["unloadOffsetM"] ?? 2.2);
+    // Seite frei waehlbar: der Tieflader setzt zur Platzmitte hin ab, damit das Wrack in Reichweite des Baggers
+    // liegt (Patrick 09.09.: „es laesst sich mit dem Pkw nichts machen" — es lag 20,8 m weg bei 9,2 m Reichweite).
+    const side = String(this.ctx.data.balancing.composites["unloadSide"] ?? "left") === "right" ? 1 : -1;
     for (const l of run.loads) {
       const body = this.ctx.physics.safeBody(l.handle); const item = this.ctx.world.items.get(l.itemId);
       if (!body || !item) continue;
-      const local: Vec3 = { x: -(b.bedW / 2 + off), y: item.size[1] / 2 + 0.05, z: l.local.z };
+      const local: Vec3 = { x: side * (b.bedW / 2 + off), y: item.size[1] / 2 + 0.05, z: l.local.z };
       this.toWorld(run, local, false, this.tmp);
       body.setBodyType(RAPIER.RigidBodyType.Dynamic, true);
       body.setTranslation({ x: this.tmp.x, y: this.tmp.y, z: this.tmp.z }, true); body.setRotation(this.frameQuat(run, false, this.q), true);

@@ -93,7 +93,10 @@ describe("Verbundteile (CompositeSystem)", () => {
     expect(run.stage).toBe("done");
     const st = [...sim.world.composites.values()][0]!; const hull = sim.world.items.get(st.hullItemId)!;
     expect(hull.state).toBe("loose"); expect(hull.pos.y).toBeGreaterThan(0.3); expect(hull.pos.y).toBeLessThan(1.5);
-    expect(sim.level.inZone("dismantle", hull.pos.x, hull.pos.z) || Math.hypot(hull.pos.x + 16, hull.pos.z - 2) < 8).toBe(true);
+    // Seit 09.09. setzt der Tieflader an der Annahme ab statt im Zerlegebereich: das Wrack muss ohne Fahren erreichbar sein
+    const exb = sim.data.balancing.excavator as Record<string, number>;
+    const reach = Number(exb["boomLenM"]) + Number(exb["stickLenM"]);
+    expect(Math.hypot(hull.pos.x - sim.world.excavator.pos.x, hull.pos.z - sim.world.excavator.pos.z)).toBeLessThan(reach - 1);
     expect(sim.world.economy.moneyEur).toBeCloseTo(money0 - 120, 2);
     sim.dispose();
   });
@@ -105,6 +108,40 @@ describe("Erstes Wrack garantiert", () => {
     const sim = new Simulation(d); sim.init(); sim.world.day.day = 1; sim.world.day.phase = "work";
     let steps = 0; while (!sim.vehicles.runs.length && steps < 60 * 30) { sim.step(); steps++; }
     expect(sim.vehicles.runs[0]?.def.id).toBe("lowloader"); expect(sim.world.composites.size).toBe(1);
+    sim.dispose();
+  });
+});
+
+/**
+ * Anlieferungs-Waechter (Patrick, iPad 09.09.: „es laesst sich mit dem Pkw nichts machen"). Der Fehler lag NICHT in der
+ * Zerlege-Mechanik — die war getestet — sondern davor: Der Tieflader setzte das Wrack im Zerlegebereich ab, 20,8 m vom
+ * Bagger entfernt bei 9,2 m Reichweite. Dieser Test deckt die Kette Anlieferung → Ablage ab: Das Wrack muss ohne Fahren
+ * erreichbar sein, auf dem Boden stehen und darf nicht in der Schuettzone der Kipper liegen.
+ */
+describe("Wrack-Anlieferung", () => {
+  it("Tieflader setzt das Wrack in Reichweite des Baggers ab", () => {
+    const sim = new Simulation(loadGameData()); sim.init();
+    sim.world.day.day = 1; sim.day.startDay(); // Tag 0 ist der Einweisungstag ohne Anlieferungen
+    for (let i = 0; i < 60 * 240 && sim.world.composites.size === 0; i++) sim.step();
+    expect(sim.world.composites.size, "Tieflader kommt an Tag 1").toBe(1);
+    for (let i = 0; i < 60 * 40; i++) sim.step(); // absetzen und ausrollen abwarten
+
+    const st = [...sim.world.composites.values()][0]!;
+    const hull = sim.world.items.get(st.hullItemId)!;
+    const ex = sim.world.excavator;
+    const b = sim.data.balancing.excavator as Record<string, number>;
+    const reach = Number(b["boomLenM"]) + Number(b["stickLenM"]);
+
+    const dist = Math.hypot(hull.pos.x - ex.pos.x, hull.pos.z - ex.pos.z);
+    expect(dist, "ohne Fahren erreichbar (mit Sicherheitsabstand zur Reichweitengrenze)").toBeLessThan(reach - 1);
+    expect(hull.pos.y, "steht auf dem Boden, nicht darin oder auf einer Box").toBeGreaterThan(0.1);
+    expect(hull.state).toBe("loose");
+    expect(st.remainingParts.length, "alle Baugruppen noch dran").toBeGreaterThanOrEqual(6);
+
+    // nicht in der Schuettzone der Kipper (dort landet der Haufen)
+    const pile = sim.level.zone("intake_pile");
+    const inPile = Math.abs(hull.pos.x - pile.x) < pile.hw && Math.abs(hull.pos.z - pile.z) < pile.hd;
+    expect(inPile, "liegt nicht im Schuettbereich der Kipper").toBe(false);
     sim.dispose();
   });
 });
