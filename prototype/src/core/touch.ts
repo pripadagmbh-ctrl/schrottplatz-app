@@ -94,6 +94,8 @@ export class TouchControls {
       return;
     }
     root.style.display = "block";
+    // Merkmal fuers Stylesheet: nur auf Touchgeraeten sitzt die Tutorialkarte oben
+    document.body.classList.add("touch");
     this.left = this.makeStick("touch-left", "zone-left");
     this.right = this.makeStick("touch-right", "zone-right");
     this.bindSafety();
