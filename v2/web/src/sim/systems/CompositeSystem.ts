@@ -6,7 +6,6 @@ import type { CompositeDef, PartDef } from "@/data/types";
 import type { CompositeState, ScrapItem } from "@/sim/world/WorldState";
 import { nextId, type CompositeId, type ItemId } from "@/shared/ids";
 import { quatFromAxisY, rotateVec, type Vec3 } from "@/shared/math";
-import { clawTipDepth } from "@/shared/clawGeometry";
 
 /**
  * Verbundteile (Briefing Kap. 8.1; M5): Rumpf = ein normales Schrottteil (Form `hull_<def>`, Masse = Rumpf + noch
@@ -32,16 +31,7 @@ export class CompositeSystem implements System {
   private ctx!: SimContext; private scrap!: ScrapSystem; private ex!: ExcavatorSystem; private grip!: GripSystem;
   private defs = new Map<string, CompositeDef>();
   private c!: Record<string, number | string>;
-  private readonly tmp: Vec3 = { x: 0, y: 0, z: 0 }; private readonly loc: Vec3 = { x: 0, y: 0, z: 0 }; private readonly reach: Vec3 = { x: 0, y: 0, z: 0 };
-
-  /**
-   * Greifpunkt der Spinne fuer Baugruppen: Mitte auf Hoehe der Krallenspitzen (nicht der Sensor in der Korbmitte).
-   * Spinne 2.0 kollidiert echt mit dem Rumpf — sie sitzt auf dem Dach, die Spitzen fassen um die Baugruppe.
-   */
-  private reachPoint(): Vec3 {
-    const p = this.ex.pose; this.loc.x = 0; this.loc.y = -clawTipDepth(p.splay); this.loc.z = 0;
-    rotateVec(p.grappleQuat, this.loc, this.reach); this.reach.x += p.grapplePos.x; this.reach.y += p.grapplePos.y; this.reach.z += p.grapplePos.z; return this.reach;
-  }
+  private readonly tmp: Vec3 = { x: 0, y: 0, z: 0 }; private readonly loc: Vec3 = { x: 0, y: 0, z: 0 };
 
   init(ctx: SimContext): void {
     this.ctx = ctx; this.scrap = ctx.get<ScrapSystem>("scrap"); this.ex = ctx.get<ExcavatorSystem>("excavator"); this.grip = ctx.get<GripSystem>("grip");
@@ -94,8 +84,8 @@ export class CompositeSystem implements System {
       const st = ctx.world.composites.get(this.engaged.compositeId); const def = st && this.defs.get(st.defId);
       const part = def?.parts.find((p) => p.id === this.engaged!.partId);
       if (!st || !def || !part || g < start || !st.remainingParts.includes(part.id)) { this.disengage(); return; }
-      const a = this.anchorWorld(st, part, this.tmp); const s = this.reachPoint();
-      if (!this.within(a, s, part.grabRadius + Number(this.c["disengageRadiusM"] ?? 0.4))) { this.disengage(); return; }
+      const a = this.anchorWorld(st, part, this.tmp); const s = this.ex.pose.sensorPos;
+      if (Math.hypot(a.x - s.x, a.y - s.y, a.z - s.z) > part.grabRadius + Number(this.c["disengageRadiusM"] ?? 0.4)) { this.disengage(); return; }
       const c = ctx.control;
       this.engaged.pull = Math.min(1, Math.max(Math.abs(c.boom), Math.abs(c.cab), Math.abs(c.stick), Math.abs(c.rotator) * Number(this.c["rotatorFactor"] ?? 1.8)));
       this.engaged.blockedBy = part.requires.find((r) => st.remainingParts.includes(r)) ?? null;
@@ -107,22 +97,17 @@ export class CompositeSystem implements System {
     }
     // Fassen: Spinne schliesst, nichts in der Spinne, Sensor im grabRadius einer angebauten Baugruppe
     if (g < start || g > 0.98 || ctx.control.grapple <= 0 || this.grip.count > 0) return;
-    const s = this.reachPoint(); let best: { st: CompositeState; part: PartDef; d: number } | null = null;
+    const s = this.ex.pose.sensorPos; let best: { st: CompositeState; part: PartDef; d: number } | null = null;
     for (const st of ctx.world.composites.values()) {
       const def = this.defs.get(st.defId); if (!def) continue;
       const item = this.hullItem(st); if (!item || item.state !== "loose") continue;
       for (const part of def.parts) {
         if (!st.remainingParts.includes(part.id) || part.tool !== "grapple") continue;
-        const a = this.anchorWorld(st, part, this.tmp); const d = Math.hypot(a.x - s.x, a.z - s.z);
-        if (this.within(a, s, part.grabRadius) && (!best || d < best.d)) best = { st, part, d };
+        const a = this.anchorWorld(st, part, this.tmp); const d = Math.hypot(a.x - s.x, a.y - s.y, a.z - s.z);
+        if (d <= part.grabRadius && (!best || d < best.d)) best = { st, part, d };
       }
     }
     if (best) this.engage(best.st, best.part);
-  }
-
-  /** Waagerecht im Radius, senkrecht mit Toleranz: die Spitzen sitzen auf dem Rumpf, der Anker liegt darunter (Rumpf ist ein Kasten). */
-  private within(a: Vec3, s: Vec3, r: number): boolean {
-    return Math.hypot(a.x - s.x, a.z - s.z) <= r && Math.abs(a.y - s.y) <= Math.max(r, Number(this.c["verticalToleranceM"] ?? 0.8));
   }
 
   /** Fuer HUD/Chip: was gerade gefasst ist. */

@@ -69,7 +69,8 @@
     "_src2": "boomPivot/Kollider aus excavator.ts:29, 897-955; Spinne hängt grappleLink+palmOffsetY unter der Stielspitze; Sensor palmToSensor darunter",
     "_tuning": "08.09.2026 Gerätetest PC: Oberwagen 40→36, Hauptarm 25→22,5 (leicht zu flink); Stiel 30 ok; Aufsetzen und Greifen gut; Spinne schließen 0,4→0,8 s, öffnen 0,3→0,5 s (zu schnell, Anheben wirkte unnatürlich), Haltepose 0,15→0,25 s; Rotator 45→90°/s, Raste 15→30° (zu langsam) clawRakeMaxClosure 0 = Krallen beruehren lose Teile nie (E-025); >0 = Rechen mit offener Spinne erlaubt, aber kinematische Zinken schleudern Teile weg.",
     "clawRakeMaxClosure": 0.0,
-    "_comment_rake": "clawRakeMaxClosure ist seit Spinne 2.0 ohne Wirkung (Krallen kollidieren immer mit losen Teilen, aber mit endlicher Kraft)"
+    "clawTipDipMaxM": 0.1,
+    "_comment_dip": "SW 09.09.: max. Eintauchtiefe der Zinken beim Schliessen am Boden (E-024 war unbegrenzt = 0,34 m, Patrick: versinkt). 0 = altes Verhalten (E-013)."
   },
   "grip": {
     "maxItems": 12,
@@ -223,26 +224,6 @@
     "disengageRadiusM": 0.4,
     "unloadOffsetM": 2.2,
     "_src": "Briefing Kap. 8.1 (SW): Timer laeuft bei Zugkraft > 0,5; Rotator zaehlt x1,8; Tieflader setzt das Wrack seitlich ab (Annahme M5)",
-    "firstWreckDay": 1,
-    "verticalToleranceM": 0.8
-  },
-  "grapple": {
-    "massKg": 900,
-    "springNPerM": 180000,
-    "damperNsPerM": 26000,
-    "maxForceN": 22000,
-    "yawTorqueNm": 9000,
-    "yawDampingNms": 2500,
-    "linearDamping": 1.2,
-    "angularDamping": 2.5,
-    "maxCompressionM": 0.06,
-    "contactCompressionM": 0.03,
-    "clawFriction": 0.4,
-    "clawRestitution": 0.0,
-    "_src": "Spinne 2.0 (E-038, SW): Spinne als dynamischer Koerper (Sennebogen MG4.1 ~900 kg) an einer Feder-Daempfer-Aufhaengung am Stiel; Federkraft gekappt auf ~2,5x Gewicht, damit sie sich auf Boden/Haufen abstuetzt statt einzutauchen. Oberwagen-Drehung/Rotator ueber Gier-Drehmoment.",
-    "uprightTorqueNm": 60000,
-    "tiltDampingNms": 8000,
-    "maxSpeedMs": 4,
-    "maxAngularRadS": 6
+    "firstWreckDay": 1
   }
 }

@@ -1,7 +1,7 @@
 import type { System, SimContext } from "./System";
 import type { ExcavatorState } from "@/sim/world/WorldState";
-import { clamp, deg, ramp, quatFromAxisY, rotateVec, type Vec3, type Quat } from "@/shared/math";
-import { CLAW_OPEN_SPLAY } from "@/shared/clawGeometry";
+import { clamp, deg, ramp, quatFromAxisX, quatFromAxisY, quatFromAxisZ, quatMul, rotateVec, type Vec3, type Quat } from "@/shared/math";
+import { CLAW_OPEN_SPLAY, clawTipDepth } from "@/shared/clawGeometry";
 
 /**
  * Bagger-Kinematik als reines Modell (Briefing Kap. 5.1, 6.1; Kern aus prototype excavator.ts:1015-1176).
@@ -51,10 +51,13 @@ export class ExcavatorSystem implements System {
     chassisQuat: { x: 0, y: 0, z: 0, w: 1 },
   };
   /** Pose des vorherigen Schritts — für die Render-Interpolation (Bagger springt sonst mit 60 Hz vor 48/120-Hz-Bildschirmen) */
-  readonly prev = { x: 0, y: 0, z: 0, heading: 0, cab: 0, boom: 0, stick: 0, rotator: 0, splay: CLAW_OPEN_SPLAY, gx: 0, gy: 0, gz: 0, swingX: 0, swingZ: 0, gqx: 0, gqy: 0, gqz: 0, gqw: 1 };
+  readonly prev = { x: 0, y: 0, z: 0, heading: 0, cab: 0, boom: 0, stick: 0, rotator: 0, splay: CLAW_OPEN_SPLAY, gx: 0, gy: 0, gz: 0, swingX: 0, swingZ: 0 };
 
-  // Pendel: seit Spinne 2.0 (E-038) echte Physik des Spinnenkoerpers; swingX/Z werden aus seiner Neigung abgeleitet
+  // --- Pendel (prototype excavator.ts:1314-1346; Werte aus balancing.assist) ---
+  private swingVelX = 0; private swingVelZ = 0;
+  private prevTip: Vec3 = { x: 0, y: 0, z: 0 }; private prevTipVel: Vec3 = { x: 0, y: 0, z: 0 }; private pendulumInit = false;
   private a!: Record<string, number | boolean | string>;
+  private readonly qYaw: Quat = { x: 0, y: 0, z: 0, w: 1 }; private readonly qTiltX: Quat = { x: 0, y: 0, z: 0, w: 1 }; private readonly qTiltZ: Quat = { x: 0, y: 0, z: 0, w: 1 }; private readonly qTilt: Quat = { x: 0, y: 0, z: 0, w: 1 };
   private readonly hang: Vec3 = { x: 0, y: 0, z: 0 };
 
   // --- Snap (Greif-Magnet, Briefing Kap. 5.4): Oberwagen und Stiel gleiten kurz auf ein Zielteil ---
@@ -65,9 +68,10 @@ export class ExcavatorSystem implements System {
 
   /** Geschwindigkeit der Spinne (Welt, m/s) — für Loslassen und Widerstand */
   readonly grappleVel: Vec3 = { x: 0, y: 0, z: 0 };
+  private prevGrapple: Vec3 = { x: 0, y: 0, z: 0 };
+  private prevInit = false;
 
   init(ctx: SimContext): void {
-    this.ctxRef = ctx;
     const b = ctx.data.balancing.excavator as Record<string, number | number[] | string>;
     this.b = b as Record<string, number>;
     this.boomLen = Number(b["boomLenM"]); this.stickLen = Number(b["stickLenM"]);
@@ -94,7 +98,7 @@ export class ExcavatorSystem implements System {
     const c = ctx.control;
     const pv = this.prev, pp = this.pose;
     pv.x = s.pos.x; pv.y = s.pos.y; pv.z = s.pos.z; pv.heading = s.heading; pv.cab = s.cab; pv.boom = s.boom; pv.stick = s.stick; pv.rotator = s.rotator;
-    pv.splay = pp.splay; pv.gx = pp.grapplePos.x; pv.gy = pp.grapplePos.y; pv.gz = pp.grapplePos.z; pv.swingX = pp.swingX; pv.swingZ = pp.swingZ; pv.gqx = pp.grappleQuat.x; pv.gqy = pp.grappleQuat.y; pv.gqz = pp.grappleQuat.z; pv.gqw = pp.grappleQuat.w;
+    pv.splay = pp.splay; pv.gx = pp.grapplePos.x; pv.gy = pp.grapplePos.y; pv.gz = pp.grapplePos.z; pv.swingX = pp.swingX; pv.swingZ = pp.swingZ;
     const b = this.b;
     const lf = this.loadFactor();
     const rampT = Number(b["rampTimeS"]);
@@ -136,29 +140,13 @@ export class ExcavatorSystem implements System {
     if (!this.closing) this.snapT = 0; // Loslassen bricht den Snap ab
 
     this.resolveGroundClamp(s);
+    this.integratePendulum(s, dt);
     this.computePose(s);
-  }
 
-  /** Kardan-Ist der Spinne (Welt), vom dynamischen Koerper (E-038); vor dem ersten Physikschritt = Stielspitze */
-  private bodyPos: Vec3 = { x: 0, y: 0, z: 0 }; private bodyInit = false;
-  private ctxRef: SimContext | null = null;
-  /**
-   * Spinne 2.0: Pose der Spinne kommt vom dynamischen Koerper (GrapplePoseSystem nach jedem Physikschritt).
-   * Setzt grapplePos/grappleQuat/sensorPos, leitet Pendelwinkel (Ansicht/Audio) aus der Neigung ab, misst die Geschwindigkeit.
-   */
-  syncFromBody(t: { x: number; y: number; z: number }, r: { x: number; y: number; z: number; w: number }, dt: number): void {
-    const p = this.pose;
-    if (dt > 0 && this.bodyInit) { this.grappleVel.x = (t.x - this.bodyPos.x) / dt; this.grappleVel.y = (t.y - this.bodyPos.y) / dt; this.grappleVel.z = (t.z - this.bodyPos.z) / dt; }
-    this.bodyPos.x = t.x; this.bodyPos.y = t.y; this.bodyPos.z = t.z; this.bodyInit = true;
-    p.grapplePos.x = t.x; p.grapplePos.y = t.y; p.grapplePos.z = t.z;
-    p.grappleQuat.x = r.x; p.grappleQuat.y = r.y; p.grappleQuat.z = r.z; p.grappleQuat.w = r.w;
-    // Neigung: gedrehte Abwaerts-Achse → swingX kippt um X (Last nach ∓z), swingZ um Z (Last nach ±x)
-    this.hang.x = 0; this.hang.y = -1; this.hang.z = 0; rotateVec(p.grappleQuat, this.hang, this.hang);
-    p.swingX = Math.atan2(this.hang.z, -this.hang.y); p.swingZ = Math.atan2(-this.hang.x, -this.hang.y);
-    this.hang.x = 0; this.hang.y = -(this.grappleLink + this.palmOffsetY + this.palmToSensor); this.hang.z = 0;
-    rotateVec(p.grappleQuat, this.hang, this.hang);
-    p.sensorPos.x = t.x + this.hang.x; p.sensorPos.y = t.y + this.hang.y; p.sensorPos.z = t.z + this.hang.z;
-    this.groundContact = t.y - p.stickTip.y > Number(this.ctxRef?.data.balancing.grapple["contactCompressionM"] ?? 0.03);
+    // Spinnengeschwindigkeit (für Loslassen mit Schwung)
+    const p = this.pose.grapplePos;
+    if (this.prevInit) { this.grappleVel.x = (p.x - this.prevGrapple.x) / dt; this.grappleVel.y = (p.y - this.prevGrapple.y) / dt; this.grappleVel.z = (p.z - this.prevGrapple.z) / dt; }
+    this.prevGrapple.x = p.x; this.prevGrapple.y = p.y; this.prevGrapple.z = p.z; this.prevInit = true;
   }
 
   /** Spreizung: zu = Kalotte, aber nie enger, als die Ladung Platz braucht (excavator.ts:1183-1189). */
@@ -177,19 +165,28 @@ export class ExcavatorSystem implements System {
   groundLift = 0;
 
   /**
-   * Bodenanschlag, Spinne 2.0 (E-038): Massstab ist die FEDERKOMPRESSION. Sitzt die Spinne auf Boden oder Haufen auf,
-   * bleibt ihr Kardan-Ist ueber dem Kardan-Soll des Stiels. Der Arm darf hoechstens `maxCompressionM` tiefer als die
-   * Spinne, sonst wird er mit begrenzter Rate angehoben (kein Hochschnellen). Mitgefuehrte Ladung (kinematisch, E-017)
-   * haelt der Arm zusaetzlich ueber dem Boden. Ersetzt E-013/E-024 (Spitzentiefen-Formeln).
+   * Boden ist harter Widerstand (excavator.ts:1197-1246), aber anders gelöst als im Prototyp (E-013):
+   * Dort hob der Anschlag den Arm über den Stielwinkel an — dabei wanderte die Spinne beim Schließen bis zu
+   * 1,3 m zur Seite und verlor das Teil. Jetzt setzt die Spinne auf und wird am Kardangelenk senkrecht
+   * hochgeschoben (bis maxLift); erst darüber hinaus wird der Arm geklemmt.
    */
   private resolveGroundClamp(s: ExcavatorState): void {
-    const maxComp = Number(this.ctxRef?.data.balancing.grapple["maxCompressionM"] ?? 0.12);
-    const clearance = Number(this.b["groundClearanceM"]);
-    const minTipY = Math.max(this.bodyInit ? this.bodyPos.y - maxComp : -Infinity, this.carriedBottomM > 0 ? this.carriedBottomM + clearance : -Infinity);
-    this.groundLift = clamp(this.bodyInit ? this.bodyPos.y - this.tipY(s) : 0, 0, 1);
+    // Bezug ist die Spitzentiefe der OFFENEN Spinne (E-024, ersetzt E-013 teilweise): Beim Schliessen werden die Spitzen bis
+    // 0,34 m tiefer — frueher hob der Anschlag dann die ganze Spinne an („Hochbocken", geschlossen kam sie nicht mehr an den
+    // Haufen, Ladung fuhr mit hoch; iPad-Test 08.09.). Jetzt duerfen die Spitzen beim Schliessen in Boden/Haufen eintauchen,
+    // wie echte Zinken. Dazu die Unterkante einer mitgefuehrten Ladung (E-017).
+    // Nachjustiert 09.09. (iPad: „Spinne versinkt im Boden"): Bezug ist die AKTUELLE Spreizung, die Spitzen duerfen aber
+    // hoechstens clawTipDipMaxM tiefer als der Boden — geschlossen hebt sich die Spinne also nur um (0,34 − dip) m statt 0,34.
+    const dip = Number(this.b["clawTipDipMaxM"] ?? 0.1);
+    const tipDepth = Math.max(clawTipDepth(CLAW_OPEN_SPLAY), clawTipDepth(this.splay(s)) - dip, this.carriedBottomM);
+    const minTipY = tipDepth + Number(this.b["groundClearanceM"]);
+    const maxLift = 0.6;
+    let need = minTipY - this.tipY(s);
+    this.groundLift = clamp(need, 0, maxLift);
+    // Pro Schritt hoechstens so viel Armbewegung wie der Fahrer selbst in 3 Schritten schafft — kein Hochschnellen
     let clamped = false, guard = 0;
     const maxIter = Math.max(2, Math.round((Math.max(this.boomRate, this.stickRate) * 3 / 60) / 0.004));
-    while (this.tipY(s) < minTipY && guard++ < maxIter) {
+    while (this.tipY(s) + maxLift < minTipY && guard++ < maxIter) {
       clamped = true;
       const total = s.boom + s.stick;
       const dStick = this.stickLen * Math.cos(total);
@@ -199,12 +196,15 @@ export class ExcavatorSystem implements System {
       else break;
     }
     if (clamped) {
+      need = minTipY - this.tipY(s);
+      this.groundLift = clamp(need, 0, maxLift);
       const total = s.boom + s.stick;
       const dBoom = this.boomLen * Math.cos(s.boom) + this.stickLen * Math.cos(total);
       const dStick = this.stickLen * Math.cos(total);
       if (this.boomVel * dBoom < 0) this.boomVel = 0;
       if (this.stickVel * dStick < 0) this.stickVel = 0;
     }
+    this.groundContact = this.groundLift > 0.001 || this.tipY(s) < minTipY + 0.04;
   }
 
   /**
@@ -226,17 +226,41 @@ export class ExcavatorSystem implements System {
     this.snapT = Math.max(0, this.snapT - dt);
   }
 
-  /** Pendel zurücksetzen (Laden, Tests). */
-  resetPendulum(): void {
-    this.pose.swingX = this.pose.swingZ = 0; this.bodyInit = false; this.computePose(this.ctxRef!.world.excavator);
-    const cols = this.ctxRef?.get("excavatorColliders") as unknown as { teleportGrapple(p: Vec3, yaw: number): void; grapple: { translation(): Vec3 } };
-    cols.teleportGrapple(this.pose.stickTip, this.pose.grappleYaw);
-    this.syncFromBody(cols.grapple.translation(), this.pose.grappleQuat, 0);
-    // Arm sofort ueber die (ggf. angehobene) Spinne klemmen — sonst zieht die Feder sie in den Boden
-    const s = this.ctxRef!.world.excavator;
-    for (let i = 0; i < 400 && this.tipY(s) < this.bodyPos.y - 0.05; i++) this.resolveGroundClamp(s);
-    this.computePose(s);
+  /**
+   * Gedämpftes Pendel am Kardan (prototype excavator.ts:1314-1346): angetrieben von der horizontalen
+   * Beschleunigung der Stielspitze (gekappt), schwere Last pendelt länger nach, Bodenkontakt beruhigt sofort.
+   * Teleport (Spawn, Laden) füttert das Pendel nicht mit einem Riesenimpuls.
+   */
+  private integratePendulum(s: ExcavatorState, dt: number): void {
+    const a = this.a;
+    const yaw = s.heading + s.cab;
+    const reach = this.boomLen * Math.cos(s.boom) + this.stickLen * Math.cos(s.boom + s.stick);
+    const bpX = this.boomPivot[0], bpZ = this.boomPivot[2];
+    const sy = Math.sin(yaw), cy = Math.cos(yaw);
+    const tx = s.pos.x + bpX * cy + bpZ * sy + reach * sy, tz = s.pos.z - bpX * sy + bpZ * cy + reach * cy;
+    if (!this.pendulumInit) { this.prevTip.x = tx; this.prevTip.z = tz; this.pendulumInit = true; }
+    const vx = (tx - this.prevTip.x) / dt, vz = (tz - this.prevTip.z) / dt;
+    this.prevTip.x = tx; this.prevTip.z = tz;
+    if (Math.hypot(vx, vz) > 30) { this.swingVelX = 0; this.swingVelZ = 0; this.prevTipVel.x = vx; this.prevTipVel.z = vz; return; }
+    const cap = Number(a["pendulumAccelCapMs2"]);
+    const ax = clamp((vx - this.prevTipVel.x) / dt, -cap, cap), az = clamp((vz - this.prevTipVel.z) / dt, -cap, cap);
+    this.prevTipVel.x = vx; this.prevTipVel.z = vz;
+    const L = Number(a["pendulumLengthM"]), G = 9.81, maxRad = Number(a["pendulumMaxRad"]);
+    const heavy = Math.min(this.carriedMassKg / Number(a["pendulumHeavyRefKg"]), 1);
+    const damping = Number(a["pendulumDampingLight"]) + (Number(a["pendulumDampingHeavy"]) - Number(a["pendulumDampingLight"])) * heavy;
+    const p = this.pose;
+    this.swingVelX += (-(G / L) * Math.sin(p.swingX) - damping * this.swingVelX + az / L) * dt;
+    this.swingVelZ += (-(G / L) * Math.sin(p.swingZ) - damping * this.swingVelZ - ax / L) * dt;
+    p.swingX = clamp(p.swingX + this.swingVelX * dt, -maxRad, maxRad);
+    p.swingZ = clamp(p.swingZ + this.swingVelZ * dt, -maxRad, maxRad);
+    if (this.groundContact) {
+      const dp = Number(a["pendulumGroundDampPos"] ?? 0.75), dv = Number(a["pendulumGroundDampVel"] ?? 0.5);
+      p.swingX *= dp; p.swingZ *= dp; this.swingVelX *= dv; this.swingVelZ *= dv;
+    }
   }
+
+  /** Pendel zurücksetzen (Laden, Tests). */
+  resetPendulum(): void { this.pose.swingX = this.pose.swingZ = 0; this.swingVelX = this.swingVelZ = 0; this.pendulumInit = false; }
 
   /** Vorwärtskinematik in Weltkoordinaten. Oberwagen dreht um Y; Arm liegt in der Ebene des Oberwagens. */
   computePose(s: ExcavatorState): void {
@@ -249,12 +273,15 @@ export class ExcavatorSystem implements System {
     const reach = this.boomLen * Math.cos(s.boom) + this.stickLen * Math.cos(s.boom + s.stick);
     const height = this.boomLen * Math.sin(s.boom) + this.stickLen * Math.sin(s.boom + s.stick);
     p.stickTip.x = p.boomPivot.x + reach * sy; p.stickTip.y = p.boomPivot.y + height; p.stickTip.z = p.boomPivot.z + reach * cy;
+    p.grapplePos.x = p.stickTip.x; p.grapplePos.y = p.stickTip.y + this.groundLift; p.grapplePos.z = p.stickTip.z;
     p.grappleYaw = yaw + s.rotator;
-    if (!this.bodyInit) { // vor dem ersten Physikschritt haengt die Spinne lotrecht am Kardan
-      p.grapplePos.x = p.stickTip.x; p.grapplePos.y = p.stickTip.y; p.grapplePos.z = p.stickTip.z;
-      quatFromAxisY(p.grappleYaw, p.grappleQuat);
-      p.sensorPos.x = p.stickTip.x; p.sensorPos.y = p.stickTip.y - (this.grappleLink + this.palmOffsetY + this.palmToSensor); p.sensorPos.z = p.stickTip.z;
-    }
+    // Gieren zuerst, dann Neigung um Weltachsen (wie im Prototyp: qTilt × qYaw)
+    quatFromAxisY(p.grappleYaw, this.qYaw); quatFromAxisX(p.swingX, this.qTiltX); quatFromAxisZ(p.swingZ, this.qTiltZ);
+    quatMul(this.qTiltX, this.qTiltZ, this.qTilt); quatMul(this.qTilt, this.qYaw, p.grappleQuat);
+    // Sensor hängt unter dem Kardan — mit der Neigung mit
+    this.hang.x = 0; this.hang.y = -(this.grappleLink + this.palmOffsetY + this.palmToSensor); this.hang.z = 0;
+    rotateVec(this.qTilt, this.hang, this.hang);
+    p.sensorPos.x = p.grapplePos.x + this.hang.x; p.sensorPos.y = p.grapplePos.y + this.hang.y; p.sensorPos.z = p.grapplePos.z + this.hang.z;
     p.splay = this.splay(s);
     p.chassisQuat.x = 0; p.chassisQuat.y = Math.sin(s.heading / 2); p.chassisQuat.z = 0; p.chassisQuat.w = Math.cos(s.heading / 2);
   }

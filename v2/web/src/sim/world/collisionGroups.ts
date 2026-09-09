@@ -22,8 +22,6 @@ export const COLLISION = {
   static: groups(GROUP.STATIC, ALL),
   loose: groups(GROUP.LOOSE, GROUP.STATIC | GROUP.LOOSE | GROUP.EXCAVATOR | GROUP.HELD | GROUP.VEHICLE),
   excavator: groups(GROUP.EXCAVATOR, GROUP.STATIC | GROUP.LOOSE | GROUP.VEHICLE),
-  /** Spinne 2.0 (E-038): der dynamische Spinnenkoerper und seine Krallen — Boden, lose Teile, Fahrzeuge; nie die eigene Ladung (HELD) */
-  grapple: groups(GROUP.EXCAVATOR, GROUP.STATIC | GROUP.LOOSE | GROUP.VEHICLE),
   /** Krallen bei schliessender/geschlossener Spinne: keine losen Teile mehr wegschleudern (E-025) — nur Boden/Fahrzeuge */
   clawsClosed: groups(GROUP.EXCAVATOR, GROUP.STATIC | GROUP.VEHICLE),
   /** Gehaltene Teile sind kinematisch (= unendlich schwer): Kontakt mit losen Teilen wuerde diese wegschleudern —

@@ -192,18 +192,10 @@ export class ScrapSystem implements System {
   }
 
   /** Alle Körper sofort schlafen legen — nach der Vorsimulation beim Laden. */
-  /**
-   * Alle schlafen legen — ausser Teile nahe der Spinne: Spinne 2.0 ist ein dynamischer Koerper, der nie schlaeft.
-   * Ein per sleep() erzwungen schlafendes Teil, das in seiner Insel liegt, faellt sonst „schlafend" durch den Boden
-   * (Test grapple2: Coil bei −0,63 m). Rapier weckt sie ueber den Kontakt ohnehin wieder.
-   */
-  sleepAll(ctx?: SimContext): void {
-    const g = ctx ? (ctx.get("excavator") as unknown as { pose: { grapplePos: { x: number; y: number; z: number } } }).pose.grapplePos : null;
+  sleepAll(): void {
     for (const item of this.ctx.world.items.values()) {
       const b = this.ctx.physics.safeBody(item.bodyHandle);
-      if (!b) continue;
-      if (g && Math.hypot(item.pos.x - g.x, item.pos.z - g.z) < 3 && item.pos.y > g.y - 3.5) continue;
-      b.sleep(); item.sleeping = true;
+      if (b) { b.sleep(); item.sleeping = true; }
     }
   }
 
@@ -232,7 +224,7 @@ export class ScrapSystem implements System {
     }
     if (check && anyAwake && this.sleepLin2 > 0) {
       this.quietChecks = allStill ? this.quietChecks + 1 : 0;
-      if (this.quietChecks >= 3) { this.sleepAll(ctx); this.quietChecks = 0; }
+      if (this.quietChecks >= 3) { this.sleepAll(); this.quietChecks = 0; }
     }
   }
 

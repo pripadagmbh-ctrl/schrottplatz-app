@@ -2,7 +2,15 @@
 
 Jede Architektur- oder Design-Entscheidung mit Datum und Begründung, damit nichts zweimal diskutiert wird (CLAUDE.md). Neueste oben.
 
-## 2026-09-09 — Spinne 2.0, Lieferung 1: Physik (gebaut, Gerätetest offen)
+## 2026-09-09 — Spinne 2.0, Lieferung 1 — **zurückgenommen** (Patrick, iPad-Test 09.09.)
+
+| # | Entscheidung | Begründung | Alternative (verworfen) |
+|---|---|---|---|
+| E-042 | Spinne 2.0 (E-038–E-041) komplett zurückgenommen; Code exakt auf den Stand M5a (Commit 0bcbb5e) gesetzt, Tieflader-Garantie an Tag 1 bleibt. `GrapplePoseSystem.ts` und `test/sim/grapple2.test.ts` sind leere Reste und können gelöscht werden | iPad-Test: Spinnenkörper löste sich vom Arm (hing 2 m neben der Stielspitze), Handling und Optik „schwere Fehler". Im Container/Test hielt die Feder, auf dem Gerät nicht — mutmaßlich Aufholschritte bei Bildratenabfall (Feder gekappt bei 22 kN → Körper bleibt zurück) | Nachbessern auf dem Gerät (verworfen: Kernstück darf nicht als Baustelle live sein) |
+
+Lehre: Physikumbau der Spinne nur noch in kleinen, einzeln auf dem iPad abgenommenen Schritten auf Basis der Kinematik (siehe nächster Plan).
+
+### (Archiv) Spinne 2.0, Lieferung 1: Physik — nicht mehr im Code
 
 | # | Entscheidung | Begründung | Alternative (verworfen) |
 |---|---|---|---|

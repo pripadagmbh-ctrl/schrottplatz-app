@@ -17,7 +17,6 @@ import { DaySystem } from "./systems/DaySystem";
 import { MissionSystem } from "./systems/MissionSystem";
 import { TutorialSystem } from "./systems/TutorialSystem";
 import { CompositeSystem } from "./systems/CompositeSystem";
-import { GrapplePoseSystem } from "./systems/GrapplePoseSystem";
 
 /**
  * Bündelt WorldState, PhysicsWorld, Level, Scheduler und EventBus zu einer kopflosen Simulation.
@@ -72,7 +71,6 @@ export class Simulation {
     this.scheduler.register(this.vehicles);           // preStep 15
     this.scheduler.register(this.composites);         // preStep 18
     this.scheduler.register(this.grip);               // preStep 20
-    this.scheduler.register(new GrapplePoseSystem()); // postStep 5
     this.scheduler.register(this.scrap);              // postStep 10
     this.scheduler.register(this.aim);                // postStep 20
     this.scheduler.register(this.containers);         // slow ×6
