@@ -1,5 +1,8 @@
 import type { System, SimContext } from "./System";
+import type { ScrapSystem } from "./ScrapSystem";
+import type { Level } from "@/sim/world/Level";
 import type { VehicleSystem } from "./VehicleSystem";
+import type { UpgradeSystem } from "./UpgradeSystem";
 import { emptyDayReport, type DayState, type EconomyState } from "@/sim/world/WorldState";
 
 /**
@@ -15,6 +18,7 @@ import { emptyDayReport, type DayState, type EconomyState } from "@/sim/world/Wo
  * Speichert Tag + Wirtschaft (Bagger-Pose liegt in world.excavator und wird hier mitgesichert).
  */
 export class DaySystem implements System {
+  constructor(private readonly level: Level) {}
   readonly name = "day";
   readonly phase = "slow" as const;
   readonly order = 30;
@@ -40,7 +44,16 @@ export class DaySystem implements System {
   get day(): DayState { return this.ctx.world.day; }
   get economy(): EconomyState { return this.ctx.world.economy; }
   /** Wie viele Fuhren der Tag laut Plan hat (Tag 0 = 0, Tutorial ruft selbst). */
-  plannedDeliveries(day = this.day.day): number { const t = this.ctx.data.balancing.day.deliveriesPerDay; return t[String(day)] ?? t["4"] ?? 2; }
+  plannedDeliveries(day = this.day.day): number {
+    const t = this.ctx.data.balancing.day.deliveriesPerDay;
+    const geplant = t[String(day)] ?? t["4"] ?? 2;
+    if (day < 1) return geplant; // Tag 0 bleibt das Tutorial
+    // Wer ausgebaut hat, bekommt mehr Kundschaft — der Wert steht als
+    // deliveriesPerDay in upgrades.json und ersetzt den Tagesplan, sobald er
+    // darüber liegt.
+    const ausbau = this.ctx.get<UpgradeSystem>("upgrades").deliveriesPerDayOverride;
+    return ausbau !== null && ausbau > geplant ? ausbau : geplant;
+  }
   /** Fuhren erledigt und keine mehr geplant → Tag kann ohne Verlust beendet werden. */
   get deliveriesFinished(): boolean {
     const d = this.day; const veh = this.ctx.get<VehicleSystem>("vehicles");
@@ -58,7 +71,33 @@ export class DaySystem implements System {
     this.ctx.bus.emit("dayPhaseChanged", { day: d.day, phase });
   }
 
-  startDay(): boolean { if (this.day.phase !== "morning") return false; this.setPhase("work"); return true; }
+  startDay(): boolean {
+    if (this.day.phase !== "morning") return false;
+    this.setPhase("work");
+    this.topUpPile();
+    return true;
+  }
+
+  /**
+   * Grundstock auf der Abladeflaeche (Patrick 09.09.: „es soll auch immer ein Schrotthaufen liegen bleiben"):
+   * Liegt dort morgens weniger als `pileMinKg`, wird bis `pileTargetKg` aufgefuellt. So sieht der Platz nie
+   * leergeraeumt aus und es gibt immer Arbeit — abgeraeumt wird trotzdem, der Nachschub kommt erst am naechsten Morgen.
+   */
+  private topUpPile(): void {
+    const b = this.ctx.data.balancing.scrap as Record<string, number>;
+    const minKg = Number(b["pileMinKg"] ?? 0), zielKg = Number(b["pileTargetKg"] ?? 0);
+    if (minKg <= 0 || zielKg <= 0) return;
+    let kg = 0;
+    for (const it of this.ctx.world.items.values()) {
+      if (it.state === "loose" && this.level.inZone("intake_pile", it.pos.x, it.pos.z)) kg += it.massKg;
+    }
+    if (kg >= minKg) return;
+    const scrap = this.ctx.get<ScrapSystem>("scrap");
+    const fehlend = zielKg - kg;
+    const stueck = Math.max(1, Math.round(fehlend / Number(b["pileAvgItemKg"] ?? 45)));
+    const n = scrap.spawnPile("intake_pile", stueck, this.day.day * 977 + 13);
+    if (n > 0) this.ctx.bus.emit("toast", { text: `Nachschub auf dem Platz: ${n} Teile`, kind: "info" });
+  }
 
   /** Feierabend: Fixkosten, Zinsen, Pleite-Pruefung. Fahrzeuge auf dem Platz laufen weiter aus (kein Abbruch). */
   endDay(): boolean {

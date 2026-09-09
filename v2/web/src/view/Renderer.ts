@@ -14,6 +14,7 @@ import type { VehicleRun } from "@/sim/systems/VehicleSystem";
 import type { AimState } from "@/sim/systems/AimSystem";
 import type { ExcavatorPose } from "@/sim/systems/ExcavatorSystem";
 import type { ControlFrame } from "@/sim/control/ControlFrame";
+import { BuildingsView } from "./BuildingsView";
 
 const AXIS_Y = new THREE.Vector3(0, 1, 0);
 
@@ -33,6 +34,9 @@ export class Renderer {
   readonly rig: CameraRig;
   readonly aimRing: AimRing;
   readonly vehicles: VehicleView; readonly fills: ContainerFillView;
+  private readonly buildings: BuildingsView;
+  /** Ausbau-Kennung → Gebäudestufe, aus upgrades.json */
+  private readonly stufeJeAusbau = new Map<string, number>();
   private runs: readonly VehicleRun[] = [];
   private aim: AimState | null = null;
   private readonly modelPose: ModelPose = { pos: { x: 0, y: 0, z: 0 }, heading: 0, cabYaw: 0, boomAngle: 0, stickAngle: 0, rotatorYaw: 0, splay: 0, cabLift: 0, outriggerDown: 0, bladeDown: 0, inputs: { cab: 0, boom: 0, stick: 0, grapple: 0 } };
@@ -89,6 +93,9 @@ export class Renderer {
         innerW: Number(pb["innerW"]), innerD: Number(pb["innerD"]), wallH: Number(pb["wallH"]), plateT: Number(pb["plateT"]),
       });
     }
+    // Betriebsgebäude: Häuschen, Büro, Halle — je nach Ausbaustufe sichtbar
+    this.buildings = new BuildingsView(this.scene, level);
+    for (const u of data.upgrades.upgrades) if (u.stage) this.stufeJeAusbau.set(u.id, u.stage);
     const ex = data.balancing.excavator as Record<string, number | number[]>;
     this.excavator = new ExcavatorModel(this.scene, {
       boomLen: Number(ex["boomLenM"]), stickLen: Number(ex["stickLenM"]), boomPivot: ex["boomPivot"] as [number, number, number], grappleLink: Number(ex["grappleLinkM"]),
@@ -153,6 +160,14 @@ export class Renderer {
   private pressView: PressView | null = null;
 
   render(world: WorldState, alpha: number, frameDt: number, control?: ControlFrame): void {
+    // Gebäude folgen der Ausbaustufe. Die Stufe steht in economy.upgrades;
+    // die Ansicht liest nur, sie entscheidet nichts.
+    let stufe = 1;
+    for (const id of world.economy.upgrades) {
+      const s = this.stufeJeAusbau.get(id);
+      if (s && s > stufe) stufe = s;
+    }
+    this.buildings.setStage(stufe);
     this.pressView?.update(this.press.lidAngle, this.press.ramX, this.press.running, this.press.blocked);
     this.scrap.update(world, alpha);
     this.compositeView.update(world, alpha);

@@ -133,7 +133,11 @@ describe("Paketierpresse", () => {
     const z = sim.level.zone("press"); const ex = sim.world.excavator;
     const b = sim.data.balancing.excavator as Record<string, number>;
     const reach = Number(b["boomLenM"]) + Number(b["stickLenM"]);
-    expect(Math.hypot(z.x - ex.pos.x, z.z - ex.pos.z), "Muldenmitte in Reichweite (E-048)").toBeLessThan(reach - 1);
+    // Die Mulde ist 10 m lang (Prototyp-Maß) — eingefüllt wird über die lange Kante, nicht in der Mitte.
+    // Geprüft wird daher der nächste Punkt des Rechtecks, so wie es data.test.ts für die Mulden tut.
+    const dx = Math.max(0, Math.abs(z.x - ex.pos.x) - z.hw);
+    const dz = Math.max(0, Math.abs(z.z - ex.pos.z) - z.hd);
+    expect(Math.hypot(dx, dz), "Einfüllkante in Reichweite (E-048/E-059)").toBeLessThan(reach - 1);
     sim.dispose();
   });
 });

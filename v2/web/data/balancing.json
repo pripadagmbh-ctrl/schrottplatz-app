@@ -155,9 +155,12 @@
     "busyKg": 6000,
     "jamKg": 16000,
     "jamClearKg": 11000,
-    "_src": "shift.ts:17-21",
+    "_src": "shift.ts:17-21 | Grundstock (E-057, alle SW): faellt der Haufen auf der Abladeflaeche morgens unter pileMinKg, wird auf pileTargetKg aufgefuellt (Patrick 09.09.: „es soll auch immer ein Schrotthaufen liegen bleiben\")",
     "startPileCount": 40,
-    "startPileZone": "intake_pile"
+    "startPileZone": "intake_pile",
+    "pileMinKg": 900,
+    "pileTargetKg": 2200,
+    "pileAvgItemKg": 45
   },
   "customers": {
     "privatePatienceS": 60,
@@ -222,8 +225,8 @@
     "rotatorFactor": 1.8,
     "engageWindowStart": 0.3,
     "disengageRadiusM": 0.4,
-    "unloadOffsetM": 5.0,
-    "_src": "Briefing Kap. 8.1 (SW): Timer laeuft bei Zugkraft > 0,5; Rotator zaehlt x1,8; Tieflader setzt das Wrack seitlich ab (Annahme M5) | Ablage (E-047, 09.09.): unloadSide=right + unloadOffsetM 5,0 (SW) setzen das Wrack an der Annahme neben dem Tieflader ab, 4,9-7,2 m vom Bagger — vorher lag es im Zerlegebereich 20,8 m weg bei 9,2 m Reichweite und war unerreichbar (Patrick, iPad 09.09.)",
+    "unloadOffsetM": 3.0,
+    "_src": "Briefing Kap. 8.1 (SW): Timer laeuft bei Zugkraft > 0,5; Rotator zaehlt x1,8; Tieflader setzt das Wrack seitlich ab (Annahme M5) | Ablage (E-047/E-056): unloadSide=left + unloadOffsetM 3,25 (SW) setzen das Wrack neben dem haltenden Tieflader auf der Abladeflaeche ab, rund 7 m vom Bagger — vorher lag es im Zerlegebereich 20,8 m weg und war unerreichbar (Patrick, iPad 09.09.)",
     "firstWreckDay": 1,
     "unloadSide": "right"
   },
@@ -237,8 +240,8 @@
     "_src": "Spinne Schritt 1 (E-043, alle SW): Zinken schieben lose Teile mit hoechstens pushMaxMs (Kraftstoss, Anteil pushGain); wer schon schneller als pushMaxMs*pushSpeedCapFactor ist, bekommt keinen Schub mehr (Aufschaukeln, Messung 09.09.); geschobene Masse bremst das Schliessen bis brakeMin"
   },
   "press": {
-    "innerW": 6.0,
-    "innerD": 2.8,
+    "innerW": 10.0,
+    "innerD": 4.0,
     "wallH": 1.9,
     "plateT": 0.3,
     "lidOpenAngle": 2.65,
@@ -254,6 +257,6 @@
       0.42,
       0.6
     ],
-    "_src": "Paketierpresse nach Prototyp `world/press.ts` (Design 29.08./02.09.2026): Muldenmasse dort 10 x 4 m — hier auf 6 x 2,8 m gekuerzt, damit die Einfuellkante vom Standplatz aus erreichbar bleibt (E-048). Zeiten, Klappenwinkel 2,65 rad und die Paketdicken-Formel unveraendert aus dem Prototyp uebernommen; baleHalf (SW) ist die Paketgroesse in v2"
+    "_src": "Paketierpresse nach Prototyp `world/press.ts` (Design 29.08./02.09.2026): Mulde 10 x 4 m, Wandhoehe 1,9 m, Klappenwinkel 2,65 rad, Zeiten und Paketdicken-Formel unveraendert uebernommen. baleHalf (SW) ist die Paketgroesse in v2"
   }
 }

@@ -89,15 +89,15 @@ describe("Greifen kinematisch", () => {
     const sim = new Simulation(loadGameData());
     sim.init();
     sim.scrap.spawnPile("intake", 120, 3); sim.settle();
-    // hoch über die Annahmefläche (z = −5), Spinne offen
-    aimSensorAt(sim, 0, 4, -5);
+    // hoch über die Annahmefläche (seit E-059 im Norden bei z = 7), Spinne offen
+    aimSensorAt(sim, 0, 4, 6);
     sim.control.boom = -1; // absenken
     let minFactorDescending = 1;
     for (let i = 0; i < 60; i++) { sim.step(); if (sim.excavator.pose.grapplePos.y - 2.4 > 1.6) minFactorDescending = Math.min(minFactorDescending, sim.excavator.plowFactor); }
     sim.control.boom = 0;
     expect(minFactorDescending, "Bremse ohne Kontakt").toBeGreaterThan(0.95);
     // jetzt auf Haufenhöhe schwenken
-    aimSensorAt(sim, 3, 0.5, -5);
+    aimSensorAt(sim, 3, 0.5, 6);
     sim.control.cab = -1;
     let minFactorSwing = 1;
     for (let i = 0; i < 90; i++) { sim.step(); minFactorSwing = Math.min(minFactorSwing, sim.excavator.plowFactor); }

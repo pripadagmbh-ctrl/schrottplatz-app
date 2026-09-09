@@ -16,6 +16,7 @@ import { ContainerSystem } from "./systems/ContainerSystem";
 import { DaySystem } from "./systems/DaySystem";
 import { MissionSystem } from "./systems/MissionSystem";
 import { TutorialSystem } from "./systems/TutorialSystem";
+import { UpgradeSystem } from "./systems/UpgradeSystem";
 import { PressSystem } from "./systems/PressSystem";
 import { CompositeSystem } from "./systems/CompositeSystem";
 
@@ -39,8 +40,9 @@ export class Simulation {
   readonly aim: AimSystem;
   readonly vehicles: VehicleSystem;
   readonly containers: ContainerSystem;
-  readonly day = new DaySystem();
+  readonly day: DaySystem;
   readonly missions: MissionSystem;
+  readonly upgrades: UpgradeSystem;
   readonly press: PressSystem;
   readonly tutorial: TutorialSystem;
   readonly dt: number;
@@ -57,6 +59,7 @@ export class Simulation {
       world: this.world, physics: this.physics, data, bus: this.bus, control: this.control,
       get: <T extends System>(name: string) => scheduler.get<T>(name),
     };
+    this.day = new DaySystem(this.level);
     this.press = new PressSystem(this.level);
     this.scrap = new ScrapSystem(this.level);
     this.aim = new AimSystem(this.level);
@@ -64,6 +67,7 @@ export class Simulation {
     this.containers = new ContainerSystem(this.level);
     this.missions = new MissionSystem(this.level);
     this.tutorial = new TutorialSystem(this.level);
+    this.upgrades = new UpgradeSystem();
     this.registerDefaultSystems();
   }
 
@@ -81,6 +85,7 @@ export class Simulation {
     this.scheduler.register(this.press);              // slow ×6 (35)
     this.scheduler.register(this.missions);           // slow ×6 (40)
     this.scheduler.register(this.tutorial);           // slow ×6 (50)
+    this.scheduler.register(this.upgrades);           // slow ×30 (90)
     this.scheduler.register(new HeartbeatSystem());   // postStep 1000
   }
 

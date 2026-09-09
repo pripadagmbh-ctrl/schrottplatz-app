@@ -2,6 +2,8 @@
 
 Neuaufbau nach `../docs/02_Briefing.md` (Kap. 17 Architektur, Kap. 22 Meilensteine). Stand: **M5b — Presse** (E-048–E-050), auf Basis M5a und Spinne Schritt 1 (E-043–E-046). Spinne 2.0 (E-038) wurde am 09.09. zurückgenommen (E-042); die Steuerung bleibt kinematisch, Physik kommt nur als Wirkung dazu, in einzeln abgenommenen Schritten.
 
+**Platz (E-059, nach Prototyp-Vorlage):** Bagger im Zentrum, links der offene Stahlhaufen, rechts die Betonlego-Reihe (Edelstahl, Alu, Kupfer, Kabel — dreiseitig, offen zum Bagger) und dahinter Rücken an Rücken E-Schrott, Reifen und Störstoff. Im Süden Presse und Ballenlager, im Norden die Annahme; Tor und Waage am Nordrand. Auf der Annahme bleibt ein Grundstock liegen (E-057).
+
 **Paketierpresse (M5b, nach Prototyp-Vorbild):** Mulde nördlich vom Bagger — losen Schrott mit der Spinne einfüllen, im Menü ☰ „Presse auslösen“: Deckelklappen schließen, der Stempel fährt längs durch und presst alles zu einem Paket. Sortenrein eingefüllt gibt ein sauberes Paket; ein Wrack mit Batterie oder Motor blockiert (E-052 bis E-055).
 
 **Zuletzt behoben (E-047):** Das Wrack lag 20,8 m vom Bagger entfernt im Zerlegebereich und war bei 9,2 m Reichweite unerreichbar. Der Tieflader hält jetzt an der Annahme und setzt es 7,2 m neben dem Bagger ab. Der Zerlegebereich steht dafür vorerst leer.

@@ -85,8 +85,7 @@ export class PressSystem implements System {
     const z = this.level.zone("press"); this.cx = z.x; this.cz = z.z;
     this.lidAngle = this.lidOpen;
     this.ramHome = this.innerW / 2 - 0.35; this.ramX = this.ramHome; this.ramTarget = this.ramHome;
-    this.build(ctx);
-    this.sync();
+    this.build(ctx); // Startpose steckt schon in build() — kein sync() noetig, das wuerde nur einen Sprung erzeugen
   }
 
   /** Mulde als feste Wände, Klappen und Stempel als kinematische Körper (wie der Prototyp). */
@@ -104,13 +103,22 @@ export class PressSystem implements System {
     for (const [x, z, sx, sz] of walls) {
       w.createCollider(RAPIER.ColliderDesc.cuboid(sx / 2, h / 2, sz / 2).setTranslation(x, h / 2 + 0.3, z).setCollisionGroups(COLLISION.static), fixed);
     }
+    // Klappen und Stempel gleich an ihrer Startpose erzeugen. Wer sie am Weltursprung anlegt und erst per
+    // setNextKinematicTranslation versetzt, erzeugt einen Sprung ueber den halben Platz — Rapier leitet daraus eine
+    // Geschwindigkeit von ueber 2000 m/s ab und schleudert jedes Teil weg, das auf der Strecke liegt
+    // (Messung 09.09.: zwei Teile mit 80 m/s ins Nichts, Vorsimulation lief nie zur Ruhe).
     const lidReach = id / 2 + 0.14, lidLen = iw + 0.25;
+    const hingeY0 = h - 0.1 + 0.3, sa0 = Math.sin(this.lidAngle), ca0 = Math.cos(this.lidAngle);
     for (let i = 0; i < 2; i++) {
-      const b = w.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased());
+      const side = i === 0 ? -1 : 1;
+      const th = side * this.lidAngle;
+      const b = w.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased()
+        .setTranslation(this.cx, hingeY0 + (lidReach / 2) * sa0, this.cz + side * (id / 2 + 0.12) - side * (lidReach / 2) * ca0)
+        .setRotation({ x: Math.sin(th / 2), y: 0, z: 0, w: Math.cos(th / 2) }));
       w.createCollider(RAPIER.ColliderDesc.cuboid(lidLen / 2, this.plateT / 2, lidReach / 2).setCollisionGroups(COLLISION.excavator), b);
       this.lidBodies.push(b);
     }
-    this.ramBody = w.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased());
+    this.ramBody = w.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(this.cx + this.ramX, h / 2 + 0.3, this.cz));
     w.createCollider(RAPIER.ColliderDesc.cuboid((this.plateT * 1.4) / 2, (h - 0.1) / 2, (id - 0.1) / 2).setCollisionGroups(COLLISION.excavator), this.ramBody);
   }
 
@@ -187,7 +195,10 @@ export class PressSystem implements System {
   }
 
   update(ctx: SimContext, dt: number): void {
-    if (this.ph === "idle") { this.sync(); return; }
+    // Im Leerlauf werden die kinematischen Koerper NICHT neu gesetzt: ein jeden Schritt neu gesetzter kinematischer
+    // Koerper gilt fuer Rapier als bewegt und haelt die Kontakte ringsum wach — der Haufen kam dadurch nie zur Ruhe
+    // (Messung 09.09.: settle() lief in die Obergrenze von 600 Schritten, 4 Koerper blieben wach).
+    if (this.ph === "idle") return;
     this.t += dt;
     const lerp = (a: number, b: number, k: number) => a + (b - a) * k;
     switch (this.ph) {
@@ -241,9 +252,11 @@ export class PressSystem implements System {
       anteile.set(it.materialId, (anteile.get(it.materialId) ?? 0) + it.massKg);
       kg += it.massKg; entfernen.push(id);
     }
+    const verpressteWracks: string[] = [];
     for (const cid of c.wrecks) {
       const st = ctx.world.composites.get(cid as never); if (!st) continue;
       const def = this.composites.def(st.defId)!;
+      verpressteWracks.push(st.defId);
       const m = def.hull.massKg + this.composites.remaining(st).reduce((s, p) => s + p.massKg, 0);
       anteile.set(def.hull.materialId, (anteile.get(def.hull.materialId) ?? 0) + m);
       kg += m;
@@ -270,7 +283,12 @@ export class PressSystem implements System {
     if (bale) bale.origin = "torn";
 
     const rein = (anteile.get(dominant) ?? 0) / kg;
-    ctx.bus.emit("pressDone", { itemId: (bale?.id ?? "") as ItemId, kg, purity: rein });
+    ctx.bus.emit("pressDone", {
+      itemId: (bale?.id ?? "") as ItemId,
+      kg,
+      purity: rein,
+      compositeDefIds: verpressteWracks,
+    });
     ctx.bus.emit("toast", {
       text: rein > 0.95 ? `Paket gepresst · ${Math.round(kg)} kg sortenrein` : `Paket gepresst · ${Math.round(kg)} kg gemischt (${Math.round(rein * 100)} % ${dominant})`,
       kind: rein > 0.95 ? "good" : "info",

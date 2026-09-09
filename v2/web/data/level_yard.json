@@ -1,10 +1,10 @@
 {
   "$schema": "./schema/level.schema.json",
-  "_comment": "Briefing Kap. 12. Eine Wahrheit für Kollider, Zonen, Hindernisliste, Routen (Prototyp hatte drei: yard.ts, obstacles.ts, containers.ts). Koordinaten in m, +Z = Nord, Ursprung = Bagger-Standort. Boxen liegen im Bogen (Radius 8,5 m) um den Bagger, damit alle ohne Fahren erreichbar sind (Reichweite ≈ 9,75 m) — der Test data.test.ts prüft das.",
+  "_comment": "Platz nach dem Prototyp (prototype/src/world/{yard,containers,press}.ts, Design 29.08./02.09.2026): Bagger im Zentrum auf (0,-1), links der grosse Stahlhaufen, rechts die Betonlego-Reihe (offen zum Bagger), dahinter Ruecken an Ruecken die Nichtmetalle, im Sueden Presse und Ballenlager, im Norden die Annahme. Tor und Waage am Nordrand bei x=-22.",
   "id": "yard_v2",
   "size": {
-    "w": 60,
-    "d": 45
+    "w": 80,
+    "d": 58
   },
   "ground": {
     "material": "concrete",
@@ -12,42 +12,14 @@
   },
   "walls": [
     {
-      "id": "south_w",
+      "id": "south",
       "from": [
-        -30,
-        -22.5
+        -40,
+        -29
       ],
       "to": [
-        -4,
-        -22.5
-      ],
-      "height": 1.8,
-      "thickness": 0.6,
-      "style": "betonlego"
-    },
-    {
-      "id": "south_e",
-      "from": [
-        4,
-        -22.5
-      ],
-      "to": [
-        30,
-        -22.5
-      ],
-      "height": 1.8,
-      "thickness": 0.6,
-      "style": "betonlego"
-    },
-    {
-      "id": "north",
-      "from": [
-        -30,
-        22.5
-      ],
-      "to": [
-        30,
-        22.5
+        40,
+        -29
       ],
       "height": 1.8,
       "thickness": 0.6,
@@ -56,40 +28,68 @@
     {
       "id": "west",
       "from": [
-        -30,
-        -22.5
+        -40,
+        -29
       ],
       "to": [
-        -30,
-        22.5
+        -40,
+        29
       ],
       "height": 1.8,
       "thickness": 0.6,
-      "style": "fence"
+      "style": "betonlego"
     },
     {
       "id": "east",
       "from": [
-        30,
-        -22.5
+        40,
+        -29
       ],
       "to": [
-        30,
-        22.5
+        40,
+        29
       ],
       "height": 1.8,
       "thickness": 0.6,
-      "style": "fence"
+      "style": "betonlego"
+    },
+    {
+      "id": "north_w",
+      "from": [
+        -40,
+        29
+      ],
+      "to": [
+        -26,
+        29
+      ],
+      "height": 1.8,
+      "thickness": 0.6,
+      "style": "betonlego"
+    },
+    {
+      "id": "north_e",
+      "from": [
+        -18,
+        29
+      ],
+      "to": [
+        40,
+        29
+      ],
+      "height": 1.8,
+      "thickness": 0.6,
+      "style": "betonlego"
     }
   ],
   "gate": {
-    "x": 0,
-    "z": -22.5,
+    "x": -22,
+    "z": 29,
     "halfWidth": 4
   },
   "weighbridge": {
-    "x": 0,
-    "z": -15,
+    "x": -22,
+    "z": 24,
     "length": 10,
     "width": 3.5
   },
@@ -98,8 +98,8 @@
       "id": "hut",
       "stage": 1,
       "rect": {
-        "x": 5,
-        "z": -15,
+        "x": -17,
+        "z": 22,
         "hw": 1.5,
         "hd": 1.5
       },
@@ -110,8 +110,8 @@
       "id": "office",
       "stage": 2,
       "rect": {
-        "x": -22,
-        "z": -16,
+        "x": -30,
+        "z": 16,
         "hw": 4,
         "hd": 3
       },
@@ -122,8 +122,8 @@
       "id": "hall",
       "stage": 3,
       "rect": {
-        "x": -22,
-        "z": -8,
+        "x": -30,
+        "z": 4,
         "hw": 5,
         "hd": 4
       },
@@ -138,13 +138,13 @@
       "kind": "pile",
       "stage": 1,
       "rect": {
-        "x": 13,
-        "z": -2,
-        "hw": 4,
-        "hd": 4
+        "x": -9,
+        "z": 1,
+        "hw": 5.5,
+        "hd": 6.0
       },
-      "wallHeight": 1.8,
-      "openSide": "west"
+      "wallHeight": 0.0,
+      "openSide": "east"
     },
     {
       "id": "box_va",
@@ -152,13 +152,13 @@
       "kind": "mulde",
       "stage": 1,
       "rect": {
-        "x": -7.36,
-        "z": 4.25,
-        "hw": 2,
-        "hd": 1.2
+        "x": 4.6,
+        "z": -5.6,
+        "hw": 1.5,
+        "hd": 1.65
       },
-      "wallHeight": 1.6,
-      "openSide": "south"
+      "wallHeight": 2.5,
+      "openSide": "west"
     },
     {
       "id": "box_alu",
@@ -166,13 +166,13 @@
       "kind": "mulde",
       "stage": 1,
       "rect": {
-        "x": -4.25,
-        "z": 7.36,
-        "hw": 2,
-        "hd": 1.2
+        "x": 4.6,
+        "z": -1.9,
+        "hw": 1.5,
+        "hd": 1.65
       },
-      "wallHeight": 1.6,
-      "openSide": "south"
+      "wallHeight": 2.5,
+      "openSide": "west"
     },
     {
       "id": "box_copper",
@@ -180,13 +180,13 @@
       "kind": "mulde",
       "stage": 1,
       "rect": {
-        "x": 0.0,
-        "z": 8.5,
-        "hw": 2,
-        "hd": 1.2
+        "x": 4.6,
+        "z": 1.9,
+        "hw": 1.5,
+        "hd": 1.65
       },
-      "wallHeight": 1.6,
-      "openSide": "south"
+      "wallHeight": 2.5,
+      "openSide": "west"
     },
     {
       "id": "box_cable",
@@ -194,13 +194,41 @@
       "kind": "mulde",
       "stage": 1,
       "rect": {
-        "x": 4.25,
-        "z": 7.36,
-        "hw": 2,
-        "hd": 1.2
+        "x": 4.6,
+        "z": 5.6,
+        "hw": 1.5,
+        "hd": 1.65
       },
-      "wallHeight": 1.6,
-      "openSide": "south"
+      "wallHeight": 2.5,
+      "openSide": "west"
+    },
+    {
+      "id": "box_ewaste",
+      "materialId": "ewaste",
+      "kind": "mulde",
+      "stage": 1,
+      "rect": {
+        "x": 7.9,
+        "z": -3.9,
+        "hw": 1.5,
+        "hd": 1.75
+      },
+      "wallHeight": 2.0,
+      "openSide": "east"
+    },
+    {
+      "id": "box_tires",
+      "materialId": "tire",
+      "kind": "mulde",
+      "stage": 1,
+      "rect": {
+        "x": 7.9,
+        "z": 0,
+        "hw": 1.5,
+        "hd": 1.75
+      },
+      "wallHeight": 2.0,
+      "openSide": "east"
     },
     {
       "id": "box_contaminant",
@@ -208,40 +236,12 @@
       "kind": "mulde",
       "stage": 1,
       "rect": {
-        "x": 7.36,
-        "z": 4.25,
-        "hw": 2,
-        "hd": 1.2
+        "x": 7.9,
+        "z": 3.9,
+        "hw": 1.5,
+        "hd": 1.75
       },
-      "wallHeight": 1.6,
-      "openSide": "south"
-    },
-    {
-      "id": "box_tires",
-      "materialId": "tire",
-      "kind": "mulde",
-      "stage": 2,
-      "rect": {
-        "x": -8.5,
-        "z": 0,
-        "hw": 1.2,
-        "hd": 2
-      },
-      "wallHeight": 1.6,
-      "openSide": "east"
-    },
-    {
-      "id": "box_ewaste",
-      "materialId": "ewaste",
-      "kind": "mulde",
-      "stage": 2,
-      "rect": {
-        "x": -8.5,
-        "z": -5,
-        "hw": 1.2,
-        "hd": 2
-      },
-      "wallHeight": 1.6,
+      "wallHeight": 2.0,
       "openSide": "east"
     }
   ],
@@ -249,199 +249,208 @@
     {
       "id": "intake",
       "rect": {
-        "x": 0,
-        "z": -5,
-        "hw": 6,
-        "hd": 3
+        "x": 0.0,
+        "z": 7.0,
+        "hw": 4.0,
+        "hd": 4.0
+      }
+    },
+    {
+      "id": "intake_pile",
+      "rect": {
+        "x": 0.0,
+        "z": 7.0,
+        "hw": 3.2,
+        "hd": 3.2
       }
     },
     {
       "id": "dismantle",
       "rect": {
-        "x": -16,
-        "z": 2,
-        "hw": 4,
-        "hd": 3
+        "x": 0.0,
+        "z": 7.0,
+        "hw": 4.0,
+        "hd": 4.0
       }
     },
     {
       "id": "press",
       "rect": {
-        "x": 0,
-        "z": 4.6,
-        "hw": 3.2,
-        "hd": 1.6
+        "x": -8.5,
+        "z": -7.0,
+        "hw": 5.0,
+        "hd": 2.0
       }
     },
     {
-      "id": "toolswap",
+      "id": "bales",
       "rect": {
-        "x": -22,
-        "z": -1,
-        "hw": 1.5,
-        "hd": 1.5
+        "x": -2.6,
+        "z": -7.0,
+        "hw": 1.6,
+        "hd": 2.1
       }
     },
     {
       "id": "pickup",
       "rect": {
-        "x": -4,
-        "z": 12.5,
-        "hw": 10,
+        "x": -22.0,
+        "z": 14.0,
+        "hw": 2.0,
+        "hd": 6.0
+      }
+    },
+    {
+      "id": "toolswap",
+      "rect": {
+        "x": -14.0,
+        "z": -12.0,
+        "hw": 1.5,
         "hd": 1.5
       }
     },
     {
       "id": "lane_block_check",
       "rect": {
-        "x": -4,
-        "z": -5,
-        "hw": 2,
+        "x": -8.0,
+        "z": 12.0,
+        "hw": 2.5,
         "hd": 2.5
-      }
-    },
-    {
-      "id": "intake_pile",
-      "rect": {
-        "x": 2.5,
-        "z": -5,
-        "hw": 3.2,
-        "hd": 2.6
       }
     }
   ],
   "routes": {
     "deliver_in": [
       [
-        0,
-        -27
+        -22,
+        34
+      ],
+      [
+        -22,
+        24
+      ],
+      [
+        -18,
+        16
+      ],
+      [
+        -6,
+        11
       ],
       [
         0,
-        -15
-      ],
-      [
-        -4,
-        -12
-      ],
-      [
-        -12,
-        -10
-      ]
-    ],
-    "deliver_out": [
-      [
-        -5.8,
-        -5.0
-      ],
-      [
-        -10,
-        -8.5
-      ],
-      [
-        -12,
-        -11
-      ],
-      [
-        -4,
-        -13
-      ],
-      [
-        0,
-        -15
-      ],
-      [
-        0,
-        -27
-      ]
-    ],
-    "lowloader_in": [
-      [
-        0,
-        -27
-      ],
-      [
-        0,
-        -15
-      ],
-      [
-        0,
-        -7
-      ]
-    ],
-    "lowloader_out": [
-      [
-        0,
-        -7
-      ],
-      [
-        0,
-        -15
-      ],
-      [
-        0,
-        -27
-      ]
-    ],
-    "pickup_in": [
-      [
-        0,
-        -27
-      ],
-      [
-        0,
-        -15
-      ],
-      [
-        -12,
-        -9
-      ],
-      [
-        -12,
-        12.5
-      ],
-      [
-        -4,
-        12.5
-      ]
-    ],
-    "pickup_out": [
-      [
-        -4,
-        12.5
-      ],
-      [
-        -12,
-        12.5
-      ],
-      [
-        -12,
-        -9
-      ],
-      [
-        0,
-        -15
-      ],
-      [
-        0,
-        -27
+        11.5
       ]
     ],
     "deliver_dock": [
       [
-        -12,
-        -10
+        0,
+        11.5
       ],
       [
-        -5.8,
-        -5.0
+        0,
+        8.5
+      ]
+    ],
+    "deliver_out": [
+      [
+        0,
+        8.5
+      ],
+      [
+        -6,
+        13
+      ],
+      [
+        -18,
+        17
+      ],
+      [
+        -22,
+        24
+      ],
+      [
+        -22,
+        34
+      ]
+    ],
+    "lowloader_in": [
+      [
+        -22,
+        34
+      ],
+      [
+        -22,
+        24
+      ],
+      [
+        -18,
+        16
+      ],
+      [
+        -6,
+        13
+      ],
+      [
+        2,
+        10
+      ]
+    ],
+    "lowloader_out": [
+      [
+        2,
+        10
+      ],
+      [
+        -6,
+        13
+      ],
+      [
+        -18,
+        16
+      ],
+      [
+        -22,
+        24
+      ],
+      [
+        -22,
+        34
+      ]
+    ],
+    "pickup_in": [
+      [
+        -22,
+        34
+      ],
+      [
+        -22,
+        24
+      ],
+      [
+        -22,
+        14
+      ]
+    ],
+    "pickup_out": [
+      [
+        -22,
+        14
+      ],
+      [
+        -22,
+        24
+      ],
+      [
+        -22,
+        34
       ]
     ]
   },
   "spawns": {
     "excavator": {
       "x": 0,
-      "z": 0,
+      "z": -1,
       "heading": 0
     },
     "piles": [
@@ -456,20 +465,20 @@
       "model": "floodlight",
       "at": [
         [
-          -28,
-          20
+          -36,
+          26
         ],
         [
-          28,
-          20
+          36,
+          26
         ],
         [
-          -28,
-          -20
+          -36,
+          -26
         ],
         [
-          28,
-          -20
+          36,
+          -26
         ]
       ]
     },
@@ -477,8 +486,8 @@
       "model": "sign_feierabend",
       "at": [
         [
-          4.5,
-          -22
+          -26,
+          26
         ]
       ]
     }

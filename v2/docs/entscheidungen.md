@@ -2,6 +2,52 @@
 
 Jede Architektur- oder Design-Entscheidung mit Datum und Begründung, damit nichts zweimal diskutiert wird (CLAUDE.md). Neueste oben.
 
+## 2026-09-09 — M6: Der Ausbau wirkt
+
+Befund vor der Arbeit: `upgrades.json` führte fünf Ausbaustufen, `economy.upgrades` wurde gespeichert und geladen — aber es gab keine Stelle zum Kaufen und keine einzige Abfrage einer Wirkung. Damit war v2 an derselben Stelle wie der Prototyp, dessen Prüfbericht vom 03.09. genau das als belegten Fehler führt (drei Stufen für zusammen 63 000 € ohne Wirkung).
+
+| # | Entscheidung | Begründung | Alternative (verworfen) |
+|---|---|---|---|
+| E-062 | **Alle Wirkungen laufen über das `UpgradeSystem`**, niemand liest `economy.upgrades` selbst aus | Im Prototyp lagen Kaufliste und Wirkung getrennt, und niemandem fiel auf, dass drei Stufen ins Leere liefen. Eine einzige Stelle lässt sich prüfen — der Strukturtest tut genau das | Abfragen dort, wo sie gebraucht werden (verstreut, nicht prüfbar) |
+| E-063 | **Der Bestand bleibt in `economy.upgrades`**; das System hat kein eigenes `save()` | Er wird dort schon gespeichert und geladen. Ein zweiter Speicherort hieße zwei Wahrheiten, die auseinanderlaufen können | Eigenes save/load im System (Architektur-Regel verlangt es, hier aber doppelt) |
+| E-064 | **Gekauft wird am Feierabend** im Tages-Sheet, nicht während der Arbeit | Dort stehen Geld und Sterne fest — der Moment, in dem man ohnehin überlegt, wie es weitergeht. Ein Kaufmenü im Betrieb würde den Arbeitsfluss unterbrechen | Jederzeit über das ☰-Menü |
+| E-065 | **Bezahlt wird mit Sternen UND Geld** | Geld allein könnte man durch bloßes Weiterspielen ansammeln. Sterne belegen, dass die Aufträge erfüllt wurden — der Ausbau folgt dem Können, nicht der Zeit | Nur Geld (wie im Prototyp) |
+| E-066 | **Gebäude kommen aus `level_yard.json`** (`buildings[].stage`), die Ansicht zeigt alles bis zur erreichten Stufe; das Häuschen weicht dem Büro | Die Daten waren bereits vorhanden und ungenutzt. So bleibt die Anordnung an einer Stelle, und die View entscheidet nichts | Gebäude im Code positionieren (Prototyp-Weg) |
+| E-067 | **`pressDone` trägt `compositeDefIds`** | Der Auftrag „Auto pressen" prüfte nur, DASS gepresst wurde — ein Paket aus losem Blech erfüllte ihn ebenso. Der Test dazu war schon geschrieben und lief gegen ein Feld, das es nicht gab | Auftrag ungeprüft lassen |
+| E-068 | **Testdateien laufen nacheinander** (`fileParallelism: false`) | Der Geschwindigkeitswächter misst Wanduhrzeit je Physikschritt. Parallel laufende Dateien teilen sich die Kerne, und er maß deren Last mit: 0,39 ms statt < 0,30, einzeln jedoch grün. Eine Messung, die von der Nachbarschaft abhängt, taugt nicht als Wächter. Der Lauf wurde dadurch sogar schneller (67 s statt 144 s) | Schwelle anheben (verfälscht den Wächter); Perf-Test aus dem Pflichtlauf nehmen (CLAUDE.md verlangt ihn) |
+
+Offen nach M6: Halle, Schere, Magnet und große Presse sind als `tier: V1` eingetragen und werden noch nicht verkauft — ihre Wirkungen (`speedFactor`, `capacityFactor`, `pressCapacityFactor`, `staffLoader`, `tool`) sind im `UpgradeSystem` vorbereitet, aber bewusst noch nicht angeschlossen. Der Strukturtest prüft nur MVP-Stufen; wer eine V1-Stufe auf MVP hebt, wird von ihm sofort daran erinnert.
+
+## 2026-09-09 — Platz nach Prototyp-Vorlage nachgebaut (gebaut, Gerätetest offen)
+
+Patrick 09.09.: „Baue den Schrottplatz nach wie beim Prototypen." Grundlage sind `prototype/src/world/yard.ts`, `containers.ts` und `press.ts` (Design 29.08./02.09.2026); die Koordinaten sind eins zu eins übernommen.
+
+| # | Entscheidung | Begründung | Alternative (verworfen) |
+|---|---|---|---|
+| E-059 | **Platz 80 × 58 m mit der Anordnung des Prototyps:** Bagger im Zentrum auf (0, −1). Links der große **Stahlhaufen ohne Wände** (−9/1, 11 × 12 m). Rechts die **Betonlego-Reihe** von Süd nach Nord — Edelstahl, Alu, Kupfer, Kabel (x = 4,6; z = −5,6 / −1,9 / 1,9 / 5,6; je 3,0 × 3,3 m, Wand 2,5 m, offen nach Westen zum Bagger). Dahinter **Rücken an Rücken** die Nichtmetalle (x = 7,9; E-Schrott, Reifen, Störstoff; offen nach Osten, vom Radlader beschickt). Süden: **Schere/Paketierpresse** (−8,5/−7, Mulde 10 × 4 m) und daneben das **Ballenlager** (−2,6/−7). Norden: **Annahme** (0/7, 8 × 8 m), Tor und Waage am Nordrand bei x = −22 | Der Prototyp ist die vereinbarte Referenz, und seine Anordnung ist durchdacht: alles liegt im Schwenkbereich, kaum Fahren nötig. Nachgerechnet: Stahlhaufen-Kante 4,0 m, Mulden 4,7–8,0 m, Presskante 6,1 m, Ballenlager 6,5 m, Annahme 8,0 m — alles unter 9,2 m Reichweite | Eigenes Layout weiterentwickeln (E-056), das drei Anläufe brauchte und den Platz enger machte |
+| E-060 | **Mulden sind dreiseitig** — die offene Seite bleibt frei, für jede Mulde, nicht nur für Haufen | Im Prototyp sind es Betonlego-Bays mit drei Wänden und offener Front. Eine vierte Wand vor der Öffnung macht das Einwerfen unnötig schwer | Vier Wände wie bisher |
+| E-061 | **Wandhöhe 0 heißt gar keine Wände** (offener Haufenplatz) | Der Stahlhaufen des Prototyps hat Höhe 0. Ohne diese Regel entstehen Kollider mit Höhe null, in denen Teile hängen bleiben — gemessen: Teile unter dem Boden, Haufen kam nie zur Ruhe | Mindesthöhe erzwingen |
+| — | Die Presse hat wieder ihre **Originalmaße 10 × 4 m**; befüllt wird über die lange Kante, nicht über die Mitte. Die Erreichbarkeitsprüfung misst deshalb den nächsten Punkt des Rechtecks | Bei einer 10-m-Mulde ist die Mitte naturgemäß weiter weg als die Reichweite — entscheidend ist die Einfüllkante | Presse künstlich kürzen (E-055) |
+
+Abnahmekriterium: `data.test.ts` prüft, dass Stahlhaufen und alle sieben Mulden vom Standplatz aus erreichbar sind und die Fahrrouten Abstand zu ihnen halten; `press.test.ts` die Einfüllkante; `composite.test.ts` die Wrack-Ablage bei der Annahme (7,2 m).
+
+Auf dem Gerät zu prüfen: Findest du dich auf dem Platz zurecht wie im Prototyp — Stahl links, Sortierreihe rechts, Presse hinten links, Anlieferung von vorn?
+
+## 2026-09-09 — Platz neu geordnet: jede Himmelsrichtung eine Aufgabe (gebaut, Gerätetest offen)
+
+Patrick 09.09.: „die Presse hinter dem Bagger, die Sortierboxen sollen links als Betonlego-Mulden gereiht und erreichbar sein. Stahlschrott kann eine Mulde haben, Mischschrott liegt ohne Mulde da. Es soll auch immer ein Schrotthaufen liegen bleiben."
+
+| # | Entscheidung | Begründung | Alternative (verworfen) |
+|---|---|---|---|
+| E-056 | **Platzaufteilung nach Himmelsrichtung:** Westen (links vom Bagger) die gereihten Betonlego-Mulden zum Vorsortieren — sechs vorn bei x = −4,9 (Stahl, Edelstahl, Alu, Kupfer, Kabel, Störstoff) und zwei in zweiter Reihe dahinter bei x = −7,5 (E-Schrott, Reifen). Osten die offene Abladefläche: Anlieferung, Mischschrott-Haufen und Zerlegen an derselben Stelle, ohne Mulde. Süden hinter dem Bagger die Presse. Norden die Abholspur | Patricks Vorgabe. Der alte Befund E-006 („eine Reihe ist vom Zentrum nicht erreichbar") galt für 6-m-Mulden; mit 2,3 m breiten Mulden sind alle acht Plätze in Reichweite — nachgerechnet und durch einen Test gesichert. Die zweite Reihe dahinter spart Platz, bleibt aber mit 8,7 m erreichbar | Bogen beibehalten; nur eine Reihe (dann fehlen Plätze) |
+| E-057 | **Grundstock auf der Abladefläche:** Liegt dort zum Tagesbeginn weniger als 900 kg, wird auf 2200 kg aufgefüllt (alles SW) | Patrick: „es soll auch immer ein Schrotthaufen liegen bleiben". Nachschub kommt erst am nächsten Morgen — abräumen lohnt sich also weiterhin, der Platz sieht nur nie leer aus | Fester Deko-Haufen ohne Physik; gar kein Nachfüllen |
+| E-058 | Kinematische Körper werden **an ihrer Startpose erzeugt**, nie am Weltursprung und dann versetzt | Die Presse legte Klappen und Stempel bei (0,0,0) an und versetzte sie im ersten Schritt an ihren Platz. Rapier leitet aus so einem Sprung eine Geschwindigkeit von über 2000 m/s ab: zwei Teile flogen mit 80 m/s davon und die Vorsimulation kam nie zur Ruhe (600 Schritte statt 160). Gilt ab jetzt für jeden kinematischen Körper | Sprung in Kauf nehmen |
+| — | Die Presse setzt ihre Klappen im **Leerlauf nicht mehr jeden Schritt** neu | Ein jeden Schritt neu gesetzter kinematischer Körper gilt für Rapier als bewegt und hält die Kontakte ringsum wach | Immer synchronisieren |
+
+Abnahmekriterien: `press.test.ts` prüft die Erreichbarkeit der Mulde, `composite.test.ts` die Wrack-Ablage auf der Abladefläche, `day.test.ts` den Grundstock (leerer Platz wird morgens aufgefüllt, voller nicht), `scrap_sleep.test.ts` die Vorsimulation (160 Schritte).
+
+**Noch offen — eigener Schritt:** Patrick will, dass die Mulden nur zum **Vorsortieren** dienen und die Abholung nicht mehr automatisch läuft: Beim Abholen kommt ein Auflieger, der vom Spieler **beladen** werden muss. Das ist eine neue Spielmechanik (heute noch verkauft der Abrollkipper die Mulde automatisch) und wird getrennt gebaut.
+
 ## 2026-09-09 — M5b: Paketierpresse nach Prototyp-Vorbild (gebaut, Gerätetest offen)
 
 Die erste v2-Fassung (Stempel von oben, nur für Wracks) ging am Kern vorbei — Patrick 09.09.: „die Presse ist ja Käse, schau im Originalspiel nach". Der Prototyp (`prototype/src/world/press.ts`, Design 29.08./02.09.2026) hat eine **Paketierpresse**: eine oben offene Mulde, in die mit der Spinne **loser Schrott** eingefüllt wird. Genau das konnte meine Fassung nicht.
@@ -16,26 +62,6 @@ Die erste v2-Fassung (Stempel von oben, nur für Wracks) ging am Kern vorbei —
 Abnahmekriterien (`test/sim/press.test.ts`, 6 Tests): Loser Schrott wird zu einem Paket, Masse bleibt erhalten; gemischt eingefüllt sinkt die Reinheit und das schwerste Material gewinnt; ein Wrack mit Batterie oder Motor blockiert und die Presse nennt das Teil; ein ausgebautes Wrack wird mitgepresst (700 kg); leere Mulde startet nicht; die Mulde ist vom Standplatz aus erreichbar.
 
 Auf dem Gerät zu prüfen: Ein paar Teile in die Mulde werfen, Menü ☰ → „Presse auslösen" — schließen die Klappen sichtbar, fährt der Stempel durch, liegt danach ein Paket drin? Und ist die Presse an dieser Stelle im Weg, wenn du in die Sortierboxen dahinter ablegst?
-
-## 2026-09-09 — M6 Schritt 1: Zerlege- und Presse-Auftrag (gebaut, Gerätetest offen)
-
-Das Wrack lag seit E-047 ab Tag 1 auf dem Platz, ohne dass ein Auftrag dazu aufforderte. Grund: `dismantle_engine` stand auf `tier: V1` und `fromDay: 5`. Gezogen werden nur MVP-Aufträge, und die Gratis-Tage enden nach `unlockAfterDay` (3) — der Auftrag war **doppelt unerreichbar**. Patrick 09.09.: „baue Spiel zu Ende"; damit ist die in E-047 offen gelassene Entscheidung getroffen.
-
-> **Umnummeriert.** Diese drei Entscheidungen wurden als E-051 bis E-053 committet (d01c928), während parallel in einer zweiten Sitzung die Paketierpresse als E-052 bis E-055 entstand. Um die Kollision aufzulösen, heißen sie hier **E-056 bis E-058**; die Commit-Nachricht von d01c928 nennt noch die alten Nummern.
-
-| # | Entscheidung | Begründung | Alternative (verworfen) |
-|---|---|---|---|
-| E-056 | `dismantle_engine` wird **MVP, ab Tag 2**; neuer Auftrag `press_car` (250 €) **ab Tag 3** | Der Meilensteinplan (Kap. 22) sieht für M6 ohnehin einen „Presse-Auftrag Tag 3" vor. Tieflader ab Tag 1, Zerlegen Tag 2, Pressen Tag 3 — die drei Tage bauen aufeinander auf, und M5 bekommt im MVP endlich einen Zweck | (a) Tieflader erst ab Tag 5 kommen lassen — nähme dem MVP den ganzen M5-Inhalt; (b) alles lassen — das Auto bleibt Deko |
-| E-057 | Der Auftrag gilt als erfüllt, **sobald der Motor ab ist** — nicht erst beim Verkauf. Der Anzeigetext wurde entsprechend gekürzt auf „Reiß den Motor aus dem Wrack" | Zwei Bedingungen in einem Auftrag sind auf einer Handy-Karte nicht ablesbar, und das Verkaufen deckt bereits der `deliver`-Auftrag ab. Text und Prüfung sagen jetzt dasselbe | Erfüllung erst beim Verkauf des Motors |
-| E-058 | `supported()` prüft bei `dismantle`/`press`, ob bis zu diesem Tag überhaupt ein Kunde das Wrack liefert (`customers.compositeDefId`), und ob das Teil freigeschaltet ist (`unlockDay`) | Sonst kann wieder ein Auftrag gezogen werden, den niemand erfüllen kann. Die Prüfung liest die Daten, statt den Tag hart zu setzen | Feste Tageszahl im Code |
-
-**Neue Wächter-Sorte (`test/sim/mission_m6.test.ts`):** Die Tests prüfen nicht Mechanik, sondern **Erreichbarkeit** — bekommt der Spieler das überhaupt zu Gesicht? Genau das fanden Modultests nicht: Tieflader, Zerlegen und Presse waren einzeln gebaut und getestet, nur verband sie nichts. Geprüft wird: kein MVP-Auftrag startet nach dem letzten Kampagnentag; die Gratis-Tage haben jeden Tag volle `perDay` Aufträge im Topf; Zerlegen und Pressen liegen in den Gratis-Tagen; kein Auftrag verlangt ein Wrack vor der ersten Lieferung.
-
-Beim Schreiben fiel auf, dass zwei weitere MVP-Aufträge (`deliver_alu_large` ab Tag 6, `clear_intake_strict` ab Tag 8) hinter Tag 3 liegen. Das ist **kein Fehler** — sie sind Inhalt für zahlende Spieler, die Kampagne läuft 30 Tage. Der Wächter wurde korrigiert, nicht die Daten.
-
-**Offen durch die neue Presse:** `press_car` heißt „Press ein Wrack zum Paket", erfüllt sich aber bei jedem `pressDone` — seit E-052 also auch beim Pressen von losem Schrott. Text und Prüfung müssen wieder zusammengeführt werden, sobald die Paketierpresse steht.
-
-Auf dem Gerät zu prüfen: Steht an Tag 2 „Reiß den Motor aus dem Wrack" auf der Morgen-Karte, und springt der Stern, sobald der Motor fällt?
 
 ## 2026-09-09 — Wrack war unerreichbar: Ablage an der Annahme (gebaut, Gerätetest offen)
 

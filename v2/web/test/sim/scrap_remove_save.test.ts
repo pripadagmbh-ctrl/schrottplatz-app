@@ -58,10 +58,10 @@ describe("Entfernen über Registry und Spielstand", () => {
     const walls = sim.level.boxes.filter((b) => b.kind === "wall").length;
     const cont = sim.level.boxes.filter((b) => b.kind === "container").length;
     expect(walls).toBe(5);
-    expect(cont).toBe(5 * 4 + 3); // 5 Mulden × 4 Wände + Stahlhaufen 3 Wände
-    expect(sim.level.inZone("intake", 0, -5)).toBe(true);
-    expect(sim.level.containerAt(0, 8.5)).toBe("box_copper");
-    expect(sim.level.containerAt(0, 0)).toBeNull();
+    expect(cont).toBe(7 * 3); // 7 Betonlego-Mulden mit je 3 Wänden (offene Seite frei); der Stahlhaufen ist wandlos (E-059)
+    expect(sim.level.inZone("intake", 0, 7)).toBe(true); // Annahme im Norden wie im Prototyp (E-059)
+    expect(sim.level.containerAt(4.6, 1.9)).toBe("box_copper"); // Betonlego-Reihe rechts (E-059)
+    expect(sim.level.containerAt(0, -1)).toBeNull(); // Baggerplatz bleibt frei
     sim.dispose();
   });
 });

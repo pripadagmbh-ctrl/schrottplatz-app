@@ -1,6 +1,7 @@
 import type { System, SimContext } from "./System";
 import type { ScrapSystem } from "./ScrapSystem";
 import type { CompositeSystem } from "./CompositeSystem";
+import type { UpgradeSystem } from "./UpgradeSystem";
 import type { CustomerDef, VehicleDef } from "@/data/types";
 import type { DeliveryState } from "@/sim/world/WorldState";
 import type { DeliveryId, ItemId } from "@/shared/ids";
@@ -88,9 +89,14 @@ export class VehicleSystem implements System {
     return run;
   }
 
-  /** Abholer fuer einen Container rufen (Briefing 9.5). Einer gleichzeitig. */
+  /**
+   * Abholer für einen Container rufen (Briefing 9.5). Ohne Ausbau fährt einer
+   * zur Zeit; mit Büro dürfen mehrere gleichzeitig auf dem Platz sein
+   * (`pickupsParallel` aus upgrades.json).
+   */
   requestPickup(containerId: string): VehicleRun | null {
-    if (this.runs.some((r) => r.def.id === "rolloff")) return null;
+    const erlaubt = this.ctx.get<UpgradeSystem>("upgrades").pickupsParallel;
+    if (this.runs.filter((r) => r.def.id === "rolloff").length >= erlaubt) return null;
     const def = this.ctx.data.customers.vehicles.find((v) => v.id === "rolloff"); if (!def) return null;
     const delivery: DeliveryState = { id: nextId<DeliveryId>("pick"), customerId: "pickup", vehicleId: "rolloff", phase: "approach", grossKg: 0, tareKg: def.body.tareKg, priceEur: 0, tStart: this.ctx.world.step, sorted: true, materialId: null };
     this.ctx.world.deliveries.set(delivery.id, delivery);
@@ -317,7 +323,11 @@ export class VehicleSystem implements System {
       }
       case "weighIn": {
         run.timer -= dt;
-        if (run.timer <= 0) { this.ctx.bus.emit("vehicleWeighed", { deliveryId: d.id, grossKg: d.grossKg }); this.price(run); d.phase = "toDump"; run.stage = "in"; }
+        if (run.timer <= 0) {
+          this.ctx.bus.emit("vehicleWeighed", { deliveryId: d.id, grossKg: d.grossKg });
+          this.zeigeZusammensetzung(run);
+          this.price(run); d.phase = "toDump"; run.stage = "in";
+        }
         break;
       }
       case "dock": {
@@ -393,6 +403,35 @@ export class VehicleSystem implements System {
   }
 
   // ------------------------------------------------------------------ Geld
+  /**
+   * Marktkenntnis (Ausbaustufe Büro): Einer gemischten Fuhre sieht man auf
+   * der Ladefläche nicht an, was drinsteckt. Wer im Büro die Notierungen
+   * führt, weiß es schon an der Waage — und kann entscheiden, ob sich die
+   * Fuhre lohnt, bevor sie auf dem Platz liegt.
+   */
+  private zeigeZusammensetzung(run: VehicleRun): void {
+    if (!this.ctx.get<UpgradeSystem>("upgrades").showComposition) return;
+    const d = run.delivery;
+    if (d.sorted || d.compositeDefId || run.loads.length === 0) return; // nur bei Mischfuhren
+    const kgJe = new Map<string, number>();
+    let gesamt = 0;
+    for (const l of run.loads) {
+      const it = this.ctx.world.items.get(l.itemId); if (!it) continue;
+      kgJe.set(it.materialId, (kgJe.get(it.materialId) ?? 0) + it.massKg);
+      gesamt += it.massKg;
+    }
+    if (gesamt <= 0) return;
+    const text = [...kgJe.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([mat, kg]) => {
+        const namen = (this.ctx.data.i18n as { material?: Record<string, string> }).material ?? {};
+        return `${Math.round((kg / gesamt) * 100)} % ${namen[mat] ?? mat}`;
+      })
+      .join(", ");
+    this.ctx.bus.emit("toast", { text: `Waage: ${text}`, kind: "info" });
+  }
+
   private price(run: VehicleRun): void {
     const d = run.delivery, econ = this.ctx.data.balancing.economy;
     const netKg = d.grossKg - d.tareKg;

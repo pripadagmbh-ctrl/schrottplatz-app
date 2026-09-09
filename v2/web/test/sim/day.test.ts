@@ -131,3 +131,30 @@ describe("Einweisung (TutorialSystem)", () => {
     a.dispose(); b.dispose(); c.dispose();
   });
 });
+
+/**
+ * Grundstock auf dem Platz (E-057, Patrick 09.09.: „es soll auch immer ein Schrotthaufen liegen bleiben").
+ * Morgens wird die Abladefläche aufgefüllt, wenn zu wenig darauf liegt — abgeräumt werden darf trotzdem.
+ */
+describe("Schrotthaufen bleibt liegen", () => {
+  it("leerer Platz wird zum Tagesbeginn aufgefüllt, voller nicht", () => {
+    const sim = newSim();
+    const kgAufPlatz = () => [...sim.world.items.values()]
+      .filter((i) => i.state === "loose" && sim.level.inZone("intake_pile", i.pos.x, i.pos.z))
+      .reduce((s, i) => s + i.massKg, 0);
+    const b = sim.data.balancing.scrap as Record<string, number>;
+
+    expect(kgAufPlatz(), "vor Tagesbeginn ist der Platz leer").toBe(0);
+    sim.day.startDay();
+    sim.settle();
+    const nachher = kgAufPlatz();
+    expect(nachher, "aufgefüllt bis in die Nähe des Zielwerts").toBeGreaterThan(Number(b["pileMinKg"]));
+
+    // zweiter Tag: es liegt genug, also kein Nachschub
+    sim.day.endDay(); sim.day.nextDay();
+    const vorTag2 = kgAufPlatz();
+    sim.day.startDay(); sim.settle();
+    expect(kgAufPlatz(), "voller Platz bekommt keinen Nachschub").toBeCloseTo(vorTag2, 0);
+    sim.dispose();
+  });
+});

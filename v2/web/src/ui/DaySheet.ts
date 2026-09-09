@@ -26,6 +26,12 @@ export class DaySheet {
       const act = b.dataset["act"];
       if (act === "start") this.actions.onStart(); else if (act === "next") this.actions.onNext(); else if (act === "restart") this.actions.onRestart();
       else if (act === "export") this.actions.onExport(); else if (act === "import") this.file.click();
+      else if (act === "buy") {
+        const id = b.dataset["id"];
+        // Nach dem Kauf neu zeichnen: Kontostand und Angebot ändern sich
+        // Leerer Schlüssel erzwingt das Neuzeichnen im nächsten update()
+        if (id && this.sim.upgrades.buy(id) === "gekauft") this.lastKey = "";
+      }
     });
   }
 
@@ -37,7 +43,7 @@ export class DaySheet {
     const show = d.phase !== "work";
     if (this.root.hidden === show) this.root.hidden = !show;
     if (!show) { this.lastKey = ""; return; }
-    const key = `${d.phase}:${d.day}:${Math.round(e.moneyEur * 100)}:${this.sim.missions.active.map((m) => m.def.id + m.done).join(",")}:${this.sim.day.isBankrupt}`;
+    const key = `${d.phase}:${d.day}:${Math.round(e.moneyEur * 100)}:${this.sim.missions.active.map((m) => m.def.id + m.done).join(",")}:${this.sim.day.isBankrupt}:${e.upgrades.length}`;
     if (key === this.lastKey) return; this.lastKey = key;
     this.body.innerHTML = d.phase === "morning" ? this.morning() : d.phase === "evening" ? this.evening() : this.ended();
   }
@@ -62,8 +68,39 @@ export class DaySheet {
       ${row(t("day.points"), `${r.points} P (${r.correctSorts} ✓ / ${r.wrongSorts} ✗)`)}${row(t("day.stars"), `★ ${e.starsTotal}`)}
       ${row(t("day.balance"), eur(e.moneyEur), e.moneyEur < 0 ? "bad" : "")}
       ${missionRows}
+      ${this.ausbau()}
       <div class="sheet-actions"><button type="button" class="primary" data-act="next">${t("hud.nextDay")}</button>
       <button type="button" data-act="export">${t("day.export")}</button><button type="button" data-act="import">${t("day.import")}</button></div>`;
+  }
+
+  /**
+   * Ausbau am Feierabend: Hier ist das Geld gezählt und die Sterne stehen
+   * fest — der Moment, in dem man entscheidet, was als Nächstes gebaut wird.
+   * Angeboten wird nur, was es im MVP wirklich gibt.
+   */
+  private ausbau(): string {
+    const t = this.t;
+    const u = this.sim.upgrades;
+    const offen = u.angebot().filter((d) => !u.has(d.id));
+    if (offen.length === 0) return "";
+    const zeilen = offen
+      .map((d) => {
+        const urteil = u.pruefe(d.id);
+        const kaufbar = urteil === "gekauft";
+        const grund =
+          urteil === "zuWenigSterne"
+            ? t("upgrade.needStars", { stars: d.requiresStars })
+            : urteil === "zuWenigGeld"
+              ? t("upgrade.needMoney", { eur: eur(d.priceEur) })
+              : urteil === "vorstufeFehlt"
+                ? t("upgrade.needPrev")
+                : "";
+        return `<div class="row"><span>${esc(t(`upgrade.${d.id}`))}<br><small class="muted">${esc(t(`upgrade.${d.id}.effect`))}</small></span>
+          <button type="button" data-act="buy" data-id="${esc(d.id)}"${kaufbar ? "" : " disabled"}>
+            ${kaufbar ? eur(d.priceEur) : esc(grund)}</button></div>`;
+      })
+      .join("");
+    return `<h3>${t("upgrade.title")}</h3>${zeilen}`;
   }
 
   private ended(): string {

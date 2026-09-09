@@ -23,11 +23,18 @@ export class Level {
       const rotY = Math.atan2(x2 - x1, z2 - z1); // 0 = entlang +Z
       this.addBox(w, { cx: (x1 + x2) / 2, cz: (z1 + z2) / 2, hx: wall.thickness / 2, hy: wall.height / 2, hz: len / 2, rotY, kind: "wall" }, wall.height / 2);
     }
-    for (const c of def.containers.filter((c) => c.stage === 1)) this.addContainerWalls(w, c.rect, c.wallHeight, c.kind === "pile" ? c.openSide : null);
+    // Jede Mulde ist dreiseitig, die offene Seite zeigt zum Bagger — wie die Betonlego-Bays im Prototyp
+    for (const c of def.containers.filter((c) => c.stage === 1)) this.addContainerWalls(w, c.rect, c.wallHeight, c.openSide);
   }
 
-  /** Mulde = 4 Wände, Haufen (Betonlego) = 3 Wände, offene Seite frei. Wandstärke 0,3 m (SW). */
+  /**
+   * Mulde = 4 Wände, Haufen (Betonlego) = 3 Wände, offene Seite frei. Wandstärke 0,3 m (SW).
+   * Wandhöhe 0 heißt: gar keine Wände — ein offener Haufenplatz, wie der Stahlschrott im Prototyp
+   * (`containers.ts`: `kind: "pile"`, size [11, 12, 0]). Ohne diese Regel entstünden Kollider mit Höhe null,
+   * in denen Teile hängen bleiben und die den Haufen nie zur Ruhe kommen lassen (Messung 09.09.).
+   */
   private addContainerWalls(w: RAPIER.World, r: Rect, height: number, openSide: "north" | "south" | "east" | "west" | null): void {
+    if (height <= 0) return;
     const t = 0.15; const hy = height / 2;
     const sides: { side: "north" | "south" | "east" | "west"; cx: number; cz: number; hx: number; hz: number }[] = [
       { side: "north", cx: r.x, cz: r.z + r.hd - t, hx: r.hw, hz: t },

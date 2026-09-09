@@ -139,5 +139,21 @@
     "import": "Spielstand importieren",
     "deliveriesLeft": "{n} Fuhren stehen noch aus",
     "allDone": "Alle Fuhren erledigt"
+  },
+  "upgrade": {
+    "title": "Platz ausbauen",
+    "needStars": "★ {stars} nötig",
+    "needMoney": "{eur}",
+    "needPrev": "Vorstufe fehlt",
+    "stage2_office": "Büro",
+    "stage2_office.effect": "Mehr Kundschaft, zwei Abholer gleichzeitig, und an der Waage sieht man, was in einer Mischfuhre steckt",
+    "stage3_hall": "Halle am Büro",
+    "stage3_hall.effect": "Unterstellplatz: schnellere Hydraulik, mehr Traglast, Radlader für den Platzwart",
+    "tool_shear": "Schere am Ausleger",
+    "tool_shear.effect": "Trennt Großteile direkt am Bagger",
+    "tool_magnet": "Magnet",
+    "tool_magnet.effect": "Zieht Eisen sauber vom Rest",
+    "press_large": "Größere Presse",
+    "press_large.effect": "Schwerere Pakete je Pressvorgang"
   }
 }

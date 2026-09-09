@@ -25,12 +25,12 @@ describe("Datenkataloge", () => {
     const mvpMass = car.hull.massKg + car.parts.filter((p) => (p.tier ?? "MVP") === "MVP").reduce((a, p) => a + p.massKg, 0);
     expect(mvpMass).toBeGreaterThan(900); expect(mvpMass).toBeLessThan(1000);
   });
-  it("level_yard.json: alle 5 Boxen + Stahlhaufen der Stufe 1 innerhalb der Bagger-Reichweite", () => {
+  it("level_yard.json: Stahlhaufen und alle 7 Betonlego-Mulden sind vom Standplatz aus erreichbar", () => {
     const b = data.balancing.excavator;
     const reach = Number(b["boomLenM"]) + Number(b["stickLenM"]) + Number(b["grappleLinkM"]) + 0.5;
     const spawn = data.level.spawns.excavator;
     const stage1 = data.level.containers.filter((c) => c.stage === 1);
-    expect(stage1).toHaveLength(6);
+    expect(stage1, "Stahlhaufen + 7 Mulden wie im Prototyp (E-059)").toHaveLength(8);
     for (const c of stage1) {
       // nächster Punkt des Rechtecks zum Bagger muss erreichbar sein (Kap. 12 „Fertig, wenn")
       const dx = Math.max(0, Math.abs(c.rect.x - spawn.x) - c.rect.hw);

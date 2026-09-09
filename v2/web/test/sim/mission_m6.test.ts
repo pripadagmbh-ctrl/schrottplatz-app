@@ -138,12 +138,28 @@ describe("Presse-Auftrag", () => {
     expect(pool(3)).toContain("press_car");
   });
 
-  it("ein fertiges Paket erfuellt ihn", () => {
+  it("ein mitverpresstes Auto erfuellt ihn", () => {
     const sim = newSim(3);
     const m = force(sim, "press_car");
     const geld0 = sim.world.economy.moneyEur;
-    sim.bus.emit("pressDone", { compositeId: cid, itemId: iid("bale1"), kg: 700 });
+    sim.bus.emit("pressDone", {
+      itemId: iid("bale1"),
+      kg: 700,
+      purity: 0.9,
+      compositeDefIds: ["car_compact"],
+    });
     expect(m.done).toBe(true);
     expect(sim.world.economy.moneyEur - geld0).toBeCloseTo(m.def.bonusEur, 2);
+  });
+
+  it("ein Paket aus losem Blech erfuellt ihn nicht", () => {
+    // Der Auftrag heisst „Auto pressen". Ohne diese Pruefung zaehlte jedes
+    // beliebige Paket — dann waere er nebenbei erledigt, ohne ein Wrack.
+    const sim = newSim(3);
+    const m = force(sim, "press_car");
+    const geld0 = sim.world.economy.moneyEur;
+    sim.bus.emit("pressDone", { itemId: iid("bale2"), kg: 700, purity: 1, compositeDefIds: [] });
+    expect(m.done).toBe(false);
+    expect(sim.world.economy.moneyEur).toBeCloseTo(geld0, 2);
   });
 });

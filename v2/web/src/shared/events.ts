@@ -12,7 +12,12 @@ export interface GameEvents {
   partTorn: { compositeId: CompositeId; partId: string; itemId: ItemId; kg: number };
   pressStarted: { items: number; wrecks: number };
   pressLidsClosed: Record<string, never>;
-  pressDone: { itemId: ItemId; kg: number; purity: number };
+  /**
+   * `compositeDefIds` nennt die Bauarten der mitverpressten Wracks (leer, wenn
+   * nur loser Schrott drin war). Ohne diese Angabe könnte der Auftrag
+   * „Auto pressen" auch von einem Blechpaket erfüllt werden.
+   */
+  pressDone: { itemId: ItemId; kg: number; purity: number; compositeDefIds: string[] };
   pressDenied: { reason: "empty" | "blocked"; blockedBy: string[] };
   containerSold: { containerId: ContainerId; kg: number; purity: number; eur: number };
   vehicleArrived: { deliveryId: DeliveryId };
@@ -26,7 +31,7 @@ export interface GameEvents {
   pickupOrdered: { containerId: ContainerId };
   toast: { text: string; kind: "info" | "good" | "bad" };
   pressUsed: { compositeId: CompositeId; crushStage: number };
-  upgradeBought: { upgradeId: string };
+  upgradeBought: { upgradeId: string; priceEur: number; stage: number };
   saveRequested: { reason: "day" | "hidden" | "manual" | "interval" };
   /** M4b */
   missionsRolled: { day: number; missionIds: string[] };

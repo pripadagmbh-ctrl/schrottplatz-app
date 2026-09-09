@@ -61,9 +61,13 @@ export class MissionSystem implements System {
         if (m.def.params["partId"] === partId) { m.progress = 1; this.check(m); }
       }
     });
-    ctx.bus.on("pressDone", () => {
+    ctx.bus.on("pressDone", ({ compositeDefIds }) => {
       for (const m of this.active) {
         if (m.done || m.def.type !== "press") continue;
+        // Verlangt der Auftrag eine bestimmte Bauart (z. B. „Auto pressen"),
+        // muss sie auch wirklich mit im Paket gewesen sein.
+        const gefordert = m.def.params["compositeDefId"];
+        if (typeof gefordert === "string" && !compositeDefIds.includes(gefordert)) continue;
         m.progress = 1; this.check(m);
       }
     });

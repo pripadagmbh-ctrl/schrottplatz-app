@@ -42,7 +42,7 @@ function aimAt(sim: Simulation, target: { x: number; y: number; z: number }, par
 describe("Verbundteile (CompositeSystem)", () => {
   it("Motor: Batterie zuerst, dann 2,4–3,0 s Zug → Stahlteil 210 kg in der Spinne, Rumpf 210 kg leichter", () => {
     const sim = newSim();
-    const st = sim.composites.spawn("car_compact", { x: 0, y: 0, z: -7 }, 0)!; // frei, seit die Presse noerdlich bei z 4,6 steht (E-052)
+    const st = sim.composites.spawn("car_compact", { x: 0, y: 0, z: 5 }, 0)!; // noerdlich frei, seit die Presse suedlich steht (E-056)
     sim.run(120); // setzen
     const hull = sim.world.items.get(st.hullItemId)!;
     const def = sim.composites.def("car_compact")!;
@@ -138,10 +138,8 @@ describe("Wrack-Anlieferung", () => {
     expect(hull.state).toBe("loose");
     expect(st.remainingParts.length, "alle Baugruppen noch dran").toBeGreaterThanOrEqual(6);
 
-    // nicht in der Schuettzone der Kipper (dort landet der Haufen)
-    const pile = sim.level.zone("intake_pile");
-    const inPile = Math.abs(hull.pos.x - pile.x) < pile.hw && Math.abs(hull.pos.z - pile.z) < pile.hd;
-    expect(inPile, "liegt nicht im Schuettbereich der Kipper").toBe(false);
+    // Das Wrack landet auf der Abladeflaeche — dort wird auch zerlegt (Patrick 09.09., E-056)
+    expect(sim.level.inZone("dismantle", hull.pos.x, hull.pos.z), "liegt auf der Abladeflaeche").toBe(true);
     sim.dispose();
   });
 });
