@@ -956,6 +956,8 @@ async function main(): Promise<void> {
     debug.update(frameDt, {
       bodies: counts.bodies,
       awake: counts.awake,
+      dynamic: counts.dynamic,
+      dynAwake: counts.dynAwake,
       gripped: grip.grippedCount,
       grippedKg: grip.totalMassKg,
     });

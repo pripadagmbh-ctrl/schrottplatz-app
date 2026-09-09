@@ -23,14 +23,27 @@ export class PhysicsWorld {
     this.world.step();
   }
 
-  counts(): { bodies: number; awake: number } {
+  /**
+   * Zaehlung fuers Overlay. `awake` allein taeuscht: Rapier meldet feste und
+   * kinematische Koerper nie als schlafend, und davon gibt es auf dem Platz
+   * reichlich — Waende, Mulden, Gebaeude, die Baggerglieder, die Fahrzeuge.
+   * Die koennen gar nicht einschlafen, faerben die Zahl aber ein. Zum Beurteilen
+   * der Haufen-Ruhe zaehlt nur `dynAwake` von `dynamic`.
+   */
+  counts(): { bodies: number; awake: number; dynamic: number; dynAwake: number } {
     let bodies = 0;
     let awake = 0;
+    let dynamic = 0;
+    let dynAwake = 0;
     this.world.bodies.forEach((b) => {
       bodies++;
       if (!b.isSleeping()) awake++;
+      if (b.isDynamic()) {
+        dynamic++;
+        if (!b.isSleeping()) dynAwake++;
+      }
     });
-    return { bodies, awake };
+    return { bodies, awake, dynamic, dynAwake };
   }
 }
 

@@ -17,7 +17,14 @@ export class DebugOverlay {
   /** Jeden Render-Frame aufrufen; schreibt das DOM nur 4×/s. */
   update(
     frameDt: number,
-    stats: { bodies: number; awake: number; gripped: number; grippedKg: number }
+    stats: {
+      bodies: number;
+      awake: number;
+      dynamic: number;
+      dynAwake: number;
+      gripped: number;
+      grippedKg: number;
+    }
   ): void {
     const fps = 1 / Math.max(frameDt, 1e-4);
     this.fpsSmoothed += (fps - this.fpsSmoothed) * 0.05;
@@ -28,7 +35,9 @@ export class DebugOverlay {
     this.el.innerHTML =
       `FPS: ${this.fpsSmoothed.toFixed(0)}<br />` +
       `Frame: ${(frameDt * 1000).toFixed(1)} ms<br />` +
-      `Bodies: ${stats.bodies} (wach: ${stats.awake})<br />` +
+      `Koerper: ${stats.bodies} (wach: ${stats.awake})<br />` +
+      // Die aussagekraeftige Zeile: nur bewegliche Teile koennen ueberhaupt schlafen
+      `Beweglich: ${stats.dynamic} (wach: ${stats.dynAwake})<br />` +
       `Gegriffen: ${stats.gripped} Obj / ${stats.grippedKg.toFixed(0)} kg`;
   }
 }
