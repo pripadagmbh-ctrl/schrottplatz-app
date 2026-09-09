@@ -30,6 +30,109 @@ interface AttachedPart {
 
 const SETTLE_GRACE_STEPS = 90; // nach Spawn keine Aufprall-Events (Setzen des Wracks)
 
+/**
+ * Aus dem Quader eine Karosserie formen.
+ *
+ * Der Rumpf war ein glatter Kasten von 1,7 x 0,55 x 4,0 m — daher der Eindruck
+ * "sehr eckig". Statt neue Geometrie zu bauen, werden die Eckpunkte des
+ * vorhandenen Quaders verschoben: Die Schnauze faellt ab und zieht sich ein,
+ * das Heck ebenso etwas, die Schweller ruecken nach innen, die Flanken bauchen
+ * leicht aus. Das muss vor dem Erfassen der Beul-Ausgangslage passieren, sonst
+ * beulte die Physik gegen die alte Form.
+ *
+ * Der Weg ueber die Eckpunkte ist Absicht: Die Beul-Mechanik rechnet auf dem
+ * regelmaessigen Gitter des Quaders, und das bleibt so erhalten.
+ */
+export function formeKarosserie(geo: THREE.BufferGeometry): void {
+  const pos = geo.getAttribute("position") as THREE.BufferAttribute;
+  const HALB_L = 2.0;
+  for (let i = 0; i < pos.count; i++) {
+    let x = pos.getX(i);
+    let y = pos.getY(i);
+    const z = pos.getZ(i);
+    const t = z / HALB_L; // -1 Heck ... +1 Schnauze
+    const oben = y > 0;
+
+    // Schnauze: schmaler und vorn abfallend (Motorhaube)
+    if (t > 0.5) {
+      const k = (t - 0.5) / 0.5;
+      x *= 1 - 0.26 * k;
+      if (oben) y -= 0.16 * k * k;
+    }
+    // Heck: leicht eingezogen, Kante gebrochen
+    if (t < -0.55) {
+      const k = (-t - 0.55) / 0.45;
+      x *= 1 - 0.18 * k;
+      if (oben) y -= 0.07 * k;
+    }
+    // Schweller: unten schmaler als auf Tuerhoehe — sonst steht das Auto
+    // auf einem Brett
+    if (!oben) x *= 0.9;
+    // Flanken bauchen auf halber Hoehe leicht aus
+    else x *= 1.04;
+
+    pos.setXYZ(i, x, y, z);
+  }
+  pos.needsUpdate = true;
+  geo.computeVertexNormals();
+}
+
+/**
+ * Stossstangen, Leuchten, Kuehlergrill, Radlaeufe, Spiegel.
+ *
+ * Nichts davon ist noetig, damit das Wrack funktioniert — aber ein Kasten mit
+ * Raedern liest sich erst als Auto, wenn vorne ein Gesicht dran ist. Alles
+ * haengt im crushGroup, wird beim Pressen also mitgequetscht.
+ */
+export function baueAnbauteile(gruppe: THREE.Group, lack: THREE.Material): void {
+  const schwarz = new THREE.MeshStandardMaterial({ color: 0x24262a, roughness: 0.85 });
+  const chrom = new THREE.MeshStandardMaterial({ color: 0x9aa0a6, roughness: 0.35, metalness: 0.8 });
+  const klar = new THREE.MeshStandardMaterial({ color: 0xf2eddc, roughness: 0.25, emissive: 0x2a2418 });
+  const rot = new THREE.MeshStandardMaterial({ color: 0x8e2318, roughness: 0.35, emissive: 0x2a0806 });
+
+  const add = (
+    geo: THREE.BufferGeometry,
+    mat: THREE.Material,
+    x: number, y: number, z: number,
+    rx = 0
+  ): void => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(x, y, z);
+    m.rotation.x = rx;
+    m.castShadow = true;
+    gruppe.add(m);
+  };
+
+  // Stossstangen
+  const stange = new THREE.BoxGeometry(1.5, 0.16, 0.16);
+  add(stange, schwarz, 0, 0.22, 1.94);
+  add(stange, schwarz, 0, 0.22, -1.94);
+  // Kuehlergrill
+  add(new THREE.BoxGeometry(1.0, 0.16, 0.06), chrom, 0, 0.42, 1.92);
+  // Scheinwerfer und Rueckleuchten
+  for (const sx of [-1, 1]) {
+    add(new THREE.BoxGeometry(0.3, 0.16, 0.06), klar, sx * 0.52, 0.44, 1.9);
+    add(new THREE.BoxGeometry(0.26, 0.18, 0.06), rot, sx * 0.55, 0.42, -1.9);
+  }
+  // Radlaeufe: flache Boegen ueber den Raedern, damit die Raeder nicht
+  // wie angeklebt wirken
+  const bogen = new THREE.TorusGeometry(0.42, 0.055, 6, 12, Math.PI);
+  for (const sx of [-1, 1]) {
+    for (const z of [1.25, -1.25]) {
+      const m = new THREE.Mesh(bogen, lack);
+      m.position.set(sx * 0.83, 0.34, z);
+      m.rotation.y = Math.PI / 2;
+      m.castShadow = true;
+      gruppe.add(m);
+    }
+  }
+  // Aussenspiegel
+  for (const sx of [-1, 1]) {
+    add(new THREE.BoxGeometry(0.16, 0.1, 0.08), schwarz, sx * 0.92, 1.0, 0.62);
+  }
+}
+
+
 export class CarComposite {
   readonly body: RAPIER.RigidBody;
   readonly group = new THREE.Group();
@@ -110,6 +213,7 @@ export class CarComposite {
     // Unterteilte Geometrie, damit Aufprall-Beulen (dent) greifen können.
     this.group.add(this.crushGroup);
     const chassis = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.55, 4.0, 4, 2, 9), paint);
+    formeKarosserie(chassis.geometry);
     chassis.position.y = 0.28;
     chassis.castShadow = true;
     this.crushGroup.add(chassis);
@@ -128,6 +232,8 @@ export class CarComposite {
       this.crushGroup.add(pane);
       this.windows.push({ id: w.id, mesh: pane, anchor: new THREE.Vector3(...w.anchor), intact: true });
     }
+
+    baueAnbauteile(this.crushGroup, paint);
 
     // Parts (nicht quetschbar): Motor + Räder
     for (const p of this.def.parts) {
