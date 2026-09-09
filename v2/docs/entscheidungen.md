@@ -15,6 +15,8 @@ Der Rumpf wird in die Presse gelegt und über das Menü ausgelöst; sie quetscht
 
 Abnahmekriterien (`test/sim/press.test.ts`, 4 Tests): Verweigerung mit Batterie und Motor samt Nennung des blockierenden Teils; Pressen ohne diese Teile ergibt in 3,6 s ein Stahlpaket von 700 kg (600 kg Rumpf + 4 × 25 kg Räder), das Wrack verschwindet; ein Rumpf außerhalb der Zone wird nicht gepresst; die Presse liegt in Reichweite.
 
+| E-051 | Die Presse ist **orange** (Maschinenfarbe), 3,2 m hoch und ragt über die Muldenwände | Erste Fassung war betongrau wie die Sortiermulden — Patrick 09.09.: „ich sehe keine Presse". Sie war gezeichnet (in der Szene nachgewiesen), ging aber zwischen den grauen Mulden unter. Briefing Kap. 16: Farbe trennt Stationen von Lagerflächen | Beschriftungsschild; Presse größer, aber grau |
+
 Auf dem Gerät zu prüfen: Rumpf in die Presse legen, Menü öffnen — steht dort der richtige Grund, wenn die Batterie noch drin ist? Und sieht man den Stempel herunterfahren?
 
 ## 2026-09-09 — Wrack war unerreichbar: Ablage an der Annahme (gebaut, Gerätetest offen)
