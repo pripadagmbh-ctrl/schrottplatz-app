@@ -12,7 +12,8 @@ const viewports = [
   { name: "Kompakt 390 quer", width: 844, height: 390, compact: false },
   // Safari mit Leisten: Debug-Box (nur Dev) darf hier überlappen — im Live-Build ist sie unsichtbar
   { name: "iPhone mini quer mit Safari-Leisten", width: 812, height: 265, compact: false, ignoreDebugBox: true },
-  { name: "iPhone mini hoch", width: 375, height: 812, compact: true },
+  // Debug-Box (nur Dev) darf im Hochformat unter der Einweisung liegen — im Live-Build ist sie unsichtbar
+  { name: "iPhone mini hoch", width: 375, height: 812, compact: true, ignoreDebugBox: true },
 ];
 
 interface Box { id: string; x: number; y: number; w: number; h: number }
@@ -27,10 +28,14 @@ for (const vp of viewports) {
     await page.goto("/");
     await expect(page.locator("body[data-ready='1']")).toBeAttached({ timeout: 30_000 });
     await expect(page.locator("#touch-layer")).toBeAttached();
+    // M4b: Morgen-Karte schliessen, sonst steht der Bagger
+    await page.locator(".sheet button[data-act='start']").dispatchEvent("pointerup");
+    await expect(page.locator(".sheet")).toBeHidden();
+    await expect(page.locator(".tut")).toBeVisible(); // Einweisung Tag 0 — ihr Knopf darf nichts ueberlappen
     expect(await page.locator("#touch-layer").evaluate((el) => el.classList.contains("compact"))).toBe(vp.compact);
 
     const boxes: Box[] = await page.evaluate(() =>
-      ["btn-drive", "btn-rot-l", "btn-rot-r", "btn-camera", "debug-box"].map((id) => {
+      ["btn-drive", "btn-rot-l", "btn-rot-r", "btn-camera", "tut-skip", "debug-box"].map((id) => {
         const r = document.getElementById(id)!.getBoundingClientRect();
         return { id, x: r.x, y: r.y, w: r.width, h: r.height };
       }));
@@ -58,7 +63,8 @@ for (const vp of viewports) {
     expect(stick, "Stick sichtbar").not.toBeNull();
     expect(Math.abs(stick!.x + stick!.width / 2 - lx)).toBeLessThanOrEqual(3); // Rahmen 2 px
     await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: lx, y: ly - 50, id: 1 }] });
-    await page.waitForTimeout(120);
+    // Headless rendert ~4 fps und die Simulation holt nur begrenzt auf — deshalb warten, bis der Wert steht, statt fester Zeit
+    await page.waitForFunction(() => (window.__bagerana?.sim.control.boom ?? 0) > 0.3, undefined, { timeout: 5000 }).catch(() => undefined);
     const boom = await page.evaluate(() => window.__bagerana?.sim.control.boom ?? 0);
     expect(boom, "Hauptarm hebt").toBeGreaterThan(0.3);
     await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
@@ -69,7 +75,7 @@ for (const vp of viewports) {
     const rx = Math.round(vp.width * 0.8), ry = Math.round(vp.height * 0.75);
     await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: rx, y: ry, id: 2 }] });
     await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: rx + 55, y: ry, id: 2 }] });
-    await page.waitForTimeout(150);
+    await page.waitForFunction(() => (window.__bagerana?.sim.control.grapple ?? 0) > 0.3, undefined, { timeout: 5000 }).catch(() => undefined);
     const grapple = await page.evaluate(() => window.__bagerana?.sim.control.grapple ?? 0);
     expect(grapple, "Spinne schließt").toBeGreaterThan(0.3);
     await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });

@@ -13,6 +13,9 @@ import { GripSystem } from "./systems/GripSystem";
 import { AimSystem } from "./systems/AimSystem";
 import { VehicleSystem } from "./systems/VehicleSystem";
 import { ContainerSystem } from "./systems/ContainerSystem";
+import { DaySystem } from "./systems/DaySystem";
+import { MissionSystem } from "./systems/MissionSystem";
+import { TutorialSystem } from "./systems/TutorialSystem";
 
 /**
  * Bündelt WorldState, PhysicsWorld, Level, Scheduler und EventBus zu einer kopflosen Simulation.
@@ -33,6 +36,9 @@ export class Simulation {
   readonly aim: AimSystem;
   readonly vehicles: VehicleSystem;
   readonly containers: ContainerSystem;
+  readonly day = new DaySystem();
+  readonly missions: MissionSystem;
+  readonly tutorial: TutorialSystem;
   readonly dt: number;
   private readonly ctx: SimContext;
 
@@ -51,6 +57,8 @@ export class Simulation {
     this.aim = new AimSystem(this.level);
     this.vehicles = new VehicleSystem(this.level);
     this.containers = new ContainerSystem(this.level);
+    this.missions = new MissionSystem(this.level);
+    this.tutorial = new TutorialSystem(this.level);
     this.registerDefaultSystems();
   }
 
@@ -63,6 +71,9 @@ export class Simulation {
     this.scheduler.register(this.scrap);              // postStep 10
     this.scheduler.register(this.aim);                // postStep 20
     this.scheduler.register(this.containers);         // slow ×6
+    this.scheduler.register(this.day);                // slow ×6 (30)
+    this.scheduler.register(this.missions);           // slow ×6 (40)
+    this.scheduler.register(this.tutorial);           // slow ×6 (50)
     this.scheduler.register(new HeartbeatSystem());   // postStep 1000
   }
 

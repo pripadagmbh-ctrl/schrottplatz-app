@@ -1,13 +1,53 @@
 {
   "$schema": "../schema/i18n.schema.json",
-  "app": { "title": "Bagerana", "tapToStart": "Tippen zum Start", "loading": "Lädt …", "rotateDevice": "Bitte Gerät drehen" },
-  "hud": { "account": "Konto", "day": "Tag {day}/{total}", "phase": { "morning": "Morgen", "work": "Annahme", "evening": "Feierabend", "ended": "Tag beendet" }, "grabInfo": { "tooHeavy": "zu schwer ({kg} / {max} kg)", "held": "gegriffen", "fee": "Gebühr" } },
-  "material": {
-    "steel": "Stahlschrott", "va": "Edelstahl VA", "alu": "Aluminium", "copper": "Kupfer/Messing", "cable": "Kabel",
-    "contaminant": "Störstoff", "wood": "Holz", "rubble": "Baumischabfall", "tire_rim": "Rad", "battery": "Starterbatterie",
-    "tire": "Reifen", "ewaste": "Elektroschrott", "catalyst": "Katalysator"
+  "app": {
+    "title": "Bagerana",
+    "tapToStart": "Tippen zum Start",
+    "loading": "Lädt …",
+    "rotateDevice": "Bitte Gerät drehen"
   },
-  "part": { "engine": "Motor", "battery": "Batterie", "wheel": "Rad", "catalyst": "Katalysator", "tank": "Tank", "harness": "Kabelbaum", "door": "Tür" },
+  "hud": {
+    "account": "Konto",
+    "day": "Tag {day}/{total}",
+    "phase": {
+      "morning": "Morgen",
+      "work": "Annahme",
+      "evening": "Feierabend",
+      "ended": "Tag beendet"
+    },
+    "grabInfo": {
+      "tooHeavy": "zu schwer ({kg} / {max} kg)",
+      "held": "gegriffen",
+      "fee": "Gebühr"
+    },
+    "endDay": "Tag beenden",
+    "startDay": "Arbeitstag starten",
+    "nextDay": "Nächster Tag"
+  },
+  "material": {
+    "steel": "Stahlschrott",
+    "va": "Edelstahl VA",
+    "alu": "Aluminium",
+    "copper": "Kupfer/Messing",
+    "cable": "Kabel",
+    "contaminant": "Störstoff",
+    "wood": "Holz",
+    "rubble": "Baumischabfall",
+    "tire_rim": "Rad",
+    "battery": "Starterbatterie",
+    "tire": "Reifen",
+    "ewaste": "Elektroschrott",
+    "catalyst": "Katalysator"
+  },
+  "part": {
+    "engine": "Motor",
+    "battery": "Batterie",
+    "wheel": "Rad",
+    "catalyst": "Katalysator",
+    "tank": "Tank",
+    "harness": "Kabelbaum",
+    "door": "Tür"
+  },
   "missions": {
     "deliver_alu_small": "Abholer mit {kg} kg Alu, ≥ {purity} % rein",
     "deliver_steel_medium": "Abholer mit {kg} kg Stahl, ≥ {purity} % rein",
@@ -20,7 +60,83 @@
     "dismantle_engine": "Reiß den Motor aus dem Wrack, verkauf ihn als Stahl",
     "clean_day": "Kein Fehlwurf heute"
   },
-  "menu": { "continue": "Weiterspielen", "newGame": "Neues Spiel", "freePlay": "Freies Spiel", "settings": "Einstellungen", "controls": "Steuerung", "graphics": "Grafik", "audio": "Audio", "accessibility": "Barrierefreiheit", "language": "Sprache", "export": "Spielstand exportieren", "import": "Spielstand importieren", "pause": "Pause", "resume": "Weiter", "save": "Speichern", "toStart": "Zum Start-Screen", "orderPickup": "Abholer rufen", "press": "Presse auslösen", "endDay": "Tag beenden" },
-  "save": { "broken": "Spielstand beschädigt — Neues Spiel oder Importieren?", "saved": "Gespeichert" },
-  "debug": { "fps": "fps", "frameMs": "Bild ms", "physicsMs": "Physik ms", "bodies": "Körper wach/gesamt", "drawCalls": "Draw Calls", "tris": "Dreiecke", "heapMb": "Heap MB" }
+  "menu": {
+    "continue": "Weiterspielen",
+    "newGame": "Neues Spiel",
+    "freePlay": "Freies Spiel",
+    "settings": "Einstellungen",
+    "controls": "Steuerung",
+    "graphics": "Grafik",
+    "audio": "Audio",
+    "accessibility": "Barrierefreiheit",
+    "language": "Sprache",
+    "export": "Spielstand exportieren",
+    "import": "Spielstand importieren",
+    "pause": "Pause",
+    "resume": "Weiter",
+    "save": "Speichern",
+    "toStart": "Zum Start-Screen",
+    "orderPickup": "Abholer rufen",
+    "press": "Presse auslösen",
+    "endDay": "Tag beenden"
+  },
+  "save": {
+    "broken": "Spielstand beschädigt — Neues Spiel oder Importieren?",
+    "saved": "Gespeichert"
+  },
+  "debug": {
+    "fps": "fps",
+    "frameMs": "Bild ms",
+    "physicsMs": "Physik ms",
+    "bodies": "Körper wach/gesamt",
+    "drawCalls": "Draw Calls",
+    "tris": "Dreiecke",
+    "heapMb": "Heap MB"
+  },
+  "tutorial": {
+    "title": "Einweisung",
+    "skip": "Überspringen",
+    "l1": "Lektion 1 — Große Stahlteile in die Stahlmulde",
+    "l2": "Lektion 2 — Eine Lkw-Ladung Stahl",
+    "l3": "Lektion 3 — Mischschrott sortieren",
+    "l1s1_touch": "Linker Daumen: nach oben/unten wischen hebt und senkt den Hauptarm.",
+    "l1s1_kbd": "W / S: Hauptarm heben und senken.",
+    "l1s2_touch": "Linker Daumen: nach links/rechts wischen dreht den Oberwagen.",
+    "l1s2_kbd": "A / D: Oberwagen drehen.",
+    "l1s3_touch": "Rechter Daumen: nach oben/unten wischen fährt den Stiel aus und ein.",
+    "l1s3_kbd": "Pfeil hoch / runter: Stiel ausfahren und einziehen.",
+    "l1s4_touch": "Rechter Daumen: nach rechts wischen schließt die Spinne, nach links öffnet sie.",
+    "l1s4_kbd": "Leertaste halten schließt die Spinne, loslassen öffnet sie.",
+    "l1s5": "Greife ein großes Stahlteil vom Abladeplatz: Spinne offen über das Teil, absenken, schließen.",
+    "l1s6_touch": "FAHREN antippen, dann mit dem linken Daumen den Bagger Richtung Stahlmulde (Betonsteine, rechts) fahren.",
+    "l1s6_kbd": "F schaltet den Fahrmodus um; W / S / A / D fahren den Bagger zur Stahlmulde (Betonsteine, rechts).",
+    "l1s7": "Lege das Teil in die Stahlmulde ab: Spinne über die Mulde, öffnen. {done}/{need} liegen drin.",
+    "l2s1": "Ein Kipper der Gießerei bringt eine Ladung Stahl. Warte, bis er abgekippt hat.",
+    "l2s2": "Setze die Ladung in die Stahlmulde um. {done}/{need} Teile sind drin.",
+    "l3s1": "Ein Schrotthändler bringt Mischschrott. Warte, bis er abgekippt hat.",
+    "l3s2": "Sortiere: Der Ring unter der Spinne und der Chip zeigen die richtige Box. {done}/{need} richtig, {wrong} Fehlwürfe.",
+    "done": "Einweisung abgeschlossen. Beende den Tag über „Tag beenden“."
+  },
+  "day": {
+    "morning": "Tag {day}",
+    "morningSub": "Heute: {deliveries} Fuhren, Fixkosten {fixed} €",
+    "missions": "Aufträge des Tages",
+    "noMissions": "Einweisung — noch keine Aufträge",
+    "evening": "Feierabend — Tag {day}",
+    "sales": "Verkäufe",
+    "purchases": "Ankäufe",
+    "fixed": "Fixkosten",
+    "interest": "Zinsen",
+    "missionBonus": "Auftragsbonus",
+    "points": "Sortierpunkte heute",
+    "balance": "Kontostand",
+    "stars": "Sterne",
+    "bankrupt": "Zahlungsunfähig — der Platz ist pleite.",
+    "campaignDone": "Kampagne geschafft — {days} Tage überstanden.",
+    "restart": "Neu beginnen",
+    "export": "Spielstand exportieren",
+    "import": "Spielstand importieren",
+    "deliveriesLeft": "{n} Fuhren stehen noch aus",
+    "allDone": "Alle Fuhren erledigt"
+  }
 }

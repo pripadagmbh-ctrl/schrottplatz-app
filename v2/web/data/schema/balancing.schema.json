@@ -1,23 +1,245 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
-  "required": ["physics", "excavator", "grip", "economy", "day", "containers", "scrap", "customers", "budgets", "assist", "vehicles"],
+  "required": [
+    "physics",
+    "excavator",
+    "grip",
+    "economy",
+    "day",
+    "containers",
+    "scrap",
+    "customers",
+    "budgets",
+    "assist",
+    "vehicles",
+    "tutorial"
+  ],
   "properties": {
-    "physics": { "type": "object", "required": ["stepHz", "maxCatchUpSteps", "solverIterations", "internalPgsIterations", "contactNaturalFrequency", "sleepLinearThreshold", "sleepAngularThreshold", "spawnGapM", "presimulateSteps"],
-      "properties": { "stepHz": { "enum": [60] }, "maxCatchUpSteps": { "type": "integer", "minimum": 1, "maximum": 5 }, "solverIterations": { "type": "integer", "minimum": 1, "maximum": 16 } } },
-    "excavator": { "type": "object", "required": ["driveMaxMs", "cabRateDegS", "boomRateDegS", "stickRateDegS", "boomMinDeg", "boomMaxDeg", "stickMinDeg", "stickMaxDeg", "closeTimeS", "openTimeS", "rampTimeS", "loadFactorMin", "loadFactorRefKg"],
-      "properties": { "driveMaxMs": { "type": "number", "minimum": 0.5, "maximum": 5 }, "closeTimeS": { "type": "number", "exclusiveMinimum": 0 }, "loadFactorMin": { "type": "number", "minimum": 0.1, "maximum": 1 } } },
-    "grip": { "type": "object", "required": ["maxItems", "maxTotalKg", "sensorRadiusM", "grabWindowStart", "grabWindowEnd", "minContactClaws", "holdPoseSeconds"],
-      "properties": { "maxItems": { "type": "integer", "minimum": 1 }, "maxTotalKg": { "type": "number", "exclusiveMinimum": 0 }, "grabWindowStart": { "type": "number", "minimum": 0, "maximum": 1 }, "grabWindowEnd": { "type": "number", "minimum": 0, "maximum": 1 } } },
-    "economy": { "type": "object", "required": ["startMoneyEur", "creditLimitEur", "fixedCostsPerDayEur", "mixedBuyPricePerKg", "sortingBonusPerKg", "purityExponent", "purityGreen", "purityYellow"],
-      "properties": { "purityExponent": { "enum": [2] }, "creditLimitEur": { "type": "number", "maximum": 0 } } },
-    "day": { "type": "object", "required": ["deliveriesPerDay", "deliveryIntervalS", "campaignDays", "unlockAfterDay", "premiumPriceEur", "targetDayMinutes"] },
-    "containers": { "type": "object", "required": ["bookAfterRestS", "keepVisibleCount", "muldeCapacityKg", "pileCapacityKg", "pickupArrivalS"] },
-    "scrap": { "type": "object", "required": ["maxLooseItems", "bundleCount", "maxAwakeBodies", "busyKg", "jamKg", "jamClearKg"] },
-    "customers": { "type": "object", "required": ["privatePatienceS", "tradePatienceS", "privateMaxKg", "tradeMaxKg"] },
-    "budgets": { "type": "object", "required": ["drawCallsMobile", "drawCallsDesktop", "physicsMsMobile", "fpsMobileMin", "pixelRatioMax"] },
-    "vehicles": { "type": "object", "required": ["tipAngleDeg", "releaseAngleDeg", "creepSpeedMs", "creepDistanceM", "scaleStopS", "loadMaxItems"] },
-    "assist": { "type": "object", "required": ["snapEnabled", "snapRadiusM", "snapSeconds", "aimRayMaxM", "pendulumLengthM", "pendulumAccelCapMs2", "pendulumDampingLight", "pendulumDampingHeavy", "pendulumHeavyRefKg", "pendulumMaxRad"],
-      "properties": { "snapRadiusM": { "type": "number", "minimum": 0, "maximum": 2 }, "snapSeconds": { "type": "number", "exclusiveMinimum": 0 }, "pendulumMaxRad": { "type": "number", "minimum": 0, "maximum": 1 } } }
+    "physics": {
+      "type": "object",
+      "required": [
+        "stepHz",
+        "maxCatchUpSteps",
+        "solverIterations",
+        "internalPgsIterations",
+        "contactNaturalFrequency",
+        "sleepLinearThreshold",
+        "sleepAngularThreshold",
+        "spawnGapM",
+        "presimulateSteps"
+      ],
+      "properties": {
+        "stepHz": {
+          "enum": [
+            60
+          ]
+        },
+        "maxCatchUpSteps": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "solverIterations": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
+        }
+      }
+    },
+    "excavator": {
+      "type": "object",
+      "required": [
+        "driveMaxMs",
+        "cabRateDegS",
+        "boomRateDegS",
+        "stickRateDegS",
+        "boomMinDeg",
+        "boomMaxDeg",
+        "stickMinDeg",
+        "stickMaxDeg",
+        "closeTimeS",
+        "openTimeS",
+        "rampTimeS",
+        "loadFactorMin",
+        "loadFactorRefKg"
+      ],
+      "properties": {
+        "driveMaxMs": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 5
+        },
+        "closeTimeS": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "loadFactorMin": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 1
+        }
+      }
+    },
+    "grip": {
+      "type": "object",
+      "required": [
+        "maxItems",
+        "maxTotalKg",
+        "sensorRadiusM",
+        "grabWindowStart",
+        "grabWindowEnd",
+        "minContactClaws",
+        "holdPoseSeconds"
+      ],
+      "properties": {
+        "maxItems": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxTotalKg": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "grabWindowStart": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "grabWindowEnd": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "economy": {
+      "type": "object",
+      "required": [
+        "startMoneyEur",
+        "creditLimitEur",
+        "fixedCostsPerDayEur",
+        "mixedBuyPricePerKg",
+        "sortingBonusPerKg",
+        "purityExponent",
+        "purityGreen",
+        "purityYellow"
+      ],
+      "properties": {
+        "purityExponent": {
+          "enum": [
+            2
+          ]
+        },
+        "creditLimitEur": {
+          "type": "number",
+          "maximum": 0
+        }
+      }
+    },
+    "day": {
+      "type": "object",
+      "required": [
+        "deliveriesPerDay",
+        "deliveryIntervalS",
+        "campaignDays",
+        "unlockAfterDay",
+        "premiumPriceEur",
+        "targetDayMinutes"
+      ]
+    },
+    "containers": {
+      "type": "object",
+      "required": [
+        "bookAfterRestS",
+        "keepVisibleCount",
+        "muldeCapacityKg",
+        "pileCapacityKg",
+        "pickupArrivalS"
+      ]
+    },
+    "scrap": {
+      "type": "object",
+      "required": [
+        "maxLooseItems",
+        "bundleCount",
+        "maxAwakeBodies",
+        "busyKg",
+        "jamKg",
+        "jamClearKg"
+      ]
+    },
+    "customers": {
+      "type": "object",
+      "required": [
+        "privatePatienceS",
+        "tradePatienceS",
+        "privateMaxKg",
+        "tradeMaxKg"
+      ]
+    },
+    "budgets": {
+      "type": "object",
+      "required": [
+        "drawCallsMobile",
+        "drawCallsDesktop",
+        "physicsMsMobile",
+        "fpsMobileMin",
+        "pixelRatioMax"
+      ]
+    },
+    "vehicles": {
+      "type": "object",
+      "required": [
+        "tipAngleDeg",
+        "releaseAngleDeg",
+        "creepSpeedMs",
+        "creepDistanceM",
+        "scaleStopS",
+        "loadMaxItems"
+      ]
+    },
+    "assist": {
+      "type": "object",
+      "required": [
+        "snapEnabled",
+        "snapRadiusM",
+        "snapSeconds",
+        "aimRayMaxM",
+        "pendulumLengthM",
+        "pendulumAccelCapMs2",
+        "pendulumDampingLight",
+        "pendulumDampingHeavy",
+        "pendulumHeavyRefKg",
+        "pendulumMaxRad"
+      ],
+      "properties": {
+        "snapRadiusM": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "snapSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "pendulumMaxRad": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "tutorial": {
+      "type": "object",
+      "required": [
+        "lesson1ItemCount",
+        "lesson1NeedBooked",
+        "lesson2NeedShare",
+        "lesson3NeedShare",
+        "inputHoldS",
+        "driveDistanceM"
+      ]
+    }
   }
 }

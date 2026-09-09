@@ -63,14 +63,15 @@ export class VehicleSystem implements System {
 
   // ------------------------------------------------------------------ Anlieferung starten
   /** Anlieferung eines Kunden starten (zufaellig nach Gewicht und Tag, oder gezielt). */
-  requestDelivery(customerId?: string): VehicleRun | null {
+  /** `forceSorted` (M4b-Tutorial): sortenrein erzwingen statt wuerfeln. */
+  requestDelivery(customerId?: string, forceSorted?: boolean): VehicleRun | null {
     const day = this.ctx.world.day.day;
     const pool = this.ctx.data.customers.customers.filter((c) => c.fromDay <= day && !c.compositeDefId && this.ctx.data.customers.vehicles.find((v) => c.vehicleIds.includes(v.id) && v.tier === "MVP" && v.tips));
     const customer = customerId ? this.ctx.data.customers.customers.find((c) => c.id === customerId) : pool.length ? this.rng.pickWeighted(pool, (c) => c.weight) : undefined;
     if (!customer) return null;
     const vehicleId = customer.vehicleIds.find((id) => this.ctx.data.customers.vehicles.find((v) => v.id === id && v.tier === "MVP" && v.tips)) ?? customer.vehicleIds[0]!;
     const def = this.ctx.data.customers.vehicles.find((v) => v.id === vehicleId)!;
-    const sorted = this.rng.next() < customer.sortedProbability;
+    const sorted = forceSorted ?? this.rng.next() < customer.sortedProbability;
     const dominant = [...customer.loadProfile].sort((a, b) => b.share - a.share)[0]?.materialId ?? null;
     const delivery: DeliveryState = {
       id: nextId<DeliveryId>("dlv"), customerId: customer.id, vehicleId, phase: "approach",
@@ -180,11 +181,15 @@ export class VehicleSystem implements System {
     const x0 = -b.bedW / 2 + gap, x1 = b.bedW / 2 - gap, z0 = gap, z1 = b.bedLen - gap;
     let x = x0, z = z0, y = b.floorY + gap, rowDepth = 0, layerH = 0, kg = 0;
     const maxItemKg = targetKg * Number(this.v["maxItemShareOfLoad"] ?? 0.34); // kein 1-t-Gussteil auf dem Privatanhaenger
-    for (let i = 0; i < count && kg < targetKg * 1.3; i++) {
+    // Stueckzahl UND Gewicht treffen: pro Teil ein Massebudget; zu schwere Formen werden neu gewuerfelt (Balancing 08.09.:
+    // vorher 10 Teile mit 3,9 t statt 15–30 Teile mit 1,5–3 t)
+    const perItemKg = Math.max(20, (targetKg / count) * 2.2);
+    for (let i = 0; i < count && kg < targetKg * 1.15; i++) {
       const mat = this.rng.pickWeighted(profile, (p) => p.share).materialId;
+      const remaining = targetKg * 1.15 - kg;
       let plan = this.scrap.planShape(mat, this.rng);
-      for (let tries = 0; plan && plan.massKg > maxItemKg && tries < 6; tries++) plan = this.scrap.planShape(mat, this.rng);
-      if (!plan || plan.massKg > maxItemKg) continue;
+      for (let tries = 0; plan && (plan.massKg > Math.min(maxItemKg, perItemKg) || plan.massKg > remaining) && tries < 8; tries++) plan = this.scrap.planShape(mat, this.rng);
+      if (!plan || plan.massKg > maxItemKg || plan.massKg > remaining) continue;
       const { shape, size } = plan;
       const fw = shape.collider === "cylinder" ? size[2] : size[0], fd = shape.collider === "cylinder" ? size[0] * 2 : size[2], fh = shape.collider === "cylinder" ? size[0] * 2 : size[1];
       const long = Math.max(fw, fd), short = Math.min(fw, fd);

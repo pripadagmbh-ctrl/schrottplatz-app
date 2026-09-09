@@ -108,11 +108,13 @@
     "sortPointsPerItem": 10,
     "sortPointsPerKg": 0.1,
     "wrongSortPoints": -10,
-    "_comment": "M4a: Sortieren gibt PUNKTE, kein Geld (Patrick 08.09.); Geld nur beim Verkauf mit Reinheit^purityExponent. Tagespunkte sollen spaeter Skills freischalten (Patrick 08.09., Progression M4b/V1). sortingBonusPerKg (Prototyp) bleibt ungenutzt."
+    "_comment": "M4a: Sortieren gibt PUNKTE, kein Geld (Patrick 08.09.); Geld nur beim Verkauf mit Reinheit^purityExponent. Tagespunkte sollen spaeter Skills freischalten (Patrick 08.09., Progression M4b/V1). sortingBonusPerKg (Prototyp) bleibt ungenutzt.",
+    "debtInterestFactor": 1.2,
+    "_comment_m4b": "M4b (SW): Fixkosten am Feierabend; negatives Konto wird am Abend mit debtInterestFactor verzinst (aus creditPenaltyFactor); unter creditLimitEur ist Schluss (Pleite)."
   },
   "day": {
     "deliveriesPerDay": {
-      "0": 1,
+      "0": 0,
       "1": 2,
       "2": 2,
       "3": 2,
@@ -131,7 +133,8 @@
       6,
       10
     ],
-    "_src": "Briefing Kap. 4.3 (Rückfrage 3: 6-10 min)"
+    "_src": "Briefing Kap. 4.3 (Rückfrage 3: 6-10 min)",
+    "_comment_m4b": "M4b: Tag 0 = Tutorial, das TutorialSystem ruft seine zwei Fuhren selbst (E-026). Arbeitstag endet per Knopf; Fixkosten und Zinsen am Abend."
   },
   "containers": {
     "bookAfterRestS": 3,
@@ -202,5 +205,14 @@
     "autoDeliveries": true,
     "firstDeliveryDelayS": 8,
     "maxItemShareOfLoad": 0.34
+  },
+  "tutorial": {
+    "lesson1ItemCount": 4,
+    "lesson1NeedBooked": 3,
+    "lesson2NeedShare": 0.8,
+    "lesson3NeedShare": 0.7,
+    "inputHoldS": 1.0,
+    "driveDistanceM": 3.0,
+    "_src": "M4b (SW) nach E-026: drei Lektionen, blockierende Schritte"
   }
 }

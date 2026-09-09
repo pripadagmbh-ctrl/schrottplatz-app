@@ -2,6 +2,20 @@
 
 Jede Architektur- oder Design-Entscheidung mit Datum und Begründung, damit nichts zweimal diskutiert wird (CLAUDE.md). Neueste oben.
 
+## 2026-09-08 — M4b: Tag und Spiel (gebaut, Gerätetest offen)
+
+| # | Entscheidung | Begründung | Alternative (verworfen) |
+|---|---|---|---|
+| — | Sortierpunkte werden in M4b nur gezählt und in der Abend-Bilanz gezeigt; Skills dafür kommen mit dem Upgrade-Baum in M6 | Patrick 08.09.: „ok fürs Erste" | Skills schon in M4b |
+| E-026 | Tag 0 = drei Lektionen statt Briefing 14.3: (1) große Stahlteile vom Abladeplatz in die Betonlego-Mulde legen — Steuerung wird dabei Schritt für Schritt eingeblendet; (2) eine komplette Lkw-Ladung Stahl abladen und in den Stahl-„Silo" (Haufen) umsetzen; (3) Mischschrott mit großen Teilen vom Kipper sortieren. Kein Pkw-Anhänger im Tutorial | Patrick 08.09.: „langsam an die Steuerung heranführen … Tutorial zur Bedienung beim ersten Versuch mit einbauen"; Lkw-Fokus | Briefing 14.3 (Anhänger mit 5 Teilen) |
+| E-027 | Willi und Lambert bleiben in M4b **außen vor**; Hinweise sind neutrale Systemtexte. Story, Figuren und Karten kommen später als eigener Schritt | Patrick 08.09.: „Rollen Willi und Lambert erst außen vor lassen, Story kommt später" | Lambert-Blasen laut Briefing |
+| E-028 | Autosave sichert nur den **Ruhezustand**: Teile, Container, Tag, Konto, Aufträge, Tutorial-Abschluss, Bagger-Pose. Fahrzeuge unterwegs werden verworfen, ihre Fuhre zählt beim Laden als „noch nicht gekommen" (deliveriesToday − unterwegs). Speichern am Tagesende, beim Verstecken der Seite und alle 60 s im Betrieb; Ablage IndexedDB, Export/Import als JSON | Ein Lkw mit kinematischer Ladung mitten im Kippvorgang lässt sich nicht sauber wiederherstellen; der Verlust ist klein (eine Fuhre kommt nach) | Fahrzeuge inklusive Ladung serialisieren |
+| E-029 | Neues Spiel startet mit **leerem Platz** — die Einweisung liefert das Material (4 große Stahlteile, dann zwei Fuhren). Der 40er-Start-Haufen bleibt als Dev-Weg über `?pile` in der URL und Taste P | Ein Anfänger soll die vier Teile finden, nicht 40 kleine drum herum; die Lektionen sagen „vom Abladeplatz in die Stahlmulde" (E-026) | Start-Haufen wie M1–M4a |
+| E-030 | Tag endet **per Knopf** („Tag beenden", grün sobald alle geplanten Fuhren durch sind), nicht per Uhr. Am Abend: Fixkosten 150 €, negatives Konto × 1,2 (`debtInterestFactor`, SW), unter −1500 € Pleite; nach 30 Tagen Kampagne geschafft. Fahrzeuge auf dem Platz fahren zu Ende | Briefing 4.3 nennt 6–10 min Zieldauer, aber ein Zeitlimit bestraft langsames Sortieren doppelt (Fehlwürfe + Abbruch); die Fuhren-Zahl begrenzt den Tag ohnehin. Zinsen statt „Strafzins auf Ankäufe" (Prototyp `creditPenaltyFactor`) sind in der Bilanz nachvollziehbarer | Tagesuhr mit Zwangs-Feierabend |
+| E-031 | Aufträge: 3/Tag ab Tag 1 aus `missions.json`, Seed = Tag (Spielstand bekommt dieselben zurück), nur Tier MVP und nur Typen, die die Welt kann (deliver/clear/customer). `deliver` zählt heute verkaufte kg mit Reinheit ≥ minPurity je Verkauf; `clear` wird beim Feierabend geprüft; `customer` misst Tor-zu-Tor | Briefing 11.2; dismantle/clean brauchen Verbundteile bzw. Fehlwurf-Statistik (V1) | Zufall ohne Seed |
+| — | Erste Sounds synthetisch (WebAudio-Oszillatoren): Greifen, Ablegen, Punkte/Fehlwurf, Verkauf, Bonus, Hupe bei Ankunft, Kippen, Feierabend. Ton nach erster Geste, M schaltet stumm | Feedback prüfbar, bevor Samples da sind; keine Dateien, kein Lizenzthema | Sample-Pack einkaufen |
+| — | Tutorial-Texte je Eingabegerät (`_touch`/`_kbd` in i18n), Auswahl per `pointer: coarse` in der UI; die Simulation kennt keine Tasten | Schichtenregel; das Banner ist die einzige Stelle, die weiß, ob ein Finger oder eine Tastatur spielt | Texte ohne Gerätebezug („bewege den Arm") |
+
 ## 2026-09-08 — M4a: Anlieferung und Wirtschafts-Rückgrat (in Arbeit)
 
 | # | Entscheidung | Begründung | Alternative (verworfen) |

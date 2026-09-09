@@ -73,7 +73,34 @@
       .sell-row .ok { color: #4fbf3f; } .sell-row .warn { color: #f2b632; } .sell-row .bad { color: #e0483a; }
       .sell-row button { min-height: 40px; padding: 0 12px; border: 0; border-radius: 8px; background: #f2b632; color: #1e2124; font-weight: 600; }
       .sell-row button[disabled] { opacity: .35; }
-      @media (max-height: 500px) { .hud-bar { height: 30px; font-size: 13px; gap: 10px; } .hud-toasts { top: calc(env(safe-area-inset-top, 0px) + 44px); } #grip-chip { top: calc(env(safe-area-inset-top, 0px) + 44px + 30px); } }
+      @media (max-height: 500px) { .hud-bar { height: 30px; font-size: 13px; gap: 10px; } #grip-chip { top: calc(env(safe-area-inset-top, 0px) + 44px + 30px); } }
+      /* M4b: Tag-Anzeige, „Tag beenden", Auftragszeile, Bottom-Sheet (Morgen/Feierabend), Einweisungs-Banner */
+      .hud-day { color: rgba(238,240,236,.75); font-weight: 600; }
+      .hud-end { min-height: 36px; padding: 0 12px; border: 0; border-radius: 14px; background: rgba(238,240,236,.15); color: #eef0ec; font: 600 13px Inter, system-ui, sans-serif; touch-action: manipulation; }
+      .hud-end.ready { background: #4fbf3f; color: #1e2124; }
+      .hud-missions { position: fixed; left: 50%; transform: translateX(-50%); top: calc(env(safe-area-inset-top, 0px) + 56px); z-index: 6; display: flex; gap: 8px; max-width: calc(100vw - 160px); overflow: hidden; pointer-events: none; }
+      .hud-missions span { padding: 3px 10px; border-radius: 10px; background: rgba(20,22,24,.7); color: #eef0ec; font: 600 12px Inter, system-ui, sans-serif; white-space: nowrap; }
+      .hud-missions span.done { background: rgba(79,191,63,.85); color: #1e2124; }
+      .hud-missions[hidden] { display: none; }
+      /* Toasts nach unten ueber den Griff-Chip: oben sitzen jetzt Auftragszeile und Einweisung */
+      .hud-toasts { top: auto; bottom: calc(env(safe-area-inset-bottom, 0px) + 96px); }
+      .sheet { position: fixed; inset: 0; z-index: 20; display: grid; align-items: end; justify-items: center; background: rgba(20,22,24,.45); }
+      .sheet[hidden] { display: none; }
+      .sheet-body { width: min(560px, 100vw); max-height: min(80vh, 100dvh - 24px); overflow: auto; box-sizing: border-box; padding: 16px 20px calc(env(safe-area-inset-bottom, 0px) + 16px); background: rgba(20,22,24,.97); color: #eef0ec; border-radius: 16px 16px 0 0; font: 15px/1.4 Inter, system-ui, sans-serif; touch-action: pan-y; }
+      .sheet-body * { touch-action: pan-y; }
+      .sheet-body h2 { margin: 0 0 6px; font-size: 20px; } .sheet-body h3 { margin: 12px 0 4px; font-size: 14px; color: rgba(238,240,236,.75); text-transform: uppercase; letter-spacing: .04em; }
+      .sheet-body ul { margin: 0; padding-left: 18px; } .sheet-body li { margin: 4px 0; } .sheet-body .bonus { color: #f2b632; white-space: nowrap; }
+      .sheet-body .muted { color: rgba(238,240,236,.65); } .sheet-body .ok { color: #4fbf3f; } .sheet-body .bad { color: #e0483a; }
+      .sheet-body .row { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-top: 1px solid rgba(238,240,236,.1); }
+      .sheet-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+      .sheet-actions button { min-height: 44px; padding: 0 16px; border: 0; border-radius: 10px; background: rgba(238,240,236,.12); color: #eef0ec; font: 600 15px Inter, system-ui, sans-serif; touch-action: manipulation; }
+      .sheet-actions button.primary { background: #f2b632; color: #1e2124; flex: 1 1 auto; }
+      /* Oben unter der HUD-Leiste, NICHT unten: unten liegen die Stick-Zonen, und der Ueberspringen-Knopf fing dort Daumen ab (E2E Hochformat) */
+      .tut { position: fixed; left: 50%; transform: translateX(-50%); top: calc(env(safe-area-inset-top, 0px) + 58px); z-index: 6; width: min(560px, calc(100vw - 150px)); box-sizing: border-box; padding: 8px 12px; display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; background: rgba(20,22,24,.88); color: #eef0ec; border-radius: 12px; border-left: 6px solid #f2b632; font: 14px/1.35 Inter, system-ui, sans-serif; pointer-events: none; }
+      .tut[hidden] { display: none; }
+      .tut-title { font-weight: 600; font-size: 12px; color: #f2b632; grid-column: 1; } .tut-text { grid-column: 1; }
+      .tut-skip { grid-column: 2; grid-row: 1 / span 2; align-self: center; min-height: 44px; min-width: 44px; padding: 0 10px; border: 0; border-radius: 8px; background: rgba(238,240,236,.12); color: #eef0ec; font: 600 12px Inter, system-ui, sans-serif; pointer-events: auto; touch-action: manipulation; }
+      @media (max-height: 500px) { .tut { top: calc(env(safe-area-inset-top, 0px) + 44px + 30px + 40px); width: min(460px, 44vw); font-size: 12px; padding: 6px 10px; } .hud-missions { top: calc(env(safe-area-inset-top, 0px) + 40px); } .hud-end, .hud-sell { min-height: 26px; font-size: 12px; } }
       .fatal { padding: 24px; max-width: 900px; margin: 0 auto; }
       .fatal h1 { color: #e0483a; font-size: 20px; }
       .fatal pre { white-space: pre-wrap; font-size: 13px; }

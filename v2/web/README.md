@@ -1,6 +1,6 @@
 # Bagerana v2 — Spur A (Web)
 
-Neuaufbau nach `../docs/02_Briefing.md` (Kap. 17 Architektur, Kap. 22 Meilensteine). Stand: **M4a — Anlieferung und Wirtschaft** (Kundenfahrzeuge, Kippen, Verbuchung, Verkauf, HUD) — in Arbeit.
+Neuaufbau nach `../docs/02_Briefing.md` (Kap. 17 Architektur, Kap. 22 Meilensteine). Stand: **M4b — Tag und Spiel** (Tagesstruktur, Aufträge, Einweisung, Autosave, erste Sounds) — gebaut, Gerätetest offen.
 
 ## Befehle
 
@@ -83,6 +83,17 @@ Steuerung im Browser: **Q/E** Oberwagen · **R/F** Hauptarm · **T/G** Stiel · 
 - Tasten: **K** Kunde rufen (Debug). Automatische Anlieferungen laufen im Arbeitsteil des Tages (`deliveriesPerDay`).
 - Test: `test/sim/delivery.test.ts`.
 
+## Was M4b enthält
+
+- `sim/systems/DaySystem.ts` (slow ×6): Morgen → Betrieb → Feierabend → nächster Tag; `startDay()/endDay()/nextDay()` von der UI; Fixkosten, Zinsen auf Minus, Pleite unter der Kreditlinie, Kampagnenende nach `campaignDays`; Tagesbilanz in `world.day.report`. Sichert Tag, Konto und Bagger-Pose (E-028, E-030).
+- `sim/systems/MissionSystem.ts` (slow ×6): 3 Aufträge/Tag ab Tag 1 aus `missions.json` (Seed = Tag), Typen deliver/clear/customer, Bonus + Stern (E-031).
+- `sim/systems/TutorialSystem.ts` (slow ×6): Einweisung an Tag 0 in drei Lektionen mit blockierenden Schritten (E-026), neutrale Texte (E-027), `skip()`. Werte in `balancing.tutorial`.
+- `app/SaveService.ts` + `app/Persistence.ts`: Autosave in IndexedDB (Tagesende, Seite versteckt, alle 60 s), Export/Import als JSON, Dialog bei kaputtem Stand.
+- `ui/DaySheet.ts` (Morgen-Karte, Abend-Bilanz, Spielende), `ui/TutorialBanner.ts`, `ui/BrokenSaveDialog.ts`, HUD mit Tag, **Tag beenden**, Auftragszeile.
+- `view/audio/AudioSystem.ts`: synthetische Sounds an Events, Freigabe nach erster Geste, **M** stumm.
+- Neues Spiel startet leer (E-029); `?pile` in der URL legt den 40er-Haufen (Dev), **P** kippt 150 weitere.
+- Test: `test/sim/day.test.ts`; Rauchtest prüft Morgen-Karte, Feierabend, Autosave über Neuladen.
+
 ## Nächster Meilenstein
 
-**M4b — Tag und Spiel**: Morgen/Feierabend, Morgen-Karte, drei Tagesaufträge mit Sternen, Fixkosten, Onboarding Tag 0 mit Willi/Lambert, Autosave + Export, Audio an Events.
+**M5 — Verbundteile**: Pkw/Traktor/Lkw als zerlegbare Objekte (Motor, Kat, Batterie, Reifen, Tank, Kabelbaum), Presse, Auftragstyp dismantle.

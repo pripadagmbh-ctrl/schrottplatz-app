@@ -94,6 +94,8 @@ export interface BalancingFile {
   budgets: Record<string, number>;
   assist: Record<string, number | boolean | string>;
   vehicles: Record<string, number | boolean | string>;
+  /** M4b: Tutorial-Startwerte (E-026) */
+  tutorial: Record<string, number | string>;
 }
 
 export type I18nFile = Record<string, unknown>;

@@ -24,6 +24,10 @@ export interface GameEvents {
   pressUsed: { compositeId: CompositeId; crushStage: number };
   upgradeBought: { upgradeId: string };
   saveRequested: { reason: "day" | "hidden" | "manual" | "interval" };
+  /** M4b */
+  missionsRolled: { day: number; missionIds: string[] };
+  tutorialStep: { lesson: number; step: number; done: boolean };
+  dayEnded: { day: number; bankrupt: boolean; campaignDone: boolean };
 }
 export type EventName = keyof GameEvents;
 export type Handler<K extends EventName> = (payload: GameEvents[K]) => void;

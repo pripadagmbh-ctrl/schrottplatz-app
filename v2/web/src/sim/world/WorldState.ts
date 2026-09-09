@@ -41,6 +41,15 @@ export interface DeliveryState {
 export interface DayState {
   day: number; phase: "morning" | "work" | "evening" | "ended"; secondsInPhase: number;
   deliveriesToday: number; deliveriesDone: number;
+  /** M4b: Tagesbilanz — wird am Morgen genullt, am Abend angezeigt */
+  report: DayReport;
+}
+export interface DayReport {
+  salesEur: number; purchasesEur: number; fixedEur: number; interestEur: number; missionBonusEur: number;
+  points: number; correctSorts: number; wrongSorts: number; missionsDone: number; moneyStartEur: number;
+}
+export function emptyDayReport(moneyStartEur: number): DayReport {
+  return { salesEur: 0, purchasesEur: 0, fixedEur: 0, interestEur: 0, missionBonusEur: 0, points: 0, correctSorts: 0, wrongSorts: 0, missionsDone: 0, moneyStartEur };
 }
 export interface EconomyState {
   moneyEur: number; starsTotal: number; premiumUnlocked: boolean; upgrades: string[];
@@ -65,7 +74,7 @@ export function createWorldState(startMoneyEur: number, spawn: { x: number; z: n
   return {
     items: new Map(), containers: new Map(), composites: new Map(), deliveries: new Map(),
     excavator: { pos: { x: spawn.x, y: 0, z: spawn.z }, heading: spawn.heading, cab: 0, boom: 35 * Math.PI / 180, stick: -70 * Math.PI / 180, rotator: 0, grapple: 0, cabLift: 0, driveMode: false },
-    day: { day: 0, phase: "morning", secondsInPhase: 0, deliveriesToday: 0, deliveriesDone: 0 },
+    day: { day: 0, phase: "morning", secondsInPhase: 0, deliveriesToday: 0, deliveriesDone: 0, report: emptyDayReport(startMoneyEur) },
     economy: { moneyEur: startMoneyEur, starsTotal: 0, premiumUnlocked: false, upgrades: [], stats: { turnoverKg: 0, correctSorts: 0, wrongSorts: 0, daysPlayed: 0 }, sortPoints: 0 },
     step: 0,
   };
