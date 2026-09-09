@@ -14,6 +14,7 @@ import {
   clawPoint,
   clawSpan,
   clawTipDepth,
+  naechsteSpreizung,
 } from "../src/excavator/clawGeometry";
 import {
   ROUTE_IN_FWD,
@@ -217,5 +218,55 @@ describe("Greifergeometrie", () => {
       expect(tiefe).toBeGreaterThan(vorher);
       vorher = tiefe;
     }
+  });
+});
+
+/**
+ * Ungleichmäßiges Schließen der Spinne (Wunsch 10.09.2026).
+ *
+ * Steckt eine Stange zwischen zwei Zähnen, sollen genau die beiden stehen
+ * bleiben und die anderen drei weiter zugehen. Die Regel dafür ist
+ * `naechsteSpreizung`; kleinerer Winkel heißt weiter geschlossen.
+ */
+describe("Krallen schließen einzeln", () => {
+  const SCHRITT = 0.1;
+
+  it("eine freie Kralle geht weiter zu", () => {
+    expect(naechsteSpreizung(1.0, 0.4, SCHRITT, false)).toBeCloseTo(0.9, 6);
+  });
+
+  it("eine blockierte Kralle bleibt genau stehen", () => {
+    expect(naechsteSpreizung(1.0, 0.4, SCHRITT, true)).toBe(1.0);
+  });
+
+  it("blockiert heißt nicht offen: sie faellt nicht zurueck", () => {
+    const ist = 0.62;
+    expect(naechsteSpreizung(ist, 0.4, SCHRITT, true)).toBe(ist);
+  });
+
+  it("oeffnen geht auch dann, wenn etwas im Weg ist", () => {
+    // Sonst bliebe eine Kralle fuer immer stecken, sobald sie einmal aufsitzt
+    expect(naechsteSpreizung(0.5, 1.25, SCHRITT, true)).toBeCloseTo(0.6, 6);
+  });
+
+  it("das Ziel wird nicht ueberschossen", () => {
+    expect(naechsteSpreizung(0.45, 0.4, SCHRITT, false)).toBeCloseTo(0.4, 6);
+    expect(naechsteSpreizung(1.2, 1.25, SCHRITT, false)).toBeCloseTo(1.25, 6);
+  });
+
+  it("die Stange zwischen zwei Zaehnen: drei gehen zu, zwei bleiben", () => {
+    // Fuenf Krallen, zwei davon blockiert — nach zehn Bildern muessen sich die
+    // Winkel deutlich unterscheiden, sonst schliesst die Spinne wieder synchron
+    const blockiert = [false, true, true, false, false];
+    let winkel = [1.25, 1.25, 1.25, 1.25, 1.25];
+    for (let i = 0; i < 10; i++) {
+      winkel = winkel.map((w, k) => naechsteSpreizung(w, 0.3, SCHRITT, blockiert[k]!));
+    }
+    expect(winkel[0]).toBeCloseTo(0.3, 6);
+    expect(winkel[3]).toBeCloseTo(0.3, 6);
+    expect(winkel[1]).toBe(1.25);
+    expect(winkel[2]).toBe(1.25);
+    const spanne = Math.max(...winkel) - Math.min(...winkel);
+    expect(spanne, "die Spinne geht wieder gleichmaessig zu").toBeGreaterThan(0.5);
   });
 });

@@ -13,6 +13,7 @@ import {
   CLAW_SEG_BEND,
   CLAW_SEG_LEN,
   clawPoint,
+  naechsteSpreizung,
   clawTipDepth,
 } from "./clawGeometry";
 
@@ -177,7 +178,10 @@ export class Excavator {
     barrelLen: number;
   }> = [];
 
+  private world!: RAPIER.World;
+
   constructor(scene: THREE.Scene, world: RAPIER.World) {
+    this.world = world;
     this.buildMeshes();
     scene.add(this.root);
     scene.add(this.grappleGroup);
@@ -967,10 +971,13 @@ export class Excavator {
    * Krallen-Kollider der aktuellen Öffnung nachführen. Beim Tragen werden sie
    * abgeschaltet: die Last hängt am Gelenk und würde sonst herausgequetscht.
    */
-  private updateClawColliders(splay: number): void {
+  private updateClawColliders(): void {
     const carrying = this.carriedCount > 0;
     for (let c = 0; c < CLAW_COUNT; c++) {
       const a = (c / CLAW_COUNT) * Math.PI * 2;
+      // Jede Kralle mit ihrem eigenen Winkel — sonst stuenden die Kollider
+      // woanders als die Zacken, die man sieht
+      const splay = this.clawSplayIst[c] ?? this.currentSplay();
       for (let h = 0; h < 2; h++) {
         const col = this.clawColliders[c * 2 + h];
         col.setEnabled(!carrying);
@@ -1131,7 +1138,12 @@ export class Excavator {
     this.rotatorVel = (this.rotatorYaw - this.lastRotatorYaw) / Math.max(dt, 1e-4);
     this.lastRotatorYaw = this.rotatorYaw;
 
+    // Erst die Pose dieses Bildes herstellen, dann aufsetzen: Die Strahlen
+    // gehen von den Krallenspitzen aus, und die stehen sonst noch dort, wo sie
+    // im letzten Bild waren — beim Schwenken misst man dann die falsche Stelle.
+    this.syncMeshes();
     this.resolveGroundClamp();
+    this.updateClawBlocking(dt);
     this.syncMeshes();
 
     // Fahrwerk und Arm werden getrennt geprüft: ein Hindernis neben den
@@ -1205,13 +1217,145 @@ export class Excavator {
     return THREE.MathUtils.lerp(CLAW_OPEN_SPLAY, minSplay, this.closure);
   }
 
+  /**
+   * Spreizung je Kralle. Bisher bekamen alle fuenf denselben Winkel — die
+   * Spinne ging immer gleichmaessig zu, auch wenn eine Stange zwischen zwei
+   * Zaehnen steckte. Jede Kralle hat jetzt ihren eigenen Weg: Was blockiert
+   * ist, bleibt stehen, der Rest geht weiter zu.
+   */
+  private clawSplayIst: number[] = new Array(CLAW_COUNT).fill(CLAW_OPEN_SPLAY);
+  private blockTmp = new THREE.Vector3();
+  private blockShape = new RAPIER.Ball(0.14);
+  private static readonly IDENT = { x: 0, y: 0, z: 0, w: 1 };
+  /**
+   * Wie schnell eine freie Kralle ihrem Sollwinkel folgt. Bewusst hoch: Eine
+   * unbehinderte Spinne soll sich anfuehlen wie vorher, sichtbar werden soll
+   * nur, was haengen bleibt.
+   */
+  private static readonly CLAW_RATE = 4.0; // rad/s
+
+  /**
+   * Sitzt diese Kralle bei der angepeilten Spreizung auf etwas auf?
+   *
+   * Geprüft wird nur gegen bewegliche Koerper — Schrott, Wracks, Ladung. Beton,
+   * Waende und Muldenboeden sind fest und duerfen die Zaehne nicht festhalten:
+   * Auf ebenem Boden schliesst ein Greifer sehr wohl, die Spitzen schleifen
+   * dann ueber die Platte.
+   */
+  private clawBlocked(a: number, splay: number): boolean {
+    clawPoint(a, splay, CLAW_SEGMENTS, this.blockTmp);
+    this.grappleGroup.localToWorld(this.blockTmp);
+    return (
+      this.world.intersectionWithShape(
+        this.blockTmp,
+        Excavator.IDENT,
+        this.blockShape,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        (c) => {
+          const b = c.parent();
+          if (!b) return false;
+          if (this.selfHandles.has(b.handle)) return false;
+          return b.isDynamic();
+        }
+      ) !== null
+    );
+  }
+
+  /**
+   * Krallen einzeln nachfuehren. Oeffnen geht immer — sonst bliebe eine Kralle
+   * fuer immer stecken, sobald sie einmal aufsitzt. Schliessen nur so weit, wie
+   * Platz ist.
+   */
+  private updateClawBlocking(dt: number): void {
+    const ziel = this.currentSplay();
+    const schritt = Excavator.CLAW_RATE * dt;
+    for (let c = 0; c < CLAW_COUNT; c++) {
+      const ist = this.clawSplayIst[c]!;
+      if (ziel >= ist) {
+        this.clawSplayIst[c] = naechsteSpreizung(ist, ziel, schritt, false);
+        continue;
+      }
+      const naechste = Math.max(ziel, ist - schritt);
+      const a = (c / CLAW_COUNT) * Math.PI * 2;
+      this.clawSplayIst[c] = naechsteSpreizung(
+        ist,
+        ziel,
+        schritt,
+        this.clawBlocked(a, naechste)
+      );
+    }
+  }
+
+  /** Wie weit die Spinne tatsaechlich zu ist — die am weitesten offene Kralle zaehlt. */
+  get clawSplayMax(): number {
+    let max = 0;
+    for (const v of this.clawSplayIst) max = Math.max(max, v);
+    return max;
+  }
+
+  private aufsetzRay = new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 });
+  private aufsetzTmp = new THREE.Vector3();
+
+  /**
+   * Höhe der Fläche unter den Krallenspitzen — Beton, Ladefläche, Muldenboden,
+   * was auch immer dort liegt.
+   *
+   * Vorher rechnete der Bodenanschlag gegen eine gedachte Ebene bei y = 0. Auf
+   * dem Betonplatz stimmte das ungefähr; über einer Ladefläche gar nicht, und
+   * die Spinne sank sichtbar durch die Mulde. Jetzt wird gemessen statt
+   * angenommen: ein Strahl je Spitze, senkrecht nach unten. Maßgeblich ist die
+   * höchste getroffene Fläche — an ihr setzt die Spinne auf, auch wenn nur eine
+   * Kralle über der Mulde steht.
+   *
+   * Ausgenommen sind die eigenen Körper und die Ladung: Sonst setzte die Spinne
+   * auf ihrer eigenen Kralle oder auf dem Teil auf, das sie gerade trägt.
+   */
+  private surfaceUnderClaws(splay: number): number {
+    this.grappleGroup.updateWorldMatrix(true, false);
+    let hoechste = 0; // Beton als Rückfallebene
+    for (let i = 0; i < CLAW_COUNT; i++) {
+      const a = (i / CLAW_COUNT) * Math.PI * 2;
+      clawPoint(a, splay, CLAW_SEGMENTS, this.aufsetzTmp);
+      this.grappleGroup.localToWorld(this.aufsetzTmp);
+      // Von oberhalb der Spitze nach unten, damit auch eine bereits
+      // eingesunkene Kralle die Fläche über sich findet und herausgehoben wird
+      this.aufsetzRay.origin.x = this.aufsetzTmp.x;
+      this.aufsetzRay.origin.y = this.aufsetzTmp.y + 1.2;
+      this.aufsetzRay.origin.z = this.aufsetzTmp.z;
+      const treffer = this.world.castRay(
+        this.aufsetzRay,
+        14,
+        true,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        (c) => {
+          const b = c.parent();
+          if (!b) return true;
+          return !this.selfHandles.has(b.handle) && !this.grippedHandles.has(b.handle);
+        }
+      );
+      if (treffer) {
+        hoechste = Math.max(hoechste, this.aufsetzRay.origin.y - treffer.timeOfImpact);
+      }
+    }
+    return hoechste;
+  }
+
   private resolveGroundClamp(): void {
     // Spitzentiefe direkt aus der Krallengeometrie — so bleibt der Bodenanschlag
     // richtig, auch wenn sich Form oder Öffnungswinkel ändern.
-    const tipDepth = clawTipDepth(this.currentSplay());
+    const splay = this.currentSplay();
+    const tipDepth = clawTipDepth(splay);
+    // Gemessene Fläche statt angenommener Ebene: darauf setzt die Spinne auf.
+    const flaeche = this.surfaceUnderClaws(splay);
     // tipY() rechnet ab der Maschinenbasis; steht die Maschine aufgebockt,
     // ist der Boden entsprechend weiter unten
-    const minTipY = tipDepth + 0.02 - this.position.y;
+    const minTipY = flaeche + tipDepth + 0.02 - this.position.y;
     const tipY = () =>
       BOOM_PIVOT.y +
       BOOM_LEN * Math.sin(this.boomAngle) +
@@ -1293,11 +1437,10 @@ export class Excavator {
     // Zacken: offen weit gespreizt. Geschlossen fügen sich die Schalen zur
     // dichten Kalotte — es sei denn, es liegt Material darin: dann bleibt die
     // Spinne so weit offen, wie die Ladung Platz braucht.
-    const splay = this.currentSplay();
-    for (const pivot of this.fingerPivots) {
-      pivot.rotation.x = -splay;
-    }
-    this.updateClawColliders(splay);
+    this.fingerPivots.forEach((pivot, i) => {
+      pivot.rotation.x = -(this.clawSplayIst[i] ?? this.currentSplay());
+    });
+    this.updateClawColliders();
 
     this.updateHydraulics();
 

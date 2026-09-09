@@ -69,3 +69,28 @@ export function clawSpan(splay: number): number {
 export function clawTipDepth(splay: number): number {
   return -clawPoint(0, splay, CLAW_SEGMENTS, new THREE.Vector3()).y;
 }
+
+/**
+ * Nächster Spreizwinkel einer einzelnen Kralle.
+ *
+ * Die Regel steckte vorher im Bagger und war damit nicht prüfbar. Sie ist der
+ * Kern des ungleichmäßigen Schließens: Öffnen geht immer — sonst bliebe eine
+ * Kralle für immer stecken, sobald sie einmal aufsitzt. Schließen nur, solange
+ * nichts im Weg ist; blockiert bleibt sie stehen, wo sie ist, und die anderen
+ * gehen weiter zu.
+ *
+ * @param ist       aktueller Winkel dieser Kralle
+ * @param ziel      Winkel, den der Fahrer kommandiert
+ * @param schritt   was in diesem Bild höchstens zurückgelegt wird (rad)
+ * @param blockiert ob bei `ist - schritt` etwas im Weg wäre
+ */
+export function naechsteSpreizung(
+  ist: number,
+  ziel: number,
+  schritt: number,
+  blockiert: boolean
+): number {
+  if (ziel >= ist) return Math.min(ziel, ist + schritt); // öffnen
+  if (blockiert) return ist;
+  return Math.max(ziel, ist - schritt);
+}
