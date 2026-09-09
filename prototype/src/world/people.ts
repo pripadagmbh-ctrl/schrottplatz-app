@@ -160,6 +160,11 @@ type LambertState = "patrol" | "guide" | "fetch" | "carry";
 
 export class StaffManager {
   private lambert: PersonParts;
+  /**
+   * Das Wiegehäuschen — wird beim Ausbau vom Büro abgelöst und dann
+   * ausgeblendet (siehe world/office.ts).
+   */
+  weighHut!: THREE.Group;
   private lambertState: LambertState = "patrol";
   private lambertTarget = new THREE.Vector3();
   private walkPhase = 0;
@@ -250,6 +255,7 @@ export class StaffManager {
     mario.group.rotation.y = Math.PI;
     mario.legLeft.visible = false;
     mario.legRight.visible = false;
+    this.weighHut = weighHut;
     weighHut.add(mario.group);
     this.addNameTag(weighHut, "MARIO", 0, 2.0, 1.16);
 

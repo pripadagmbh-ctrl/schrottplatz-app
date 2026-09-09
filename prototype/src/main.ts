@@ -25,7 +25,8 @@ import { UPGRADES, UpgradeState, type UpgradeId } from "./economy/upgrades";
 import { haggle, leavesOnRefusal, hint, OFFER_FACTOR, OFFER_LABEL, type Offer } from "./economy/haggle";
 import { LaneWatch } from "./delivery/laneWatch";
 import { Daylight, Floodlights } from "./world/daylight";
-import { hitsObstacle } from "./world/obstacles";
+import { hitsObstacle, setBuildingObstacles, BUILDING_HUT } from "./world/obstacles";
+import { OfficeBuilding } from "./world/office";
 import { Signage } from "./world/signage";
 import {
   type AxisId,
@@ -444,10 +445,33 @@ async function main(): Promise<void> {
   // --- Platz ausbauen: verdientes Geld bekommt eine Verwendung ---
   const ausbau = new UpgradeState();
   ausbau.load(save?.upgrades);
+  // Das Betriebsgebäude wächst mit: Häuschen → Büro → Büro mit Halle
+  const buero = new OfficeBuilding(scene, WEIGH_X - 4.6, WEIGH_Z);
+  buero.setHut(staff.weighHut);
+  /**
+   * Grundriss des Betriebsgebäudes an die Hindernisprüfung melden. Solange
+   * nur das Häuschen steht, gilt dessen kleiner Kasten; danach der größere
+   * Grundriss von Büro und Halle.
+   */
+  const setzeGebaeudeHindernisse = (
+    fp: Array<[number, number, number, number]>
+  ): void => {
+    setBuildingObstacles(
+      fp.length === 0
+        ? BUILDING_HUT
+        : fp.map(([x, z, hw, hd]) => ({ x, z, hw, hd, top: 4.2, label: "Betriebsgebäude" }))
+    );
+  };
+  setzeGebaeudeHindernisse(buero.footprints());
   const shopEl = document.getElementById("shop")!;
   /** Wirkung eines gekauften Ausbaus sofort anwenden. */
   const wendeAn = (id: UpgradeId): void => {
     if (id === "loader") staff.setLoader(true);
+    // Aus dem Wiegehäuschen wird ein Büro, später mit Halle daneben
+    if (id === "office" || id === "hall") {
+      buero.setStage(ausbau.has("hall") ? "hall" : "office");
+      setzeGebaeudeHindernisse(buero.footprints());
+    }
     // dozer, forklift, magnet, boom und press wirken über Abfragen an
     // anderer Stelle — hier ist nichts einzuschalten
   };
@@ -456,7 +480,11 @@ async function main(): Promise<void> {
   excavator.getSpeedBonus = () => (ausbau.has("boom") ? 1.35 : 1);
   grip.getCapacityBonus = () => (ausbau.has("boom") ? 1.5 : 1);
   press.getBaleBonus = () => (ausbau.has("press") ? 1.6 : 1);
-  staff.getSpeedBonus = () => (ausbau.has("dozer") || ausbau.has("forklift") ? 1.4 : 1);
+  // Bulldozer und Stapler tun Verschiedenes: der eine macht Lambert schneller,
+  // der andere lässt ihn schwerer heben. Wer beide hat, merkt beides.
+  staff.getSpeedBonus = () => (ausbau.has("dozer") ? 1.4 : 1);
+  staff.getLiftBonus = () => (ausbau.has("forklift") ? 2.5 : 1);
+  account.hasMagnet = ausbau.has("magnet");
 
   const zeigeAusbau = (): void => {
     const liste = document.getElementById("shop-list")!;
@@ -516,8 +544,19 @@ async function main(): Promise<void> {
     const reinheit = rein ? 1 : 0.45;
     document.getElementById("haggle-who")!.textContent =
       kunde.group === "haendler" ? `${kunde.name} ${kunde.subtitle}` : kunde.name;
+    // Mit Büro sieht man einer gemischten Ladung an, was drinsteckt — das
+    // ist die Marktkenntnis, die der Kaufeintrag verspricht.
+    const mix = ausbau.has("office") && !rein ? vehicles.activeCargoMix : [];
+    const zusammensetzung =
+      mix.length > 0
+        ? " · " +
+          mix
+            .slice(0, 3)
+            .map((m) => `${Math.round(m.share * 100)} % ${getMaterial(m.materialId).name}`)
+            .join(", ")
+        : "";
     document.getElementById("haggle-info")!.textContent =
-      `${Math.round(kg)} kg ${rein ? getMaterial(rein).name : "Mischschrott"} · ` +
+      `${Math.round(kg)} kg ${rein ? getMaterial(rein).name : "Mischschrott"}${zusammensetzung} · ` +
       `Marktpreis ${marktEur.toFixed(0)} € · ${hint(kunde)}`;
     const liste = document.getElementById("haggle-list")!;
     liste.innerHTML = "";
@@ -529,7 +568,13 @@ async function main(): Promise<void> {
         haggleEl.classList.remove("open");
         vehicles.dealPending = false;
         tutPreis = true;
-        const r = haggle(kunde, offer, reinheit, ruf.get(kunde.group) / 100);
+        const r = haggle(
+          kunde,
+          offer,
+          reinheit,
+          ruf.get(kunde.group) / 100,
+          ausbau.has("office") // Büro: begründetes Angebot wird eher akzeptiert
+        );
         preisFaktor = r.factor;
         hud.toast(`${kunde.name}: „${r.reply}"`);
         if (r.offense > 0.05) ruf.note("hartGedrueckt", kunde.group);

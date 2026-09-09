@@ -235,5 +235,14 @@
     "brakeRefKg": 600,
     "brakeMin": 0.35,
     "_src": "Spinne Schritt 1 (E-043, alle SW): Zinken schieben lose Teile mit hoechstens pushMaxMs (Kraftstoss, Anteil pushGain); wer schon schneller als pushMaxMs*pushSpeedCapFactor ist, bekommt keinen Schub mehr (Aufschaukeln, Messung 09.09.); geschobene Masse bremst das Schliessen bis brakeMin"
+  },
+  "press": {
+    "stageSeconds": 1.2,
+    "packHalf": [
+      0.8,
+      0.3,
+      0.4
+    ],
+    "_src": "Briefing Kap. 8.3: Paket 1,6 x 0,8 x 0,6 m (hier als Halbmasse 0,8/0,3/0,4). stageSeconds 1,2 (SW) — drei Quetschstufen, zusammen 3,6 s"
   }
 }

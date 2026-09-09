@@ -22,6 +22,12 @@ export class AudioSystem {
     bus.on("dayPhaseChanged", ({ phase }) => { if (phase === "evening") this.chime([440, 554, 659], 0.16); if (phase === "work") this.chime([392, 523], 0.12); });
     bus.on("missionCompleted", () => this.chime([659, 784, 988, 1319], 0.09));
     bus.on("partTorn", ({ kg }) => { this.noise(0.4, 0.5); this.tone(90, 0.3, "sawtooth", Math.min(0.35, 0.15 + kg / 600)); });
+    // Presse (M5b): Hydraulik als tiefer, langsam steigender Ton, Blechknicken als kurzes Rauschen je Quetschstufe,
+    // Verweigerung als kurze Warnhupe — nie als Fehlerpiepsen (Briefing Kap. 15: „nie Buzzer").
+    bus.on("pressStarted", () => this.hydraulics());
+    bus.on("pressStage", () => { this.noise(0.25, 0.45); this.tone(120, 0.18, "square", 0.18); });
+    bus.on("pressDone", () => { this.noise(0.35, 0.5); this.chime([330, 415, 523], 0.11); });
+    bus.on("pressDenied", () => { this.tone(196, 0.5, "sawtooth", 0.16); this.tone(147, 0.5, "sawtooth", 0.16); });
   }
 
   /** Beim ersten Nutzer-Input rufen. */
@@ -47,6 +53,16 @@ export class AudioSystem {
   private chime(freqs: number[], step: number): void { freqs.forEach((f, i) => this.tone(f, step * 2.2, "sine", 0.25, i * step)); }
   private buzz(): void { this.tone(110, 0.25, "square", 0.12); this.tone(104, 0.25, "square", 0.12); }
   private horn(): void { this.tone(220, 0.35, "sawtooth", 0.12); this.tone(277, 0.35, "sawtooth", 0.12); }
+  /** Hydraulikpumpe: tiefer Ton, der ueber 3,6 s leicht ansteigt — so lange dauern die drei Quetschstufen. */
+  private hydraulics(): void {
+    if (!this.ctx || !this.master || this.muted) return;
+    const t0 = this.ctx.currentTime; const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
+    o.type = "sawtooth"; o.frequency.setValueAtTime(55, t0); o.frequency.linearRampToValueAtTime(78, t0 + 3.6);
+    const f = this.ctx.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 320;
+    g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(0.22, t0 + 0.15);
+    g.gain.setValueAtTime(0.22, t0 + 3.3); g.gain.exponentialRampToValueAtTime(0.001, t0 + 3.8);
+    o.connect(f); f.connect(g); g.connect(this.master); o.start(t0); o.stop(t0 + 3.9);
+  }
   private thud(vol: number): void { this.tone(70, 0.12, "sine", 0.4 * vol); this.noise(0.06, 0.15 * vol); }
   private noise(dur: number, vol: number): void {
     if (!this.ctx || !this.master || this.muted) return;

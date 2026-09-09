@@ -10,6 +10,10 @@ export interface GameEvents {
   itemSorted: { itemId: ItemId; containerId: ContainerId; correct: boolean; kg: number };
   itemRemoving: { itemId: ItemId; reason: "press" | "sold" | "bundled" | "cleanup" };
   partTorn: { compositeId: CompositeId; partId: string; itemId: ItemId; kg: number };
+  pressStarted: { compositeId: CompositeId };
+  pressStage: { compositeId: CompositeId; stage: 0 | 1 | 2 };
+  pressDone: { compositeId: CompositeId; itemId: ItemId; kg: number };
+  pressDenied: { reason: "empty" | "blocked"; blockedBy: string[] };
   containerSold: { containerId: ContainerId; kg: number; purity: number; eur: number };
   vehicleArrived: { deliveryId: DeliveryId };
   vehicleWeighed: { deliveryId: DeliveryId; grossKg: number };

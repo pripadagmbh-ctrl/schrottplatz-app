@@ -1,6 +1,8 @@
 # Bagerana v2 — Spur A (Web)
 
-Neuaufbau nach `../docs/02_Briefing.md` (Kap. 17 Architektur, Kap. 22 Meilensteine). Stand: **Spinne Schritt 1 — weicher Zinken-Kontakt** (E-043–E-046) auf Basis M5a. Spinne 2.0 (E-038) wurde am 09.09. zurückgenommen (E-042); die Steuerung bleibt kinematisch, Physik kommt nur als Wirkung dazu, in einzeln abgenommenen Schritten.
+Neuaufbau nach `../docs/02_Briefing.md` (Kap. 17 Architektur, Kap. 22 Meilensteine). Stand: **M5b — Presse** (E-048–E-050), auf Basis M5a und Spinne Schritt 1 (E-043–E-046). Spinne 2.0 (E-038) wurde am 09.09. zurückgenommen (E-042); die Steuerung bleibt kinematisch, Physik kommt nur als Wirkung dazu, in einzeln abgenommenen Schritten.
+
+**Presse (M5b):** Rumpf in die Presse legen, im Menü ☰ „Presse auslösen“ — drei Quetschstufen, dann ein Stahlpaket. Sie verweigert, solange Batterie oder Motor dranhängen, und sagt welches Teil im Weg ist. Sie steht in Reichweite des Baggers (E-048), nicht im Westen wie im Briefing.
 
 **Zuletzt behoben (E-047):** Das Wrack lag 20,8 m vom Bagger entfernt im Zerlegebereich und war bei 9,2 m Reichweite unerreichbar. Der Tieflader hält jetzt an der Annahme und setzt es 7,2 m neben dem Bagger ab. Der Zerlegebereich steht dafür vorerst leer.
 

@@ -15,7 +15,8 @@
     "vehicles",
     "tutorial",
     "composites",
-    "clawContact"
+    "clawContact",
+    "press"
   ],
   "properties": {
     "physics": {
@@ -272,6 +273,13 @@
         "pushSpeedCapFactor",
         "brakeRefKg",
         "brakeMin"
+      ]
+    },
+    "press": {
+      "type": "object",
+      "required": [
+        "stageSeconds",
+        "packHalf"
       ]
     }
   }

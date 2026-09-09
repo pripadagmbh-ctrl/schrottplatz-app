@@ -63,6 +63,7 @@ async function boot(): Promise<void> {
   try { renderer.rig.followCab = localStorage.getItem("bagerana.followCab") === "1"; } catch { /* Standard: fest wie Prototyp */ }
   const menu = new MenuPanel(document.body, data.i18n as Record<string, unknown>, audio.muted, renderer.rig.followCab, {
     onNewGame: () => void persistence.restart(), onExport: () => persistence.export(), onToggleMute: () => audio.toggleMute(),
+    onPress: () => sim.press.trigger(),
     onToggleFollowCab: () => { const v = !renderer.rig.followCab; renderer.rig.followCab = v; try { localStorage.setItem("bagerana.followCab", v ? "1" : "0"); } catch { /* egal */ } return v; },
     onImport: (f) => void persistence.import(f).then((ok) => { if (!ok) sim.bus.emit("toast", { text: "Datei ist kein Spielstand", kind: "bad" }); }),
   });
@@ -87,6 +88,9 @@ async function boot(): Promise<void> {
       chip.update(sim.aim.state, sim.composites.engagedInfo());
       hud.update(sim.world, sim.vehicles.runs.some((r) => r.def.id === "rolloff"), sim.missions.active, sim.day.deliveriesFinished);
       sheet.update(); banner.update(sim.tutorial.state, performance.now()); persistence.tick(dt);
+      const ps = sim.press.status();
+      renderer.press = { progress: ps.progress, running: ps.running, blocked: ps.loaded && ps.blockedBy.length > 0 };
+      if (menu.open) menu.setPress(ps); // Knopftext nur solange das Menue sichtbar ist
     },
     render: (alpha, frameDt) => {
       renderer.render(sim.world, alpha, frameDt, { ...sim.control, camOrbit: camFrame.camOrbit, camZoom: camFrame.camZoom });

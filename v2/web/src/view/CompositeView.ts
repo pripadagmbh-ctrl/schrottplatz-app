@@ -27,6 +27,9 @@ export class CompositeView {
       this.tmpP.set(item.prevPos.x + (item.pos.x - item.prevPos.x) * alpha, item.prevPos.y + (item.pos.y - item.prevPos.y) * alpha, item.prevPos.z + (item.pos.z - item.prevPos.z) * alpha);
       this.tmpQ.set(item.prevRot.x, item.prevRot.y, item.prevRot.z, item.prevRot.w).slerp(new THREE.Quaternion(item.rot.x, item.rot.y, item.rot.z, item.rot.w), alpha);
       m.root.position.copy(this.tmpP); m.root.quaternion.copy(this.tmpQ);
+      // Beim Pressen sackt alles mit, was noch dranhaengt (M5b, crushScales aus composites.json)
+      const sc = def.crushScales[st.crushStage] ?? 1;
+      if (m.root.scale.y !== sc) m.root.scale.set(1, sc, 1);
       for (const [id, mesh] of m.parts) { const on = st.remainingParts.includes(id); if (mesh.visible !== on) mesh.visible = on; }
     }
     for (const [id, m] of this.models) if (!seen.has(id)) { this.scene.remove(m.root); this.models.delete(id); }

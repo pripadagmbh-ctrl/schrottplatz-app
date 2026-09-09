@@ -69,11 +69,19 @@ export interface HaggleResult {
  *                 lässt sich schlechter drücken
  * @param repBonus Rufbonus −1..1; guter Ruf verschafft Spielraum
  */
+/**
+ * Zuschlag auf die Toleranzgrenze, wenn im Büro gearbeitet wird. Wer die
+ * Tagesnotierungen kennt, kann sein Angebot begründen — das lassen die
+ * Kunden eher gelten.
+ */
+export const MARKET_KNOWLEDGE_BONUS = 0.06;
+
 export function haggle(
   c: CustomerProfile,
   offer: Offer,
   purity: number,
-  repBonus = 0
+  repBonus = 0,
+  marketKnowledge = false
 ): HaggleResult {
   const abschlag = 1 - OFFER_FACTOR[offer];
   // Sortenreine Ware hat einen klaren Marktwert: Da glaubt niemand an
@@ -83,7 +91,11 @@ export function haggle(
   const haerteMalus = (c.hardness - 1) * 0.035;
   const grenze = Math.max(
     0.05,
-    TOLERANZ[c.group] - reinheitsMalus - haerteMalus + repBonus * 0.1
+    TOLERANZ[c.group] -
+      reinheitsMalus -
+      haerteMalus +
+      repBonus * 0.1 +
+      (marketKnowledge ? MARKET_KNOWLEDGE_BONUS : 0)
   );
 
   if (abschlag <= grenze) {

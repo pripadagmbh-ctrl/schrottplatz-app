@@ -36,6 +36,8 @@ export class Account {
   /** Statistik für HUD/Bilanz */
   purchasedKg = 0;
   sortedKg = 0;
+  /** Magnet gekauft? Wird vom Ausbau gesetzt und wirkt beim Verkauf. */
+  hasMagnet = false;
 
   /** Ankauf nach der Ausfahrtswiegung: Kunde erhält Geld. */
   /**
@@ -109,17 +111,34 @@ export class Account {
         }
       }
     }
-    const purity = dominantKg / totalKg;
+    // Der Magnet trennt Eisen von Nichteisen — und zwar in beide Richtungen:
+    // Aus einer Buntmetallladung zieht er den Stahl heraus (der wird separat
+    // vergütet, der Rest wird sortenreiner), aus einer Stahlladung bleibt
+    // umgekehrt nur das Eisen übrig.
+    const verkauftKg = totalKg; // fürs Umschlagskonto zählt die ganze Fuhre
+    let magnetEur = 0;
+    let wertKg = totalKg;
+    const steelKg = massByMaterial.get("steel") ?? 0;
+    if (this.hasMagnet && steelKg > 0 && steelKg < totalKg) {
+      if (dominant === "steel") {
+        wertKg = steelKg;
+        dominantKg = steelKg;
+      } else {
+        wertKg = totalKg - steelKg;
+        magnetEur = steelKg * getMaterial("steel").sellPricePerKg;
+      }
+    }
+    const purity = dominantKg / wertKg;
     const price = getMaterial(dominant).sellPricePerKg;
     // Sortenreinheit zählt stark: eine saubere Ladung bringt ein Vielfaches
     // einer gemischten. Hoch drei spreizt das deutlicher als hoch zwei.
-    const eur = totalKg * price * purity * purity * purity;
+    const eur = wertKg * price * purity * purity * purity + magnetEur;
     this.moneyEur += eur;
 
     for (const it of loaded) {
       const wasCar = composites.despawnByBody(it.body);
       items.remove(it, !wasCar);
     }
-    return { eur, massKg: totalKg, purity, dominant };
+    return { eur, massKg: verkauftKg, purity, dominant };
   }
 }

@@ -2,6 +2,21 @@
 
 Jede Architektur- oder Design-Entscheidung mit Datum und Begründung, damit nichts zweimal diskutiert wird (CLAUDE.md). Neueste oben.
 
+## 2026-09-09 — M5b: Presse (gebaut, Gerätetest offen)
+
+Der Rumpf wird in die Presse gelegt und über das Menü ausgelöst; sie quetscht in drei Stufen zu einem Stahlpaket. Baugruppen, die laut `composites.json` `blocksPress` tragen (Batterie, Motor), verhindern das.
+
+| # | Entscheidung | Begründung | Alternative (verworfen) |
+|---|---|---|---|
+| E-048 | Die Presse steht **in Reichweite des Baggers** (Zone `press` von −16/−6 auf 6,8/1,2 verlegt, 7 m vom Standplatz) statt wie im Briefing Kap. 12 im Westen neben dem Zerlegebereich | Patrick 09.09.: derselbe Grund wie beim Wrack (E-047) — ein 600-kg-Rumpf 17 m weit zu transportieren hieße fahren, und genau daran ist das Zerlegen schon einmal gescheitert. Der Platz bleibt so von einer Position aus bedienbar (im Geiste von E-006). Gesichert durch einen Test, der die Reichweite prüft | Presse bleibt West, Spieler fährt mit dem Wrack hin (abgelehnt); Standort erst nach einem Fahrtest entscheiden (abgelehnt) |
+| E-049 | Gequetscht wird über die **Höhe des Rumpf-Teils** (`size[1]` × `crushScales`), nicht über eine eigene Anzeige-Skalierung. Der Kollider bleibt in Originalgröße | Anzeige und Simulation lesen damit dieselbe Zahl — keine zweite Wahrheit, die auseinanderlaufen kann. Ein mitschrumpfender Kollider brachte im Test nur Zittern; der Rumpf liegt während des Pressens ohnehin still, also ist die Verformung bewusst gefaked (Briefing Kap. 6 „was wird gefaked") | Kollider mitschrumpfen; eigene Mesh-Skalierung nur in der Anzeige |
+| E-050 | Der Menüknopf **nennt immer den Grund**, wenn er nicht geht: „kein Wrack in der Presse" bzw. „erst ausbauen: Starterbatterie, Motor". Verweigerung zusätzlich als kurze Warnhupe, nie als Fehlerpiepsen | Ein grau gesetzter Knopf ohne Begründung lässt den Spieler raten — genau die Sackgasse, die beim unerreichbaren Wrack entstanden ist (Briefing Kap. 14/15) | Knopf einfach sperren |
+| — | Das Paket wiegt Rumpf **plus alles, was noch dranhängt** (Räder, Kat) | Wer die Räder dranlässt, presst sie mit ein und verschenkt den Störstoff-Erlös — das Briefing will genau diesen Anreiz (Kap. 8.3: „Zerlegen lohnt, Pfusch kostet") | Nur den Rumpf verwerten |
+
+Abnahmekriterien (`test/sim/press.test.ts`, 4 Tests): Verweigerung mit Batterie und Motor samt Nennung des blockierenden Teils; Pressen ohne diese Teile ergibt in 3,6 s ein Stahlpaket von 700 kg (600 kg Rumpf + 4 × 25 kg Räder), das Wrack verschwindet; ein Rumpf außerhalb der Zone wird nicht gepresst; die Presse liegt in Reichweite.
+
+Auf dem Gerät zu prüfen: Rumpf in die Presse legen, Menü öffnen — steht dort der richtige Grund, wenn die Batterie noch drin ist? Und sieht man den Stempel herunterfahren?
+
 ## 2026-09-09 — Wrack war unerreichbar: Ablage an der Annahme (gebaut, Gerätetest offen)
 
 Patrick auf dem iPad: „es lässt sich mit dem Pkw nichts machen". Der Fehler lag **nicht** in der Zerlege-Mechanik — die ist getestet und funktioniert — sondern eine Stufe davor, in der Anlieferung.

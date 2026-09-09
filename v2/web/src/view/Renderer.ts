@@ -7,6 +7,7 @@ import { ExcavatorModel, type ExcavatorPose as ModelPose } from "./ExcavatorMode
 import { CameraRig } from "./CameraRig";
 import { AimRing } from "./AimRing";
 import { VehicleView } from "./VehicleView";
+import { PressView } from "./PressView";
 import { CompositeView } from "./CompositeView";
 import { ContainerFillView } from "./ContainerFillView";
 import type { VehicleRun } from "@/sim/systems/VehicleSystem";
@@ -81,6 +82,8 @@ export class Renderer {
     this.scene.add(im);
     this.scrap = new ScrapView(this.scene, data, Number(data.balancing.scrap["maxLooseItems"]) + 50);
     this.compositeView = new CompositeView(this.scene, data.composites.composites);
+    const pz = level.zones.find((z) => z.id === "press");
+    if (pz) this.pressView = new PressView(this.scene, pz.rect);
     const ex = data.balancing.excavator as Record<string, number | number[]>;
     this.excavator = new ExcavatorModel(this.scene, {
       boomLen: Number(ex["boomLenM"]), stickLen: Number(ex["stickLenM"]), boomPivot: ex["boomPivot"] as [number, number, number], grappleLink: Number(ex["grappleLinkM"]),
@@ -140,7 +143,12 @@ export class Renderer {
     this.cabPos.x = m.pos.x; this.cabPos.y = m.pos.y + 2.6; this.cabPos.z = m.pos.z;
   }
 
+  /** Zustand der Presse fuer die Anzeige (Stempel, Warnlampe) — wird von der App vor render() gesetzt. */
+  press = { progress: 0, running: false, blocked: false };
+  private pressView: PressView | null = null;
+
   render(world: WorldState, alpha: number, frameDt: number, control?: ControlFrame): void {
+    this.pressView?.update(this.press.progress, this.press.running, this.press.blocked);
     this.scrap.update(world, alpha);
     this.compositeView.update(world, alpha);
     this.updateExcavator(alpha);

@@ -1059,6 +1059,26 @@ export class VehicleManager {
     return this.active?.sortedMaterial ?? null;
   }
 
+  /**
+   * Zusammensetzung der wartenden Ladung nach Fraktion, absteigend nach
+   * Masse. Sichtbar wird das erst mit dem Büro — ohne Marktkenntnis sieht man
+   * einem gemischten Haufen auf der Ladefläche nicht an, was drinsteckt.
+   */
+  get activeCargoMix(): Array<{ materialId: string; kg: number; share: number }> {
+    const items = this.active?.cargo.items ?? [];
+    if (items.length === 0) return [];
+    const kgJe = new Map<string, number>();
+    let gesamt = 0;
+    for (const it of items) {
+      kgJe.set(it.materialId, (kgJe.get(it.materialId) ?? 0) + it.massKg);
+      gesamt += it.massKg;
+    }
+    if (gesamt <= 0) return [];
+    return [...kgJe.entries()]
+      .map(([materialId, kg]) => ({ materialId, kg, share: kg / gesamt }))
+      .sort((a, b) => b.kg - a.kg);
+  }
+
   update(dt: number): void {
     this.t += dt;
     // Wartende Fahrzeuge weiterlaufen lassen: Pause, dann Ausfahrt

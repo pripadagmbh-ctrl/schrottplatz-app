@@ -98,10 +98,28 @@ export const STATIC_OBSTACLES: Obstacle[] = [
   { x: -8.5, z: -7.0, hw: 5.4, hd: 2.4, top: 2.2, label: "Schere" },
 
 
-  // --- Gebäude: Wiegehäuschen an der Waage, Kaffeebude abseits ---
-  { x: WEIGH_X - 4.6, z: WEIGH_Z, hw: 2.4, hd: 1.7, top: 3.2, label: "Wiegehäuschen" },
+  // --- Gebäude: Kaffeebude abseits ---
+  // Das Wiegehäuschen steht nicht hier, sondern in BUILDING_HUT: Es weicht
+  // beim Ausbau dem Büro, und dann gilt dessen größerer Grundriss.
   { x: GATE_X - 6, z: WEIGH_Z - 13, hw: 2.6, hd: 1.8, top: 3.2, label: "Kaffeebude" },
 ];
+
+/** Grundriss des Wiegehäuschens — gilt, solange nicht ausgebaut wurde. */
+export const BUILDING_HUT: Obstacle[] = [
+  { x: WEIGH_X - 4.6, z: WEIGH_Z, hw: 2.4, hd: 1.7, top: 3.2, label: "Wiegehäuschen" },
+];
+
+/**
+ * Bauwerke, die erst im Laufe des Spiels entstehen — Büro und Halle wachsen
+ * aus dem Wiegehäuschen heraus. Sie werden beim Ausbau gesetzt und ersetzen
+ * dabei die vorherige Liste.
+ */
+let dynamicObstacles: Obstacle[] = [];
+
+/** Gebäude-Hindernisse austauschen (Ausbaustufe geändert). */
+export function setBuildingObstacles(list: Obstacle[]): void {
+  dynamicObstacles = list;
+}
 
 /**
  * Liegt (x,z) in einem festen Bauwerk? `pad` erweitert es um einen
@@ -109,6 +127,11 @@ export const STATIC_OBSTACLES: Obstacle[] = [
  * eine Mauer schwenken, nur eben nicht hindurch.
  */
 export function hitsObstacle(x: number, z: number, pad = 0, y?: number): Obstacle | null {
+  for (const o of dynamicObstacles) {
+    if (Math.abs(x - o.x) >= o.hw + pad || Math.abs(z - o.z) >= o.hd + pad) continue;
+    if (y !== undefined && y > o.top) continue;
+    return o;
+  }
   for (const o of STATIC_OBSTACLES) {
     if (Math.abs(x - o.x) >= o.hw + pad || Math.abs(z - o.z) >= o.hd + pad) continue;
     if (y !== undefined && y > o.top) continue;

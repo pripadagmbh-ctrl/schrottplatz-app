@@ -100,6 +100,7 @@ export interface BalancingFile {
   composites: Record<string, number | string>;
   /** Spinne Schritt 1 (E-043): weicher Zinken-Kontakt */
   clawContact: Record<string, number | string>;
+  press: Record<string, number | number[] | string>;
 }
 
 export type I18nFile = Record<string, unknown>;
