@@ -1,0 +1,66 @@
+name: Deploy zu GitHub Pages
+
+# Baut den Prototyp (unverändert auf die Root-URL) und Bagerana v2 (Unterpfad /v2/).
+# Prototyp-URL bleibt: https://<user>.github.io/schrottplatz-app/
+# v2-URL:              https://<user>.github.io/schrottplatz-app/v2/
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Prototyp — Abhängigkeiten
+        working-directory: prototype
+        run: npm ci
+      - name: Prototyp — Bauen
+        working-directory: prototype
+        run: npm run build
+
+      - name: v2 — Abhängigkeiten
+        working-directory: v2/web
+        run: npm ci
+      - name: v2 — Prüfen (check, lint, test)
+        working-directory: v2/web
+        run: npm run verify
+      - name: v2 — Bauen
+        working-directory: v2/web
+        run: npm run build
+
+      - name: Zusammenführen (Prototyp = Root, v2 = /v2/)
+        run: |
+          mkdir -p site
+          cp -r prototype/dist/. site/
+          mkdir -p site/v2
+          cp -r v2/web/dist/. site/v2/
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
