@@ -128,3 +128,10 @@ export const WORK_ZONES: Array<[number, number, number]> = [
 export const BLOCK_GIVEUP_S = 35;
 
 export const TIP_ANGLE = THREE.MathUtils.degToRad(58); // (SW) steil genug für sperrige Großteile
+/**
+ * Wie weit der Kipper mit oben stehender Mulde anzieht, bevor er sie senkt.
+ * Senkt er im Stand, bleibt Schrott auf der Fläche liegen, sobald unten schon
+ * etwas im Weg liegt — und das wird mit jeder Fuhre wahrscheinlicher.
+ */
+export const TIP_CREEP_M = 3.2;
+export const TIP_CREEP_SPEED = 1.1; // m/s — Schritttempo, damit man das Abrutschen sieht

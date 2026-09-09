@@ -42,6 +42,8 @@ import {
   WORK_ZONES,
   BLOCK_GIVEUP_S,
   TIP_ANGLE,
+  TIP_CREEP_M,
+  TIP_CREEP_SPEED,
 } from "./routes";
 
 type Phase =
@@ -54,6 +56,7 @@ type Phase =
   | "pauseBeforeUnload"
   | "tipping"
   | "tipHold"
+  | "tipCreep"
   | "tipBack"
   | "waitUnload"
   | "waitLoad"
@@ -85,6 +88,10 @@ class DeliveryVehicle {
   private phaseT = 0;
   private tip = 0;
   cargo: Cargo = { items: [], car: null };
+  /** Restweg des gekippten Anziehens (Phase tipCreep) */
+  private creepLeft = 0;
+  /** true, solange die Mulde waehrend der Abfahrt noch heruntergefahren wird */
+  private senken = false;
   done = false;
   private bedLen: number;
   private riding: RidingBody[] = [];
@@ -748,9 +755,27 @@ class DeliveryVehicle {
         break;
       case "tipHold":
         if (this.phaseT > 2.2) {
-          this.phase = "tipBack";
+          this.phase = "tipCreep";
+          this.creepLeft = TIP_CREEP_M;
         }
         break;
+      case "tipCreep": {
+        // Gekippt ein Stueck geradeaus ziehen, bevor die Mulde sinkt (v2-Vorbild).
+        // Senkt der LKW im Stand, bleibt Schrott auf der Flaeche liegen, sobald
+        // unten schon etwas im Weg ist — der Haufen wird ja mit jeder Fuhre
+        // hoeher. Zieht er gekippt weg, rutscht der Rest ueber die Kante nach.
+        const schritt = Math.min(TIP_CREEP_SPEED * dt, this.creepLeft);
+        this.group.position.x += Math.sin(this.group.rotation.y) * schritt;
+        this.group.position.z += Math.cos(this.group.rotation.y) * schritt;
+        this.creepLeft -= schritt;
+        this.snapBodiesToPose();
+        if (this.creepLeft <= 1e-6) {
+          // Die Mulde sinkt jetzt waehrend der Abfahrt weiter, nicht im Stand
+          this.senken = true;
+          this.leaveUnloadingBay();
+        }
+        break;
+      }
       case "tipBack":
         this.tip = Math.max(this.tip - dt / 1.5, 0);
         if (this.tip <= 0) this.leaveUnloadingBay();
@@ -795,6 +820,14 @@ class DeliveryVehicle {
         }
         if (this.routeS >= this.routeLength(this.routeOut)) this.done = true;
         break;
+    }
+
+    // Nach dem gekippten Anziehen sinkt die Mulde waehrend der Abfahrt, nicht im
+    // Stand — der LKW haelt den Betrieb nicht auf, und der Rest rutscht unterwegs
+    // noch nach.
+    if (this.senken) {
+      this.tip = Math.max(this.tip - dt / 2.4, 0);
+      if (this.tip <= 0) this.senken = false;
     }
 
     // Kippwinkel: Fläche hebt sich vorn (Kabinenseite), Ladung rutscht hinten ab
