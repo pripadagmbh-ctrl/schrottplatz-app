@@ -55,7 +55,7 @@
       /* Aufsetzflaechen: linke und rechte Bildhaelfte, unsichtbar. Der Stick
          entsteht dort, wo der Daumen aufsetzt, und verschwindet beim Loslassen
          (Design 09.09.2026, Vorbild Bagerana/v2). Die Zonen liegen unter den
-         Knoepfen, damit Fadenkreuz, Rotator und Raedchen zuerst drankommen. */
+         Knoepfen, damit FAHREN, Rotator und Raedchen zuerst drankommen. */
       #touch .zone {
         position: absolute; top: 0; bottom: 0; width: 50%;
         pointer-events: auto; touch-action: none; z-index: 0;
@@ -82,13 +82,17 @@
         text-align: center;
       }
       #touch .btn.down { background: rgba(240,180,41,0.65); color: #1a1c1e; }
-      /* Fahr-Fadenkreuz rechts neben dem linken Stick (dort, wo vorher der
-         Greifen-Knopf saß) — nur fürs Fahren und Lenken */
-      #touch .cross { position: absolute; width: 46px; height: 42px; padding: 11px 4px; }
-      #btn-fwd { left: 214px; bottom: 108px; }
-      #btn-back { left: 214px; bottom: 12px; }
-      #btn-left { left: 164px; bottom: 60px; }
-      #btn-right { left: 264px; bottom: 60px; }
+      /* FAHREN-Umschalter statt Fadenkreuz (Wunsch 10.09.2026, Vorbild v2):
+         Solange er an ist, wird der linke Stick zu Gas und Lenkung. Vier feste
+         Pfeiltasten waren auf dem Glas ohnehin schlecht zu treffen, und man
+         konnte nicht gleichzeitig lenken und den Arm bewegen. */
+      #btn-drive {
+        left: 168px; bottom: 42px; width: 104px; padding: 14px 6px; font-size: 13px;
+        letter-spacing: 1px;
+      }
+      #btn-drive.active {
+        background: rgba(240,180,41,0.82); color: #1a1c1e; border-color: #f0d060;
+      }
       /* Spinne drehen: zwei Tasten über dem rechten Stick */
       #btn-rot-l, #btn-rot-r {
         bottom: 160px; width: 56px; height: 46px; padding: 0; line-height: 46px; font-size: 20px;
@@ -132,11 +136,7 @@
       @media (max-height: 430px) {
         #touch .pad { width: 108px; height: 108px; margin: -54px 0 0 -54px; }
         #touch .knob { width: 44px; height: 44px; margin: -22px 0 0 -22px; }
-        #touch .cross { width: 40px; height: 36px; padding: 8px 4px; }
-        #btn-fwd { left: 172px; bottom: 86px; }
-        #btn-back { left: 172px; bottom: 8px; }
-        #btn-left { left: 128px; bottom: 47px; }
-        #btn-right { left: 216px; bottom: 47px; }
+        #btn-drive { left: 130px; bottom: 30px; width: 88px; padding: 11px 6px; font-size: 12px; }
         /* neben den rechten Stick statt darüber — oben liegt die Tastenleiste */
         #btn-rot-l, #btn-rot-r { bottom: 14px; width: 46px; height: 40px; line-height: 40px; }
         #btn-rot-l { right: 190px; }
@@ -241,7 +241,7 @@
       }
       #tutorial.open { display: block; }
       /* Auf dem Tablet nach oben: unten links lag die Karte auf dem
-         Fahr-Fadenkreuz, und seit die Sticks schweben, ist die untere linke
+         FAHREN-Umschalter, und seit die Sticks schweben, ist die untere linke
          Ecke der natuerliche Platz fuer den linken Daumen. Oben links steht
          nichts im Weg — die Tastenliste ist auf Touchgeraeten ausgeblendet. */
       body.touch #tutorial { top: 12px; bottom: auto; }
@@ -356,10 +356,7 @@
       <div class="pad" id="touch-right" hidden><div class="knob"></div></div>
       <div class="btn" id="btn-rot-l">↺</div>
       <div class="btn" id="btn-rot-r">↻</div>
-      <div class="btn cross" id="btn-fwd">▲</div>
-      <div class="btn cross" id="btn-back">▼</div>
-      <div class="btn cross" id="btn-left">◀</div>
-      <div class="btn cross" id="btn-right">▶</div>
+      <div class="btn" id="btn-drive">FAHREN</div>
       <div id="fnbar"><div class="slot"></div>
         <div class="btn fn" id="btn-cab">KABINE</div>
         <div class="btn fn" id="btn-outrig">STÜTZEN</div>
@@ -384,7 +381,7 @@
         <button id="pause-new">Neues Spiel</button>
         <p class="hint">
           Linker Stick: Hauptarm &amp; Oberwagen · Rechter Stick: Ausleger &amp; Spinne<br />
-          ↺ ↻ Spinne drehen · Fadenkreuz: fahren · Doppeltipp: Ansicht
+          ↺ ↻ Spinne drehen · FAHREN: linker Stick lenkt · Doppeltipp: Ansicht
         </p>
       </div>
       <div id="controls-menu">
@@ -413,7 +410,9 @@
         <button id="ctrl-reset">Werkseinstellung</button>
         <button id="ctrl-back">Zurück</button>
         <p class="hint">
-          Fahren läuft immer über das Fadenkreuz, Spinne drehen zusätzlich über ↺ ↻.
+          Fahren läuft über den FAHREN-Umschalter: Solange er an ist, wird der
+          linke Stick zu Gas und Lenkung — die Belegung hier ruht so lange.
+          Spinne drehen zusätzlich über ↺ ↻.
         </p>
       </div>
     </div>

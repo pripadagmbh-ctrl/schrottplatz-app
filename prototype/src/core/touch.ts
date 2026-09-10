@@ -8,9 +8,11 @@
  *   mehr (Vorbild Bagerana/v2). Maßgeblich ist die Bildhälfte, nicht der Ort.
  *   (alle vier Achsen sind im Steuerungsmenü frei belegbar)
  *   ↺ / ↻          — Spinne links bzw. rechts drehen (Rotator)
- *   Fadenkreuz     — nur Fahren: vor/zurück und links/rechts lenken (simultan)
+ *   FAHREN         — Umschalter: solange er an ist, wird der linke Stick zu Gas
+ *                    (Y) und Lenkung (X). Endet von selbst nach vier Sekunden
+ *                    ohne Daumen auf dem linken Stick.
  *   Greifen        — über den rechten Stick (oder festen Fingerdruck)
- *   Extras         — Doppeltipp wechselt die Ansicht, Kippen ersetzt das Fadenkreuz
+ *   Extras         — Doppeltipp wechselt die Ansicht, Kippen fährt ohne Stick
  *   Rädchen        — die übrigen Funktionen, endlos drehbar
  *   Fünf Finger    — Debug-Overlay ein/aus (auf dem Tablet gibt es keine F3-Taste)
  */
@@ -49,6 +51,8 @@ const PRESSURE_GRAB = 0.55;
 const TILT_FULL = 22;
 /** Totzone der Spinnenachse — schützt vor ungewolltem Öffnen beim Baggern */
 const GRAPPLE_DEADZONE = 0.38;
+/** So lange darf der linke Stick unberuehrt bleiben, bevor der Fahrmodus endet */
+const DRIVE_AUTO_EXIT_S = 4;
 /** Ein Aufsetzen zählt nur als Tipp, wenn es kürzer dauert und der Finger kaum wandert */
 const TAP_MAX_MS = 250;
 const TAP_MAX_MOVE = 12;
@@ -83,6 +87,13 @@ export class TouchControls {
   private tiltDrive = 0;
   private tiltSteer = 0;
   private lastTap = 0;
+  /**
+   * Fahrmodus (Vorbild v2). Vier feste Pfeiltasten waren auf dem Glas schlecht
+   * zu treffen, und man konnte nicht gleichzeitig lenken und den Arm bewegen.
+   * Jetzt uebernimmt der linke Stick das Fahren, solange der Modus laeuft.
+   */
+  private driveMode = false;
+  private driveIdleS = 0;
   private lastTapX = 0;
   private lastTapY = 0;
 
@@ -101,10 +112,7 @@ export class TouchControls {
     this.right = this.makeStick("touch-right", "zone-right");
     this.bindSafety();
     this.bindDebugGeste();
-    this.bindHold("btn-fwd", "fwd");
-    this.bindHold("btn-back", "back");
-    this.bindHold("btn-left", "left");
-    this.bindHold("btn-right", "right");
+    this.bindDrive();
     this.bindHold("btn-rot-l", "rotL");
     this.bindHold("btn-rot-r", "rotR");
     this.bindTap("btn-cab", "KeyX");
@@ -310,9 +318,35 @@ export class TouchControls {
     for (const st of [this.left, this.right]) if (st) TouchControls.resetStick(st);
     this.held.clear();
     this.pressureGrab = false;
-    for (const id of ["btn-fwd", "btn-back", "btn-left", "btn-right", "btn-rot-l", "btn-rot-r"]) {
+    for (const id of ["btn-rot-l", "btn-rot-r"]) {
       document.getElementById(id)?.classList.remove("down");
     }
+  }
+
+  /** FAHREN-Umschalter. Tippen schaltet um, die Taste faerbt sich. */
+  private bindDrive(): void {
+    const el = document.getElementById("btn-drive");
+    if (!el) return;
+    el.addEventListener(
+      "pointerup",
+      (e) => {
+        this.setDrive(!this.driveMode);
+        e.preventDefault();
+      },
+      { passive: false }
+    );
+  }
+
+  private setDrive(v: boolean): void {
+    this.driveMode = v;
+    this.driveIdleS = 0;
+    document.getElementById("btn-drive")?.classList.toggle("active", v);
+    if (v) TouchControls.vibrate(18);
+  }
+
+  /** true, solange der linke Stick fahrt statt den Arm bewegt. */
+  get isDriveMode(): boolean {
+    return this.driveMode;
   }
 
   private bindHold(id: string, key: string): void {
@@ -487,7 +521,7 @@ export class TouchControls {
     render();
   }
 
-  /** Kippsteuerung: Gerät neigen statt Fadenkreuz drücken. */
+  /** Kippsteuerung: Gerät neigen statt den linken Stick zum Fahren zu nehmen. */
   private bindTilt(): void {
     const el = document.getElementById("btn-tilt");
     if (!el) return;
@@ -557,10 +591,21 @@ export class TouchControls {
     return true;
   }
 
-  update(): void {
+  update(dt = 1 / 60): void {
     if (!this.active) return;
     const l = this.left;
     const r = this.right;
+    // Fahrmodus endet von selbst: Wer den Daumen vom linken Stick nimmt, will
+    // in aller Regel wieder baggern. Ohne das bleibt der Modus an, und der
+    // naechste Griff an den Stick faehrt die Maschine statt den Arm zu heben.
+    if (this.driveMode) {
+      if (l && l.id === null) {
+        this.driveIdleS += dt;
+        if (this.driveIdleS > DRIVE_AUTO_EXIT_S) this.setDrive(false);
+      } else {
+        this.driveIdleS = 0;
+      }
+    }
     // Die vier Stickachsen sind frei belegbar (Steuerungsmenü). Werkseinstellung:
     // Hauptarm und Oberwagen links, Ausleger und Spinne rechts.
     this.axes.cab = 0;
@@ -575,6 +620,9 @@ export class TouchControls {
       rightX: r ? r.dx : 0,
     };
     for (const id of ["leftY", "leftX", "rightY", "rightX"] as AxisId[]) {
+      // Im Fahrmodus gehoert der linke Stick dem Fahrwerk — die eingestellte
+      // Belegung ruht so lange.
+      if (this.driveMode && (id === "leftX" || id === "leftY")) continue;
       const b = this.config[id];
       const v = raw[id] * (b.invert ? -1 : 1);
       switch (b.fn) {
@@ -610,10 +658,11 @@ export class TouchControls {
     this.axes.rotator = clamp1(
       (this.held.has("rotR") ? 1 : 0) - (this.held.has("rotL") ? 1 : 0) + rotAxis
     );
-    this.axes.drive =
-      (this.held.has("fwd") ? 1 : 0) - (this.held.has("back") ? 1 : 0) + this.tiltDrive;
-    this.axes.steer =
-      (this.held.has("right") ? 1 : 0) - (this.held.has("left") ? 1 : 0) + this.tiltSteer;
+    // Fahren: linker Stick im Fahrmodus, dazu weiterhin die Kippsteuerung
+    const fahrY = this.driveMode && l ? -l.dy : 0; // Stick nach oben = vorwaerts
+    const fahrX = this.driveMode && l ? l.dx : 0;
+    this.axes.drive = fahrY + this.tiltDrive;
+    this.axes.steer = fahrX + this.tiltSteer;
     this.axes.drive = clamp1(this.axes.drive);
     this.axes.steer = clamp1(this.axes.steer);
     this.axes.boom = clamp1(this.axes.boom);

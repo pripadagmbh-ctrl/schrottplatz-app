@@ -765,7 +765,7 @@ async function main(): Promise<void> {
     const frameDt = Math.min((now - lastTime) / 1000, 0.25);
     lastTime = now;
 
-    touch.update();
+    touch.update(frameDt);
     if (input.wasPressed("Escape") || input.wasPressed("KeyP") || touch.consumePress("Escape")) {
       setPaused(!paused);
     }
