@@ -225,6 +225,15 @@ export class GripSystem {
       { x: 0, y: 0, z: 0, w: 1 }
     );
     const joint = this.world.createImpulseJoint(jointData, this.grappleBody, body, true);
+    // Aufwecken, sonst bleibt das Teil stehen, wo es lag: Ein schlafender
+    // Koerper wird nicht integriert, das Gelenk zum kinematischen Greifer zieht
+    // ins Leere. Man faehrt weg, das Teil haengt in der Luft — und faellt erst,
+    // wenn das Oeffnen das Gelenk loest und es weckt.
+    //
+    // Frueher fiel das nicht auf, weil im Haufen ohnehin fast nichts schlief
+    // (gemessen 89 von 118 dauerhaft wach). Seit die Schlafhilfe ihn zur Ruhe
+    // bringt, greift man regelmaessig nach schlafenden Teilen.
+    body.wakeUp();
     this.items.push({ body, joint, massKg: body.mass() });
     return true;
   }

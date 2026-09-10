@@ -466,10 +466,16 @@ class DeliveryVehicle {
       const maxZ = Math.max(this.bedLen - r - 0.15, minZ + 0.05);
       let spot: { x: number; y: number; z: number; r: number } | null = null;
       // Flach stapeln: die Ladung liegt gleich an ihrem Platz, statt aus der
-      // Luft auf die Pritsche zu fallen
-      for (let layer = 0; layer < 6 && !spot; layer++) {
-        const y = 0.3 + layer * 0.45;
-        for (let attempt = 0; attempt < 24; attempt++) {
+      // Luft auf die Pritsche zu fallen.
+      // Hoehe begrenzt: Mit sechs Lagen a 0,45 m tuermte sich die Fuhre bis
+      // 2,55 m ueber den Boden der Mulde — ueber drei Meter ueber der Strasse.
+      // So faehrt niemand vom Hof. Drei Lagen reichen bis knapp einen Meter,
+      // etwa Bordwandhoehe plus Haufen obendrauf. Was nicht mehr passt, faellt
+      // weg; die Liefermenge des Kunden wird ohnehin ueber die Massen der
+      // gesetzten Stuecke erreicht, nicht ueber ihre Zahl.
+      for (let layer = 0; layer < 3 && !spot; layer++) {
+        const y = 0.25 + layer * 0.36;
+        for (let attempt = 0; attempt < 40; attempt++) {
           const x = (Math.random() * 2 - 1) * maxX;
           const z = minZ + Math.random() * (maxZ - minZ);
           const clash = placed.some(

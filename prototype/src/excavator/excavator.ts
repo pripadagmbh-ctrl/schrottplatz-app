@@ -1761,11 +1761,16 @@ export class Excavator {
     clawPoint(0, this.currentSplay(), CLAW_SEGMENTS, this.basketTip);
     const tipY = this.basketTip.y;
     const tipR = Math.max(this.basketTip.z, 0);
-    // etwas Luft nach oben und unten, damit sperrige Teile noch gefasst werden
-    if (p.y > CLAW_RING_Y + 0.45 || p.y < tipY - 0.35) return false;
+    // Wenig Luft nach oben und unten. Vorher waren es 0,45 bzw. 0,35 m — damit
+    // galt als gefasst, was gut einen halben Meter neben der Spinne schwebte,
+    // ohne jede Beruehrung. Der Zuschlag stammt aus der Zeit vor der
+    // Oberflaechen-Projektion unten in tryGrab: Damals wurde der Schwerpunkt
+    // geprueft, und sperrige Teile waren sonst nicht zu fassen. Seit der
+    // naechstgelegene Oberflaechenpunkt zaehlt, braucht es das nicht mehr.
+    if (p.y > CLAW_RING_Y + 0.22 || p.y < tipY - 0.18) return false;
     // Radius des Korbs auf dieser Höhe: vom Gelenkring zur Spitze verjüngt
     const t = THREE.MathUtils.clamp((CLAW_RING_Y - p.y) / Math.max(CLAW_RING_Y - tipY, 0.01), 0, 1);
-    const r = THREE.MathUtils.lerp(CLAW_RING_R, tipR, t) + 0.45;
+    const r = THREE.MathUtils.lerp(CLAW_RING_R, tipR, t) + 0.14;
     return Math.hypot(p.x, p.z) <= r;
   }
 
