@@ -423,8 +423,11 @@ export class Yard {
    * In der linken hinteren Ecke (Nordwesten) bleibt eine Lücke als Einfahrt.
    */
   /**
-   * Graffiti auf der Betonwand links neben dem Wiegehäuschen. Der Sprüher war
-   * offensichtlich Aarau-Fan (Wunsch 29.08.2026).
+   * Graffiti auf der Betonwand links neben dem Wiegehäuschen.
+   *
+   * Ortsbezug Niederrhein: Abteiberg, Stadtteil Eicken, Kurvenparolen. Bewusst
+   * Wahrzeichen und Ortsnamen statt Vereinsmarke — Vereinsnamen, Wappen und
+   * Farben sind geschützt, Ortsnamen nicht (Wunsch 10.09.2026).
    */
   private buildGraffiti(scene: THREE.Scene): void {
     const cv = document.createElement("canvas");
@@ -445,14 +448,48 @@ export class Yard {
     c.globalAlpha = 1;
 
     // Ortsbezug statt Vereinsmarke (Wunsch 10.09.2026): Der Platz liegt am
-    // Niederrhein, und was auf so einer Wand steht, sind Ortsnamen und
-    // Wahrzeichen — nicht das Wappen eines Vereins. Vereinsnamen und -zeichen
-    // sind geschuetzt; Stadt- und Stadtteilnamen sind es nicht.
+    // Niederrhein. Was auf so einer Wand steht, sind Ortsnamen, Wahrzeichen und
+    // Kurvenparolen — nicht das Wappen eines Vereins. Vereinsnamen, Wappen und
+    // Farben sind geschuetzt; Stadt- und Stadtteilnamen sind es nicht.
     //
-    // Silhouette des Abteibergs: zwei ungleiche Tuerme, wie man sie von der
-    // Stadt aus sieht. Grob gesprueht, nicht gezeichnet.
+    // Eine echte Wand ist nie EIN Schriftzug, sondern viele uebereinander: ein
+    // grosses Stueck, drumherum Tags, Sprueche und Gekritzel, teils
+    // uebersprueht. Darum ist die ganze Flaeche belegt.
+
+    /** Farbnasen unter einem Element — das, was die Wand alt aussehen laesst. */
+    const nasen = (x: number, y: number, breite: number, farbe: string, n = 4): void => {
+      c.fillStyle = farbe;
+      for (let i = 0; i < n; i++) {
+        const nx = x + Math.random() * breite;
+        c.fillRect(nx, y, 3 + Math.random() * 3, 14 + Math.random() * 42);
+      }
+    };
+
+    /** Tag: schneller Zug mit der Dose, leicht schraeg. */
+    const tag = (
+      text: string,
+      x: number,
+      y: number,
+      groesse: number,
+      farbe: string,
+      neigung: number
+    ): void => {
+      c.save();
+      c.translate(x, y);
+      c.rotate(neigung);
+      c.font = `italic 900 ${groesse}px Impact, 'Arial Black', sans-serif`;
+      c.textAlign = "left";
+      c.textBaseline = "middle";
+      c.fillStyle = "rgba(12,12,16,0.75)";
+      c.fillText(text, 4, 5);
+      c.fillStyle = farbe;
+      c.fillText(text, 0, 0);
+      c.restore();
+    };
+
+    // --- Abteiberg links: zwei ungleiche Tuerme, wie von der Stadt aus gesehen
     c.save();
-    c.translate(180, 250);
+    c.translate(96, 268);
     c.fillStyle = "#101014";
     const turm = (x: number, breite: number, hoehe: number, spitze: number): void => {
       c.fillRect(x, -hoehe, breite, hoehe);
@@ -463,36 +500,73 @@ export class Yard {
       c.closePath();
       c.fill();
     };
-    turm(0, 26, 96, 34);
-    turm(34, 22, 74, 26);
-    c.fillRect(-10, -52, 78, 52); // Kirchenschiff darunter
+    turm(0, 24, 104, 36);
+    turm(32, 20, 78, 28);
+    c.fillRect(-12, -54, 76, 54); // Kirchenschiff darunter
     c.restore();
+    tag("ABTEIBERG", 24, 300, 34, "#dcdcd6", -0.03);
 
-    // Schriftzug, leicht schräg gesprüht
+    // --- Hauptstueck in der Mitte
     c.save();
-    c.translate(cv.width / 2 + 70, 150);
-    c.rotate(-0.055);
+    c.translate(548, 132);
+    c.rotate(-0.05);
     c.textAlign = "center";
     c.textBaseline = "middle";
-    c.font = "italic 900 150px Impact, 'Arial Black', sans-serif";
-    // Versatzschatten wie beim Nachziehen mit der zweiten Dose
+    c.font = "italic 900 132px Impact, 'Arial Black', sans-serif";
     c.fillStyle = "#101014";
-    c.fillText("GLADBACH", 10, 12);
+    c.fillText("GLADBACH", 9, 11);
     c.fillStyle = "#f2f2ee";
     c.fillText("GLADBACH", 0, 0);
     c.lineWidth = 7;
     c.strokeStyle = "#101014";
     c.strokeText("GLADBACH", 0, 0);
-    c.font = "italic 900 62px Impact, 'Arial Black', sans-serif";
-    c.fillStyle = "#101014";
-    c.fillText("ABTEIBERG · RHEYDT", 0, 104);
+    c.restore();
+    nasen(330, 178, 430, "rgba(16,16,20,0.5)", 7);
+
+    // --- Kurvenparolen und Stadtteil
+    tag("EICKEN", 300, 244, 62, "#7fc24a", -0.04);
+    tag("ULTRAS", 610, 250, 58, "#e8e8e4", 0.03);
+    nasen(612, 268, 190, "rgba(232,232,228,0.45)", 5);
+    tag("NORDKURVE", 300, 312, 30, "#c9ccc4", -0.02);
+    tag("BÖKELBERG", 620, 316, 28, "#9aa2a8", 0.02);
+
+    // --- Kleines Gekritzel rechts: Krone, Stern, Herz, ein Kuerzel
+    tag("MG", 872, 118, 96, "#7fc24a", 0.06);
+    nasen(874, 152, 96, "rgba(127,194,74,0.5)", 4);
+    // Stern
+    c.save();
+    c.translate(910, 232);
+    c.fillStyle = "#f2f2ee";
+    c.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const r = i % 2 ? 11 : 26;
+      const a = (i / 10) * Math.PI * 2 - Math.PI / 2;
+      const fn = i === 0 ? "moveTo" : "lineTo";
+      c[fn](Math.cos(a) * r, Math.sin(a) * r);
+    }
+    c.closePath();
+    c.fill();
+    c.restore();
+    // Herz
+    c.save();
+    c.translate(838, 300);
+    c.scale(1.1, 1.1);
+    c.fillStyle = "#c0392b";
+    c.beginPath();
+    c.moveTo(0, 8);
+    c.bezierCurveTo(-16, -8, -22, 10, 0, 24);
+    c.bezierCurveTo(22, 10, 16, -8, 0, 8);
+    c.fill();
     c.restore();
 
-    // Laufende Farbnasen
-    c.fillStyle = "rgba(16,16,20,0.55)";
-    for (const x of [214, 352, 508, 655, 806]) {
-      c.fillRect(x, 236, 7, 40 + Math.random() * 55);
-    }
+    // --- Ein uebersprayter Tag: erst gekritzelt, dann durchgestrichen
+    tag("1861 EV", 148, 128, 30, "rgba(180,180,175,0.5)", 0.12);
+    c.strokeStyle = "rgba(200,60,45,0.75)";
+    c.lineWidth = 7;
+    c.beginPath();
+    c.moveTo(140, 146);
+    c.lineTo(272, 108);
+    c.stroke();
 
     const tex = new THREE.CanvasTexture(cv);
     tex.colorSpace = THREE.SRGBColorSpace;
