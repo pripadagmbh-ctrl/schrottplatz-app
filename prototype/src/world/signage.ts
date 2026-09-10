@@ -20,14 +20,21 @@ interface SignSpec {
 }
 
 /** Die Beschriftungen. Positionen folgen dem Platzplan aus yard.ts. */
+/**
+ * Nur noch Mulden und Presse (Wunsch 10.09.2026).
+ *
+ * Der Platz stand voller Wegweiser: STAHLSCHROTT, ANNAHME, VERLADUNG, WAAGE,
+ * EINFAHRT. Das liest sich wie ein Lehrpfad, nicht wie ein Betrieb — und
+ * doppelt sich obendrein: Jede Mulde traegt ihr eigenes Schild mit Fraktion,
+ * Gewicht und Reinheit, der Haufen ebenso. Wer auf einem Schrottplatz
+ * arbeitet, weiss, wo die Waage steht.
+ */
 const SIGNS: SignSpec[] = [
-  { text: "STAHLSCHROTT", hint: "alles Eisen — hierher kippen die Kipper", x: -9, z: 8.5, rot: 0 },
-  { text: "ANNAHME", hint: "Pritschen laden hier ab", x: 0, z: 12.5, rot: 0 },
-  { text: "BOXEN", hint: "Alu · Kupfer · VA · Kabel", x: 9.5, z: 6.5, rot: -0.6 },
-  { text: "SCHERE / PRESSE", hint: "Mischschrott pressen (Taste B)", x: -8.5, z: -10.4, rot: Math.PI },
-  { text: "VERLADUNG", hint: "Abholer beladen (Taste V)", x: -7.5, z: 13.5, rot: -0.4 },
-  { text: "WAAGE", hint: "brutto rein, tara raus", x: -20, z: 20, rot: 0.5 },
-  { text: "EINFAHRT", hint: "hier kommen die Kunden", x: -26, z: 27, rot: 0.4 },
+  // Am Nordende der Muldenzeile, zum Bagger gedreht. Die Reihe ist nach Osten
+  // gewandert; das Schild stand vorher daneben in der Luft.
+  { text: "BOXEN", hint: "Alu · Kupfer · VA · Kabel · Holz · Reifen", x: 7.0, z: 6.8, rot: -0.5 },
+  // Nordseite der Presskammer statt dahinter — von dort schaut man hin
+  { text: "SCHERE / PRESSE", hint: "Mischschrott pressen (Taste B)", x: -8.5, z: -4.0, rot: 0 },
 ];
 
 export class Signage {
