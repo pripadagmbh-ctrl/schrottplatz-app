@@ -1335,7 +1335,6 @@ export class Excavator {
   }
 
   private aufsetzRay = new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 });
-  private aufsetzTmp = new THREE.Vector3();
 
   /**
    * Höhe der Fläche unter den Krallenspitzen — Beton, Ladefläche, Muldenboden,
@@ -1351,42 +1350,42 @@ export class Excavator {
    * Ausgenommen sind die eigenen Körper und die Ladung: Sonst setzte die Spinne
    * auf ihrer eigenen Kralle oder auf dem Teil auf, das sie gerade trägt.
    */
-  private surfaceUnderClaws(splay: number): number {
+  private surfaceUnderClaws(_splay: number): number {
     this.grappleGroup.updateWorldMatrix(true, false);
-    let hoechste = 0; // Beton als Rückfallebene
-    for (let i = 0; i < CLAW_COUNT; i++) {
-      const a = (i / CLAW_COUNT) * Math.PI * 2;
-      clawPoint(a, splay, CLAW_SEGMENTS, this.aufsetzTmp);
-      this.grappleGroup.localToWorld(this.aufsetzTmp);
-      // Von oberhalb der Spitze nach unten, damit auch eine bereits
-      // eingesunkene Kralle die Fläche über sich findet und herausgehoben wird
-      this.aufsetzRay.origin.x = this.aufsetzTmp.x;
-      this.aufsetzRay.origin.y = this.aufsetzTmp.y + 1.2;
-      this.aufsetzRay.origin.z = this.aufsetzTmp.z;
-      const treffer = this.world.castRay(
-        this.aufsetzRay,
-        14,
-        true,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        (c) => {
-          const b = c.parent();
-          if (!b) return false;
-          if (this.selfHandles.has(b.handle)) return false;
-          // NUR tragender Grund: Beton, Waende, Muldenboeden, Ladeflaechen.
-          // Loser Schrott zaehlt ausdruecklich nicht — sonst setzt die Spinne
-          // auf dem Haufen auf, statt hineinzugreifen, und man bekommt gar
-          // nichts mehr zu fassen. Genau das ist beim ersten Wurf passiert.
-          return !b.isDynamic();
-        }
-      );
-      if (treffer) {
-        hoechste = Math.max(hoechste, this.aufsetzRay.origin.y - treffer.timeOfImpact);
+    // EIN Strahl, aus der Mitte der Spinne senkrecht nach unten.
+    //
+    // Vorher waren es fuenf, einer je Spitze, und massgeblich war die hoechste
+    // getroffene Flaeche. Das laesst die Spinne schweben: Steht eine einzige
+    // Spitze ueber einer Bordwand, dem Chassis oder gar der Kabine, haengt der
+    // ganze Greifer an dieser Hoehe fest und kommt nicht mehr an das Material
+    // auf der Ladeflaeche heran. Der Kontakt soll aber hart sein — man soll das
+    // Gewicht des Arms spueren, nicht ueber der Fuhre gebremst werden.
+    //
+    // Die Mitte ist der Punkt, mit dem der Greifer aufsetzt. Eine Spitze, die
+    // ueber den Muldenrand hinausragt, ist eine Frage der Darstellung, nicht
+    // des Anschlags. Nebenbei kostet das ein Fuenftel der Strahlen.
+    this.aufsetzRay.origin.x = this.grappleGroup.position.x;
+    this.aufsetzRay.origin.y = this.grappleGroup.position.y;
+    this.aufsetzRay.origin.z = this.grappleGroup.position.z;
+    const treffer = this.world.castRay(
+      this.aufsetzRay,
+      20,
+      true,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      (c) => {
+        const b = c.parent();
+        if (!b) return false;
+        if (this.selfHandles.has(b.handle)) return false;
+        // NUR tragender Grund: Beton, Waende, Muldenboeden, Ladeflaechen.
+        // Loser Schrott zaehlt ausdruecklich nicht — sonst setzt die Spinne
+        // auf dem Haufen auf, statt hineinzugreifen.
+        return !b.isDynamic();
       }
-    }
-    return hoechste;
+    );
+    return treffer ? this.aufsetzRay.origin.y - treffer.timeOfImpact : 0;
   }
 
   private resolveGroundClamp(): void {

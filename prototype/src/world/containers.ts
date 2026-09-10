@@ -48,13 +48,17 @@ const CONFIGS: ContainerConfig[] = [
   // Riesiger Stahlhaufen direkt links neben dem Bagger (Guss läuft mit)
   { id: "c_steel", fractionId: "steel", label: "STAHLSCHROTT", kind: "pile", x: -9, z: 1, size: [11, 12, 0] },
   // Boxenreihe rechts, von Süd nach Nord aufgereiht
-  // Vier Betonlego-Mulden in einer Reihe, Öffnung zeigt nach Westen zum Bagger
+  // Vier Betonlego-Mulden in einer Reihe, Öffnung zeigt nach Westen zum Bagger.
+  // Wandhöhe 1,0 m — zwei Lagen Betonlego. Höher geht nicht: Der Arm erreicht
+  // über der Muldenmitte nur 1,58 m (gemessen aus Boom 5,2 m, Stiel 4,0 m,
+  // Drehpunkt 2,55 m). Mit den früheren 2,5 m war die Mulde von der
+  // Standposition aus nicht zu befüllen, ohne den Bagger zu versetzen.
   // Nach Norden gerückt: die westliche Öffnung darf nicht von der Presse
   // versperrt werden
-  { id: "c_va", fractionId: "va", label: "EDELSTAHL VA", kind: "bay", x: 4.6, z: -5.6, size: [3.0, 3.3, 2.5], shareEast: true },
-  { id: "c_alu", fractionId: "alu", label: "ALU", kind: "bay", x: 4.6, z: -1.9, size: [3.0, 3.3, 2.5], shareEast: true },
-  { id: "c_copper", fractionId: "copper", label: "KUPFER/MS", kind: "bay", x: 4.6, z: 1.9, size: [3.0, 3.3, 2.5], shareEast: true },
-  { id: "c_cable", fractionId: "cable", label: "KABEL", kind: "bay", x: 4.6, z: 5.6, size: [3.0, 3.3, 2.5], shareEast: true },
+  { id: "c_va", fractionId: "va", label: "EDELSTAHL VA", kind: "bay", x: 4.6, z: -5.6, size: [3.0, 3.3, 1.0], shareEast: true },
+  { id: "c_alu", fractionId: "alu", label: "ALU", kind: "bay", x: 4.6, z: -1.9, size: [3.0, 3.3, 1.0], shareEast: true },
+  { id: "c_copper", fractionId: "copper", label: "KUPFER/MS", kind: "bay", x: 4.6, z: 1.9, size: [3.0, 3.3, 1.0], shareEast: true },
+  { id: "c_cable", fractionId: "cable", label: "KABEL", kind: "bay", x: 4.6, z: 5.6, size: [3.0, 3.3, 1.0], shareEast: true },
   // Nichtmetalle Rücken an Rücken hinter der Sortierreihe: Sie teilen sich
   // deren Rückwand, öffnen nach Osten und werden vom Radlader beschickt.
   // Eine Doppelwand zur Mitte braucht es dafür nicht.
@@ -125,7 +129,11 @@ class GameContainer {
       const BLOCK_L = 1.5;
       const BLOCK_H = 0.5;
       const BLOCK_T = 0.55;
-      const ROWS = 5;
+      // Reihen aus der angegebenen Wandhöhe statt fest verdrahtet: Die Zahl in
+      // CONFIGS hatte bisher keine Wirkung, jede Mulde bekam 5 Reihen à 0,5 m,
+      // also 2,50 m Wand. Gemessen an der Armgeometrie ist das unerreichbar —
+      // über der Muldenmitte (4,6 m vom Bagger) kommt die Spinne auf 1,58 m.
+      const ROWS = Math.max(2, Math.round(h / BLOCK_H));
       // Fünf Grautöne statt drei: schon das lässt die Wand gebraucht
       // wirken, weil Blöcke aus verschiedenen Chargen nebeneinanderstehen.
       // Kostet nichts — die Materialien werden ohnehin geteilt.
