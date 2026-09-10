@@ -70,21 +70,17 @@ export const CONFIGS: ContainerConfig[] = [
   { id: "c_alu", fractionId: "alu", label: "ALU", kind: "bay", x: 7.0, z: -2.85, size: [3.0, 3.3, 2.5] },
   { id: "c_copper", fractionId: "copper", label: "KUPFER/MS", kind: "bay", x: 7.0, z: 0.85, size: [3.0, 3.3, 2.5] },
   { id: "c_cable", fractionId: "cable", label: "KABEL", kind: "bay", x: 7.0, z: 4.55, size: [3.0, 3.3, 2.5] },
-  // Nichtmetalle hinter Bagger und Presse (Wunsch 10.09.2026). Sie standen
-  // Rücken an Rücken hinter der Sortierreihe — genau dort, wo die Platzgrenze
-  // hinkommt. Nach Süden hinter die Schere gerückt, in einer Reihe, Öffnung
-  // nach Norden zum Platz. Sie werden vom Radlader beschickt, nicht vom Bagger;
-  // die Reichweite spielt hier also keine Rolle.
-  //
-  // Quadratischer Grundriss mit Absicht: Bei Öffnung nach Norden ist die Mulde
-  // gedreht, und die Zonenprüfung rechnet in Weltachsen. Sind Breite und Tiefe
-  // gleich, geht dabei nichts durcheinander.
-  { id: "c_wood", fractionId: "wood", label: "HOLZ", kind: "bay", x: -9.0, z: -12.5,
-    size: [3.2, 3.2, 2.5], facing: "north" },
-  { id: "c_tires", fractionId: "tires", label: "REIFEN", kind: "bay", x: -4.5, z: -12.5,
-    size: [3.2, 3.2, 2.5], facing: "north" },
-  { id: "c_rubble", fractionId: "rubble", label: "BAUMISCH", kind: "bay", x: 0, z: -12.5,
-    size: [3.2, 3.2, 2.5], facing: "north" },
+  // Nichtmetalle schliessen die Sortierreihe nach Sueden ab (Wunsch
+  // 10.09.2026). Sie standen erst hinter der Sortierreihe, dann hinter der
+  // Presse — beides sah nach Ausweichquartier aus. In einer Flucht mit den
+  // Buntmetallen ergibt sich eine durchgehende Muldenzeile, und der Radlader
+  // faehrt sie in einem Zug ab. Gleiche Masse und Oeffnung wie die anderen.
+  { id: "c_wood", fractionId: "wood", label: "HOLZ", kind: "bay", x: 7.0, z: -10.25,
+    size: [3.0, 3.3, 2.5] },
+  { id: "c_tires", fractionId: "tires", label: "REIFEN", kind: "bay", x: 7.0, z: -13.95,
+    size: [3.0, 3.3, 2.5] },
+  { id: "c_rubble", fractionId: "rubble", label: "BAUMISCH", kind: "bay", x: 7.0, z: -17.65,
+    size: [3.0, 3.3, 2.5] },
   // Ballenlager direkt neben der Schere: Was gepresst aus der Kammer kommt,
   // wandert hierher und wartet auf den Abholer.
   //
@@ -93,7 +89,11 @@ export const CONFIGS: ContainerConfig[] = [
   // Pakete auftauchen. Die Zone bleibt, sie zaehlt und verkauft weiterhin; nur
   // die Waende sind weg. Ein Ballenlager ist ohnehin ein markierter Platz, kein
   // Behaelter: Man stellt Pakete ab, man schuettet sie nicht ein.
-  { id: "c_bales", fractionId: "steel", label: "BALLEN", kind: "pile", x: -2.6, z: -7.0,
+  // Abgerueckt von der Presskammer (Wunsch 10.09.2026): Sie endet bei x -3,5,
+  // und ein Ballen unmittelbar davor lag halb unter dem Maschinenrand — man
+  // bekam ihn nicht zu fassen. Jetzt oestlich davon, gut 7,5 m vom Bagger und
+  // damit im gut erreichbaren Bereich des Arms.
+  { id: "c_bales", fractionId: "steel", label: "BALLEN", kind: "pile", x: -0.5, z: -8.5,
     size: [3.2, 4.2, 0] },
   // Nichtmetalle südlich, im Bogen um den Bagger gelegt, damit alle drei in
   // Reichweite bleiben. Öffnung nach Norden zur Maschine.
@@ -193,12 +193,20 @@ class GameContainer {
       };
       // Wände: Ostseite + Nord + Süd. Die WESTseite bleibt offen — dorthin
       // schaut der Bagger, von dort wird eingefüllt und ausgeräumt.
-      for (let r = 0; r < ROWS; r++) {
+      //
+      // Die Rückwand steht zwei Lagen höher als die Flanken: Wer von oben
+      // einfüllt, wirft regelmäßig ein Stück über die hintere Kante, und
+      // dahinter ist es verloren. Vorn ändert das nichts — dort wird
+      // eingefüllt, und die Reichweite des Arms haengt an der Muldenmitte.
+      const REIHEN_HINTEN = ROWS + 2;
+      for (let r = 0; r < REIHEN_HINTEN; r++) {
         const y = BLOCK_H / 2 + r * BLOCK_H;
         const off = (r % 2) * (BLOCK_L / 2);
-        for (let x = -w / 2 + BLOCK_L / 2 - off; x < w / 2 + 0.4; x += BLOCK_L) {
-          if (!cfg.shareNorth) placeBlock(x, y, d / 2 + BLOCK_T / 2, true);
-          if (!cfg.shareSouth) placeBlock(x, y, -(d / 2 + BLOCK_T / 2), true);
+        if (r < ROWS) {
+          for (let x = -w / 2 + BLOCK_L / 2 - off; x < w / 2 + 0.4; x += BLOCK_L) {
+            if (!cfg.shareNorth) placeBlock(x, y, d / 2 + BLOCK_T / 2, true);
+            if (!cfg.shareSouth) placeBlock(x, y, -(d / 2 + BLOCK_T / 2), true);
+          }
         }
         // Rückwand: entfällt, wenn die Nachbarmulde dahinter sie schon stellt
         if (!cfg.shareEast) {
@@ -246,10 +254,13 @@ class GameContainer {
           body
         );
       }
+      // Rückwand-Kollider so hoch wie ihre Blöcke, sonst fliegt der Schrott
+      // durch die zwei zusätzlichen Lagen hindurch
+      const wallHinten = REIHEN_HINTEN * BLOCK_H;
       world.createCollider(
-        RAPIER.ColliderDesc.cuboid(BLOCK_T / 2, wallH / 2, d / 2 + BLOCK_T).setTranslation(
+        RAPIER.ColliderDesc.cuboid(BLOCK_T / 2, wallHinten / 2, d / 2 + BLOCK_T).setTranslation(
           w / 2 + BLOCK_T / 2,
-          wallH / 2,
+          wallHinten / 2,
           0
         ),
         body

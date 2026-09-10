@@ -13,6 +13,7 @@
 import { describe, it, expect } from "vitest";
 import { hoechsteKrallenspitze } from "../src/excavator/excavator";
 import { CONFIGS } from "../src/world/containers";
+import { ROUTE_IN_REV, TIP_CREEP_M } from "../src/delivery/routes";
 
 /** Standplatz des Baggers — siehe `position` in excavator.ts. */
 const BAGGER = { x: 0, z: -1 };
@@ -31,6 +32,19 @@ describe("Reichweite des Arms", () => {
     expect(hoechsteKrallenspitze(4.6)).toBeLessThan(2.0);
     expect(hoechsteKrallenspitze(6.0)).toBeLessThan(3.0);
     expect(hoechsteKrallenspitze(7.5)).toBeGreaterThan(4.0);
+  });
+
+  it("alles, was ein Kipper ablaedt, bleibt in Reichweite", () => {
+    // Der Arm erreicht den BODEN nur zwischen 3,0 und 9,5 m. Der Kipper dockt
+    // an, kippt und zieht dann gekippt an — der Rest der Fuhre rutscht auf
+    // dieser Strecke heraus. Reicht sie ueber 9,5 m hinaus, liegt dort Schrott,
+    // den man nicht mehr wegbekommt (Befund 10.09.2026).
+    const dock = ROUTE_IN_REV[ROUTE_IN_REV.length - 1]!;
+    const weitesterPunkt = Math.hypot(dock[0] - BAGGER.x, dock[1] + TIP_CREEP_M - BAGGER.z);
+    expect(
+      weitesterPunkt,
+      `letzter Abwurf bei ${weitesterPunkt.toFixed(1)} m — dort kommt der Arm nicht mehr auf den Boden`
+    ).toBeLessThan(9.5);
   });
 
   it("jenseits von zehn Metern reicht er gar nicht", () => {

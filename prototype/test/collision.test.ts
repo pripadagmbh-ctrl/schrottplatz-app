@@ -223,12 +223,32 @@ describe("Reichweite des Baggers", () => {
     expect(Math.hypot(-8.5 + 2.5, -9.8 + 3.0)).toBeLessThan(REICHWEITE_M);
   });
 
-  it("die Nichtmetall-Mulden stehen hinter Bagger und Presse", () => {
-    // Sie beschickt der Radlader, nicht der Bagger — Reichweite ist hier keine
-    // Bedingung. Sie duerfen aber nicht in der Presskammer stehen (z -9 bis -5).
+  it("die Nichtmetall-Mulden setzen die Sortierreihe fort", () => {
+    // Eine durchgehende Zeile statt eines Ausweichquartiers: gleiche Flucht wie
+    // die Buntmetalle, nur weiter suedlich.
+    const reiheX = SORTIERMULDEN[0]!.x;
     for (const c of NICHTMETALLE) {
-      expect(c.z, `${c.label} steht nicht hinter der Presse`).toBeLessThan(-9.5);
+      expect(c.x, `${c.label} steht nicht in der Flucht`).toBeCloseTo(reiheX, 3);
+      expect(c.z, `${c.label} liegt nicht suedlich der Buntmetalle`).toBeLessThan(
+        Math.min(...SORTIERMULDEN.map((m) => m.z))
+      );
     }
+  });
+
+  it("die Ruecknwand ist hoeher als die Flanken", () => {
+    // Beim Einfuellen von oben fliegt regelmaessig ein Stueck ueber die hintere
+    // Kante — dahinter ist es verloren.
+    const c = SORTIERMULDEN[0]!;
+    const wand = STATIC_OBSTACLES.find((o) => o.label === `${c.label} Stirn`)!;
+    const flanke = STATIC_OBSTACLES.find((o) => o.label === `${c.label} Süd`)!;
+    expect(wand.top).toBeGreaterThan(flanke.top);
+  });
+
+  it("das Ballenlager liegt nicht mehr an der Presskammer", () => {
+    const lager = CONFIGS.find((c) => c.id === "c_bales")!;
+    const presse = STATIC_OBSTACLES.find((o) => o.label === "Schere")!;
+    const luecke = lager.x - lager.size[0] / 2 - (presse.x + presse.hw);
+    expect(luecke, `nur ${luecke.toFixed(2)} m zwischen Presse und Ballen`).toBeGreaterThan(0.8);
   });
 
   it("schließt mittig, ohne dass die Spitzen sich überlappen", () => {

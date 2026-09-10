@@ -616,15 +616,21 @@ class DeliveryVehicle {
    * Bereits entfernte Körper (verkauft/gepresst) zählen als abgeladen — ihre
    * translation() abzufragen würde die Physik-Engine zum Absturz bringen.
    */
+  /**
+   * Ist die Ladeflaeche leer?
+   *
+   * Vorher galt der LKW erst als entladen, wenn JEDES Ladungsteil mehr als 4 m
+   * vom Fahrzeug entfernt lag. Wer den Schrott gleich neben dem LKW ablegte —
+   * und das tut man, der Haufen ist ja da —, sperrte ihn damit fest: Der
+   * Fahrer wartete auf etwas, das laengst nicht mehr auf seiner Flaeche lag.
+   * Genau das war "der LKW sieht leer aus und faehrt trotzdem nicht".
+   *
+   * Massgeblich ist jetzt, was auf der Flaeche liegt, nicht was daneben liegt.
+   * Ein Rest von 20 kg bleibt zulaessig — ein einzelnes verklemmtes Blech soll
+   * den Betrieb nicht anhalten.
+   */
   private isUnloaded(): boolean {
-    const gp = this.group.position;
-    const far = (b: RAPIER.RigidBody): boolean => {
-      if (!b.isValid()) return true;
-      const p = b.translation();
-      return Math.hypot(p.x - gp.x, p.z - gp.z) > 4;
-    };
-    if (this.cargo.car) return far(this.cargo.car.body);
-    return this.cargo.items.every((it) => far(it.body));
+    return this.cargoMassKg() <= 20;
   }
 
   private placeAt(route: Array<[number, number]>, s: number, reverse = false): void {
@@ -659,6 +665,24 @@ class DeliveryVehicle {
    * Steht der Bagger (oder etwas anderes Blockierendes) auf dem nächsten
    * Streckenabschnitt? Dann hält der Fahrer an und hupt — er fährt nie hindurch.
    */
+  /**
+   * Steht ein festes Bauwerk im Weg? Das gilt immer — anders als loser Schrott
+   * laesst es sich nicht wegraeumen, und hindurchfahren darf niemand.
+   */
+  private isBlockedByBuilding(
+    route: Array<[number, number]>,
+    aheadS: number,
+    reverse: boolean
+  ): boolean {
+    const ax = this.group.position.x;
+    const az = this.group.position.z;
+    const probe = this.probePoint(route, aheadS, reverse);
+    for (let t = 0.3; t <= 1.001; t += 0.235) {
+      if (hitsObstacle(ax + (probe.x - ax) * t, az + (probe.z - az) * t, 1.4)) return true;
+    }
+    return false;
+  }
+
   private isBlocked(route: Array<[number, number]>, aheadS: number, reverse: boolean): boolean {
     if (!this.getBlocker) return false;
     const ax = this.group.position.x;
@@ -694,6 +718,18 @@ class DeliveryVehicle {
 
   /** Fahrschritt mit Blockade-Prüfung; liefert true, wenn tatsächlich gefahren wurde. */
   private advance(route: Array<[number, number]>, step: number, reverse: boolean, dt: number): boolean {
+    // Bauten zuerst und ohne Ausnahme: Die Aufgeben-Regel unten ist fuer losen
+    // Schrott gedacht, der irgendwann weggeraeumt wird. Auf Mauern, Mulden und
+    // das Wiegehaeuschen darf sie nicht durchschlagen — sonst faehrt der LKW
+    // nach der Wartezeit einfach hindurch, und genau das war zu sehen.
+    if (this.isBlockedByBuilding(route, this.routeS + 4, reverse)) {
+      this.blockedT += dt;
+      if (this.blockedT > HONK_AFTER_S && !this.honked) {
+        this.honked = true;
+        this.onHonk?.();
+      }
+      return false;
+    }
     // Sicherheitsabstand: 4 m vorausschauen (Heck bzw. Front)
     if (!this.gaveUpWaiting && this.isBlocked(route, this.routeS + 4, reverse)) {
       this.blockedT += dt;
@@ -964,19 +1000,38 @@ class DeliveryVehicle {
   despawn(): void {
     for (const w of this.sideWalls) this.world.removeRigidBody(w.body);
     this.sideWalls = [];
-    // Was noch auf der Fläche klemmt, setzt der Fahrer am Abladeplatz ab —
-    // sonst führe er Material vom Platz und es wäre für den Spieler weg.
-    const [dx, dz] = this.routeRev[this.routeRev.length - 1];
+    // Was noch auf der Ladeflaeche klemmt, stellt der Fahrer beim Wegfahren ab —
+    // sonst fuehre er Material vom Platz und es waere fuer den Spieler weg.
+    //
+    // Frueher landete es auf einem FESTEN Punkt am Abladeplatz, in 0,6 bis 1,6 m
+    // Hoehe. Wer gerade woanders arbeitete, sah dort unvermittelt Schrott vom
+    // Himmel fallen — ohne Fahrzeug, ohne Zusammenhang. Jetzt wird nur abgesetzt,
+    // was wirklich auf der Flaeche liegt, und zwar dicht neben dem Fahrzeug auf
+    // dem Boden: Das liest sich als Abladen, nicht als Regen.
+    const gp = this.group.position;
+    const quer = { x: Math.cos(this.group.rotation.y), z: -Math.sin(this.group.rotation.y) };
+    const local = new THREE.Vector3();
     let k = 0;
     for (const it of this.cargo.items) {
       if (!it.body.isValid()) continue;
       const p = it.body.translation();
-      if (Math.hypot(p.x - this.group.position.x, p.z - this.group.position.z) > 6) continue;
+      local.set(p.x, p.y, p.z);
+      this.bedGroup.worldToLocal(local);
+      const aufDerFlaeche =
+        Math.abs(local.x) < BED_HALF_W + 0.5 &&
+        local.z > -0.5 &&
+        local.z < this.bedLen + 0.5 &&
+        local.y > -0.4 &&
+        local.y < 5.0;
+      if (!aufDerFlaeche) continue; // liegt schon auf dem Platz — nicht anfassen
+      // Seitlich neben das Fahrzeug, knapp ueber dem Boden
+      const seite = 3.2 + (k % 3) * 0.9;
       it.body.setTranslation(
-        { x: dx - 3.5 + (k % 3) * 1.2, y: 0.6 + Math.floor(k / 3) * 0.5, z: dz + ((k % 2) - 0.5) * 1.6 },
+        { x: gp.x + quer.x * seite, y: 0.35, z: gp.z + quer.z * seite },
         true
       );
       it.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      it.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
       k++;
     }
     this.group.removeFromParent();
@@ -1031,9 +1086,8 @@ export class VehicleManager {
    * liegender Schrott ab 25 kg — LKW fahren nicht darüber hinweg.
    */
   private blockedAt = (x: number, z: number, r: number, ignore: Set<number>): boolean => {
-    // Feste Bauten: Betonlego-Umrandung, Boxen, Schere. Ein LKW fährt da
-    // nicht hindurch — die Physik hält ihn nicht auf, er fährt kinematisch.
-    if (hitsObstacle(x, z, 1.4)) return true;
+    // Feste Bauten pruefen NICHT mehr hier: Sie haengen an isBlockedByBuilding,
+    // damit die Aufgeben-Regel nicht auf sie durchschlaegt.
     const ex = this.getExcavatorPos?.();
     if (ex && Math.hypot(ex.x - x, ex.z - z) < r) return true;
     // In den Arbeitszonen (Abkipp-/Verladeplatz) darf Schrott liegen — dorthin

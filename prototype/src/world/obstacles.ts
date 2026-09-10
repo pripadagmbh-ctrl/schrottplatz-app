@@ -45,6 +45,8 @@ const WALL_H = 1.8;
  * gesperrt und man käme mit der Spinne nicht mehr hinein.
  */
 const BAY_T = 0.35;
+/** Die Rueckwand steht zwei Betonlego-Lagen hoeher als die Flanken. */
+const RUECKWAND_PLUS = 1.0;
 
 function bayObstacles(cfg: ContainerConfig): Obstacle[] {
   if (cfg.kind !== "bay") return []; // Haufen und offene Flächen haben keine Wände
@@ -61,12 +63,14 @@ function bayObstacles(cfg: ContainerConfig): Obstacle[] {
       { x: cfg.x + hw, z: cfg.z, hw: BAY_T, hd, top, label: `${L} Ost` },
     ];
   }
-  // Öffnung nach Westen (Standard) oder Osten — die andere Stirnseite ist zu
+  // Öffnung nach Westen (Standard) oder Osten — die andere Stirnseite ist zu.
+  // Sie steht zwei Lagen hoeher als die Flanken (siehe containers.ts), damit
+  // beim Einfuellen nichts dahinterfaellt.
   const stirn = cfg.facing === "east" ? -hw : hw;
   return [
     { x: cfg.x, z: cfg.z - hd, hw, hd: BAY_T, top, label: `${L} Süd` },
     { x: cfg.x, z: cfg.z + hd, hw, hd: BAY_T, top, label: `${L} Nord` },
-    { x: cfg.x + stirn, z: cfg.z, hw: BAY_T, hd, top, label: `${L} Stirn` },
+    { x: cfg.x + stirn, z: cfg.z, hw: BAY_T, hd, top: top + RUECKWAND_PLUS, label: `${L} Stirn` },
   ];
 }
 

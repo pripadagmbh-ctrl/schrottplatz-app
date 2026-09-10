@@ -133,7 +133,14 @@ export const TIP_ANGLE = THREE.MathUtils.degToRad(58); // (SW) steil genug für 
  * Senkt er im Stand, bleibt Schrott auf der Fläche liegen, sobald unten schon
  * etwas im Weg liegt — und das wird mit jeder Fuhre wahrscheinlicher.
  */
-export const TIP_CREEP_M = 3.2;
+/**
+ * Kurz gehalten mit Absicht. Der Bagger erreicht den Boden nur zwischen 3,0 und
+ * 9,5 m (gemessen aus der Armgeometrie). Der Kipper dockt bei z = 7 an, also
+ * 8 m vom Bagger — zieht er gekippt 3,2 m weiter weg, landet der Rest der Fuhre
+ * bei ueber 11 m und ist nicht mehr wegzubaggern. 1,4 m reichen, damit der
+ * Wagen unter dem Haufen hervorkommt und der Rest ueber die Kante nachrutscht.
+ */
+export const TIP_CREEP_M = 1.4;
 export const TIP_CREEP_SPEED = 1.1; // m/s — Schritttempo, damit man das Abrutschen sieht
 /** Wie weit der Händlerkran beim Andocken zur Seite schwenkt (aus dem Weg). */
 export const CRANE_SWING = THREE.MathUtils.degToRad(78);
