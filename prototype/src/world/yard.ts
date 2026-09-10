@@ -6,7 +6,18 @@ import RAPIER from "@dimforge/rapier3d-compat";
 export const WEIGH_X = -22;
 export const WEIGH_Z = 24;
 /** Platzmaße (SW) — deutlich größer als die Ausgangsfläche */
-export const YARD_W = 80;
+/**
+ * Platzgrenzen. Der Platz ist NICHT um x = 0 zentriert (Wunsch 10.09.2026):
+ * Im Osten, wo die Sortiermulden stehen, ruecken Wand und Zaun bis dicht an
+ * die Mulden heran — dort war zwischen letzter Mulde (x 8,5) und Wand (x 40)
+ * gut 30 m Leere. Im Westen bleibt es, wie es war: Dort liegen Tor, Waage und
+ * die Zufahrt.
+ */
+export const YARD_MIN_X = -40;
+export const YARD_MAX_X = 10.5;
+export const YARD_W = YARD_MAX_X - YARD_MIN_X;
+/** Mitte des Platzes in x — der Boden liegt nicht mehr im Ursprung. */
+export const YARD_CX = (YARD_MIN_X + YARD_MAX_X) / 2;
 export const YARD_D = 58;
 /** Einfahrt in der linken hinteren Ecke (Nordwesten) */
 export const GATE_X = -22;
@@ -157,7 +168,6 @@ export class Yard {
       (c) => new THREE.MeshStandardMaterial({ color: c, roughness: 1, flatShading: true })
     );
     const trunkGeo = new THREE.CylinderGeometry(0.22, 0.32, 2.4, 7);
-    const hx = YARD_W / 2;
     const hz = YARD_D / 2;
 
     // Bäume ringsum, mit Lücke bei der Einfahrt
@@ -192,17 +202,17 @@ export class Yard {
       let x: number;
       let z: number;
       if (side === 0) {
-        x = -hx + t * YARD_W;
+        x = YARD_MIN_X + t * YARD_W;
         z = hz + 5 + rnd() * 26;
         if (Math.abs(x - GATE_X) < 9) continue; // Einfahrt freihalten
       } else if (side === 1) {
-        x = -hx + t * YARD_W;
+        x = YARD_MIN_X + t * YARD_W;
         z = -hz - 5 - rnd() * 26;
       } else if (side === 2) {
-        x = -hx - 5 - rnd() * 26;
+        x = YARD_MIN_X - 5 - rnd() * 26;
         z = -hz + t * YARD_D;
       } else {
-        x = hx + 5 + rnd() * 26;
+        x = YARD_MAX_X + 5 + rnd() * 26;
         z = -hz + t * YARD_D;
       }
       placeTree(x, z, 0.85 + rnd() * 0.8);
@@ -290,7 +300,9 @@ export class Yard {
    * obendrauf liegt loser Schrott (spawnt in main).
    */
   /** Kulissen-Berge am Platzrand (nicht mehr Arbeitsfläche — die ist jetzt der Stahlhaufen) */
-  readonly moundCenters = [new THREE.Vector3(-22, 0, -10), new THREE.Vector3(23, 0, 6)];
+  // Der zweite Berg stand bei x 23 — seit die Ostgrenze bei 10,5 liegt, waere
+  // das ausserhalb der Mauer. Nach Westen geholt, wo jetzt der Platz ist.
+  readonly moundCenters = [new THREE.Vector3(-22, 0, -10), new THREE.Vector3(-31, 0, 6)];
 
   private buildScrapMounds(scene: THREE.Scene, world: RAPIER.World): void {
     const rust = new THREE.MeshStandardMaterial({ color: 0x5f5248, roughness: 1 });
@@ -386,6 +398,7 @@ export class Yard {
       new THREE.MeshStandardMaterial({ map: tex, roughness: 1 })
     );
     ground.rotation.x = -Math.PI / 2;
+    ground.position.x = YARD_CX; // der Platz liegt nicht mehr im Ursprung
     ground.receiveShadow = true;
     scene.add(ground);
 
@@ -582,7 +595,6 @@ export class Yard {
     const blockGeo = new THREE.BoxGeometry(BL, BH, BT);
     const studGeo = new THREE.CylinderGeometry(0.13, 0.13, 0.09, 8);
     const wallBody = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
-    const hx = YARD_W / 2;
     const hz = YARD_D / 2;
     let n = 0;
 
@@ -610,14 +622,14 @@ export class Yard {
     };
 
     // Nord- und Südwand (Einfahrtslücke im Norden bei GATE_X)
-    for (let x = -hx + BL / 2; x < hx; x += BL) {
+    for (let x = YARD_MIN_X + BL / 2; x < YARD_MAX_X; x += BL) {
       if (!(Math.abs(x - GATE_X) < 4.5)) place(x, hz, true);
       place(x, -hz, true);
     }
     // Ost- und Westwand
     for (let z = -hz + BL / 2; z < hz; z += BL) {
-      place(-hx, z, false);
-      place(hx, z, false);
+      place(YARD_MIN_X, z, false);
+      place(YARD_MAX_X, z, false);
     }
 
     const wallMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95 });
@@ -648,14 +660,14 @@ export class Yard {
         wallBody
       );
     };
-    addWall(0, -hz, YARD_W, BT);
-    addWall(-hx, 0, BT, YARD_D);
-    addWall(hx, 0, BT, YARD_D);
+    addWall(YARD_CX, -hz, YARD_W, BT);
+    addWall(YARD_MIN_X, 0, BT, YARD_D);
+    addWall(YARD_MAX_X, 0, BT, YARD_D);
     // Nordwand in zwei Stücken links und rechts der Einfahrt
     const gateL = GATE_X - 4.5;
     const gateR = GATE_X + 4.5;
-    addWall((-hx + gateL) / 2, hz, gateL + hx, BT);
-    addWall((gateR + hx) / 2, hz, hx - gateR, BT);
+    addWall((YARD_MIN_X + gateL) / 2, hz, gateL - YARD_MIN_X, BT);
+    addWall((gateR + YARD_MAX_X) / 2, hz, YARD_MAX_X - gateR, BT);
 
     // Einfahrtstor-Pfosten
     const post = new THREE.MeshStandardMaterial({ color: 0xd7a71f, roughness: 0.8 });

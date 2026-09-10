@@ -66,19 +66,25 @@ export const CONFIGS: ContainerConfig[] = [
   // wieder unerreichbar.
   // Nach Norden gerückt: die westliche Öffnung darf nicht von der Presse
   // versperrt werden
-  { id: "c_va", fractionId: "va", label: "EDELSTAHL VA", kind: "bay", x: 7.0, z: -6.55, size: [3.0, 3.3, 2.5], shareEast: true },
-  { id: "c_alu", fractionId: "alu", label: "ALU", kind: "bay", x: 7.0, z: -2.85, size: [3.0, 3.3, 2.5], shareEast: true },
-  { id: "c_copper", fractionId: "copper", label: "KUPFER/MS", kind: "bay", x: 7.0, z: 0.85, size: [3.0, 3.3, 2.5], shareEast: true },
-  { id: "c_cable", fractionId: "cable", label: "KABEL", kind: "bay", x: 7.0, z: 4.55, size: [3.0, 3.3, 2.5], shareEast: true },
-  // Nichtmetalle Rücken an Rücken hinter der Sortierreihe: Sie teilen sich
-  // deren Rückwand, öffnen nach Osten und werden vom Radlader beschickt.
-  // Eine Doppelwand zur Mitte braucht es dafür nicht.
-  { id: "c_wood", fractionId: "wood", label: "HOLZ", kind: "bay", x: 10.3, z: -4.9,
-    size: [3.0, 3.5, 2.5], facing: "east", shareWest: true },
-  { id: "c_tires", fractionId: "tires", label: "REIFEN", kind: "bay", x: 10.3, z: -1.0,
-    size: [3.0, 3.5, 2.5], facing: "east", shareWest: true },
-  { id: "c_rubble", fractionId: "rubble", label: "BAUMISCH", kind: "bay", x: 10.3, z: 2.9,
-    size: [3.0, 3.5, 2.5], facing: "east", shareWest: true },
+  { id: "c_va", fractionId: "va", label: "EDELSTAHL VA", kind: "bay", x: 7.0, z: -6.55, size: [3.0, 3.3, 2.5] },
+  { id: "c_alu", fractionId: "alu", label: "ALU", kind: "bay", x: 7.0, z: -2.85, size: [3.0, 3.3, 2.5] },
+  { id: "c_copper", fractionId: "copper", label: "KUPFER/MS", kind: "bay", x: 7.0, z: 0.85, size: [3.0, 3.3, 2.5] },
+  { id: "c_cable", fractionId: "cable", label: "KABEL", kind: "bay", x: 7.0, z: 4.55, size: [3.0, 3.3, 2.5] },
+  // Nichtmetalle hinter Bagger und Presse (Wunsch 10.09.2026). Sie standen
+  // Rücken an Rücken hinter der Sortierreihe — genau dort, wo die Platzgrenze
+  // hinkommt. Nach Süden hinter die Schere gerückt, in einer Reihe, Öffnung
+  // nach Norden zum Platz. Sie werden vom Radlader beschickt, nicht vom Bagger;
+  // die Reichweite spielt hier also keine Rolle.
+  //
+  // Quadratischer Grundriss mit Absicht: Bei Öffnung nach Norden ist die Mulde
+  // gedreht, und die Zonenprüfung rechnet in Weltachsen. Sind Breite und Tiefe
+  // gleich, geht dabei nichts durcheinander.
+  { id: "c_wood", fractionId: "wood", label: "HOLZ", kind: "bay", x: -9.0, z: -12.5,
+    size: [3.2, 3.2, 2.5], facing: "north" },
+  { id: "c_tires", fractionId: "tires", label: "REIFEN", kind: "bay", x: -4.5, z: -12.5,
+    size: [3.2, 3.2, 2.5], facing: "north" },
+  { id: "c_rubble", fractionId: "rubble", label: "BAUMISCH", kind: "bay", x: 0, z: -12.5,
+    size: [3.2, 3.2, 2.5], facing: "north" },
   // Ballenlager direkt neben der Schere: Was gepresst aus der Kammer kommt,
   // wandert hierher und wartet auf den Abholer.
   //

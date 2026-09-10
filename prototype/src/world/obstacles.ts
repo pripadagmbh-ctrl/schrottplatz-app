@@ -1,4 +1,5 @@
-import { YARD_W, YARD_D, GATE_X, WEIGH_X, WEIGH_Z } from "./yard";
+import { YARD_W, YARD_D, YARD_MIN_X, YARD_MAX_X, YARD_CX, GATE_X, WEIGH_X, WEIGH_Z } from "./yard";
+import { CONFIGS, type ContainerConfig } from "./containers";
 
 /**
  * Feste Bauten auf dem Platz — alles, wodurch niemand hindurchlaufen oder
@@ -23,7 +24,6 @@ export interface Obstacle {
   label: string;
 }
 
-const HX = YARD_W / 2;
 const HZ = YARD_D / 2;
 /** Breite der Einfahrtslücke in der Nordwand */
 const GATE_HALF = 4.5;
@@ -32,67 +32,69 @@ const WALL_T = 0.6;
 /** Höhe der Umrandung: drei Reihen */
 const WALL_H = 1.8;
 
-/** Mittelachse der Boxenreihe */
-const BAY_X = 4.6;
-/** halbe Boxentiefe (x) und -breite (z) */
-const BAY_HW = 1.8;
-const BAY_HD = 2.0;
-/** Wanddicke der Betonlego-Boxen */
+/**
+ * Wände einer Mulde, aus ihrer eigenen Konfiguration gerechnet.
+ *
+ * Vorher stand die Muldengeometrie hier ein zweites Mal, von Hand gepflegt.
+ * Beim Verschieben der Sortierreihe blieb sie zurück: Der Arm stiess gegen
+ * unsichtbare Wände am alten Platz und fuhr durch die echten hindurch. Und die
+ * Wände des Ballenlagers standen noch in der Liste, obwohl daraus längst eine
+ * offene Fläche geworden war. Zwei Wahrheiten über dieselbe Sache halten nie.
+ *
+ * Die Öffnung bleibt frei — als Vollfläche eingetragen wäre der Innenraum
+ * gesperrt und man käme mit der Spinne nicht mehr hinein.
+ */
 const BAY_T = 0.35;
-const BAY_TOP = 2.5;
 
-/** Die drei Wände einer Box — vorn nach Westen bleibt sie offen. */
-function bayWalls(z: number, name: string): Obstacle[] {
+function bayObstacles(cfg: ContainerConfig): Obstacle[] {
+  if (cfg.kind !== "bay") return []; // Haufen und offene Flächen haben keine Wände
+  const [w, d, top] = cfg.size;
+  // Bei Öffnung nach Norden ist die Mulde gedreht: Breite und Tiefe tauschen
+  const nord = cfg.facing === "north";
+  const hw = (nord ? d : w) / 2;
+  const hd = (nord ? w : d) / 2;
+  const L = cfg.label;
+  if (nord) {
+    return [
+      { x: cfg.x, z: cfg.z - hd, hw, hd: BAY_T, top, label: `${L} Süd` },
+      { x: cfg.x - hw, z: cfg.z, hw: BAY_T, hd, top, label: `${L} West` },
+      { x: cfg.x + hw, z: cfg.z, hw: BAY_T, hd, top, label: `${L} Ost` },
+    ];
+  }
+  // Öffnung nach Westen (Standard) oder Osten — die andere Stirnseite ist zu
+  const stirn = cfg.facing === "east" ? -hw : hw;
   return [
-    { x: BAY_X, z: z - BAY_HD, hw: BAY_HW, hd: BAY_T, top: BAY_TOP, label: `Box ${name} Süd` },
-    { x: BAY_X, z: z + BAY_HD, hw: BAY_HW, hd: BAY_T, top: BAY_TOP, label: `Box ${name} Nord` },
-    { x: BAY_X + BAY_HW, z, hw: BAY_T, hd: BAY_HD, top: BAY_TOP, label: `Box ${name} Ost` },
+    { x: cfg.x, z: cfg.z - hd, hw, hd: BAY_T, top, label: `${L} Süd` },
+    { x: cfg.x, z: cfg.z + hd, hw, hd: BAY_T, top, label: `${L} Nord` },
+    { x: cfg.x + stirn, z: cfg.z, hw: BAY_T, hd, top, label: `${L} Stirn` },
   ];
 }
 
 export const STATIC_OBSTACLES: Obstacle[] = [
   // --- Umrandung aus Betonlego, Einfahrt im Nordwesten ausgespart ---
-  { x: 0, z: -HZ, hw: HX, hd: WALL_T / 2, top: WALL_H, label: "Südwand" },
-  { x: -HX, z: 0, hw: WALL_T / 2, hd: HZ, top: WALL_H, label: "Westwand" },
-  { x: HX, z: 0, hw: WALL_T / 2, hd: HZ, top: WALL_H, label: "Ostwand" },
+  { x: YARD_CX, z: -HZ, hw: YARD_W / 2, hd: WALL_T / 2, top: WALL_H, label: "Südwand" },
+  { x: YARD_MIN_X, z: 0, hw: WALL_T / 2, hd: HZ, top: WALL_H, label: "Westwand" },
+  { x: YARD_MAX_X, z: 0, hw: WALL_T / 2, hd: HZ, top: WALL_H, label: "Ostwand" },
   // Nordwand in zwei Stücken links und rechts der Einfahrt
   {
-    x: (-HX + (GATE_X - GATE_HALF)) / 2,
+    x: (YARD_MIN_X + (GATE_X - GATE_HALF)) / 2,
     z: HZ,
-    hw: (GATE_X - GATE_HALF + HX) / 2,
+    hw: (GATE_X - GATE_HALF - YARD_MIN_X) / 2,
     hd: WALL_T / 2,
     top: WALL_H,
     label: "Nordwand West",
   },
   {
-    x: (GATE_X + GATE_HALF + HX) / 2,
+    x: (GATE_X + GATE_HALF + YARD_MAX_X) / 2,
     z: HZ,
-    hw: (HX - GATE_X - GATE_HALF) / 2,
+    hw: (YARD_MAX_X - GATE_X - GATE_HALF) / 2,
     hd: WALL_T / 2,
     top: WALL_H,
     label: "Nordwand Ost",
   },
 
-  // --- Betonlego-Boxen für die Buntmetalle ---
-  // Je drei Wände, vorn (Westen) offen. Als Vollfläche eingetragen wäre der
-  // Innenraum gesperrt und man käme mit der Spinne nicht mehr hinein.
-  ...bayWalls(-5.6, "VA"),
-  ...bayWalls(-1.9, "Alu"),
-  ...bayWalls(1.9, "Kupfer"),
-  ...bayWalls(5.6, "Kabel"),
-
-  // --- Nichtmetall-Mulden dahinter, Rücken an Rücken, Öffnung nach Osten ---
-  // Die gemeinsame Wand zwischen beiden Reihen steht bei x 6,4.
-  { x: 6.4, z: 0, hw: 0.35, hd: 6.0, top: 2.5, label: "Mittelwand Muldenreihen" },
-  { x: 7.9, z: -5.75, hw: 1.8, hd: 0.3, top: 2.0, label: "Mulde Holz Süd" },
-  { x: 7.9, z: -2.05, hw: 1.8, hd: 0.3, top: 2.0, label: "Trennwand Holz/Reifen" },
-  { x: 7.9, z: 1.85, hw: 1.8, hd: 0.3, top: 2.0, label: "Trennwand Reifen/Baumisch" },
-  { x: 7.9, z: 5.75, hw: 1.8, hd: 0.3, top: 2.0, label: "Mulde Baumisch Nord" },
-
-  // --- Ballenlager neben der Schere, Öffnung nach Osten ---
-  { x: -2.6, z: -9.3, hw: 1.9, hd: 0.3, top: 2.0, label: "Ballenlager Süd" },
-  { x: -2.6, z: -4.7, hw: 1.9, hd: 0.3, top: 2.0, label: "Ballenlager Nord" },
-  { x: -4.4, z: -7.0, hw: 0.3, hd: 2.3, top: 2.0, label: "Ballenlager West" },
+  // --- Mulden: aus CONFIGS erzeugt, damit sie nicht auseinanderlaufen ---
+  ...CONFIGS.flatMap(bayObstacles),
 
   // --- Schere und Presse, südlich hinter dem Bagger ---
   { x: -8.5, z: -7.0, hw: 5.4, hd: 2.4, top: 2.2, label: "Schere" },

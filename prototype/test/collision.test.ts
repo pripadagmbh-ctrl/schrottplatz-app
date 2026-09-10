@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import * as THREE from "three";
+import { CONFIGS } from "../src/world/containers";
+import { YARD_MIN_X, YARD_MAX_X, YARD_D } from "../src/world/yard";
 import {
   STATIC_OBSTACLES,
   BUILDING_HUT,
@@ -40,12 +42,21 @@ import {
 /** Gemessene Reichweite des Auslegers am Boden */
 const REICHWEITE_M = 9.8;
 /** Mitten der vier Sortiermulden (Reihe im Osten) */
-const SORTIERMULDEN_Z = [-5.6, -1.9, 1.9, 5.6];
-/** Mitte der Sortiermuldenreihe in x */
-const SORTIER_X = 4.6;
-/** Mitten der drei Nichtmetall-Mulden (dahinter, Öffnung nach Osten) */
-const NICHTMETALL_Z = [-3.9, 0, 3.9];
-const NICHTMETALL_X = 7.9;
+/**
+ * Muldenlage NICHT hier eintragen — sie kommt aus CONFIGS.
+ *
+ * Vorher standen die Koordinaten hier fest, und beim Verschieben der
+ * Sortierreihe prüfte der Test die alte Stelle: grün, obwohl die Wände
+ * woanders standen. Ein Test, der seine eigene Wahrheit mitbringt, prüft
+ * nichts.
+ */
+const SORTIERMULDEN = CONFIGS.filter((c) =>
+  ["c_va", "c_alu", "c_copper", "c_cable"].includes(c.id)
+);
+/** Standplatz des Baggers — siehe `position` in excavator.ts. */
+const BAGGER_X = 0;
+const BAGGER_Z = -1;
+const NICHTMETALLE = CONFIGS.filter((c) => ["c_wood", "c_tires", "c_rubble"].includes(c.id));
 
 describe("Feste Bauten", () => {
   it("sperrt jedes eingetragene Bauwerk an seinem Platz", () => {
@@ -114,21 +125,56 @@ describe("Feste Bauten", () => {
   });
 
   it("lässt die Sortiermulden von vorn offen, sperrt aber ihre Wände", () => {
-    for (const z of SORTIERMULDEN_Z) {
-      expect(hitsObstacle(SORTIER_X, z, 0), "Innenraum frei").toBeNull();
-      expect(hitsObstacle(2.4, z, 0), "Öffnung nach Westen frei").toBeNull();
-      expect(hitsObstacle(SORTIER_X, z + 2.0, 0), "Nordwand sperrt").not.toBeNull();
-      expect(hitsObstacle(SORTIER_X, z - 2.0, 0), "Südwand sperrt").not.toBeNull();
+    for (const c of SORTIERMULDEN) {
+      const [w, d] = c.size;
+      expect(hitsObstacle(c.x, c.z, 0), `${c.label}: Innenraum frei`).toBeNull();
+      // Öffnung nach Westen: knapp vor der Mulde muss man hineinlangen können
+      expect(hitsObstacle(c.x - w / 2 - 0.9, c.z, 0), `${c.label}: Öffnung frei`).toBeNull();
+      expect(hitsObstacle(c.x, c.z + d / 2, 0), `${c.label}: Nordwand sperrt`).not.toBeNull();
+      expect(hitsObstacle(c.x, c.z - d / 2, 0), `${c.label}: Südwand sperrt`).not.toBeNull();
+      // Rückwand: Seit die Nichtmetalle weggezogen sind, stellt jede Mulde ihre
+      // eigene. Ohne sie wäre die Reihe nach hinten offen.
+      expect(hitsObstacle(c.x + w / 2, c.z, 0), `${c.label}: Rückwand sperrt`).not.toBeNull();
     }
   });
 
-  it("lässt die Nichtmetall-Mulden nach Osten offen", () => {
-    for (const z of NICHTMETALL_Z) {
-      expect(hitsObstacle(NICHTMETALL_X, z, 0), "Innenraum frei").toBeNull();
-      expect(hitsObstacle(10.2, z, 0), "Öffnung nach Osten frei").toBeNull();
+  it("lässt die Nichtmetall-Mulden nach Norden offen", () => {
+    for (const c of NICHTMETALLE) {
+      const [, d] = c.size;
+      expect(hitsObstacle(c.x, c.z, 0), `${c.label}: Innenraum frei`).toBeNull();
+      expect(hitsObstacle(c.x, c.z + d / 2 + 0.9, 0), `${c.label}: Öffnung frei`).toBeNull();
+      expect(hitsObstacle(c.x, c.z - d / 2, 0), `${c.label}: Südwand sperrt`).not.toBeNull();
     }
-    // Die gemeinsame Wand zwischen beiden Reihen steht
-    expect(hitsObstacle(6.4, 0, 0), "Mittelwand sperrt").not.toBeNull();
+  });
+
+  it("alles steht innerhalb der Platzgrenzen", () => {
+    // Seit die Ostgrenze an die Mulden herangerueckt ist (x 10,5 statt 40),
+    // muss geprueft werden, dass nichts jenseits davon liegt — sonst stuende
+    // eine Mulde oder ein Schrottberg ausserhalb der Mauer.
+    for (const c of CONFIGS) {
+      const [w, d] = c.size;
+      expect(c.x + w / 2, `${c.label} ragt ueber die Ostgrenze`).toBeLessThan(YARD_MAX_X);
+      expect(c.x - w / 2, `${c.label} ragt ueber die Westgrenze`).toBeGreaterThan(YARD_MIN_X);
+      expect(Math.abs(c.z) + d / 2, `${c.label} ragt ueber Nord/Sued`).toBeLessThan(YARD_D / 2);
+    }
+  });
+
+  it("die Ostgrenze steht dicht hinter der Sortierreihe", () => {
+    // Der Sinn des Verkleinerns: keine Leere mehr zwischen letzter Mulde und
+    // Mauer. Frueher lagen dort ueber 30 m.
+    const hinterste = Math.max(...SORTIERMULDEN.map((c) => c.x + c.size[0] / 2));
+    const luft = YARD_MAX_X - hinterste;
+    expect(luft, `${luft.toFixed(1)} m Leere hinter der letzten Mulde`).toBeLessThan(4);
+    expect(luft, "die Mauer steht auf der Mulde").toBeGreaterThan(0.8);
+  });
+
+  it("das Ballenlager hat keine Wände mehr", () => {
+    const lager = CONFIGS.find((c) => c.id === "c_bales")!;
+    // Es ist eine markierte Fläche geworden. Stünden seine Wände noch in der
+    // Hindernisliste, stiesse der Arm neben der Presse gegen nichts Sichtbares.
+    for (const dz of [-2.3, 0, 2.3]) {
+      expect(hitsObstacle(lager.x, lager.z + dz, 0), "unsichtbare Wand").toBeNull();
+    }
   });
 
   it("lässt den Arm über niedrige Mauern schwenken, aber nicht hindurch", () => {
@@ -148,7 +194,8 @@ describe("Feste Bauten", () => {
   it("lenkt eine Richtung an der Wand entlang, statt hindurch", () => {
     const out = { x: 0, z: 0 };
     // Von Süden frontal auf die Südwand einer Sortiermulde zu
-    const abgelenkt = slideAround(SORTIER_X, SORTIERMULDEN_Z[0] - 2.9, 0, 1, 0.7, out);
+    const mulde = SORTIERMULDEN[0]!;
+    const abgelenkt = slideAround(mulde.x, mulde.z - mulde.size[1] / 2 - 0.9, 0, 1, 0.7, out);
     expect(abgelenkt).toBe(true);
     expect(Math.hypot(out.x, out.z)).toBeCloseTo(1, 3);
   });
@@ -161,15 +208,13 @@ describe("Feste Bauten", () => {
 
 describe("Reichweite des Baggers", () => {
   it("erreicht alle vier Sortiermulden vom Standplatz aus", () => {
-    // Der Bagger steht im Ursprung. Lag eine Mulde außerhalb, war sie im
-    // Spiel schlicht nicht bedienbar.
-    for (const [name, x, z] of [
-      ["VA", SORTIER_X, SORTIERMULDEN_Z[0]],
-      ["Alu", SORTIER_X, SORTIERMULDEN_Z[1]],
-      ["Kupfer", SORTIER_X, SORTIERMULDEN_Z[2]],
-      ["Kabel", SORTIER_X, SORTIERMULDEN_Z[3]],
-    ] as Array<[string, number, number]>) {
-      expect(Math.hypot(x, z), `${name} muss in Reichweite liegen`).toBeLessThan(REICHWEITE_M);
+    // Reine Entfernungsprobe. Wie hoch der Arm dabei kommt, prueft
+    // test/reach.test.ts — das ist die schaerfere Bedingung.
+    for (const c of SORTIERMULDEN) {
+      expect(
+        Math.hypot(c.x - BAGGER_X, c.z - BAGGER_Z),
+        `${c.label} muss in Reichweite liegen`
+      ).toBeLessThan(REICHWEITE_M);
     }
   });
 
@@ -178,14 +223,14 @@ describe("Reichweite des Baggers", () => {
     expect(Math.hypot(-8.5 + 2.5, -9.8 + 3.0)).toBeLessThan(REICHWEITE_M);
   });
 
-  it("erreicht auch die drei Nichtmetall-Mulden dahinter", () => {
-    for (const z of NICHTMETALL_Z) {
-      expect(Math.hypot(NICHTMETALL_X, z), `Mulde bei z ${z}`).toBeLessThan(REICHWEITE_M);
+  it("die Nichtmetall-Mulden stehen hinter Bagger und Presse", () => {
+    // Sie beschickt der Radlader, nicht der Bagger — Reichweite ist hier keine
+    // Bedingung. Sie duerfen aber nicht in der Presskammer stehen (z -9 bis -5).
+    for (const c of NICHTMETALLE) {
+      expect(c.z, `${c.label} steht nicht hinter der Presse`).toBeLessThan(-9.5);
     }
   });
-});
 
-describe("Greifergeometrie", () => {
   it("schließt mittig, ohne dass die Spitzen sich überlappen", () => {
     const p = clawPoint(0, 0, CLAW_SEGMENTS, new THREE.Vector3());
     // Radius nahe null heißt: die Spitzen treffen sich in der Mitte
