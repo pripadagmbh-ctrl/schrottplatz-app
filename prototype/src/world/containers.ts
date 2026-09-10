@@ -80,10 +80,15 @@ export const CONFIGS: ContainerConfig[] = [
   { id: "c_rubble", fractionId: "rubble", label: "BAUMISCH", kind: "bay", x: 10.3, z: 2.9,
     size: [3.0, 3.5, 2.5], facing: "east", shareWest: true },
   // Ballenlager direkt neben der Schere: Was gepresst aus der Kammer kommt,
-  // wandert hierher und wartet auf den Abholer. Offen nach Osten, damit der
-  // Bagger von seinem Standplatz aus hineinlangt (Wunsch 02.09.2026).
-  { id: "c_bales", fractionId: "steel", label: "BALLEN", kind: "bay", x: -2.6, z: -7.0,
-    size: [3.2, 4.2, 2.5], facing: "east" },
+  // wandert hierher und wartet auf den Abholer.
+  //
+  // Offene Flaeche statt Betonlego-Mulde (Wunsch 10.09.2026): Die Wanne sah aus
+  // wie ein Versehen — eine leere Mulde neben der Presse, in der ohne Zutun
+  // Pakete auftauchen. Die Zone bleibt, sie zaehlt und verkauft weiterhin; nur
+  // die Waende sind weg. Ein Ballenlager ist ohnehin ein markierter Platz, kein
+  // Behaelter: Man stellt Pakete ab, man schuettet sie nicht ein.
+  { id: "c_bales", fractionId: "steel", label: "BALLEN", kind: "pile", x: -2.6, z: -7.0,
+    size: [3.2, 4.2, 0] },
   // Nichtmetalle südlich, im Bogen um den Bagger gelegt, damit alle drei in
   // Reichweite bleiben. Öffnung nach Norden zur Maschine.
 ];
