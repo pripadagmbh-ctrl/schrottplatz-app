@@ -14,6 +14,7 @@ import {
   CLAW_SEG_LEN,
   clawPoint,
   naechsteSpreizung,
+  NACHDRUECK_RESERVE,
   clawTipDepth,
 } from "./clawGeometry";
 
@@ -1224,8 +1225,12 @@ export class Excavator {
    * ist, bleibt stehen, der Rest geht weiter zu.
    */
   private clawSplayIst: number[] = new Array(CLAW_COUNT).fill(CLAW_OPEN_SPLAY);
+  /** Verbleibendes Nachdruecken je Kralle, damit sie nicht schlagartig steht */
+  private clawReserve: number[] = new Array(CLAW_COUNT).fill(NACHDRUECK_RESERVE);
   private blockTmp = new THREE.Vector3();
-  private blockShape = new RAPIER.Ball(0.14);
+  // Feine Tastkugel: Mit 0,14 blieb der Zahn sichtbar auf Abstand stehen,
+  // als griffe er ins Leere. Er soll bis fast an das Teil heran.
+  private blockShape = new RAPIER.Ball(0.08);
   private static readonly IDENT = { x: 0, y: 0, z: 0, w: 1 };
   /**
    * Wie schnell eine freie Kralle ihrem Sollwinkel folgt. Bewusst hoch: Eine
@@ -1242,6 +1247,13 @@ export class Excavator {
    * Auf ebenem Boden schliesst ein Greifer sehr wohl, die Spitzen schleifen
    * dann ueber die Platte.
    */
+  /**
+   * Gibt dieser Koerper unter den Zaehnen nach? Von aussen gesetzt, weil der
+   * Bagger den Schrottkatalog nicht kennt. Ohne Zuordnung blockiert alles
+   * Bewegliche — die vorsichtige Annahme.
+   */
+  clawBlockedBy: ((body: RAPIER.RigidBody) => boolean) | null = null;
+
   private clawBlocked(a: number, splay: number): boolean {
     clawPoint(a, splay, CLAW_SEGMENTS, this.blockTmp);
     this.grappleGroup.localToWorld(this.blockTmp);
@@ -1258,7 +1270,11 @@ export class Excavator {
           const b = c.parent();
           if (!b) return false;
           if (this.selfHandles.has(b.handle)) return false;
-          return b.isDynamic();
+          if (!b.isDynamic()) return false;
+          // Ein Greifer bleibt an Blech nicht stehen — er quetscht es platt
+          // oder schiebt es beiseite. Stehen bleibt er an massivem Stahl:
+          // Traeger, dicke Platten, ein Motorblock.
+          return this.clawBlockedBy ? this.clawBlockedBy(b) : true;
         }
       ) !== null
     );
@@ -1275,17 +1291,22 @@ export class Excavator {
     for (let c = 0; c < CLAW_COUNT; c++) {
       const ist = this.clawSplayIst[c]!;
       if (ziel >= ist) {
-        this.clawSplayIst[c] = naechsteSpreizung(ist, ziel, schritt, false);
+        const auf = naechsteSpreizung(ist, ziel, schritt, false, this.clawReserve[c]!);
+        this.clawSplayIst[c] = auf.winkel;
+        this.clawReserve[c] = auf.reserve;
         continue;
       }
       const naechste = Math.max(ziel, ist - schritt);
       const a = (c / CLAW_COUNT) * Math.PI * 2;
-      this.clawSplayIst[c] = naechsteSpreizung(
+      const zu = naechsteSpreizung(
         ist,
         ziel,
         schritt,
-        this.clawBlocked(a, naechste)
+        this.clawBlocked(a, naechste),
+        this.clawReserve[c]!
       );
+      this.clawSplayIst[c] = zu.winkel;
+      this.clawReserve[c] = zu.reserve;
     }
   }
 
@@ -1335,8 +1356,13 @@ export class Excavator {
         undefined,
         (c) => {
           const b = c.parent();
-          if (!b) return true;
-          return !this.selfHandles.has(b.handle) && !this.grippedHandles.has(b.handle);
+          if (!b) return false;
+          if (this.selfHandles.has(b.handle)) return false;
+          // NUR tragender Grund: Beton, Waende, Muldenboeden, Ladeflaechen.
+          // Loser Schrott zaehlt ausdruecklich nicht — sonst setzt die Spinne
+          // auf dem Haufen auf, statt hineinzugreifen, und man bekommt gar
+          // nichts mehr zu fassen. Genau das ist beim ersten Wurf passiert.
+          return !b.isDynamic();
         }
       );
       if (treffer) {

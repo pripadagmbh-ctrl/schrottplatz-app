@@ -71,26 +71,48 @@ export function clawTipDepth(splay: number): number {
 }
 
 /**
- * Nächster Spreizwinkel einer einzelnen Kralle.
+ * Wieviel Winkel eine Kralle gegen Widerstand noch nachdrücken darf (rad).
+ * Ein Greifer bleibt nicht schlagartig stehen, wenn er auf Stahl trifft — die
+ * Hydraulik drückt weiter, bis der Druck steht. Sichtbar wird das als kurzes
+ * Nachsetzen, nicht als abrupter Stopp.
+ */
+export const NACHDRUECK_RESERVE = 0.12;
+/** Wie langsam das Nachdrücken gegenüber freier Bewegung läuft. */
+const NACHDRUECK_TEMPO = 0.25;
+
+/**
+ * Nächster Spreizwinkel einer einzelnen Kralle. Kleinerer Winkel = weiter zu.
  *
- * Die Regel steckte vorher im Bagger und war damit nicht prüfbar. Sie ist der
- * Kern des ungleichmäßigen Schließens: Öffnen geht immer — sonst bliebe eine
- * Kralle für immer stecken, sobald sie einmal aufsitzt. Schließen nur, solange
- * nichts im Weg ist; blockiert bleibt sie stehen, wo sie ist, und die anderen
- * gehen weiter zu.
+ * Die Regel ist der Kern des ungleichmäßigen Schließens: Öffnen geht immer —
+ * sonst bliebe eine Kralle für immer stecken, sobald sie einmal aufsitzt.
+ * Schließen läuft frei, solange nichts im Weg ist. Trifft die Kralle auf etwas,
+ * das nicht nachgibt, drückt sie noch ein Stück nach und steht dann.
+ *
+ * Was nachgibt — Blech, Kabel, Fässer — gilt gar nicht erst als blockierend;
+ * das entscheidet der Aufrufer. Ein Greifer quetscht solche Teile platt oder
+ * schiebt sie beiseite, statt an ihnen hängen zu bleiben.
  *
  * @param ist       aktueller Winkel dieser Kralle
  * @param ziel      Winkel, den der Fahrer kommandiert
  * @param schritt   was in diesem Bild höchstens zurückgelegt wird (rad)
- * @param blockiert ob bei `ist - schritt` etwas im Weg wäre
+ * @param blockiert ob bei `ist - schritt` etwas Massives im Weg wäre
+ * @param reserve   verbleibendes Nachdrücken dieser Kralle
  */
 export function naechsteSpreizung(
   ist: number,
   ziel: number,
   schritt: number,
-  blockiert: boolean
-): number {
-  if (ziel >= ist) return Math.min(ziel, ist + schritt); // öffnen
-  if (blockiert) return ist;
-  return Math.max(ziel, ist - schritt);
+  blockiert: boolean,
+  reserve: number = NACHDRUECK_RESERVE
+): { winkel: number; reserve: number } {
+  // Öffnen: immer erlaubt, und der Druck ist damit weg
+  if (ziel >= ist) {
+    return { winkel: Math.min(ziel, ist + schritt), reserve: NACHDRUECK_RESERVE };
+  }
+  if (!blockiert) {
+    return { winkel: Math.max(ziel, ist - schritt), reserve: NACHDRUECK_RESERVE };
+  }
+  if (reserve <= 0) return { winkel: ist, reserve: 0 };
+  const drueck = Math.min(schritt * NACHDRUECK_TEMPO, reserve, ist - ziel);
+  return { winkel: ist - drueck, reserve: reserve - drueck };
 }

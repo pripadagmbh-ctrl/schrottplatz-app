@@ -15,6 +15,7 @@ import {
   clawSpan,
   clawTipDepth,
   naechsteSpreizung,
+  NACHDRUECK_RESERVE,
 } from "../src/excavator/clawGeometry";
 import {
   ROUTE_IN_FWD,
@@ -225,47 +226,74 @@ describe("Greifergeometrie", () => {
  * Ungleichmäßiges Schließen der Spinne (Wunsch 10.09.2026).
  *
  * Steckt eine Stange zwischen zwei Zähnen, sollen genau die beiden stehen
- * bleiben und die anderen drei weiter zugehen. Die Regel dafür ist
- * `naechsteSpreizung`; kleinerer Winkel heißt weiter geschlossen.
+ * bleiben und die anderen drei weiter zugehen. Ein Greifer bleibt dabei nicht
+ * schlagartig stehen — er drückt noch ein Stück nach, bis der Druck steht.
+ * Kleinerer Winkel heißt weiter geschlossen.
  */
 describe("Krallen schließen einzeln", () => {
   const SCHRITT = 0.1;
+  const R = NACHDRUECK_RESERVE;
 
   it("eine freie Kralle geht weiter zu", () => {
-    expect(naechsteSpreizung(1.0, 0.4, SCHRITT, false)).toBeCloseTo(0.9, 6);
-  });
-
-  it("eine blockierte Kralle bleibt genau stehen", () => {
-    expect(naechsteSpreizung(1.0, 0.4, SCHRITT, true)).toBe(1.0);
-  });
-
-  it("blockiert heißt nicht offen: sie faellt nicht zurueck", () => {
-    const ist = 0.62;
-    expect(naechsteSpreizung(ist, 0.4, SCHRITT, true)).toBe(ist);
+    expect(naechsteSpreizung(1.0, 0.4, SCHRITT, false, R).winkel).toBeCloseTo(0.9, 6);
   });
 
   it("oeffnen geht auch dann, wenn etwas im Weg ist", () => {
     // Sonst bliebe eine Kralle fuer immer stecken, sobald sie einmal aufsitzt
-    expect(naechsteSpreizung(0.5, 1.25, SCHRITT, true)).toBeCloseTo(0.6, 6);
+    expect(naechsteSpreizung(0.5, 1.25, SCHRITT, true, 0).winkel).toBeCloseTo(0.6, 6);
   });
 
   it("das Ziel wird nicht ueberschossen", () => {
-    expect(naechsteSpreizung(0.45, 0.4, SCHRITT, false)).toBeCloseTo(0.4, 6);
-    expect(naechsteSpreizung(1.2, 1.25, SCHRITT, false)).toBeCloseTo(1.25, 6);
+    expect(naechsteSpreizung(0.45, 0.4, SCHRITT, false, R).winkel).toBeCloseTo(0.4, 6);
+    expect(naechsteSpreizung(1.2, 1.25, SCHRITT, false, R).winkel).toBeCloseTo(1.25, 6);
+  });
+
+  it("blockiert wird nachgedrueckt, langsam und begrenzt", () => {
+    // Erstes Bild: die Kralle steht nicht, sie setzt nach
+    const a = naechsteSpreizung(1.0, 0.4, SCHRITT, true, R);
+    expect(a.winkel, "die Kralle bleibt schlagartig stehen").toBeLessThan(1.0);
+    expect(1.0 - a.winkel, "sie drueckt so schnell nach wie sonst").toBeLessThan(SCHRITT);
+    expect(a.reserve).toBeLessThan(R);
+  });
+
+  it("das Nachdruecken ist irgendwann zu Ende", () => {
+    let winkel = 1.0;
+    let reserve = R;
+    for (let i = 0; i < 200; i++) {
+      const r = naechsteSpreizung(winkel, 0.4, SCHRITT, true, reserve);
+      winkel = r.winkel;
+      reserve = r.reserve;
+    }
+    expect(reserve).toBe(0);
+    // Nachgedrueckt hat sie genau ihre Reserve, nicht mehr
+    expect(1.0 - winkel).toBeCloseTo(R, 6);
+    // ... und ist damit weit vom kommandierten Winkel entfernt geblieben
+    expect(winkel).toBeGreaterThan(0.8);
+  });
+
+  it("wer loslaesst, bekommt seine Reserve zurueck", () => {
+    const zu = naechsteSpreizung(1.0, 0.4, SCHRITT, true, 0.01);
+    expect(zu.reserve).toBeLessThanOrEqual(0.01);
+    const auf = naechsteSpreizung(zu.winkel, 1.25, SCHRITT, true, zu.reserve);
+    expect(auf.reserve, "sonst drueckt sie beim naechsten Griff nicht mehr nach").toBe(R);
   });
 
   it("die Stange zwischen zwei Zaehnen: drei gehen zu, zwei bleiben", () => {
-    // Fuenf Krallen, zwei davon blockiert — nach zehn Bildern muessen sich die
-    // Winkel deutlich unterscheiden, sonst schliesst die Spinne wieder synchron
     const blockiert = [false, true, true, false, false];
     let winkel = [1.25, 1.25, 1.25, 1.25, 1.25];
-    for (let i = 0; i < 10; i++) {
-      winkel = winkel.map((w, k) => naechsteSpreizung(w, 0.3, SCHRITT, blockiert[k]!));
+    let reserve = [R, R, R, R, R];
+    for (let i = 0; i < 60; i++) {
+      const neu = winkel.map((w, k) =>
+        naechsteSpreizung(w, 0.3, SCHRITT, blockiert[k]!, reserve[k]!)
+      );
+      winkel = neu.map((n) => n.winkel);
+      reserve = neu.map((n) => n.reserve);
     }
     expect(winkel[0]).toBeCloseTo(0.3, 6);
     expect(winkel[3]).toBeCloseTo(0.3, 6);
-    expect(winkel[1]).toBe(1.25);
-    expect(winkel[2]).toBe(1.25);
+    // Die blockierten haben nachgedrueckt, aber nur um ihre Reserve
+    expect(winkel[1]).toBeCloseTo(1.25 - R, 6);
+    expect(winkel[2]).toBeCloseTo(1.25 - R, 6);
     const spanne = Math.max(...winkel) - Math.min(...winkel);
     expect(spanne, "die Spinne geht wieder gleichmaessig zu").toBeGreaterThan(0.5);
   });

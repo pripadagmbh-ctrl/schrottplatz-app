@@ -383,6 +383,15 @@ async function main(): Promise<void> {
   // Achsbewegung. Wer die Spinne am Motor verdreht, bekommt ihn schneller los.
   grip.getViolence = () => excavator.tearViolence;
   grip.insideGrapple = (pos) => excavator.isInsideGrapple(pos);
+  // Woran die Zaehne stehen bleiben. Was sich quetschen laesst — Blech, Kabel,
+  // Faesser, Buntmetall, Draht — gibt nach: Der Greifer drueckt es platt oder
+  // schiebt es beiseite, genau wie in Wirklichkeit. Stehen bleibt er an
+  // massivem Stahl und an allem, was kein Schrottteil ist (Wracks).
+  excavator.clawBlockedBy = (body) => {
+    const it = items.itemByBody(body);
+    if (!it) return true; // Karosse, Presspaket, Unbekanntes: haelt
+    return !items.isCrushable(it);
+  };
   excavator.getStaffPos = () => staff.lambertPosition();
   staff.getBlockingItem = () => {
     const b = lanes.nearest(staff.lambertPosition());
