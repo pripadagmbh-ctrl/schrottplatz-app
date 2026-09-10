@@ -64,23 +64,27 @@ export const CONFIGS: ContainerConfig[] = [
   // zentriert: So liegen alle vier zwischen 7,2 und 8,9 m, also im Fenster.
   // Weiter östlich ginge nicht — die äußeren Mulden kämen über 9,5 m und wären
   // wieder unerreichbar.
+  //
+  // Wandhöhe 3,0 m (sechs Lagen, Wunsch 10.09.2026), die Rückwand zwei Lagen
+  // darüber. Der Arm kommt über der Muldenmitte auf gut 5 m — Luft genug.
+  // Höhere Wände halten mehr Material in der Mulde, statt es davor zu haben.
   // Nach Norden gerückt: die westliche Öffnung darf nicht von der Presse
   // versperrt werden
-  { id: "c_va", fractionId: "va", label: "EDELSTAHL VA", kind: "bay", x: 7.0, z: -6.55, size: [3.0, 3.3, 2.5] },
-  { id: "c_alu", fractionId: "alu", label: "ALU", kind: "bay", x: 7.0, z: -2.85, size: [3.0, 3.3, 2.5] },
-  { id: "c_copper", fractionId: "copper", label: "KUPFER/MS", kind: "bay", x: 7.0, z: 0.85, size: [3.0, 3.3, 2.5] },
-  { id: "c_cable", fractionId: "cable", label: "KABEL", kind: "bay", x: 7.0, z: 4.55, size: [3.0, 3.3, 2.5] },
+  { id: "c_va", fractionId: "va", label: "EDELSTAHL VA", kind: "bay", x: 7.0, z: -6.55, size: [3.0, 3.3, 3.0] },
+  { id: "c_alu", fractionId: "alu", label: "ALU", kind: "bay", x: 7.0, z: -2.85, size: [3.0, 3.3, 3.0] },
+  { id: "c_copper", fractionId: "copper", label: "KUPFER/MS", kind: "bay", x: 7.0, z: 0.85, size: [3.0, 3.3, 3.0] },
+  { id: "c_cable", fractionId: "cable", label: "KABEL", kind: "bay", x: 7.0, z: 4.55, size: [3.0, 3.3, 3.0] },
   // Nichtmetalle schliessen die Sortierreihe nach Sueden ab (Wunsch
   // 10.09.2026). Sie standen erst hinter der Sortierreihe, dann hinter der
   // Presse — beides sah nach Ausweichquartier aus. In einer Flucht mit den
   // Buntmetallen ergibt sich eine durchgehende Muldenzeile, und der Radlader
   // faehrt sie in einem Zug ab. Gleiche Masse und Oeffnung wie die anderen.
   { id: "c_wood", fractionId: "wood", label: "HOLZ", kind: "bay", x: 7.0, z: -10.25,
-    size: [3.0, 3.3, 2.5] },
+    size: [3.0, 3.3, 3.0] },
   { id: "c_tires", fractionId: "tires", label: "REIFEN", kind: "bay", x: 7.0, z: -13.95,
-    size: [3.0, 3.3, 2.5] },
+    size: [3.0, 3.3, 3.0] },
   { id: "c_rubble", fractionId: "rubble", label: "BAUMISCH", kind: "bay", x: 7.0, z: -17.65,
-    size: [3.0, 3.3, 2.5] },
+    size: [3.0, 3.3, 3.0] },
   // Ballenlager direkt neben der Schere: Was gepresst aus der Kammer kommt,
   // wandert hierher und wartet auf den Abholer.
   //

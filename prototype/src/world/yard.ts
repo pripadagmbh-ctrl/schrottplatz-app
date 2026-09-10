@@ -444,24 +444,48 @@ export class Yard {
     }
     c.globalAlpha = 1;
 
-    // Schriftzug in Vereinsfarben: schwarz-weiß, leicht schräg gesprüht
+    // Ortsbezug statt Vereinsmarke (Wunsch 10.09.2026): Der Platz liegt am
+    // Niederrhein, und was auf so einer Wand steht, sind Ortsnamen und
+    // Wahrzeichen — nicht das Wappen eines Vereins. Vereinsnamen und -zeichen
+    // sind geschuetzt; Stadt- und Stadtteilnamen sind es nicht.
+    //
+    // Silhouette des Abteibergs: zwei ungleiche Tuerme, wie man sie von der
+    // Stadt aus sieht. Grob gesprueht, nicht gezeichnet.
     c.save();
-    c.translate(cv.width / 2, 168);
+    c.translate(180, 250);
+    c.fillStyle = "#101014";
+    const turm = (x: number, breite: number, hoehe: number, spitze: number): void => {
+      c.fillRect(x, -hoehe, breite, hoehe);
+      c.beginPath();
+      c.moveTo(x - 4, -hoehe);
+      c.lineTo(x + breite / 2, -hoehe - spitze);
+      c.lineTo(x + breite + 4, -hoehe);
+      c.closePath();
+      c.fill();
+    };
+    turm(0, 26, 96, 34);
+    turm(34, 22, 74, 26);
+    c.fillRect(-10, -52, 78, 52); // Kirchenschiff darunter
+    c.restore();
+
+    // Schriftzug, leicht schräg gesprüht
+    c.save();
+    c.translate(cv.width / 2 + 70, 150);
     c.rotate(-0.055);
     c.textAlign = "center";
     c.textBaseline = "middle";
-    c.font = "italic 900 168px Impact, 'Arial Black', sans-serif";
+    c.font = "italic 900 150px Impact, 'Arial Black', sans-serif";
     // Versatzschatten wie beim Nachziehen mit der zweiten Dose
     c.fillStyle = "#101014";
-    c.fillText("FC AARAU", 10, 12);
+    c.fillText("GLADBACH", 10, 12);
     c.fillStyle = "#f2f2ee";
-    c.fillText("FC AARAU", 0, 0);
+    c.fillText("GLADBACH", 0, 0);
     c.lineWidth = 7;
     c.strokeStyle = "#101014";
-    c.strokeText("FC AARAU", 0, 0);
-    c.font = "italic 900 74px Impact, 'Arial Black', sans-serif";
+    c.strokeText("GLADBACH", 0, 0);
+    c.font = "italic 900 62px Impact, 'Arial Black', sans-serif";
     c.fillStyle = "#101014";
-    c.fillText("1902", 0, 118);
+    c.fillText("ABTEIBERG · RHEYDT", 0, 104);
     c.restore();
 
     // Laufende Farbnasen
