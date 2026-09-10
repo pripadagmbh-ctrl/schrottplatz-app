@@ -105,21 +105,24 @@ export const STATIC_OBSTACLES: Obstacle[] = [
   { x: -8.5, z: -7.0, hw: 5.4, hd: 2.4, top: 2.2, label: "Schere" },
 
 
-  // --- Gebäude ---
-  // Sie stehen nicht hier, sondern in BUILDING_START: Das Betriebsgebäude
-  // wächst im Spiel, und dann gilt sein größerer Grundriss.
+  // --- Betriebsgebäude: Büro und Halle, hinten rechts an der Wand ---
+  // Der Grundriss kommt aus office.ts, damit Bau, Kollider und Hindernis
+  // nicht auseinanderlaufen.
+  ...officeFootprints().map(([x, z, hw, hd]) => ({
+    x,
+    z,
+    hw,
+    hd,
+    top: 5.4,
+    label: "Betriebsgebäude",
+  })),
 ];
 
-/** Grundriss des Betriebsgebäudes, solange nur der Container steht. */
-export const BUILDING_START: Obstacle[] = officeFootprints("container").map(
-  ([x, z, hw, hd]) => ({ x, z, hw, hd, top: 3.2, label: "Bürocontainer" })
-);
-
 /**
- * Bauwerke, die sich im Laufe des Spiels ändern: Aus dem Bürocontainer wird
- * ein Büro, später mit Halle daneben. Zu Beginn gilt der Container.
+ * Bauwerke, die im Spiel dazukommen können. Zurzeit keine — die Ausbaustufen
+ * verändern nur noch die Einrichtung, nicht den Bau (Stand 10.09.2026).
  */
-let dynamicObstacles: Obstacle[] = BUILDING_START;
+let dynamicObstacles: Obstacle[] = [];
 
 /** Gebäude-Hindernisse austauschen (Ausbaustufe geändert). */
 export function setBuildingObstacles(list: Obstacle[]): void {

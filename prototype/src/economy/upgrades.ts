@@ -37,18 +37,18 @@ export interface Upgrade {
  * damit sinnvoll voran.
  */
 export const UPGRADES: Upgrade[] = [
-  // --- Gebäude: aus dem Bürocontainer wird ein Betrieb ---
+  // --- Gebäude: der Bau steht, gekauft wird die Einrichtung ---
   {
     id: "office",
-    name: "Büro",
+    name: "Büro einrichten",
     effect: "Marktkenntnis: mehr Verhandlungsspielraum und die Zusammensetzung gemischter Ladungen schon an der Waage",
     priceEur: 9000,
     requiresTurnoverKg: 15000,
   },
   {
     id: "hall",
-    name: "Halle am Büro",
-    effect: "Unterstellplatz für Maschinen — erst damit lohnen sich Bulldozer, Stapler und Magnet",
+    name: "Halle einrichten",
+    effect: "Werkstatt und Unterstellplatz — erst damit lohnen sich Bulldozer, Stapler und Magnet",
     priceEur: 28000,
     requiresTurnoverKg: 50000,
     requires: "office",

@@ -128,8 +128,14 @@ describe("Jede Ausbaustufe wirkt, und zwar eigenständig", () => {
     // aufgerufen — ist am 03.09.2026 durchgerutscht.
     const quelltext = leseQuellen(resolve(__dirname, "../src")).join("\n");
     for (const u of UPGRADES) {
+      // Ein Ausbau wirkt entweder direkt im Code — oder er schaltet einen
+      // anderen frei. Beides ist eine Wirkung; nur wer gar nichts tut, faellt
+      // hier durch.
+      const schaltetFrei = UPGRADES.some((a) => a.requires === u.id);
       const treffer =
-        quelltext.includes(`has("${u.id}")`) || quelltext.includes(`id === "${u.id}"`);
+        quelltext.includes(`has("${u.id}")`) ||
+        quelltext.includes(`id === "${u.id}"`) ||
+        schaltetFrei;
       expect(treffer, `Ausbau „${u.name}" (${u.id}) wird nirgends abgefragt`).toBe(true);
     }
   });

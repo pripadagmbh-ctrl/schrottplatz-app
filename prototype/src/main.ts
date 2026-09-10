@@ -26,7 +26,7 @@ import { UPGRADES, UpgradeState, type UpgradeId } from "./economy/upgrades";
 import { haggle, leavesOnRefusal, hint, OFFER_FACTOR, OFFER_LABEL, type Offer } from "./economy/haggle";
 import { LaneWatch } from "./delivery/laneWatch";
 import { Daylight, Floodlights } from "./world/daylight";
-import { hitsObstacle, setBuildingObstacles } from "./world/obstacles";
+import { hitsObstacle } from "./world/obstacles";
 import { OfficeBuilding, KAFFEE_POS } from "./world/office";
 import { Signage } from "./world/signage";
 import {
@@ -477,30 +477,15 @@ async function main(): Promise<void> {
   // --- Platz ausbauen: verdientes Geld bekommt eine Verwendung ---
   const ausbau = new UpgradeState();
   ausbau.load(save?.upgrades);
-  // Das Betriebsgebäude wächst mit: Container → Büro → Büro mit Halle
-  const buero = new OfficeBuilding(scene, physics.world);
-  /**
-   * Grundriss des Betriebsgebäudes an die Hindernisprüfung melden. Solange
-   * nur der Container steht, gilt dessen kleiner Kasten; danach der größere
-   * Grundriss von Büro und Halle.
-   */
-  const setzeGebaeudeHindernisse = (
-    fp: Array<[number, number, number, number]>
-  ): void => {
-    setBuildingObstacles(
-      fp.map(([x, z, hw, hd]) => ({ x, z, hw, hd, top: 5.4, label: "Betriebsgebäude" }))
-    );
-  };
-  setzeGebaeudeHindernisse(buero.footprints());
+  // Betriebsgebäude: Büro und Halle stehen von Anfang an; sein Grundriss
+  // liegt fest in der Hindernisliste (world/obstacles.ts).
+  new OfficeBuilding(scene, physics.world);
   const shopEl = document.getElementById("shop")!;
   /** Wirkung eines gekauften Ausbaus sofort anwenden. */
   const wendeAn = (id: UpgradeId): void => {
     if (id === "loader") staff.setLoader(true);
-    // Aus dem Bürocontainer wird ein Büro, später mit Halle daneben
-    if (id === "office" || id === "hall") {
-      buero.setStage(ausbau.has("hall") ? "hall" : "office");
-      setzeGebaeudeHindernisse(buero.footprints());
-    }
+    // "office" und "hall" richten das vorhandene Gebäude ein — sie wirken
+    // über Abfragen (Marktkenntnis, Maschinenkauf), nicht über die Kulisse
     if (id === "magnet") account.hasMagnet = true;
     // dozer, forklift, boom und press wirken über Abfragen an anderer
     // Stelle — hier ist nichts einzuschalten

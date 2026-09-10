@@ -9,22 +9,18 @@ import RAPIER from "@dimforge/rapier3d-compat";
  * Platz. Jetzt sitzt alles Gebaute in der hinteren rechten Ecke an der Wand
  * beisammen — der Rest der Fläche gehört dem Schrott.
  *
- * Es wächst in drei Stufen mit dem Betrieb mit:
+ * Zwei Bauteile: der Flachbau mit dem Büro — Schreibtisch, Marktnotierungen
+ * an der Wand, Fensterband zum Platz — und die offene Halle daneben, in der
+ * die Maschinen stehen.
  *
- *   CONTAINER      Ein Bürocontainer auf Kanthölzern. Mehr ist am Anfang
- *                  nicht drin.
- *   BÜRO           Ein Flachbau: Schreibtisch, Marktnotierungen an der Wand,
- *                  Fensterband zum Platz. Wer hier arbeitet, kennt die Preise
- *                  und sieht einer gemischten Ladung an, was drinsteckt.
- *   BÜRO MIT HALLE Daneben eine offene Halle mit Tor. Dort stehen die
- *                  Maschinen — erst damit lohnt sich der Kauf von Bulldozer,
- *                  Stapler und Magnet.
+ * Sie stehen von Anfang an da (Befund 10.09.2026: "ich seh kein Büro"). Erst
+ * waren sie an Ausbaustufen gehängt und blieben unsichtbar; ein Betriebshof
+ * hat aber ein Gebäude, auch wenn drin noch nicht viel passiert. Was man
+ * kauft, ist die Einrichtung, nicht der Rohbau.
  *
- * Alle Stufen öffnen sich nach Norden, also zum Platz hin: Von der Kabine aus
- * sieht man Fenster und Hallentor, nicht die Rückwand.
+ * Beide öffnen sich nach Norden, also zum Platz hin: Von der Kabine aus sieht
+ * man Fenster und Hallentor, nicht die Rückwand.
  */
-
-export type OfficeStage = "container" | "office" | "hall";
 
 /** Mitte des Betriebsgebäudes — hintere rechte Ecke, an der Wand. */
 export const OFFICE_X = 6.2;
@@ -36,10 +32,6 @@ export const KAFFEE_POS = new THREE.Vector3(OFFICE_X - 2.6, 0, OFFICE_Z + 3.4);
 const B = 7.2;
 const T = 4.4;
 const H = 2.9;
-/** Container: Breite, Tiefe, Höhe */
-const CB = 6.0;
-const CT = 2.8;
-const CH = 2.7;
 /** Halle: Breite, Tiefe, Höhe */
 const HB = 9.0;
 const HT = 7.0;
@@ -56,23 +48,16 @@ const HALLE_DZ = -(HT - T) / 2;
  * Steht hier als freie Funktion, damit obstacles.ts denselben Grundriss
  * benutzen kann, ohne eine Szene bauen zu müssen.
  */
-export function officeFootprints(stage: OfficeStage): Array<[number, number, number, number]> {
-  const f: Array<[number, number, number, number]> = [];
-  if (stage === "container") f.push([OFFICE_X, OFFICE_Z, CB / 2 + 0.15, CT / 2 + 0.15]);
-  else f.push([OFFICE_X, OFFICE_Z, B / 2 + 0.25, T / 2 + 0.25]);
-  if (stage === "hall") {
-    f.push([OFFICE_X + HALLE_DX, OFFICE_Z + HALLE_DZ, HB / 2 + 0.1, HT / 2 + 0.1]);
-  }
-  return f;
+export function officeFootprints(): Array<[number, number, number, number]> {
+  return [
+    [OFFICE_X, OFFICE_Z, B / 2 + 0.25, T / 2 + 0.25],
+    [OFFICE_X + HALLE_DX, OFFICE_Z + HALLE_DZ, HB / 2 + 0.1, HT / 2 + 0.1],
+  ];
 }
 
 export class OfficeBuilding {
-  private containerGroup = new THREE.Group();
   private officeGroup = new THREE.Group();
   private hallGroup = new THREE.Group();
-  private stage: OfficeStage = "container";
-
-  private klotz: RAPIER.Collider[] = [];
 
   constructor(
     scene: THREE.Scene,
@@ -93,42 +78,7 @@ export class OfficeBuilding {
       opacity: 0.32,
     });
 
-    // --- Stufe 1: Bürocontainer auf Kanthölzern ---
-    const conMat = new THREE.MeshStandardMaterial({ color: 0x9fb4bd, roughness: 0.8, metalness: 0.2 });
-    const korb = new THREE.Mesh(new THREE.BoxGeometry(CB, CH, CT), conMat);
-    korb.position.set(0, CH / 2 + 0.2, 0);
-    korb.castShadow = true;
-    korb.receiveShadow = true;
-    this.containerGroup.add(korb);
-    // Sicken: senkrechte Rippen, daran erkennt man den Container
-    for (let i = -6; i <= 6; i++) {
-      const rippe = new THREE.Mesh(new THREE.BoxGeometry(0.09, CH - 0.3, 0.06), sockel);
-      rippe.position.set(i * 0.42, CH / 2 + 0.2, CT / 2 + 0.02);
-      this.containerGroup.add(rippe);
-      const hinten = rippe.clone();
-      hinten.position.z = -CT / 2 - 0.02;
-      this.containerGroup.add(hinten);
-    }
-    // Kanthölzer unter den Ecken
-    for (const kx of [-CB / 2 + 0.5, CB / 2 - 0.5]) {
-      const balken = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.2, CT), sockel);
-      balken.position.set(kx, 0.1, 0);
-      this.containerGroup.add(balken);
-    }
-    // Tür und Fenster nach Norden
-    const ctuer = new THREE.Mesh(new THREE.BoxGeometry(0.9, 2.0, 0.08), dach);
-    ctuer.position.set(-CB / 2 + 1.1, 1.2, CT / 2 + 0.05);
-    this.containerGroup.add(ctuer);
-    const cfenster = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.9, 0.06), glas);
-    cfenster.position.set(CB / 2 - 1.6, 1.75, CT / 2 + 0.05);
-    this.containerGroup.add(cfenster);
-    const stufe = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.18, 0.6), sockel);
-    stufe.position.set(-CB / 2 + 1.1, 0.09, CT / 2 + 0.4);
-    this.containerGroup.add(stufe);
-    this.containerGroup.position.set(this.x, 0, this.z);
-    scene.add(this.containerGroup);
-
-    // --- Stufe 2: Flachbau mit Büro ---
+    // --- Flachbau mit Büro ---
     const korpus = new THREE.Mesh(new THREE.BoxGeometry(B, H, T), wand);
     korpus.position.set(0, H / 2, 0);
     korpus.castShadow = true;
@@ -167,10 +117,9 @@ export class OfficeBuilding {
     tafel.position.set(2.4, 1.7, -T / 2 + 0.1);
     this.officeGroup.add(tafel);
     this.officeGroup.position.set(this.x, 0, this.z);
-    this.officeGroup.visible = false;
     scene.add(this.officeGroup);
 
-    // --- Stufe 3: offene Halle, schließt westlich an, Tor nach Norden ---
+    // --- Offene Halle, schließt westlich an, Tor nach Norden ---
     const stahl = new THREE.MeshStandardMaterial({ color: 0x7d858b, roughness: 0.6, metalness: 0.5 });
     const wellblech = new THREE.MeshStandardMaterial({ color: 0x9aa2a8, roughness: 0.75, metalness: 0.3 });
     // Rückwand im Süden, Seitenwände Ost und West, nach Norden offen
@@ -200,53 +149,29 @@ export class OfficeBuilding {
     sturz.position.set(0, HH - 0.3, HT / 2);
     this.hallGroup.add(sturz);
     this.hallGroup.position.set(this.x + HALLE_DX, 0, this.z + HALLE_DZ);
-    this.hallGroup.visible = false;
     scene.add(this.hallGroup);
 
-    /*
-     * Feste Kollider je Ausbaustufe. Nur der sichtbare Bau ist aktiv — sonst
-     * stünde die Halle schon als unsichtbare Wand da, bevor sie gebaut ist.
-     * Reihenfolge: [Container, Büro, Halle] — setStage schaltet danach.
-     */
+    // Feste Kollider: Durch ein Gebäude fährt niemand hindurch.
     if (world) {
       const body = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
-      const quader = (
-        cx: number,
-        cz: number,
-        hw: number,
-        hh: number,
-        hd: number
-      ): RAPIER.Collider =>
+      const quader = (cx: number, cz: number, hw: number, hh: number, hd: number): void => {
         world.createCollider(
           RAPIER.ColliderDesc.cuboid(hw, hh, hd).setTranslation(cx, hh, cz),
           body
         );
-      this.klotz = [
-        quader(this.x, this.z, CB / 2, CH / 2, CT / 2),
-        quader(this.x, this.z, B / 2, H / 2, T / 2),
-        quader(this.x + HALLE_DX, this.z + HALLE_DZ, HB / 2, HH / 2, HT / 2),
-      ];
+      };
+      quader(this.x, this.z, B / 2, H / 2, T / 2);
+      // Die Halle ist offen: nur Rück- und Seitenwände, damit man hineinfahren
+      // kann und nicht gegen eine unsichtbare Front stösst.
+      quader(this.x + HALLE_DX, this.z + HALLE_DZ - HT / 2, HB / 2, HH / 2, 0.12);
+      for (const sx of [-1, 1]) {
+        quader(this.x + HALLE_DX + (sx * HB) / 2, this.z + HALLE_DZ, 0.12, HH / 2, HT / 2);
+      }
     }
-    this.setStage("container");
-  }
-
-  /** Ausbaustufe setzen. Höhere Stufen lösen die niedrigeren ab. */
-  setStage(stage: OfficeStage): void {
-    this.stage = stage;
-    this.containerGroup.visible = stage === "container";
-    this.officeGroup.visible = stage !== "container";
-    this.hallGroup.visible = stage === "hall";
-    this.klotz[0]?.setEnabled(stage === "container");
-    this.klotz[1]?.setEnabled(stage !== "container");
-    this.klotz[2]?.setEnabled(stage === "hall");
-  }
-
-  get current(): OfficeStage {
-    return this.stage;
   }
 
   /** Grundfläche für die Hindernisprüfung: [x, z, halbeBreite, halbeTiefe] */
   footprints(): Array<[number, number, number, number]> {
-    return officeFootprints(this.stage);
+    return officeFootprints();
   }
 }

@@ -4,10 +4,8 @@ import { CONFIGS } from "../src/world/containers";
 import { YARD_MIN_X, YARD_MAX_X, YARD_D } from "../src/world/yard";
 import {
   STATIC_OBSTACLES,
-  BUILDING_START,
   hitsObstacle,
   slideAround,
-  setBuildingObstacles,
 } from "../src/world/obstacles";
 import { OFFICE_X, OFFICE_Z, officeFootprints } from "../src/world/office";
 import {
@@ -75,36 +73,25 @@ describe("Feste Bauten", () => {
     }
   });
 
-  it("stellt den Bürocontainer von Anfang an in den Weg", () => {
-    // Er steht nicht in der festen Liste, weil er beim Ausbau dem Büro
-    // weicht. Geprüft wird deshalb die Wirkung, nicht der Listeneintrag.
-    const treffer = hitsObstacle(OFFICE_X, OFFICE_Z, 0);
-    expect(treffer?.label).toBe("Bürocontainer");
+  it("stellt Büro und Halle von Anfang an in den Weg", () => {
+    // Sie stehen von der ersten Sekunde an da — nicht erst nach einem Kauf.
+    expect(hitsObstacle(OFFICE_X, OFFICE_Z, 0)?.label).toBe("Betriebsgebäude");
+    const [, halle] = officeFootprints();
+    expect(hitsObstacle(halle[0], halle[1], 0)?.label).toBe("Betriebsgebäude");
   });
 
-  it("übernimmt den größeren Grundriss, sobald die Halle steht", () => {
-    // Die Halle steht westlich neben dem Büro — dort ist vorher frei
-    const [, halle] = officeFootprints("hall");
-    expect(hitsObstacle(halle[0], halle[1], 0)).toBeNull();
-    setBuildingObstacles(
-      officeFootprints("hall").map(([x, z, hw, hd]) => ({
-        x,
-        z,
-        hw,
-        hd,
-        top: 5.4,
-        label: "Betriebsgebäude",
-      }))
-    );
-    expect(hitsObstacle(halle[0], halle[1], 0)?.label).toBe("Betriebsgebäude");
-    setBuildingObstacles(BUILDING_START);
-    expect(hitsObstacle(halle[0], halle[1], 0)).toBeNull();
+  it("lässt zwischen Büro und Halle keine Scheinlücke sperren", () => {
+    // Der Streifen dazwischen ist frei begehbar, sonst stünde dort eine
+    // unsichtbare Wand.
+    const [buero, halle] = officeFootprints();
+    const mitte = (buero[0] - buero[2] + (halle[0] + halle[2])) / 2;
+    expect(hitsObstacle(mitte, OFFICE_Z, 0)).toBeNull();
   });
 
   it("hält das Betriebsgebäude in der hinteren rechten Ecke, an der Wand", () => {
     // Der Wunsch war ausdrücklich: alles Gebaute nach hinten rechts, damit
     // der Platz frei bleibt. Sonst wandert es beim nächsten Umbau zurück.
-    for (const [x, z, hw, hd] of officeFootprints("hall")) {
+    for (const [x, z, hw, hd] of officeFootprints()) {
       expect(z + hd, "ragt zu weit auf den Platz").toBeLessThan(-18);
       expect(z - hd, "steht in der Südwand").toBeGreaterThan(-YARD_D / 2 + 0.3);
       expect(x + hw, "steht in der Ostwand").toBeLessThan(YARD_MAX_X - 0.3);
