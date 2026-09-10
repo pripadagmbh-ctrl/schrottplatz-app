@@ -91,8 +91,8 @@ export const TIP_OUT: Array<[number, number]> = [
 
 /**
  * Warteplatz an der Innenseite der Nordwand, westlich der Einfahrt: Nach dem
- * Abladen stellen sich vor allem die Händler dort ab, holen sich bei Janine
- * einen Kaffee und quatschen, bevor sie fahren. Das hält Betrieb auf dem
+ * Abladen stellen sich vor allem die Händler dort ab und quatschen, bevor
+ * sie fahren. Das hält Betrieb auf dem
  * Platz — und macht den Abladeplatz sofort für den Nächsten frei
  * (Wunsch 02.09.2026).
  */

@@ -37,7 +37,7 @@ export interface Upgrade {
  * damit sinnvoll voran.
  */
 export const UPGRADES: Upgrade[] = [
-  // --- Gebäude: aus dem Wiegehäuschen wird ein Betrieb ---
+  // --- Gebäude: aus dem Bürocontainer wird ein Betrieb ---
   {
     id: "office",
     name: "Büro",

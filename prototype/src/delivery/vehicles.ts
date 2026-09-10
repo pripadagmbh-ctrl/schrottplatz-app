@@ -727,7 +727,7 @@ class DeliveryVehicle {
   private advance(route: Array<[number, number]>, step: number, reverse: boolean, dt: number): boolean {
     // Bauten zuerst und ohne Ausnahme: Die Aufgeben-Regel unten ist fuer losen
     // Schrott gedacht, der irgendwann weggeraeumt wird. Auf Mauern, Mulden und
-    // das Wiegehaeuschen darf sie nicht durchschlagen — sonst faehrt der LKW
+    // das Betriebsgebaeude darf sie nicht durchschlagen — sonst faehrt der LKW
     // nach der Wartezeit einfach hindurch, und genau das war zu sehen.
     if (this.isBlockedByBuilding(route, this.routeS + 4, reverse)) {
       this.blockedT += dt;
@@ -779,7 +779,7 @@ class DeliveryVehicle {
         }
         break;
       case "weighIn":
-        // Der Fahrer geht bei Mario ins Wiegehäuschen — das dauert einen
+        // Der Fahrer gibt Mario an der Waage die Papiere — das dauert einen
         // Moment. Danach wird über den Preis geredet, und erst wenn man sich
         // einig ist, fährt er auf den Platz. Solange bleibt er auf der Waage
         // stehen (Design 02.09.2026).

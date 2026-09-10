@@ -2,7 +2,7 @@ import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 
 /** Position der Brückenwaage in der Nordspur (SW) */
-/** Brückenwaage direkt hinter der Einfahrt, neben dem Wiegehäuschen */
+/** Brückenwaage direkt hinter der Einfahrt */
 export const WEIGH_X = -22;
 export const WEIGH_Z = 24;
 /** Platzmaße (SW) — deutlich größer als die Ausgangsfläche */
@@ -423,7 +423,7 @@ export class Yard {
    * In der linken hinteren Ecke (Nordwesten) bleibt eine Lücke als Einfahrt.
    */
   /**
-   * Graffiti auf der Betonwand links neben dem Wiegehäuschen.
+   * Graffiti auf der Betonwand westlich der Einfahrt.
    *
    * Ortsbezug Niederrhein: Abteiberg, Stadtteil Eicken, Kurvenparolen. Bewusst
    * Wahrzeichen und Ortsnamen statt Vereinsmarke — Vereinsnamen, Wappen und
@@ -818,17 +818,73 @@ export class Yard {
     addWall((YARD_MIN_X + gateL) / 2, hz, gateL - YARD_MIN_X, BT);
     addWall((gateR + YARD_MAX_X) / 2, hz, YARD_MAX_X - gateR, BT);
 
-    // Einfahrtstor-Pfosten
-    const post = new THREE.MeshStandardMaterial({ color: 0xd7a71f, roughness: 0.8 });
+    this.buildGate(scene, gateL, gateR, hz);
+  }
+
+  /**
+   * Einfahrtstor aus Stahl (Wunsch 10.09.2026).
+   *
+   * Vorher stand hier ein gelber Torbogen quer über der Einfahrt — der sah
+   * aus wie eine Schranke und hing dem Kranausleger im Weg. Jetzt sind es
+   * zwei Flügel aus Vierkantrohr, die tagsüber offen an der Mauer stehen:
+   * Man sieht, dass der Platz ein Tor hat, und trotzdem ist die Durchfahrt
+   * in voller Höhe frei.
+   */
+  private buildGate(scene: THREE.Scene, gateL: number, gateR: number, hz: number): void {
+    const stahl = new THREE.MeshStandardMaterial({
+      color: 0x5d666d,
+      roughness: 0.45,
+      metalness: 0.75,
+    });
+    const FL = 4.2; // Flügellänge
+    const FH = 2.4; // Flügelhöhe
+    // Angelpfosten links und rechts der Lücke
     for (const px of [gateL, gateR]) {
-      const p = new THREE.Mesh(new THREE.BoxGeometry(0.35, 4.2, 0.35), post);
-      p.position.set(px, 2.1, hz);
-      p.castShadow = true;
-      scene.add(p);
+      const pf = new THREE.Mesh(new THREE.BoxGeometry(0.26, 3.0, 0.26), stahl);
+      pf.position.set(px, 1.5, hz);
+      pf.castShadow = true;
+      scene.add(pf);
+      const kappe = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.08, 0.34), stahl);
+      kappe.position.set(px, 3.04, hz);
+      scene.add(kappe);
     }
-    const beam = new THREE.Mesh(new THREE.BoxGeometry(gateR - gateL, 0.35, 0.35), post);
-    beam.position.set(GATE_X, 4.0, hz);
-    scene.add(beam);
+    // Zwei Flügel, offen an die Mauer geschwenkt
+    for (const [px, dir] of [
+      [gateL, -1],
+      [gateR, 1],
+    ] as const) {
+      const fl = new THREE.Group();
+      fl.position.set(px, 0, hz - 0.5);
+      fl.rotation.y = dir < 0 ? Math.PI : 0;
+      // Rahmen: oben, unten, aussen
+      for (const [y, h] of [
+        [0.35, 0.12],
+        [FH, 0.14],
+      ] as const) {
+        const holm = new THREE.Mesh(new THREE.BoxGeometry(FL, h, 0.1), stahl);
+        holm.position.set(FL / 2, y, 0);
+        holm.castShadow = true;
+        fl.add(holm);
+      }
+      const kante = new THREE.Mesh(new THREE.BoxGeometry(0.12, FH - 0.2, 0.1), stahl);
+      kante.position.set(FL - 0.06, (FH + 0.35) / 2, 0);
+      fl.add(kante);
+      // Senkrechte Fuellstaebe
+      for (let i = 1; i < 14; i++) {
+        const stab = new THREE.Mesh(new THREE.BoxGeometry(0.06, FH - 0.4, 0.06), stahl);
+        stab.position.set((i * FL) / 14, (FH + 0.35) / 2, 0);
+        fl.add(stab);
+      }
+      // Diagonalstrebe — die haelt so ein Tor erst gerade
+      const strebe = new THREE.Mesh(
+        new THREE.BoxGeometry(Math.hypot(FL, FH - 0.5), 0.08, 0.07),
+        stahl
+      );
+      strebe.position.set(FL / 2, (FH + 0.35) / 2, 0.06);
+      strebe.rotation.z = Math.atan2(FH - 0.5, FL);
+      fl.add(strebe);
+      scene.add(fl);
+    }
   }
 
   /** Markierte Annahmefläche 8 × 8 m (Kap. 12) — rein visuell. */

@@ -1,4 +1,5 @@
-import { YARD_W, YARD_D, YARD_MIN_X, YARD_MAX_X, YARD_CX, GATE_X, WEIGH_X, WEIGH_Z } from "./yard";
+import { YARD_W, YARD_D, YARD_MIN_X, YARD_MAX_X, YARD_CX, GATE_X } from "./yard";
+import { officeFootprints } from "./office";
 import { CONFIGS, type ContainerConfig } from "./containers";
 
 /**
@@ -104,23 +105,21 @@ export const STATIC_OBSTACLES: Obstacle[] = [
   { x: -8.5, z: -7.0, hw: 5.4, hd: 2.4, top: 2.2, label: "Schere" },
 
 
-  // --- Gebäude: Kaffeebude abseits ---
-  // Das Wiegehäuschen steht nicht hier, sondern in BUILDING_HUT: Es weicht
-  // beim Ausbau dem Büro, und dann gilt dessen größerer Grundriss.
-  { x: GATE_X - 6, z: WEIGH_Z - 13, hw: 2.6, hd: 1.8, top: 3.2, label: "Kaffeebude" },
+  // --- Gebäude ---
+  // Sie stehen nicht hier, sondern in BUILDING_START: Das Betriebsgebäude
+  // wächst im Spiel, und dann gilt sein größerer Grundriss.
 ];
 
-/** Grundriss des Wiegehäuschens — gilt, solange nicht ausgebaut wurde. */
-export const BUILDING_HUT: Obstacle[] = [
-  { x: WEIGH_X - 4.6, z: WEIGH_Z, hw: 2.4, hd: 1.7, top: 3.2, label: "Wiegehäuschen" },
-];
+/** Grundriss des Betriebsgebäudes, solange nur der Container steht. */
+export const BUILDING_START: Obstacle[] = officeFootprints("container").map(
+  ([x, z, hw, hd]) => ({ x, z, hw, hd, top: 3.2, label: "Bürocontainer" })
+);
 
 /**
- * Bauwerke, die sich im Laufe des Spiels ändern: Aus dem Wiegehäuschen wird
- * ein Büro, später mit Halle daneben. Zu Beginn gilt das Häuschen — so ist
- * die Einfahrt auch ohne Ausbau richtig verstellt.
+ * Bauwerke, die sich im Laufe des Spiels ändern: Aus dem Bürocontainer wird
+ * ein Büro, später mit Halle daneben. Zu Beginn gilt der Container.
  */
-let dynamicObstacles: Obstacle[] = BUILDING_HUT;
+let dynamicObstacles: Obstacle[] = BUILDING_START;
 
 /** Gebäude-Hindernisse austauschen (Ausbaustufe geändert). */
 export function setBuildingObstacles(list: Obstacle[]): void {

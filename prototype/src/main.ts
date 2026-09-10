@@ -26,8 +26,8 @@ import { UPGRADES, UpgradeState, type UpgradeId } from "./economy/upgrades";
 import { haggle, leavesOnRefusal, hint, OFFER_FACTOR, OFFER_LABEL, type Offer } from "./economy/haggle";
 import { LaneWatch } from "./delivery/laneWatch";
 import { Daylight, Floodlights } from "./world/daylight";
-import { hitsObstacle, setBuildingObstacles, BUILDING_HUT } from "./world/obstacles";
-import { OfficeBuilding } from "./world/office";
+import { hitsObstacle, setBuildingObstacles } from "./world/obstacles";
+import { OfficeBuilding, KAFFEE_POS } from "./world/office";
 import { Signage } from "./world/signage";
 import {
   type AxisId,
@@ -39,7 +39,7 @@ import {
 import { Account, PURCHASE_PRICE_PER_KG } from "./economy/account";
 import { getMaterial } from "./materials/catalog";
 import { StaffManager } from "./world/people";
-import { GATE_X, WEIGH_X, WEIGH_Z } from "./world/yard";
+import { WEIGH_X, WEIGH_Z } from "./world/yard";
 import { clearSave, readSave, storeSave, type SaveData } from "./core/save";
 
 const FIXED_DT = 1 / 60;
@@ -155,8 +155,7 @@ async function main(): Promise<void> {
     scene,
     items,
     new THREE.Vector3(WEIGH_X, 0, WEIGH_Z),
-    physics.world,
-    GATE_X
+    KAFFEE_POS
   );
   staff.getExcavatorPos = () => excavator.position;
   const carPos: THREE.Vector3[] = [];
@@ -478,21 +477,18 @@ async function main(): Promise<void> {
   // --- Platz ausbauen: verdientes Geld bekommt eine Verwendung ---
   const ausbau = new UpgradeState();
   ausbau.load(save?.upgrades);
-  // Das Betriebsgebäude wächst mit: Häuschen → Büro → Büro mit Halle
-  const buero = new OfficeBuilding(scene, WEIGH_X - 4.6, WEIGH_Z);
-  buero.setHut(staff.weighHut);
+  // Das Betriebsgebäude wächst mit: Container → Büro → Büro mit Halle
+  const buero = new OfficeBuilding(scene, physics.world);
   /**
    * Grundriss des Betriebsgebäudes an die Hindernisprüfung melden. Solange
-   * nur das Häuschen steht, gilt dessen kleiner Kasten; danach der größere
+   * nur der Container steht, gilt dessen kleiner Kasten; danach der größere
    * Grundriss von Büro und Halle.
    */
   const setzeGebaeudeHindernisse = (
     fp: Array<[number, number, number, number]>
   ): void => {
     setBuildingObstacles(
-      fp.length === 0
-        ? BUILDING_HUT
-        : fp.map(([x, z, hw, hd]) => ({ x, z, hw, hd, top: 4.2, label: "Betriebsgebäude" }))
+      fp.map(([x, z, hw, hd]) => ({ x, z, hw, hd, top: 5.4, label: "Betriebsgebäude" }))
     );
   };
   setzeGebaeudeHindernisse(buero.footprints());
@@ -500,7 +496,7 @@ async function main(): Promise<void> {
   /** Wirkung eines gekauften Ausbaus sofort anwenden. */
   const wendeAn = (id: UpgradeId): void => {
     if (id === "loader") staff.setLoader(true);
-    // Aus dem Wiegehäuschen wird ein Büro, später mit Halle daneben
+    // Aus dem Bürocontainer wird ein Büro, später mit Halle daneben
     if (id === "office" || id === "hall") {
       buero.setStage(ausbau.has("hall") ? "hall" : "office");
       setzeGebaeudeHindernisse(buero.footprints());

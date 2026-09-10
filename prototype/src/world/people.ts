@@ -1,13 +1,12 @@
 import * as THREE from "three";
-import RAPIER from "@dimforge/rapier3d-compat";
 import type { ItemManager } from "./scrapItems";
 import { hitsObstacle, slideAround } from "./obstacles";
 import { WheelLoader, LOADER_SPEED } from "./loader";
 
 /**
  * Platzpersonal (Design 2026-08-29):
- * - Mario Baer sitzt im Wiegehäuschen an der Brückenwaage.
- * - Janine Prison gibt in der Kaffeebude Kaffee an die Händler aus.
+ * - Mario Baer steht an der Brückenwaage und wiegt ein und aus.
+ * - Janine Prison schenkt am Klapptisch vor dem Büro Kaffee aus.
  * - Lambert Prison ist Platzwart: Er weist ankommende LKW ein und räumt
  *   zwischendurch herumliegende Kleinteile auf.
  * Alle Figuren sind stilisierte Low-Poly-Figuren aus runden Grundformen.
@@ -76,95 +75,10 @@ export function buildPerson(colors: PersonColors): PersonParts {
   return { group, armLeft, armRight, legLeft, legRight };
 }
 
-/** Kleines Häuschen mit Fenster — für Waage und Kaffeebude. */
-function buildHut(
-  scene: THREE.Scene,
-  pos: THREE.Vector3,
-  rotY: number,
-  wallColor: number,
-  sign: string,
-  signColor: string,
-  width = 2.6,
-  world?: RAPIER.World
-): THREE.Group {
-  const g = new THREE.Group();
-  g.position.copy(pos);
-  g.rotation.y = rotY;
-  scene.add(g);
-  // Gebäude sind physische Hindernisse — nichts darf hindurchfahren
-  if (world) {
-    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, rotY, 0));
-    const body = world.createRigidBody(
-      RAPIER.RigidBodyDesc.fixed()
-        .setTranslation(pos.x, 0, pos.z)
-        .setRotation({ x: q.x, y: q.y, z: q.z, w: q.w })
-    );
-    world.createCollider(
-      RAPIER.ColliderDesc.cuboid(width / 2 + 0.15, 1.35, 1.25).setTranslation(0, 1.35, 0),
-      body
-    );
-  }
-
-  const wall = new THREE.MeshStandardMaterial({ color: wallColor, roughness: 0.85 });
-  const trim = new THREE.MeshStandardMaterial({ color: 0x2f3336, roughness: 0.8 });
-  const glass = new THREE.MeshStandardMaterial({
-    color: 0xbfe3f0,
-    roughness: 0.1,
-    transparent: true,
-    opacity: 0.35,
-  });
-
-  const body = new THREE.Mesh(new THREE.BoxGeometry(width, 2.5, 2.2), wall);
-  body.position.y = 1.35;
-  body.castShadow = true;
-  body.receiveShadow = true;
-  g.add(body);
-  const base = new THREE.Mesh(new THREE.BoxGeometry(width + 0.3, 0.2, 2.5), trim);
-  base.position.y = 0.1;
-  g.add(base);
-  // Flachdach mit Überstand
-  const roof = new THREE.Mesh(new THREE.BoxGeometry(width + 0.6, 0.16, 2.9), trim);
-  roof.position.y = 2.68;
-  roof.castShadow = true;
-  g.add(roof);
-  // Schalterfenster nach vorn (+z)
-  const win = new THREE.Mesh(new THREE.BoxGeometry(width - 0.8, 1.0, 0.06), glass);
-  win.position.set(0, 1.6, 1.11);
-  g.add(win);
-  const sill = new THREE.Mesh(new THREE.BoxGeometry(width - 0.6, 0.12, 0.3), trim);
-  sill.position.set(0, 1.05, 1.18);
-  g.add(sill);
-
-  // Beschriftung über dem Fenster
-  const canvas = document.createElement("canvas");
-  canvas.width = 512;
-  canvas.height = 128;
-  const ctx = canvas.getContext("2d")!;
-  ctx.fillStyle = "#15181a";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = signColor;
-  ctx.font = "bold 62px 'Arial Black', Impact, sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(sign, canvas.width / 2, canvas.height / 2 + 4);
-  const board = new THREE.Mesh(
-    new THREE.PlaneGeometry(width - 0.4, 0.55),
-    new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(canvas), roughness: 0.6 })
-  );
-  board.position.set(0, 2.35, 1.13);
-  g.add(board);
-  return g;
-}
-
 type LambertState = "patrol" | "guide" | "fetch" | "carry";
 
 export class StaffManager {
   private lambert: PersonParts;
-  /**
-   * Das Wiegehäuschen — wird beim Ausbau vom Büro abgelöst und dann
-   * ausgeblendet (siehe world/office.ts).
-   */
-  weighHut!: THREE.Group;
   private lambertState: LambertState = "patrol";
   private lambertTarget = new THREE.Vector3();
   private walkPhase = 0;
@@ -231,69 +145,66 @@ export class StaffManager {
   /** Karossen — durch die läuft er nicht hindurch */
   getObstaclePositions: (() => THREE.Vector3[]) | null = null;
 
+  /**
+   * @param weighPos Mitte der Wiegeplatte — dort steht Mario
+   * @param kaffeePos Klapptisch vor dem Büro — dort steht Janine
+   */
   constructor(
     scene: THREE.Scene,
     private items: ItemManager,
     weighPos: THREE.Vector3,
-    world?: RAPIER.World,
-    gateX = -22
+    kaffeePos: THREE.Vector3
   ) {
-    // Wiegehäuschen links neben der Einfahrt, breit, Schalter zur Fahrspur
-    const weighHut = buildHut(
-      scene,
-      // Westlich der Waage, also auf der anderen Seite der Einfahrt: So
-      // blickt man von der Wiegeplatte und vom Platz aus in den Schalter
-      // hinein und sieht Mario darin sitzen (Wunsch 02.09.2026).
-      new THREE.Vector3(weighPos.x - 4.6, 0, weighPos.z),
-      Math.PI * 0.5, // Schalter zeigt zur Waage — jetzt nach Osten
-      0xb9c0c4,
-      "WAAGE",
-      "#f0d060",
-      4.4,
-      world
-    );
+    /*
+     * Mario steht neben der Wiegeplatte, nicht mehr in einem Häuschen: Die
+     * Buden auf dem Platz sind weg, gebaut wird nur noch hinten rechts
+     * (Wunsch 10.09.2026). Die Waage bleibt — er bedient sie im Stehen, mit
+     * dem Klemmbrett am Anzeigemast.
+     */
     const mario = buildPerson({ shirt: 0x2f5c8a, trousers: 0x2b2f33, hair: 0x39312b });
-    mario.group.position.set(0, 0.45, 0.35); // sitzt am Schalter
-    mario.group.rotation.y = Math.PI;
-    mario.legLeft.visible = false;
-    mario.legRight.visible = false;
-    this.weighHut = weighHut;
-    weighHut.add(mario.group);
-    this.addNameTag(weighHut, "MARIO", 0, 2.0, 1.16);
-
-    // Kaffeebude mit Janine Prison, an der Fahrspur zur Annahme
-    const coffeeHut = buildHut(
-      scene,
-      // an einer ruhigen Ecke abseits der Fahrspur, Schalter zum Platz
-      new THREE.Vector3(gateX - 6, 0, weighPos.z - 13),
-      Math.PI * 0.75,
-      0xc8743a,
-      "KAFFEE",
-      "#ffffff",
-      4.0,
-      world
+    // 3,8 m neben der Plattenmitte: neben dem Anzeigemast und knapp
+    // ausserhalb der Spur, in der die LKW auf die Waage rollen
+    mario.group.position.set(weighPos.x + 3.8, 0, weighPos.z - 2.4);
+    mario.group.rotation.y = -Math.PI / 2; // schaut quer zur Fahrspur auf die Platte
+    scene.add(mario.group);
+    this.addNameTagToObject(mario.group, "MARIO", 0, 2.1, 0);
+    const brett = new THREE.Mesh(
+      new THREE.BoxGeometry(0.3, 0.02, 0.22),
+      new THREE.MeshStandardMaterial({ color: 0xb98a4a, roughness: 0.9 })
     );
+    brett.position.set(0.16, 1.05, 0.18);
+    brett.rotation.z = 0.35;
+    mario.group.add(brett);
+
+    // Janine mit ihrem Klapptisch vor dem Büro — die Bude ist ersatzlos weg
     const janine = buildPerson({ shirt: 0xe8e2d5, trousers: 0x4a3b52, hair: 0x8a5a2b });
-    janine.group.position.set(0, 0.45, 0.35);
-    janine.group.rotation.y = Math.PI;
-    janine.legLeft.visible = false;
-    janine.legRight.visible = false;
-    coffeeHut.add(janine.group);
-    this.addNameTag(coffeeHut, "JANINE", 0, 2.0, 1.16);
-    // Klapptisch mit Kaffeekannen vor der Bude
+    janine.group.position.set(kaffeePos.x, 0, kaffeePos.z - 0.8);
+    scene.add(janine.group);
+    this.addNameTagToObject(janine.group, "JANINE", 0, 2.1, 0);
     const table = new THREE.Mesh(
       new THREE.BoxGeometry(1.6, 0.08, 0.6),
       new THREE.MeshStandardMaterial({ color: 0x8d6a4a, roughness: 0.9 })
     );
-    table.position.set(0, 0.95, 1.6);
-    coffeeHut.add(table);
+    table.position.set(kaffeePos.x, 0.95, kaffeePos.z);
+    table.castShadow = true;
+    scene.add(table);
+    for (const bx of [-0.6, 0.6]) {
+      for (const bz of [-0.22, 0.22]) {
+        const bein = new THREE.Mesh(
+          new THREE.BoxGeometry(0.06, 0.9, 0.06),
+          new THREE.MeshStandardMaterial({ color: 0x5a5f64, roughness: 0.9 })
+        );
+        bein.position.set(kaffeePos.x + bx, 0.46, kaffeePos.z + bz);
+        scene.add(bein);
+      }
+    }
     for (const tx of [-0.5, -0.1, 0.35]) {
       const pot = new THREE.Mesh(
         new THREE.CylinderGeometry(0.09, 0.11, 0.26, 10),
         new THREE.MeshStandardMaterial({ color: 0xd8d8d2, roughness: 0.4, metalness: 0.5 })
       );
-      pot.position.set(tx, 1.12, 1.6);
-      coffeeHut.add(pot);
+      pot.position.set(kaffeePos.x + tx, 1.12, kaffeePos.z);
+      scene.add(pot);
     }
 
     // Lambert Prison — Platzwart in Warnweste
@@ -309,27 +220,6 @@ export class StaffManager {
     this.lambert.group.add(vest);
     this.addNameTagToObject(this.lambert.group, "LAMBERT", 0, 2.1, 0);
     this.lambertTarget.copy(this.patrol[1]);
-  }
-
-  private addNameTag(parent: THREE.Object3D, text: string, x: number, y: number, z: number): void {
-    const canvas = document.createElement("canvas");
-    canvas.width = 512;
-    canvas.height = 96;
-    const ctx = canvas.getContext("2d")!;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "rgba(20,24,26,0.85)";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#e8e8e4";
-    ctx.font = "bold 46px 'Arial Black', Impact, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(text, canvas.width / 2, canvas.height / 2 + 2);
-    const plate = new THREE.Mesh(
-      new THREE.PlaneGeometry(1.7, 0.32),
-      new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(canvas), roughness: 0.7 })
-    );
-    plate.position.set(x, y, z);
-    parent.add(plate);
   }
 
   private addNameTagToObject(

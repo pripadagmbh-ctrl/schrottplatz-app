@@ -4,12 +4,12 @@ import { CONFIGS } from "../src/world/containers";
 import { YARD_MIN_X, YARD_MAX_X, YARD_D } from "../src/world/yard";
 import {
   STATIC_OBSTACLES,
-  BUILDING_HUT,
+  BUILDING_START,
   hitsObstacle,
   slideAround,
   setBuildingObstacles,
 } from "../src/world/obstacles";
-import { WEIGH_X, WEIGH_Z } from "../src/world/yard";
+import { OFFICE_X, OFFICE_Z, officeFootprints } from "../src/world/office";
 import {
   CLAW_OPEN_SPLAY,
   CLAW_SEGMENTS,
@@ -70,26 +70,45 @@ describe("Feste Bauten", () => {
 
   it("führt die erwarteten Bauwerke", () => {
     const labels = STATIC_OBSTACLES.map((o) => o.label).join(" ");
-    for (const pflicht of ["Südwand", "Westwand", "Ostwand", "Schere", "Kaffeebude"]) {
+    for (const pflicht of ["Südwand", "Westwand", "Ostwand", "Schere"]) {
       expect(labels, `${pflicht} fehlt in der Hindernisliste`).toContain(pflicht);
     }
   });
 
-  it("stellt das Wiegehäuschen von Anfang an in den Weg", () => {
-    // Es steht nicht in der festen Liste, weil es beim Ausbau dem Büro
+  it("stellt den Bürocontainer von Anfang an in den Weg", () => {
+    // Er steht nicht in der festen Liste, weil er beim Ausbau dem Büro
     // weicht. Geprüft wird deshalb die Wirkung, nicht der Listeneintrag.
-    const treffer = hitsObstacle(WEIGH_X - 4.6, WEIGH_Z, 0);
-    expect(treffer?.label).toBe("Wiegehäuschen");
+    const treffer = hitsObstacle(OFFICE_X, OFFICE_Z, 0);
+    expect(treffer?.label).toBe("Bürocontainer");
   });
 
-  it("übernimmt den größeren Grundriss, sobald das Büro steht", () => {
-    setBuildingObstacles([
-      { x: WEIGH_X - 4.6, z: WEIGH_Z, hw: 3.85, hd: 2.45, top: 4.2, label: "Betriebsgebäude" },
-    ]);
-    // Drei Meter neben der Hausmitte: am Häuschen noch frei, am Büro belegt
-    expect(hitsObstacle(WEIGH_X - 4.6 + 3.0, WEIGH_Z, 0)?.label).toBe("Betriebsgebäude");
-    setBuildingObstacles(BUILDING_HUT);
-    expect(hitsObstacle(WEIGH_X - 4.6 + 3.0, WEIGH_Z, 0)).toBeNull();
+  it("übernimmt den größeren Grundriss, sobald die Halle steht", () => {
+    // Die Halle steht westlich neben dem Büro — dort ist vorher frei
+    const [, halle] = officeFootprints("hall");
+    expect(hitsObstacle(halle[0], halle[1], 0)).toBeNull();
+    setBuildingObstacles(
+      officeFootprints("hall").map(([x, z, hw, hd]) => ({
+        x,
+        z,
+        hw,
+        hd,
+        top: 5.4,
+        label: "Betriebsgebäude",
+      }))
+    );
+    expect(hitsObstacle(halle[0], halle[1], 0)?.label).toBe("Betriebsgebäude");
+    setBuildingObstacles(BUILDING_START);
+    expect(hitsObstacle(halle[0], halle[1], 0)).toBeNull();
+  });
+
+  it("hält das Betriebsgebäude in der hinteren rechten Ecke, an der Wand", () => {
+    // Der Wunsch war ausdrücklich: alles Gebaute nach hinten rechts, damit
+    // der Platz frei bleibt. Sonst wandert es beim nächsten Umbau zurück.
+    for (const [x, z, hw, hd] of officeFootprints("hall")) {
+      expect(z + hd, "ragt zu weit auf den Platz").toBeLessThan(-18);
+      expect(z - hd, "steht in der Südwand").toBeGreaterThan(-YARD_D / 2 + 0.3);
+      expect(x + hw, "steht in der Ostwand").toBeLessThan(YARD_MAX_X - 0.3);
+    }
   });
 
   it("lässt die Einfahrt offen", () => {
