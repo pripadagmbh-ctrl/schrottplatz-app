@@ -75,14 +75,66 @@ describe("Greifen", () => {
     b.sleep();
     grip.attachBody(b);
 
-    // Greifer 4 m zur Seite fahren, wie beim Schwenken des Oberwagens
+    // Greifer 4 m zur Seite fahren, wie beim Schwenken des Oberwagens.
+    // Das Mitfuehren macht seit dem Umbau das Greifsystem je Schritt, nicht
+    // mehr ein Gelenk — also muss der Takt hier auch laufen.
+    const sensor = new THREE.Vector3();
     for (let i = 0; i < 60; i++) {
       const t = greifer.translation();
       greifer.setNextKinematicTranslation({ x: t.x + 4 / 60, y: t.y, z: t.z });
+      grip.update(0.8, true, sensor.set(t.x, t.y, t.z), 1 / 60);
       world.step();
     }
     const p = b.translation();
     expect(p.x, `Teil steht bei x=${p.x.toFixed(2)} statt mitzukommen`).toBeGreaterThan(2.5);
+    expect(b.isKinematic(), "das Teil wird kinematisch mitgefuehrt").toBe(true);
+  });
+
+  it("die Haltepose zieht das Teil in den Korb, ohne es hochzusaugen", () => {
+    const { world, grip, greifer } = aufbau();
+    // Seitlich versetzt gefasst, wie wenn man am Rand zupackt
+    const b = teil(world, 0.9, 2.2, 0);
+    grip.attachBody(b);
+    const sensor = new THREE.Vector3();
+    for (let i = 0; i < 40; i++) {
+      const t = greifer.translation();
+      grip.update(0.8, true, sensor.set(t.x, t.y, t.z), 1 / 60);
+      world.step();
+    }
+    const p = b.translation();
+    expect(Math.abs(p.x), "Teil haengt weiter neben der Spinne").toBeLessThan(0.5);
+    // ... aber die Hoehe bleibt: ein Teil am Boden darf nicht hochgesaugt werden
+    expect(p.y, `Hoehe von 2,2 auf ${p.y.toFixed(2)} gewandert`).toBeCloseTo(2.2, 1);
+  });
+
+  it("Loslassen gibt den Schwung der Spinne mit", () => {
+    const { world, grip, greifer } = aufbau();
+    const b = teil(world, 0, 2.6, 0);
+    grip.attachBody(b);
+    const sensor = new THREE.Vector3();
+    // Spinne zieht zur Seite, dann loslassen
+    for (let i = 0; i < 10; i++) {
+      const t = greifer.translation();
+      greifer.setNextKinematicTranslation({ x: t.x + 3 / 60, y: t.y, z: t.z });
+      grip.update(0.8, true, sensor.set(t.x, t.y, t.z), 1 / 60);
+      world.step();
+    }
+    grip.update(0.8, false, sensor, 1 / 60); // Taste los
+    const v = b.linvel();
+    expect(b.isDynamic(), "Teil ist wieder dynamisch").toBe(true);
+    expect(v.x, "der Schwung fehlt — das Teil fiele senkrecht").toBeGreaterThan(1.0);
+    expect(v.y, "es soll fallen, nicht steigen").toBeLessThanOrEqual(0);
+  });
+
+  it("beim Loslassen wird die Schonfrist gemeldet", () => {
+    const { world, grip } = aufbau();
+    const b = teil(world, 0, 2.6, 0);
+    grip.attachBody(b);
+    let gemeldet = 0;
+    grip.onReleaseGrace = () => gemeldet++;
+    grip.update(0.8, false, new THREE.Vector3(), 1 / 60);
+    // Ohne die Frist quetschen die zufahrenden Krallen das Teil gegen den Boden
+    expect(gemeldet).toBe(1);
   });
 
   it("fasst nichts, was nicht im Schalenkorb liegt", () => {

@@ -385,6 +385,9 @@ async function main(): Promise<void> {
   // Achsbewegung. Wer die Spinne am Motor verdreht, bekommt ihn schneller los.
   grip.getViolence = () => excavator.tearViolence;
   grip.insideGrapple = (pos) => excavator.isInsideGrapple(pos);
+  // Nach dem Loslassen bleiben die Krallen-Kollider kurz aus, sonst quetschen
+  // sie das eben abgeworfene Teil gegen den Boden.
+  grip.onReleaseGrace = () => excavator.startClawGrace();
   // Woran die Zaehne stehen bleiben. Was sich quetschen laesst — Blech, Kabel,
   // Faesser, Buntmetall, Draht — gibt nach: Der Greifer drueckt es platt oder
   // schiebt es beiseite, genau wie in Wirklichkeit. Stehen bleibt er an

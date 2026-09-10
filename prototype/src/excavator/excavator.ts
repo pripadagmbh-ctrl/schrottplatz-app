@@ -1010,7 +1010,7 @@ export class Excavator {
    * abgeschaltet: die Last hängt am Gelenk und würde sonst herausgequetscht.
    */
   private updateClawColliders(): void {
-    const carrying = this.carriedCount > 0;
+    const carrying = this.carriedCount > 0 || this.clawGraceS > 0;
     for (let c = 0; c < CLAW_COUNT; c++) {
       const a = (c / CLAW_COUNT) * Math.PI * 2;
       // Jede Kralle mit ihrem eigenen Winkel — sonst stuenden die Kollider
@@ -1179,6 +1179,7 @@ export class Excavator {
     // Erst die Pose dieses Bildes herstellen, dann aufsetzen: Die Strahlen
     // gehen von den Krallenspitzen aus, und die stehen sonst noch dort, wo sie
     // im letzten Bild waren — beim Schwenken misst man dann die falsche Stelle.
+    this.clawGraceS = Math.max(0, this.clawGraceS - dt);
     this.syncMeshes();
     this.resolveGroundClamp();
     this.updateClawBlocking(dt);
@@ -1262,6 +1263,13 @@ export class Excavator {
    * ist, bleibt stehen, der Rest geht weiter zu.
    */
   private clawSplayIst: number[] = new Array(CLAW_COUNT).fill(CLAW_OPEN_SPLAY);
+  /**
+   * Schonfrist nach dem Loslassen: Solange sie laeuft, sind die Krallen-Kollider
+   * abgeschaltet. Beim Oeffnen sind die Zacken noch fast zu und die Spinne sinkt
+   * noch — ohne die Frist quetschen die kinematischen Krallen das eben
+   * losgelassene Teil gegen den Boden, und es schiesst weg (v2 E-018).
+   */
+  private clawGraceS = 0;
   /** Verbleibendes Nachdruecken je Kralle, damit sie nicht schlagartig steht */
   private clawReserve: number[] = new Array(CLAW_COUNT).fill(NACHDRUECK_RESERVE);
   private blockTmp = new THREE.Vector3();
@@ -1290,6 +1298,11 @@ export class Excavator {
    * Bewegliche — die vorsichtige Annahme.
    */
   clawBlockedBy: ((body: RAPIER.RigidBody) => boolean) | null = null;
+
+  /** Schonfrist starten — vom Greifsystem beim Loslassen gerufen. */
+  startClawGrace(sekunden = 0.6): void {
+    this.clawGraceS = Math.max(this.clawGraceS, sekunden);
+  }
   /**
    * Ein Zahn ist in ein nachgiebiges Teil eingedrungen. Wer sich aufspiessen
    * laesst, soll es hinterher ansehen — sonst steckt das Teil unversehrt auf
