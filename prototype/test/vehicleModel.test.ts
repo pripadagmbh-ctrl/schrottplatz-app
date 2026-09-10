@@ -112,15 +112,64 @@ describe("Anlieferfahrzeuge", () => {
     expect(Math.abs(nachher.x - vorher.x), "Ausleger bleibt über der Fläche stehen").toBeGreaterThan(0.8);
   });
 
+  it("PKW und Anhänger sind zwei Körper mit Gelenk an der Kupplung", () => {
+    const v = bauen("pkw", 2.4);
+    const anhaenger = teileVomBau.trailer;
+    expect(anhaenger, "kein Anhänger als eigene Gruppe").not.toBeNull();
+    // Die Ladefläche gehört an den Anhänger, nicht an den Rahmen — sonst bliebe
+    // die Ladung beim Einlenken in der Luft stehen
+    let wurzel: THREE.Object3D | null = v.bedGroup.parent;
+    let unterAnhaenger = false;
+    while (wurzel) {
+      if (wurzel === anhaenger) unterAnhaenger = true;
+      wurzel = wurzel.parent;
+    }
+    expect(unterAnhaenger, "Ladefläche hängt nicht am Anhänger").toBe(true);
+  });
+
+  it("das Gelenk sitzt an der Kupplung, nicht in der Anhängermitte", () => {
+    const v = bauen("pkw", 2.4);
+    const anhaenger = teileVomBau.trailer!;
+    v.group.updateWorldMatrix(true, true);
+    const kupplung = anhaenger.getWorldPosition(new THREE.Vector3()).clone();
+    const achseVorher = v.bedGroup.getWorldPosition(new THREE.Vector3()).clone();
+
+    anhaenger.rotation.y = 0.5;
+    v.group.updateWorldMatrix(true, true);
+    const kupplungNachher = anhaenger.getWorldPosition(new THREE.Vector3());
+    const achseNachher = v.bedGroup.getWorldPosition(new THREE.Vector3());
+
+    // Der Kupplungspunkt bleibt stehen ...
+    expect(kupplungNachher.distanceTo(kupplung)).toBeLessThan(1e-6);
+    // ... und der Anhänger schwenkt darum herum
+    expect(achseNachher.distanceTo(achseVorher)).toBeGreaterThan(0.4);
+  });
+
+  it("das Zugfahrzeug steht vor dem Anhänger, ohne ihn zu überlappen", () => {
+    const v = bauen("pkw", 2.4);
+    const anhaenger = teileVomBau.trailer!;
+    v.group.updateWorldMatrix(true, true);
+    // Karosserie ist das breiteste Teil am Rahmen; der Anhänger liegt dahinter
+    const anhaengerBox = new THREE.Box3().setFromObject(anhaenger);
+    const kupplungZ = anhaenger.position.z;
+    // Vorher stand das Heck des Wagens über dem Anhängerboden — der Anhänger
+    // darf nicht über die Kupplung hinausragen
+    expect(anhaengerBox.max.z).toBeLessThanOrEqual(kupplungZ + 0.1);
+  });
+
   it("der PKW-Anhänger trägt seine Ladung dort, wo der Boden ist", () => {
     const v = bauen("pkw", 2.4);
     // Die Ladung wird bei lokal z zwischen 0,15 und bedLen-0,15 gesetzt
     // (siehe `loadCargo`). Diese Spanne muss auf dem Anhängerboden liegen.
+    const anhaenger = teileVomBau.trailer!;
+    const boden = new THREE.Box3().setFromObject(anhaenger);
     const vorne = v.bedGroup.localToWorld(new THREE.Vector3(0, 0, 0.15));
     const hinten = v.bedGroup.localToWorld(new THREE.Vector3(0, 0, 2.25));
     for (const p of [vorne, hinten]) {
-      expect(p.z, "Ladung sitzt auf dem Anhänger, nicht daneben").toBeGreaterThan(-0.5);
-      expect(p.z, "Ladung sitzt auf dem Anhänger, nicht am Zugfahrzeug").toBeLessThan(3.0);
+      expect(p.z, "Ladung liegt hinter dem Anhänger").toBeGreaterThan(boden.min.z - 0.2);
+      expect(p.z, "Ladung liegt vor der Kupplung, also am Zugfahrzeug").toBeLessThan(
+        boden.max.z + 0.2
+      );
     }
   });
 });

@@ -29,6 +29,8 @@ export interface VehicleModelParts {
   tailGate: { hinge: THREE.Group; mesh: THREE.Mesh; body: RAPIER.RigidBody } | null;
   /** Drehbare Kransäule — der Ablauf schwenkt sie beim Andocken zur Seite */
   crane: THREE.Group | null;
+  /** Anhänger des PKW — hängt gelenkig an der Kupplung und wird nachgeführt */
+  trailer: THREE.Group | null;
 }
 
 /**
@@ -108,15 +110,24 @@ function buildCrane(v: VehicleModelContext, dark: THREE.MeshStandardMaterial): T
   return saeule;
 }
 
+/**
+ * PKW mit Anhänger — zwei Körper, gelenkig an der Kupplung.
+ *
+ * Vorher war beides ein starres Gebilde, und die Maße überlappten sogar: Das
+ * Zugfahrzeug stand mit seinem Heck über dem Anhängerboden. Jetzt sitzt vorn
+ * der Wagen, dahinter die Deichsel, und der Anhänger hängt in einer eigenen
+ * Gruppe, deren Ursprung genau die Kupplung ist. Wer sie dreht, schwenkt den
+ * Anhänger um den Kupplungspunkt — so, wie ein Anhänger es tut.
+ *
+ * Zurückgegeben wird diese Gruppe; der Ablauf führt sie beim Fahren nach.
+ */
 function buildCarAndTrailer(
-v: VehicleModelContext,
-  paint: THREE.MeshStandardMaterial,
+  v: VehicleModelContext,
+  _paint: THREE.MeshStandardMaterial,
   dark: THREE.MeshStandardMaterial,
   bedMat: THREE.MeshStandardMaterial
-): void {
-  void paint;
-  // Jeder Privatwagen sieht etwas anders aus
-  const farben = [0x8a3b32, 0x2f4858, 0x6b7a52, 0xa8a49c, 0x3c3f45, 0x7a5c3a];
+): THREE.Group {
+  const farben = [0x35618f, 0x7a2f2a, 0x2f5c3a, 0x8a8f95, 0xb08a3a, 0x2b2f36];
   const lack = new THREE.MeshStandardMaterial({
     color: farben[Math.floor(Math.random() * farben.length)],
     roughness: 0.45,
@@ -132,11 +143,14 @@ v: VehicleModelContext,
     opacity: 0.32,
   });
   const kombi = Math.random() < 0.7;
-  const zugZ = v.bedLen / 2 + 2.6; // Mitte des Zugfahrzeugs
   const len = kombi ? 4.3 : 5.0;
   const hoehe = kombi ? 0.72 : 1.35;
+  // Kupplung: ein Stück vor der Anhängerfront, dort greift die Deichsel an
+  const kupplungZ = v.bedLen + 1.05;
+  // Zugfahrzeug steht davor, mit Luft zwischen Heck und Kupplung
+  const zugZ = kupplungZ + 0.35 + len / 2;
 
-  // Karosserie: Kombi flach mit Dachaufbau, Kastenwagen ein hoher Kasten
+  // --- Zugfahrzeug (bleibt am Fahrzeugrahmen) ---
   const wanne = new THREE.Mesh(new THREE.BoxGeometry(1.82, hoehe, len), lack);
   wanne.position.set(0, 0.62 + hoehe / 2, zugZ);
   wanne.castShadow = true;
@@ -156,7 +170,6 @@ v: VehicleModelContext,
     front.rotation.x = 0.34;
     v.group.add(front);
   } else {
-    // Kastenwagen: verglaste Fahrerkabine vorn, geschlossener Aufbau
     const front = new THREE.Mesh(new THREE.BoxGeometry(1.66, 0.62, 0.06), glas);
     front.position.set(0, 1.6, zugZ + len / 2 - 0.35);
     front.rotation.x = 0.22;
@@ -171,47 +184,68 @@ v: VehicleModelContext,
   const kopf = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 10), haut);
   kopf.position.set(-0.42, kombi ? 1.6 : 1.55, zugZ + len / 2 - 1.1);
   v.group.add(kopf);
+  // Anhängerkupplung am Heck des Wagens
+  const kugel = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), dark);
+  kugel.position.set(0, 0.5, kupplungZ);
+  v.group.add(kugel);
 
-  // Anhänger: offener Kasten auf einer Achse
-  const rahmen = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.24, v.bedLen + 0.5), dark);
-  rahmen.position.set(0, 0.72, v.bedLen / 2 - 0.1);
-  v.group.add(rahmen);
-  const boden = new THREE.Mesh(new THREE.BoxGeometry(1.86, 0.08, v.bedLen), bedMat);
-  boden.position.set(0, 0.86, v.bedLen / 2);
-  v.group.add(boden);
-  const deichsel = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 1.5), dark);
-  deichsel.position.set(0, 0.66, v.bedLen + 0.85);
-  v.group.add(deichsel);
-
-  // Die Ladeflaeche des Anhaengers. Ohne diese zwei Zeilen blieb `bedGroup` im
-  // Weltursprung haengen und wurde nie ans Fahrzeug gehaengt — der Rumpf der
-  // Funktion setzt sie erst weiter unten, und fuer den PKW wird vorher
-  // zurueckgesprungen. Die Ladung wird ueber `bedGroup.localToWorld()`
-  // platziert, landete also mitten auf dem Platz statt auf dem Anhaenger:
-  // Der Privatmann kam sichtbar ohne Schrott an und liess sich nicht abladen.
-  // Hoehe = Oberkante des Anhaengerbodens (0,86 + halbe Dicke), z = 0, weil der
-  // Boden hier von 0 bis bedLen reicht (beim LKW liegt er um bedLen/2 versetzt).
-  v.bedGroup.position.set(0, 0.9, 0);
-  v.group.add(v.bedGroup);
-
-  // Räder: zwei am Anhänger, vier am Zugfahrzeug
   const radGeo = new THREE.CylinderGeometry(0.33, 0.33, 0.22, 12);
   radGeo.rotateZ(Math.PI / 2);
   const gummi = new THREE.MeshStandardMaterial({ color: 0x1e2022, roughness: 0.9 });
-  const raeder: Array<[number, number]> = [
-    [-0.98, v.bedLen / 2],
-    [0.98, v.bedLen / 2],
-    [-0.86, zugZ + len / 2 - 0.9],
-    [0.86, zugZ + len / 2 - 0.9],
-    [-0.86, zugZ - len / 2 + 0.9],
-    [0.86, zugZ - len / 2 + 0.9],
-  ];
-  for (const [rx, rz] of raeder) {
-    const rad = new THREE.Mesh(radGeo, gummi);
-    rad.position.set(rx, 0.33, rz);
-    rad.castShadow = true;
-    v.group.add(rad);
+  for (const rx of [-0.86, 0.86]) {
+    for (const rz of [zugZ + len / 2 - 0.9, zugZ - len / 2 + 0.9]) {
+      const rad = new THREE.Mesh(radGeo, gummi);
+      rad.position.set(rx, 0.33, rz);
+      rad.castShadow = true;
+      v.group.add(rad);
+    }
   }
+
+  // --- Anhänger (eigene Gruppe, Ursprung = Kupplung) ---
+  const anhaenger = new THREE.Group();
+  anhaenger.position.set(0, 0, kupplungZ);
+  v.group.add(anhaenger);
+  // Alles Folgende in Anhänger-Koordinaten: z = 0 ist die Kupplung,
+  // der Anhänger liegt dahinter (negatives z).
+  const zu = (zImRahmen: number): number => zImRahmen - kupplungZ;
+
+  const deichsel = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 1.05), dark);
+  deichsel.position.set(0, 0.5, zu(v.bedLen + 0.525));
+  anhaenger.add(deichsel);
+  const rahmen = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.24, v.bedLen + 0.5), dark);
+  rahmen.position.set(0, 0.72, zu(v.bedLen / 2 - 0.1));
+  anhaenger.add(rahmen);
+  const boden = new THREE.Mesh(new THREE.BoxGeometry(1.86, 0.08, v.bedLen), bedMat);
+  boden.position.set(0, 0.86, zu(v.bedLen / 2));
+  boden.castShadow = true;
+  anhaenger.add(boden);
+  // Bordwände — ohne sie ist es ein Brett, kein Anhänger
+  for (const [bx, bz, bw, bd] of [
+    [0, zu(0.02), 1.86, 0.06],
+    [0, zu(v.bedLen - 0.02), 1.86, 0.06],
+    [-0.9, zu(v.bedLen / 2), 0.06, v.bedLen],
+    [0.9, zu(v.bedLen / 2), 0.06, v.bedLen],
+  ] as Array<[number, number, number, number]>) {
+    const wand = new THREE.Mesh(new THREE.BoxGeometry(bw, 0.34, bd), bedMat);
+    wand.position.set(bx, 1.07, bz);
+    wand.castShadow = true;
+    anhaenger.add(wand);
+  }
+  for (const rx of [-0.98, 0.98]) {
+    const rad = new THREE.Mesh(radGeo, gummi);
+    rad.position.set(rx, 0.33, zu(v.bedLen / 2));
+    rad.castShadow = true;
+    anhaenger.add(rad);
+  }
+
+  // Die Ladefläche gehört an den Anhänger, nicht an den Rahmen: Sie muss beim
+  // Einlenken mitschwenken, sonst bleibt die Ladung in der Luft stehen.
+  // Höhe = Oberkante des Anhängerbodens; z = 0 des Bodens, der von 0 bis
+  // bedLen reicht (beim LKW liegt er um bedLen/2 versetzt).
+  v.bedGroup.position.set(0, 0.9, zu(0));
+  anhaenger.add(v.bedGroup);
+
+  return anhaenger;
 }
 
 export function buildVehicleModel(v: VehicleModelContext): VehicleModelParts {
@@ -220,10 +254,10 @@ export function buildVehicleModel(v: VehicleModelContext): VehicleModelParts {
   const bedMat = new THREE.MeshStandardMaterial({ color: 0x5c6166, roughness: 0.7, metalness: 0.4 });
 
   // Was der Ablauf danach ansteuert, wird hier gesammelt und zurückgegeben
-  const teile: VehicleModelParts = { tailGate: null, crane: null };
+  const teile: VehicleModelParts = { tailGate: null, crane: null, trailer: null };
 
   if (v.kind === "pkw") {
-    buildCarAndTrailer(v, paint, dark, bedMat);
+    teile.trailer = buildCarAndTrailer(v, paint, dark, bedMat);
     return teile;
   }
   const chassis = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.5, v.bedLen + 1.6), dark);

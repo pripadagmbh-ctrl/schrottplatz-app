@@ -54,6 +54,14 @@ const CAB_MAX = THREE.MathUtils.degToRad(40);
 const BOOM_RATE = THREE.MathUtils.degToRad(25);
 const STICK_RATE = THREE.MathUtils.degToRad(30);
 const ROTATOR_STEP = THREE.MathUtils.degToRad(15); // pro Mausrad-Raste
+/**
+ * Dauerdrehung des Rotators. Vorher wurde je Bild ein fester Winkel addiert,
+ * nicht je Sekunde: Bei 60 Bildern ergab das 54°/s, bei 30 Bildern auf dem
+ * Tablet nur 27 — der Rotator war dort halb so schnell wie am Rechner, ohne
+ * dass es jemand so gebaut hätte. Jetzt zeitbasiert, und deutlich zügiger:
+ * Ein Schrottgreifer dreht die Ladung flott in die Mulde, er zirkelt nicht.
+ */
+const ROTATOR_SPEED = THREE.MathUtils.degToRad(160); // rad/s
 const CLOSE_TIME = 0.4; // s (SW)
 const OPEN_TIME = 0.3; // s (SW)
 const RAMP_TIME = 0.2; // s Anlauf-/Auslauframpe (SW, vereinfacht symmetrisch)
@@ -1065,7 +1073,7 @@ export class Excavator {
     // ↑/↓ Stiel, Bild↑/Bild↓ Ausleger
     // Tastatur + Touch-Sticks auf dieselben Achsen
     const t = this.touch;
-    if (t?.rotator) this.rotatorYaw += t.rotator * ROTATOR_STEP * 0.06; // Dauerdrehung, ~54°/s
+    if (t?.rotator) this.rotatorYaw += t.rotator * ROTATOR_SPEED * dt;
     this.inCab = clamp1(axis2(input, "KeyE", "KeyQ", "ArrowRight", "ArrowLeft") + (t?.cab ?? 0));
     this.inBoom = clamp1(axis2(input, "KeyF", "KeyR", "PageDown", "PageUp") + (t?.boom ?? 0));
     this.inStick = clamp1(axis2(input, "KeyG", "KeyT", "ArrowDown", "ArrowUp") + (t?.stick ?? 0));
@@ -1253,31 +1261,40 @@ export class Excavator {
    * Bewegliche — die vorsichtige Annahme.
    */
   clawBlockedBy: ((body: RAPIER.RigidBody) => boolean) | null = null;
+  /**
+   * Ein Zahn ist in ein nachgiebiges Teil eingedrungen. Wer sich aufspiessen
+   * laesst, soll es hinterher ansehen — sonst steckt das Teil unversehrt auf
+   * der Zacke und nichts erklaert, warum.
+   */
+  onClawPierce: ((body: RAPIER.RigidBody) => void) | null = null;
 
   private clawBlocked(a: number, splay: number): boolean {
     clawPoint(a, splay, CLAW_SEGMENTS, this.blockTmp);
     this.grappleGroup.localToWorld(this.blockTmp);
-    return (
-      this.world.intersectionWithShape(
-        this.blockTmp,
-        Excavator.IDENT,
-        this.blockShape,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        (c) => {
-          const b = c.parent();
-          if (!b) return false;
-          if (this.selfHandles.has(b.handle)) return false;
-          if (!b.isDynamic()) return false;
-          // Ein Greifer bleibt an Blech nicht stehen — er quetscht es platt
-          // oder schiebt es beiseite. Stehen bleibt er an massivem Stahl:
-          // Traeger, dicke Platten, ein Motorblock.
-          return this.clawBlockedBy ? this.clawBlockedBy(b) : true;
+    let blockiert = false;
+    // Eine Abfrage fuer beides: Was haelt, stoppt den Zahn. Was nachgibt,
+    // bekommt seine Beule — der Zahn geht hindurch.
+    this.world.intersectionsWithShape(
+      this.blockTmp,
+      Excavator.IDENT,
+      this.blockShape,
+      (c) => {
+        const b = c.parent();
+        if (!b) return true;
+        if (this.selfHandles.has(b.handle)) return true;
+        if (!b.isDynamic()) return true;
+        // Ein Greifer bleibt an Blech nicht stehen — er quetscht es platt
+        // oder schiebt es beiseite. Stehen bleibt er an massivem Stahl:
+        // Traeger, dicke Platten, ein Motorblock.
+        if (this.clawBlockedBy ? this.clawBlockedBy(b) : true) {
+          blockiert = true;
+          return false; // haelt — weitersuchen bringt nichts
         }
-      ) !== null
+        this.onClawPierce?.(b);
+        return true;
+      }
     );
+    return blockiert;
   }
 
   /**

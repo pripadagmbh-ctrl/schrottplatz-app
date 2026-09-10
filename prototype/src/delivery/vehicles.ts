@@ -89,6 +89,11 @@ class DeliveryVehicle {
   private phaseT = 0;
   private tip = 0;
   cargo: Cargo = { items: [], car: null };
+  /** Anhänger des PKW — eigener Körper, Gelenk an der Kupplung */
+  private trailer: THREE.Group | null = null;
+  private trailerYawRel = 0;
+  private letztePos = new THREE.Vector3();
+  private letzterYaw = 0;
   /** Ladekran der Händler — nur Bild, schwenkt beim Andocken zur Seite */
   private crane: THREE.Group | null = null;
   private craneSide = 1;
@@ -149,6 +154,41 @@ class DeliveryVehicle {
    * Abladeplatz räumen. Wer einen Warteplatz zugewiesen bekommen hat, stellt
    * sich dort ab und macht Pause; alle anderen fahren gleich vom Hof.
    */
+  /**
+   * Anhänger nachführen. Ein Anhänger hat keinen eigenen Willen: Er dreht sich
+   * um seine Achse in die Richtung, in die die Kupplung ihn zieht. Das ist die
+   * übliche Einspur-Kinematik — je Meter Fahrweg dreht er um sin(Knickwinkel)
+   * geteilt durch den Abstand Kupplung–Achse.
+   *
+   * Rückwärts gilt sie nicht: Dort ist die Gleichung instabil, der Anhänger
+   * knickt ein. Ein Fahrer hält beim Rangieren dagegen, und genau das tut hier
+   * die Rückstellung — sonst stünde der Anhänger nach dem Andocken quer.
+   */
+  private updateTrailer(dt: number): void {
+    if (!this.trailer || dt <= 0) return;
+    const p = this.group.position;
+    const psi = this.group.rotation.y;
+    const dx = p.x - this.letztePos.x;
+    const dz = p.z - this.letztePos.z;
+    const strecke = Math.hypot(dx, dz);
+    const vorwaerts = Math.sin(psi) * dx + Math.cos(psi) * dz;
+    let dpsi = psi - this.letzterYaw;
+    while (dpsi > Math.PI) dpsi -= Math.PI * 2;
+    while (dpsi < -Math.PI) dpsi += Math.PI * 2;
+    this.letztePos.copy(p);
+    this.letzterYaw = psi;
+
+    const L = this.bedLen / 2 + 1.05; // Kupplung bis Anhängerachse
+    if (strecke > 1e-5 && vorwaerts > 0) {
+      this.trailerYawRel += -Math.sin(this.trailerYawRel) * (strecke / L) - dpsi;
+    } else {
+      this.trailerYawRel += (0 - this.trailerYawRel) * Math.min(1, dt * 2.5);
+    }
+    // Ein Anhänger knickt irgendwann an der Deichsel an — weiter geht es nicht
+    this.trailerYawRel = THREE.MathUtils.clamp(this.trailerYawRel, -0.75, 0.75);
+    this.trailer.rotation.y = this.trailerYawRel;
+  }
+
   private leaveUnloadingBay(): void {
     this.phaseT = 0;
     if (this.parkSpot) {
@@ -283,6 +323,7 @@ class DeliveryVehicle {
     });
     this.tailGate = teile.tailGate;
     this.crane = teile.crane;
+    this.trailer = teile.trailer;
     // Zu welcher Seite geschwenkt wird, entscheidet das Fahrzeug einmal —
     // sonst schwenken alle gleich und es sieht nach Choreografie aus.
     this.craneSide = Math.random() < 0.5 ? -1 : 1;
@@ -291,16 +332,20 @@ class DeliveryVehicle {
     // Oberkante MUSS unter dem Muldenboden (0,99 m) liegen UND das Chassis darf
     // NICHT hinter das Muldenheck ragen — sonst landet abgekippte Ladung auf dem
     // Chassis und fährt mit dem LKW davon
-    world.createCollider(
-      RAPIER.ColliderDesc.cuboid(1.1, 0.42, (this.bedLen + 1.6) / 2).setTranslation(0, 0.5, 0.8),
-      this.chassisBody
-    );
     if (kind === "pkw") {
-      // Das Zugfahrzeug steht vor dem Anhaenger und war bisher ohne Kollider —
-      // der Baggerarm fuhr hindurch. Masse und Lage nach dem Modell
-      // (Mitte bei bedLen/2 + 2,6, Laenge bis 5 m).
+      // Nur das Zugfahrzeug haengt am starren Rahmen. Der LKW-Kollider entfaellt
+      // hier: Er deckte die Anhaengerflaeche ab, und die schwenkt jetzt am
+      // Gelenk weg — ein starrer Kasten darueber waere schlicht falsch. Der
+      // Anhaenger ist ueber die Ladeflaechen-Koerper vorhanden, die dem Gelenk
+      // folgen.
+      const zugZ = this.bedLen + 1.05 + 0.35 + 2.15;
       world.createCollider(
-        RAPIER.ColliderDesc.cuboid(0.95, 0.8, 2.5).setTranslation(0, 0.9, this.bedLen / 2 + 2.6),
+        RAPIER.ColliderDesc.cuboid(0.95, 0.8, 2.3).setTranslation(0, 0.9, zugZ),
+        this.chassisBody
+      );
+    } else {
+      world.createCollider(
+        RAPIER.ColliderDesc.cuboid(1.1, 0.42, (this.bedLen + 1.6) / 2).setTranslation(0, 0.5, 0.8),
         this.chassisBody
       );
     }
@@ -835,6 +880,8 @@ class DeliveryVehicle {
         if (this.routeS >= this.routeLength(this.routeOut)) this.done = true;
         break;
     }
+
+    this.updateTrailer(dt);
 
     // Ladekran: beim Andocken zur Seite schwenken, damit der Ausleger nicht ueber
     // der Ladeflaeche haengt und dem Baggerfahrer die Sicht und den Weg nimmt.

@@ -392,6 +392,17 @@ async function main(): Promise<void> {
     if (!it) return true; // Karosse, Presspaket, Unbekanntes: haelt
     return !items.isCrushable(it);
   };
+  // Aufgespiesst: Der Zahn geht durch nachgiebiges Material hindurch — dann
+  // soll man dem Teil hinterher ansehen, was passiert ist. Sonst steckt es
+  // unversehrt auf der Zacke und nichts erklaert, warum es dort haengt.
+  // flattenItem greift je Teil nur einmal, es bleibt also bei einem Knirschen.
+  excavator.onClawPierce = (body) => {
+    const it = items.itemByBody(body);
+    if (!it || !items.isCrushable(it) || !items.flattenItem(it)) return;
+    const p = body.translation();
+    audio.playDrop(it.materialId);
+    particles.spawn(new THREE.Vector3(p.x, p.y, p.z), 4, 0xb0b6bb, 1.4, 1.0, 0.45);
+  };
   excavator.getStaffPos = () => staff.lambertPosition();
   staff.getBlockingItem = () => {
     const b = lanes.nearest(staff.lambertPosition());
