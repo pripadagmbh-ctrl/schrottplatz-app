@@ -214,3 +214,66 @@ export class WheelLoader {
 
 /** Vorne am Knick: dort sitzt die Achse, um die der Vorderwagen dreht. */
 export const LOADER_FRONT_LEN = FRONT_LEN;
+
+/*
+ * --- Schieben: was der Bagger nicht erreicht, holt der Radlader heran ---
+ *
+ * Der Bagger kommt am Boden nur zwischen 3,0 und 9,5 m an sein Material
+ * (gemessen aus der Armgeometrie, siehe reach.test.ts). Was weiter draussen
+ * liegt, war bisher verloren: Man sah es, kam aber nicht heran, und der
+ * Haufen blieb liegen (Befund iPad 10.09.2026). Genau dafuer ist der Lader
+ * da — er schiebt es in die Zone, in der der Bagger sauber arbeitet.
+ */
+
+/** Ab hier draussen kommt der Bagger nicht mehr hin (Rest als Sicherheit). */
+export const SCHIEB_AB_M = 9.0;
+/** Dorthin wird geschoben: mitten in den guten Bereich, nicht an dessen Rand. */
+export const SCHIEB_ZIEL_M = 6.0;
+/** Wie weit hinter dem Teil der Lader anhaelt, um sich davorzusetzen. */
+export const ANSTELL_ABSTAND = 2.8;
+/** Darunter lohnt die Fahrt nicht — Kleinteile traegt Lambert von Hand. */
+export const SCHIEB_MIN_KG = 25;
+/** Zu nah am Bagger wird nichts geschoben — sonst schiebt er es in die Maschine. */
+export const SCHIEB_MIN_M = 3.0;
+
+/**
+ * Lohnt sich das Schieben? Nur, was ausserhalb der Baggerreichweite liegt.
+ * Alles darin ist Sache des Baggers — der Lader hat dort nichts zu suchen.
+ */
+export function brauchtSchieben(ix: number, iz: number, ex: number, ez: number): boolean {
+  return Math.hypot(ix - ex, iz - ez) > SCHIEB_AB_M;
+}
+
+/**
+ * Wo der Lader sich anstellt: auf der Verlaengerung Bagger → Teil, hinter dem
+ * Teil. Von dort zeigt die Schaufel genau auf den Bagger zu.
+ */
+export function anstellPunkt(
+  ix: number,
+  iz: number,
+  ex: number,
+  ez: number
+): [number, number] {
+  const dx = ix - ex;
+  const dz = iz - ez;
+  const d = Math.hypot(dx, dz) || 1;
+  return [ix + (dx / d) * ANSTELL_ABSTAND, iz + (dz / d) * ANSTELL_ABSTAND];
+}
+
+/**
+ * Wohin geschoben wird: auf derselben Linie, aber im guten Bereich des
+ * Baggers. Zurueck kommt die Halteposition des Laders — das Teil selbst
+ * landet eine Schaufellaenge davor.
+ */
+export function schiebeZiel(
+  ix: number,
+  iz: number,
+  ex: number,
+  ez: number
+): [number, number] {
+  const dx = ix - ex;
+  const dz = iz - ez;
+  const d = Math.hypot(dx, dz) || 1;
+  const ziel = SCHIEB_ZIEL_M + ANSTELL_ABSTAND;
+  return [ex + (dx / d) * ziel, ez + (dz / d) * ziel];
+}

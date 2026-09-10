@@ -1,7 +1,16 @@
 import * as THREE from "three";
 import type { ItemManager } from "./scrapItems";
 import { hitsObstacle, slideAround } from "./obstacles";
-import { WheelLoader, LOADER_SPEED } from "./loader";
+import { CONFIGS, type ContainerConfig } from "./containers";
+import {
+  WheelLoader,
+  LOADER_SPEED,
+  brauchtSchieben,
+  anstellPunkt,
+  schiebeZiel,
+  SCHIEB_MIN_M,
+  SCHIEB_MIN_KG,
+} from "./loader";
 
 /**
  * Platzpersonal (Design 2026-08-29):
@@ -75,7 +84,20 @@ export function buildPerson(colors: PersonColors): PersonParts {
   return { group, armLeft, armRight, legLeft, legRight };
 }
 
-type LambertState = "patrol" | "guide" | "fetch" | "carry";
+/**
+ * Was Lambert gerade tut.
+ *
+ *   patrol  wartet und sieht sich um
+ *   guide   weist einen LKW ein
+ *   fetch   holt ein Teil (zu Fuss oder mit der Schaufel)
+ *   carry   bringt es in seine Mulde
+ *   shove   faehrt hinter ein Teil, das der Bagger nicht erreicht
+ *   shoving schiebt es in die Reichweite des Baggers
+ *
+ * Die beiden letzten gibt es nur mit Radlader — von Hand schiebt niemand
+ * einen halben Motorblock ueber den Platz.
+ */
+type LambertState = "patrol" | "guide" | "fetch" | "carry" | "shove" | "shoving";
 
 export class StaffManager {
   private lambert: PersonParts;
@@ -106,6 +128,15 @@ export class StaffManager {
    * über ihm bewegt, nicht der ganzen Maschine (Design-Fix 29.08.2026).
    */
   getGrapplePos: (() => THREE.Vector3) | null = null;
+  /** Liegt (x,z) auf einer Sortierflaeche — Haufen oder Mulde? */
+  private static inZone(x: number, z: number): boolean {
+    for (const c of CONFIGS) {
+      const [w, d] = c.size;
+      if (Math.abs(x - c.x) < w / 2 + 1.0 && Math.abs(z - c.z) < d / 2 + 1.0) return true;
+    }
+    return false;
+  }
+
   /**
    * Teil, das gerade eine Fahrspur blockiert. Das hat Vorrang vor allem
    * anderen: Solange es dort liegt, steht der Betrieb.
@@ -257,8 +288,11 @@ export class StaffManager {
     this.stateT += dt;
     const g = this.lambert.group;
 
-    // Einweisen hat Vorrang: sobald ein LKW auf dem Platz rangiert
-    if (truck && this.lambertState !== "carry") {
+    // Einweisen hat Vorrang: sobald ein LKW auf dem Platz rangiert. Was er
+    // gerade in der Schaufel hat oder vor sich herschiebt, laesst er dafuer
+    // aber nicht mitten auf dem Platz stehen.
+    const gebunden = this.lambertState === "carry" || this.lambertState === "shoving";
+    if (truck && !gebunden) {
       if (this.lambertState !== "guide") {
         this.lambertState = "guide";
         this.stateT = 0;
@@ -334,20 +368,54 @@ export class StaffManager {
       this.lambert.armRight.rotation.x = swing * 0.6;
     }
 
-    // Getragenes Teil mitführen
-    if (this.carriedItemId) {
-      const it = this.items.items.find((i) => i.id === this.carriedItemId);
-      if (it && it.body.isValid()) {
-        it.body.setTranslation(
-          { x: g.position.x, y: 1.15, z: g.position.z + 0.35 },
-          true
-        );
-        it.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-      } else {
-        this.carriedItemId = null;
-      }
+    // Schaufelstellung: gesenkt zum Aufnehmen und Schieben, gehoben zum Fahren
+    if (this.hasLoader) {
+      this.loader?.setLift(this.lambertState === "carry");
     }
+
+    this.fuehreLast(g);
   }
+
+  /**
+   * Was Lambert gerade bewegt, mit ihm mitfuehren.
+   *
+   * Zu Fuss traegt er es vor der Brust. Mit dem Radlader liegt es in der
+   * Schaufel — und beim Schieben eben davor am Boden: Ein Radlader hebt einen
+   * Traeger nicht auf Brusthoehe, er schiebt ihn ueber den Beton.
+   */
+  private fuehreLast(g: THREE.Object3D): void {
+    if (!this.carriedItemId || !this.lastAufgenommen) return;
+    const it = this.items.items.find((i) => i.id === this.carriedItemId);
+    if (!it || !it.body.isValid()) {
+      this.carriedItemId = null;
+      this.lastAufgenommen = false;
+      return;
+    }
+    let ziel: THREE.Vector3;
+    if (this.hasLoader && this.loader) {
+      ziel = this.loader.bucketPosition(this.lastTmp);
+      if (this.lambertState === "shoving") {
+        // vor der Schneide, am Boden — nicht in der Schaufel
+        ziel.set(
+          g.position.x + Math.sin(g.rotation.y) * 2.4,
+          0.35,
+          g.position.z + Math.cos(g.rotation.y) * 2.4
+        );
+      }
+    } else {
+      ziel = this.lastTmp.set(g.position.x, 1.15, g.position.z + 0.35);
+    }
+    it.body.setTranslation({ x: ziel.x, y: ziel.y, z: ziel.z }, true);
+    it.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+  }
+
+  private lastTmp = new THREE.Vector3();
+  /**
+   * Erst ab dem Moment, in dem er beim Teil steht, nimmt er es mit. Ohne das
+   * sprang es ihm quer ueber den Platz entgegen, sobald er es sich vorgenommen
+   * hatte — beim Schieben faellt so etwas sofort auf.
+   */
+  private lastAufgenommen = false;
 
   private stuckT = 0;
   private bestDist = Infinity;
@@ -364,6 +432,7 @@ export class StaffManager {
   private giveUpTarget(): void {
     this.resetStuck();
     this.carriedItemId = null;
+    this.lastAufgenommen = false;
     this.lambertState = "patrol";
     this.patrolIdx = (this.patrolIdx + 1) % this.patrol.length;
     this.lambertTarget.copy(this.patrol[this.patrolIdx]);
@@ -373,21 +442,57 @@ export class StaffManager {
   private onArrived(): void {
     if (this.lambertState === "guide") return;
 
+    if (this.lambertState === "shove") {
+      // Hinter dem Teil angekommen: aufnehmen und in Richtung Bagger schieben
+      const it = this.items.items.find((i) => i.id === this.carriedItemId);
+      const ex = this.getExcavatorPos?.();
+      if (it && it.body.isValid() && ex) {
+        const p = it.body.translation();
+        const [zx, zz] = schiebeZiel(p.x, p.z, ex.x, ex.z);
+        this.lambertState = "shoving";
+        this.lastAufgenommen = true;
+        this.lambertTarget.set(zx, 0, zz);
+      } else {
+        this.carriedItemId = null;
+        this.lastAufgenommen = false;
+        this.lambertState = "patrol";
+      }
+      return;
+    }
+    if (this.lambertState === "shoving") {
+      // Abgeliefert: Teil liegt jetzt im Arbeitsbereich des Baggers
+      const it = this.items.items.find((i) => i.id === this.carriedItemId);
+      if (it && it.body.isValid()) {
+        it.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+        it.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      }
+      this.carriedItemId = null;
+      this.lastAufgenommen = false;
+      this.lambertState = "patrol";
+      // Ein Stueck zuruecksetzen, sonst steht er dem Bagger im Schwenkbereich
+      this.patrolIdx = (this.patrolIdx + 1) % this.patrol.length;
+      this.lambertTarget.copy(this.patrol[this.patrolIdx]);
+      return;
+    }
     if (this.lambertState === "fetch") {
       // Aufgenommen — jetzt zur Box, in die das Material gehört
       const it = this.items.items.find((i) => i.id === this.carriedItemId);
       if (it) {
-        const ziel = StaffManager.BOX_FOR_MATERIAL[it.materialId];
-        if (ziel) {
+        const mulde = StaffManager.muldeFuer(it.materialId);
+        if (mulde) {
           this.lambertState = "carry";
-          // vor der Box stehen bleiben, nicht mitten hinein laufen
-          this.lambertTarget.set(ziel[0] - 3.4, 0, ziel[1]);
+          this.lastAufgenommen = true;
+          // vor der Mulde stehen bleiben, nicht mitten hinein fahren
+          const [ax, az] = StaffManager.anlieferPunkt(mulde);
+          this.lambertTarget.set(ax, 0, az);
         } else {
           this.carriedItemId = null;
+          this.lastAufgenommen = false;
           this.lambertState = "patrol";
         }
       } else {
         this.carriedItemId = null;
+        this.lastAufgenommen = false;
         this.lambertState = "patrol";
       }
       return;
@@ -396,13 +501,15 @@ export class StaffManager {
       // In die Box legen: Lambert wirft es über die Wand hinein
       const it = this.items.items.find((i) => i.id === this.carriedItemId);
       if (it && it.body.isValid()) {
-        const ziel = StaffManager.BOX_FOR_MATERIAL[it.materialId];
-        if (ziel) {
+        const mulde = StaffManager.muldeFuer(it.materialId);
+        if (mulde) {
+          // Ueber die Wand gekippt: aus Schaufelhoehe in die Mulde fallen
+          // lassen, nicht am Boden absetzen — sonst haengt es in der Wand.
           it.body.setTranslation(
             {
-              x: ziel[0] + (Math.random() - 0.5) * 1.6,
-              y: 1.6,
-              z: ziel[1] + (Math.random() - 0.5) * 1.6,
+              x: mulde.x + (Math.random() - 0.5) * 1.2,
+              y: mulde.size[2] - 0.6,
+              z: mulde.z + (Math.random() - 0.5) * 1.2,
             },
             true
           );
@@ -411,6 +518,7 @@ export class StaffManager {
         }
       }
       this.carriedItemId = null;
+      this.lastAufgenommen = false;
       this.lambertState = "patrol";
       this.lambertTarget.copy(this.patrol[this.patrolIdx]);
       return;
@@ -419,12 +527,35 @@ export class StaffManager {
     // Patrouille: regelmäßig nach einem verirrten Kleinteil sehen
     if (this.stateT > 0.8) {
       this.stateT = 0;
-      const stray = this.findStray();
-      if (stray) {
-        this.carriedItemId = stray.id;
-        const p = stray.body.translation();
+      const hol = (it: (typeof this.items.items)[number]): void => {
+        this.carriedItemId = it.id;
+        const p = it.body.translation();
         this.lambertTarget.set(p.x, 0, p.z);
         this.lambertState = "fetch";
+      };
+      // Reihenfolge mit Absicht: Eine blockierte Fahrspur legt den Betrieb
+      // lahm. Danach kommt, was der Bagger nicht erreicht — daran kommt sonst
+      // niemand heran, waehrend Sortierteile nur liegenbleiben und warten.
+      // Stuende das Sortieren davor, wuerde nie geschoben: Es liegt immer
+      // irgendwo noch ein Stueck Buntmetall herum (gemessen 10.09.2026).
+      const blocker = this.findBlocker();
+      if (blocker) {
+        hol(blocker);
+        return;
+      }
+      const weit = this.findSchiebegut();
+      if (weit) {
+        const p = weit.body.translation();
+        const ex = this.getExcavatorPos!();
+        const [ax, az] = anstellPunkt(p.x, p.z, ex.x, ex.z);
+        this.carriedItemId = weit.id;
+        this.lambertTarget.set(ax, 0, az);
+        this.lambertState = "shove";
+        return;
+      }
+      const stray = this.findStray();
+      if (stray) {
+        hol(stray);
         return;
       }
       this.patrolIdx = (this.patrolIdx + 1) % this.patrol.length;
@@ -433,18 +564,74 @@ export class StaffManager {
   }
 
   /**
-   * Wohin gehört welche Fraktion? Koordinaten der Betonboxen aus
-   * containers.ts. Stahl fehlt bewusst: der bleibt Sache des Baggers.
+   * Schrott, an den der Bagger nicht herankommt.
+   *
+   * Der Wunsch dahinter (10.09.2026): "Der soll den Schrott, der nicht
+   * erreichbar ist, zu mir schieben." Gesucht wird deshalb nach Gewicht und
+   * Entfernung, nicht nach Material — was zu weit draussen liegt, blockiert
+   * den Betrieb, egal was drinsteckt. Ganz kleine Teile bleiben aussen vor —
+   * dafuer lohnt die Fahrt nicht.
    */
-  private static readonly BOX_FOR_MATERIAL: Record<string, [number, number]> = {
-    va: [4.6, -5.6],
-    alu: [4.6, -1.9],
-    copper: [4.6, 1.9],
-    cable: [4.6, 5.6],
-    wood: [7.9, -3.9],
-    tires: [7.9, 0],
-    rubble: [7.9, 3.9],
-  };
+  private findSchiebegut(): (typeof this.items.items)[number] | null {
+    if (!this.hasLoader) return null;
+    const ex = this.getExcavatorPos?.();
+    if (!ex) return null;
+    const gr = this.getGrapplePos?.();
+    const von = this.lambert.group.position;
+    let best: (typeof this.items.items)[number] | null = null;
+    let bestD = Infinity;
+    for (const it of this.items.items) {
+      if (!it.body.isValid() || !it.body.isDynamic()) continue;
+      // Fuer eine Schraube faehrt niemand den Lader an
+      if (it.massKg < SCHIEB_MIN_KG) continue;
+      const p = it.body.translation();
+      if (p.y > 1.4) continue;
+      if (!brauchtSchieben(p.x, p.z, ex.x, ex.z)) continue;
+      // Was in einer Mulde oder auf einer Ladeflaeche liegt, liegt richtig
+      if (hitsObstacle(p.x, p.z, 0.4)) continue;
+      // Und was auf einer Sortierflaeche liegt — vor allem im Stahlhaufen —
+      // liegt ebenfalls richtig. Dessen Rand ist gut 9 m vom Bagger entfernt;
+      // ohne diese Regel schob Lambert den Haufen endlos in sich zusammen
+      // (gemessen 10.09.2026).
+      if (StaffManager.inZone(p.x, p.z)) continue;
+      // Nur auf dem Arbeitsteil des Platzes, nicht hinten bei den Gebaeuden
+      if (p.z < -12 || p.z > 22 || p.x < -24 || p.x > 4) continue;
+      if (gr && Math.hypot(p.x - gr.x, p.z - gr.z) < StaffManager.GRAPPLE_KEEPOUT) continue;
+      // Das Ziel muss frei sein, sonst schiebt er es gegen den naechsten Haufen
+      const [zx, zz] = schiebeZiel(p.x, p.z, ex.x, ex.z);
+      if (Math.hypot(zx - ex.x, zz - ex.z) < SCHIEB_MIN_M) continue;
+      if (hitsObstacle(zx, zz, 0.8)) continue;
+      const [ax, az] = anstellPunkt(p.x, p.z, ex.x, ex.z);
+      if (!this.reachable(ax, az)) continue;
+      const d = Math.hypot(p.x - von.x, p.z - von.z);
+      if (d < bestD) {
+        bestD = d;
+        best = it;
+      }
+    }
+    return best;
+  }
+
+  /**
+   * Wohin gehört welche Fraktion? Direkt aus containers.ts gelesen.
+   *
+   * Vorher standen die Koordinaten hier abgeschrieben — und blieben beim
+   * Verschieben der Muldenzeile zurueck: Lambert trug Buntmetall zu einer
+   * Stelle, an der seit dem Umbau nur noch Beton war. Zwei Wahrheiten ueber
+   * dieselbe Sache halten nie. Stahl fehlt bewusst: der bleibt Sache des
+   * Baggers, und das Ballenlager ist keine Mulde.
+   */
+  private static muldeFuer(materialId: string): ContainerConfig | undefined {
+    return CONFIGS.find((c) => c.kind === "bay" && c.fractionId === materialId);
+  }
+
+  /** Halteplatz vor einer Mulde: vor ihrer offenen Seite, nicht darin. */
+  private static anlieferPunkt(c: ContainerConfig): [number, number] {
+    const [w, d] = c.size;
+    if (c.facing === "north") return [c.x, c.z + d / 2 + 2.2];
+    if (c.facing === "east") return [c.x + w / 2 + 2.2, c.z];
+    return [c.x - w / 2 - 2.2, c.z];
+  }
 
   /**
    * Freier Weg von Lambert zum Ziel? Abgetastet wird die Luftlinie in
@@ -456,7 +643,7 @@ export class StaffManager {
     const dx = tx - from.x;
     const dz = tz - from.z;
     const dist = Math.hypot(dx, dz);
-    if (dist > StaffManager.REACH_M) return false;
+    if (dist > this.reichweite) return false;
     const steps = Math.ceil(dist);
     for (let i = 1; i <= steps; i++) {
       const f = i / steps;
@@ -466,8 +653,15 @@ export class StaffManager {
   }
 
 
-  /** So weit läuft er für ein Kleinteil — alles Weitere ist Baggerarbeit. */
-  private static readonly REACH_M = 26;
+  /**
+   * So weit macht er sich auf den Weg. Zu Fuss ist bei 26 m Schluss — alles
+   * Weitere waere ein halber Arbeitstag fuer ein Kleinteil. Mit dem Radlader
+   * faehrt er den ganzen Platz ab; genau dafuer ist er da, denn was ganz
+   * aussen liegt, erreicht sonst niemand (Wunsch 10.09.2026).
+   */
+  private get reichweite(): number {
+    return this.hasLoader ? 60 : 26;
+  }
 
   /** Wo Lambert gerade steht — der Baggerarm weicht ihm aus. */
   lambertPosition(): THREE.Vector3 {
@@ -502,13 +696,20 @@ export class StaffManager {
     const gr = this.getGrapplePos?.();
     if (gr) push(gr.x, gr.z, StaffManager.GRAPPLE_KEEPOUT);
     for (const c of this.getObstaclePositions?.() ?? []) push(c.x, c.z, 3.2);
-    // Sperrige Schrottteile: er steigt nicht darüber, er geht drumherum
+    /*
+     * Sperrige Schrottteile: zu Fuss steigt er nicht darueber, er geht
+     * drumherum. Mit dem Radlader gilt das nur noch fuer richtige Brocken —
+     * Kleinzeug schiebt so eine Maschine beiseite. Ohne diese Ausnahme blieb
+     * er im Stahlhaufen stehen: Ringsum drueckte ihn alles gleichzeitig weg,
+     * unterm Strich bewegte er sich nicht mehr (gemessen 10.09.2026).
+     */
+    const schwelle = this.hasLoader ? 400 : 120;
     for (const it of this.items.items) {
-      if (it.massKg < 120 || !it.body.isValid()) continue;
+      if (it.massKg < schwelle || !it.body.isValid()) continue;
       const q = it.body.translation();
       if (Math.abs(q.x - pos.x) > 3 || Math.abs(q.z - pos.z) > 3) continue;
       if (it.id === this.carriedItemId) continue; // sein eigenes Ziel nicht
-      push(q.x, q.z, 1.5);
+      push(q.x, q.z, this.hasLoader ? 1.2 : 1.5);
     }
     out.y = 0;
     out.normalize();
@@ -520,14 +721,11 @@ export class StaffManager {
     return out.normalize();
   }
 
-  /** Kleinteil, das frei herumliegt (nicht in einer Zone, nicht gegriffen). */
-  private findStray(): (typeof this.items.items)[number] | null {
-    // Lamberts Hauptaufgabe: Buntmetall aus dem Stahlschrott holen und in die
-    // passende Box legen. Stahl und Störstoff lässt er liegen — der eine ist
-    // Sache des Baggers, der andere kommt gesondert weg. Das nächstgelegene
-    // Teil hat Vorrang, damit er nicht quer über den Platz läuft, während
-    // Vorrang hat immer, was eine Fahrspur blockiert — daran hängt der
-    // ganze Betrieb, und ein Kleinteil in der Box kann warten.
+  /**
+   * Teil, das gerade eine Fahrspur blockiert. Daran haengt der ganze Betrieb,
+   * deshalb hat es Vorrang vor allem anderen.
+   */
+  private findBlocker(): (typeof this.items.items)[number] | null {
     const stoerfall = this.getBlockingItem?.();
     if (
       stoerfall &&
@@ -537,6 +735,19 @@ export class StaffManager {
     ) {
       return stoerfall;
     }
+    return null;
+  }
+
+  /** Kleinteil, das frei herumliegt (nicht in einer Zone, nicht gegriffen). */
+  private findStray(): (typeof this.items.items)[number] | null {
+    // Lamberts Hauptaufgabe: Buntmetall aus dem Stahlschrott holen und in die
+    // passende Box legen. Stahl und Störstoff lässt er liegen — der eine ist
+    // Sache des Baggers, der andere kommt gesondert weg. Das nächstgelegene
+    // Teil hat Vorrang, damit er nicht quer über den Platz läuft, während
+    // Vorrang hat immer, was eine Fahrspur blockiert — daran hängt der
+    // ganze Betrieb, und ein Kleinteil in der Box kann warten.
+    const stoerfall = this.findBlocker();
+    if (stoerfall) return stoerfall;
 
     // neben ihm etwas liegt.
     const ex = this.getExcavatorPos?.();
@@ -548,15 +759,18 @@ export class StaffManager {
       // Was er heben kann, hängt am Ausbau: von Hand nur Kleinteile, mit
       // Stapler auch schwerere Stücke, mit Radlader ganze Brocken.
       if (it.massKg > this.tragkraft) continue;
-      const ziel = StaffManager.BOX_FOR_MATERIAL[it.materialId];
-      if (!ziel) continue;
+      const mulde = StaffManager.muldeFuer(it.materialId);
+      if (!mulde) continue;
       if (!it.body.isValid() || !it.body.isDynamic()) continue;
       const p = it.body.translation();
       if (p.y > 1.4) continue;
       // Liegt es schon in seiner Box, bleibt es dort. Alles andere — auch was
       // im Stahlhaufen steckt — holt er heraus; genau das ist seine Aufgabe.
-      if (Math.hypot(p.x - ziel[0], p.z - ziel[1]) < 2.8) continue;
-      if (Math.abs(p.x) > 22 || p.z < -10 || p.z > 22) continue;
+      if (Math.hypot(p.x - mulde.x, p.z - mulde.z) < 2.8) continue;
+      // Der Arbeitsteil des Platzes. Nach Sueden reicht er bis hinter die
+      // letzte Mulde — die Zeile endet bei z = -17,65, und was daneben liegt,
+      // soll er einraeumen duerfen.
+      if (Math.abs(p.x) > 22 || p.z < -20 || p.z > 22) continue;
       // Nicht dort zugreifen, wo die Spinne gerade arbeitet
       if (gr && Math.hypot(p.x - gr.x, p.z - gr.z) < StaffManager.GRAPPLE_KEEPOUT) continue;
       if (ex && Math.hypot(p.x - ex.x, p.z - ex.z) < StaffManager.EXCAVATOR_KEEPOUT) continue;
