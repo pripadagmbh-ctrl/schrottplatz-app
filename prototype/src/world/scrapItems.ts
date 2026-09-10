@@ -192,6 +192,29 @@ const SPECS: PileSpec[] = [
   // Maschendraht-Bündel: sperrig + leicht — eignet sich als „Kehrbesen" zum
   // Freischieben von Pritsche und Boden (Design-Wunsch 2026-08-27)
   { materialId: "steel", massKg: 22, kind: "wire", dims: [0.55] },
+
+  // Was auf einem Schrottplatz sonst noch liegt (Wunsch 10.09.2026). Vorher
+  // war das Sortiment sehr nach Baustelle: Profile, Rohre, Bleche. Ein Platz
+  // lebt aber von dem, was die Leute anschleppen — Hausrat, Zweiraeder,
+  // Landmaschinen, ausgeschlachtete Fahrzeugteile.
+  { materialId: "steel", massKg: 42, kind: "box", dims: [0.55, 0.85, 0.55] }, // Waschmaschine
+  { materialId: "steel", massKg: 38, kind: "box", dims: [0.6, 0.85, 0.6] }, // Spuelmaschine
+  { materialId: "steel", massKg: 30, kind: "box", dims: [0.65, 0.9, 0.6] }, // Elektroherd
+  { materialId: "steel", massKg: 52, kind: "cyl", dims: [0.28, 1.4] }, // Warmwasserspeicher
+  { materialId: "steel", massKg: 48, kind: "box", dims: [1.6, 0.55, 0.7] }, // Badewanne
+  { materialId: "steel", massKg: 26, kind: "box", dims: [0.6, 0.9, 1.9] }, // Motorradrahmen
+  { materialId: "steel", massKg: 14, kind: "box", dims: [0.5, 0.7, 1.6] }, // Mopedrahmen
+  { materialId: "steel", massKg: 120, kind: "box", dims: [1.1, 0.35, 0.9] }, // Pflugschar
+  { materialId: "steel", massKg: 85, kind: "cyl", dims: [0.34, 1.7] }, // Eggenwalze
+  { materialId: "steel", massKg: 160, kind: "box", dims: [0.5, 0.5, 1.4] }, // Traktor-Frontgewicht
+  { materialId: "steel", massKg: 95, kind: "box", dims: [2.1, 0.25, 0.35] }, // Heuwender-Ausleger
+  { materialId: "steel", massKg: 210, kind: "cyl", dims: [0.16, 2.2] }, // LKW-Achse
+  { materialId: "steel", massKg: 130, kind: "box", dims: [0.8, 0.7, 0.9] }, // LKW-Getriebe
+  { materialId: "steel", massKg: 75, kind: "box", dims: [0.9, 0.75, 0.12] }, // LKW-Kuehler
+  { materialId: "steel", massKg: 46, kind: "cyl", dims: [0.28, 0.32] }, // LKW-Felge
+  { materialId: "alu", massKg: 16, kind: "box", dims: [0.7, 0.5, 0.15] }, // Motorradmotor
+  { materialId: "copper", massKg: 22, kind: "box", dims: [0.45, 0.4, 0.35] }, // Elektromotor
+  { materialId: "contaminant", massKg: 11, kind: "torus", dims: [0.31, 0.11] }, // Traktorreifen
 ];
 
 /**

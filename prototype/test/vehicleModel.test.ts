@@ -157,6 +157,33 @@ describe("Anlieferfahrzeuge", () => {
     expect(anhaengerBox.max.z).toBeLessThanOrEqual(kupplungZ + 0.1);
   });
 
+  it("die Aufbauten unterscheiden sich in der Wandhöhe", () => {
+    // Haendler fahren nicht alle denselben Wagen. Gemessen wird die Huelle des
+    // Fahrzeugs: Ein Rungen- oder Kofferaufbau ragt hoeher als flache
+    // Bordwaende.
+    const hoehe = (stil: "flach" | "rungen" | "koffer"): number => {
+      const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
+      const ctx: VehicleModelContext = {
+        kind: "pritsche",
+        bedLen: 5.4,
+        bodyStyle: stil,
+        group: new THREE.Group(),
+        bedGroup: new THREE.Group(),
+        world,
+        sideWalls: [],
+        tailGate: null,
+      };
+      buildVehicleModel(ctx);
+      ctx.group.updateWorldMatrix(true, true);
+      return new THREE.Box3().setFromObject(ctx.bedGroup).max.y;
+    };
+    const flach = hoehe("flach");
+    const rungen = hoehe("rungen");
+    const koffer = hoehe("koffer");
+    expect(rungen, "Rungen ragen nicht hoeher als flache Bordwaende").toBeGreaterThan(flach);
+    expect(koffer, "Koffer ragt nicht hoeher als Rungen").toBeGreaterThan(rungen);
+  });
+
   it("der PKW-Anhänger trägt seine Ladung dort, wo der Boden ist", () => {
     const v = bauen("pkw", 2.4);
     // Die Ladung wird bei lokal z zwischen 0,15 und bedLen-0,15 gesetzt

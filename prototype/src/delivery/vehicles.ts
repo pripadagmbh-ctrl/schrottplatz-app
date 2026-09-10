@@ -315,6 +315,13 @@ class DeliveryVehicle {
       withCrane:
         this.customer?.group === "haendler" &&
         (this.kind === "kipper" || this.kind === "pritsche"),
+      // Haendler fahren nicht alle denselben Wagen: mal flache Bordwaende, mal
+      // der klassische Rungenaufbau, mal ein geschlossener Kasten. Gewerbe und
+      // Privat bleiben flach — sie liefern kein Schuettgut.
+      bodyStyle:
+        this.customer?.group === "haendler"
+          ? (["rungen", "rungen", "koffer", "flach"] as const)[Math.floor(Math.random() * 4)]
+          : "flach",
       group: this.group,
       bedGroup: this.bedGroup,
       world: this.world,

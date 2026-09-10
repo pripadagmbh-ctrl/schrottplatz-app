@@ -238,8 +238,12 @@ const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
  */
 export function rollCustomer(): CustomerProfile {
   const r = Math.random();
-  if (r < 0.34) return rollPrivat();
-  if (r < 0.74) return rollHaendler();
+  // Weniger Privatleute (Wunsch 10.09.2026): Sie bringen Kleinkram im
+  // Anhaenger, und wenn jeder Dritte einer ist, steht der Platz voller
+  // Kofferraumladungen. Ein Schrottplatz lebt vom Haendler — der bringt die
+  // Fuhren, an denen Schere und Presse ueberhaupt lohnen.
+  if (r < 0.18) return rollPrivat();
+  if (r < 0.78) return rollHaendler();
   return rollGewerbe();
 }
 

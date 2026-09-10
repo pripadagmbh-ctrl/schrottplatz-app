@@ -17,6 +17,13 @@ export interface VehicleModelContext {
   bedLen: number;
   /** Schrotthändler fahren ihren eigenen Ladekran mit */
   withCrane?: boolean;
+  /**
+   * Aufbau der Ladefläche. Händler fahren nicht alle denselben Wagen:
+   *   flach   niedrige Bordwände, wie ein Baustellenpritsche
+   *   rungen  hohe Seitenwände mit Rungen — der klassische Schrottaufbau
+   *   koffer  geschlossener Kastenaufbau, fast schon ein Container
+   */
+  bodyStyle?: "flach" | "rungen" | "koffer";
   group: THREE.Group;
   bedGroup: THREE.Group;
   world: RAPIER.World;
@@ -318,10 +325,19 @@ export function buildVehicleModel(v: VehicleModelContext): VehicleModelParts {
   floor.castShadow = true;
   v.bedGroup.add(floor);
   const isContainer = v.kind === "abholer";
-  const wallH = isContainer ? 2.5 : 0.64;
+  const aufbau = v.bodyStyle ?? "flach";
+  const wallH = isContainer
+    ? 2.5
+    : aufbau === "koffer"
+      ? 1.55
+      : aufbau === "rungen"
+        ? 1.05
+        : 0.64;
   const sideMat = isContainer
     ? new THREE.MeshStandardMaterial({ color: 0x2f7a4f, roughness: 0.75, metalness: 0.35 })
-    : bedMat;
+    : aufbau === "koffer"
+      ? new THREE.MeshStandardMaterial({ color: 0x53585d, roughness: 0.8, metalness: 0.3 })
+      : bedMat;
   // Bordwände links und rechts als aufklappbare Klappen (Scharnier unten
   // außen). Beim Abladen fallen sie zur Seite — der Schrott darf herunter.
   for (const dir of [-1, 1] as const) {
@@ -336,6 +352,17 @@ export function buildVehicleModel(v: VehicleModelContext): VehicleModelParts {
       const latch = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.16, 0.1), bedMat);
       latch.position.set(dir * 0.06, wallH - 0.2, lz);
       hinge.add(latch);
+    }
+    // Rungen: senkrechte Steher aussen an der Wand — daran erkennt man den
+    // Schrottaufbau schon von weitem
+    if (aufbau === "rungen") {
+      for (let i = 0; i < 4; i++) {
+        const rz = -v.bedLen / 2 + 0.5 + (i / 3) * (v.bedLen - 1.0);
+        const runge = new THREE.Mesh(new THREE.BoxGeometry(0.1, wallH + 0.3, 0.12), dark);
+        runge.position.set(dir * 0.1, (wallH + 0.3) / 2, rz);
+        runge.castShadow = true;
+        hinge.add(runge);
+      }
     }
     v.bedGroup.add(hinge);
     const wallBody = v.world.createRigidBody(
