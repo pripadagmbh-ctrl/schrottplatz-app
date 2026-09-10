@@ -54,7 +54,14 @@ const GRAPPLE_DEADZONE = 0.38;
 /** So lange darf der linke Stick unberuehrt bleiben, bevor der Fahrmodus endet */
 const DRIVE_AUTO_EXIT_S = 4;
 /** Bis hierhin gilt eine Berührung des Rädchens als Tipp, darüber als Blättern (px) */
-const WHEEL_TAP_MAX_MOVE = 10;
+/** So lange muss der rechte Daumen stillhalten, bis der Kranz aufklappt */
+const RADIAL_HOLD_S = 0.4;
+/** Halbmesser des Kranzes in px */
+const RADIAL_R = 104;
+/** Ab diesem Zugweg gilt eine Richtung als gewaehlt */
+const RADIAL_MIN_PX = 34;
+/** Bis hierhin gilt der Daumen als stillgehalten (Anteil des Vollausschlags) */
+const RADIAL_STILL = 0.14;
 /** Ein Aufsetzen zählt nur als Tipp, wenn es kürzer dauert und der Finger kaum wandert */
 const TAP_MAX_MS = 250;
 const TAP_MAX_MOVE = 12;
@@ -96,6 +103,11 @@ export class TouchControls {
    */
   private driveMode = false;
   private driveIdleS = 0;
+  private radialEl: HTMLElement | null = null;
+  private radialItems: Array<{ el: HTMLElement; code: string }> = [];
+  private radialSel = -1;
+  private radialOpen = false;
+  private radialHoldS = 0;
   private lastTapX = 0;
   private lastTapY = 0;
 
@@ -114,7 +126,6 @@ export class TouchControls {
     this.right = this.makeStick("touch-right", "zone-right");
     this.bindSafety();
     this.bindDebugGeste();
-    this.bindDrive();
     this.bindHold("btn-rot-l", "rotL");
     this.bindHold("btn-rot-r", "rotR");
     this.bindTap("btn-cab", "KeyX");
@@ -127,7 +138,9 @@ export class TouchControls {
     this.bindTap("btn-music", "KeyU");
     this.bindTap("btn-shop", "KeyZ");
     this.bindTap("btn-pause", "Escape");
-    this.buildWheel();
+    this.bindTap("btn-tilt", "TILT");
+    this.bindMenu();
+    this.buildRadial();
     this.bindTilt();
     this.bindCanvas(canvas);
     TouchControls.blockBrowserZoom();
@@ -240,9 +253,20 @@ export class TouchControls {
     );
     zone.addEventListener("pointerup", (e) => {
       if (st.id !== e.pointerId) return;
-      const dauer = performance.now() - st.downT;
-      const weg = Math.hypot(e.clientX - st.baseX, e.clientY - st.baseY);
-      if (dauer < TAP_MAX_MS && weg < TAP_MAX_MOVE) this.registerTap(e.clientX, e.clientY);
+      if (st === this.right && this.radialOpen) {
+        // Gezogen und losgelassen waehlt; nur losgelassen schliesst folgenlos
+        const gewaehlt = this.radialItems[this.radialSel];
+        if (gewaehlt) this.fire(gewaehlt.code);
+        this.radialOpen = false;
+        this.radialHoldS = 0;
+        this.closeRadial();
+      } else {
+        const dauer = performance.now() - st.downT;
+        const weg = Math.hypot(e.clientX - st.baseX, e.clientY - st.baseY);
+        if (dauer < TAP_MAX_MS && weg < TAP_MAX_MOVE) {
+          this.registerTap(e.clientX, e.clientY, st === this.left);
+        }
+      }
       TouchControls.resetStick(st);
       this.pressureGrab = false;
     });
@@ -271,11 +295,16 @@ export class TouchControls {
    * überall aufsetzen dürfen: ohne sie gälten linker und rechter Daumen kurz
    * nacheinander als Doppeltipp und die Kamera spränge beim Baggern ständig um.
    */
-  private registerTap(x: number, y: number): void {
+  private registerTap(x: number, y: number, links: boolean): void {
     const now = performance.now();
     const nah = Math.hypot(x - this.lastTapX, y - this.lastTapY) < DOUBLE_TAP_RADIUS;
     if (now - this.lastTap < DOUBLE_TAP_MS && nah) {
-      this.pressed.add("KeyC");
+      // Links doppelt: Fahren an/aus — dort liegt der Fahrdaumen ohnehin, und
+      // ein Knopf an dieser Stelle wurde staendig versehentlich getroffen.
+      // Rechts doppelt: Ansicht wechseln, wie bisher.
+      if (links) this.setDrive(!this.driveMode);
+      else this.pressed.add("KeyC");
+      this.onTap?.();
       this.lastTap = 0;
       return;
     }
@@ -326,52 +355,26 @@ export class TouchControls {
     for (const st of [this.left, this.right]) if (st) TouchControls.resetStick(st);
     this.held.clear();
     this.pressureGrab = false;
+    if (this.radialOpen) {
+      this.radialOpen = false;
+      this.closeRadial();
+    }
+    this.radialHoldS = 0;
     for (const id of ["btn-rot-l", "btn-rot-r"]) {
       document.getElementById(id)?.classList.remove("down");
     }
   }
 
   /** FAHREN-Umschalter. Tippen schaltet um, die Taste faerbt sich. */
-  private bindDrive(): void {
-    const el = document.getElementById("btn-drive");
-    if (!el) return;
-    // Nur ein bewusster Tipp schaltet: aufsetzen UND loslassen auf der Taste,
-    // dazwischen kaum Bewegung. Der Knopf liegt dort, wo der linke Daumen fuer
-    // den schwebenden Stick ohnehin aufsetzt — ein Wisch darueber hinweg darf
-    // den Fahrmodus nicht umlegen.
-    let von: { x: number; y: number } | null = null;
-    el.addEventListener(
-      "pointerdown",
-      (e) => {
-        von = { x: e.clientX, y: e.clientY };
-        e.preventDefault();
-      },
-      { passive: false }
-    );
-    el.addEventListener(
-      "pointerup",
-      (e) => {
-        const start = von;
-        von = null;
-        if (!start) return; // der Finger kam von woanders her
-        if (Math.hypot(e.clientX - start.x, e.clientY - start.y) > TAP_MAX_MOVE) return;
-        this.setDrive(!this.driveMode);
-        this.onTap?.();
-        e.preventDefault();
-      },
-      { passive: false }
-    );
-    el.addEventListener("pointercancel", () => {
-      von = null;
-    });
-  }
-
   private setDrive(v: boolean): void {
     this.driveMode = v;
     this.driveIdleS = 0;
-    document.getElementById("btn-drive")?.classList.toggle("active", v);
-    if (v) TouchControls.vibrate(18);
+    TouchControls.vibrate(v ? 18 : 9);
+    this.onDriveMode?.(v);
   }
+
+  /** Wechsel des Fahrmodus melden — main zeigt es in der Griff-Info an. */
+  onDriveMode: ((an: boolean) => void) | null = null;
 
   /** true, solange der linke Stick fahrt statt den Arm bewegt. */
   get isDriveMode(): boolean {
@@ -414,182 +417,127 @@ export class TouchControls {
     el.dataset["action"] = code;
   }
 
-  /** Scharfgestellten Eintrag auslösen — vom Rädchen gerufen. */
-  private fireWheel(): void {
-    const sel = document.querySelector<HTMLElement>("#fnbar .btn.sel");
-    const code = sel?.dataset["action"];
-    if (!sel || !code) return;
+  /** Eintrag auslösen. */
+  private fire(code: string): void {
+    if (code === "TILT") {
+      void this.toggleTilt();
+      TouchControls.vibrate(22);
+      this.onTap?.();
+      return;
+    }
     this.pressed.add(code);
     TouchControls.vibrate(22); // spürbar, wo das Gerät es kann
     this.onTap?.(); // hörbar überall — auf iOS die einzige Rückmeldung
-    sel.classList.add("down");
-    window.setTimeout(() => sel.classList.remove("down"), 120);
   }
 
   /**
-   * Funktionsrädchen: Die Tasten sitzen auf einer gedachten Walze. Wischen
-   * dreht sie, der Eintrag in der Mitte ist scharfgestellt und lässt sich
-   * antippen. So bleibt die Liste kurz, egal wie viele Funktionen dazukommen
-   * (Design 29.08.2026).
+   * Funktionskranz am rechten Joystickkopf.
+   *
+   * Feste Knöpfe auf dem Glas werden versehentlich bedient — sie liegen dort,
+   * wo die Daumen ohnehin sind. In einer echten Maschine liegt nichts im Weg:
+   * Die Funktionen sitzen auf der Konsole und auf den Joystickköpfen. Hier
+   * genauso: Rechten Daumen kurz stillhalten, der Kranz klappt um ihn auf. In
+   * eine Richtung ziehen und loslassen wählt; loslassen ohne zu ziehen
+   * schliesst folgenlos.
    */
-  private buildWheel(): void {
-    const bar = document.getElementById("fnbar");
-    if (!bar) return;
-    const items = Array.prototype.slice.call(
-      bar.querySelectorAll(".btn")
-    ) as HTMLElement[];
-    if (items.length === 0) return;
-    const n = items.length;
-    // Eng gestaffelt, damit mehrere Befehle gleichzeitig lesbar sind. Die
-    // Walze dreht trotzdem endlos: der Sprung vom letzten zum ersten Eintrag
-    // passiert auf der abgewandten Seite und ist ausgeblendet.
-    const STEP = 23; // Grad zwischen zwei Einträgen
-    const RADIUS = 92; // px — bestimmt, wie stark die Walze wölbt
-    let pos = 0; // aktuelle Position in Einträgen, darf zwischen zwei liegen
-
-    /** Kürzester Abstand von Eintrag i zur aktuellen Position, rundherum. */
-    const ringAbstand = (i: number): number => {
-      let d = (((i - pos) % n) + n) % n;
-      if (d > n / 2) d -= n;
-      return d;
-    };
-
-    const render = (): void => {
-      const sel = ((Math.round(pos) % n) + n) % n;
-      items.forEach((el, i) => {
-        const d = ringAbstand(i);
-        const ang = d * STEP;
-        // Rückseite der Walze wegblenden
-        const sichtbar = Math.abs(ang) < 78;
-        el.style.transform = `rotateX(${-ang}deg) translateZ(${RADIUS}px)`;
-        el.style.opacity = sichtbar ? String(Math.max(0.25, 1 - Math.abs(d) / 3.4)) : "0";
-        el.classList.toggle("sel", i === sel);
-      });
-    };
-
-    /** Beim Überrasten fühlbar und hörbar quittieren. */
-    let letzterRast = 0;
-    const drehen = (delta: number): void => {
-      pos = (((pos + delta) % n) + n) % n;
-      const rast = Math.round(pos);
-      if (rast !== letzterRast) {
-        letzterRast = rast;
-        TouchControls.vibrate(9);
-        this.onWheelTick?.();
-      }
-      render();
-    };
-
-    /**
-     * Nachlauf: Nach dem Loslassen dreht die Walze mit dem aufgenommenen
-     * Schwung weiter aus und rastet dann sanft ein. Das macht den Unterschied
-     * zwischen „Liste schieben" und einem Rad, das sich gut anfühlt.
-     */
-    let schwung = 0;
-    let laeuft = false;
-    const ausrollen = (): void => {
-      if (Math.abs(schwung) > 0.004) {
-        drehen(schwung);
-        schwung *= 0.92;
-        requestAnimationFrame(ausrollen);
-        return;
-      }
-      // sanft auf die nächste Rastung ziehen
-      const ziel = Math.round(pos);
-      const rest = ziel - pos;
-      if (Math.abs(rest) > 0.004) {
-        pos += rest * 0.25;
-        render();
-        requestAnimationFrame(ausrollen);
-        return;
-      }
-      pos = (((ziel % n) + n) % n);
-      render();
-      laeuft = false;
-    };
-
-    // Wischen: ein Eintrag je 34 px
-    let dragId: number | null = null;
-    let lastY = 0;
-    let moved = 0;
-    bar.addEventListener(
-      "pointerdown",
-      (e) => {
-        dragId = e.pointerId;
-        lastY = e.clientY;
-        moved = 0;
-        schwung = 0;
-        laeuft = false;
-        bar.setPointerCapture?.(e.pointerId);
-      },
-      { passive: true }
+  private buildRadial(): void {
+    const el = document.getElementById("radial");
+    // Nur der erste Traegerblock kommt in den Kranz; #menu-actions liegt
+    // hinter dem Menueknopf.
+    const traeger = Array.from(
+      document.querySelectorAll<HTMLElement>(".hidden-actions:not(#menu-actions) span")
     );
-    bar.addEventListener(
-      "pointermove",
-      (e) => {
-        if (dragId !== e.pointerId) return;
-        const dy = e.clientY - lastY;
-        lastY = e.clientY;
-        moved += Math.abs(dy);
-        const schritt = -dy / 30;
-        schwung = schwung * 0.6 + schritt * 0.4; // geglättet, für den Nachlauf
-        drehen(schritt);
-        e.preventDefault();
-      },
-      { passive: false }
-    );
-    const ende = (e: PointerEvent): void => {
-      if (dragId !== e.pointerId) return;
-      dragId = null;
-      // Kaum gewandert heißt: Das war ein Tipp, kein Blättern.
-      if (moved < WHEEL_TAP_MAX_MOVE) this.fireWheel();
-      // Mit Schwung ausrollen statt hart einzurasten
-      if (!laeuft) {
-        laeuft = true;
-        requestAnimationFrame(ausrollen);
-      }
-    };
-    bar.addEventListener("pointerup", ende);
-    bar.addEventListener("pointercancel", ende);
-    // Mausrad für den Test am Rechner
-    bar.addEventListener(
-      "wheel",
-      (e) => {
-        drehen(Math.sign(e.deltaY));
-        e.preventDefault();
-      },
-      { passive: false }
-    );
-    render();
+    if (!el || traeger.length === 0) return;
+    this.radialEl = el;
+    for (const t of traeger) {
+      const code = t.dataset["action"];
+      if (!code) continue;
+      const sektor = document.createElement("div");
+      sektor.className = "sektor";
+      sektor.textContent = t.textContent ?? "";
+      el.appendChild(sektor);
+      this.radialItems.push({ el: sektor, code });
+    }
+    const nabe = document.createElement("div");
+    nabe.className = "nabe";
+    el.appendChild(nabe);
+    // Sektoren einmal auf dem Kreis verteilen — die Lage aendert sich nie
+    const n = this.radialItems.length;
+    this.radialItems.forEach((it, i) => {
+      const a = (i / n) * Math.PI * 2; // 0 = oben, im Uhrzeigersinn
+      it.el.style.left = `${Math.sin(a) * RADIAL_R}px`;
+      it.el.style.top = `${-Math.cos(a) * RADIAL_R}px`;
+    });
   }
 
-  /** Kippsteuerung: Gerät neigen statt den linken Stick zum Fahren zu nehmen. */
-  private bindTilt(): void {
-    const el = document.getElementById("btn-tilt");
+  /** Menüknopf oben rechts: öffnet die Pause. */
+  private bindMenu(): void {
+    const el = document.getElementById("btn-menu");
     if (!el) return;
-    el.addEventListener("pointerdown", async (e) => {
-      e.preventDefault();
-      if (this.tiltEnabled) {
-        this.tiltEnabled = false;
-        this.tiltDrive = 0;
-        this.tiltSteer = 0;
-        el.classList.remove("down");
+    el.addEventListener(
+      "pointerup",
+      (e) => {
+        this.fire("Escape");
+        e.preventDefault();
+      },
+      { passive: false }
+    );
+  }
+
+  private openRadial(x: number, y: number): void {
+    if (!this.radialEl) return;
+    this.radialEl.style.left = `${x}px`;
+    this.radialEl.style.top = `${y}px`;
+    this.radialEl.hidden = false;
+    this.radialSel = -1;
+    for (const it of this.radialItems) it.el.classList.remove("sel");
+    TouchControls.vibrate(14);
+    this.onTap?.();
+  }
+
+  private closeRadial(): void {
+    if (this.radialEl) this.radialEl.hidden = true;
+    this.radialSel = -1;
+  }
+
+  /** Auswahl aus der Zugrichtung des Daumens. -1 = nichts gewählt. */
+  private radialPick(dx: number, dy: number): number {
+    const weg = Math.hypot(dx, dy) * RADIUS;
+    if (weg < RADIAL_MIN_PX) return -1;
+    const n = this.radialItems.length;
+    const winkel = Math.atan2(dx, -dy); // 0 = oben
+    const i = Math.round((winkel / (Math.PI * 2)) * n);
+    return ((i % n) + n) % n;
+  }
+
+  /**
+   * Kippsteuerung: Gerät neigen statt den linken Stick zum Fahren zu nehmen.
+   *
+   * Sie haengt jetzt als Eintrag im Kranz, nicht mehr an einem eigenen Knopf —
+   * den gibt es nicht mehr. Die Freigabe der Bewegungssensoren verlangt auf iOS
+   * eine Nutzergeste; das Auswaehlen im Kranz ist eine.
+   */
+  private async toggleTilt(): Promise<void> {
+    if (this.tiltEnabled) {
+      this.tiltEnabled = false;
+      this.tiltDrive = 0;
+      this.tiltSteer = 0;
+      return;
+    }
+    type OrientCtor = { requestPermission?: () => Promise<string> };
+    const ctor = (window as unknown as { DeviceOrientationEvent?: OrientCtor })
+      .DeviceOrientationEvent;
+    if (ctor?.requestPermission) {
+      try {
+        if ((await ctor.requestPermission()) !== "granted") return;
+      } catch {
         return;
       }
-      // iOS verlangt eine ausdrückliche Freigabe für Bewegungssensoren
-      type OrientCtor = { requestPermission?: () => Promise<string> };
-      const ctor = (window as unknown as { DeviceOrientationEvent?: OrientCtor })
-        .DeviceOrientationEvent;
-      if (ctor?.requestPermission) {
-        try {
-          if ((await ctor.requestPermission()) !== "granted") return;
-        } catch {
-          return;
-        }
-      }
-      this.tiltEnabled = true;
-      el.classList.add("down");
-    });
+    }
+    this.tiltEnabled = true;
+  }
+
+  private bindTilt(): void {
     window.addEventListener("deviceorientation", (e) => {
       if (!this.tiltEnabled) return;
       // beta = vor/zurück kippen, gamma = seitlich kippen (Landscape-Halterung)
@@ -640,6 +588,29 @@ export class TouchControls {
     // Fahrmodus endet von selbst: Wer den Daumen vom linken Stick nimmt, will
     // in aller Regel wieder baggern. Ohne das bleibt der Modus an, und der
     // naechste Griff an den Stick faehrt die Maschine statt den Arm zu heben.
+    // Funktionskranz: rechten Daumen stillhalten laesst ihn aufklappen
+    if (r && r.id !== null) {
+      const still = Math.hypot(r.dx, r.dy) < RADIAL_STILL;
+      if (!this.radialOpen) {
+        // Wer den Stick bewegt, will arbeiten — dann keine Uhr
+        this.radialHoldS = still ? this.radialHoldS + dt : 0;
+        if (this.radialHoldS >= RADIAL_HOLD_S) {
+          this.radialOpen = true;
+          this.openRadial(r.baseX, r.baseY);
+        }
+      } else {
+        const wahl = this.radialPick(r.dx, r.dy);
+        if (wahl !== this.radialSel) {
+          this.radialItems[this.radialSel]?.el.classList.remove("sel");
+          this.radialItems[wahl]?.el.classList.add("sel");
+          this.radialSel = wahl;
+          if (wahl >= 0) TouchControls.vibrate(9);
+        }
+      }
+    } else {
+      this.radialHoldS = 0;
+    }
+
     if (this.driveMode) {
       if (l && l.id === null) {
         this.driveIdleS += dt;
@@ -665,6 +636,9 @@ export class TouchControls {
       // Im Fahrmodus gehoert der linke Stick dem Fahrwerk — die eingestellte
       // Belegung ruht so lange.
       if (this.driveMode && (id === "leftX" || id === "leftY")) continue;
+      // Solange der Kranz offen ist, waehlt der rechte Stick aus, statt zu
+      // steuern — sonst faehrt beim Auswaehlen der Arm mit.
+      if (this.radialOpen && (id === "rightX" || id === "rightY")) continue;
       const b = this.config[id];
       const v = raw[id] * (b.invert ? -1 : 1);
       switch (b.fn) {

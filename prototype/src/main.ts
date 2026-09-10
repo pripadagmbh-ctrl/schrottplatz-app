@@ -369,6 +369,8 @@ async function main(): Promise<void> {
   touch.onWheelTick = () => audio.playTick();
   // Auf iOS gibt es keine Vibration — der Klick ist dort die einzige Bestaetigung
   touch.onTap = () => audio.playTick();
+  // Fahrmodus hat keinen Knopf mehr — die Griff-Info sagt, woran man ist
+  touch.onDriveMode = (an) => hud.toast(an ? "Fahren an — linker Stick lenkt" : "Fahren aus");
 
   const helpEl = document.getElementById("help")!;
   if (touch.active) helpEl.style.display = "none"; // auf Touchgeräten stört die Tastenliste
@@ -552,6 +554,15 @@ async function main(): Promise<void> {
   document.getElementById("shop-close")!.addEventListener("click", () =>
     shopEl.classList.remove("open")
   );
+  // Ausbau und Musik liegen nicht mehr auf dem Joystickkopf, sondern im Menue:
+  // Es sind keine Maschinenfunktionen, und der Kranz bleibt so weit gefaechert.
+  document.getElementById("pause-shop")!.addEventListener("click", () => {
+    setPaused(false);
+    zeigeAusbau();
+  });
+  document.getElementById("pause-music")!.addEventListener("click", () => {
+    hud.toast(audio.toggleMusic() ? "Musik an." : "Musik aus.");
+  });
 
   // --- Verhandeln an der Waage ---
   const ruf = new Reputation();

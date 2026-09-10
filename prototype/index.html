@@ -86,68 +86,51 @@
          Solange er an ist, wird der linke Stick zu Gas und Lenkung. Vier feste
          Pfeiltasten waren auf dem Glas ohnehin schlecht zu treffen, und man
          konnte nicht gleichzeitig lenken und den Arm bewegen. */
-      #btn-drive {
-        left: 168px; bottom: 42px; width: 104px; padding: 14px 6px; font-size: 13px;
-        letter-spacing: 1px;
+      /* Menueknopf oben rechts — weit weg von beiden Daumen. Er oeffnet die
+         Pause, in der Speichern, Steuerung und Neues Spiel liegen. */
+      #btn-menu {
+        top: 12px; right: 12px; width: 46px; height: 46px; padding: 0;
+        line-height: 46px; font-size: 20px; z-index: 3;
       }
-      #btn-drive.active {
-        background: rgba(240,180,41,0.82); color: #1a1c1e; border-color: #f0d060;
+      /* Die Funktions-Elemente tragen nur noch ihre Tastencodes; sichtbar wird
+         davon nichts. Der Kranz zeichnet sich selbst. */
+      .hidden-actions { display: none; }
+
+      /* --- Funktionskranz am rechten Joystickkopf ---
+         Rechten Daumen kurz stillhalten, der Kranz klappt um ihn auf. Kein
+         festes Ziel, das man streifen kann: Er erscheint dort, wo der Daumen
+         schon liegt — wie die schwebenden Sticks selbst. */
+      #radial { position: absolute; pointer-events: none; z-index: 4; width: 0; height: 0; }
+      #radial[hidden] { display: none; }
+      #radial .sektor {
+        position: absolute; left: 0; top: 0;
+        width: 76px; height: 30px; margin: -15px 0 0 -38px;
+        border-radius: 8px; background: rgba(20,22,24,0.88);
+        border: 2px solid rgba(255,255,255,0.28); color: #e8e8e4;
+        font: 600 11px/26px "Consolas", monospace; text-align: center;
+        transition: transform 0.09s ease-out;
       }
-      /* Spinne drehen: zwei Tasten über dem rechten Stick */
-      #btn-rot-l, #btn-rot-r {
-        bottom: 160px; width: 56px; height: 46px; padding: 0; line-height: 46px; font-size: 20px;
+      #radial .sektor.sel {
+        background: rgba(240,180,41,0.92); color: #1a1c1e; border-color: #f0d060;
+        transform: scale(1.15);
       }
-      #btn-rot-l { right: 100px; }
-      #btn-rot-r { right: 16px; }
-      /* Funktionen als Rädchen am rechten Rand: hoch- oder runterwischen
-         dreht die Walze, der Eintrag in der Mitte ist scharfgestellt und
-         wird mit einem Tipp ausgelöst. */
-      #fnbar {
-        position: absolute; top: 50%; right: 8px; transform: translateY(-50%);
-        width: 104px; height: 232px; pointer-events: auto; touch-action: none;
-        perspective: 460px; overflow: hidden; z-index: 2;
-      }
-      /* Sanftes Ausblenden nach oben und unten, damit es nach Walze aussieht */
-      #fnbar::before, #fnbar::after {
-        content: ""; position: absolute; left: 0; right: 0; height: 74px;
-        pointer-events: none; z-index: 3;
-      }
-      #fnbar::before { top: 0; background: linear-gradient(rgba(20,22,24,0.72), transparent); }
-      #fnbar::after { bottom: 0; background: linear-gradient(transparent, rgba(20,22,24,0.72)); }
-      /* Markierung der scharfgestellten Mitte */
-      #fnbar .slot {
-        position: absolute; left: 2px; right: 2px; top: 50%; height: 34px;
-        margin-top: -17px; border-top: 2px solid rgba(240,180,41,0.55);
-        border-bottom: 2px solid rgba(240,180,41,0.55); pointer-events: none; z-index: 2;
-      }
-      #touch #fnbar .btn {
-        position: absolute; left: 4px; right: 4px; top: 50%; height: 30px;
-        margin-top: -15px; padding: 0; line-height: 30px; width: auto;
-        pointer-events: none; backface-visibility: hidden;
-        transition: opacity 0.12s linear;
-      }
-      /* Der scharfgestellte Eintrag ist der einzige, den man auslösen kann.
-         Zeigerereignisse braucht er nicht: Das Rädchen fängt sie ohnehin ein
-         und entscheidet beim Loslassen, ob getippt oder geblättert wurde. */
-      #touch #fnbar .btn.sel {
-        background: rgba(240,180,41,0.28);
-        border-color: rgba(240,180,41,0.85); color: #fff3d6;
+      #radial .nabe {
+        position: absolute; left: 0; top: 0; width: 26px; height: 26px;
+        margin: -13px 0 0 -13px; border-radius: 50%;
+        background: rgba(240,180,41,0.5); border: 2px solid rgba(255,255,255,0.4);
       }
       /* Flache Displays (Handy quer): alles eine Nummer kleiner, sonst
          verdecken Sticks und Tasten das halbe Bild. */
       @media (max-height: 430px) {
         #touch .pad { width: 108px; height: 108px; margin: -54px 0 0 -54px; }
         #touch .knob { width: 44px; height: 44px; margin: -22px 0 0 -22px; }
-        #btn-drive { left: 130px; bottom: 30px; width: 88px; padding: 11px 6px; font-size: 12px; }
+        #btn-menu { top: 8px; right: 8px; width: 40px; height: 40px; line-height: 40px; font-size: 18px; }
+        #radial .sektor { width: 66px; height: 26px; margin: -13px 0 0 -33px; font-size: 10px; line-height: 22px; }
         /* neben den rechten Stick statt darüber — oben liegt die Tastenleiste */
         #btn-rot-l, #btn-rot-r { bottom: 14px; width: 46px; height: 40px; line-height: 40px; }
         #btn-rot-l { right: 190px; }
         #btn-rot-r { right: 132px; }
         /* endet über dem rechten Stick, sonst legen sich die Tasten darauf */
-        #fnbar { width: 88px; height: 176px; right: 6px; bottom: auto; perspective: 360px; }
-        #fnbar::before, #fnbar::after { height: 56px; }
-        #touch #fnbar .btn { height: 26px; margin-top: -13px; line-height: 26px; font-size: 10px; }
-        #fnbar .slot { height: 30px; margin-top: -15px; }
         #help { display: none; }
         /* Konto und Tagesablauf nach links: rechts oben braucht die
            Tastenleiste den Platz, sobald sie zweispaltig umbricht */
@@ -358,19 +341,30 @@
       <div class="pad" id="touch-right" hidden><div class="knob"></div></div>
       <div class="btn" id="btn-rot-l">↺</div>
       <div class="btn" id="btn-rot-r">↻</div>
-      <div class="btn" id="btn-drive">FAHREN</div>
-      <div id="fnbar"><div class="slot"></div>
-        <div class="btn fn" id="btn-cab">KABINE</div>
-        <div class="btn fn" id="btn-outrig">STÜTZEN</div>
-        <div class="btn fn" id="btn-press">SCHERE</div>
-        <div class="btn fn" id="btn-pickup">ABHOLEN</div>
-        <div class="btn fn" id="btn-tilt">KIPPEN</div>
-        <div class="btn fn" id="btn-marks">SCHILDER</div>
-        <div class="btn fn" id="btn-blade">SCHILD</div>
-        <div class="btn fn" id="btn-away">VORFAHREN</div>
-        <div class="btn fn" id="btn-shop">AUSBAU</div>
-        <div class="btn fn" id="btn-music">MUSIK</div>
-        <div class="btn fn" id="btn-pause">PAUSE</div>
+      <!-- Funktionskranz: zeichnet sich selbst um den rechten Daumen -->
+      <div id="radial" hidden></div>
+      <!-- Menue oben rechts, weit weg von beiden Daumen -->
+      <div class="btn" id="btn-menu">☰</div>
+      <!-- Traeger der Tastencodes; unsichtbar, der Kranz liest Beschriftung
+           und Reihenfolge daraus. So bleibt die Zuordnung an einer Stelle. -->
+      <div class="hidden-actions">
+        <span id="btn-cab">KABINE</span>
+        <span id="btn-outrig">STÜTZEN</span>
+        <span id="btn-blade">SCHILD</span>
+        <span id="btn-press">SCHERE</span>
+        <span id="btn-pickup">ABHOLEN</span>
+        <span id="btn-away">VORFAHREN</span>
+        <span id="btn-marks">SCHILDER</span>
+        <span id="btn-tilt">KIPPEN</span>
+      </div>
+      <!-- Nicht auf den Joystickkopf: Ausbau, Musik und Pause sind keine
+           Maschinenfunktionen. Sie liegen hinter dem Menue oben rechts, wo man
+           sie in Ruhe sucht — und der Kranz bleibt mit acht Eintraegen so weit
+           gefaechert, dass sich nichts ueberlappt. -->
+      <div class="hidden-actions" id="menu-actions">
+        <span id="btn-shop">AUSBAU</span>
+        <span id="btn-music">MUSIK</span>
+        <span id="btn-pause">PAUSE</span>
       </div>
     </div>
     <div id="pause">
@@ -378,12 +372,15 @@
         <h1>PAUSE</h1>
         <button id="pause-resume">Weiterspielen</button>
         <button id="pause-controls">Steuerung</button>
+        <button id="pause-shop">Platz ausbauen</button>
+        <button id="pause-music">Musik an/aus</button>
         <button id="pause-save">Speichern</button>
         <button id="pause-load">Stand laden</button>
         <button id="pause-new">Neues Spiel</button>
         <p class="hint">
           Linker Stick: Hauptarm &amp; Oberwagen · Rechter Stick: Ausleger &amp; Spinne<br />
-          ↺ ↻ Spinne drehen · FAHREN: linker Stick lenkt · Doppeltipp: Ansicht
+          ↺ ↻ Spinne drehen · Doppeltipp links: fahren · rechts: Ansicht<br />
+          Rechten Daumen stillhalten: Funktionskranz
         </p>
       </div>
       <div id="controls-menu">
@@ -412,9 +409,9 @@
         <button id="ctrl-reset">Werkseinstellung</button>
         <button id="ctrl-back">Zurück</button>
         <p class="hint">
-          Fahren läuft über den FAHREN-Umschalter: Solange er an ist, wird der
-          linke Stick zu Gas und Lenkung — die Belegung hier ruht so lange.
-          Spinne drehen zusätzlich über ↺ ↻.
+          Fahren schaltest du mit einem Doppeltipp in der linken Bildhälfte:
+          Solange es an ist, wird der linke Stick zu Gas und Lenkung — die
+          Belegung hier ruht so lange. Spinne drehen zusätzlich über ↺ ↻.
         </p>
       </div>
     </div>
