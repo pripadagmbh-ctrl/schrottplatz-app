@@ -12,7 +12,7 @@ import type { EventBus } from "../core/events";
  * in der Zone liegt — Herausgreifen macht die Zählung rückgängig (Nachsortieren).
  */
 
-interface ContainerConfig {
+export interface ContainerConfig {
   id: string;
   fractionId: string;
   label: string;
@@ -44,35 +44,46 @@ interface ContainerConfig {
  * LINKS (Westen) der riesige Stahlschrott-Haufen, RECHTS (Osten) die Boxen in
  * einer Reihe — alles im Schwenkbereich, damit kaum gefahren werden muss.
  */
-const CONFIGS: ContainerConfig[] = [
+export const CONFIGS: ContainerConfig[] = [
   // Riesiger Stahlhaufen direkt links neben dem Bagger (Guss läuft mit)
   { id: "c_steel", fractionId: "steel", label: "STAHLSCHROTT", kind: "pile", x: -9, z: 1, size: [11, 12, 0] },
-  // Boxenreihe rechts, von Süd nach Nord aufgereiht
+  // Boxenreihe rechts, von Süd nach Nord aufgereiht.
   // Vier Betonlego-Mulden in einer Reihe, Öffnung zeigt nach Westen zum Bagger.
-  // Wandhöhe 1,0 m — zwei Lagen Betonlego. Höher geht nicht: Der Arm erreicht
-  // über der Muldenmitte nur 1,58 m (gemessen aus Boom 5,2 m, Stiel 4,0 m,
-  // Drehpunkt 2,55 m). Mit den früheren 2,5 m war die Mulde von der
-  // Standposition aus nicht zu befüllen, ohne den Bagger zu versetzen.
+  //
+  // Abstand nachgerechnet (Boom 5,2 m, Stiel 4,0 m, Drehpunkt 2,55 m, Grenzen
+  // 5..62° und -140..-25°, Krallenspitzen 2,01 m unter der Stielspitze). Wie
+  // hoch die Spitzen bei welchem Abstand vom Bagger kommen:
+  //
+  //   4,5 m → 1,43 m   5,5 m → 2,03 m   6,0 m → 2,51 m
+  //   6,5 m → 7,30 m   8,5 m → 4,79 m   9,5 m → 1,66 m   10,0 m → gar nicht
+  //
+  // Der Arm hat einen scharfen Knick bei 6,5 m: Näher dran bleibt er
+  // eingeklappt und kommt nicht über eine 2,5-m-Wand. Die Reihe stand bei
+  // x = 4,6 mitten in dieser toten Zone — von der Standposition aus war keine
+  // Mulde zu befüllen. Jetzt x = 7,0, und die Reihe ist auf den Bagger (z = -1)
+  // zentriert: So liegen alle vier zwischen 7,2 und 8,9 m, also im Fenster.
+  // Weiter östlich ginge nicht — die äußeren Mulden kämen über 9,5 m und wären
+  // wieder unerreichbar.
   // Nach Norden gerückt: die westliche Öffnung darf nicht von der Presse
   // versperrt werden
-  { id: "c_va", fractionId: "va", label: "EDELSTAHL VA", kind: "bay", x: 4.6, z: -5.6, size: [3.0, 3.3, 1.0], shareEast: true },
-  { id: "c_alu", fractionId: "alu", label: "ALU", kind: "bay", x: 4.6, z: -1.9, size: [3.0, 3.3, 1.0], shareEast: true },
-  { id: "c_copper", fractionId: "copper", label: "KUPFER/MS", kind: "bay", x: 4.6, z: 1.9, size: [3.0, 3.3, 1.0], shareEast: true },
-  { id: "c_cable", fractionId: "cable", label: "KABEL", kind: "bay", x: 4.6, z: 5.6, size: [3.0, 3.3, 1.0], shareEast: true },
+  { id: "c_va", fractionId: "va", label: "EDELSTAHL VA", kind: "bay", x: 7.0, z: -6.55, size: [3.0, 3.3, 2.5], shareEast: true },
+  { id: "c_alu", fractionId: "alu", label: "ALU", kind: "bay", x: 7.0, z: -2.85, size: [3.0, 3.3, 2.5], shareEast: true },
+  { id: "c_copper", fractionId: "copper", label: "KUPFER/MS", kind: "bay", x: 7.0, z: 0.85, size: [3.0, 3.3, 2.5], shareEast: true },
+  { id: "c_cable", fractionId: "cable", label: "KABEL", kind: "bay", x: 7.0, z: 4.55, size: [3.0, 3.3, 2.5], shareEast: true },
   // Nichtmetalle Rücken an Rücken hinter der Sortierreihe: Sie teilen sich
   // deren Rückwand, öffnen nach Osten und werden vom Radlader beschickt.
   // Eine Doppelwand zur Mitte braucht es dafür nicht.
-  { id: "c_wood", fractionId: "wood", label: "HOLZ", kind: "bay", x: 7.9, z: -3.9,
-    size: [3.0, 3.5, 2.0], facing: "east", shareWest: true },
-  { id: "c_tires", fractionId: "tires", label: "REIFEN", kind: "bay", x: 7.9, z: 0,
-    size: [3.0, 3.5, 2.0], facing: "east", shareWest: true },
-  { id: "c_rubble", fractionId: "rubble", label: "BAUMISCH", kind: "bay", x: 7.9, z: 3.9,
-    size: [3.0, 3.5, 2.0], facing: "east", shareWest: true },
+  { id: "c_wood", fractionId: "wood", label: "HOLZ", kind: "bay", x: 10.3, z: -4.9,
+    size: [3.0, 3.5, 2.5], facing: "east", shareWest: true },
+  { id: "c_tires", fractionId: "tires", label: "REIFEN", kind: "bay", x: 10.3, z: -1.0,
+    size: [3.0, 3.5, 2.5], facing: "east", shareWest: true },
+  { id: "c_rubble", fractionId: "rubble", label: "BAUMISCH", kind: "bay", x: 10.3, z: 2.9,
+    size: [3.0, 3.5, 2.5], facing: "east", shareWest: true },
   // Ballenlager direkt neben der Schere: Was gepresst aus der Kammer kommt,
   // wandert hierher und wartet auf den Abholer. Offen nach Osten, damit der
   // Bagger von seinem Standplatz aus hineinlangt (Wunsch 02.09.2026).
   { id: "c_bales", fractionId: "steel", label: "BALLEN", kind: "bay", x: -2.6, z: -7.0,
-    size: [3.2, 4.2, 2.0], facing: "east" },
+    size: [3.2, 4.2, 2.5], facing: "east" },
   // Nichtmetalle südlich, im Bogen um den Bagger gelegt, damit alle drei in
   // Reichweite bleiben. Öffnung nach Norden zur Maschine.
 ];

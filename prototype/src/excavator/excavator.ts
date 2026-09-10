@@ -26,6 +26,32 @@ import {
  */
 
 // Geometrie (SW)
+/**
+ * Höchste Krallenspitze, die der Arm bei einem waagerechten Abstand vom
+ * Baggermittelpunkt noch erreicht — in Metern über dem Boden.
+ *
+ * Damit lässt sich prüfen, ob eine Mulde überhaupt zu befüllen ist: Der Arm
+ * hat einen scharfen Knick bei rund 6,5 m. Näher dran bleibt er eingeklappt
+ * und kommt kaum über zwei Meter; jenseits von 9,5 m reicht er gar nicht mehr.
+ * Ohne diese Rechnung stand die Sortierreihe bei 4,6 m mitten in der toten
+ * Zone, und keine Mulde war von der Standposition aus erreichbar.
+ *
+ * Reine Geometrie, kein Zustand — absichtlich ohne die Klasse benutzbar.
+ */
+export function hoechsteKrallenspitze(abstandM: number): number {
+  const tief = clawTipDepth(CLAW_OPEN_SPLAY);
+  let best = -Infinity;
+  for (let b = BOOM_MIN; b <= BOOM_MAX; b += 0.004) {
+    for (let st = STICK_MIN; st <= STICK_MAX; st += 0.004) {
+      const x = BOOM_PIVOT.z + BOOM_LEN * Math.cos(b) + STICK_LEN * Math.cos(b + st);
+      if (Math.abs(x - abstandM) > 0.05) continue;
+      const y = BOOM_PIVOT.y + BOOM_LEN * Math.sin(b) + STICK_LEN * Math.sin(b + st);
+      best = Math.max(best, y - tief);
+    }
+  }
+  return best;
+}
+
 const BOOM_LEN = 5.2;
 const STICK_LEN = 4.0;
 const BOOM_PIVOT = new THREE.Vector3(0, 2.55, 0.55); // relativ zum Chassis-Ursprung (Boden)

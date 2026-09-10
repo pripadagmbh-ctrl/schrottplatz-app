@@ -473,8 +473,8 @@ class DeliveryVehicle {
       // etwa Bordwandhoehe plus Haufen obendrauf. Was nicht mehr passt, faellt
       // weg; die Liefermenge des Kunden wird ohnehin ueber die Massen der
       // gesetzten Stuecke erreicht, nicht ueber ihre Zahl.
-      for (let layer = 0; layer < 3 && !spot; layer++) {
-        const y = 0.25 + layer * 0.36;
+      for (let layer = 0; layer < 2 && !spot; layer++) {
+        const y = 0.22 + layer * 0.34;
         for (let attempt = 0; attempt < 40; attempt++) {
           const x = (Math.random() * 2 - 1) * maxX;
           const z = minZ + Math.random() * (maxZ - minZ);
