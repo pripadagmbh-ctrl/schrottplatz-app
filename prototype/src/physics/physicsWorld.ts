@@ -8,15 +8,25 @@ export class PhysicsWorld {
     this.world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
     this.world.timestep = 1 / 60;
 
-    // Kontakte müssen hart sein: Beton ist Beton. Zu weiche Werte ließen
-    // Teile sichtbar in den Boden und ineinander einsinken, statt satt
-    // aufzuliegen. Viele Iterationen halten Haufen trotzdem ruhig.
+    // Kontaktwerte nach Messung (10.09.2026), nicht nach Gefuehl.
+    //
+    // Hier standen harte Werte (12 Iterationen, Frequenz 40, zugelassener
+    // Fehler 0,001, 6 Reibungsdurchlaeufe) mit der Begruendung, weichere
+    // liessen Teile in den Boden und ineinander einsinken. Nachgemessen stimmt
+    // das nicht: Mit den weichen Werten liegt KEIN Teil unter dem Boden, und
+    // der Haufen steht sogar hoeher (2,76 statt 2,11 m) — die harten Werte
+    // ruetteln ihn zusammen, statt ihn zu stuetzen.
+    //
+    // Dafuer kosten sie: 3,07 gegen 1,44 ms je Schritt im wachen Zustand. Das
+    // ist die Zeitlupe beim Abwerfen — ein Abwurf weckt den Haufen, die Physik
+    // ueberzieht das Bildbudget, und der Spiral-Schutz wirft Zeit weg. Und der
+    // Haufen schlaeft mit den weichen Werten genauso zuverlaessig ein (ueber
+    // vier Haufen je 0 von rund 100 wach).
     const p = this.world.integrationParameters;
-    p.numSolverIterations = 12;
-    p.contact_natural_frequency = 40;
-    p.normalizedAllowedLinearError = 0.001;
-    // Zusätzliche Reibungsdurchläufe: sonst rutschen gestapelte Teile ab
-    p.numAdditionalFrictionIterations = 6;
+    p.numSolverIterations = 6;
+    p.contact_natural_frequency = 30;
+    p.normalizedAllowedLinearError = 0.005;
+    p.numAdditionalFrictionIterations = 2;
   }
 
   step(): void {

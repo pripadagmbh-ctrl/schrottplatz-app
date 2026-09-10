@@ -59,14 +59,23 @@ const PROBE_R = 0.62;
  * Radius, in dem die Spinne Material verdrängt. Größer als die Prüfkugel:
  * Beim Pflügen durch einen Haufen schiebt sie auch, was sie nur streift.
  */
-const PLOW_R = 1.45;
+const PLOW_R = 1.15;
 /**
  * Masse, bei der die Achsen auf die Hälfte einbrechen. Am Bild abgestimmt:
  * Bei 750 kg war der Unterschied kaum zu merken, weil die Spinne beim
  * Schwenken ohnehin aus dem Haufen herausläuft und der Widerstand dabei
  * abfällt. Bei 350 kg pflügt man spürbar zäh.
  */
-const PLOW_HALF_KG = 350;
+/**
+ * Bei dieser verdraengten Masse halbiert sich das Tempo.
+ *
+ * Vorher 350 kg bei einem Tastradius von 1,45 m — in einem Haufen liegen darin
+ * schnell ueber 1000 kg, und der Bagger kroch mit einem Fuenftel Tempo, sobald
+ * die Spinne den Schrott auch nur beruehrte. Widerstand soll spuerbar sein,
+ * nicht laehmend: 900 kg und eine hoehere Untergrenze lassen die Bewegung
+ * schwer werden, ohne sie anzuhalten (Befund 10.09.2026).
+ */
+const PLOW_HALF_KG = 900;
 /** Ab dieser Masse ist ein Brocken nicht mehr wegzuschieben */
 const HEAVY_BLOCK_KG = 700;
 /** So nah darf die tief hängende Spinne an den Platzwart heran */
@@ -129,7 +138,7 @@ export class ExcavatorCollision {
    */
   plowFactor(): number {
     const m = this.plowMassKg();
-    return Math.max(0.14, 1 / (1 + m / PLOW_HALF_KG));
+    return Math.max(0.35, 1 / (1 + m / PLOW_HALF_KG));
   }
 
   /** Steht der Unterwagen in einem festen Bauwerk? Rein zweidimensional. */

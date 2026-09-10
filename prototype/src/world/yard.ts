@@ -430,6 +430,25 @@ export class Yard {
    * Farben sind geschützt, Ortsnamen nicht (Wunsch 10.09.2026).
    */
   private buildGraffiti(scene: THREE.Scene): void {
+    // Die ganze Nordwand ist besprueht, nicht ein Feld davon (Wunsch
+    // 10.09.2026). Mehrere Tafeln nebeneinander, jede mit eigenem Startwert:
+    // So wiederholt sich nichts, und die Einfahrt bleibt frei.
+    const wandZ = YARD_D / 2 - 0.32;
+    const felder: number[] = [];
+    for (let x = YARD_MIN_X + 4; x < YARD_MAX_X - 4; x += 6.4) {
+      if (Math.abs(x - GATE_X) < 7) continue; // Einfahrt freihalten
+      felder.push(x);
+    }
+    felder.forEach((x, i) => this.buildGraffitiFeld(scene, x, wandZ, i * 977 + 13));
+  }
+
+  /** Eine Tafel Graffiti. `saat` steuert Auswahl und Lage der Motive. */
+  private buildGraffitiFeld(scene: THREE.Scene, x: number, z: number, saat: number): void {
+    let seed = saat;
+    const rnd = (): number => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return seed / 2147483648;
+    };
     const cv = document.createElement("canvas");
     cv.width = 1024;
     cv.height = 384;
@@ -440,9 +459,9 @@ export class Yard {
     c.globalAlpha = 0.18;
     for (let i = 0; i < 300; i++) {
       c.fillStyle = i % 2 ? "#0f0f12" : "#e8e8e4";
-      const r = 6 + Math.random() * 26;
+      const r = 6 + rnd() * 26;
       c.beginPath();
-      c.arc(80 + Math.random() * 880, 60 + Math.random() * 260, r, 0, Math.PI * 2);
+      c.arc(80 + rnd() * 880, 60 + rnd() * 260, r, 0, Math.PI * 2);
       c.fill();
     }
     c.globalAlpha = 1;
@@ -487,7 +506,8 @@ export class Yard {
       c.restore();
     };
 
-    // --- Abteiberg links: zwei ungleiche Tuerme, wie von der Stadt aus gesehen
+    // --- Abteiberg: nicht auf jeder Tafel, sonst wirkt die Wand wie tapeziert
+    const mitBerg = rnd() < 0.45;
     c.save();
     c.translate(96, 268);
     c.fillStyle = "#101014";
@@ -500,11 +520,14 @@ export class Yard {
       c.closePath();
       c.fill();
     };
-    turm(0, 24, 104, 36);
-    turm(32, 20, 78, 28);
-    c.fillRect(-12, -54, 76, 54); // Kirchenschiff darunter
+    if (mitBerg) {
+      turm(0, 24, 104, 36);
+      turm(32, 20, 78, 28);
+    }
+    if (mitBerg) {
+      c.fillRect(-12, -54, 76, 54); // Kirchenschiff darunter
+    }
     c.restore();
-    tag("ABTEIBERG", 24, 300, 34, "#dcdcd6", -0.03);
 
     // --- Hauptstueck in der Mitte
     c.save();
@@ -514,21 +537,42 @@ export class Yard {
     c.textBaseline = "middle";
     c.font = "italic 900 132px Impact, 'Arial Black', sans-serif";
     c.fillStyle = "#101014";
-    c.fillText("GLADBACH", 9, 11);
+    const HAUPT = ["GLADBACH", "MG", "EICKEN", "ABTEIBERG"];
+    const wort = HAUPT[Math.floor(rnd() * HAUPT.length)]!;
+    c.fillText(wort, 9, 11);
     c.fillStyle = "#f2f2ee";
-    c.fillText("GLADBACH", 0, 0);
+    c.fillText(wort, 0, 0);
     c.lineWidth = 7;
     c.strokeStyle = "#101014";
-    c.strokeText("GLADBACH", 0, 0);
+    c.strokeText(wort, 0, 0);
     c.restore();
     nasen(330, 178, 430, "rgba(16,16,20,0.5)", 7);
 
     // --- Kurvenparolen und Stadtteil
-    tag("EICKEN", 300, 244, 62, "#7fc24a", -0.04);
-    tag("ULTRAS", 610, 250, 58, "#e8e8e4", 0.03);
-    nasen(612, 268, 190, "rgba(232,232,228,0.45)", 5);
-    tag("NORDKURVE", 300, 312, 30, "#c9ccc4", -0.02);
-    tag("BÖKELBERG", 620, 316, 28, "#9aa2a8", 0.02);
+    // Kleinere Parolen: je Tafel eine andere Auswahl aus demselben Vorrat
+    const PAROLEN = [
+      "EICKEN",
+      "ULTRAS",
+      "NORDKURVE",
+      "BÖKELBERG",
+      "NIEDERRHEIN",
+      "BUNTER GARTEN",
+      "WICKRATH",
+      "HARDTER WALD",
+      "GLADBACH BLEIBT",
+    ];
+    const gewaehlt: string[] = [];
+    while (gewaehlt.length < 4) {
+      const w = PAROLEN[Math.floor(rnd() * PAROLEN.length)]!;
+      if (!gewaehlt.includes(w)) gewaehlt.push(w);
+    }
+    const FARBEN = ["#7fc24a", "#e8e8e4", "#c9ccc4", "#9aa2a8", "#d9c15a"];
+    gewaehlt.forEach((w, i) => {
+      const gx = 290 + (i % 2) * 320;
+      const gy = 244 + Math.floor(i / 2) * 68;
+      tag(w, gx, gy, i % 2 ? 52 : 40, FARBEN[Math.floor(rnd() * FARBEN.length)]!, (rnd() - 0.5) * 0.1);
+      if (rnd() < 0.6) nasen(gx, gy + 20, 160, "rgba(232,232,228,0.4)", 4);
+    });
 
     // --- Kleines Gekritzel rechts: Krone, Stern, Herz, ein Kuerzel
     tag("MG", 872, 118, 96, "#7fc24a", 0.06);
@@ -572,7 +616,8 @@ export class Yard {
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = 4;
     const plane = new THREE.Mesh(
-      new THREE.PlaneGeometry(7.4, 2.8),
+      // Die Umrandung ist 1,8 m hoch — eine 2,8-m-Tafel ragte darueber hinaus
+      new THREE.PlaneGeometry(6.2, 1.6),
       new THREE.MeshStandardMaterial({
         map: tex,
         transparent: true,
@@ -581,9 +626,8 @@ export class Yard {
         polygonOffsetFactor: -2,
       })
     );
-    // Innenseite der Nordwand, westlich vom Wiegehäuschen — von der Waage
-    // und aus der Kabine gut zu sehen
-    plane.position.set(-11.5, 1.02, YARD_D / 2 - 0.32);
+    // Innenseite der Nordwand — von der Waage und aus der Kabine gut zu sehen
+    plane.position.set(x, 0.94, z);
     plane.rotation.y = Math.PI;
     scene.add(plane);
   }

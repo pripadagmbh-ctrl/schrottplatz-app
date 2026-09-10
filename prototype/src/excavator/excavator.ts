@@ -1421,6 +1421,11 @@ export class Excavator {
         const b = c.parent();
         if (!b) return false;
         if (this.selfHandles.has(b.handle)) return false;
+        // Die eigene Ladung ist kein Boden. Seit gefasste Teile kinematisch
+        // mitgefuehrt werden, sind sie nicht mehr dynamisch — ohne diese Zeile
+        // setzt die Spinne auf dem Teil auf, das sie gerade traegt, und wird
+        // beim Zupacken nach oben gedrueckt.
+        if (this.grippedHandles.has(b.handle)) return false;
         // NUR tragender Grund: Beton, Waende, Muldenboeden, Ladeflaechen.
         // Loser Schrott zaehlt ausdruecklich nicht — sonst setzt die Spinne
         // auf dem Haufen auf, statt hineinzugreifen.
