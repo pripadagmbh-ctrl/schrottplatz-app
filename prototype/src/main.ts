@@ -367,6 +367,8 @@ async function main(): Promise<void> {
   document.getElementById("pickup-cancel")!.addEventListener("click", () => showPickup(false));
 
   touch.onWheelTick = () => audio.playTick();
+  // Auf iOS gibt es keine Vibration — der Klick ist dort die einzige Bestaetigung
+  touch.onTap = () => audio.playTick();
 
   const helpEl = document.getElementById("help")!;
   if (touch.active) helpEl.style.display = "none"; // auf Touchgeräten stört die Tastenliste
@@ -1011,6 +1013,7 @@ async function main(): Promise<void> {
       grippedKg: grip.totalMassKg,
       calls: renderer.info.render.calls,
       tris: renderer.info.render.triangles,
+      audio: audio.diagnostics,
       msPhysik,
       msBild,
     });

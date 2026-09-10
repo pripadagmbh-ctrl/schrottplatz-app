@@ -32,6 +32,9 @@ export class DebugOverlay {
       /** reine Arbeitszeit, unabhaengig vom 60/30-Riegel der Bildsynchronisation */
       msPhysik: number;
       msBild: number;
+      /** Zustand des Tonsystems — auf dem Geraet die einzige Moeglichkeit
+       *  nachzusehen, warum nichts zu hoeren ist. */
+      audio: { ctx: string; musicWanted: boolean; musicRunning: boolean };
     }
   ): void {
     const fps = 1 / Math.max(frameDt, 1e-4);
@@ -51,6 +54,8 @@ export class DebugOverlay {
       `Beweglich: ${stats.dynamic} (wach: ${stats.dynAwake})<br />` +
       `Zeichenrufe: ${stats.calls} · ${(stats.tris / 1000).toFixed(0)}k Dreiecke<br />` +
       `Arbeit: Physik ${this.physGeglaettet.toFixed(1)} ms · Bild ${this.bildGeglaettet.toFixed(1)} ms<br />` +
+      `Ton: ${stats.audio.ctx} · Musik ${stats.audio.musicWanted ? "an" : "aus"}` +
+      `${stats.audio.musicRunning ? " (laeuft)" : ""}<br />` +
       `Gegriffen: ${stats.gripped} Obj / ${stats.grippedKg.toFixed(0)} kg`;
   }
 }

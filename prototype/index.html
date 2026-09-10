@@ -126,9 +126,11 @@
         pointer-events: none; backface-visibility: hidden;
         transition: opacity 0.12s linear;
       }
-      /* Der scharfgestellte Eintrag ist der einzige, den man drücken kann */
+      /* Der scharfgestellte Eintrag ist der einzige, den man auslösen kann.
+         Zeigerereignisse braucht er nicht: Das Rädchen fängt sie ohnehin ein
+         und entscheidet beim Loslassen, ob getippt oder geblättert wurde. */
       #touch #fnbar .btn.sel {
-        pointer-events: auto; background: rgba(240,180,41,0.28);
+        background: rgba(240,180,41,0.28);
         border-color: rgba(240,180,41,0.85); color: #fff3d6;
       }
       /* Flache Displays (Handy quer): alles eine Nummer kleiner, sonst

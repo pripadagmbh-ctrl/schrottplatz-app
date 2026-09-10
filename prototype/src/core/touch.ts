@@ -53,6 +53,8 @@ const TILT_FULL = 22;
 const GRAPPLE_DEADZONE = 0.38;
 /** So lange darf der linke Stick unberuehrt bleiben, bevor der Fahrmodus endet */
 const DRIVE_AUTO_EXIT_S = 4;
+/** Bis hierhin gilt eine Berührung des Rädchens als Tipp, darüber als Blättern (px) */
+const WHEEL_TAP_MAX_MOVE = 10;
 /** Ein Aufsetzen zählt nur als Tipp, wenn es kürzer dauert und der Finger kaum wandert */
 const TAP_MAX_MS = 250;
 const TAP_MAX_MOVE = 12;
@@ -146,6 +148,12 @@ export class TouchControls {
 
   /** Rastklick des Rädchens — von main mit dem Audiosystem verbunden. */
   onWheelTick: (() => void) | null = null;
+  /**
+   * Bestätigung beim Auslösen eines Eintrags. Auf Android vibriert das Gerät
+   * zusätzlich; iOS Safari kennt keine Vibrations-Schnittstelle, dort ist der
+   * Ton die einzige Rückmeldung, die eine Webseite geben kann.
+   */
+  onTap: (() => void) | null = null;
 
   /**
    * Browser-Zoom unterbinden: Safari kennt eigene Gesture-Events, und ein
@@ -327,14 +335,35 @@ export class TouchControls {
   private bindDrive(): void {
     const el = document.getElementById("btn-drive");
     if (!el) return;
+    // Nur ein bewusster Tipp schaltet: aufsetzen UND loslassen auf der Taste,
+    // dazwischen kaum Bewegung. Der Knopf liegt dort, wo der linke Daumen fuer
+    // den schwebenden Stick ohnehin aufsetzt — ein Wisch darueber hinweg darf
+    // den Fahrmodus nicht umlegen.
+    let von: { x: number; y: number } | null = null;
     el.addEventListener(
-      "pointerup",
+      "pointerdown",
       (e) => {
-        this.setDrive(!this.driveMode);
+        von = { x: e.clientX, y: e.clientY };
         e.preventDefault();
       },
       { passive: false }
     );
+    el.addEventListener(
+      "pointerup",
+      (e) => {
+        const start = von;
+        von = null;
+        if (!start) return; // der Finger kam von woanders her
+        if (Math.hypot(e.clientX - start.x, e.clientY - start.y) > TAP_MAX_MOVE) return;
+        this.setDrive(!this.driveMode);
+        this.onTap?.();
+        e.preventDefault();
+      },
+      { passive: false }
+    );
+    el.addEventListener("pointercancel", () => {
+      von = null;
+    });
   }
 
   private setDrive(v: boolean): void {
@@ -370,20 +399,31 @@ export class TouchControls {
     el.addEventListener("pointerleave", up);
   }
 
+  /**
+   * Eintrag des Funktionsrädchens mit einer Taste verbinden.
+   *
+   * Ausgelöst wird NICHT hier, sondern beim Loslassen im Rädchen selbst — und
+   * nur, wenn der Finger dabei kaum gewandert ist. Vorher hing die Auslösung am
+   * pointerdown des Eintrags: Weil das Rädchen den Zeiger einfängt, sobald man
+   * es dreht, galt jedes Wischen zugleich als Tipp auf den scharfgestellten
+   * Eintrag. Man wollte blättern und löste aus.
+   */
   private bindTap(id: string, code: string): void {
     const el = document.getElementById(id);
     if (!el) return;
-    el.addEventListener(
-      "pointerdown",
-      (e) => {
-        this.pressed.add(code);
-        TouchControls.vibrate(22); // spürbare Bestätigung
-        el.classList.add("down");
-        window.setTimeout(() => el.classList.remove("down"), 120);
-        e.preventDefault();
-      },
-      { passive: false }
-    );
+    el.dataset["action"] = code;
+  }
+
+  /** Scharfgestellten Eintrag auslösen — vom Rädchen gerufen. */
+  private fireWheel(): void {
+    const sel = document.querySelector<HTMLElement>("#fnbar .btn.sel");
+    const code = sel?.dataset["action"];
+    if (!sel || !code) return;
+    this.pressed.add(code);
+    TouchControls.vibrate(22); // spürbar, wo das Gerät es kann
+    this.onTap?.(); // hörbar überall — auf iOS die einzige Rückmeldung
+    sel.classList.add("down");
+    window.setTimeout(() => sel.classList.remove("down"), 120);
   }
 
   /**
@@ -501,6 +541,8 @@ export class TouchControls {
     const ende = (e: PointerEvent): void => {
       if (dragId !== e.pointerId) return;
       dragId = null;
+      // Kaum gewandert heißt: Das war ein Tipp, kein Blättern.
+      if (moved < WHEEL_TAP_MAX_MOVE) this.fireWheel();
       // Mit Schwung ausrollen statt hart einzurasten
       if (!laeuft) {
         laeuft = true;
