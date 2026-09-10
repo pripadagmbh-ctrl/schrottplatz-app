@@ -43,8 +43,16 @@ export interface CollisionContext {
 const CHASSIS_PAD = 1.3;
 /** Sicherheitsabstand von Ausleger und Stiel */
 const ARM_PAD = 0.2;
-/** Sicherheitsabstand der Spinne zu Bauten */
-const GRAPPLE_PAD = 0.9;
+/**
+ * Sicherheitsabstand der Spinne zu Bauten.
+ *
+ * Frueher 0,9 m — die Spinne blieb einen knappen Meter vor jeder Muldenwand
+ * stehen, ohne dass etwas zu sehen war. Das las sich als Haken in der
+ * Steuerung, nicht als Anstossen. Seit die Krallen eigene Kollider haben und
+ * der Bodenanschlag die Flaechen misst, braucht es den grossen Puffer nicht
+ * mehr: Was wirklich anstoesst, haelt die Physik auf.
+ */
+const GRAPPLE_PAD = 0.25;
 /** Radius der Prüfkugel im Schalenkorb */
 const PROBE_R = 0.62;
 /**

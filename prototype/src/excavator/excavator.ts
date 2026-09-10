@@ -76,9 +76,13 @@ const STICK_MAX = THREE.MathUtils.degToRad(-25);
 // Geschwindigkeiten (SW aus Briefing Kap. 5.1)
 const DRIVE_MAX = 1.4; // m/s ≈ 5 km/h
 const STEER_RATE = 0.7; // rad/s
-const CAB_MAX = THREE.MathUtils.degToRad(40);
-const BOOM_RATE = THREE.MathUtils.degToRad(25);
-const STICK_RATE = THREE.MathUtils.degToRad(30);
+// Tempo eine Stufe zurueckgenommen (Wunsch 10.09.2026: "Bagger scheint zu
+// schnell"). Ein Umschlagbagger von 30 Tonnen dreht sich nicht wie ein Bagger
+// im Garten — er setzt sich schwer in Bewegung und kommt schwer zur Ruhe.
+// Darum auch die laengere Rampe unten.
+const CAB_MAX = THREE.MathUtils.degToRad(30);
+const BOOM_RATE = THREE.MathUtils.degToRad(19);
+const STICK_RATE = THREE.MathUtils.degToRad(23);
 const ROTATOR_STEP = THREE.MathUtils.degToRad(15); // pro Mausrad-Raste
 /**
  * Dauerdrehung des Rotators. Vorher wurde je Bild ein fester Winkel addiert,
@@ -90,7 +94,7 @@ const ROTATOR_STEP = THREE.MathUtils.degToRad(15); // pro Mausrad-Raste
 const ROTATOR_SPEED = THREE.MathUtils.degToRad(160); // rad/s
 const CLOSE_TIME = 0.4; // s (SW)
 const OPEN_TIME = 0.3; // s (SW)
-const RAMP_TIME = 0.2; // s Anlauf-/Auslauframpe (SW, vereinfacht symmetrisch)
+const RAMP_TIME = 0.38; // s Anlauf-/Auslauframpe — traeger, die Masse ist zu spueren
 const CAB_LIFT_MAX = 2.6; // m Kabinenhub für besseren Überblick (SW)
 const CAB_LIFT_SPEED = 0.75; // m/s (SW)
 
@@ -452,8 +456,8 @@ export class Excavator {
     buildYoke(-0.1, true); // obere Gabel: Bolzen quer
     buildYoke(-0.3, false); // untere Gabel: 90° verdreht — greift in die obere
     // --- Greifspinne nach Fotoreferenz (Umschlagbagger-Bauart) ---
-    // Von oben nach unten: Rotatorgehäuse, Guss-Traverse, Gelenkring, fünf
-    // gebogene Sichelkrallen und in der Mitte der zentrale Eindringdorn.
+    // Von oben nach unten: Rotatorgehäuse, Guss-Traverse, Gelenkring und fünf
+    // gebogene Sichelkrallen mit stumpfem Schalenende.
     // Maße nach Datenblatt MG4.1-800-HO5 (800 l): Öffnungsweite d = 2225 mm,
     // Schalenkreis ØD = 2409 mm, Zylinderkreis ØC = 1514 mm, Gesamthöhe
     // A = 2363 mm. Alle Werte hier in Metern.
@@ -487,12 +491,9 @@ export class Excavator {
     ring.rotation.x = Math.PI / 2;
     ring.position.y = ringY;
     this.grappleGroup.add(ring);
-    // Zentraler Eindringdorn
-    const centerSpike = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.62, 4), edgeMat);
-    centerSpike.position.y = ringY - 0.26;
-    centerSpike.rotation.x = Math.PI;
-    centerSpike.castShadow = true;
-    this.grappleGroup.add(centerSpike);
+    // Kein zentraler Eindringdorn (Angleich an v2, Wunsch 10.09.2026): Echte
+    // Mehrschalengreifer haben keinen, er sah aus wie ein Dolch, und er hatte
+    // hier weder Kollider noch Funktion — die Krallen greifen, nicht er.
 
     for (let i = 0; i < 5; i++) {
       const a = (i / 5) * Math.PI * 2;
@@ -530,9 +531,11 @@ export class Excavator {
         parent.add(seg);
         parent = seg;
       }
-      const tip = new THREE.Mesh(new THREE.ConeGeometry(0.075, 0.24, 4), edgeMat);
-      tip.position.y = -SEG_LEN - 0.08;
-      tip.rotation.x = Math.PI;
+      // Stumpfes Schalenende statt 24-cm-Vierkantkegel (Angleich an v2):
+      // Sortiergreifer laufen wie ein Loeffelrand aus, nicht wie ein Spiess.
+      // Das erklaert nebenbei, warum Bleche aufgespiesst wurden.
+      const tip = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.075, 0.14, 8), edgeMat);
+      tip.position.y = -SEG_LEN - 0.03;
       tip.castShadow = true;
       tip.name = "tineTip";
       parent.add(tip);

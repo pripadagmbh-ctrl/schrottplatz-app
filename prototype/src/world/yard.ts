@@ -300,9 +300,16 @@ export class Yard {
    * obendrauf liegt loser Schrott (spawnt in main).
    */
   /** Kulissen-Berge am Platzrand (nicht mehr Arbeitsfläche — die ist jetzt der Stahlhaufen) */
-  // Der zweite Berg stand bei x 23 — seit die Ostgrenze bei 10,5 liegt, waere
-  // das ausserhalb der Mauer. Nach Westen geholt, wo jetzt der Platz ist.
-  readonly moundCenters = [new THREE.Vector3(-22, 0, -10), new THREE.Vector3(-31, 0, 6)];
+  /**
+   * Schrottberge — Kulisse, kein Material.
+   *
+   * Sie standen mitten auf dem Platz und sahen aus wie Schrott, waren aber
+   * feste Kegel: Man fuhr hin, griff zu und bekam nichts (Befund 10.09.2026).
+   * Alles, was auf dem Platz nach Material aussieht, muss auch welches sein.
+   * Jetzt liegen sie JENSEITS der Westmauer — dort liest man sie als Nachbars
+   * Halde, und niemand versucht, sie abzutragen.
+   */
+  readonly moundCenters = [new THREE.Vector3(-47, 0, -9), new THREE.Vector3(-44, 0, 9)];
 
   private buildScrapMounds(scene: THREE.Scene, world: RAPIER.World): void {
     const rust = new THREE.MeshStandardMaterial({ color: 0x5f5248, roughness: 1 });

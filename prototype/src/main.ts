@@ -94,7 +94,9 @@ async function main(): Promise<void> {
   const physics = new PhysicsWorld();
   const input = new Input(renderer.domElement);
   const touch = new TouchControls(renderer.domElement);
-  const yard = new Yard(scene, physics.world);
+  // Der Platz baut sich selbst; ein Handle brauchen wir nicht mehr, seit die
+  // Schrottberge nur noch Kulisse ausserhalb der Mauer sind.
+  new Yard(scene, physics.world);
   const signage = new Signage(scene); // Orientierungstexte, mit M umschaltbar
   const items = new ItemManager(scene, physics.world);
   const containers = new ContainerManager(scene, physics.world, bus);
@@ -129,26 +131,22 @@ async function main(): Promise<void> {
     // Altfahrzeuge stehen von Anfang an am Rand des Stahlschrott-Haufens
     composites.spawnCar(new THREE.Vector3(-15.8, 0.5, 3.5));
     composites.spawnCar(new THREE.Vector3(-15.8, 0.5, -2.5));
-    // loser Schrott auf den Bergen hinter dem Bagger — hoch genug über der
-    // Kegelspitze (1,9 m) spawnen, sonst klemmt er im Berg-Kollider
-    for (const mound of yard.moundCenters) {
-      randomCargo(5).forEach((s, i) => {
-        const a = (i / 5) * Math.PI * 2;
-        items.spawnScrap(
-          s.materialId,
-          s.massKg,
-          s.shape,
-          // vor dem Berg (außerhalb des Kegel-Kolliders, Radius 2,6) und
-          // gestaffelt, damit sich beim Spawn nichts durchdringt
-          new THREE.Vector3(mound.x + Math.cos(a) * 3.3, 1.2 + i * 1.1, mound.z + Math.sin(a) * 3.3)
-        );
-      });
-    }
+    // Etwas Streuschrott neben dem Stahlhaufen — er lag frueher an den
+    // Schrottbergen, und die stehen jetzt ausserhalb der Mauer. Auf dem Platz
+    // soll alles, was nach Material aussieht, auch aufzunehmen sein.
+    randomCargo(10).forEach((sp, i) => {
+      const a = (i / 10) * Math.PI * 2;
+      items.spawnScrap(
+        sp.materialId,
+        sp.massKg,
+        sp.shape,
+        new THREE.Vector3(-9 + Math.cos(a) * 6.2, 0.8 + (i % 3) * 0.7, 1 + Math.sin(a) * 5.4)
+      );
+    });
     // Erst jetzt setzen lassen, wenn alles Anfaengliche steht — Haufen, Autos
-    // und Bergschrott. Frueher waere sinnlos: die spaeter gespawnten Teile
+    // und Streuschrott. Frueher waere sinnlos: die spaeter gespawnten Teile
     // fallen in den Haufen und wecken ihn sofort wieder. So beginnt das erste
-    // Bild mit einem Platz, der bereits liegt, statt mit zurechtrutschendem
-    // Schrott.
+    // Bild mit einem Platz, der bereits liegt.
     items.settle(physics.world);
   }
   const vehicles = new VehicleManager(scene, physics.world, items, composites);
