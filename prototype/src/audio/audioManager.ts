@@ -32,36 +32,36 @@ interface GreiferProfil {
 const GREIFER_KLANG: Record<GreiferKlang, GreiferProfil> = {
   // klein und leicht: hoeher, kurz, wenig Bass
   polyp: {
-    freqs: [268, 402, 589, 831, 1146, 1680, 2410],
-    guete: [40, 32, 26, 20, 16, 12, 9],
-    wumms: 0.12,
+    freqs: [268, 402, 589, 831, 1146],
+    guete: [40, 32, 26, 20, 16],
+    wumms: 0.18,
     wummsVon: 128,
     wummsBis: 74,
     wummsDauer: 0.1,
     nachschlag: true,
-    rauschen: 1300,
+    rauschen: 900,
   },
   // der grosse Schrottgreifer: tief, satt, langes Nachklappern
   schrott: {
-    freqs: [168, 252, 371, 523, 742, 1090, 1580, 2270],
-    guete: [55, 42, 34, 26, 20, 15, 11, 8],
-    wumms: 0.24,
+    freqs: [168, 252, 371, 523, 742],
+    guete: [55, 42, 34, 26, 20],
+    wumms: 0.36,
     wummsVon: 104,
     wummsBis: 52,
     wummsDauer: 0.18,
     nachschlag: true,
-    rauschen: 1000,
+    rauschen: 620,
   },
   // zwei grosse Schalen: flaechiger Schlag, droehnt nach
   zweischalen: {
-    freqs: [96, 143, 214, 318, 472, 690, 1010],
-    guete: [85, 66, 52, 40, 30, 20, 14],
-    wumms: 0.4,
+    freqs: [96, 143, 214, 318, 472],
+    guete: [85, 66, 52, 40, 30],
+    wumms: 0.55,
     wummsVon: 88,
     wummsBis: 40,
     wummsDauer: 0.34,
     nachschlag: false,
-    rauschen: 700,
+    rauschen: 420,
   },
   // Magnet: kein Schnappen, ein dumpfer Aufschlag mit Brummen
   magnet: {
@@ -76,32 +76,15 @@ const GREIFER_KLANG: Record<GreiferKlang, GreiferProfil> = {
   },
 };
 
-/**
- * So oft hoechstens ein Aufschlag (s) — der staerkste im Fenster gewinnt.
- *
- * Stand auf 0,14 s. Solange alles dumpf war, verschmierten die Schlaege zu
- * einem Rollen; mit dem Anriss wurde daraus eine Salve (gemessen 11.09.2026:
- * 47 Transienten je Sekunde). Ein Schrotthaufen, der in eine Mulde faellt,
- * macht drei bis vier hoerbare Schlaege je Sekunde, nicht dreissig.
- */
-const AUFPRALL_FENSTER_S = 0.3;
+/** So oft hoechstens ein Aufschlag (s) — der staerkste im Fenster gewinnt */
+const AUFPRALL_FENSTER_S = 0.14;
 
 /**
- * Obere Grenzfrequenz der Geraeusche (Hz).
- *
- * Stand vorher auf 1600. Gemessen am 11.09.2026 lagen damit 99,6 Prozent der
- * Energie eines Stahlaufschlags unter 400 Hz, der Schwerpunkt bei 115 Hz und
- * oberhalb von 2 kHz nichts — das war das "klingt wie unter Wasser". Stahl
- * auf Stahl lebt zwischen 2 und 6 kHz. Der Tiefpass steht darum jetzt weit
- * oben und nimmt nur noch das Schrille weg; das Dumpfe macht die
- * Hoehenabsenkung darunter, und die ist ein Hang, keine Mauer.
+ * Obere Grenzfrequenz der Geraeusche (Hz). Darueber klingt es nach Werkstatt
+ * mit Fliesen, nicht nach Schrottplatz — und auf kleinen Lautsprechern nur
+ * noch schrill.
  */
-const SFX_TIEFPASS_HZ = 5500;
-
-/** Ab hier wird abgesenkt — das ist die Entfernung, nicht der Verlust. */
-const SFX_FERNE_HZ = 3500;
-/** Wie stark (dB) */
-const SFX_FERNE_DB = -7;
+const SFX_TIEFPASS_HZ = 1600;
 
 export class AudioManager {
   /**
@@ -193,14 +176,7 @@ export class AudioManager {
       bauch.type = "peaking";
       bauch.frequency.value = 110;
       bauch.Q.value = 0.9;
-      // War +6,5 dB. Zusammen mit dem tiefen Tiefpass ergab das eine
-      // Bassbetonung, die alles zugedeckt hat (Messung 11.09.2026).
-      bauch.gain.value = 1.5;
-      // Entfernung statt Verlust: ein Hang nach oben, keine Mauer.
-      const ferne = this.ctx.createBiquadFilter();
-      ferne.type = "highshelf";
-      ferne.frequency.value = SFX_FERNE_HZ;
-      ferne.gain.value = SFX_FERNE_DB;
+      bauch.gain.value = 6.5;
       /*
        * Kompressor als letztes Glied (Wunsch 11.09.2026: "lass richtig
        * krachen"). Er faengt die Spitzen ab und hebt alles darunter an —
@@ -212,12 +188,10 @@ export class AudioManager {
       const presse = this.ctx.createDynamicsCompressor();
       presse.threshold.value = -20;
       presse.knee.value = 8;
-      // 7:1 mit langem Loslassen hat die Anrisse in einen Brei gezogen —
-      // gerade das, was Stahl von Wasser unterscheidet. Jetzt moderater.
-      presse.ratio.value = 4;
+      presse.ratio.value = 7;
       presse.attack.value = 0.003;
-      presse.release.value = 0.12;
-      this.sfx.connect(bauch).connect(ferne).connect(dumpf).connect(presse).connect(this.master);
+      presse.release.value = 0.2;
+      this.sfx.connect(bauch).connect(dumpf).connect(presse).connect(this.master);
 
       // Hintergrundmusik, zur Laufzeit erzeugt — keine fremden Aufnahmen
       this.music = new Music(this.ctx, this.master);
@@ -580,28 +554,19 @@ export class AudioManager {
        * dicht beieinander liegende Eigenfrequenzen und klingen lange nach —
        * daher hohe Guete und viele Anschlaege hintereinander.
        */
-      // Die oberen drei Eigenfrequenzen kamen dazu (Messung 11.09.2026):
-      // Ohne sie endete der Blechschlag bei 651 Hz und klang wie ein Sack
-      // Sand. Ein Blech klirrt nun mal mit.
-      this.scheppern(
-        [94, 147, 223, 331, 468, 651, 920, 1310, 1760],
-        [90, 70, 55, 45, 35, 28, 22, 16, 12],
-        1.4 * w,
-        true
-      );
-      // Blechdonner: die ganze Flaeche schwingt breitbandig mit — breitbandig
-      // heisst breitbandig, nicht bis 300 Hz.
-      this.noiseBurst(1500, 0.32 + 0.3 * w, 0.38 * w, "bandpass", 0.7);
+      this.scheppern([94, 147, 223, 331, 468, 651], [90, 70, 55, 45, 35, 28], 0.85 * w, true);
+      // Blechdonner: die ganze Flaeche schwingt breitbandig mit
+      this.noiseBurst(300, 0.32 + 0.3 * w, 0.16 * w);
       // Die Flaeche wummert: tiefer Schlag, der ueber eine halbe Sekunde ausklingt
-      this.wumms(0.3 * w, 104, 42, 0.38 + 0.34 * w);
-      this.wumms(0.24 * w, 72, 36, 0.55 + 0.3 * w, 0.03);
+      this.wumms(0.8 * w, 104, 42, 0.38 + 0.34 * w);
+      this.wumms(0.36 * w, 72, 36, 0.55 + 0.3 * w, 0.03);
       return;
     }
     // Beton: kurz, trocken, wenig Nachklang
-    this.scheppern([128, 196, 289, 402, 640, 980], [30, 24, 18, 14, 11, 8], 1.05 * w, false);
+    this.scheppern([128, 196, 289, 402], [30, 24, 18, 14], 0.62 * w, false);
     // Beton schluckt: kurzer, harter Wumms ohne langen Bauch
-    this.wumms(0.32 * w, 116, 50, 0.22);
-    this.noiseBurst(1100, 0.08, 0.18 * w, "bandpass", 0.8);
+    this.wumms(0.6 * w, 116, 50, 0.22);
+    this.noiseBurst(300, 0.08, 0.12 * w);
   }
 
   /**
@@ -648,29 +613,7 @@ export class AudioManager {
    * Toene: Metall klingt nicht harmonisch wie ein Instrument, sondern
    * rauschhaft mit einigen stehenden Eigenfrequenzen — und es scheppert nach.
    */
-  /**
-   * Sperre gegen Salven.
-   *
-   * Beim Abkippen faellt eine ganze Spinnenladung auf einmal in die Mulde,
-   * und jedes Teil meldet sich einzeln. Zehn Teile ergaben zehn Fallklaenge
-   * und zehn Quittungstoene im selben Moment — genau das Maschinengewehr
-   * (Befund 11.09.2026). Wer in echt eine Fuhre abkippt, hoert ein Poltern,
-   * keine Salve. Darum darf jede Klangart nur alle paar Hundertstel einmal
-   * ansprechen; was dazwischen kommt, faellt weg.
-   */
-  private zuletzt = new Map<string, number>();
-
-  private darfSpielen(art: string, abstandS: number): boolean {
-    if (!this.ctx) return false;
-    const jetzt = this.ctx.currentTime;
-    const vorher = this.zuletzt.get(art) ?? -Infinity;
-    if (jetzt - vorher < abstandS) return false;
-    this.zuletzt.set(art, jetzt);
-    return true;
-  }
-
   playDrop(materialId: string): void {
-    if (!this.darfSpielen("drop", 0.11)) return;
     switch (materialId) {
       case "steel":
       case "mixed":
@@ -743,7 +686,7 @@ export class AudioManager {
     this.dreck.connect(this.sfx);
 
     this.hall = this.ctx.createConvolver();
-    const dauer = 0.4;
+    const dauer = 0.55;
     const len = Math.floor(this.ctx.sampleRate * dauer);
     const buf = this.ctx.createBuffer(2, len, this.ctx.sampleRate);
     for (let ch = 0; ch < 2; ch++) {
@@ -760,7 +703,7 @@ export class AudioManager {
     }
     this.hall.buffer = buf;
     this.hallSend = this.ctx.createGain();
-    this.hallSend.gain.value = 0.15;
+    this.hallSend.gain.value = 0.28;
     this.hallSend.connect(this.hall).connect(this.sfx);
   }
 
@@ -773,49 +716,12 @@ export class AudioManager {
    * @param anregung Dauer der Anregung (kurz = harter Schlag)
    * @param wann Versatz in Sekunden
    */
-  /**
-   * Der Anriss vor dem Klang.
-   *
-   * Gemessen am 11.09.2026: Im ganzen Krach lag oberhalb von 2 kHz nichts,
-   * der Schwerpunkt bei 115 Hz. So klingt kein Stahl. Was fehlte, sind die
-   * ersten Millisekunden, in denen zwei Bleche aufeinanderschlagen — ein
-   * sehr kurzes, helles Rauschen zwischen 2 und 7 kHz. Man hoert es nicht
-   * als Ton, sondern als Haerte; ohne das bleibt jeder Schlag ein Plumps.
-   */
-  private knall(gain: number, wann = 0, mitteHz = 3800): void {
-    if (!this.ctx || !this.dreck) return;
-    const t = this.ctx.currentTime + wann;
-    const src = this.ctx.createBufferSource();
-    src.buffer = this.noiseBuffer();
-    src.playbackRate.value = 0.9 + Math.random() * 0.4;
-    const hp = this.ctx.createBiquadFilter();
-    hp.type = "highpass";
-    hp.frequency.value = mitteHz * 0.5;
-    const spitz = this.ctx.createBiquadFilter();
-    spitz.type = "peaking";
-    spitz.frequency.value = mitteHz * (0.85 + Math.random() * 0.3);
-    spitz.Q.value = 1.1;
-    spitz.gain.value = 7;
-    const g = this.ctx.createGain();
-    g.gain.setValueAtTime(gain, t);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.014);
-    src.connect(hp).connect(spitz).connect(g);
-    // Direkt UND durch den Dreck: der direkte Weg haelt den Anriss spitz, die
-    // Saettigung gibt ihm Schmutz. Nur ueber die Saettigung wird er rund.
-    if (this.sfx) g.connect(this.sfx);
-    g.connect(this.dreck);
-    if (this.hallSend) g.connect(this.hallSend);
-    src.start(t);
-    src.stop(t + 0.06);
-  }
-
   private anschlag(
     freqs: number[],
     guete: number[],
     gain: number,
     anregung: number,
-    wann = 0,
-    knallAnteil = 0.5
+    wann = 0
   ): void {
     if (!this.ctx || !this.sfx || !this.dreck) return;
     const t = this.ctx.currentTime + wann;
@@ -834,30 +740,13 @@ export class AudioManager {
       bp.frequency.value = f * (0.93 + Math.random() * 0.14);
       bp.Q.value = guete[i] ?? 40;
       const g = this.ctx!.createGain();
-      /*
-       * Lautstaerke je Teilton. Zwei Anteile:
-       *
-       * - Die hoeheren Teiltoene sind leiser als die tiefen (1/(1+i·0,25)).
-       * - Dazu eine breite Betonung um 1150 Hz. Genau dort sitzt bei echten
-       *   Aufnahmen (Uploads 11.09.2026) das Gewicht eines Metallschlags;
-       *   ohne diese Betonung war der Klang Bass plus ein heller Tick und
-       *   dazwischen nichts.
-       */
-      const bell = 0.4 + 0.6 / (1 + Math.pow(Math.log2(bp.frequency.value / 1150), 2) * 0.7);
-      g.gain.value = (1 / (1 + i * 0.25)) * bell;
+      g.gain.value = 1 / (1 + i * 0.55);
       anreg.connect(bp).connect(g);
       g.connect(this.dreck!);
       if (this.hallSend) g.connect(this.hallSend);
     });
     src.start(t);
     src.stop(t + anregung + 1.2);
-
-    // Die Haerte oben drauf. Wie hell, richtet sich nach dem Material: Ein
-    // duenner Blechschnipsel klirrt, ein Motorblock schlaegt nur.
-    if (knallAnteil > 0) {
-      const oben = freqs[freqs.length - 1] ?? 700;
-      this.knall(gain * knallAnteil, wann, 700 + oben * 0.6);
-    }
   }
 
   /**
@@ -910,9 +799,7 @@ export class AudioManager {
    * rutscht aus — genau das unterscheidet Krach von einem einzelnen "Pling".
    */
   private scheppern(freqs: number[], guete: number[], wucht: number, stahl: boolean): void {
-    // War 4 bis 9 bzw. 3 bis 5 — zusammen mit dem Fenster von 0,14 s ergab
-    // das eine Dauersalve statt einzelner Schlaege.
-    const schlaege = stahl ? 3 + Math.floor(Math.random() * 3) : 2 + Math.floor(Math.random() * 2);
+    const schlaege = stahl ? 4 + Math.floor(Math.random() * 6) : 3 + Math.floor(Math.random() * 3);
     let wann = 0;
     for (let i = 0; i < schlaege; i++) {
       const staerke = wucht * Math.pow(0.72, i) * (0.75 + Math.random() * 0.6);
@@ -921,14 +808,7 @@ export class AudioManager {
         guete,
         staerke,
         i === 0 ? 0.004 : 0.006 + Math.random() * 0.01,
-        wann,
-        /*
-         * Nur der erste Kontakt reisst hart an. Gemessen am 11.09.2026:
-         * Mit einem Anriss je Huepfer kamen bei voller Ladung 47 scharfe
-         * Transienten je Sekunde zusammen — das war das Maschinengewehr.
-         * Was danach kommt, ist Klappern, kein Schlag.
-         */
-        i === 0 ? (stahl ? 0.85 : 0.7) : 0.12
+        wann
       );
       wann += 0.035 + Math.random() * (stahl ? 0.13 : 0.07);
     }
@@ -982,8 +862,6 @@ export class AudioManager {
   }
 
   playCorrect(): void {
-    // Eine Fuhre ist ein Treffer, nicht zwanzig — sonst klingelt es im Kreis.
-    if (!this.darfSpielen("correct", 0.6)) return;
     // dezentes „Kaching": zwei weiche Sinustöne (−6 dB unter Weltklang, SW)
     this.tone(660, 0.1, 0.12, 0);
     this.tone(990, 0.16, 0.12, 0.07);
@@ -1034,15 +912,14 @@ export class AudioManager {
     }
   }
 
-  private noiseBurst(cutoff: number, dur: number, gain: number, typ: BiquadFilterType = "lowpass", guete = 1): void {
+  private noiseBurst(cutoff: number, dur: number, gain: number): void {
     if (!this.ctx || !this.master) return;
     const t = this.ctx.currentTime;
     const src = this.ctx.createBufferSource();
     src.buffer = this.noiseBuffer();
     const filter = this.ctx.createBiquadFilter();
-    filter.type = typ;
+    filter.type = "lowpass";
     filter.frequency.value = cutoff;
-    filter.Q.value = guete;
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(gain, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + dur);
