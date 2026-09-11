@@ -76,8 +76,15 @@ const GREIFER_KLANG: Record<GreiferKlang, GreiferProfil> = {
   },
 };
 
-/** So oft hoechstens ein Aufschlag (s) — der staerkste im Fenster gewinnt */
-const AUFPRALL_FENSTER_S = 0.14;
+/**
+ * So oft hoechstens ein Aufschlag (s) — der staerkste im Fenster gewinnt.
+ *
+ * Stand auf 0,14 s. Solange alles dumpf war, verschmierten die Schlaege zu
+ * einem Rollen; mit dem Anriss wurde daraus eine Salve (gemessen 11.09.2026:
+ * 47 Transienten je Sekunde). Ein Schrotthaufen, der in eine Mulde faellt,
+ * macht drei bis vier hoerbare Schlaege je Sekunde, nicht dreissig.
+ */
+const AUFPRALL_FENSTER_S = 0.3;
 
 /**
  * Obere Grenzfrequenz der Geraeusche (Hz).
@@ -579,21 +586,21 @@ export class AudioManager {
       this.scheppern(
         [94, 147, 223, 331, 468, 651, 920, 1310, 1760],
         [90, 70, 55, 45, 35, 28, 22, 16, 12],
-        1.1 * w,
+        1.4 * w,
         true
       );
       // Blechdonner: die ganze Flaeche schwingt breitbandig mit — breitbandig
       // heisst breitbandig, nicht bis 300 Hz.
-      this.noiseBurst(1500, 0.32 + 0.3 * w, 0.3 * w, "bandpass", 0.7);
+      this.noiseBurst(1500, 0.32 + 0.3 * w, 0.38 * w, "bandpass", 0.7);
       // Die Flaeche wummert: tiefer Schlag, der ueber eine halbe Sekunde ausklingt
-      this.wumms(0.45 * w, 104, 42, 0.38 + 0.34 * w);
+      this.wumms(0.3 * w, 104, 42, 0.38 + 0.34 * w);
       this.wumms(0.24 * w, 72, 36, 0.55 + 0.3 * w, 0.03);
       return;
     }
     // Beton: kurz, trocken, wenig Nachklang
-    this.scheppern([128, 196, 289, 402, 640, 980], [30, 24, 18, 14, 11, 8], 0.8 * w, false);
+    this.scheppern([128, 196, 289, 402, 640, 980], [30, 24, 18, 14, 11, 8], 1.05 * w, false);
     // Beton schluckt: kurzer, harter Wumms ohne langen Bauch
-    this.wumms(0.4 * w, 116, 50, 0.22);
+    this.wumms(0.32 * w, 116, 50, 0.22);
     this.noiseBurst(1100, 0.08, 0.18 * w, "bandpass", 0.8);
   }
 
@@ -641,7 +648,29 @@ export class AudioManager {
    * Toene: Metall klingt nicht harmonisch wie ein Instrument, sondern
    * rauschhaft mit einigen stehenden Eigenfrequenzen — und es scheppert nach.
    */
+  /**
+   * Sperre gegen Salven.
+   *
+   * Beim Abkippen faellt eine ganze Spinnenladung auf einmal in die Mulde,
+   * und jedes Teil meldet sich einzeln. Zehn Teile ergaben zehn Fallklaenge
+   * und zehn Quittungstoene im selben Moment — genau das Maschinengewehr
+   * (Befund 11.09.2026). Wer in echt eine Fuhre abkippt, hoert ein Poltern,
+   * keine Salve. Darum darf jede Klangart nur alle paar Hundertstel einmal
+   * ansprechen; was dazwischen kommt, faellt weg.
+   */
+  private zuletzt = new Map<string, number>();
+
+  private darfSpielen(art: string, abstandS: number): boolean {
+    if (!this.ctx) return false;
+    const jetzt = this.ctx.currentTime;
+    const vorher = this.zuletzt.get(art) ?? -Infinity;
+    if (jetzt - vorher < abstandS) return false;
+    this.zuletzt.set(art, jetzt);
+    return true;
+  }
+
   playDrop(materialId: string): void {
+    if (!this.darfSpielen("drop", 0.11)) return;
     switch (materialId) {
       case "steel":
       case "mixed":
@@ -881,7 +910,9 @@ export class AudioManager {
    * rutscht aus — genau das unterscheidet Krach von einem einzelnen "Pling".
    */
   private scheppern(freqs: number[], guete: number[], wucht: number, stahl: boolean): void {
-    const schlaege = stahl ? 4 + Math.floor(Math.random() * 6) : 3 + Math.floor(Math.random() * 3);
+    // War 4 bis 9 bzw. 3 bis 5 — zusammen mit dem Fenster von 0,14 s ergab
+    // das eine Dauersalve statt einzelner Schlaege.
+    const schlaege = stahl ? 3 + Math.floor(Math.random() * 3) : 2 + Math.floor(Math.random() * 2);
     let wann = 0;
     for (let i = 0; i < schlaege; i++) {
       const staerke = wucht * Math.pow(0.72, i) * (0.75 + Math.random() * 0.6);
@@ -891,7 +922,13 @@ export class AudioManager {
         staerke,
         i === 0 ? 0.004 : 0.006 + Math.random() * 0.01,
         wann,
-        stahl ? 0.55 : 0.4
+        /*
+         * Nur der erste Kontakt reisst hart an. Gemessen am 11.09.2026:
+         * Mit einem Anriss je Huepfer kamen bei voller Ladung 47 scharfe
+         * Transienten je Sekunde zusammen — das war das Maschinengewehr.
+         * Was danach kommt, ist Klappern, kein Schlag.
+         */
+        i === 0 ? (stahl ? 0.85 : 0.7) : 0.12
       );
       wann += 0.035 + Math.random() * (stahl ? 0.13 : 0.07);
     }
@@ -945,6 +982,8 @@ export class AudioManager {
   }
 
   playCorrect(): void {
+    // Eine Fuhre ist ein Treffer, nicht zwanzig — sonst klingelt es im Kreis.
+    if (!this.darfSpielen("correct", 0.6)) return;
     // dezentes „Kaching": zwei weiche Sinustöne (−6 dB unter Weltklang, SW)
     this.tone(660, 0.1, 0.12, 0);
     this.tone(990, 0.16, 0.12, 0.07);

@@ -119,6 +119,43 @@ die schweren: rund **−10 dB über 700 Hz** und **−13 dB über 2 kHz**.
 Holz bleibt dumpf, Metall nicht mehr — der Unterschied zwischen den
 Materialien ist jetzt messbar 14 dB statt 0,6 dB.
 
+## 3 Nachtrag: das Maschinengewehr
+
+Rueckmeldung nach dem Umbau: „aktuell ists grausam mit dem Maschinengewehr".
+Das war kein Klangproblem, sondern ein Mengenproblem — solange alles dumpf
+war, verschmierten die vielen Einzelschlaege zu einem Rollen; mit dem Anriss
+wurde jeder einzelne hoerbar.
+
+Gezaehlt wurden die Ausloeser, nicht geschaetzt:
+
+| | vorher | nachher |
+|---|---|---|
+| laute Anrisse je Sekunde, Ladeflaeche | **47,1** | **5,3** |
+| laute Anrisse je Sekunde, Beton | 27,1 | 3,3 |
+| Schlaege je Aufprall (Kaskade) | 4 bis 9 | 3 bis 5 |
+| Klangausloeser bei zehn Teilen zugleich in der Mulde | 10 | **1** |
+| Quittungstoene dabei | 20 | **2** |
+
+Zum Vergleich: Ein echtes Maschinengewehr schafft 10 bis 13 Schuss je
+Sekunde. Drei Aenderungen:
+
+1. **Der Anriss sitzt nur noch auf dem ersten Kontakt.** Was danach kommt,
+   ist Klappern, kein Schlag — die Huepfer bekommen ein Achtel.
+2. **Das Aufprallfenster** ist von 0,14 auf 0,3 s verlaengert: hoechstens gut
+   drei hoerbare Aufschlaege je Sekunde statt sieben.
+3. **Fallklaenge und Quittungstoene werden zusammengefasst.** Beim Abkippen
+   meldete sich jedes Teil einzeln; jetzt sperrt eine Frist von 0,11 s
+   (Fallklang) bzw. 0,6 s (Quittung) die Salve weg. Eine Fuhre ist ein
+   Treffer, nicht zwanzig.
+
+Weil weniger Schlaege kommen, ist jeder einzelne lauter — sonst kippt die
+Balance zurueck ins Dumpfe. Gegengemessen nach dem Ausduennen:
+
+| Aufprall Ladeflaeche | Wert | Ziel |
+|---|---|---|
+| ueber 700 Hz | −12,3 dB | −10,2 dB |
+| ueber 2 kHz | −12,9 dB | −13,4 dB |
+
 Die Aufnahmen selbst wurden **nicht** eingebaut, nur als Zielwert benutzt
 (E-049). Wer nachjustieren will: Ein Wert, `SFX_FERNE_DB` in
 `audio/audioManager.ts`, verschiebt die ganze Balance zwischen dumpf und hell.
