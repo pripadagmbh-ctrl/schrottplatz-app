@@ -2,6 +2,7 @@ import * as THREE from "three";
 import type { ItemManager } from "./scrapItems";
 import { hitsObstacle, slideAround } from "./obstacles";
 import { CONFIGS, type ContainerConfig } from "./containers";
+import { KAFFEE_ROT } from "./yard";
 import {
   WheelLoader,
   LOADER_SPEED,
@@ -28,7 +29,7 @@ export interface PersonColors {
   skin?: number;
 }
 
-interface PersonParts {
+export interface PersonParts {
   group: THREE.Group;
   armLeft: THREE.Mesh;
   armRight: THREE.Mesh;
@@ -105,10 +106,11 @@ export function buildPerson(colors: PersonColors): PersonParts {
  * Lichterkette. Auf einem Schrottplatz ist so ein Wagen der einzige Ort mit
  * Farbe — deshalb Mintgrün und Messing statt Grau.
  */
-function buildKaffeewagen(scene: THREE.Scene, pos: THREE.Vector3): THREE.Group {
+function buildKaffeewagen(scene: THREE.Scene, pos: THREE.Vector3, rot: number): THREE.Group {
   const g = new THREE.Group();
   g.position.copy(pos);
-  // Klappe und Theke zeigen nach Osten, zum Platz
+  // Klappe und Theke sitzen in +x; die Drehung richtet sie zum Platz aus
+  g.rotation.y = rot;
   scene.add(g);
 
   const alu = new THREE.MeshStandardMaterial({ color: 0xd8dee0, roughness: 0.25, metalness: 0.85 });
@@ -342,11 +344,16 @@ export class StaffManager {
     this.mario.group.add(brett);
 
     // Janine verkauft aus einem Kaffeewagen — kein Klapptisch mehr
-    buildKaffeewagen(scene, kaffeePos);
+    buildKaffeewagen(scene, kaffeePos, KAFFEE_ROT);
     const janine = buildPerson({ shirt: 0xe8e2d5, trousers: 0x4a3b52, hair: 0x8a5a2b });
-    // hinter der Theke, also auf der Wagenseite
-    janine.group.position.set(kaffeePos.x - 0.5, 0, kaffeePos.z - 0.2);
-    janine.group.rotation.y = Math.PI / 2;
+    // Hinter der Theke, also im Wagen. Der Platz liegt im gedrehten System des
+    // Wagens, sonst steht sie neben ihm statt darin.
+    const innen = new THREE.Vector3(-0.5, 0, -0.2).applyAxisAngle(
+      new THREE.Vector3(0, 1, 0),
+      KAFFEE_ROT
+    );
+    janine.group.position.set(kaffeePos.x + innen.x, 0, kaffeePos.z + innen.z);
+    janine.group.rotation.y = KAFFEE_ROT;
     janine.legLeft.visible = false; // steht hinter der Klappe
     janine.legRight.visible = false;
     janine.group.position.y = 0.55;

@@ -60,14 +60,6 @@ export const BUERO_TUER = new THREE.Vector3(
 );
 
 /**
- * Janines Kaffeewagen steht vorn auf dem Hof, rechts neben den Hallen (also
- * am nördlichen Ende der Front) — zwischen Gebäudefront und Waage, wo die
- * Fahrer ohnehin vorbeikommen (Wunsch 11.09.2026). Marios Weg von der Tür
- * zur Waage führt nördlich daran vorbei.
- */
-export const KAFFEE_POS = new THREE.Vector3(OFFICE_FRONT_X + 3.1, 0, OFFICE_Z - 3.5);
-
-/**
  * Grundflächen für die Hindernisprüfung: [x, z, halbeBreite, halbeTiefe].
  *
  * Steht hier als freie Funktion, damit obstacles.ts denselben Grundriss

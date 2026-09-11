@@ -1,5 +1,14 @@
-import { YARD_W, YARD_D, YARD_MIN_X, YARD_MAX_X, YARD_CX, GATE_X } from "./yard";
-import { officeFootprints, KAFFEE_POS } from "./office";
+import {
+  YARD_W,
+  YARD_D,
+  YARD_MIN_X,
+  YARD_MAX_X,
+  YARD_CX,
+  GATE_X,
+  KAFFEE_POS,
+  KAFFEE_FUSS,
+} from "./yard";
+import { officeFootprints } from "./office";
 import { CONFIGS, type ContainerConfig } from "./containers";
 
 /**
@@ -110,7 +119,14 @@ export const STATIC_OBSTACLES: Obstacle[] = [
   // nicht auseinanderlaufen.
   // Janines Kaffeewagen steht auf dem Vorplatz — ein Anhaenger ist ein
   // Hindernis wie jedes andere.
-  { x: KAFFEE_POS.x, z: KAFFEE_POS.z, hw: 1.3, hd: 2.3, top: 2.6, label: "Kaffeewagen" },
+  {
+    x: KAFFEE_POS.x,
+    z: KAFFEE_POS.z,
+    hw: KAFFEE_FUSS[0],
+    hd: KAFFEE_FUSS[1],
+    top: 2.6,
+    label: "Kaffeewagen",
+  },
 
   ...officeFootprints().map(([x, z, hw, hd]) => ({
     x,

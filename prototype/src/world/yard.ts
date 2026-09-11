@@ -23,6 +23,21 @@ export const YARD_D = 58;
 export const GATE_X = -22;
 
 /**
+ * Janines Kaffeewagen steht an der Nordwand vor den Graffiti, oestlich der
+ * Einfahrt — dort, wo die Fahrer nach dem Abladen ohnehin warten (Wunsch
+ * 11.09.2026). Laengsseite an der Mauer, Verkaufsklappe nach Sueden zum Platz,
+ * die Warteplaetze links und rechts daneben.
+ */
+export const KAFFEE_POS = new THREE.Vector3(-10.5, 0, 27.0);
+/** Gedreht, damit die Klappe nach Sueden zeigt und der Wagen laengs zur Wand steht. */
+export const KAFFEE_ROT = Math.PI / 2;
+/** Grundriss des Wagens [halbe Breite in x, halbe Tiefe in z] — dreht mit. */
+export const KAFFEE_FUSS: [number, number] =
+  Math.abs(Math.sin(KAFFEE_ROT)) > 0.5 ? [2.5, 1.4] : [1.4, 2.5];
+/** Wo die Fahrer ihren Kaffee trinken: vor der Theke, Suedseite. */
+export const KAFFEE_THEKE = new THREE.Vector3(KAFFEE_POS.x, 0, KAFFEE_POS.z - 2.4);
+
+/**
  * Platz-Grundfläche Stufe A (60 × 40 m, Briefing Kap. 12):
  * Sandboden, Betonwände, Annahmefläche, Fahrspuren und Brückenwaage.
  */

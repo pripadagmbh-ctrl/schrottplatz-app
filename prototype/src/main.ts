@@ -27,7 +27,7 @@ import { haggle, leavesOnRefusal, hint, OFFER_FACTOR, OFFER_LABEL, type Offer } 
 import { LaneWatch } from "./delivery/laneWatch";
 import { Daylight, Floodlights } from "./world/daylight";
 import { hitsObstacle } from "./world/obstacles";
-import { OfficeBuilding, KAFFEE_POS, BUERO_TUER } from "./world/office";
+import { OfficeBuilding, BUERO_TUER } from "./world/office";
 import { Signage } from "./world/signage";
 import {
   type AxisId,
@@ -39,7 +39,7 @@ import {
 import { Account, PURCHASE_PRICE_PER_KG } from "./economy/account";
 import { getMaterial } from "./materials/catalog";
 import { StaffManager } from "./world/people";
-import { WEIGH_X, WEIGH_Z } from "./world/yard";
+import { WEIGH_X, WEIGH_Z, KAFFEE_POS } from "./world/yard";
 import { clearSave, readSave, storeSave, type SaveData } from "./core/save";
 
 const FIXED_DT = 1 / 60;

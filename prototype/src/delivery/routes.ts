@@ -27,11 +27,11 @@ export const ROUTE_IN_FWD: Array<[number, number]> = [
 // Nach dem Wiegen weiter zum Rangierpunkt vor dem Abkippplatz
 export const ROUTE_APPROACH: Array<[number, number]> = [
   [GATE_X, 24],
-  [-14, 18.5],
-  [0, 19],
+  [-14, 16.5],
+  [0, 16.5],
 ];
 export const ROUTE_IN_REV: Array<[number, number]> = [
-  [0, 19],
+  [0, 16.5],
   // 7,0 m: so nah, dass der Bagger die ganze Ladefläche bestreicht, und noch
   // weit genug, dass die Blockadeprüfung (5,5 m um die Maschine) nicht
   // dauernd anspricht.
@@ -39,8 +39,8 @@ export const ROUTE_IN_REV: Array<[number, number]> = [
 ];
 export const ROUTE_OUT: Array<[number, number]> = [
   [0, 7.0],
-  [0, 19],
-  [-14, 18.5],
+  [0, 16.5],
+  [-14, 16.5],
   [GATE_X, 24],
   [GATE_X, 40],
 ];
@@ -53,19 +53,19 @@ export const PICKUP_IN_FWD: Array<[number, number]> = [
 ];
 export const PICKUP_APPROACH: Array<[number, number]> = [
   [GATE_X, 24],
-  [-14, 18.5],
-  [-3.5, 19],
+  [-14, 16.5],
+  [-3.5, 16.5],
 ];
 // Rückwärts nach Westen direkt neben die Presse — Heck (Container-Öffnung)
 // zeigt zur Schere, der Bagger lädt von dort um (Design-Fix 2026-08-29)
 export const PICKUP_IN_REV: Array<[number, number]> = [
-  [-3.5, 19],
+  [-3.5, 16.5],
   [-3.5, 8.0],
 ];
 export const PICKUP_OUT: Array<[number, number]> = [
   [-3.5, 8.0],
-  [-3.5, 19],
-  [-14, 18.5],
+  [-3.5, 16.5],
+  [-14, 16.5],
   [GATE_X, 24],
   [GATE_X, 40],
 ];
@@ -74,7 +74,7 @@ export const PICKUP_OUT: Array<[number, number]> = [
 // kippt seine Ladung direkt dort ab (Design-Fix 29.08.2026).
 export const TIP_APPROACH: Array<[number, number]> = [
   [GATE_X, 24],
-  [-14, 18.5],
+  [-14, 16.5],
   [-9, 13],
 ];
 export const TIP_IN_REV: Array<[number, number]> = [
@@ -84,7 +84,7 @@ export const TIP_IN_REV: Array<[number, number]> = [
 export const TIP_OUT: Array<[number, number]> = [
   [-9, 7.5],
   [-9, 13],
-  [-14, 18.5],
+  [-14, 16.5],
   [GATE_X, 24],
   [GATE_X, 40],
 ];
@@ -100,10 +100,15 @@ export const TIP_OUT: Array<[number, number]> = [
  * Betriebshof — die LKW haetten im Buero geparkt.
  */
 export const PARK_SLOTS: Array<[number, number]> = [
-  [-14, 25],
-  [-8.5, 25],
-  [-3, 25],
+  [-16, 24],
+  [-6, 24],
+  [-1.5, 24],
 ];
+/**
+ * Wie weit suedlich des Platzes der LKW anhaelt, bevor er rueckwaerts an die
+ * Wand setzt. Ein Fahrer stellt sich nicht mit der Schnauze an die Mauer.
+ */
+export const PARK_ANFAHRT_M = 8;
 /** So lange bleibt ein Fahrzeug stehen (s) */
 export const PARK_TIME_S: [number, number] = [45, 120];
 

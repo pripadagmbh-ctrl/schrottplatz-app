@@ -2,10 +2,15 @@ import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { randomCargo, type ItemManager, type ScrapItem } from "../world/scrapItems";
 import type { CompositeManager, CarComposite } from "../dismantle/composites";
-import { WEIGH_Z } from "../world/yard";
+import { WEIGH_Z, KAFFEE_THEKE } from "../world/yard";
+import { buildPerson, type PersonParts } from "../world/people";
 
 /** So lange haelt ein beladener Abholer auf der Waage fuer Marios Kontrolle. */
 const WIEGE_HALT_S = 6;
+/** Rueckwaertstempo beim Einparken (m/s) — Schrittgeschwindigkeit. */
+const PARK_RUECK_SPEED = 1.6;
+/** Gehtempo des Fahrers (m/s) */
+const FAHRER_TEMPO = 1.5;
 import { hitsObstacle } from "../world/obstacles";
 import { rollCustomer, vehicleForCustomer, type CustomerProfile } from "./customers";
 import { buildVehicleModel } from "./vehicleModel";
@@ -34,6 +39,7 @@ import {
   TIP_IN_REV,
   TIP_OUT,
   PARK_SLOTS,
+  PARK_ANFAHRT_M,
   PARK_TIME_S,
   SPEED,
   FIRST_DELAY_S,
@@ -66,6 +72,7 @@ type Phase =
   | "waitLoad"
   | "nudging"
   | "toPark"
+  | "parkRueck"
   | "parked"
   | "out";
 
@@ -194,6 +201,84 @@ class DeliveryVehicle {
     this.trailer.rotation.y = this.trailerYawRel;
   }
 
+  /**
+   * Aussteigen und zum Kaffeewagen hinuebergehen (Wunsch 11.09.2026).
+   *
+   * Der Fahrer klettert an der Fahrerseite heraus, geht zur Theke, steht dort
+   * mit seinem Becher und kommt zurueck, bevor die Pause endet. Erst wenn er
+   * wieder im Haus ist, faehrt der LKW los — ein LKW faehrt nicht ohne Fahrer.
+   */
+  private steigeAus(): void {
+    if (!this.fahrer) {
+      this.fahrer = buildPerson({ shirt: 0x3c4f63, trousers: 0x2b2f33, hair: 0x4a3a2e });
+      this.scene.add(this.fahrer.group);
+      // Becher in der Hand
+      const becher = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.045, 0.04, 0.1, 8),
+        new THREE.MeshStandardMaterial({ color: 0xe8e2d5, roughness: 0.6 })
+      );
+      becher.position.set(0.2, 1.02, 0.18);
+      this.fahrer.group.add(becher);
+    }
+    // Fahrerseite: links neben der Kabine, in Fahrtrichtung gesehen
+    const seite = new THREE.Vector3(-1.9, 0, 1.6).applyAxisAngle(
+      new THREE.Vector3(0, 1, 0),
+      this.group.rotation.y
+    );
+    this.fahrerTuer.set(
+      this.group.position.x + seite.x,
+      0,
+      this.group.position.z + seite.z
+    );
+    // Platz an der Theke, leicht versetzt, damit sich zwei nicht überlagern
+    this.fahrerTheke.set(
+      KAFFEE_THEKE.x + (Math.random() - 0.5) * 2.4,
+      0,
+      KAFFEE_THEKE.z - Math.random() * 0.8
+    );
+    this.fahrer.group.position.copy(this.fahrerTuer);
+    this.fahrer.group.visible = true;
+    this.fahrerState = "raus";
+    this.kaffeeGehabt = true;
+  }
+
+  /** Ein Schritt des Fahrers; ausserhalb der Pause ist nichts zu tun. */
+  private updateFahrer(dt: number): void {
+    const f = this.fahrer;
+    if (!f || this.fahrerState === "drin") return;
+    const ziel = this.fahrerState === "rein" ? this.fahrerTuer : this.fahrerTheke;
+    const g = f.group;
+    const dx = ziel.x - g.position.x;
+    const dz = ziel.z - g.position.z;
+    const d = Math.hypot(dx, dz);
+    if (d > 0.3 && this.fahrerState !== "kaffee") {
+      const schritt = Math.min(FAHRER_TEMPO * dt, d);
+      g.position.x += (dx / d) * schritt;
+      g.position.z += (dz / d) * schritt;
+      g.rotation.y = Math.atan2(dx, dz);
+      this.fahrerPhase += dt * 7;
+      const swing = Math.sin(this.fahrerPhase) * 0.45;
+      f.legLeft.rotation.x = swing;
+      f.legRight.rotation.x = -swing;
+      f.armLeft.rotation.x = -swing * 0.5;
+      return;
+    }
+    f.legLeft.rotation.x = 0;
+    f.legRight.rotation.x = 0;
+    if (this.fahrerState === "raus") {
+      this.fahrerState = "kaffee";
+      // zur Theke schauen und den Becher heben
+      const zx = KAFFEE_THEKE.x - g.position.x;
+      const zz = KAFFEE_THEKE.z + 1.2 - g.position.z;
+      g.rotation.y = Math.atan2(zx, zz);
+      f.armRight.rotation.x = -1.35;
+    } else if (this.fahrerState === "rein") {
+      this.fahrerState = "drin";
+      f.armRight.rotation.x = 0;
+      g.visible = false;
+    }
+  }
+
   private leaveUnloadingBay(): void {
     this.phaseT = 0;
     if (this.parkSpot) {
@@ -211,6 +296,18 @@ class DeliveryVehicle {
   /** Bruttowiegung erledigt; verhindert, dass sie sich wiederholt */
   private weighedIn = false;
 
+  /**
+   * Der Fahrer. Er entsteht erst, wenn er gebraucht wird — also beim ersten
+   * Halt auf dem Warteplatz. Fuer die meisten Fuhren gibt es ihn nie.
+   */
+  private fahrer: PersonParts | null = null;
+  private fahrerState: "drin" | "raus" | "kaffee" | "rein" = "drin";
+  private fahrerPhase = 0;
+  /** Pause schon gemacht? Sonst steigt er endlos wieder aus. */
+  private kaffeeGehabt = false;
+  private readonly fahrerTuer = new THREE.Vector3();
+  private readonly fahrerTheke = new THREE.Vector3();
+
   /** Zugewiesener Warteplatz, null = fährt direkt vom Hof. */
   parkSpot: [number, number] | null = null;
   /** Wie lange die Pause dauert */
@@ -218,7 +315,7 @@ class DeliveryVehicle {
 
   /** Steht das Fahrzeug auf dem Warteplatz und macht Pause? */
   get isParked(): boolean {
-    return this.phase === "parked" || this.phase === "toPark";
+    return this.phase === "parked" || this.phase === "toPark" || this.phase === "parkRueck";
   }
 
   private nudgeReturn: Phase = "waitUnload";
@@ -297,7 +394,7 @@ class DeliveryVehicle {
 
   constructor(
     readonly kind: DeliveryKind,
-    scene: THREE.Scene,
+    private scene: THREE.Scene,
     private world: RAPIER.World,
     /** Ist an (x,z) etwas im Weg (Bagger oder liegender Schrott)? Dann wird gewartet. */
     private getBlocker:
@@ -903,14 +1000,19 @@ class DeliveryVehicle {
         if (this.phaseT > 1 && this.isUnloaded()) this.leaveUnloadingBay();
         break;
       case "toPark": {
-        // Zum Warteplatz rollen. Der Abladeplatz ist damit sofort frei.
+        /*
+         * Zum Warteplatz rollen — aber nicht bis an die Wand: Der Fahrer
+         * haelt davor, dreht sich und setzt dann rueckwaerts an die
+         * Graffitiwand neben den Kaffeewagen (Wunsch 11.09.2026). Niemand
+         * stellt sich mit der Schnauze an die Mauer.
+         */
         this.sideOpenTarget = 0;
         const ziel = this.parkSpot!;
         const dx = ziel[0] - this.group.position.x;
-        const dz = ziel[1] - this.group.position.z;
+        const dz = ziel[1] - PARK_ANFAHRT_M - this.group.position.z;
         const d = Math.hypot(dx, dz);
         if (d < 0.6) {
-          this.phase = "parked";
+          this.phase = "parkRueck";
           this.phaseT = 0;
           break;
         }
@@ -921,9 +1023,44 @@ class DeliveryVehicle {
         this.snapBodiesToPose();
         break;
       }
+      case "parkRueck": {
+        // Rueckwaerts an die Wand, dabei in die Laengsrichtung eindrehen.
+        const ziel = this.parkSpot!;
+        const dx = ziel[0] - this.group.position.x;
+        const dz = ziel[1] - this.group.position.z;
+        const d = Math.hypot(dx, dz);
+        if (d < 0.4) {
+          this.group.rotation.y = Math.PI; // Front zum Platz, Heck zur Wand
+          this.phase = "parked";
+          this.phaseT = 0;
+          this.snapBodiesToPose();
+          break;
+        }
+        const schritt = Math.min(PARK_RUECK_SPEED * dt, d);
+        this.group.position.x += (dx / d) * schritt;
+        this.group.position.z += (dz / d) * schritt;
+        // Die Front zeigt beim Zurueckstossen nach Sueden; sie dreht sich
+        // waehrend der Fahrt dorthin ein, statt zu springen.
+        const soll = Math.PI;
+        let diff = soll - this.group.rotation.y;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        this.group.rotation.y += diff * Math.min(dt * 1.6, 1);
+        this.snapBodiesToPose();
+        break;
+      }
       case "parked":
-        // Kaffeepause. Danach geht es über die Waage vom Hof.
-        if (this.phaseT > this.parkSeconds) {
+        // Kaffeepause: Der Fahrer steigt aus und geht zu Janine hinueber.
+        // Einmal pro Pause. Ohne diese Sperre stieg er sofort wieder aus,
+        // sobald er drin war, und der LKW fuhr nie los.
+        if (this.fahrerState === "drin" && !this.kaffeeGehabt && this.phaseT > 1.2) {
+          this.steigeAus();
+        }
+        // Rechtzeitig zurueck, sonst faehrt der LKW ohne ihn los
+        if (this.fahrerState === "kaffee" && this.phaseT > this.parkSeconds - 12) {
+          this.fahrerState = "rein";
+        }
+        if (this.phaseT > this.parkSeconds && this.fahrerState === "drin") {
           this.phase = "out";
           this.routeS = this.nearestS(this.routeOut);
         }
@@ -952,6 +1089,7 @@ class DeliveryVehicle {
     }
 
     this.updateTrailer(dt);
+    this.updateFahrer(dt);
 
     // Ladekran: beim Andocken zur Seite schwenken, damit der Ausleger nicht ueber
     // der Ladeflaeche haengt und dem Baggerfahrer die Sicht und den Weg nimmt.
