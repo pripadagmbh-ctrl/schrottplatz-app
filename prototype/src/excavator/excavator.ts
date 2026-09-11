@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { findeBox, type Box } from "../world/boxen";
 import RAPIER from "@dimforge/rapier3d-compat";
 import type { Input } from "../core/input";
 import { ExcavatorCollision, type ArmShape } from "./collision";
@@ -124,6 +125,9 @@ export function anlaufZeit(lastKg: number): number {
   const bisNenn = Math.min(Math.max(lastKg, 0) / NENNLAST_KG, 1);
   return RAMP_TIME * (1 + LAST_ANLAUF * bisNenn);
 }
+
+/** Halbe Breite des Unterwagens — damit rechnet die Fahrzeugsperre. */
+const UNTERWAGEN_R = 2.6;
 
 const CLOSE_TIME = 0.4; // s (SW)
 const OPEN_TIME = 0.3; // s (SW)
@@ -1090,6 +1094,14 @@ export class Excavator {
     this.outriggerTarget = this.outriggerTarget > 0.5 ? 0 : 1;
   }
 
+  /**
+   * Standflaechen der Fahrzeuge auf dem Hof — von main gesetzt. Solange das
+   * nicht gesetzt ist, faehrt der Bagger wie bisher ungebremst.
+   */
+  getVehicleBoxes: (() => Box[]) | null = null;
+  /** Stand der letzte Fahrversuch vor einem LKW? Fuers HUD. */
+  blockedByVehicle = false;
+
   /** Aktuelle Kabinenhöhe (0 = unten) — fürs HUD. */
   get cabLiftHeight(): number {
     return this.cabLift;
@@ -1128,8 +1140,23 @@ export class Excavator {
       const speedFactor = THREE.MathUtils.clamp(Math.abs(this.driveVel) / DRIVE_MAX, 0.35, 1);
       this.heading -= steer * STEER_RATE * speedFactor * dir * dt;
     }
-    this.position.x += Math.sin(this.heading) * this.driveVel * dt;
-    this.position.z += Math.cos(this.heading) * this.driveVel * dt;
+    const naechstesX = this.position.x + Math.sin(this.heading) * this.driveVel * dt;
+    const naechstesZ = this.position.z + Math.cos(this.heading) * this.driveVel * dt;
+    /*
+     * Nicht durch stehende LKW fahren (Befund 11.09.2026). Der Unterwagen ist
+     * gut 2,6 m breit; genau darum wird die Standflaeche des Fahrzeugs
+     * erweitert. Ist der Schritt belegt, bleibt die Maschine stehen und das
+     * Tempo faellt auf null — sie schiebt keinen LKW vor sich her.
+     */
+    const boxen = this.getVehicleBoxes?.();
+    if (boxen && findeBox(naechstesX, naechstesZ, boxen, UNTERWAGEN_R)) {
+      this.driveVel = 0;
+      this.blockedByVehicle = true;
+    } else {
+      this.blockedByVehicle = false;
+      this.position.x = naechstesX;
+      this.position.z = naechstesZ;
+    }
 
     // --- Oberwagen / Ausleger / Stiel (mit Last-Trägheit) ---
     // Zweitbelegung Pfeil-Block (einhändiges Testen): ←/→ Oberwagen,

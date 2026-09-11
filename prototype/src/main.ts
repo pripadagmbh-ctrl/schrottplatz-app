@@ -160,6 +160,8 @@ async function main(): Promise<void> {
   );
   // Mario kommt aus dem Buero, sobald ein LKW zur Kontrolle auf der Waage steht
   staff.getWeighTruck = () => vehicles.wiegeKontrolle();
+  // Weder Bagger noch Radlader fahren durch einen stehenden LKW hindurch
+  staff.getVehicleBoxes = () => vehicles.fahrzeugBoxen();
   staff.getExcavatorPos = () => excavator.position;
   const carPos: THREE.Vector3[] = [];
   staff.getObstaclePositions = () => {
@@ -197,6 +199,8 @@ async function main(): Promise<void> {
     fencesBroken: fence.brokenFlags,
   });
   const excavator = new Excavator(scene, physics.world);
+  // Der Bagger faehrt nicht durch stehende LKW hindurch
+  excavator.getVehicleBoxes = () => vehicles.fahrzeugBoxen();
   const grip = new GripSystem(physics.world, excavator.grappleBody);
   const orbit = new OrbitCamera(window.innerWidth / window.innerHeight);
   const debug = new DebugOverlay();

@@ -4,6 +4,7 @@ import { randomCargo, type ItemManager, type ScrapItem } from "../world/scrapIte
 import type { CompositeManager, CarComposite } from "../dismantle/composites";
 import { WEIGH_Z, KAFFEE_THEKE } from "../world/yard";
 import { buildPerson, type PersonParts } from "../world/people";
+import type { Box } from "../world/boxen";
 
 /** So lange haelt ein beladener Abholer auf der Waage fuer Marios Kontrolle. */
 const WIEGE_HALT_S = 6;
@@ -11,6 +12,8 @@ const WIEGE_HALT_S = 6;
 const PARK_RUECK_SPEED = 1.6;
 /** Gehtempo des Fahrers (m/s) */
 const FAHRER_TEMPO = 1.5;
+/** Rechenhilfe fuer boxen() — kein neuer Vektor je Bild. */
+const BOX_TMP = new THREE.Vector3();
 import { hitsObstacle } from "../world/obstacles";
 import { rollCustomer, vehicleForCustomer, type CustomerProfile } from "./customers";
 import { buildVehicleModel } from "./vehicleModel";
@@ -312,6 +315,35 @@ class DeliveryVehicle {
   parkSpot: [number, number] | null = null;
   /** Wie lange die Pause dauert */
   parkSeconds = 60;
+
+  /**
+   * Standfläche für die Kollisionsprüfung: Zugfahrzeug und, falls vorhanden,
+   * Anhänger einzeln — der knickt an der Kupplung ab und steht anders als
+   * das Zugfahrzeug.
+   */
+  boxen(out: Box[]): void {
+    const p = this.group.position;
+    out.push({
+      x: p.x,
+      z: p.z,
+      hw: 1.55,
+      hd: this.bedLen / 2 + 1.6,
+      rot: this.group.rotation.y,
+    });
+    if (this.trailer) {
+      const w = this.trailer.getWorldPosition(BOX_TMP);
+      // Der Anhänger hängt hinter der Kupplung; sein Mittelpunkt liegt eine
+      // halbe Ladeflächenlänge dahinter.
+      const rot = this.group.rotation.y + this.trailerYawRel;
+      out.push({
+        x: w.x - Math.sin(rot) * (this.bedLen / 2),
+        z: w.z - Math.cos(rot) * (this.bedLen / 2),
+        hw: 1.35,
+        hd: this.bedLen / 2 + 0.5,
+        rot,
+      });
+    }
+  }
 
   /** Steht das Fahrzeug auf dem Warteplatz und macht Pause? */
   get isParked(): boolean {
@@ -1359,6 +1391,19 @@ export class VehicleManager {
     }
     return null;
   }
+
+  /**
+   * Standflächen aller Fahrzeuge auf dem Hof. Bagger und Radlader fragen das
+   * ab, bevor sie einen Schritt machen — vorher fuhren beide mitten durch
+   * stehende LKW hindurch (Befund 11.09.2026).
+   */
+  fahrzeugBoxen(): Box[] {
+    this.boxCache.length = 0;
+    if (this.active) this.active.boxen(this.boxCache);
+    for (const v of this.parked) v.boxen(this.boxCache);
+    return this.boxCache;
+  }
+  private boxCache: Box[] = [];
 
   /** Der wartende Abhol-LKW (für Beladung/Verkauf), sonst null. */
   get pickupTruck(): DeliveryVehicle | null {

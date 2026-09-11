@@ -3,6 +3,7 @@ import type { ItemManager } from "./scrapItems";
 import { hitsObstacle, slideAround } from "./obstacles";
 import { CONFIGS, type ContainerConfig } from "./containers";
 import { KAFFEE_ROT } from "./yard";
+import { findeBox, ausBox, type Box } from "./boxen";
 import {
   WheelLoader,
   LOADER_SPEED,
@@ -307,6 +308,11 @@ export class StaffManager {
   }
   /** Karossen — durch die läuft er nicht hindurch */
   getObstaclePositions: (() => THREE.Vector3[]) | null = null;
+  /**
+   * Standflächen der Fahrzeuge. Weder zu Fuss noch mit dem Radlader geht es
+   * durch einen stehenden LKW hindurch (Befund 11.09.2026).
+   */
+  getVehicleBoxes: (() => Box[]) | null = null;
 
   /**
    * @param weighPos Mitte der Wiegeplatte — dorthin geht Mario zur Kontrolle
@@ -445,7 +451,11 @@ export class StaffManager {
       g.position.addScaledVector(step, tempo * dt);
       // Sicherheitsnetz: landet der Schritt trotz Ausweichen in einem
       // Bauwerk, wird er verworfen — Lambert läuft durch nichts hindurch
-      if (hitsObstacle(g.position.x, g.position.z, 0.35)) {
+      const fahrzeug = this.getVehicleBoxes?.();
+      if (
+        hitsObstacle(g.position.x, g.position.z, 0.35) ||
+        (fahrzeug && findeBox(g.position.x, g.position.z, fahrzeug, this.eigenRadius))
+      ) {
         g.position.x = vorher.x;
         g.position.z = vorher.z;
       }
@@ -893,6 +903,10 @@ export class StaffManager {
   /** Abstand zur arbeitenden Spinne — darunter macht er Platz */
   private static readonly GRAPPLE_KEEPOUT = 5.5;
   private avoidTmp = new THREE.Vector3();
+  /** Wie breit er selbst baut: zu Fuss schmal, mit dem Radlader eine Maschine. */
+  private get eigenRadius(): number {
+    return this.hasLoader ? 1.9 : 0.5;
+  }
   private slideTmp = { x: 0, z: 0 };
 
   /**
@@ -933,6 +947,22 @@ export class StaffManager {
     }
     out.y = 0;
     out.normalize();
+    // Fahrzeuge: an der Kante entlang statt hinein. Sie stehen schraeg auf
+    // dem Hof, deshalb die gedrehte Box und nicht nur ein Umkreis.
+    const boxen = this.getVehicleBoxes?.();
+    if (boxen) {
+      const vorn = findeBox(
+        pos.x + out.x * (this.eigenRadius + 1.2),
+        pos.z + out.z * (this.eigenRadius + 1.2),
+        boxen,
+        this.eigenRadius
+      );
+      if (vorn) {
+        ausBox(pos.x, pos.z, vorn, this.slideTmp);
+        out.set(this.slideTmp.x, 0, this.slideTmp.z);
+      }
+    }
+
     // Feste Bauten — Betonlego, Boxen, Schere — laufen lassen sich nicht
     // wegdrücken: hier wird die Richtung an der Wand entlang umgelenkt.
     if (slideAround(pos.x, pos.z, out.x, out.z, 0.7, this.slideTmp)) {
