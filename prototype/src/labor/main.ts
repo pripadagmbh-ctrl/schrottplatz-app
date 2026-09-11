@@ -172,6 +172,7 @@ async function main(): Promise<void> {
   let spitzePhysik = 0;
   let spitzeSpinne = 0;
   const messEl = document.getElementById("mess")!;
+  const laufEl = document.getElementById("lauf") as HTMLElement;
   let messUhr = 0;
 
   /**
@@ -330,9 +331,14 @@ async function main(): Promise<void> {
     };
   }
 
-  /** Ergebnis eines Messlaufs anzeigen und ein paar Sekunden stehen lassen. */
+  /**
+   * Ergebnis eines Messlaufs anzeigen. Es bleibt stehen, bis der naechste
+   * Lauf kommt: Auf dem Geraet war es nach sechs Sekunden verschwunden,
+   * bevor der Screenshot gemacht war. Tippen blendet es weg.
+   */
   function zeigeLauf(titel: string, r: ReturnType<typeof messlauf>): void {
-    messEl.innerHTML =
+    laufEl.hidden = false;
+    laufEl.innerHTML =
       `<b>${titel} · ${r.schritte} Schritte</b>
 ` +
       `Spinne+Greifer ${r.spinneMs.toFixed(2).padStart(6)} ms/Schritt
@@ -341,11 +347,13 @@ async function main(): Promise<void> {
 ` +
       `Summe          ${r.gesamtMs.toFixed(2).padStart(6)} ms/Schritt
 ` +
+      // Kein Zeichenruf-Zaehler hier: Der Messlauf zeichnet nicht, der Zaehler
+      // stuende auf null und wuerde nur verwirren. Er steht in der Laufanzeige.
       `beweglich ${r.koerper.dynamic} (wach ${r.koerper.dynAwake})`;
-    messUhr = -6; // sechs Sekunden stehen lassen
   }
 
   function zeigeMessung(): void {
+    if (!laufEl.hidden) return; // das Ergebnis hat Vorrang
     const c = physics.counts();
     const info = renderer.info.render;
     const gesamt = gPhysik.stand + gSpinne.stand + gRest.stand;
@@ -377,8 +385,12 @@ async function main(): Promise<void> {
       tue();
     });
   };
-  knopf("k-teile", () => legeTeile(8));
+  knopf("k-teile", () => {
+    laufEl.hidden = true;
+    legeTeile(8);
+  });
   knopf("k-wecken", () => {
+    laufEl.hidden = true;
     for (const it of items.items) if (it.body.isValid()) it.body.wakeUp();
   });
   knopf("k-mess", () => zeigeLauf("MESSLAUF ruhig", messlauf(300)));

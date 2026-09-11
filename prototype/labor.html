@@ -32,6 +32,11 @@
         white-space: pre;
       }
       #mess { top: 10px; right: 10px; color: #f0d060; }
+      /* Das Ergebnis eines Messlaufs bleibt stehen, bis der naechste laeuft —
+         auf dem Geraet war es nach sechs Sekunden weg, bevor der Screenshot
+         gemacht war. */
+      #lauf { top: 10px; right: 10px; color: #8fd18f; border-color: #8fd18f; }
+      #lauf[hidden] { display: none; }
       #mess b { color: #8fd18f; }
       #hilfe { top: 10px; left: 10px; }
       #hilfe i { color: #f0b429; font-style: normal; }
@@ -97,6 +102,7 @@
   <body>
     <div id="laden">Labor lädt …</div>
     <div class="karte" id="mess"></div>
+    <div class="karte" id="lauf" hidden></div>
     <div class="karte" id="hilfe">
 <i>SPINNEN-LABOR</i>
 W/S Fahren · A/D Lenken
