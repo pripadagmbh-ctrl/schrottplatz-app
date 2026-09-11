@@ -28,6 +28,7 @@ import { LaneWatch } from "./delivery/laneWatch";
 import { Daylight, Floodlights } from "./world/daylight";
 import { hitsObstacle } from "./world/obstacles";
 import { OfficeBuilding, BUERO_TUER } from "./world/office";
+import { Police } from "./world/police";
 import { Signage } from "./world/signage";
 import {
   type AxisId,
@@ -161,7 +162,7 @@ async function main(): Promise<void> {
   // Mario kommt aus dem Buero, sobald ein LKW zur Kontrolle auf der Waage steht
   staff.getWeighTruck = () => vehicles.wiegeKontrolle();
   // Weder Bagger noch Radlader fahren durch einen stehenden LKW hindurch
-  staff.getVehicleBoxes = () => vehicles.fahrzeugBoxen();
+  staff.getVehicleBoxes = () => alleFahrzeugBoxen();
   staff.getExcavatorPos = () => excavator.position;
   const carPos: THREE.Vector3[] = [];
   staff.getObstaclePositions = () => {
@@ -199,8 +200,20 @@ async function main(): Promise<void> {
     fencesBroken: fence.brokenFlags,
   });
   const excavator = new Excavator(scene, physics.world);
-  // Der Bagger faehrt nicht durch stehende LKW hindurch
-  excavator.getVehicleBoxes = () => vehicles.fahrzeugBoxen();
+  /*
+   * Streifenwagen: kommt zwischendurch zur Kontrolle, ohne Folgen. Seine
+   * Standflaeche kommt zu den LKW dazu — auch durch ein Polizeiauto faehrt
+   * der Bagger nicht hindurch.
+   */
+  const polizei = new Police(scene, physics.world);
+  polizei.getExcavatorPos = () => excavator.position;
+  polizei.onFunk = (text) => hud.toast(text);
+  const alleFahrzeugBoxen = (): ReturnType<typeof vehicles.fahrzeugBoxen> => {
+    const boxen = vehicles.fahrzeugBoxen();
+    polizei.boxen(boxen);
+    return boxen;
+  };
+  excavator.getVehicleBoxes = alleFahrzeugBoxen;
   const grip = new GripSystem(physics.world, excavator.grappleBody);
   const orbit = new OrbitCamera(window.innerWidth / window.innerHeight);
   const debug = new DebugOverlay();
@@ -742,6 +755,7 @@ async function main(): Promise<void> {
     vehicles.update(FIXED_DT);
     press.update(FIXED_DT);
     staff.update(FIXED_DT, vehicles.maneuveringTruck());
+    polizei.update(FIXED_DT);
     stepCount++;
     if (stepCount % RECOUNT_INTERVAL === 0) {
       const grippedHandles = new Set(grip.grippedBodies.map((b) => b.handle));
@@ -771,6 +785,7 @@ async function main(): Promise<void> {
       daylight,
       floodlights,
       staff,
+      polizei,
       lanes,
       audio,
       togglePause: () => setPaused(!paused),
