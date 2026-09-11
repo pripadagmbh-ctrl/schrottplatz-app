@@ -131,7 +131,15 @@ const SCHNAPP_AB = 0.93;
 /** Bis hierher gilt eine Kralle als am Teil anliegend (m) */
 const KONTAKT_NAH = 0.14;
 /** So tief duerfen die Spitzen in Material beissen, bevor der Arm anhaelt (m) */
-const EINDRING_OK = 0.05;
+const EINDRING_OK = 0.18;
+/** Erst ab dieser Masse gilt ein Teil als Brocken, der den Arm aufhaelt (kg) */
+const EINDRING_SCHWER_KG = 350;
+/** Totband des Bodenanschlags (m) — darunter wird nicht nachgeregelt */
+const BODEN_TOLERANZ = 0.012;
+/** So lange haelt die Abwaertssperre nach dem letzten Kontakt (s) */
+const BODEN_SPERRE_S = 0.2;
+/** So lange haelt eine einmal gefundene Sperre, statt neu zu regeln (s) */
+const EINDRING_HALT_S = 0.35;
 /** Wie weit die Schalen beim Anschlag zurueckfedern (rad) */
 const ANSCHLAG_GRAD = THREE.MathUtils.degToRad(4.5);
 /** Wie lange der Rueckprall nachschwingt (s) */
@@ -1182,11 +1190,27 @@ export class Excavator {
     this.cabVel = ramp(this.cabVel, cabTarget, (CAB_MAX / rampe) * dt);
     this.cabYaw += this.cabVel * dt;
 
-    const boomTarget = this.inBoom * BOOM_RATE * loadFactor;
+    /*
+     * Liegt die Spinne auf, wird die Abwaertsrichtung gar nicht erst
+     * kommandiert. Welche Achsrichtung "abwaerts" ist, haengt von der
+     * Armstellung ab: Beim Ausleger senkt ein negativer Winkel die Spitze nur,
+     * solange er vor der Senkrechten steht.
+     */
+    const gesamtWinkel = this.boomAngle + this.stickAngle;
+    const dBoomTip = BOOM_LEN * Math.cos(this.boomAngle) + STICK_LEN * Math.cos(gesamtWinkel);
+    const dStickTip = STICK_LEN * Math.cos(gesamtWinkel);
+    let boomEingabe = this.inBoom;
+    let stickEingabe = this.inStick;
+    if (this.bodenSperre) {
+      if (boomEingabe * dBoomTip < 0) boomEingabe = 0;
+      if (stickEingabe * dStickTip < 0) stickEingabe = 0;
+    }
+
+    const boomTarget = boomEingabe * BOOM_RATE * loadFactor;
     this.boomVel = ramp(this.boomVel, boomTarget, (BOOM_RATE / rampe) * dt);
     this.boomAngle = THREE.MathUtils.clamp(this.boomAngle + this.boomVel * dt, BOOM_MIN, BOOM_MAX);
 
-    const stickTarget = this.inStick * STICK_RATE * loadFactor;
+    const stickTarget = stickEingabe * STICK_RATE * loadFactor;
     this.stickVel = ramp(this.stickVel, stickTarget, (STICK_RATE / rampe) * dt);
     this.stickAngle = THREE.MathUtils.clamp(
       this.stickAngle + this.stickVel * dt,
@@ -1590,11 +1614,17 @@ export class Excavator {
    * sich nicht, weil das Teil am Boden liegt, hohe Reibung hat und die weichen
    * Kontaktwerte den Rest tun.
    *
-   * Deshalb hier ein eigener, weicherer Anschlag: Ein Stueck Biss ist erlaubt
-   * (EINDRING_OK), darueber hinaus wird der Arm angehoben — wie beim Boden,
-   * nur eben gegen Material. Gerechnet werden die fuenf Spitzen gegen die
-   * Teile im Umkreis; das ist die Fokus-Zone aus Phase 1.3, angewendet auf
-   * Genauigkeit statt auf Sparen.
+   * Der erste Versuch hat den Arm bei jedem Eintauchen ueber fuenf Zentimeter
+   * angehoben — und zwar je Schritt neu. Das ergab einen Regelkreis, der
+   * schwingt: gemessen 39 Richtungswechsel je Sekunde bei 13 mm Ausschlag.
+   * Im Spiel war das eine Naehmaschine (Befund 11.09.2026: "sie ist mehr wie
+   * ein Presslufthammer beim Reingreifen").
+   *
+   * Jetzt gilt die Sperre nur noch gegen BROCKEN, die sich nicht beiseite
+   * schieben lassen (ab EINDRING_SCHWER_KG), und sie haelt ihren Wert kurz
+   * fest, statt ihn jeden Schritt neu zu suchen. In losen Haufen woehlt die
+   * Spinne wieder, wie sie soll: Kleinteile werden verdraengt, nicht
+   * umfahren.
    */
   private eindringtiefe(splay: number): number {
     if (this.grippedHandles.size > 0) return 0; // beim Tragen sind die Krallen aus
@@ -1610,6 +1640,8 @@ export class Excavator {
         const b = col.parent();
         if (!b || !b.isDynamic()) return true;
         if (this.selfHandles.has(b.handle) || this.grippedHandles.has(b.handle)) return true;
+        // Was sich schieben laesst, wird geschoben — nicht umfahren
+        if (b.mass() < EINDRING_SCHWER_KG) return true;
         for (let c = 0; c < CLAW_COUNT; c++) {
           const a = (c / CLAW_COUNT) * Math.PI * 2;
           clawPoint(a, this.clawSplayIst[c] ?? splay, CLAW_SEGMENTS, this.clawA);
@@ -1633,6 +1665,12 @@ export class Excavator {
   }
 
   private eindringShape = new RAPIER.Ball(2.0);
+  /** Liegt die Spinne auf? Dann sperrt die Abwaertsrichtung im naechsten Schritt. */
+  private bodenSperre = false;
+  private bodenSperreS = 0;
+  /** Festgehaltener Anschlag gegen Brocken und seine Restzeit */
+  private eindringGrenze = 0;
+  private eindringHaltS = 0;
 
   private resolveGroundClamp(): void {
     // Spitzentiefe direkt aus der Krallengeometrie — so bleibt der Bodenanschlag
@@ -1644,23 +1682,40 @@ export class Excavator {
     // tipY() rechnet ab der Maschinenbasis; steht die Maschine aufgebockt,
     // ist der Boden entsprechend weiter unten
     let minTipY = flaeche + tipDepth + 0.02 - this.position.y;
-    // Material unter den Spitzen: ein Stueck Biss ja, durchtauchen nein
-    const tief = this.eindringtiefe(splay);
-    if (tief > EINDRING_OK) {
-      const tipYJetzt =
-        BOOM_PIVOT.y +
-        BOOM_LEN * Math.sin(this.boomAngle) +
-        STICK_LEN * Math.sin(this.boomAngle + this.stickAngle);
-      minTipY = Math.max(minTipY, tipYJetzt + (tief - EINDRING_OK));
+    /*
+     * Brocken unter den Spitzen: ein Stueck Biss ja, durchtauchen nein. Der
+     * gefundene Anschlag wird kurz festgehalten (EINDRING_HALT_S) — sonst
+     * sucht die Regelung ihn jeden Schritt neu und faengt an zu schwingen.
+     */
+    const tipYJetzt =
+      BOOM_PIVOT.y +
+      BOOM_LEN * Math.sin(this.boomAngle) +
+      STICK_LEN * Math.sin(this.boomAngle + this.stickAngle);
+    if (this.eindringHaltS > 0) {
+      this.eindringHaltS -= 1 / 60;
+      minTipY = Math.max(minTipY, this.eindringGrenze);
+    } else {
+      const tief = this.eindringtiefe(splay);
+      if (tief > EINDRING_OK) {
+        this.eindringGrenze = tipYJetzt + (tief - EINDRING_OK);
+        this.eindringHaltS = EINDRING_HALT_S;
+        minTipY = Math.max(minTipY, this.eindringGrenze);
+      }
     }
     const tipY = () =>
       BOOM_PIVOT.y +
       BOOM_LEN * Math.sin(this.boomAngle) +
       STICK_LEN * Math.sin(this.boomAngle + this.stickAngle);
 
+    /*
+     * Totband: Erst ab gut einem Zentimeter Verletzung wird nachgeregelt.
+     * Ohne das korrigiert die Mechanik jede Kleinigkeit, die der Messstrahl
+     * zwischen zwei Schritten anders sieht — und genau daraus entsteht das
+     * Zittern (gemessen 39, danach noch 15 Richtungswechsel je Sekunde).
+     */
     let clamped = false;
     let guard = 0;
-    while (tipY() < minTipY && guard++ < 80) {
+    while (tipY() < minTipY - BODEN_TOLERANZ && guard++ < 80) {
       clamped = true;
       const total = this.boomAngle + this.stickAngle;
       const dStick = STICK_LEN * Math.cos(total);
@@ -1677,6 +1732,22 @@ export class Excavator {
       }
     }
 
+    /*
+     * Aufliegen heisst: nicht weiter nach unten. Bisher wurde erst
+     * integriert und danach zurueckgeschoben — das ergab je Schritt einen
+     * Ruck von einigen Millimetern hin und zurueck, gemessen 39
+     * Richtungswechsel je Sekunde bei 13 mm Ausschlag. Im Spiel war das eine
+     * Naehmaschine (Befund 11.09.2026).
+     *
+     * Jetzt merkt sich die Maschine den Anschlag, und die Achsen kommen im
+     * naechsten Schritt gar nicht erst in diese Richtung los — so wie ein
+     * Zylinder am Ende seines Hubs steht.
+     */
+    // Die Sperre haelt kurz nach, damit sie nicht im Sekundentakt auf- und
+    // zugeht, wenn der Messstrahl mal danebentrifft.
+    if (clamped || tipY() < minTipY + BODEN_TOLERANZ) this.bodenSperreS = BODEN_SPERRE_S;
+    else this.bodenSperreS = Math.max(0, this.bodenSperreS - 1 / 60);
+    this.bodenSperre = this.bodenSperreS > 0;
     if (clamped) {
       // abwärts gerichtete Achsgeschwindigkeiten hart stoppen
       const total = this.boomAngle + this.stickAngle;

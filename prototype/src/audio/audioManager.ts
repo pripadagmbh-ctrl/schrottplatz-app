@@ -14,7 +14,7 @@ const AUFPRALL_FENSTER_S = 0.14;
  * mit Fliesen, nicht nach Schrottplatz — und auf kleinen Lautsprechern nur
  * noch schrill.
  */
-const SFX_TIEFPASS_HZ = 1800;
+const SFX_TIEFPASS_HZ = 1600;
 
 export class AudioManager {
   private ctx: AudioContext | null = null;
@@ -74,7 +74,7 @@ export class AudioManager {
     try {
       this.ctx = new AudioContext();
       this.master = this.ctx.createGain();
-      this.master.gain.value = 0.5;
+      this.master.gain.value = 0.62;
       this.master.connect(this.ctx.destination);
 
       /*
@@ -87,7 +87,7 @@ export class AudioManager {
        * absichtlich daran vorbei: Sie soll klar bleiben.
        */
       this.sfx = this.ctx.createGain();
-      this.sfx.gain.value = 1;
+      this.sfx.gain.value = 1.35;
       const dumpf = this.ctx.createBiquadFilter();
       dumpf.type = "lowpass";
       dumpf.frequency.value = SFX_TIEFPASS_HZ;
@@ -96,10 +96,24 @@ export class AudioManager {
       // wenn die Hoehen weg sind
       const bauch = this.ctx.createBiquadFilter();
       bauch.type = "peaking";
-      bauch.frequency.value = 180;
+      bauch.frequency.value = 110;
       bauch.Q.value = 0.9;
-      bauch.gain.value = 4;
-      this.sfx.connect(bauch).connect(dumpf).connect(this.master);
+      bauch.gain.value = 6.5;
+      /*
+       * Kompressor als letztes Glied (Wunsch 11.09.2026: "lass richtig
+       * krachen"). Er faengt die Spitzen ab und hebt alles darunter an —
+       * dadurch wird ein Krach lauter, ohne zu uebersteuern, und ein
+       * einzelner Schlag klingt wuchtiger statt nur spitzer. Schnelles
+       * Ansprechen, damit der Anschlag durchkommt, langsames Loslassen, damit
+       * das Scheppern zusammenhaengt.
+       */
+      const presse = this.ctx.createDynamicsCompressor();
+      presse.threshold.value = -20;
+      presse.knee.value = 8;
+      presse.ratio.value = 7;
+      presse.attack.value = 0.003;
+      presse.release.value = 0.2;
+      this.sfx.connect(bauch).connect(dumpf).connect(presse).connect(this.master);
 
       // Hintergrundmusik, zur Laufzeit erzeugt — keine fremden Aufnahmen
       this.music = new Music(this.ctx, this.master);
@@ -374,7 +388,7 @@ export class AudioManager {
      * ueber Resonanzen gebaut statt aus Oszillatoren — sonst klingt es nach
      * Glockenspiel.
      */
-    this.burst([58], 0.14, 0.24 * h, "triangle");
+    this.wumms(0.36 * h, 104, 52, 0.18);
     this.anschlag([168, 252, 371, 523, 742], [55, 42, 34, 26, 20], 0.5 * h, 0.004);
     this.anschlag([180, 268, 398], [40, 30, 24], 0.2 * h, 0.007, 0.045 + Math.random() * 0.03);
   }
@@ -427,7 +441,10 @@ export class AudioManager {
 
   private aufprallJetzt(materialId: string, wucht: number, aufStahl: boolean): void {
     if (!this.ctx || !this.sfx) return;
-    const w = Math.min(Math.max(wucht / 4, 0.12), 1);
+    // Frueher wurde erst ab 4 m/s voll aufgedreht — damit blieb fast alles im
+    // Halbschatten. Jetzt ist bei 2,6 m/s Anschlag, und darunter faellt es
+    // sanft ab.
+    const w = Math.min(Math.max(wucht / 2.6, 0.16), 1);
     const weich =
       materialId === "wood" ||
       materialId === "plastic" ||
@@ -437,8 +454,9 @@ export class AudioManager {
 
     if (weich) {
       // Holz, Gummi, Kunststoff: ein Plumps, kein Klang. Wenige, stark
-      // gedaempfte Resonanzen und viel Rauschen.
+      // gedaempfte Resonanzen, viel Rauschen — und ein kurzer tiefer Druck.
       this.anschlag([78, 121, 205], [7, 5, 4], 0.5 * w, 0.02);
+      this.wumms(0.34 * w, 84, 46, 0.16);
       this.noiseBurst(260, 0.12, 0.16 * w);
       return;
     }
@@ -449,12 +467,18 @@ export class AudioManager {
        * dicht beieinander liegende Eigenfrequenzen und klingen lange nach —
        * daher hohe Guete und viele Anschlaege hintereinander.
        */
-      this.scheppern([94, 147, 223, 331, 468, 651], [90, 70, 55, 45, 35, 28], 0.55 * w, true);
-      this.burst([41, 55], 0.3 + 0.25 * w, 0.14 * w, "sine"); // das Blech wummert
+      this.scheppern([94, 147, 223, 331, 468, 651], [90, 70, 55, 45, 35, 28], 0.85 * w, true);
+      // Blechdonner: die ganze Flaeche schwingt breitbandig mit
+      this.noiseBurst(300, 0.32 + 0.3 * w, 0.16 * w);
+      // Die Flaeche wummert: tiefer Schlag, der ueber eine halbe Sekunde ausklingt
+      this.wumms(0.8 * w, 104, 42, 0.38 + 0.34 * w);
+      this.wumms(0.36 * w, 72, 36, 0.55 + 0.3 * w, 0.03);
       return;
     }
     // Beton: kurz, trocken, wenig Nachklang
-    this.scheppern([128, 196, 289, 402], [30, 24, 18, 14], 0.42 * w, false);
+    this.scheppern([128, 196, 289, 402], [30, 24, 18, 14], 0.62 * w, false);
+    // Beton schluckt: kurzer, harter Wumms ohne langen Bauch
+    this.wumms(0.6 * w, 116, 50, 0.22);
     this.noiseBurst(300, 0.08, 0.12 * w);
   }
 
@@ -508,6 +532,7 @@ export class AudioManager {
       case "mixed":
         // schwerer Stahl: tief, lang, mit Nachklappern
         this.scheppern([104, 158, 236, 347, 498], [80, 62, 48, 38, 30], 0.5, true);
+        this.wumms(0.45, 92, 42, 0.42);
         break;
       case "va":
         // Edelstahl: heller und praeziser, kuerzeres Scheppern
@@ -567,7 +592,7 @@ export class AudioManager {
     const kurve = new Float32Array(n);
     for (let i = 0; i < n; i++) {
       const x = (i / (n - 1)) * 2 - 1;
-      kurve[i] = Math.tanh(x * 2.4);
+      kurve[i] = Math.tanh(x * 4.2);
     }
     this.dreck.curve = kurve;
     this.dreck.oversample = "2x";
@@ -638,14 +663,59 @@ export class AudioManager {
   }
 
   /**
+   * Wumms: der tiefe Schlag unter dem Krach (Wunsch 11.09.2026).
+   *
+   * Ein schwerer Brocken auf Blech ist zuerst ein Druck, dann erst ein
+   * Geraeusch. Gebaut wie eine Basstrommel: ein Ton, der in wenigen
+   * Hundertstel von oben nach unten faellt, mit einem kraeftigen Anschlag
+   * davor.
+   *
+   * Dazu ein zweiter, gesaettigter Weg: Auf einem Tablet- oder
+   * Handylautsprecher ist unter etwa 200 Hz nichts mehr zu hoeren. Die
+   * Saettigung erzeugt Obertoene des Grundtons, und das Ohr setzt daraus den
+   * fehlenden Grundton wieder zusammen — so bleibt der Wumms auch dort
+   * spuerbar, wo der Lautsprecher ihn gar nicht abstrahlen kann.
+   */
+  private wumms(gain: number, vonHz: number, bisHz: number, dauer: number, wann = 0): void {
+    if (!this.ctx || !this.sfx) return;
+    const t = this.ctx.currentTime + wann;
+    const osc = this.ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(vonHz, t);
+    osc.frequency.exponentialRampToValueAtTime(bisHz, t + Math.min(0.14, dauer * 0.5));
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dauer);
+    osc.connect(g).connect(this.sfx);
+    osc.start(t);
+    osc.stop(t + dauer + 0.05);
+
+    // Obertonweg fuer kleine Lautsprecher
+    if (this.dreck) {
+      const osc2 = this.ctx.createOscillator();
+      osc2.type = "triangle";
+      osc2.frequency.setValueAtTime(vonHz * 2, t);
+      osc2.frequency.exponentialRampToValueAtTime(bisHz * 2, t + Math.min(0.14, dauer * 0.5));
+      const g2 = this.ctx.createGain();
+      g2.gain.setValueAtTime(0.0001, t);
+      g2.gain.exponentialRampToValueAtTime(gain * 0.45, t + 0.006);
+      g2.gain.exponentialRampToValueAtTime(0.0001, t + dauer * 0.7);
+      osc2.connect(g2).connect(this.dreck);
+      osc2.start(t);
+      osc2.stop(t + dauer + 0.05);
+    }
+  }
+
+  /**
    * Scheppern: eine Kaskade von Anschlaegen. Das Stueck springt, kippt und
    * rutscht aus — genau das unterscheidet Krach von einem einzelnen "Pling".
    */
   private scheppern(freqs: number[], guete: number[], wucht: number, stahl: boolean): void {
-    const schlaege = stahl ? 3 + Math.floor(Math.random() * 5) : 2 + Math.floor(Math.random() * 3);
+    const schlaege = stahl ? 4 + Math.floor(Math.random() * 6) : 3 + Math.floor(Math.random() * 3);
     let wann = 0;
     for (let i = 0; i < schlaege; i++) {
-      const staerke = wucht * Math.pow(0.62, i) * (0.7 + Math.random() * 0.6);
+      const staerke = wucht * Math.pow(0.72, i) * (0.75 + Math.random() * 0.6);
       this.anschlag(
         freqs.map((f) => f * (0.9 + Math.random() * 0.25)),
         guete,
