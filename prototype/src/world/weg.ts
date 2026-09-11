@@ -96,3 +96,80 @@ export function wegFrei(
 ): boolean {
   return wegPunkte(vonX, vonZ, nachX, nachZ, teile, breite, ausser) <= WEG_MAX_PUNKTE;
 }
+
+/**
+ * Eine Fläche, die der Radlader nicht durchfahren darf: Abkippplatz,
+ * Stahlhaufen, Ballenlager. Er arbeitet an ihren Aussengrenzen — hinein fährt
+ * er nicht (Wunsch 11.09.2026: "er darf nur an aussengrenzen ran").
+ */
+export interface Zone {
+  x: number;
+  z: number;
+  hw: number;
+  hd: number;
+}
+
+/**
+ * Schneidet die Strecke das Rechteck? Slab-Verfahren: Für jede Achse wird
+ * ausgerechnet, in welchem Abschnitt der Strecke sie innerhalb der Grenzen
+ * liegt; überlappen sich beide Abschnitte, geht die Strecke hindurch.
+ *
+ * `schrumpf` verkleinert die Zone. Damit bleibt Arbeit am Rand möglich: Wer
+ * ein Teil an der Kante holt, streift die Zone zwangsläufig.
+ */
+export function streckeSchneidetZone(
+  ax: number,
+  az: number,
+  bx: number,
+  bz: number,
+  zone: Zone,
+  schrumpf = 0
+): boolean {
+  const hw = zone.hw - schrumpf;
+  const hd = zone.hd - schrumpf;
+  if (hw <= 0 || hd <= 0) return false;
+  const minX = zone.x - hw;
+  const maxX = zone.x + hw;
+  const minZ = zone.z - hd;
+  const maxZ = zone.z + hd;
+  let t0 = 0;
+  let t1 = 1;
+  const achse = (start: number, delta: number, min: number, max: number): boolean => {
+    if (Math.abs(delta) < 1e-9) return start >= min && start <= max;
+    let n0 = (min - start) / delta;
+    let n1 = (max - start) / delta;
+    if (n0 > n1) [n0, n1] = [n1, n0];
+    t0 = Math.max(t0, n0);
+    t1 = Math.min(t1, n1);
+    return t0 <= t1;
+  };
+  if (!achse(ax, bx - ax, minX, maxX)) return false;
+  if (!achse(az, bz - az, minZ, maxZ)) return false;
+  return t0 <= t1;
+}
+
+/** Liegt der Punkt in einer der Zonen? */
+export function inZonen(x: number, z: number, zonen: Zone[], schrumpf = 0): boolean {
+  for (const zo of zonen) {
+    if (Math.abs(x - zo.x) < zo.hw - schrumpf && Math.abs(z - zo.z) < zo.hd - schrumpf) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Wie viele andere Teile liegen im Umkreis? Damit erkennt man den Rand. */
+export function nachbarn(
+  x: number,
+  z: number,
+  teile: WegTeil[],
+  radius: number,
+  ausser?: WegTeil
+): number {
+  let n = 0;
+  for (const t of teile) {
+    if (t === ausser) continue;
+    if (Math.hypot(t.x - x, t.z - z) <= radius) n++;
+  }
+  return n;
+}

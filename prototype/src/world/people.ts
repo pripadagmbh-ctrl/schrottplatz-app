@@ -4,7 +4,15 @@ import { hitsObstacle, slideAround } from "./obstacles";
 import { CONFIGS, type ContainerConfig } from "./containers";
 import { KAFFEE_ROT } from "./yard";
 import { findeBox, ausBox, type Box } from "./boxen";
-import { wegFrei, SCHAUFEL_BREITE, type WegTeil } from "./weg";
+import {
+  wegFrei,
+  streckeSchneidetZone,
+  inZonen,
+  nachbarn,
+  SCHAUFEL_BREITE,
+  type WegTeil,
+  type Zone,
+} from "./weg";
 import { KAFFEE_THEKE } from "./yard";
 import {
   WheelLoader,
@@ -237,6 +245,16 @@ const PRUEF_INTERVALL_S: [number, number] = [3, 5];
 const FUSS_BREITE = 0.9;
 /** Bis hierher traegt er von Hand, wenn der Radlader nicht hinkommt (kg) */
 const HANDLAST_KG = 60;
+/** So lange setzt er zurueck, wenn ihm etwas den Weg versperrt (s) */
+const RUECKWAERTS_S = 1.6;
+/** Abkippplatz vor dem Bagger — dort landet die Fuhre, da faehrt er nicht hinein */
+const ABKIPP = { x: 0, z: 7, hw: 4.5, hd: 4.5 };
+/** In diesem Umkreis muss ein Teil frei liegen, damit er es holt (m) */
+/** Um so viel wird eine Zone fuer die Wegpruefung geschrumpft (m) */
+const ZONE_RAND = 1.0;
+const RAND_RADIUS = 1.8;
+/** So viele Nachbarn darf ein Teil hoechstens haben — sonst liegt es mitten drin */
+const RAND_MAX_NACHBARN = 2;
 /** In diesem Umkreis zaehlt ein Aufwachen als "von Lambert verursacht" (m) */
 const WECK_RADIUS = 4;
 /** So weit im Voraus werden schlafende Teile gemerkt (m) */
@@ -283,11 +301,15 @@ export class StaffManager {
    * stellt er sich dorthin, statt sinnlos Runden zu drehen.
    */
   private readonly patrol = [
-    new THREE.Vector3(-1.5, 0, 14),
-    new THREE.Vector3(1.5, 0, 14.5),
+    // Beide Posten liegen ausserhalb des Abkippplatzes (0/7, 8 x 8 m) und
+    // neben der Einfahrtsspur. Vorher stand er mitten in der Abladestelle —
+    // gemessen 92 Prozent der Zeit (11.09.2026).
+    new THREE.Vector3(5.2, 0, 13.5),
+    new THREE.Vector3(-6.5, 0, 13.0),
   ];
   /** Einweisplatz neben dem Abkippplatz */
-  private readonly guidePos = new THREE.Vector3(3.6, 0, 8.5);
+  /** Einweisplatz: am Rand des Abkippplatzes, nicht darin */
+  private readonly guidePos = new THREE.Vector3(6.0, 0, 11.5);
 
   /** Baggerposition — um die Maschine selbst geht er herum */
   getExcavatorPos: (() => THREE.Vector3) | null = null;
@@ -345,6 +367,8 @@ export class StaffManager {
   private naechstePruefung = 0;
   /** Zeit seit der letzten Arbeitssuche (s) */
   private pruefUhr = 0;
+  /** Restliche Zeit, in der er zurueckstoesst (s) */
+  private rueckwaertsS = 0;
   /** Fuer das Debug-Overlay: von ihm aufgeweckte Koerper je Minute */
   private weckSpur: number[] = [];
   private schlafendeHandles = new Set<number>();
@@ -507,6 +531,23 @@ export class StaffManager {
       return; // waehrend der Pause keine Wegpruefungen
     }
 
+    // Zuruecksetzen laeuft vor allem anderen ab
+    if (this.rueckwaertsS > 0) {
+      this.rueckwaertsS -= dt;
+      const tempo = (this.faehrt ? LOADER_SPEED : 2.2) * 0.6;
+      const rueck = this.avoidTmp.set(-Math.sin(g.rotation.y), 0, -Math.cos(g.rotation.y));
+      const vorher = { x: g.position.x, z: g.position.z };
+      g.position.addScaledVector(rueck, tempo * dt);
+      if (hitsObstacle(g.position.x, g.position.z, 0.35)) {
+        g.position.x = vorher.x;
+        g.position.z = vorher.z;
+        this.rueckwaertsS = 0;
+      }
+      this.loader?.update(dt, this.faehrt ? g.position : this.maschinePos, this.loaderYaw, true);
+      this.lambertTarget.copy(g.position);
+      return;
+    }
+
     // Einweisen hat Vorrang: sobald ein LKW auf dem Platz rangiert. Was er
     // gerade in der Schaufel hat oder vor sich herschiebt, laesst er dafuer
     // aber nicht mitten auf dem Platz stehen.
@@ -543,12 +584,27 @@ export class StaffManager {
       // Sicherheitsnetz: landet der Schritt trotz Ausweichen in einem
       // Bauwerk, wird er verworfen — Lambert läuft durch nichts hindurch
       const fahrzeug = this.getVehicleBoxes?.();
-      if (
-        hitsObstacle(g.position.x, g.position.z, 0.35) ||
-        (fahrzeug && findeBox(g.position.x, g.position.z, fahrzeug, this.eigenRadius))
-      ) {
-        g.position.x = vorher.x;
-        g.position.z = vorher.z;
+      const steckt =
+        fahrzeug && findeBox(g.position.x, g.position.z, fahrzeug, this.eigenRadius);
+      if (hitsObstacle(g.position.x, g.position.z, 0.35) || steckt) {
+        /*
+         * Zurueck auf den alten Platz — es sei denn, der war auch schon
+         * belegt. Dann steckt er fest und wuerde ewig stehen bleiben: Genau
+         * das war zu sehen, als ein LKW ueber ihm parkte und er 92 Prozent
+         * der Zeit reglos in der Abladestelle stand (Messung 11.09.2026).
+         * In dem Fall setzt er zurueck, wie es ein Fahrer auch taete.
+         */
+        const vorherSteckt =
+          fahrzeug && findeBox(vorher.x, vorher.z, fahrzeug, this.eigenRadius);
+        if (steckt && vorherSteckt) {
+          ausBox(vorher.x, vorher.z, vorherSteckt, this.slideTmp);
+          g.position.x = vorher.x + this.slideTmp.x * tempo * dt;
+          g.position.z = vorher.z + this.slideTmp.z * tempo * dt;
+          this.setzeZurueck();
+        } else {
+          g.position.x = vorher.x;
+          g.position.z = vorher.z;
+        }
       }
       g.rotation.y = Math.atan2(step.x, step.z);
       this.walkPhase += dt * 7;
@@ -990,6 +1046,39 @@ export class StaffManager {
     return `${this.lambertState}${this.zuFuss ? " (zu Fuss)" : ""}`;
   }
 
+  /**
+   * Flaechen, in die der Radlader nicht hineinfaehrt: Abkippplatz,
+   * Stahlhaufen, Ballenlager. Er arbeitet an ihren Aussengrenzen — hinein
+   * faehrt er nicht (Wunsch 11.09.2026). Die Mulden stehen ohnehin schon als
+   * Hindernis in obstacles.ts.
+   */
+  private get sperrZonen(): Zone[] {
+    if (this.zonenCache.length === 0) {
+      for (const c of CONFIGS) {
+        if (c.kind === "bay") continue; // hat Waende, steht in obstacles.ts
+        this.zonenCache.push({ x: c.x, z: c.z, hw: c.size[0] / 2, hd: c.size[1] / 2 });
+      }
+      // Der Abkippplatz vor dem Bagger: dort faellt die Fuhre herunter
+      this.zonenCache.push({ x: ABKIPP.x, z: ABKIPP.z, hw: ABKIPP.hw, hd: ABKIPP.hd });
+    }
+    return this.zonenCache;
+  }
+  private zonenCache: Zone[] = [];
+
+  /**
+   * Setzt zurueck, wie es ein Fahrer tut, wenn ihm etwas den Weg versperrt.
+   * Danach sucht er sich eine neue Aufgabe, statt weiter dagegenzudruecken.
+   */
+  private setzeZurueck(): void {
+    if (this.rueckwaertsS > 0) return;
+    this.rueckwaertsS = RUECKWAERTS_S;
+    this.carriedItemId = null;
+    this.lastAufgenommen = false;
+    this.lambertState = "patrol";
+    this.naechstePruefung = RUECKWAERTS_S + 0.5;
+    this.pruefUhr = 0;
+  }
+
   /** Aus dem Radlader steigen; die Maschine bleibt stehen, wo sie steht. */
   private steigeAb(): void {
     if (!this.hasLoader || this.zuFuss) return;
@@ -1043,15 +1132,36 @@ export class StaffManager {
       this.wegTeile.push(eintrag);
       if (ausser && it.id === ausser.id) ausserTeil = eintrag;
     }
-    return wegFrei(
-      von.x,
-      von.z,
-      zielX,
-      zielZ,
-      this.wegTeile,
-      this.faehrt ? SCHAUFEL_BREITE : FUSS_BREITE,
-      ausserTeil
-    );
+    if (
+      !wegFrei(
+        von.x,
+        von.z,
+        zielX,
+        zielZ,
+        this.wegTeile,
+        this.faehrt ? SCHAUFEL_BREITE : FUSS_BREITE,
+        ausserTeil
+      )
+    ) {
+      return false;
+    }
+    /*
+     * Mit der Maschine nicht quer durch Abkippplatz oder Haufen: Dort liegt
+     * die Arbeit des Baggers, und wer hindurchfaehrt, wuehlt alles auf. Die
+     * Zone wird fuer die Pruefung um einen Meter geschrumpft — sonst kaeme er
+     * an kein Teil am Rand heran, und genau dort soll er arbeiten.
+     */
+    if (this.faehrt) {
+      for (const zone of this.sperrZonen) {
+        if (streckeSchneidetZone(von.x, von.z, zielX, zielZ, zone, ZONE_RAND)) return false;
+      }
+    }
+    // Und er holt nur, was frei liegt — nicht, was mitten im Haufen steckt.
+    if (ausserTeil && nachbarn(zielX, zielZ, this.wegTeile, RAND_RADIUS, ausserTeil) >
+      RAND_MAX_NACHBARN) {
+      return false;
+    }
+    return true;
   }
 
   private wegTeile: WegTeil[] = [];
@@ -1097,6 +1207,7 @@ export class StaffManager {
       const [ax, az] = anstellPunkt(p.x, p.z, ex.x, ex.z);
       if (!this.reachable(ax, az)) continue;
       // Nicht durch den Haufen pfluegen: Der Anstellpunkt muss anfahrbar sein
+      if (this.faehrt && inZonen(ax, az, this.sperrZonen, ZONE_RAND)) continue;
       if (!this.wegIstFrei(ax, az, it)) continue;
       const d = Math.hypot(p.x - von.x, p.z - von.z);
       if (d < bestD) {

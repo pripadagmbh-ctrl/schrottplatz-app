@@ -6,7 +6,11 @@ import {
   SCHAUFEL_BREITE,
   WEG_MAX_PUNKTE,
   WEG_SCHWER_KG,
+  streckeSchneidetZone,
+  inZonen,
+  nachbarn,
   type WegTeil,
+  type Zone,
 } from "../src/world/weg";
 
 /**
@@ -65,5 +69,42 @@ describe("Wegprüfung des Radladers", () => {
   it("lässt das Zielteil selbst aussen vor", () => {
     const ziel = teil(0, 3);
     expect(wegFrei(0, 0, 0, 3, [ziel], SCHAUFEL_BREITE, ziel)).toBe(true);
+  });
+});
+
+/**
+ * "Er darf nur an Aussengrenzen ran" (Wunsch 11.09.2026). Der Radlader
+ * faehrt nicht durch Abkippplatz oder Haufen — gemessen stand Lambert vorher
+ * 92 Prozent der Zeit mitten in der Abladestelle.
+ */
+describe("Sperrzonen und Rand", () => {
+  const abkipp: Zone = { x: 0, z: 7, hw: 4.5, hd: 4.5 };
+
+  it("erkennt eine Strecke quer durch die Zone", () => {
+    expect(streckeSchneidetZone(-10, 7, 10, 7, abkipp)).toBe(true);
+    expect(streckeSchneidetZone(0, -5, 0, 20, abkipp)).toBe(true);
+  });
+
+  it("lässt Wege daran vorbei zu", () => {
+    expect(streckeSchneidetZone(-10, 14, 10, 14, abkipp)).toBe(false);
+    expect(streckeSchneidetZone(8, 0, 8, 20, abkipp)).toBe(false);
+  });
+
+  it("lässt Arbeit am Rand zu, wenn die Zone geschrumpft geprüft wird", () => {
+    // Ein Teil dicht an der Kante: ohne Schrumpfen gesperrt, mit erlaubt
+    expect(streckeSchneidetZone(9, 11.4, 0.5, 11.4, abkipp)).toBe(true);
+    expect(streckeSchneidetZone(9, 11.4, 0.5, 11.4, abkipp, 1.0)).toBe(false);
+  });
+
+  it("erkennt Punkte in der Zone", () => {
+    expect(inZonen(0, 7, [abkipp])).toBe(true);
+    expect(inZonen(0, 13, [abkipp])).toBe(false);
+  });
+
+  it("zählt Nachbarn, um vergrabene Teile auszuschliessen", () => {
+    const haufen = [teil(0, 0), teil(0.5, 0.3), teil(-0.4, 0.6), teil(0.2, -0.5)];
+    const einzeln = teil(20, 20);
+    expect(nachbarn(0, 0, haufen, 1.8, haufen[0])).toBe(3);
+    expect(nachbarn(einzeln.x, einzeln.z, [...haufen, einzeln], 1.8, einzeln)).toBe(0);
   });
 });

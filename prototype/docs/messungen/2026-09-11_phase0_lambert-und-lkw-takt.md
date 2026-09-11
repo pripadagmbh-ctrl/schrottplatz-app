@@ -29,6 +29,32 @@ Zwei Nebenbefunde aus derselben Messung:
 - Die Kaffeepause greift: 52 s → 105 s in der Probe, also 53 s Pause
   innerhalb der vorgegebenen 30–90 s, danach zurück zur Maschine.
 
+## 0.2 Nachtrag: Lambert stand in der Abladestelle
+
+Befund vom Gerät: "Lambert fährt immer noch durch die Abladestelle." Nachgemessen,
+Position viermal je Sekunde über 5 Minuten:
+
+| | vorher | nachher |
+|---|---|---|
+| Zeit im Abkippplatz (0/7, 8 × 8 m) | **92,6 %** | **2,4 %** |
+
+Zwei Ursachen, beide behoben:
+
+1. **Er steckte fest.** Ein LKW parkte über ihm; jeder Schritt landete in
+   dessen Standfläche und wurde verworfen — auch der Schritt, der ihn
+   herausgeführt hätte. Er stand reglos bei (3, 5). Jetzt gilt: War der alte
+   Platz ebenfalls belegt, wird nicht zurückgesetzt, sondern nach draußen
+   gesteuert und zurückgestoßen, wie es ein Fahrer täte.
+2. **Seine Standplätze lagen mitten im Abkippplatz.** Der Einweisplatz war
+   (3,6 / 8,5), also mittendrin. Patrouille und Einweisplatz liegen jetzt
+   außerhalb, bei z ≈ 13 und (6 / 11,5).
+
+Dazu die Regel aus dem Wunsch: Mit der Maschine fährt er nicht mehr durch
+Abkippplatz, Stahlhaufen oder Ballenlager — geprüft wird die Strecke gegen
+die Zonen (um 1 m geschrumpft, damit Arbeit an der Kante möglich bleibt). Und
+er holt nur, was frei liegt: Mehr als zwei Nachbarn im Umkreis von 1,8 m, und
+das Teil gilt als vergraben.
+
 ## 0.3 LKW-Takt
 
 ### Wo er eingestellt wird
