@@ -90,16 +90,19 @@ export const TIP_OUT: Array<[number, number]> = [
 ];
 
 /**
- * Warteplatz an der Innenseite der Nordwand, westlich der Einfahrt: Nach dem
+ * Warteplatz an der Innenseite der Nordwand, oestlich der Einfahrt: Nach dem
  * Abladen stellen sich vor allem die Händler dort ab und quatschen, bevor
  * sie fahren. Das hält Betrieb auf dem
  * Platz — und macht den Abladeplatz sofort für den Nächsten frei
  * (Wunsch 02.09.2026).
+ *
+ * Vorher lagen sie westlich der Einfahrt. Dort steht seit 11.09.2026 der
+ * Betriebshof — die LKW haetten im Buero geparkt.
  */
 export const PARK_SLOTS: Array<[number, number]> = [
-  [-30, 24],
-  [-33.5, 24],
-  [-30, 20],
+  [-14, 25],
+  [-8.5, 25],
+  [-3, 25],
 ];
 /** So lange bleibt ein Fahrzeug stehen (s) */
 export const PARK_TIME_S: [number, number] = [45, 120];

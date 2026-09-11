@@ -8,6 +8,7 @@ import {
   slideAround,
 } from "../src/world/obstacles";
 import { OFFICE_X, OFFICE_Z, officeFootprints } from "../src/world/office";
+import { WEIGH_X, WEIGH_Z } from "../src/world/yard";
 import {
   CLAW_OPEN_SPLAY,
   CLAW_SEGMENTS,
@@ -80,21 +81,23 @@ describe("Feste Bauten", () => {
     expect(hitsObstacle(halle[0], halle[1], 0)?.label).toBe("Betriebsgebäude");
   });
 
-  it("lässt zwischen Büro und Halle keine Scheinlücke sperren", () => {
-    // Der Streifen dazwischen ist frei begehbar, sonst stünde dort eine
-    // unsichtbare Wand.
-    const [buero, halle] = officeFootprints();
-    const mitte = (buero[0] - buero[2] + (halle[0] + halle[2])) / 2;
-    expect(hitsObstacle(mitte, OFFICE_Z, 0)).toBeNull();
+  it("stellt den Betriebshof neben die Waage in die hintere Ecke", () => {
+    // Ausdruecklicher Wunsch (11.09.2026): an die Westwand, nahe der Ecke,
+    // in Sichtweite der Waage. Sonst wandert der Bau beim naechsten Umbau
+    // wieder mitten auf den Platz.
+    for (const [x, z, hw, hd] of officeFootprints()) {
+      expect(x - hw, "steht in der Westwand").toBeGreaterThanOrEqual(YARD_MIN_X);
+      expect(x + hw, "ragt zu weit auf den Platz").toBeLessThan(-28);
+      expect(z + hd, "steht in der Nordwand").toBeLessThanOrEqual(YARD_D / 2);
+    }
+    // Das Buero schaut auf die Waage
+    expect(Math.hypot(OFFICE_X - WEIGH_X, OFFICE_Z - WEIGH_Z)).toBeLessThan(20);
   });
 
-  it("hält das Betriebsgebäude in der hinteren rechten Ecke, an der Wand", () => {
-    // Der Wunsch war ausdrücklich: alles Gebaute nach hinten rechts, damit
-    // der Platz frei bleibt. Sonst wandert es beim nächsten Umbau zurück.
-    for (const [x, z, hw, hd] of officeFootprints()) {
-      expect(z + hd, "ragt zu weit auf den Platz").toBeLessThan(-18);
-      expect(z - hd, "steht in der Südwand").toBeGreaterThan(-YARD_D / 2 + 0.3);
-      expect(x + hw, "steht in der Ostwand").toBeLessThan(YARD_MAX_X - 0.3);
+  it("lässt die Zufahrt zur Waage frei", () => {
+    // Zwischen Gebaeudefront und Wiegeplatte muss ein LKW durchpassen.
+    for (let z = 14; z <= 27; z += 1) {
+      expect(hitsObstacle(WEIGH_X, z, 2.0), `Waagenspur bei z=${z}`).toBeNull();
     }
   });
 
