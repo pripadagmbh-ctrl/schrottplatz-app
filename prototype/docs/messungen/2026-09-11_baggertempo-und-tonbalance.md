@@ -224,3 +224,47 @@ Was daraus folgt: Der Schrott braucht denselben Aufbau wie die Spinne — ein
 Labor mit wiederholbaren Läufen, in dem ein Schüttwinkel über zehn Versuche
 gemittelt wird, statt einmal zu messen und sich zu freuen. Vorher lohnt es
 nicht, an Formen oder Reibung zu drehen.
+
+## 6 Drehwerk-Endtempo und Pflügen
+
+Zwei Rückmeldungen nach dem Pendel-Umbau: „der Turm ist zu schnell" und „es
+fliegt wie nichts durch den Schrott, obwohl die Masse den Kran abbremsen
+sollte".
+
+### Endtempo
+
+45 °/s waren zu viel. Der Wert lag bewusst im Datenblattbereich (7 bis 9
+Umdrehungen je Minute = 42 bis 54 °/s) — nur ist das das **Höchste, was die
+Maschine kann**, und ein Fahrer benutzt es fast nie. Im Spiel kennt die Taste
+kein Halbgas, also fährt der Spieler dauernd Anschlag. Das Endtempo muss darum
+ein Arbeitstempo sein: **36 °/s, sechs Umdrehungen je Minute.**
+
+Das frühere „zu langsam" galt nicht dem Grundtempo, sondern der Last („alles
+bis vier, fünf Tonnen sollte kein Problem sein") — dafür sorgt `tempoFaktor`,
+nicht `CAB_MAX`. Der Test in `reach.test.ts` prüft jetzt 30 bis 42 °/s statt
+42 bis 54, mit dieser Begründung.
+
+### Pflügen durch den Haufen
+
+Der Widerstand war vorhanden und griff auch — er war nur zu schwach:
+
+| | vorher | nachher |
+|---|---|---|
+| verdrängte Masse in der Prüfkugel (1,15 m) | 800–1260 kg | unverändert |
+| Faktor daraus | 0,43–0,54 | **0,41 bei 800 kg** |
+| Schwenk im Haufen | 15,6–19 °/s | **12,6 °/s** |
+| Schwenk in freier Luft | 45 °/s | 36 °/s |
+| Beschleunigung im Haufen | wie in freier Luft | **halb so groß** |
+
+Zwei Änderungen:
+
+1. `PLOW_HALF_KG` von 900 auf **500**, Untergrenze von 0,35 auf **0,2**. Der
+   Arm ist kinematisch — er kann durch Kontakt gar nicht gebremst werden.
+   Dieser Faktor ist der einzige Ersatz für die Kraft, die eine Tonne
+   verhakter Stahl einem Ausleger entgegensetzt, und eine Tonne hält einen
+   Ausleger fast auf.
+2. Das Pflügen bremst jetzt auch den **Anlauf** (`PFLUG_TRAEGHEIT`). Vorher
+   sprang der Arm im Material genauso munter an wie in der Luft und war bloß
+   früher fertig — das las sich wie ein Spielzeug, das durch Watte fährt.
+
+Im Haufen bleibt damit rund ein Drittel des freien Tempos übrig.

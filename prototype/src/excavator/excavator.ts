@@ -96,13 +96,24 @@ const STICK_MAX = THREE.MathUtils.degToRad(-25);
 const DRIVE_MAX = 1.4; // m/s ≈ 5 km/h
 const STEER_RATE = 0.7; // rad/s
 /*
- * Drehwerk. Ein Umschlagbagger dieser Groesse dreht mit 7 bis 9 Umdrehungen
- * je Minute, also 42 bis 54 Grad je Sekunde. Mit 30 Grad war der Turm am
- * unteren Ende und fuehlte sich zaeh an (Befund 11.09.2026). Schwer wirkt die
- * Maschine ueber die Rampe, nicht ueber ein niedriges Endtempo: Sie laeuft
- * traege an und kommt traege zur Ruhe — nur eben zu einem ordentlichen Tempo.
+ * Drehwerk.
+ *
+ * Das Datenblatt einer solchen Maschine nennt 7 bis 9 Umdrehungen je Minute,
+ * also 42 bis 54 Grad je Sekunde. Das ist aber das **Hoechste, was sie kann**,
+ * und ein Fahrer benutzt es fast nie: Er zieht den Hebel so weit, wie er die
+ * Last noch im Griff hat. Im Spiel gibt es diesen Unterschied nicht — die
+ * Taste kennt nur ganz oder gar nicht, und damit faehrt der Spieler staendig
+ * Anschlag. Das Endtempo muss darum ein Arbeitstempo sein, nicht das Maximum
+ * der Maschine.
+ *
+ * 45 Grad je Sekunde waren zu viel (Befund 11.09.2026: "der Turm ist zu
+ * schnell"). 36 sind sechs Umdrehungen je Minute — ruhiges Arbeitstempo.
+ *
+ * Das frueher gemeldete "zu langsam" galt nicht dem Grundtempo, sondern der
+ * Last: "alles bis vier, fuenf Tonnen sollte kein Problem sein". Dafuer
+ * sorgt tempoFaktor, nicht CAB_MAX.
  */
-export const CAB_MAX = THREE.MathUtils.degToRad(45);
+export const CAB_MAX = THREE.MathUtils.degToRad(36);
 const BOOM_RATE = THREE.MathUtils.degToRad(19);
 const STICK_RATE = THREE.MathUtils.degToRad(20);
 const ROTATOR_STEP = THREE.MathUtils.degToRad(15); // pro Mausrad-Raste
@@ -169,6 +180,8 @@ const ANSCHLAG_GRAD = THREE.MathUtils.degToRad(4.5);
 /** Wie lange der Rueckprall nachschwingt (s) */
 const ANSCHLAG_S = 0.22;
 
+/** Um so viel traeger laeuft der Arm an, wenn er ganz im Material steckt */
+const PFLUG_TRAEGHEIT = 2.2;
 /** Zeitkonstante, mit der die Spitzenbeschleunigung fuers Pendel geglaettet wird (s) */
 const ACC_GLAETTUNG_S = 0.09;
 /**
@@ -1185,7 +1198,15 @@ export class Excavator {
      */
     const ausbau = this.getSpeedBonus?.() ?? 1;
     const carried = tempoFaktor(this.carriedMassKg);
-    const rampe = anlaufZeit(this.carriedMassKg) / ausbau;
+    /*
+     * Im Material kommt die Maschine auch langsamer in Fahrt, nicht nur
+     * langsamer voran. Vorher bremste das Pfluegen nur das Endtempo — der
+     * Arm sprang also genauso munter an und war bloss frueher fertig. Das
+     * las sich wie ein Spielzeug, das durch Watte faehrt.
+     */
+    const rampe =
+      (anlaufZeit(this.carriedMassKg) / ausbau) *
+      THREE.MathUtils.lerp(1, PFLUG_TRAEGHEIT, 1 - this.plowFactor);
     this.plowFactor += (this.collision.plowFactor() - this.plowFactor) * Math.min(dt * 6, 1);
     const loadFactor = carried * this.plowFactor;
     // Zustand vor der Bewegung merken (für die Fahrzeug-Sperre unten)

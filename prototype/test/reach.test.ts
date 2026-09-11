@@ -108,11 +108,16 @@ describe("Last am Greifer", () => {
     expect(anlaufZeit(20000)).toBe(anlaufZeit(5000));
   });
 
-  it("dreht den Turm zügig genug für Umschlagarbeit", () => {
-    // 7 bis 9 Umdrehungen je Minute sind bei dieser Maschinenklasse üblich,
-    // also 42 bis 54 Grad je Sekunde.
+  it("dreht den Turm im Arbeitstempo, nicht am Anschlag der Maschine", () => {
+    /*
+     * Das Datenblatt nennt 7 bis 9 Umdrehungen je Minute (42 bis 54 Grad je
+     * Sekunde) — das ist das Hoechste, was die Maschine kann. Ein Fahrer
+     * benutzt es kaum; im Spiel faehrt die Taste aber immer Anschlag. Darum
+     * liegt das Endtempo bewusst darunter, bei fuenf bis sieben Umdrehungen.
+     * Unter 30 Grad fuehlt sich der Turm zaeh an, ueber 42 wird er wild.
+     */
     const gradProSekunde = THREE.MathUtils.radToDeg(CAB_MAX);
-    expect(gradProSekunde).toBeGreaterThanOrEqual(42);
-    expect(gradProSekunde).toBeLessThanOrEqual(54);
+    expect(gradProSekunde).toBeGreaterThanOrEqual(30);
+    expect(gradProSekunde).toBeLessThanOrEqual(42);
   });
 });
