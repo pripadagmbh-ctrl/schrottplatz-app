@@ -1,9 +1,11 @@
 import * as THREE from "three";
-import type { ItemManager } from "./scrapItems";
+import { umkugelRadius, type ItemManager } from "./scrapItems";
 import { hitsObstacle, slideAround } from "./obstacles";
 import { CONFIGS, type ContainerConfig } from "./containers";
 import { KAFFEE_ROT } from "./yard";
 import { findeBox, ausBox, type Box } from "./boxen";
+import { wegFrei, SCHAUFEL_BREITE, type WegTeil } from "./weg";
+import { KAFFEE_THEKE } from "./yard";
 import {
   WheelLoader,
   LOADER_SPEED,
@@ -95,6 +97,9 @@ export function buildPerson(colors: PersonColors): PersonParts {
  *   carry   bringt es in seine Mulde
  *   shove   faehrt hinter ein Teil, das der Bagger nicht erreicht
  *   shoving schiebt es in die Reichweite des Baggers
+ *   zurBude geht zu Janine, weil gerade nichts zu holen ist
+ *   kaffee  steht an der Theke
+ *   zurueckZurMaschine geht zurueck zum Radlader
  *
  * Die beiden letzten gibt es nur mit Radlader — von Hand schiebt niemand
  * einen halben Motorblock ueber den Platz.
@@ -215,10 +220,41 @@ function buildKaffeewagen(scene: THREE.Scene, pos: THREE.Vector3, rot: number): 
   return g;
 }
 
+/*
+ * Lamberts Pausen (Auftrag 11.09.2026, Phase 0.2). Wenn nichts zu holen ist,
+ * sitzt er nicht untaetig im Radlader — er geht zu Janine einen Kaffee
+ * trinken und sieht danach wieder nach.
+ */
+/** Mindestabstand zwischen zwei Pausen (s) */
+const PAUSE_ABSTAND_S = 180;
+/** Pausendauer (s) — gewuerfelt */
+const PAUSE_DAUER_S: [number, number] = [30, 90];
+/** Kommt ein LKW, trinkt er aus: Rest halbiert, hoechstens so lange (s) */
+const PAUSE_KURZ_MAX_S = 15;
+/** So oft sieht er nach neuer Arbeit, wenn gerade nichts geht (s) */
+const PRUEF_INTERVALL_S: [number, number] = [3, 5];
+/** Korridorbreite zu Fuss — ein Mensch steigt ueber Kleinteile */
+const FUSS_BREITE = 0.9;
+/** Bis hierher traegt er von Hand, wenn der Radlader nicht hinkommt (kg) */
+const HANDLAST_KG = 60;
+/** In diesem Umkreis zaehlt ein Aufwachen als "von Lambert verursacht" (m) */
+const WECK_RADIUS = 4;
+/** So weit im Voraus werden schlafende Teile gemerkt (m) */
+const WECK_MERK_RADIUS = 12;
+
 /** Marios Gehtempo (m/s) — zuegig, er hat einen LKW warten. */
 const MARIO_TEMPO = 2.0;
 
-type LambertState = "patrol" | "guide" | "fetch" | "carry" | "shove" | "shoving";
+type LambertState =
+  | "patrol"
+  | "guide"
+  | "fetch"
+  | "carry"
+  | "shove"
+  | "shoving"
+  | "zurBude"
+  | "kaffee"
+  | "zurueckZurMaschine";
 
 export class StaffManager {
   private lambert: PersonParts;
@@ -281,12 +317,40 @@ export class StaffManager {
    * räumt er auch schwere Brocken von der Fahrspur.
    */
   get tragkraft(): number {
-    return (this.hasLoader ? 900 : 60) * (this.getLiftBonus?.() ?? 1);
+    return (this.faehrt ? 900 : HANDLAST_KG) * (this.getLiftBonus?.() ?? 1);
+  }
+
+  /** Sitzt er gerade im Radlader? Zu Fuss gelten andere Regeln. */
+  private get faehrt(): boolean {
+    return this.hasLoader && !this.zuFuss;
   }
   /** Tempofaktor aus dem Bulldozer — von main gesetzt */
   getSpeedBonus: (() => number) | null = null;
   /** Traglastfaktor aus dem Stapler — von main gesetzt */
   getLiftBonus: (() => number) | null = null;
+
+  /**
+   * Zu Fuss unterwegs, obwohl der Radlader da ist: Wenn mit der Maschine
+   * nichts zu erreichen ist, steigt er aus und sortiert Kleinteile von Hand
+   * oder geht Kaffee trinken (Auftrag 11.09.2026, Rangfolge in Phase 0.2).
+   */
+  private zuFuss = false;
+  /** Wo der Radlader steht, solange Lambert zu Fuss unterwegs ist. */
+  private readonly maschinePos = new THREE.Vector3();
+  /** Restliche Pausenzeit (s) */
+  private pauseRestS = 0;
+  /** Zeit seit der letzten Pause (s) — siehe PAUSE_ABSTAND_S */
+  private seitPauseS = PAUSE_ABSTAND_S;
+  /** Wann er das naechste Mal nach Arbeit sieht (s) */
+  private naechstePruefung = 0;
+  /** Zeit seit der letzten Arbeitssuche (s) */
+  private pruefUhr = 0;
+  /** Fuer das Debug-Overlay: von ihm aufgeweckte Koerper je Minute */
+  private weckSpur: number[] = [];
+  private schlafendeHandles = new Set<number>();
+  private weckUhr = 0;
+  /** Blickrichtung des abgestellten Radladers */
+  private loaderYaw = 0;
 
   /** Radlader vorhanden? Wird vom Upgrade-System gesetzt. */
   private _hasLoader = false;
@@ -303,8 +367,16 @@ export class StaffManager {
   setLoader(on: boolean): void {
     this._hasLoader = on;
     this.loader?.setVisible(on);
-    // Zu Fuß oder auf der Maschine — nicht beides sichtbar
-    this.lambert.group.visible = !on;
+    if (on) this.maschinePos.copy(this.lambert.group.position);
+    this.zeigeRichtige();
+  }
+
+  /**
+   * Zu Fuss oder auf der Maschine — nie beides. Steigt er aus, bleibt der
+   * Radlader stehen, wo er ihn abgestellt hat.
+   */
+  private zeigeRichtige(): void {
+    this.lambert.group.visible = !this.faehrt;
   }
   /** Karossen — durch die läuft er nicht hindurch */
   getObstaclePositions: (() => THREE.Vector3[]) | null = null;
@@ -413,7 +485,27 @@ export class StaffManager {
    */
   update(dt: number, truck: THREE.Vector3 | null): void {
     this.stateT += dt;
+    this.seitPauseS += dt;
+    this.pruefUhr += dt;
     const g = this.lambert.group;
+    this.zaehleGeweckte(dt);
+
+    // --- Kaffeepause ---
+    if (this.lambertState === "kaffee") {
+      // Kommt ein LKW, trinkt er aus: Rest halbiert, hoechstens 15 Sekunden.
+      if (truck && this.pauseRestS > PAUSE_KURZ_MAX_S) {
+        this.pauseRestS = Math.min(this.pauseRestS / 2, PAUSE_KURZ_MAX_S);
+      }
+      this.pauseRestS -= dt;
+      if (this.pauseRestS <= 0) {
+        this.lambert.armRight.rotation.x = 0;
+        // Gemaechlich zurueck zur Maschine — oder gleich weiterarbeiten
+        this.lambertState = this.hasLoader ? "zurueckZurMaschine" : "patrol";
+        this.lambertTarget.copy(this.hasLoader ? this.maschinePos : this.patrol[this.patrolIdx]);
+      }
+      this.loader?.update(dt, this.maschinePos, this.loaderYaw, false);
+      return; // waehrend der Pause keine Wegpruefungen
+    }
 
     // Einweisen hat Vorrang: sobald ein LKW auf dem Platz rangiert. Was er
     // gerade in der Schaufel hat oder vor sich herschiebt, laesst er dafuer
@@ -460,7 +552,12 @@ export class StaffManager {
       }
       g.rotation.y = Math.atan2(step.x, step.z);
       this.walkPhase += dt * 7;
-      this.loader?.update(dt, g.position, g.rotation.y, true);
+      if (this.faehrt) {
+        this.loaderYaw = g.rotation.y;
+        this.loader?.update(dt, g.position, g.rotation.y, true);
+      } else {
+        this.loader?.update(dt, this.maschinePos, this.loaderYaw, false);
+      }
       // Festgefahren? Wenn das Ausweichen ihn im Kreis schickt, kommt er dem
       // Ziel nicht näher — dann lieber aufgeben als endlos am Hindernis kleben.
       this.stuckT += dt;
@@ -472,7 +569,7 @@ export class StaffManager {
       }
     } else {
       this.walkPhase = 0;
-      this.loader?.update(dt, g.position, g.rotation.y, false);
+      this.loader?.update(dt, this.faehrt ? g.position : this.maschinePos, this.loaderYaw, false);
       this.resetStuck();
       this.onArrived();
     }
@@ -753,44 +850,211 @@ export class StaffManager {
       return;
     }
 
-    // Patrouille: regelmäßig nach einem verirrten Kleinteil sehen
-    if (this.stateT > 0.8) {
-      this.stateT = 0;
-      const hol = (it: (typeof this.items.items)[number]): void => {
-        this.carriedItemId = it.id;
-        const p = it.body.translation();
-        this.lambertTarget.set(p.x, 0, p.z);
-        this.lambertState = "fetch";
-      };
-      // Reihenfolge mit Absicht: Eine blockierte Fahrspur legt den Betrieb
-      // lahm. Danach kommt, was der Bagger nicht erreicht — daran kommt sonst
-      // niemand heran, waehrend Sortierteile nur liegenbleiben und warten.
-      // Stuende das Sortieren davor, wuerde nie geschoben: Es liegt immer
-      // irgendwo noch ein Stueck Buntmetall herum (gemessen 10.09.2026).
-      const blocker = this.findBlocker();
-      if (blocker) {
-        hol(blocker);
-        return;
-      }
-      const weit = this.findSchiebegut();
-      if (weit) {
-        const p = weit.body.translation();
-        const ex = this.getExcavatorPos!();
-        const [ax, az] = anstellPunkt(p.x, p.z, ex.x, ex.z);
-        this.carriedItemId = weit.id;
-        this.lambertTarget.set(ax, 0, az);
-        this.lambertState = "shove";
-        return;
-      }
-      const stray = this.findStray();
-      if (stray) {
-        hol(stray);
-        return;
-      }
-      this.patrolIdx = (this.patrolIdx + 1) % this.patrol.length;
-      this.lambertTarget.copy(this.patrol[this.patrolIdx]);
+    if (this.lambertState === "zurBude") {
+      // An der Theke angekommen: Kaffee, und in der Zeit keine Wegpruefungen
+      this.lambertState = "kaffee";
+      this.pauseRestS =
+        PAUSE_DAUER_S[0] + Math.random() * (PAUSE_DAUER_S[1] - PAUSE_DAUER_S[0]);
+      this.lambert.armRight.rotation.x = -1.3;
+      const zx = KAFFEE_THEKE.x - this.lambert.group.position.x;
+      const zz = KAFFEE_THEKE.z + 1.2 - this.lambert.group.position.z;
+      this.lambert.group.rotation.y = Math.atan2(zx, zz);
+      return;
     }
+    if (this.lambertState === "kaffee") return; // wird in update() abgezaehlt
+    if (this.lambertState === "zurueckZurMaschine") {
+      // Wieder aufgestiegen
+      this.zuFuss = false;
+      this.zeigeRichtige();
+      this.lambertState = "patrol";
+      this.naechstePruefung = 0;
+      return;
+    }
+
+    // Nichts zu tun: In festem Takt nach Arbeit sehen, nicht jedes Bild.
+    // Die Uhr laeuft in update() mit; hier wird nur abgelesen.
+    if (this.pruefUhr < this.naechstePruefung) return;
+    this.pruefUhr = 0;
+    this.stateT = 0;
+    this.naechstePruefung =
+      PRUEF_INTERVALL_S[0] + Math.random() * (PRUEF_INTERVALL_S[1] - PRUEF_INTERVALL_S[0]);
+    this.waehleAufgabe();
   }
+
+  /**
+   * Rangfolge seiner Arbeit (Auftrag 11.09.2026, Phase 0.2):
+   *
+   *   1. erreichbare Radlader-Arbeit
+   *   2. sonst aussteigen und Kleinteile von Hand sortieren
+   *   3. sonst Kaffeepause bei Janine
+   *   4. sonst warten und gleich wieder nachsehen
+   *
+   * "Erreichbar" heisst: Der Fahrweg ist frei (siehe world/weg.ts). Vorher
+   * fuhr er auf das naechstgelegene Teil zu, egal was dazwischen lag — und
+   * pfluegte dabei durch den Haufen.
+   */
+  private waehleAufgabe(): void {
+    const hol = (it: (typeof this.items.items)[number]): void => {
+      this.carriedItemId = it.id;
+      const p = it.body.translation();
+      this.lambertTarget.set(p.x, 0, p.z);
+      this.lambertState = "fetch";
+    };
+    // Eine blockierte Fahrspur legt den Betrieb lahm und hat Vorrang. Danach
+    // kommt, was der Bagger nicht erreicht — daran kommt sonst niemand heran,
+    // waehrend Sortierteile nur liegenbleiben. Stuende das Sortieren davor,
+    // wuerde nie geschoben: Es liegt immer noch irgendwo Buntmetall herum.
+    const blocker = this.findBlocker();
+    if (blocker) {
+      hol(blocker);
+      return;
+    }
+    const weit = this.findSchiebegut();
+    if (weit) {
+      const p = weit.body.translation();
+      const ex = this.getExcavatorPos!();
+      const [ax, az] = anstellPunkt(p.x, p.z, ex.x, ex.z);
+      this.carriedItemId = weit.id;
+      this.lambertTarget.set(ax, 0, az);
+      this.lambertState = "shove";
+      return;
+    }
+    const stray = this.findStray();
+    if (stray) {
+      hol(stray);
+      return;
+    }
+    /*
+     * Mit der Maschine ist nichts zu erreichen? Dann aussteigen und von Hand
+     * sortieren — zu Fuss ist der Korridor schmal, er steigt ja drueber.
+     * Erst nachsehen, dann absteigen: Sonst stand er neben dem Radlader und
+     * hatte trotzdem nichts zu tun (Befund beim Messen 11.09.2026).
+     */
+    if (this.faehrt) {
+      this.zuFuss = true; // nur fuer die Suche
+      const kleinteil = this.findStray();
+      this.zuFuss = false;
+      if (kleinteil) {
+        this.steigeAb();
+        hol(kleinteil);
+        return;
+      }
+    }
+    if (this.gehePause()) return;
+    this.patrolIdx = (this.patrolIdx + 1) % this.patrol.length;
+    this.lambertTarget.copy(this.patrol[this.patrolIdx]);
+  }
+
+  /**
+   * Wie viele schlafende Koerper Lambert aufweckt (Auftrag 11.09.2026,
+   * Phase 0.2: Debug-Overlay vorher/nachher).
+   *
+   * Gezaehlt wird, was in seiner Naehe von schlafend auf wach springt —
+   * genau das kostet Rechenzeit, und genau das soll die Wegregel verhindern.
+   * Gemessen wird viermal je Sekunde, das reicht fuer eine Rate je Minute.
+   */
+  private zaehleGeweckte(dt: number): void {
+    this.weckUhr += dt;
+    if (this.weckUhr < 0.25) return;
+    this.weckUhr = 0;
+    const p = this.lambert.group.position;
+    let neu = 0;
+    for (const it of this.items.items) {
+      if (!it.body.isValid() || !it.body.isDynamic()) continue;
+      const q = it.body.translation();
+      const d = Math.max(Math.abs(q.x - p.x), Math.abs(q.z - p.z));
+      // Im weiteren Umkreis merken, im engeren zaehlen: Sonst entgeht das
+      // Aufwachen genau der Teile, auf die er gerade zufaehrt.
+      if (d > WECK_MERK_RADIUS) continue;
+      const h = it.body.handle;
+      if (it.body.isSleeping()) {
+        this.schlafendeHandles.add(h);
+      } else if (this.schlafendeHandles.delete(h) && d <= WECK_RADIUS) {
+        neu++;
+      }
+    }
+    this.weckSpur.push(neu);
+    // Ein Fenster von einer Minute: 240 Messungen a 0,25 s
+    if (this.weckSpur.length > 240) this.weckSpur.shift();
+  }
+
+  /** Von Lambert aufgeweckte Koerper je Minute (gleitendes Fenster). */
+  get geweckteProMinute(): number {
+    if (this.weckSpur.length === 0) return 0;
+    const summe = this.weckSpur.reduce((a, b) => a + b, 0);
+    return (summe / this.weckSpur.length) * 240;
+  }
+
+  /** Was Lambert gerade tut — fuers Debug-Overlay. */
+  get taetigkeit(): string {
+    return `${this.lambertState}${this.zuFuss ? " (zu Fuss)" : ""}`;
+  }
+
+  /** Aus dem Radlader steigen; die Maschine bleibt stehen, wo sie steht. */
+  private steigeAb(): void {
+    if (!this.hasLoader || this.zuFuss) return;
+    this.maschinePos.copy(this.lambert.group.position);
+    this.zuFuss = true;
+    this.zeigeRichtige();
+  }
+
+  /**
+   * Kaffeepause, wenn nichts zu holen ist — aber nicht ununterbrochen:
+   * zwischen zwei Pausen liegen mindestens drei Minuten.
+   */
+  private gehePause(): boolean {
+    if (this.seitPauseS < PAUSE_ABSTAND_S) return false;
+    this.steigeAb();
+    this.seitPauseS = 0;
+    this.lambertState = "zurBude";
+    this.lambertTarget.set(KAFFEE_THEKE.x + (Math.random() - 0.5) * 2.0, 0, KAFFEE_THEKE.z - 0.6);
+    return true;
+  }
+
+  /**
+   * Messschalter: Mit `true` faehrt er wieder wie vorher, quer durch alles.
+   * Der Auftrag verlangt einen Vorher-Nachher-Vergleich der aufgeweckten
+   * Koerper (Phase 0.2) — dafuer muss sich das alte Verhalten herstellen
+   * lassen, ohne den Code zurueckzubauen. Im Spiel bleibt der Schalter aus.
+   */
+  pfluegenErlaubt = false;
+
+  /**
+   * Ist der Weg von Lambert zu (x,z) frei? Mit der Maschine gilt die
+   * Schaufelbreite, zu Fuss ein schmaler Korridor — ein Mensch steigt ueber
+   * Kleinteile, ein Radlader schiebt sie vor sich her.
+   */
+  private wegIstFrei(zielX: number, zielZ: number, ausser?: { id: string }): boolean {
+    if (this.pfluegenErlaubt) return true;
+    const von = this.lambert.group.position;
+    this.wegTeile.length = 0;
+    let ausserTeil: WegTeil | undefined;
+    for (const it of this.items.items) {
+      if (!it.body.isValid() || !it.body.isDynamic()) continue;
+      const p = it.body.translation();
+      if (p.y > 1.6) continue;
+      const eintrag: WegTeil = {
+        x: p.x,
+        z: p.z,
+        r: it.shape ? umkugelRadius(it.shape) : 0.3,
+        massKg: it.massKg,
+        schlaeft: it.body.isSleeping(),
+      };
+      this.wegTeile.push(eintrag);
+      if (ausser && it.id === ausser.id) ausserTeil = eintrag;
+    }
+    return wegFrei(
+      von.x,
+      von.z,
+      zielX,
+      zielZ,
+      this.wegTeile,
+      this.faehrt ? SCHAUFEL_BREITE : FUSS_BREITE,
+      ausserTeil
+    );
+  }
+
+  private wegTeile: WegTeil[] = [];
 
   /**
    * Schrott, an den der Bagger nicht herankommt.
@@ -832,6 +1096,8 @@ export class StaffManager {
       if (hitsObstacle(zx, zz, 0.8)) continue;
       const [ax, az] = anstellPunkt(p.x, p.z, ex.x, ex.z);
       if (!this.reachable(ax, az)) continue;
+      // Nicht durch den Haufen pfluegen: Der Anstellpunkt muss anfahrbar sein
+      if (!this.wegIstFrei(ax, az, it)) continue;
       const d = Math.hypot(p.x - von.x, p.z - von.z);
       if (d < bestD) {
         bestD = d;
@@ -1026,6 +1292,7 @@ export class StaffManager {
       // Nur holen, wohin ein freier Weg führt — was hinter Boxen oder Mauern
       // liegt, ist Baggerarbeit
       if (!this.reachable(p.x, p.z)) continue;
+      if (!this.wegIstFrei(p.x, p.z, it)) continue;
       const d = Math.hypot(p.x - von.x, p.z - von.z);
       if (d < bestD) {
         bestD = d;

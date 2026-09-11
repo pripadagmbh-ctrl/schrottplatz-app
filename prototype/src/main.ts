@@ -696,7 +696,27 @@ async function main(): Promise<void> {
 
   // --- Fester Physik-Step, von Loop und Test-Handle gemeinsam genutzt ---
   let stepCount = 0;
+  /** Bildschleife rechnet selbst? Beim Messen von aussen abschaltbar. */
+  let autoStep = true;
+  /**
+   * Laeuft gerade ein Schritt? Die Messhilfe `__game.step()` und die
+   * Bildschleife duerfen sich nicht ueberlappen: Rapier bricht dann mit
+   * "recursive use of an object" ab, weil ein Kollider zweimal gleichzeitig
+   * angefasst wird (beim Messen am 11.09.2026 passiert).
+   */
+  let imSchritt = false;
+
   function stepOnce(): void {
+    if (imSchritt) return;
+    imSchritt = true;
+    try {
+      schrittInhalt();
+    } finally {
+      imSchritt = false;
+    }
+  }
+
+  function schrittInhalt(): void {
     excavator.update(FIXED_DT, input);
     excavator.getSensorPosition(sensorPos);
     grip.update(excavator.closure, excavator.closing, sensorPos, FIXED_DT);
@@ -755,9 +775,17 @@ async function main(): Promise<void> {
       audio,
       togglePause: () => setPaused(!paused),
       isPaused: () => paused,
+      /**
+       * Schritte von aussen ausloesen (Messungen). `autoStep(false)` haelt
+       * vorher die Bildschleife an, sonst laufen zwei Schrittquellen
+       * gegeneinander.
+       */
       step: (n: number) => {
         for (let i = 0; i < n; i++) stepOnce();
         items.syncMeshes();
+      },
+      autoStep: (an: boolean) => {
+        autoStep = an;
       },
     };
   }
@@ -853,7 +881,7 @@ async function main(): Promise<void> {
     // frameDt zeigt dann 34,0 ms, egal ob die Arbeit 18 oder 33 ms dauert —
     // jede Verbesserung bliebe unsichtbar, bis sie die Schwelle unterbietet.
     const tPhysik = performance.now();
-    while (accumulator >= FIXED_DT && steps < MAX_STEPS_PER_FRAME) {
+    while (autoStep && accumulator >= FIXED_DT && steps < MAX_STEPS_PER_FRAME) {
       stepOnce();
       accumulator -= FIXED_DT;
       steps++;
@@ -1026,6 +1054,10 @@ async function main(): Promise<void> {
       calls: renderer.info.render.calls,
       tris: renderer.info.render.triangles,
       audio: audio.diagnostics,
+      lambert: {
+        taetigkeit: staff.taetigkeit,
+        geweckteProMinute: staff.geweckteProMinute,
+      },
       msPhysik,
       msBild,
     });

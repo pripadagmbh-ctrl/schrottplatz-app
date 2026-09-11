@@ -13,8 +13,16 @@ import * as THREE from "three";
 
 /** Abstand Knickgelenk → Vorderachse */
 const FRONT_LEN = 1.15;
-/** Fahrgeschwindigkeit (m/s) — deutlich flotter als zu Fuß */
-export const LOADER_SPEED = 4.2;
+/**
+ * Fahrgeschwindigkeit (m/s).
+ *
+ * Um 35 Prozent zurueckgenommen (Auftrag 11.09.2026, Phase 0.1): 4,2 m/s sind
+ * gut 15 km/h — damit schoss der Lader ueber den Hof und wirkte wie ein
+ * Spielzeug. 2,7 m/s sind rund 10 km/h und damit das Tempo, mit dem so eine
+ * Maschine tatsaechlich rangiert. Bewusst als Konstante, damit sich das ohne
+ * Suche nachstellen laesst.
+ */
+export const LOADER_SPEED = 2.7;
 /** Wie schnell der Knick einlenkt (rad/s) */
 const ARTICULATION_RATE = 0.9;
 /** Maximaler Knickwinkel */

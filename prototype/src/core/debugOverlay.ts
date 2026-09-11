@@ -35,6 +35,9 @@ export class DebugOverlay {
       /** Zustand des Tonsystems — auf dem Geraet die einzige Moeglichkeit
        *  nachzusehen, warum nichts zu hoeren ist. */
       audio: { ctx: string; musicWanted: boolean; musicRunning: boolean };
+      /** Was Lambert treibt und wie viele Koerper er dabei je Minute weckt
+       *  (Auftrag 11.09.2026, Phase 0.2) */
+      lambert: { taetigkeit: string; geweckteProMinute: number };
     }
   ): void {
     const fps = 1 / Math.max(frameDt, 1e-4);
@@ -56,6 +59,8 @@ export class DebugOverlay {
       `Arbeit: Physik ${this.physGeglaettet.toFixed(1)} ms · Bild ${this.bildGeglaettet.toFixed(1)} ms<br />` +
       `Ton: ${stats.audio.ctx} · Musik ${stats.audio.musicWanted ? "an" : "aus"}` +
       `${stats.audio.musicRunning ? " (laeuft)" : ""}<br />` +
-      `Gegriffen: ${stats.gripped} Obj / ${stats.grippedKg.toFixed(0)} kg`;
+      `Gegriffen: ${stats.gripped} Obj / ${stats.grippedKg.toFixed(0)} kg<br />` +
+      `Lambert: ${stats.lambert.taetigkeit} · weckt ` +
+      `${stats.lambert.geweckteProMinute.toFixed(0)}/min`;
   }
 }
