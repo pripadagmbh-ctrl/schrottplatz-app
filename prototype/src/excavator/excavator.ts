@@ -104,7 +104,7 @@ const STEER_RATE = 0.7; // rad/s
  */
 export const CAB_MAX = THREE.MathUtils.degToRad(45);
 const BOOM_RATE = THREE.MathUtils.degToRad(19);
-const STICK_RATE = THREE.MathUtils.degToRad(23);
+const STICK_RATE = THREE.MathUtils.degToRad(20);
 const ROTATOR_STEP = THREE.MathUtils.degToRad(15); // pro Mausrad-Raste
 /**
  * Dauerdrehung des Rotators. Vorher wurde je Bild ein fester Winkel addiert,
@@ -113,7 +113,13 @@ const ROTATOR_STEP = THREE.MathUtils.degToRad(15); // pro Mausrad-Raste
  * dass es jemand so gebaut hätte. Jetzt zeitbasiert, und deutlich zügiger:
  * Ein Schrottgreifer dreht die Ladung flott in die Mulde, er zirkelt nicht.
  */
-const ROTATOR_SPEED = THREE.MathUtils.degToRad(160); // rad/s
+/*
+ * Gemessen am 11.09.2026: 160 Grad je Sekunde drehen die Ladung so schnell
+ * herum, dass jede Bewegung nach Zappeln aussieht. Ein Rotator unter Last
+ * dreht spuerbar langsamer als frei; 105 Grad je Sekunde sind zuegig genug,
+ * um die Mulde zu treffen, ohne dass die Ladung herumgeschleudert wird.
+ */
+const ROTATOR_SPEED = THREE.MathUtils.degToRad(105); // rad/s
 /**
  * Last und Tempo.
  *
@@ -168,7 +174,7 @@ const UNTERWAGEN_R = 2.6;
 
 const CLOSE_TIME = 0.4; // s (SW)
 const OPEN_TIME = 0.3; // s (SW)
-const RAMP_TIME = 0.38; // s Anlauf-/Auslauframpe — traeger, die Masse ist zu spueren
+const RAMP_TIME = 0.5; // s Anlauf-/Auslauframpe — traeger, die Masse ist zu spueren
 const CAB_LIFT_MAX = 2.6; // m Kabinenhub für besseren Überblick (SW)
 const CAB_LIFT_SPEED = 0.75; // m/s (SW)
 
@@ -1150,9 +1156,20 @@ export class Excavator {
     // Dazu kommt der Widerstand des Materials, durch das die Spinne gerade
     // pflügt — der bremst wirklich, denn dagegen arbeitet die Maschine.
     // Der Baggerausbau macht die Hydraulik schneller
+    /*
+     * Der Ausbau macht die Maschine wacher, nicht schneller.
+     *
+     * Vorher ging der Ausbaubonus aufs Endtempo. Gemessen am 11.09.2026 drehte
+     * das Drehwerk damit 60,8 statt der eingestellten 45 Grad je Sekunde, und
+     * die Spinne lief mit 9,2 m/s — 33 km/h auf 8,7 m Radius. Das war das
+     * "zu wild". Das Endtempo ist eine Eigenschaft der Maschine und bleibt
+     * darum, wo es hingehoert (42 bis 54 Grad je Sekunde, siehe CAB_MAX); der
+     * Bonus verkuerzt stattdessen die Rampe, die Maschine spricht also
+     * schneller an.
+     */
     const ausbau = this.getSpeedBonus?.() ?? 1;
-    const carried = tempoFaktor(this.carriedMassKg) * ausbau;
-    const rampe = anlaufZeit(this.carriedMassKg);
+    const carried = tempoFaktor(this.carriedMassKg);
+    const rampe = anlaufZeit(this.carriedMassKg) / ausbau;
     this.plowFactor += (this.collision.plowFactor() - this.plowFactor) * Math.min(dt * 6, 1);
     const loadFactor = carried * this.plowFactor;
     // Zustand vor der Bewegung merken (für die Fahrzeug-Sperre unten)
@@ -2174,9 +2191,21 @@ export class Excavator {
 }
 
 /** Wert schrittweise Richtung Ziel bewegen (lineare Rampe). */
+/**
+ * Rampe mit weichen Ecken.
+ *
+ * Eine reine Gerade springt beim Loslassen von voller Beschleunigung auf
+ * null — genau dieser Knick liest sich als Ruck. Nahe am Ziel wird die
+ * Schrittweite darum kleiner: ein S statt einer Geraden. Die letzten rund
+ * zwoelf Schritte (0,2 s) laufen mit gedrosseltem Schritt aus, der Rest der
+ * Rampe bleibt unveraendert schnell.
+ */
 function ramp(current: number, target: number, maxStep: number): number {
   const diff = target - current;
-  return current + THREE.MathUtils.clamp(diff, -maxStep, maxStep);
+  if (Math.abs(diff) <= maxStep) return target;
+  const naehe = Math.min(1, Math.abs(diff) / (maxStep * 12));
+  const schritt = maxStep * (0.35 + 0.65 * naehe);
+  return current + Math.sign(diff) * schritt;
 }
 
 function clamp1(v: number): number {
