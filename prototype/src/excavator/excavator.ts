@@ -128,6 +128,8 @@ export function anlaufZeit(lastKg: number): number {
 
 /** Ab diesem Schliessgrad treffen sich die Krallenspitzen. */
 const SCHNAPP_AB = 0.93;
+/** So tief duerfen die Spitzen in Material beissen, bevor der Arm anhaelt (m) */
+const EINDRING_OK = 0.05;
 /** Wie weit die Schalen beim Anschlag zurueckfedern (rad) */
 const ANSCHLAG_GRAD = THREE.MathUtils.degToRad(4.5);
 /** Wie lange der Rueckprall nachschwingt (s) */
@@ -1575,6 +1577,61 @@ export class Excavator {
     return treffer ? this.aufsetzRay.origin.y - treffer.timeOfImpact : 0;
   }
 
+  /**
+   * Wie tief stecken die Krallenspitzen gerade in losem Material?
+   * (Auftrag 11.09.2026, Phase 1.4: "nicht in Materialkoerper eintauchen")
+   *
+   * Der Bodenanschlag oben zaehlt nur tragenden Grund — loser Schrott bleibt
+   * bewusst aussen vor, sonst setzt die Spinne auf dem Haufen auf, statt
+   * hineinzugreifen. Gemessen im Labor (11.09.2026) steckte dadurch eine
+   * Kralle 22,8 cm tief in einem liegenden Teil, dauerhaft: Der Kontakt loest
+   * sich nicht, weil das Teil am Boden liegt, hohe Reibung hat und die weichen
+   * Kontaktwerte den Rest tun.
+   *
+   * Deshalb hier ein eigener, weicherer Anschlag: Ein Stueck Biss ist erlaubt
+   * (EINDRING_OK), darueber hinaus wird der Arm angehoben — wie beim Boden,
+   * nur eben gegen Material. Gerechnet werden die fuenf Spitzen gegen die
+   * Teile im Umkreis; das ist die Fokus-Zone aus Phase 1.3, angewendet auf
+   * Genauigkeit statt auf Sparen.
+   */
+  private eindringtiefe(splay: number): number {
+    if (this.grippedHandles.size > 0) return 0; // beim Tragen sind die Krallen aus
+    this.grappleGroup.updateWorldMatrix(true, false);
+    const mitte = this.grappleGroup.position;
+    let tiefste = 0;
+    // Teile im Umkreis einsammeln — nur die koennen ueberhaupt getroffen sein
+    this.world.intersectionsWithShape(
+      { x: mitte.x, y: mitte.y, z: mitte.z },
+      { x: 0, y: 0, z: 0, w: 1 },
+      this.eindringShape,
+      (col) => {
+        const b = col.parent();
+        if (!b || !b.isDynamic()) return true;
+        if (this.selfHandles.has(b.handle) || this.grippedHandles.has(b.handle)) return true;
+        for (let c = 0; c < CLAW_COUNT; c++) {
+          const a = (c / CLAW_COUNT) * Math.PI * 2;
+          clawPoint(a, this.clawSplayIst[c] ?? splay, CLAW_SEGMENTS, this.clawA);
+          this.clawA.applyMatrix4(this.grappleGroup.matrixWorld);
+          const pr = col.projectPoint(
+            { x: this.clawA.x, y: this.clawA.y, z: this.clawA.z },
+            false
+          );
+          if (!pr || !pr.isInside) continue;
+          const d = Math.hypot(
+            pr.point.x - this.clawA.x,
+            pr.point.y - this.clawA.y,
+            pr.point.z - this.clawA.z
+          );
+          if (d > tiefste) tiefste = d;
+        }
+        return true;
+      }
+    );
+    return tiefste;
+  }
+
+  private eindringShape = new RAPIER.Ball(2.0);
+
   private resolveGroundClamp(): void {
     // Spitzentiefe direkt aus der Krallengeometrie — so bleibt der Bodenanschlag
     // richtig, auch wenn sich Form oder Öffnungswinkel ändern.
@@ -1584,7 +1641,16 @@ export class Excavator {
     const flaeche = this.surfaceUnderClaws(splay);
     // tipY() rechnet ab der Maschinenbasis; steht die Maschine aufgebockt,
     // ist der Boden entsprechend weiter unten
-    const minTipY = flaeche + tipDepth + 0.02 - this.position.y;
+    let minTipY = flaeche + tipDepth + 0.02 - this.position.y;
+    // Material unter den Spitzen: ein Stueck Biss ja, durchtauchen nein
+    const tief = this.eindringtiefe(splay);
+    if (tief > EINDRING_OK) {
+      const tipYJetzt =
+        BOOM_PIVOT.y +
+        BOOM_LEN * Math.sin(this.boomAngle) +
+        STICK_LEN * Math.sin(this.boomAngle + this.stickAngle);
+      minTipY = Math.max(minTipY, tipYJetzt + (tief - EINDRING_OK));
+    }
     const tipY = () =>
       BOOM_PIVOT.y +
       BOOM_LEN * Math.sin(this.boomAngle) +

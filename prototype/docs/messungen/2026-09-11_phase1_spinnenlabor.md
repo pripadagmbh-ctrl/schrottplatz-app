@@ -113,3 +113,29 @@ Schritt**. Das Budget für 60 fps sind 16,7 ms.
    16 Prozent des Bildbudgets belegt.** Für den Greifmoment ist reichlich
    Platz — die Spinne dürfte das Zehnfache ihrer heutigen Rechenzeit kosten,
    ohne dass die Bildrate darunter litte.
+
+## 1.4 Eintauchen in Material — gemessen und behoben
+
+Der Bodenanschlag zählt nur tragenden Grund; loser Schrott bleibt bewusst
+außen vor, sonst setzt die Spinne auf dem Haufen auf, statt hineinzugreifen.
+Die Folge war im Labor messbar:
+
+| | vorher | nachher |
+|---|---|---|
+| tiefste Krallenspitze in einem liegenden Teil | **0,228 m** | **0,000 m** |
+| Absetzhöhe der Spinne über Grund | 2,04 m | 2,04 m |
+| Kosten Spinne + Greifzone (37 wache Teile) | 0,29 ms | 0,35 ms |
+
+Die Überlappung löste sich nicht von selbst: Das Teil liegt am Boden, hat hohe
+Reibung, und die weichen Kontaktwerte tun den Rest — die Kralle steckte
+dauerhaft darin.
+
+Jetzt prüfen die fünf Spitzen je Schritt die Teile im Umkreis von 2 m. Ein
+Stück Biss ist erlaubt (5 cm), darüber hinaus hebt der Arm an — derselbe
+Mechanismus wie beim Bodenanschlag, nur gegen Material. Das ist die Fokus-Zone
+aus 1.3, angewendet auf Genauigkeit statt aufs Sparen: Sie kostet 0,06 ms je
+Schritt.
+
+Gegenprobe, dass nichts blockiert: Spinne auf den Haufen gesenkt und
+geschlossen — 2 Teile, 480 kg gefasst, Greifstellen bei 83 und 85 kN
+gemeldet.
