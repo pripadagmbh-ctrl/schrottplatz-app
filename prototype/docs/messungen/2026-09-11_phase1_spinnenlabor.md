@@ -69,15 +69,25 @@ Bei 60 fps stehen 16,7 ms je Bild zur Verfügung; belegt sind 2,62 ms, also
 1,8-fache des Rechners. Der größte Posten ist mit 68 Prozent das Zeichnen,
 nicht die Physik.
 
-**Der teure Fall fehlt in dieser Messung**: Der Haufen schlief (beweglich 27,
-wach 0). Dafür gibt es jetzt die Knöpfe „WECKEN" und „MESSEN WACH" im Labor —
-auf dem iPad gibt es keine Tastatur, und ohne Knöpfe käme vom Gerät nur der
-Fall zurück, der nichts kostet.
+### Ergebnis (iPad, Messläufe über je 300 Schritte)
 
-Hochgerechnet aus dem Verhältnis Gerät/Rechner (Physik 2,4-fach): 27 wache
-Teile kosten auf dem iPad etwa 1,3 ms, 67 wache etwa 3,4 ms. Mit Zeichnen und
-Spinne wären das rund 5,5 ms — immer noch ein Drittel des Budgets. Zu
-bestätigen ist das am Gerät.
+Die laufende Anzeige taugt auf dem Gerät nur zum Überblick: Safari rundet die
+Stoppuhr auf ganze Millisekunden, Einzelwerte je Bild sind dadurch grob. Die
+Messläufe mitteln über 300 Schritte und sind die belastbare Zahl.
+
+| Lage | Spinne + Greifzone | Physik | Summe je Schritt |
+|---|---|---|---|
+| 67 Teile, alle schlafend | 0,09 ms | 0,09 ms | **0,18 ms** |
+| 27 Teile, alle wach | 0,06 ms | 0,31 ms | **0,37 ms** |
+
+Zum Vergleich derselbe Fall auf dem Rechner (27 wach): 0,26 + 0,55 = 0,81 ms.
+Das iPad ist hier also nicht langsamer, sondern schneller — Apple-Silizium
+rechnet die Physik zügig, und der Rechnerwert stammt aus einem Browserfenster
+mit Softwarezeichnung.
+
+Hochgerechnet auf 67 wache Teile (Physik wächst annähernd linear mit der Zahl
+wacher Körper): rund 0,77 ms Physik, macht mit der Spinne knapp **0,9 ms je
+Schritt**. Das Budget für 60 fps sind 16,7 ms.
 
 ### Was daraus folgt
 
@@ -88,11 +98,18 @@ bestätigen ist das am Gerät.
 2. **Der Haufen ist es.** Die Physik wächst mit der Zahl wacher Teile:
    0,15 ms bei null, 0,55 ms bei 27, 1,41 ms bei 67. Das ist ungefähr linear,
    rund **0,02 ms je wachem Teil**.
-3. Für die Fokus-Zone (1.3) heißt das: Sie muss beim **Haufen** ansetzen —
-   weiter weg vereinfachen und schlafen legen —, nicht bei der Spinne. Die
-   Spinne darf im Gegenteil teurer werden, wenn der Greifmoment dadurch
-   besser wird; das ist genau das Budget, das der Auftrag ihr einräumt.
-4. Auf dem Rechner sind 1,70 ms bei 67 wachen Teilen weit unter dem Budget
-   von 16,7 ms für 60 fps. **Die Zahl, die zählt, kommt vom iPad** — dort
-   erwarte ich grob das Drei- bis Fünffache. Das ist der nächste Schritt
-   (1.7).
+3. **Die Fokus-Zone aus 1.3 wird nicht gebraucht — jedenfalls nicht, um zu
+   sparen.** Sie sollte Rechenzeit einsparen, indem weiter entfernte Teile
+   vereinfacht werden. Auf dem Gerät kostet die gesamte Physik mit 27 wachen
+   Teilen 0,31 ms und hochgerechnet mit 67 wachen 0,77 ms; zu sparen ist da
+   nichts, was sich lohnt. Vorschlag: Die Zone kommt trotzdem, aber andersherum
+   — als **Qualitätszone**. Näher an der Spinne feinere Kollisionsformen und
+   mehr Rechenschritte, weil das Budget dafür da ist.
+4. Der teuerste Posten ist das **Zeichnen** (1,7 bis 2,0 ms, 68 bis 71 Prozent
+   des Bildes), und es wächst mit der Teilezahl: 254 Zeichenrufe bei 27
+   Teilen, 294 bei 67 — also grob ein Zeichenruf je Teil. Wer Luft schaffen
+   will, schafft sie dort, nicht in der Physik.
+5. Gemessenes Fazit für den Auftrag: **Bei 60 fps auf dem iPad sind rund
+   16 Prozent des Bildbudgets belegt.** Für den Greifmoment ist reichlich
+   Platz — die Spinne dürfte das Zehnfache ihrer heutigen Rechenzeit kosten,
+   ohne dass die Bildrate darunter litte.
