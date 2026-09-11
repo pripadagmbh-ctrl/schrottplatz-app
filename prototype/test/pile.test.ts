@@ -152,14 +152,14 @@ function tiefsterKoerper(world: RAPIER.World): number {
 describe("Geschwindigkeitsgrenzen", () => {
   it("hält schwere Teile quer langsamer als leichte", () => {
     expect(maxSpeedFor(20)).toBeGreaterThan(maxSpeedFor(500));
-    expect(maxSpeedFor(2000)).toBeGreaterThanOrEqual(4);
+    expect(maxSpeedFor(2000)).toBeGreaterThanOrEqual(3.5);
   });
 
   it("lässt auch schweren Schrott noch geworfen werden", () => {
     // Die Spinnenspitze kommt bei 45°/s und 8 m auf gut 6 m/s. Ein Wurf muss
     // als Wurf erkennbar bleiben, sonst fällt alles senkrecht herunter.
-    expect(maxSpeedFor(200)).toBeGreaterThanOrEqual(4);
-    expect(maxSpeedFor(20)).toBeGreaterThanOrEqual(10);
+    expect(maxSpeedFor(200)).toBeGreaterThanOrEqual(3.5);
+    expect(maxSpeedFor(20)).toBeGreaterThanOrEqual(7);
   });
 
   it("deckelt nach unten erst weit jenseits des freien Falls", () => {

@@ -128,6 +128,8 @@ export function anlaufZeit(lastKg: number): number {
 
 /** Ab diesem Schliessgrad treffen sich die Krallenspitzen. */
 const SCHNAPP_AB = 0.93;
+/** Bis hierher gilt eine Kralle als am Teil anliegend (m) */
+const KONTAKT_NAH = 0.14;
 /** So tief duerfen die Spitzen in Material beissen, bevor der Arm anhaelt (m) */
 const EINDRING_OK = 0.05;
 /** Wie weit die Schalen beim Anschlag zurueckfedern (rad) */
@@ -2024,6 +2026,46 @@ export class Excavator {
     const t = THREE.MathUtils.clamp((CLAW_RING_Y - p.y) / Math.max(CLAW_RING_Y - tipY, 0.01), 0, 1);
     const r = THREE.MathUtils.lerp(CLAW_RING_R, tipR, t) + 0.14;
     return Math.hypot(p.x, p.z) <= r;
+  }
+
+  /**
+   * Wie viele Krallen beruehren diesen Koerper gerade?
+   *
+   * Der Korbtest oben fragt nur, ob der naechstgelegene Oberflaechenpunkt im
+   * Schalenraum liegt. Eine Kiste, die mit einer Ecke hineinragt, besteht ihn —
+   * und hing dann sichtbar halb neben der Spinne in der Luft (Befund
+   * 11.09.2026: "Teile werden mit hochgehoben, obwohl sie gar nicht richtig in
+   * der Spinne liegen"). Wer wirklich gefasst ist, hat mehrere Schalen an sich.
+   *
+   * Geprueft werden Spitze und Mitte jeder Kralle gegen die Oberflaeche.
+   */
+  krallenKontakte(body: RAPIER.RigidBody): number {
+    const col = body.collider(0);
+    if (!col) return 0;
+    this.grappleGroup.updateWorldMatrix(true, false);
+    let treffer = 0;
+    for (let c = 0; c < CLAW_COUNT; c++) {
+      const a = (c / CLAW_COUNT) * Math.PI * 2;
+      const splay = this.clawSplayIst[c] ?? this.currentSplay();
+      let nah = false;
+      for (const seg of [CLAW_SEGMENTS, Math.round(CLAW_SEGMENTS * 0.6)]) {
+        clawPoint(a, splay, seg, this.clawA);
+        this.clawA.applyMatrix4(this.grappleGroup.matrixWorld);
+        const pr = col.projectPoint({ x: this.clawA.x, y: this.clawA.y, z: this.clawA.z }, false);
+        if (!pr) continue;
+        const d = Math.hypot(
+          pr.point.x - this.clawA.x,
+          pr.point.y - this.clawA.y,
+          pr.point.z - this.clawA.z
+        );
+        if (pr.isInside || d <= KONTAKT_NAH) {
+          nah = true;
+          break;
+        }
+      }
+      if (nah) treffer++;
+    }
+    return treffer;
   }
 
   /** Zielpunkt für die Kamera (Oberwagen). */

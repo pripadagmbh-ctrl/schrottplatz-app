@@ -6,6 +6,13 @@
  */
 import { Music } from "./music";
 
+/**
+ * Obere Grenzfrequenz der Geraeusche (Hz). Darueber klingt es nach Werkstatt
+ * mit Fliesen, nicht nach Schrottplatz — und auf kleinen Lautsprechern nur
+ * noch schrill.
+ */
+const SFX_TIEFPASS_HZ = 1800;
+
 export class AudioManager {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
@@ -17,6 +24,8 @@ export class AudioManager {
   private hydraulicGain: GainNode | null = null;
   private hydOsc: OscillatorNode | null = null;
   private scrapeGain: GainNode | null = null;
+  /** Sammelweg aller Geraeusche — gefiltert, damit es dumpf bleibt */
+  private sfx: GainNode | null = null;
 
   constructor() {
     const start = () => this.ensureStarted();
@@ -65,6 +74,30 @@ export class AudioManager {
       this.master.gain.value = 0.5;
       this.master.connect(this.ctx.destination);
 
+      /*
+       * Eigener Weg fuer die Geraeusche, mit Tiefpass davor (Wunsch
+       * 11.09.2026: "Ton dumpfer").
+       *
+       * Ein Schrottplatz klingt nicht hell. Stahl auf Beton ist ein dumpfer
+       * Schlag mit kurzem Nachklang, kein Glockenton — und auf einem kleinen
+       * Tablet-Lautsprecher wirkt Hoehe ohnehin nur schrill. Die Musik laeuft
+       * absichtlich daran vorbei: Sie soll klar bleiben.
+       */
+      this.sfx = this.ctx.createGain();
+      this.sfx.gain.value = 1;
+      const dumpf = this.ctx.createBiquadFilter();
+      dumpf.type = "lowpass";
+      dumpf.frequency.value = SFX_TIEFPASS_HZ;
+      dumpf.Q.value = 0.6;
+      // Leichte Anhebung im Bauchbereich, damit der Schlag Koerper behaelt,
+      // wenn die Hoehen weg sind
+      const bauch = this.ctx.createBiquadFilter();
+      bauch.type = "peaking";
+      bauch.frequency.value = 180;
+      bauch.Q.value = 0.9;
+      bauch.gain.value = 4;
+      this.sfx.connect(bauch).connect(dumpf).connect(this.master);
+
       // Hintergrundmusik, zur Laufzeit erzeugt — keine fremden Aufnahmen
       this.music = new Music(this.ctx, this.master);
       if (this.musicWanted) this.music.start();
@@ -78,7 +111,7 @@ export class AudioManager {
       engineFilter.frequency.value = 220;
       this.engineGain = this.ctx.createGain();
       this.engineGain.gain.value = 0.05;
-      this.engineOsc.connect(engineFilter).connect(this.engineGain).connect(this.master);
+      this.engineOsc.connect(engineFilter).connect(this.engineGain).connect(this.sfx);
       this.engineOsc.start();
 
       // Hydraulik: kein Zischen mehr, sondern ein dezenter Pumpenton, der beim
@@ -91,7 +124,7 @@ export class AudioManager {
       hydFilter.frequency.value = 520;
       this.hydraulicGain = this.ctx.createGain();
       this.hydraulicGain.gain.value = 0;
-      this.hydOsc.connect(hydFilter).connect(this.hydraulicGain).connect(this.master);
+      this.hydOsc.connect(hydFilter).connect(this.hydraulicGain).connect(this.sfx);
       this.hydOsc.start();
       // leichtes Pulsieren der Pumpe
       const lfo = this.ctx.createOscillator();
@@ -101,17 +134,22 @@ export class AudioManager {
       lfo.connect(lfoGain).connect(this.hydOsc.frequency);
       lfo.start();
 
-      // Kratzen auf Beton: helleres, raueres Rauschband — Gain folgt der Kontakt-Intensität
+      /*
+       * Kratzen auf Beton. Vorher ein helles Rauschband bei 2600 Hz — das
+       * klang nach Sandpapier auf Holz, nicht nach Stahlzacken auf Beton
+       * (Befund 11.09.2026). Stahl auf Beton ist tief und koernig: ein
+       * Rumpeln mit etwas Griff darueber, nicht ein Zischen.
+       */
       const scrapeNoise = this.ctx.createBufferSource();
       scrapeNoise.buffer = this.noiseBuffer();
       scrapeNoise.loop = true;
       const scrapeFilter = this.ctx.createBiquadFilter();
       scrapeFilter.type = "bandpass";
-      scrapeFilter.frequency.value = 2600;
-      scrapeFilter.Q.value = 1.2;
+      scrapeFilter.frequency.value = 760;
+      scrapeFilter.Q.value = 0.8;
       this.scrapeGain = this.ctx.createGain();
       this.scrapeGain.gain.value = 0;
-      scrapeNoise.connect(scrapeFilter).connect(this.scrapeGain).connect(this.master);
+      scrapeNoise.connect(scrapeFilter).connect(this.scrapeGain).connect(this.sfx);
       scrapeNoise.start();
     } catch {
       this.ctx = null; // Audio bleibt aus, Spiel läuft weiter
@@ -148,17 +186,44 @@ export class AudioManager {
    */
   playClawSnap(haerte = 1): void {
     const h = Math.max(0.15, Math.min(haerte, 1));
-    this.metalHit([620, 940, 1380, 1970], [0.34 * h, 0.26 * h, 0.18 * h, 0.12 * h], 0.1 + 0.12 * h, {
-      transient: 1500,
-      transientGain: 0.3 * h,
+    this.metalHit([330, 505, 742, 1058], [0.36 * h, 0.27 * h, 0.19 * h, 0.12 * h], 0.12 + 0.14 * h, {
+      transient: 434,
+      transientGain: 0.34 * h,
       spread: 0.012,
     });
   }
 
-  playGrab(): void {
-    // sattes Zupacken: kurzer Rauschimpuls + tiefer Thump
-    this.burst([70], 0.18, 0.35, "triangle");
-    this.noiseBurst(500, 0.08, 0.25);
+  /**
+   * Zupacken. Der Klang gefaellt und bleibt deshalb, wie er ist — nur bekommt
+   * er jetzt je nach Material eine eigene Faerbung (Wunsch 11.09.2026):
+   * Stahl sattt und tief, Blech und Alu heller und kuerzer, Kabel und
+   * Nichtmetalle dumpf ohne Nachklang.
+   */
+  playGrab(materialId = "steel"): void {
+    switch (materialId) {
+      case "alu":
+      case "va":
+        this.burst([96], 0.15, 0.3, "triangle");
+        this.noiseBurst(620, 0.07, 0.22);
+        break;
+      case "copper":
+        this.burst([84], 0.17, 0.32, "triangle");
+        this.noiseBurst(430, 0.08, 0.2);
+        break;
+      case "cable":
+      case "wood":
+      case "plastic":
+      case "tires":
+      case "rubble":
+        // kein Metall: nur der dumpfe Griff, kein Klang danach
+        this.burst([58], 0.2, 0.3, "sine");
+        this.noiseBurst(260, 0.1, 0.2);
+        break;
+      default:
+        // Stahl, Mischschrott, Ballen: satt und tief
+        this.burst([70], 0.18, 0.35, "triangle");
+        this.noiseBurst(420, 0.08, 0.25);
+    }
   }
 
   /**
@@ -171,40 +236,40 @@ export class AudioManager {
     switch (materialId) {
       case "steel":
         // schwerer Stahl: tiefer Anschlag, langes metallisches Nachklingen
-        this.metalHit([214, 331, 487, 712, 1043], [0.9, 0.7, 0.5, 0.34, 0.22], 0.26, {
-          transient: 1600,
+        this.metalHit([132, 205, 301, 441, 646], [1.0, 0.78, 0.55, 0.36, 0.24], 0.3, {
+          transient: 992,
           transientGain: 0.3,
           spread: 0.05,
         });
         break;
       case "va":
         // Edelstahl: heller und klarer, klingt am längsten nach
-        this.metalHit([392, 611, 913, 1327, 1904], [1.25, 0.95, 0.7, 0.45, 0.3], 0.2, {
-          transient: 3400,
+        this.metalHit([243, 379, 566, 823, 1180], [1.3, 1.0, 0.72, 0.46, 0.3], 0.24, {
+          transient: 1400,
           transientGain: 0.2,
           spread: 0.03,
         });
         break;
       case "alu":
         // Aluminium: leicht, hell, kurzer Nachhall
-        this.metalHit([523, 807, 1188, 1673], [0.5, 0.36, 0.24, 0.16], 0.19, {
-          transient: 4200,
+        this.metalHit([324, 500, 736, 1037], [0.55, 0.38, 0.25, 0.17], 0.22, {
+          transient: 1400,
           transientGain: 0.22,
           spread: 0.04,
         });
         break;
       case "copper":
         // Kupfer/Messing: weicher, dunkler Klang mit tragendem Sustain
-        this.metalHit([297, 449, 668, 951], [1.0, 0.8, 0.55, 0.35], 0.22, {
-          transient: 1100,
+        this.metalHit([184, 278, 414, 590], [1.05, 0.82, 0.56, 0.36], 0.26, {
+          transient: 682,
           transientGain: 0.18,
           spread: 0.06,
         });
         break;
       case "cable":
         // Kabelbund: fast tonlos, dumpfes Poltern mit Raschelanteil
-        this.metalHit([132, 189], [0.24, 0.18], 0.2, {
-          transient: 900,
+        this.metalHit([88, 126], [0.26, 0.2], 0.24, {
+          transient: 558,
           transientGain: 0.3,
           spread: 0.09,
         });
@@ -212,8 +277,8 @@ export class AudioManager {
         break;
       default:
         // Störstoff (Holz, Beton, Kunststoff): Schlag ohne metallisches Klingen
-        this.metalHit([96, 143], [0.14, 0.1], 0.3, {
-          transient: 420,
+        this.metalHit([72, 104], [0.16, 0.12], 0.34, {
+          transient: 260,
           transientGain: 0.26,
           spread: 0.02,
         });
@@ -247,7 +312,7 @@ export class AudioManager {
       g.gain.setValueAtTime(0.0001, t);
       g.gain.exponentialRampToValueAtTime(amp, t + 0.006); // harter Anschlag
       g.gain.exponentialRampToValueAtTime(0.0001, t + decays[i]);
-      osc.connect(g).connect(this.master!);
+      osc.connect(g).connect(this.sfx!);
       osc.start(t);
       osc.stop(t + decays[i] + 0.05);
     });
@@ -264,7 +329,7 @@ export class AudioManager {
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(0.22, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
-    osc.connect(g).connect(this.master);
+    osc.connect(g).connect(this.sfx!);
     osc.start(t);
     osc.stop(t + 0.55);
     this.noiseBurst(1800, 0.35, 0.3);
@@ -326,7 +391,7 @@ export class AudioManager {
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(gain, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    osc.connect(g).connect(this.master);
+    osc.connect(g).connect(this.sfx!);
     osc.start(t);
     osc.stop(t + dur + 0.05);
   }
@@ -341,7 +406,7 @@ export class AudioManager {
       const g = this.ctx.createGain();
       g.gain.setValueAtTime(gain / freqs.length, t);
       g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-      osc.connect(g).connect(this.master);
+      osc.connect(g).connect(this.sfx!);
       osc.start(t);
       osc.stop(t + dur + 0.05);
     }
@@ -358,7 +423,7 @@ export class AudioManager {
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(gain, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    src.connect(filter).connect(g).connect(this.master);
+    src.connect(filter).connect(g).connect(this.sfx!);
     src.start(t);
     src.stop(t + dur + 0.05);
   }

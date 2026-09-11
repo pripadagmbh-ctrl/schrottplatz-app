@@ -90,8 +90,25 @@ function cableCoilGeometry(r: number, tube: number): THREE.BufferGeometry {
 const NICHTMETALLE = new Set(["wood", "tires", "rubble", "plastic"]);
 
 export function maxSpeedFor(massKg: number): number {
-  return Math.min(12, Math.max(4, 60 / Math.sqrt(Math.max(massKg, 1))));
+  return Math.min(8, Math.max(3.5, 45 / Math.sqrt(Math.max(massKg, 1))));
 }
+
+/**
+ * Wie viel Tempo ein Teil in EINEM Schritt dazugewinnen darf (m/s).
+ *
+ * Das ist die eigentliche Bremse gegen wegspringende Teile (Befund
+ * 11.09.2026). Die Spinne ist kinematisch: Klemmt ein Stueck zwischen zwei
+ * Schalen, loest der Loeser die Ueberlappung mit einem einzigen, sehr grossen
+ * Stoss auf — das Teil schiesst weg wie ein Kern aus der Seife. Eine
+ * Hoechstgeschwindigkeit faengt das schlecht ab: Sie muesste so niedrig sein,
+ * dass auch Fallen und Werfen darunter leiden (genau das war bis heute Morgen
+ * der Fall).
+ *
+ * Eine Grenze fuer den ZUWACHS trifft dagegen nur den Stoss. Die Schwerkraft
+ * gibt je Schritt 0,16 m/s dazu und bleibt unberuehrt; ein Wurf behaelt seinen
+ * Schwung, weil er beim Loslassen gesetzt und nicht gewonnen wird.
+ */
+const MAX_ZUWACHS = 0.6;
 
 /**
  * Deckelung nach unten — nur als Netz gegen Rechenausreisser. Aus 5 m freiem
@@ -934,9 +951,21 @@ export class ItemManager {
    * Geschwindigkeiten deckeln. Vorher flogen Teile beim Aufprall der Spinne
    * weit durch die Gegend — schwerer Schrott springt nicht, er rutscht.
    */
+  private tempoVorher = new Map<number, number>();
+  /**
+   * Messschalter: Mit `true` gilt die Zuwachsgrenze nicht mehr. Nur fuer den
+   * Vorher-Nachher-Vergleich im Labor; im Spiel bleibt sie an.
+   */
+  zuwachsGrenzeAus = false;
+
   clampSpeeds(): void {
     for (const item of this.items) {
-      if (!item.body.isDynamic()) continue;
+      if (!item.body.isDynamic()) {
+        // Getragene Teile sind kinematisch. Beim Loslassen sollen sie ihren
+        // Schwung behalten, also faengt die Zuwachsregel bei ihnen neu an.
+        this.tempoVorher.delete(item.body.handle);
+        continue;
+      }
       // Trägheit nach Masse: Die Spinne ist ein kinematischer Körper und
       // überträgt beim Anschlagen praktisch beliebig viel Schwung — ohne
       // Grenze fliegt ein Motorblock so weit wie ein Blech. Ein schwerer
@@ -945,6 +974,33 @@ export class ItemManager {
       const maxLinear = maxSpeedFor(item.massKg);
       const maxAngular = maxLinear * 1.4;
       const v = item.body.linvel();
+      // Zuwachs deckeln: nur was in diesem Schritt dazukommt, nicht der Stand.
+      // Frisch losgelassene Teile stehen noch nicht in der Liste — ihr Schwung
+      // ist gewollt und geht ungebremst durch.
+      const handle = item.body.handle;
+      /*
+       * Nur QUER deckeln, nie senkrecht.
+       *
+       * Die erste Fassung bremste den Zuwachs in alle Richtungen — und
+       * verhinderte damit genau das, was ein steckengebliebenes Teil rettet:
+       * Der Loeser drueckt es mit einem kraeftigen Stoss nach oben aus dem
+       * Boden heraus. Gebremst sank es stattdessen weiter ein (Befund
+       * 11.09.2026: "Objekte verschwinden im Boden").
+       *
+       * Weggeschleudert wird ohnehin quer, nicht nach oben — die Bremse trifft
+       * also weiterhin den Fall, um den es geht.
+       */
+      const quer0 = Math.hypot(v.x, v.z);
+      const vorher = this.tempoVorher.get(handle);
+      if (
+        !this.zuwachsGrenzeAus &&
+        vorher !== undefined &&
+        quer0 > vorher + MAX_ZUWACHS &&
+        quer0 > 1e-4
+      ) {
+        const f = (vorher + MAX_ZUWACHS) / quer0;
+        item.body.setLinvel({ x: v.x * f, y: v.y, z: v.z * f }, true);
+      }
       // Quer und nach oben wird gedeckelt, nach unten nicht: Fallen ist
       // Schwerkraft und keine Uebertragung aus der Spinne.
       const quer = Math.hypot(v.x, v.z);
@@ -959,6 +1015,8 @@ export class ItemManager {
         const f = maxAngular / a;
         item.body.setAngvel({ x: w.x * f, y: w.y * f, z: w.z * f }, true);
       }
+      const jetzt = item.body.linvel();
+      this.tempoVorher.set(handle, Math.hypot(jetzt.x, jetzt.z));
       // Ausreißer einsammeln: Material geht nie verloren, es landet auf der
       // Annahmefläche. Die Grenzen liegen weit außerhalb der LKW-Route.
       const p = item.body.translation();

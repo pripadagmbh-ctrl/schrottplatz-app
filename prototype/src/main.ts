@@ -395,7 +395,9 @@ async function main(): Promise<void> {
 
   // --- Event-Verdrahtung (Kap. 17: Querverbindungen nur über Events) ---
   grip.onGrabbed = (bodies) => {
-    audio.playGrab();
+    // Klang nach dem, was tatsaechlich in der Schale liegt
+    const erstes = bodies.length > 0 ? items.itemByBody(bodies[0]) : null;
+    audio.playGrab(erstes?.materialId);
     for (const b of bodies) fence.notifyGrabbed(b); // verankertes Zaunfeld? → losreißen
   };
   grip.onTear = () => audio.playTear();
@@ -406,6 +408,7 @@ async function main(): Promise<void> {
   // Achsbewegung. Wer die Spinne am Motor verdreht, bekommt ihn schneller los.
   grip.getViolence = () => excavator.tearViolence;
   grip.insideGrapple = (pos) => excavator.isInsideGrapple(pos);
+  grip.krallenKontakte = (body) => excavator.krallenKontakte(body);
   // Nach dem Loslassen bleiben die Krallen-Kollider kurz aus, sonst quetschen
   // sie das eben abgeworfene Teil gegen den Boden.
   grip.onReleaseGrace = () => excavator.startClawGrace();

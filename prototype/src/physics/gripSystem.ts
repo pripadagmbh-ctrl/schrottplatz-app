@@ -35,6 +35,8 @@ const CRUSH_TIME = 1.1;
 const RELEASE_AVG_STEPS = 3;
 /** Zusaetzlicher Abwaertsimpuls beim Loslassen (m/s) */
 const RELEASE_DOWN = 0.2;
+/** So viele Schalen muessen anliegen, wenn das Teil nicht mittig im Korb sitzt */
+const MIN_KRALLEN = 2;
 
 /**
  * Eine Greifstelle: welcher Koerper, wo die Schale ihn fasst und mit welcher
@@ -83,6 +85,12 @@ export class GripSystem {
    * würde alles im Sensorradius angehoben, auch was neben dem Greifer liegt.
    */
   insideGrapple: ((worldPos: THREE.Vector3) => boolean) | null = null;
+  /**
+   * Wie viele Schalen liegen an diesem Koerper an? Gefasst wird nur, was
+   * wirklich in der Spinne liegt — entweder mit mehreren Schalen daran oder
+   * mit dem Schwerpunkt mitten im Korb (Auftrag 11.09.2026, Phase 1.4).
+   */
+  krallenKontakte: ((body: RAPIER.RigidBody) => number) | null = null;
   private probe = new THREE.Vector3();
   /** Letzte Weltpositionen der Spinne — daraus die Loslass-Geschwindigkeit */
   private spinneSpur: THREE.Vector3[] = [];
@@ -229,6 +237,18 @@ export class GripSystem {
             if (!proj) return true;
             this.probe.set(proj.point.x, proj.point.y, proj.point.z);
             if (!this.insideGrapple(this.probe)) return true;
+          }
+          /*
+           * Kontaktbedingung: Eine Kiste, die mit einer Ecke in den Korb
+           * ragt, bestand die Pruefung oben — und hing dann halb neben der
+           * Spinne in der Luft. Jetzt braucht es entweder zwei anliegende
+           * Schalen oder den Schwerpunkt mitten im Korb.
+           */
+          if (this.krallenKontakte) {
+            const mitte = body.translation();
+            const mittig =
+              this.insideGrapple?.(this.probe.set(mitte.x, mitte.y, mitte.z)) ?? false;
+            if (!mittig && this.krallenKontakte(body) < MIN_KRALLEN) return true;
           }
           candidates.push(body);
         }

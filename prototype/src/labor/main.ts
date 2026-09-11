@@ -152,6 +152,8 @@ async function main(): Promise<void> {
   const grip = new GripSystem(world, excavator.grappleBody);
   const audio = new AudioManager();
   grip.partResolver = (pos) => composites.findPartNear(pos);
+  grip.insideGrapple = (pos) => excavator.isInsideGrapple(pos);
+  grip.krallenKontakte = (body) => excavator.krallenKontakte(body);
   grip.getViolence = () => excavator.tearViolence;
   grip.onGrabbed = () => audio.playGrab();
   grip.onTear = () => audio.playTear();
