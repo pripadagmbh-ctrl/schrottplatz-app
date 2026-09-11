@@ -49,8 +49,23 @@ export const HALL2_Z = HALL1_Z - HALLE_B;
 /** Front des Komplexes (Ostseite) — davor ist freie Fläche. */
 export const OFFICE_FRONT_X = WAND_X + TIEFE;
 
-/** Janines Klapptisch steht vor der Bürotür, unter dem Vordach. */
-export const KAFFEE_POS = new THREE.Vector3(OFFICE_FRONT_X + 1.6, 0, OFFICE_Z + 1.4);
+/**
+ * Die Bürotür an der Ostfront. Mario sitzt drinnen und kommt hier heraus,
+ * wenn ein LKW auf die Waage fährt.
+ */
+export const BUERO_TUER = new THREE.Vector3(
+  OFFICE_FRONT_X + 0.9,
+  0,
+  OFFICE_Z + BUERO_B / 2 - 1.2
+);
+
+/**
+ * Janines Kaffeewagen steht vorn auf dem Hof, rechts neben den Hallen (also
+ * am nördlichen Ende der Front) — zwischen Gebäudefront und Waage, wo die
+ * Fahrer ohnehin vorbeikommen (Wunsch 11.09.2026). Marios Weg von der Tür
+ * zur Waage führt nördlich daran vorbei.
+ */
+export const KAFFEE_POS = new THREE.Vector3(OFFICE_FRONT_X + 3.1, 0, OFFICE_Z - 3.5);
 
 /**
  * Grundflächen für die Hindernisprüfung: [x, z, halbeBreite, halbeTiefe].

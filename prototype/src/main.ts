@@ -27,7 +27,7 @@ import { haggle, leavesOnRefusal, hint, OFFER_FACTOR, OFFER_LABEL, type Offer } 
 import { LaneWatch } from "./delivery/laneWatch";
 import { Daylight, Floodlights } from "./world/daylight";
 import { hitsObstacle } from "./world/obstacles";
-import { OfficeBuilding, KAFFEE_POS } from "./world/office";
+import { OfficeBuilding, KAFFEE_POS, BUERO_TUER } from "./world/office";
 import { Signage } from "./world/signage";
 import {
   type AxisId,
@@ -155,8 +155,11 @@ async function main(): Promise<void> {
     scene,
     items,
     new THREE.Vector3(WEIGH_X, 0, WEIGH_Z),
-    KAFFEE_POS
+    KAFFEE_POS,
+    BUERO_TUER
   );
+  // Mario kommt aus dem Buero, sobald ein LKW zur Kontrolle auf der Waage steht
+  staff.getWeighTruck = () => vehicles.wiegeKontrolle();
   staff.getExcavatorPos = () => excavator.position;
   const carPos: THREE.Vector3[] = [];
   staff.getObstaclePositions = () => {
@@ -477,6 +480,17 @@ async function main(): Promise<void> {
   // --- Platz ausbauen: verdientes Geld bekommt eine Verwendung ---
   const ausbau = new UpgradeState();
   ausbau.load(save?.upgrades);
+  /*
+   * Testmodus (11.09.2026): Alles ist von Anfang an da — Radlader, Bulldozer,
+   * Stapler, Magnet, Baggerausbau, grosse Presse, Buero und Halle. Gespielt
+   * wird gerade nicht die Wirtschaft, sondern die Maschinen; was man erst
+   * kaufen muss, kann man nicht pruefen.
+   *
+   * Stufen, Level und Freischaltungen kommen zurueck, sobald sie dran sind:
+   * Dann hier auf false stellen — die Kaufwege selbst sind unveraendert.
+   */
+  const ALLES_FREI = true;
+  if (ALLES_FREI) for (const u of UPGRADES) ausbau.buy(u.id);
   // Betriebsgebäude: Büro und Halle stehen von Anfang an; sein Grundriss
   // liegt fest in der Hindernisliste (world/obstacles.ts).
   new OfficeBuilding(scene, physics.world);

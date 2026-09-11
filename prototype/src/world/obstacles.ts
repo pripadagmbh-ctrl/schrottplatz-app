@@ -1,5 +1,5 @@
 import { YARD_W, YARD_D, YARD_MIN_X, YARD_MAX_X, YARD_CX, GATE_X } from "./yard";
-import { officeFootprints } from "./office";
+import { officeFootprints, KAFFEE_POS } from "./office";
 import { CONFIGS, type ContainerConfig } from "./containers";
 
 /**
@@ -108,6 +108,10 @@ export const STATIC_OBSTACLES: Obstacle[] = [
   // --- Betriebsgebäude: Büro und Halle, hinten rechts an der Wand ---
   // Der Grundriss kommt aus office.ts, damit Bau, Kollider und Hindernis
   // nicht auseinanderlaufen.
+  // Janines Kaffeewagen steht auf dem Vorplatz — ein Anhaenger ist ein
+  // Hindernis wie jedes andere.
+  { x: KAFFEE_POS.x, z: KAFFEE_POS.z, hw: 1.3, hd: 2.3, top: 2.6, label: "Kaffeewagen" },
+
   ...officeFootprints().map(([x, z, hw, hd]) => ({
     x,
     z,

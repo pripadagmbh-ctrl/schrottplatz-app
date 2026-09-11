@@ -3,6 +3,9 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import { randomCargo, type ItemManager, type ScrapItem } from "../world/scrapItems";
 import type { CompositeManager, CarComposite } from "../dismantle/composites";
 import { WEIGH_Z } from "../world/yard";
+
+/** So lange haelt ein beladener Abholer auf der Waage fuer Marios Kontrolle. */
+const WIEGE_HALT_S = 6;
 import { hitsObstacle } from "../world/obstacles";
 import { rollCustomer, vehicleForCustomer, type CustomerProfile } from "./customers";
 import { buildVehicleModel } from "./vehicleModel";
@@ -122,6 +125,8 @@ class DeliveryVehicle {
   /** Bruttogewicht der Anlieferung (Wiegung bei der Einfahrt) */
   bruttoKg = 0;
   private weighedOut = false;
+  /** Restzeit des Kontrollhalts auf der Waage (nur Abholer) */
+  private wiegeHaltS = 0;
   /** true, sobald der Abhol-LKW abfahrbereit ist (Spieler drückt V) */
   private releaseRequested = false;
   private justDeparted = false;
@@ -723,6 +728,12 @@ class DeliveryVehicle {
     return this.probeVec;
   }
 
+  /** Steht es gerade zur Kontrolle auf der Waage? (siehe VehicleManager) */
+  get aufDerWaage(): boolean {
+    if (this.phase === "weighIn") return true;
+    return this.isPickup && this.wiegeHaltS > 0;
+  }
+
   /** Fahrschritt mit Blockade-Prüfung; liefert true, wenn tatsächlich gefahren wurde. */
   private advance(route: Array<[number, number]>, step: number, reverse: boolean, dt: number): boolean {
     // Bauten zuerst und ohne Ausnahme: Die Aufgeben-Regel unten ist fuer losen
@@ -919,12 +930,22 @@ class DeliveryVehicle {
         break;
       case "out":
         this.sideOpenTarget = 0; // Bordwände zu, bevor es vom Platz geht
+        // Abholer halten auf der Waage, solange Mario die Ladung ansieht
+        if (this.wiegeHaltS > 0) {
+          this.wiegeHaltS -= dt;
+          break;
+        }
         this.advance(this.routeOut, SPEED * dt, false, dt);
-        // Ausfahrtswiegung: leer über die Brückenwaage → Netto steht fest
-        if (!this.isPickup && !this.weighedOut && this.group.position.z >= WEIGH_Z) {
+        if (!this.weighedOut && this.group.position.z >= WEIGH_Z) {
           this.weighedOut = true;
-          const tara = this.cargoMassKg();
-          this.onWeighOut?.(Math.max(this.bruttoKg - tara, 0));
+          if (this.isPickup) {
+            // Voll vom Hof: kurz stehen bleiben, damit die Ladung geprüft wird
+            this.wiegeHaltS = WIEGE_HALT_S;
+          } else {
+            // Ausfahrtswiegung: leer über die Brückenwaage → Netto steht fest
+            const tara = this.cargoMassKg();
+            this.onWeighOut?.(Math.max(this.bruttoKg - tara, 0));
+          }
         }
         if (this.routeS >= this.routeLength(this.routeOut)) this.done = true;
         break;
@@ -1182,6 +1203,21 @@ export class VehicleManager {
     const p = this.active.phaseName;
     if (p === "reverseIn" || p === "shiftPause" || p === "pauseBeforeUnload" || p === "tipping") {
       return this.active.group.position;
+    }
+    return null;
+  }
+
+  /**
+   * Steht gerade ein Fahrzeug zur Kontrolle auf der Waage? Dann kommt Mario
+   * aus dem Büro und sieht sich die Ladung an (Wunsch 11.09.2026).
+   *
+   * Bei der Einfahrt gilt das für jeden Anlieferer. Bei der Ausfahrt nur für
+   * Abholer: Die fahren beladen vom Hof, und was rausgeht, wird geprüft. Wer
+   * leer rausfährt, hat nichts vorzuzeigen — dafür bleibt er drin.
+   */
+  wiegeKontrolle(): THREE.Vector3 | null {
+    for (const v of [this.active, ...this.parked]) {
+      if (v && v.aufDerWaage) return v.group.position;
     }
     return null;
   }

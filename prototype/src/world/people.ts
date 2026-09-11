@@ -97,10 +97,140 @@ export function buildPerson(colors: PersonColors): PersonParts {
  * Die beiden letzten gibt es nur mit Radlader — von Hand schiebt niemand
  * einen halben Motorblock ueber den Platz.
  */
+/**
+ * Janines Kaffeewagen (Wunsch 11.09.2026).
+ *
+ * Ein alter Anhänger mit runder Alu-Haube, Verkaufsklappe zur Hofseite, die
+ * als Vordach hochsteht, Theke mit Siebträgermaschine, zwei Hockern und einer
+ * Lichterkette. Auf einem Schrottplatz ist so ein Wagen der einzige Ort mit
+ * Farbe — deshalb Mintgrün und Messing statt Grau.
+ */
+function buildKaffeewagen(scene: THREE.Scene, pos: THREE.Vector3): THREE.Group {
+  const g = new THREE.Group();
+  g.position.copy(pos);
+  // Klappe und Theke zeigen nach Osten, zum Platz
+  scene.add(g);
+
+  const alu = new THREE.MeshStandardMaterial({ color: 0xd8dee0, roughness: 0.25, metalness: 0.85 });
+  const mint = new THREE.MeshStandardMaterial({ color: 0x5fbfa8, roughness: 0.5, metalness: 0.2 });
+  const messing = new THREE.MeshStandardMaterial({ color: 0xc9a227, roughness: 0.35, metalness: 0.8 });
+  const holz = new THREE.MeshStandardMaterial({ color: 0x8d6a4a, roughness: 0.85 });
+  const dunkel = new THREE.MeshStandardMaterial({ color: 0x2a2e31, roughness: 0.8 });
+
+  // Wagenkasten: unten Mintband, oben die runde Aluhaube
+  const L = 4.2; // Länge in z
+  const B = 2.1; // Breite in x
+  const kasten = new THREE.Mesh(new THREE.BoxGeometry(B, 1.05, L), mint);
+  kasten.position.set(0, 1.05, 0);
+  kasten.castShadow = true;
+  g.add(kasten);
+  const haube = new THREE.Mesh(new THREE.CylinderGeometry(B / 2, B / 2, L, 16, 1, false, 0, Math.PI), alu);
+  haube.rotation.z = Math.PI / 2;
+  haube.rotation.y = Math.PI / 2;
+  haube.position.set(0, 1.58, 0);
+  haube.castShadow = true;
+  g.add(haube);
+  // Zierstreifen auf halber Höhe
+  const streifen = new THREE.Mesh(new THREE.BoxGeometry(B + 0.04, 0.12, L + 0.04), messing);
+  streifen.position.set(0, 1.55, 0);
+  g.add(streifen);
+
+  // Verkaufsklappe zur Ostseite, hochgestellt als Vordach
+  const klappe = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.1, L - 1.2), alu);
+  klappe.position.set(B / 2 + 0.55, 2.35, 0);
+  klappe.rotation.z = -1.15;
+  klappe.castShadow = true;
+  g.add(klappe);
+  const oeffnung = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.95, L - 1.4), dunkel);
+  oeffnung.position.set(B / 2 + 0.01, 1.55, 0);
+  g.add(oeffnung);
+  // Theke: Brett vor der Öffnung
+  const theke = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.09, L - 1.4), holz);
+  theke.position.set(B / 2 + 0.28, 1.12, 0);
+  theke.castShadow = true;
+  g.add(theke);
+  // Siebträgermaschine und Mühle auf der Theke
+  const maschine = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.4, 0.6), messing);
+  maschine.position.set(B / 2 + 0.25, 1.36, -0.8);
+  g.add(maschine);
+  const muehle = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 0.42, 10), dunkel);
+  muehle.position.set(B / 2 + 0.25, 1.37, 0.1);
+  g.add(muehle);
+  for (const tz of [0.7, 0.95, 1.2]) {
+    const tasse = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.04, 0.08, 8), alu);
+    tasse.position.set(B / 2 + 0.35, 1.2, tz);
+    g.add(tasse);
+  }
+
+  // Räder und Deichsel — es ist ein Anhänger, kein Kiosk
+  for (const rz of [-0.9, 0.9]) {
+    const rad = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.18, 14), dunkel);
+    rad.rotation.z = Math.PI / 2;
+    rad.position.set(B / 2 - 0.05, 0.34, rz);
+    g.add(rad);
+    const links = rad.clone();
+    links.position.x = -B / 2 + 0.05;
+    g.add(links);
+  }
+  const stuetzen = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.5, 0.1), dunkel);
+  stuetzen.position.set(0, 0.25, -L / 2 + 0.3);
+  g.add(stuetzen);
+  const deichsel = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 1.3), dunkel);
+  deichsel.position.set(0, 0.55, L / 2 + 0.6);
+  g.add(deichsel);
+
+  // Zwei Hocker und ein Stehtisch davor
+  for (const hz of [-0.9, 0.6]) {
+    const sitz = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.07, 10), holz);
+    sitz.position.set(B / 2 + 1.5, 0.75, hz);
+    g.add(sitz);
+    const bein = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.06, 0.72, 8), messing);
+    bein.position.set(B / 2 + 1.5, 0.36, hz);
+    g.add(bein);
+  }
+
+  // Lichterkette über der Klappe
+  for (let i = 0; i < 7; i++) {
+    const birne = new THREE.Mesh(
+      new THREE.SphereGeometry(0.055, 8, 6),
+      new THREE.MeshStandardMaterial({
+        color: 0xffe2a8,
+        emissive: 0xffc25a,
+        emissiveIntensity: 0.85,
+        roughness: 0.4,
+      })
+    );
+    const t = i / 6 - 0.5;
+    birne.position.set(B / 2 + 0.95, 2.25 - Math.cos(t * 2.4) * 0.16, t * (L - 1.4));
+    g.add(birne);
+  }
+
+  // Kleine Tafel an der Wagenwand
+  const tafel = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.7, 0.5), dunkel);
+  tafel.position.set(B / 2 + 0.02, 0.9, -L / 2 + 0.5);
+  g.add(tafel);
+  return g;
+}
+
+/** Marios Gehtempo (m/s) — zuegig, er hat einen LKW warten. */
+const MARIO_TEMPO = 2.0;
+
 type LambertState = "patrol" | "guide" | "fetch" | "carry" | "shove" | "shoving";
 
 export class StaffManager {
   private lambert: PersonParts;
+  private mario!: PersonParts;
+  /** Wohin Mario zur Kontrolle geht und wohin er zurueckkehrt */
+  private readonly pruefPos = new THREE.Vector3();
+  private readonly bueroTuer = new THREE.Vector3();
+  private marioState: "innen" | "raus" | "pruefen" | "zurueck" = "innen";
+  private marioT = 0;
+  private marioPhase = 0;
+  /**
+   * Steht gerade ein Fahrzeug zur Kontrolle auf der Waage? Liefert dessen
+   * Position — von main aus der Fahrzeugverwaltung gesetzt.
+   */
+  getWeighTruck: (() => THREE.Vector3 | null) | null = null;
   private lambertState: LambertState = "patrol";
   private lambertTarget = new THREE.Vector3();
   private walkPhase = 0;
@@ -177,66 +307,51 @@ export class StaffManager {
   getObstaclePositions: (() => THREE.Vector3[]) | null = null;
 
   /**
-   * @param weighPos Mitte der Wiegeplatte — dort steht Mario
-   * @param kaffeePos Klapptisch vor dem Büro — dort steht Janine
+   * @param weighPos Mitte der Wiegeplatte — dorthin geht Mario zur Kontrolle
+   * @param kaffeePos Standplatz von Janines Kaffeewagen
+   * @param bueroTuer Tür des Betriebsgebäudes — Marios Kommen und Gehen
    */
   constructor(
     scene: THREE.Scene,
     private items: ItemManager,
     weighPos: THREE.Vector3,
-    kaffeePos: THREE.Vector3
+    kaffeePos: THREE.Vector3,
+    bueroTuer: THREE.Vector3
   ) {
     /*
-     * Mario steht neben der Wiegeplatte, nicht mehr in einem Häuschen: Die
-     * Buden auf dem Platz sind weg, gebaut wird nur noch hinten rechts
-     * (Wunsch 10.09.2026). Die Waage bleibt — er bedient sie im Stehen, mit
-     * dem Klemmbrett am Anzeigemast.
+     * Mario arbeitet im Büro und kommt nur heraus, wenn ein LKW auf der Waage
+     * steht (Wunsch 11.09.2026). Dann geht er an die Platte, sieht sich die
+     * Ladung an und verschwindet wieder. Vorher stand er den ganzen Tag im
+     * Freien neben der Waage — niemand macht das.
      */
-    const mario = buildPerson({ shirt: 0x2f5c8a, trousers: 0x2b2f33, hair: 0x39312b });
-    // 3,8 m neben der Plattenmitte: neben dem Anzeigemast und knapp
-    // ausserhalb der Spur, in der die LKW auf die Waage rollen
-    mario.group.position.set(weighPos.x + 3.8, 0, weighPos.z - 2.4);
-    mario.group.rotation.y = -Math.PI / 2; // schaut quer zur Fahrspur auf die Platte
-    scene.add(mario.group);
-    this.addNameTagToObject(mario.group, "MARIO", 0, 2.1, 0);
+    this.mario = buildPerson({ shirt: 0x2f5c8a, trousers: 0x2b2f33, hair: 0x39312b });
+    this.bueroTuer.copy(bueroTuer);
+    // Kontrollplatz: Westseite der Platte, also die Bueroseite — so laeuft er
+    // nicht durch die Spur, in der der LKW gerade steht.
+    this.pruefPos.set(weighPos.x - 3.2, 0, weighPos.z);
+    this.mario.group.position.copy(bueroTuer);
+    this.mario.group.visible = false;
+    scene.add(this.mario.group);
+    this.addNameTagToObject(this.mario.group, "MARIO", 0, 2.1, 0);
     const brett = new THREE.Mesh(
       new THREE.BoxGeometry(0.3, 0.02, 0.22),
       new THREE.MeshStandardMaterial({ color: 0xb98a4a, roughness: 0.9 })
     );
     brett.position.set(0.16, 1.05, 0.18);
     brett.rotation.z = 0.35;
-    mario.group.add(brett);
+    this.mario.group.add(brett);
 
-    // Janine mit ihrem Klapptisch vor dem Büro — die Bude ist ersatzlos weg
+    // Janine verkauft aus einem Kaffeewagen — kein Klapptisch mehr
+    buildKaffeewagen(scene, kaffeePos);
     const janine = buildPerson({ shirt: 0xe8e2d5, trousers: 0x4a3b52, hair: 0x8a5a2b });
-    janine.group.position.set(kaffeePos.x, 0, kaffeePos.z - 0.8);
+    // hinter der Theke, also auf der Wagenseite
+    janine.group.position.set(kaffeePos.x - 0.5, 0, kaffeePos.z - 0.2);
+    janine.group.rotation.y = Math.PI / 2;
+    janine.legLeft.visible = false; // steht hinter der Klappe
+    janine.legRight.visible = false;
+    janine.group.position.y = 0.55;
     scene.add(janine.group);
-    this.addNameTagToObject(janine.group, "JANINE", 0, 2.1, 0);
-    const table = new THREE.Mesh(
-      new THREE.BoxGeometry(1.6, 0.08, 0.6),
-      new THREE.MeshStandardMaterial({ color: 0x8d6a4a, roughness: 0.9 })
-    );
-    table.position.set(kaffeePos.x, 0.95, kaffeePos.z);
-    table.castShadow = true;
-    scene.add(table);
-    for (const bx of [-0.6, 0.6]) {
-      for (const bz of [-0.22, 0.22]) {
-        const bein = new THREE.Mesh(
-          new THREE.BoxGeometry(0.06, 0.9, 0.06),
-          new THREE.MeshStandardMaterial({ color: 0x5a5f64, roughness: 0.9 })
-        );
-        bein.position.set(kaffeePos.x + bx, 0.46, kaffeePos.z + bz);
-        scene.add(bein);
-      }
-    }
-    for (const tx of [-0.5, -0.1, 0.35]) {
-      const pot = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.09, 0.11, 0.26, 10),
-        new THREE.MeshStandardMaterial({ color: 0xd8d8d2, roughness: 0.4, metalness: 0.5 })
-      );
-      pot.position.set(kaffeePos.x + tx, 1.12, kaffeePos.z);
-      scene.add(pot);
-    }
+    this.addNameTagToObject(janine.group, "JANINE", 0, 1.6, 0);
 
     // Lambert Prison — Platzwart in Warnweste
     this.lambert = buildPerson({ shirt: 0xf2c018, trousers: 0x2f3a45, hair: 0x5a4632 });
@@ -374,6 +489,104 @@ export class StaffManager {
     }
 
     this.fuehreLast(g);
+    this.updateMario(dt);
+  }
+
+  /**
+   * Mario zwischen Büro und Waage.
+   *
+   *   innen    unsichtbar im Gebäude — sein Normalzustand
+   *   raus     unterwegs zur Platte, sobald dort ein LKW steht
+   *   pruefen  steht an der Ladung und sieht sie durch
+   *   zurueck  geht wieder hinein
+   *
+   * Gerufen wird er von der Fahrzeugverwaltung: bei der Einfahrtswiegung
+   * immer, bei der Ausfahrt nur für Abholer — die fahren voll vom Hof, und
+   * was rausgeht, sieht er sich an (Wunsch 11.09.2026).
+   */
+  private updateMario(dt: number): void {
+    const m = this.mario.group;
+    const lkw = this.getWeighTruck?.() ?? null;
+    this.marioT += dt;
+
+    switch (this.marioState) {
+      case "innen":
+        if (lkw) {
+          this.marioState = "raus";
+          this.marioT = 0;
+          m.visible = true;
+          m.position.copy(this.bueroTuer);
+        }
+        break;
+      case "raus":
+        if (this.geheZu(m, this.pruefPos, dt)) {
+          this.marioState = "pruefen";
+          this.marioT = 0;
+        }
+        // Laeuft der LKW weg, bevor er da ist, dreht er wieder um
+        if (!lkw && this.marioT > 1.5) {
+          this.marioState = "zurueck";
+          this.marioT = 0;
+        }
+        break;
+      case "pruefen": {
+        // Zur Ladung schauen und das Klemmbrett halten
+        const ziel = lkw ?? this.pruefPos;
+        const dx = ziel.x - m.position.x;
+        const dz = ziel.z - m.position.z;
+        if (Math.hypot(dx, dz) > 0.2) m.rotation.y = Math.atan2(dx, dz);
+        this.mario.armLeft.rotation.x = -1.15;
+        this.mario.armRight.rotation.x = -1.25;
+        // Fertig, wenn der LKW weg ist — oder nach einer halben Minute, damit
+        // er nicht draussen stehen bleibt, falls das Signal haengt
+        if (!lkw || this.marioT > 30) {
+          this.marioState = "zurueck";
+          this.marioT = 0;
+          this.mario.armLeft.rotation.x = 0;
+          this.mario.armRight.rotation.x = 0;
+        }
+        break;
+      }
+      case "zurueck":
+        // Kommt der naechste, dreht er auf dem Absatz um
+        if (lkw) {
+          this.marioState = "raus";
+          this.marioT = 0;
+          break;
+        }
+        if (this.geheZu(m, this.bueroTuer, dt)) {
+          this.marioState = "innen";
+          this.marioT = 0;
+          m.visible = false;
+        }
+        break;
+    }
+  }
+
+  /**
+   * Einen Schritt Richtung Ziel gehen. Liefert true, sobald er da ist.
+   * Bewusst ohne Ausweichlogik: Sein Weg führt über den freien Vorplatz.
+   */
+  private geheZu(m: THREE.Object3D, ziel: THREE.Vector3, dt: number): boolean {
+    const dx = ziel.x - m.position.x;
+    const dz = ziel.z - m.position.z;
+    const d = Math.hypot(dx, dz);
+    if (d < 0.3) {
+      this.mario.legLeft.rotation.x = 0;
+      this.mario.legRight.rotation.x = 0;
+      return true;
+    }
+    const schritt = Math.min(MARIO_TEMPO * dt, d);
+    m.position.x += (dx / d) * schritt;
+    m.position.z += (dz / d) * schritt;
+    m.rotation.y = Math.atan2(dx, dz);
+    this.marioPhase += dt * 7;
+    const swing = Math.sin(this.marioPhase) * 0.5;
+    this.mario.legLeft.rotation.x = swing;
+    this.mario.legRight.rotation.x = -swing;
+    this.mario.armLeft.rotation.x = -swing * 0.6;
+    this.mario.armRight.rotation.x = swing * 0.6;
+    return false;
   }
 
   /**
