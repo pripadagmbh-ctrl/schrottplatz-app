@@ -126,6 +126,9 @@ export function anlaufZeit(lastKg: number): number {
   return RAMP_TIME * (1 + LAST_ANLAUF * bisNenn);
 }
 
+/** Ab diesem Schliessgrad treffen sich die Krallenspitzen. */
+const SCHNAPP_AB = 0.93;
+
 /** Halbe Breite des Unterwagens — damit rechnet die Fahrzeugsperre. */
 const UNTERWAGEN_R = 2.6;
 
@@ -1205,7 +1208,23 @@ export class Excavator {
       closeRate = -dt / OPEN_TIME; // Tastatur losgelassen: öffnet
       this.grappleHold = false;
     }
+    const closureVorher = this.closure;
     this.closure = THREE.MathUtils.clamp(this.closure + closeRate, 0, 1);
+    /*
+     * Zuschnappen: Wenn die Zaehne aufeinandertreffen, klingt das metallisch —
+     * am deutlichsten, wenn nichts dazwischen ist (Wunsch 11.09.2026). Der
+     * Moment ist genau der, in dem die Spinne die Schliessgrenze erreicht und
+     * keine Kralle von Material blockiert wird; dann treffen sich die Spitzen
+     * tatsaechlich.
+     */
+    if (
+      closeRate > 0 &&
+      closureVorher < SCHNAPP_AB &&
+      this.closure >= SCHNAPP_AB &&
+      !this.clawBlocked
+    ) {
+      this.onClawSnap?.(held ? 0.55 : 1);
+    }
     // „closing" steuert das Greifsystem: Zupacken solange die Spinne schließt
     // oder geschlossen gehalten wird
     this.closing = held || closeRate > 0 || (this.grappleHold && this.closure > 0.5);
@@ -1370,6 +1389,11 @@ export class Excavator {
    * der Zacke und nichts erklaert, warum.
    */
   onClawPierce: ((body: RAPIER.RigidBody) => void) | null = null;
+  /**
+   * Die Zaehne schlagen aufeinander. Der Parameter sagt, wie hart: 1 = leer
+   * durchgeschnappt, weniger, wenn Material dazwischenliegt.
+   */
+  onClawSnap: ((haerte: number) => void) | null = null;
 
   private clawBlocked(a: number, splay: number): boolean {
     clawPoint(a, splay, CLAW_SEGMENTS, this.blockTmp);

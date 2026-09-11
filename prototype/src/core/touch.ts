@@ -12,7 +12,7 @@
  *                    (Y) und Lenkung (X). Endet von selbst nach vier Sekunden
  *                    ohne Daumen auf dem linken Stick.
  *   Greifen        — über den rechten Stick (oder festen Fingerdruck)
- *   Extras         — Doppeltipp wechselt die Ansicht, Kippen fährt ohne Stick
+ *   Extras         — Doppeltipp wechselt die Ansicht
  *   Rädchen        — die übrigen Funktionen, endlos drehbar
  *   Fünf Finger    — Debug-Overlay ein/aus (auf dem Tablet gibt es keine F3-Taste)
  */
@@ -47,8 +47,6 @@ interface StickState {
 const RADIUS = 62; // px bis Vollausschlag
 /** Ab diesem Druck (0..1) gilt eine Berührung als „festes Drücken" = Greifen */
 const PRESSURE_GRAB = 0.55;
-/** Neigung in Grad, ab der die Kippsteuerung Vollausschlag gibt */
-const TILT_FULL = 22;
 /** Totzone der Spinnenachse — schützt vor ungewolltem Öffnen beim Baggern */
 const GRAPPLE_DEADZONE = 0.38;
 /** So lange darf der linke Stick unberuehrt bleiben, bevor der Fahrmodus endet */
@@ -92,9 +90,6 @@ export class TouchControls {
   private pressed = new Set<string>();
   private held = new Set<string>();
   private pressureGrab = false;
-  private tiltEnabled = false;
-  private tiltDrive = 0;
-  private tiltSteer = 0;
   private lastTap = 0;
   /**
    * Fahrmodus (Vorbild v2). Vier feste Pfeiltasten waren auf dem Glas schlecht
@@ -138,10 +133,8 @@ export class TouchControls {
     this.bindTap("btn-music", "KeyU");
     this.bindTap("btn-shop", "KeyZ");
     this.bindTap("btn-pause", "Escape");
-    this.bindTap("btn-tilt", "TILT");
     this.bindMenu();
     this.buildRadial();
-    this.bindTilt();
     this.bindCanvas(canvas);
     TouchControls.blockBrowserZoom();
   }
@@ -419,12 +412,6 @@ export class TouchControls {
 
   /** Eintrag auslösen. */
   private fire(code: string): void {
-    if (code === "TILT") {
-      void this.toggleTilt();
-      TouchControls.vibrate(22);
-      this.onTap?.();
-      return;
-    }
     this.pressed.add(code);
     TouchControls.vibrate(22); // spürbar, wo das Gerät es kann
     this.onTap?.(); // hörbar überall — auf iOS die einzige Rückmeldung
@@ -508,44 +495,6 @@ export class TouchControls {
     const winkel = Math.atan2(dx, -dy); // 0 = oben
     const i = Math.round((winkel / (Math.PI * 2)) * n);
     return ((i % n) + n) % n;
-  }
-
-  /**
-   * Kippsteuerung: Gerät neigen statt den linken Stick zum Fahren zu nehmen.
-   *
-   * Sie haengt jetzt als Eintrag im Kranz, nicht mehr an einem eigenen Knopf —
-   * den gibt es nicht mehr. Die Freigabe der Bewegungssensoren verlangt auf iOS
-   * eine Nutzergeste; das Auswaehlen im Kranz ist eine.
-   */
-  private async toggleTilt(): Promise<void> {
-    if (this.tiltEnabled) {
-      this.tiltEnabled = false;
-      this.tiltDrive = 0;
-      this.tiltSteer = 0;
-      return;
-    }
-    type OrientCtor = { requestPermission?: () => Promise<string> };
-    const ctor = (window as unknown as { DeviceOrientationEvent?: OrientCtor })
-      .DeviceOrientationEvent;
-    if (ctor?.requestPermission) {
-      try {
-        if ((await ctor.requestPermission()) !== "granted") return;
-      } catch {
-        return;
-      }
-    }
-    this.tiltEnabled = true;
-  }
-
-  private bindTilt(): void {
-    window.addEventListener("deviceorientation", (e) => {
-      if (!this.tiltEnabled) return;
-      // beta = vor/zurück kippen, gamma = seitlich kippen (Landscape-Halterung)
-      const beta = e.beta ?? 0;
-      const gamma = e.gamma ?? 0;
-      this.tiltDrive = Math.max(-1, Math.min(1, -(beta - 45) / TILT_FULL));
-      this.tiltSteer = Math.max(-1, Math.min(1, gamma / TILT_FULL));
-    });
   }
 
   /**
@@ -677,8 +626,8 @@ export class TouchControls {
     // Fahren: linker Stick im Fahrmodus, dazu weiterhin die Kippsteuerung
     const fahrY = this.driveMode && l ? -l.dy : 0; // Stick nach oben = vorwaerts
     const fahrX = this.driveMode && l ? l.dx : 0;
-    this.axes.drive = fahrY + this.tiltDrive;
-    this.axes.steer = fahrX + this.tiltSteer;
+    this.axes.drive = fahrY;
+    this.axes.steer = fahrX;
     this.axes.drive = clamp1(this.axes.drive);
     this.axes.steer = clamp1(this.axes.steer);
     this.axes.boom = clamp1(this.axes.boom);

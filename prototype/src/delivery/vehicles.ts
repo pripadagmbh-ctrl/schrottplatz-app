@@ -5,18 +5,27 @@ import type { CompositeManager, CarComposite } from "../dismantle/composites";
 import { WEIGH_Z, KAFFEE_THEKE } from "../world/yard";
 import { buildPerson, type PersonParts } from "../world/people";
 import type { Box } from "../world/boxen";
+import { packeLadung, stueckMass } from "./ladung";
 
 /** So lange haelt ein beladener Abholer auf der Waage fuer Marios Kontrolle. */
 const WIEGE_HALT_S = 6;
 /** Rueckwaertstempo beim Einparken (m/s) — Schrittgeschwindigkeit. */
 const PARK_RUECK_SPEED = 1.6;
+/** So weit darf die Ladung ueber die Bordwand ragen (m). */
+const LADUNG_UEBERSTAND = 0.35;
+/** Hoechster Ausgleichsfaktor, wenn Stuecke wegfallen. */
+const LADUNG_AUSGLEICH_MAX = 2.2;
+/** Oberkante des Flaechenbodens im Ladeflaechen-System. */
+const LADE_BODEN = 0.1;
+/** Rand vorn und hinten, damit nichts ueber die Kante steht. */
+const LADE_RAND = 0.2;
 /** Gehtempo des Fahrers (m/s) */
 const FAHRER_TEMPO = 1.5;
 /** Rechenhilfe fuer boxen() — kein neuer Vektor je Bild. */
 const BOX_TMP = new THREE.Vector3();
 import { hitsObstacle } from "../world/obstacles";
 import { rollCustomer, vehicleForCustomer, type CustomerProfile } from "./customers";
-import { buildVehicleModel } from "./vehicleModel";
+import { buildVehicleModel, wandHoehe } from "./vehicleModel";
 
 /**
  * Anlieferungen M3: Kundenfahrzeuge auf fester Route (kinematisch).
@@ -311,6 +320,20 @@ class DeliveryVehicle {
   private readonly fahrerTuer = new THREE.Vector3();
   private readonly fahrerTheke = new THREE.Vector3();
 
+  /**
+   * Woher die Teile kommen, die auf der Flaeche liegen. Wird beim Anlegen
+   * gesetzt; gebraucht wird sie erst beim Wegfahren.
+   */
+  itemQuelle: ItemManager | null = null;
+
+  /**
+   * Aufbau der Ladeflaeche. Haendler fahren nicht alle denselben Wagen: mal
+   * flache Bordwaende, mal Rungen, mal ein geschlossener Kasten. Gewerbe und
+   * Privat bleiben flach — sie liefern kein Schuettgut. Die Ladung richtet
+   * sich nach der Bordwandhoehe, deshalb steht der Aufbau als Feld.
+   */
+  private readonly bodyStyleName: "flach" | "rungen" | "koffer";
+
   /** Zugewiesener Warteplatz, null = fährt direkt vom Hof. */
   parkSpot: [number, number] | null = null;
   /** Wie lange die Pause dauert */
@@ -354,7 +377,9 @@ class DeliveryVehicle {
   private nudgeTargetS = 0;
 
   sendAway(): boolean {
-    if (this.cargoReleased || this.phase === "out") return false;
+    if (this.phase === "out") return false;
+    // Was noch oben liegt, faehrt mit — sonst verliert der Wagen es unterwegs
+    this.verriegeleLadeflaeche();
     this.phase = "out";
     this.phaseT = 0;
     // Dort in die Ausfahrt einfädeln, wo der Wagen gerade steht — sonst
@@ -441,6 +466,10 @@ class DeliveryVehicle {
     this.customer = kind === "abholer" ? null : (customer ?? rollCustomer());
     // Der PKW-Anhänger ist kurz — ein Kofferraum voll, keine Fuhre
     this.bedLen = kind === "pkw" ? 2.4 : kind === "wrack" ? 5.4 : kind === "kipper" ? 6.0 : 5.4;
+    this.bodyStyleName =
+      this.customer?.group === "haendler"
+        ? (["rungen", "rungen", "koffer", "flach"] as const)[Math.floor(Math.random() * 4)]
+        : "flach";
     const teile = buildVehicleModel({
       kind: this.kind,
       bedLen: this.bedLen,
@@ -452,10 +481,7 @@ class DeliveryVehicle {
       // Haendler fahren nicht alle denselben Wagen: mal flache Bordwaende, mal
       // der klassische Rungenaufbau, mal ein geschlossener Kasten. Gewerbe und
       // Privat bleiben flach — sie liefern kein Schuettgut.
-      bodyStyle:
-        this.customer?.group === "haendler"
-          ? (["rungen", "rungen", "koffer", "flach"] as const)[Math.floor(Math.random() * 4)]
-          : "flach",
+      bodyStyle: this.bodyStyleName,
       group: this.group,
       bedGroup: this.bedGroup,
       world: this.world,
@@ -586,58 +612,59 @@ class DeliveryVehicle {
       if (summe > 0) {
         const faktor = THREE.MathUtils.clamp(c.massKg / summe, 0.3, 8);
         for (const sp of specs) sp.massKg = Math.round(sp.massKg * faktor);
-        // Greift die Deckelung — etwa wenn nur vier Schwergewichte geladen
-        // sind —, wird die angekündigte Menge nach unten korrigiert. Sonst
-        // verspricht der Kunde an der Waage mehr, als auf dem Wagen liegt.
-        (c as { massKg: number }).massKg = specs.reduce((a, sp) => a + sp.massKg, 0);
       }
     }
     const bedQuat = new THREE.Quaternion();
     this.bedGroup.getWorldQuaternion(bedQuat);
-    // Überlappungsfrei stapeln: jedes Teil bekommt einen Platz, der von allen
-    // bereits gesetzten weit genug entfernt ist — sonst klemmt die Ladung
-    // ineinander und die Physik schleudert sie beim Freigeben weg.
-    const placed: Array<{ x: number; y: number; z: number; r: number }> = [];
-    specs.forEach((s) => {
-      const dims = s.shape.dims;
-      const halfLen = s.shape.kind === "wire" ? dims[0] : Math.max(...dims) / 2;
-      const r = halfLen + 0.12;
-      const maxX = Math.max(BED_HALF_W - r, 0.05);
-      const minZ = r + 0.15;
-      const maxZ = Math.max(this.bedLen - r - 0.15, minZ + 0.05);
-      let spot: { x: number; y: number; z: number; r: number } | null = null;
-      // Flach stapeln: die Ladung liegt gleich an ihrem Platz, statt aus der
-      // Luft auf die Pritsche zu fallen.
-      // Hoehe begrenzt: Mit sechs Lagen a 0,45 m tuermte sich die Fuhre bis
-      // 2,55 m ueber den Boden der Mulde — ueber drei Meter ueber der Strasse.
-      // So faehrt niemand vom Hof. Drei Lagen reichen bis knapp einen Meter,
-      // etwa Bordwandhoehe plus Haufen obendrauf. Was nicht mehr passt, faellt
-      // weg; die Liefermenge des Kunden wird ohnehin ueber die Massen der
-      // gesetzten Stuecke erreicht, nicht ueber ihre Zahl.
-      for (let layer = 0; layer < 2 && !spot; layer++) {
-        const y = 0.22 + layer * 0.34;
-        for (let attempt = 0; attempt < 40; attempt++) {
-          const x = (Math.random() * 2 - 1) * maxX;
-          const z = minZ + Math.random() * (maxZ - minZ);
-          const clash = placed.some(
-            (p) => Math.hypot(p.x - x, (p.y - y) * 1.6, p.z - z) < p.r + r
-          );
-          if (!clash) {
-            spot = { x, y, z, r };
-            break;
-          }
-        }
-      }
-      const fin = spot ?? { x: 0, y: 0.45 + placed.length * 0.6, z: this.bedLen / 2, r };
-      placed.push(fin);
-      const local = new THREE.Vector3(fin.x, fin.y, fin.z);
+    /*
+     * Packen wie in eine Kiste: Die Ladung folgt der Flaeche, liegt dicht und
+     * endet knapp ueber der Bordwand. Vorher wurde gewuerfelt, und was keinen
+     * Platz fand, kam auf einen Stapel in der Mitte — daher die Tuerme, die
+     * weit ueber die Bordwand ragten (Befund 11.09.2026).
+     */
+    const stuecke = specs.map((sp) => stueckMass(sp.shape.kind, sp.shape.dims));
+    const maxHoehe = wandHoehe(this.kind, this.bodyStyleName) + LADUNG_UEBERSTAND;
+    const plaetze = packeLadung(
+      stuecke,
+      BED_HALF_W - 0.08,
+      this.bedLen - 2 * LADE_RAND,
+      maxHoehe
+    );
+    /*
+     * Was nicht mehr passt, faellt weg — aber nicht seine Tonnage: Sie wird
+     * auf die liegenden Stuecke verteilt. Ein Haendler bringt eben Brocken,
+     * keine Tuerme. Der Faktor ist gedeckelt, damit kein Blech zwei Tonnen
+     * wiegt.
+     */
+    const summeAlle = specs.reduce((a, sp) => a + sp.massKg, 0);
+    const summeDrauf = specs.reduce((a, sp, i) => a + (plaetze[i] ? sp.massKg : 0), 0);
+    const ausgleich =
+      summeDrauf > 0 ? Math.min(summeAlle / summeDrauf, LADUNG_AUSGLEICH_MAX) : 1;
+
+    specs.forEach((sp, i) => {
+      const platz = plaetze[i];
+      if (!platz) return;
+      sp.massKg = Math.round(sp.massKg * ausgleich);
+      const local = new THREE.Vector3(
+        platz.x,
+        LADE_BODEN + platz.y + stuecke[i].hoehe / 2,
+        LADE_RAND + platz.z
+      );
       this.bedGroup.localToWorld(local);
-      const it = items.spawnScrap(s.materialId, s.massKg, s.shape, local, bedQuat);
+      const it = items.spawnScrap(sp.materialId, sp.massKg, sp.shape, local, bedQuat);
       // Das Setzen soll niemand sehen: erst wenn die Ladung ruhig liegt,
       // taucht der LKW fertig beladen auf.
       it.mesh.visible = false;
       this.cargo.items.push(it);
     });
+    // Angekuendigte Menge auf das bringen, was wirklich oben liegt — sonst
+    // verspricht der Kunde an der Waage mehr, als der Wagen traegt.
+    if (c) {
+      (c as { massKg: number }).massKg = specs.reduce(
+        (a, sp, i) => a + (plaetze[i] ? sp.massKg : 0),
+        0
+      );
+    }
   }
 
   /**
@@ -709,6 +736,38 @@ class DeliveryVehicle {
       }
     }
     return out;
+  }
+
+  /**
+   * Alles, was noch auf der Ladefläche liegt, für die Fahrt verriegeln.
+   *
+   * Ohne das verlor der Abhol-LKW seine Ladung, sobald er anfuhr: Die Fläche
+   * ist kinematisch, die Teile darauf sind dynamisch — der Wagen fährt unter
+   * ihnen weg, und sie bleiben auf dem Hof liegen (Befund 11.09.2026). Beim
+   * Anlieferer gilt dasselbe für Reste, die nicht abgeladen wurden; die
+   * fahren mit und zählen bei der Ausfahrtswiegung als Tara.
+   */
+  verriegeleLadeflaeche(): void {
+    const quelle = this.itemQuelle;
+    if (!quelle) return;
+    const schon = new Set(this.riding.map((r) => r.body.handle));
+    const local = new THREE.Vector3();
+    for (const it of quelle.items) {
+      if (!it.body.isValid() || schon.has(it.body.handle)) continue;
+      const p = it.body.translation();
+      local.set(p.x, p.y, p.z);
+      this.bedGroup.worldToLocal(local);
+      if (
+        Math.abs(local.x) < BED_HALF_W + 0.35 &&
+        local.z > -0.4 &&
+        local.z < this.bedLen + 0.4 &&
+        local.y > -0.4 &&
+        local.y < 3.0
+      ) {
+        this.lockToBed(it.body);
+      }
+    }
+    this.cargoReleased = false;
   }
 
   /** Ladung liegt ruhig? Erst dann wird für die Fahrt verriegelt. */
@@ -990,6 +1049,7 @@ class DeliveryVehicle {
         // die Abfahrt freigibt (Taste V) — oder bis die Standzeit abläuft.
         if (this.releaseRequested || this.phaseT > 240) {
           this.justDeparted = true; // Container wird jetzt abgerechnet
+          this.verriegeleLadeflaeche();
           this.phase = "out";
           this.routeS = 0;
         }
@@ -1329,6 +1389,7 @@ export class VehicleManager {
       (kg) => this.onWeighOut?.(kg),
       c
     );
+    this.active.itemQuelle = this.items;
     if (c) this.onCustomerArrived?.(c);
     // Händler bleiben gern noch auf einen Kaffee; Gewerbe hat es eilig.
     // Nur freie Plätze vergeben, sonst stünde einer im anderen.
@@ -1424,10 +1485,18 @@ export class VehicleManager {
    * nur ein Stück vor — so kommt man an Schrott heran, der unter dem
    * Fahrzeug liegt.
    */
-  makeRoom(): "vorgefahren" | "weggeschickt" | "niemandDa" {
+  /**
+   * Den Wagen zur Waage schicken (Wunsch 11.09.2026).
+   *
+   * Vorher hiess der Befehl "Vorfahren" und ruckelte den LKW ein Stueck nach
+   * vorn. Gebraucht wird er aber, wenn hinten unsichtbar Reste liegen, die
+   * sich nicht greifen lassen — dann ist Vorfahren nur ein Umweg. Jetzt faehrt
+   * der Wagen ueber die Waage vom Hof, die Reste zaehlen als Tara, und
+   * bezahlt wird, was tatsaechlich abgeladen wurde.
+   */
+  zurWaage(): "geschickt" | "niemandDa" {
     if (!this.active) return "niemandDa";
-    if (this.active.sendAway()) return "weggeschickt";
-    return this.active.nudgeForward() ? "vorgefahren" : "niemandDa";
+    return this.active.sendAway() ? "geschickt" : "niemandDa";
   }
 
   /** Körper-Handles des aktiven Fahrzeugs — der Baggerarm taucht da nicht ein. */

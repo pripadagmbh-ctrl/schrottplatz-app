@@ -128,6 +128,18 @@ function buildCrane(v: VehicleModelContext, dark: THREE.MeshStandardMaterial): T
  *
  * Zurückgegeben wird diese Gruppe; der Ablauf führt sie beim Fahren nach.
  */
+/**
+ * Hoehe der Bordwand. Steht als eigene Funktion da, weil nicht nur der Aufbau
+ * sie braucht: Auch die Ladung richtet sich danach — sie darf nur knapp
+ * darueber hinausragen (Wunsch 11.09.2026).
+ */
+export function wandHoehe(kind: string, bodyStyle?: string): number {
+  if (kind === "abholer") return 2.5;
+  if (bodyStyle === "koffer") return 1.55;
+  if (bodyStyle === "rungen") return 1.05;
+  return 0.64;
+}
+
 function buildCarAndTrailer(
   v: VehicleModelContext,
   _paint: THREE.MeshStandardMaterial,
@@ -326,13 +338,7 @@ export function buildVehicleModel(v: VehicleModelContext): VehicleModelParts {
   v.bedGroup.add(floor);
   const isContainer = v.kind === "abholer";
   const aufbau = v.bodyStyle ?? "flach";
-  const wallH = isContainer
-    ? 2.5
-    : aufbau === "koffer"
-      ? 1.55
-      : aufbau === "rungen"
-        ? 1.05
-        : 0.64;
+  const wallH = wandHoehe(v.kind, v.bodyStyle);
   const sideMat = isContainer
     ? new THREE.MeshStandardMaterial({ color: 0x2f7a4f, roughness: 0.75, metalness: 0.35 })
     : aufbau === "koffer"

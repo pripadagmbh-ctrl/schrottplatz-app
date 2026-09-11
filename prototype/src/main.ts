@@ -386,6 +386,8 @@ async function main(): Promise<void> {
     for (const b of bodies) fence.notifyGrabbed(b); // verankertes Zaunfeld? → losreißen
   };
   grip.onTear = () => audio.playTear();
+  // Zaehne treffen aufeinander — hoerbar, auch wenn nichts drin ist
+  excavator.onClawSnap = (haerte) => audio.playClawSnap(haerte);
   grip.partResolver = (pos) => composites.findPartNear(pos);
   // Gewalt beim Herausreißen: Rotator-Drehung zählt am stärksten, dazu die
   // Achsbewegung. Wer die Spinne am Motor verdreht, bekommt ihn schneller los.
@@ -819,11 +821,10 @@ async function main(): Promise<void> {
         showPickup(true);
       }
     }
-    // „Mach Platz": vor dem Abladen wegschicken, danach ein Stück vorfahren
+    // Zur Waage schicken: Reste auf der Flaeche zaehlen dort als Tara
     if (input.wasPressed("KeyJ") || touch.consumePress("KeyJ")) {
-      const r = vehicles.makeRoom();
-      if (r === "weggeschickt") hud.toast("Weggeschickt — der Fahrer dreht ab.");
-      else if (r === "vorgefahren") hud.toast("LKW fährt ein Stück vor.");
+      const r = vehicles.zurWaage();
+      if (r === "geschickt") hud.toast("Der Fahrer faehrt zur Waage.");
       else hud.toast("Gerade ist kein Fahrzeug auf dem Platz.");
     }
     if (input.wasPressed("KeyZ") || touch.consumePress("KeyZ")) zeigeAusbau();

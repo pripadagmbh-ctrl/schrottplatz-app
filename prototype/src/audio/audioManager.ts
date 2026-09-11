@@ -138,6 +138,23 @@ export class AudioManager {
     this.scrapeGain.gain.setTargetAtTime(0.14 * intensity, this.ctx.currentTime, 0.06);
   }
 
+  /**
+   * Zuschnappen der Spinne: Stahl auf Stahl (Wunsch 11.09.2026).
+   *
+   * Kein Zupacken-Thump, sondern ein harter, heller Anschlag mit kurzem
+   * metallischem Nachklingen — so klingt es, wenn die Zaehne leer
+   * aufeinandertreffen. Liegt Material dazwischen, daempft das: dann kommt
+   * `haerte` kleiner herein und der Klang wird kuerzer und leiser.
+   */
+  playClawSnap(haerte = 1): void {
+    const h = Math.max(0.15, Math.min(haerte, 1));
+    this.metalHit([620, 940, 1380, 1970], [0.34 * h, 0.26 * h, 0.18 * h, 0.12 * h], 0.1 + 0.12 * h, {
+      transient: 1500,
+      transientGain: 0.3 * h,
+      spread: 0.012,
+    });
+  }
+
   playGrab(): void {
     // sattes Zupacken: kurzer Rauschimpuls + tiefer Thump
     this.burst([70], 0.18, 0.35, "triangle");

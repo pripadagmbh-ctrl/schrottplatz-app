@@ -350,21 +350,20 @@ export class StaffManager {
     this.mario.group.add(brett);
 
     // Janine verkauft aus einem Kaffeewagen — kein Klapptisch mehr
-    buildKaffeewagen(scene, kaffeePos, KAFFEE_ROT);
+    const wagen = buildKaffeewagen(scene, kaffeePos, KAFFEE_ROT);
     const janine = buildPerson({ shirt: 0xe8e2d5, trousers: 0x4a3b52, hair: 0x8a5a2b });
-    // Hinter der Theke, also im Wagen. Der Platz liegt im gedrehten System des
-    // Wagens, sonst steht sie neben ihm statt darin.
-    const innen = new THREE.Vector3(-0.5, 0, -0.2).applyAxisAngle(
-      new THREE.Vector3(0, 1, 0),
-      KAFFEE_ROT
-    );
-    janine.group.position.set(kaffeePos.x + innen.x, 0, kaffeePos.z + innen.z);
-    janine.group.rotation.y = KAFFEE_ROT;
-    janine.legLeft.visible = false; // steht hinter der Klappe
+    /*
+     * Janine haengt im Wagen, nicht daneben: Vorher stand sie in Weltkoordinaten
+     * hinter der Aussenwand und war schlicht nicht zu sehen (Befund
+     * 11.09.2026). Als Kind des Wagens dreht sie mit ihm mit, und der Platz
+     * gilt im Wageninneren — direkt an der Klappe, Oberkoerper ueber der Theke.
+     */
+    janine.group.position.set(0.45, 0.55, 0);
+    janine.group.rotation.y = Math.PI / 2; // schaut aus der Klappe heraus
+    janine.legLeft.visible = false; // steht hinter der Theke
     janine.legRight.visible = false;
-    janine.group.position.y = 0.55;
-    scene.add(janine.group);
-    this.addNameTagToObject(janine.group, "JANINE", 0, 1.6, 0);
+    wagen.add(janine.group);
+    this.addNameTagToObject(janine.group, "JANINE", 0, 1.35, 0);
 
     // Lambert Prison — Platzwart in Warnweste
     this.lambert = buildPerson({ shirt: 0xf2c018, trousers: 0x2f3a45, hair: 0x5a4632 });
