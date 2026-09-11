@@ -128,6 +128,10 @@ export function anlaufZeit(lastKg: number): number {
 
 /** Ab diesem Schliessgrad treffen sich die Krallenspitzen. */
 const SCHNAPP_AB = 0.93;
+/** Wie weit die Schalen beim Anschlag zurueckfedern (rad) */
+const ANSCHLAG_GRAD = THREE.MathUtils.degToRad(4.5);
+/** Wie lange der Rueckprall nachschwingt (s) */
+const ANSCHLAG_S = 0.22;
 
 /** Halbe Breite des Unterwagens — damit rechnet die Fahrzeugsperre. */
 const UNTERWAGEN_R = 2.6;
@@ -1221,10 +1225,14 @@ export class Excavator {
       closeRate > 0 &&
       closureVorher < SCHNAPP_AB &&
       this.closure >= SCHNAPP_AB &&
-      !this.clawBlocked
+      !this.krallenBlockiert
     ) {
-      this.onClawSnap?.(held ? 0.55 : 1);
+      const haerte = held ? 0.55 : 1;
+      this.anschlagStaerke = haerte;
+      this.anschlag(haerte);
+      this.onClawSnap?.(haerte);
     }
+    this.updateAnschlag(dt);
     // „closing" steuert das Greifsystem: Zupacken solange die Spinne schließt
     // oder geschlossen gehalten wird
     this.closing = held || closeRate > 0 || (this.grappleHold && this.closure > 0.5);
@@ -1333,8 +1341,45 @@ export class Excavator {
       0.5,
       this.carriedCount * 0.06 + Math.min(this.carriedMassKg / NENNLAST_KG, 1) * 0.28
     );
-    return THREE.MathUtils.lerp(CLAW_OPEN_SPLAY, minSplay, this.closure);
+    // Der Anschlag federt kurz zurueck — siehe anschlag().
+    return THREE.MathUtils.lerp(CLAW_OPEN_SPLAY, minSplay, this.closure) + this.anschlagWinkel;
   }
+
+  /*
+   * Leeres Zuschnappen mit sichtbarem Anschlag (Auftrag 11.09.2026, Phase 1.4).
+   *
+   * Treffen die Zaehne ohne Material aufeinander, gingen sie bisher lautlos
+   * und weich in die Endlage. Echte Schalen schlagen auf und federn ein Stueck
+   * zurueck. Der Rueckprall ist eine gedaempfte Feder auf dem Spreizwinkel:
+   * Er springt um ANSCHLAG_GRAD auf und klingt in ANSCHLAG_S ab. Der Klang
+   * dazu haengt am selben Ereignis.
+   */
+  private anschlagWinkel = 0;
+  private anschlagRest = 0;
+
+  private anschlag(haerte: number): void {
+    this.anschlagWinkel = ANSCHLAG_GRAD * haerte;
+    this.anschlagRest = ANSCHLAG_S;
+  }
+
+  private updateAnschlag(dt: number): void {
+    if (this.anschlagRest <= 0) {
+      this.anschlagWinkel = 0;
+      return;
+    }
+    this.anschlagRest = Math.max(0, this.anschlagRest - dt);
+    // Abklingende Schwingung: einmal auf, einmal zurueck, dann ruhig
+    const t = 1 - this.anschlagRest / ANSCHLAG_S;
+    // Nur nach OBEN federn: Weiter zu als bis zum Anschlag geht nicht, das
+    // ist ja gerade der Anschlag. Ohne die Klemmung schwang der Winkel in die
+    // Gegenrichtung und die Schalen gingen kurz zu weit zu (gemessen: -0,8°).
+    this.anschlagWinkel = Math.max(
+      0,
+      ANSCHLAG_GRAD * Math.cos(t * Math.PI * 1.5) * (1 - t) * (1 - t) * this.anschlagStaerke
+    );
+  }
+
+  private anschlagStaerke = 1;
 
   /**
    * Spreizung je Kralle. Bisher bekamen alle fuenf denselben Winkel — die
@@ -1430,6 +1475,9 @@ export class Excavator {
    * Platz ist.
    */
   private updateClawBlocking(dt: number): void {
+    // Der Merker gilt je Schritt. Die Schnappabfrage weiter oben liest den
+    // Stand des Vorschritts — bei 60 Hz ist das ein Sechzigstel Versatz.
+    this.krallenBlockiert = false;
     const ziel = this.currentSplay();
     const schritt = Excavator.CLAW_RATE * dt;
     for (let c = 0; c < CLAW_COUNT; c++) {
@@ -1442,17 +1490,24 @@ export class Excavator {
       }
       const naechste = Math.max(ziel, ist - schritt);
       const a = (c / CLAW_COUNT) * Math.PI * 2;
-      const zu = naechsteSpreizung(
-        ist,
-        ziel,
-        schritt,
-        this.clawBlocked(a, naechste),
-        this.clawReserve[c]!
-      );
+      const blockiert = this.clawBlocked(a, naechste);
+      if (blockiert) this.krallenBlockiert = true;
+      const zu = naechsteSpreizung(ist, ziel, schritt, blockiert, this.clawReserve[c]!);
       this.clawSplayIst[c] = zu.winkel;
       this.clawReserve[c] = zu.reserve;
     }
   }
+
+  /**
+   * Hat in diesem Schritt eine Kralle Material vor sich gehabt?
+   *
+   * Das war der Grund, warum das Schnappgeraeusch nie zu hoeren war: Die
+   * Bedingung fragte `!this.clawBlocked` ab — und das ist die METHODE, also
+   * immer wahr. Die Verneinung war damit immer falsch, und der Anschlag hat
+   * nie ausgeloest (gemessen im Labor 11.09.2026: null Ausloesungen in
+   * 40 Schritten bis zum vollen Schliessen).
+   */
+  private krallenBlockiert = false;
 
   /** Wie weit die Spinne tatsaechlich zu ist — die am weitesten offene Kralle zaehlt. */
   get clawSplayMax(): number {

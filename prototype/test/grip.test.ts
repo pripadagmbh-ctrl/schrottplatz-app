@@ -90,9 +90,15 @@ describe("Greifen", () => {
     expect(b.isKinematic(), "das Teil wird kinematisch mitgefuehrt").toBe(true);
   });
 
-  it("die Haltepose zieht das Teil in den Korb, ohne es hochzusaugen", () => {
+  it("saugt nichts an: das Teil bleibt, wo es gefasst wurde", () => {
+    /*
+     * Umgekehrte Regel seit dem Auftrag vom 11.09.2026 (Phase 1.4, "kein
+     * Zusammensaugen"). Vorher wanderte ein seitlich gefasstes Teil bis zu
+     * 0,35 m in den Korb — das sah aus, als sauge die Spinne es an. Dass
+     * trotzdem nichts neben der Spinne haengt, leistet die Pruefung beim
+     * Zupacken: gefasst wird nur, was zwischen den Schalen liegt.
+     */
     const { world, grip, greifer } = aufbau();
-    // Seitlich versetzt gefasst, wie wenn man am Rand zupackt
     const b = teil(world, 0.9, 2.2, 0);
     grip.attachBody(b);
     const sensor = new THREE.Vector3();
@@ -102,9 +108,44 @@ describe("Greifen", () => {
       world.step();
     }
     const p = b.translation();
-    expect(Math.abs(p.x), "Teil haengt weiter neben der Spinne").toBeLessThan(0.5);
-    // ... aber die Hoehe bleibt: ein Teil am Boden darf nicht hochgesaugt werden
+    expect(Math.abs(p.x - 0.9), "Teil wurde zur Mitte gezogen").toBeLessThan(0.05);
     expect(p.y, `Hoehe von 2,2 auf ${p.y.toFixed(2)} gewandert`).toBeCloseTo(2.2, 1);
+  });
+
+  it("meldet Greifstelle und Kraft fuers Schadensmodell", () => {
+    // Phase 1.6: Die Spinne sagt, WO sie zupackt und WIE FEST.
+    const { world, grip, greifer } = aufbau();
+    const b = teil(world, 0.3, 2.4, 0);
+    let gemeldet = 0;
+    grip.onKontakt = () => gemeldet++;
+    grip.attachBody(b);
+    const sensor = new THREE.Vector3();
+    grip.update(1, true, sensor.set(0, 2.4, 0), 1 / 60);
+    world.step();
+
+    expect(gemeldet, "beim Zupacken wird einmal gemeldet").toBe(1);
+    const k = grip.kontakte;
+    expect(k).toHaveLength(1);
+    // Der Greifpunkt liegt auf dem Teil, nicht in der Spinnenmitte
+    const d = Math.hypot(k[0].punkt.x - 0.3, k[0].punkt.y - 2.4, k[0].punkt.z);
+    expect(d, "Greifstelle liegt am Teil").toBeLessThan(0.6);
+    expect(k[0].kraftN, "Kraft ist gesetzt").toBeGreaterThan(1000);
+  });
+
+  it("die Greifkraft waechst mit Schliessdruck und Gewalt", () => {
+    const { world, grip, greifer } = aufbau();
+    const b = teil(world, 0, 2.4, 0);
+    grip.attachBody(b);
+    const sensor = new THREE.Vector3();
+    grip.update(0.5, true, sensor.set(0, 2.4, 0), 1 / 60);
+    world.step();
+    const halb = grip.kontakte[0].kraftN;
+    grip.update(1, true, sensor, 1 / 60);
+    world.step();
+    const voll = grip.kontakte[0].kraftN;
+    expect(voll).toBeGreaterThan(halb);
+    grip.getViolence = () => 1;
+    expect(grip.kontakte[0].kraftN).toBeGreaterThan(voll);
   });
 
   it("Loslassen gibt den Schwung der Spinne mit", () => {

@@ -21,30 +21,42 @@ const SENSOR_RADIUS = 1.05; // m (SW) — Wirkradius der größeren Spinne
 /** So lange muss die Spinne ganz zu gehalten werden, bis das Teil nachgibt */
 const CRUSH_TIME = 1.1;
 /**
- * Wie lange ein gefasstes Teil braucht, bis es in der Haltepose sitzt.
+ * Kein Zusammensaugen (Auftrag 11.09.2026, Phase 1.4).
  *
- * Vorher hing es per Gelenk exakt dort, wo es beim Zupacken lag — auch wenn
- * das halb neben der Spinne war. Jetzt wandert es in den Korb: seitlich
- * zentriert, ABER die Hoehe bleibt. Ein Teil, das am Boden gefasst wird, darf
- * nicht in die Spinne hochgesaugt werden (v2-Geraetetest 08.09.).
+ * Ein gefasstes Teil wanderte bisher nach dem Zupacken seitlich in den Korb —
+ * bis zu 0,35 m. Das sah aus, als sauge die Spinne es an, und genau das soll
+ * sie nicht. Es bleibt jetzt dort, wo es gefasst wurde, und faehrt nur mit.
+ *
+ * Dass trotzdem nichts neben der Spinne haengt, leistet die Pruefung beim
+ * Zupacken: Gefasst wird nur, was wirklich zwischen den Schalen liegt
+ * (`insideGrapple`). Wer dort nicht hineinragt, wird gar nicht erst gegriffen.
  */
-const HOLD_POSE_S = 0.25;
 /** Wie viele Schritte in die Loslass-Geschwindigkeit gemittelt werden */
 const RELEASE_AVG_STEPS = 3;
 /** Zusaetzlicher Abwaertsimpuls beim Loslassen (m/s) */
 const RELEASE_DOWN = 0.2;
 
+/**
+ * Eine Greifstelle: welcher Koerper, wo die Schale ihn fasst und mit welcher
+ * Kraft. Das ist die Schnittstelle, an der das Schadensmodell andockt
+ * (Auftrag 11.09.2026, Phase 1.6).
+ */
+export interface GreifKontakt {
+  body: RAPIER.RigidBody;
+  /** Weltpunkt auf der Oberflaeche des Teils */
+  punkt: THREE.Vector3;
+  /** Betrag der Greifkraft in Newton */
+  kraftN: number;
+}
+
 interface GrippedItem {
   body: RAPIER.RigidBody;
   massKg: number;
-  /** Pose beim Zupacken, relativ zur Spinne */
+  /** Pose beim Zupacken, relativ zur Spinne — sie bleibt, siehe oben */
   vonPos: THREE.Vector3;
   vonQuat: THREE.Quaternion;
-  /** Haltepose im Korb, relativ zur Spinne */
-  zuPos: THREE.Vector3;
-  zuQuat: THREE.Quaternion;
-  /** 0 = eben gefasst, 1 = Haltepose erreicht */
-  t: number;
+  /** Wo die Schale das Teil fasst — relativ zur Spinne, also mitfahrend */
+  kontaktRel: THREE.Vector3;
 }
 
 export class GripSystem {
@@ -141,8 +153,9 @@ export class GripSystem {
   }
 
   update(closure: number, closing: boolean, sensorPos: THREE.Vector3, dt: number): void {
+    this.closureJetzt = closure;
     this.trackGrapple(dt);
-    this.carryHeld(dt);
+    this.carryHeld();
     this.updateCrush(closure, dt);
     if (!closing) {
       // Loslassen wirft sofort ab — und die Spinne ist direkt wieder scharf
@@ -233,6 +246,75 @@ export class GripSystem {
     if (added > 0) this.onGrabbed?.(this.grippedBodies);
   }
 
+  /*
+   * --- Schnittstelle fuers Schadensmodell (Auftrag 11.09.2026, Phase 1.6) ---
+   *
+   * Die Spinne meldet, WO sie zupackt und WIE FEST. Mehr braucht ein
+   * Schadensmodell nicht, um an derselben Stelle eine Beule einzudruecken,
+   * an der die Schale sitzt — und nicht irgendwo in der Mitte des Teils.
+   *
+   * Die Kraft ist keine gemessene Kontaktkraft (die liefert Rapier fuer
+   * kinematische Koerper nicht brauchbar), sondern ein Modell aus drei
+   * Groessen, die im Spiel sichtbar sind: Schliessdruck der Schalen, Gewicht
+   * am Haken und Gewalt beim Drehen und Reissen. Die Zahl ist damit
+   * nachvollziehbar und stabil — und sie steigt genau dann, wenn es im Bild
+   * auch ruppig zugeht.
+   */
+  /** Greifkraft der Schalen bei voll geschlossener Spinne (N) */
+  private static readonly SCHLIESSKRAFT_N = 160_000;
+  /** Anteil, den das Gewicht der Last beitraegt */
+  private static readonly LASTANTEIL = 1.6;
+  /** Zuschlag bei voller Gewalt (Drehen, Reissen) */
+  private static readonly GEWALT_ZUSCHLAG = 0.8;
+
+  /** Wird beim Zupacken gerufen: einmal je gefasstem Koerper. */
+  onKontakt: ((k: GreifKontakt) => void) | null = null;
+
+  /** Aktueller Schliessgrad, von update() gesetzt — geht in die Kraft ein. */
+  private closureJetzt = 0;
+
+  /**
+   * Greifstellen mit Kraft, je Schritt aktuell. Das Schadensmodell liest sie
+   * einfach aus; wer lieber auf das Ereignis hoert, nimmt `onKontakt`.
+   */
+  get kontakte(): GreifKontakt[] {
+    const gewalt = this.getViolence?.() ?? 0;
+    const anteil = this.items.length > 0 ? 1 / this.items.length : 1;
+    const gPos = this.grappleBody.translation();
+    const gRot = this.grappleBody.rotation();
+    const gQuat = new THREE.Quaternion(gRot.x, gRot.y, gRot.z, gRot.w);
+    const out: GreifKontakt[] = [];
+    for (const it of this.items) {
+      if (!it.body.isValid()) continue;
+      const punkt = it.kontaktRel
+        .clone()
+        .applyQuaternion(gQuat)
+        .add(new THREE.Vector3(gPos.x, gPos.y, gPos.z));
+      out.push({
+        body: it.body,
+        punkt,
+        kraftN: this.kraftFuer(it.massKg, gewalt, anteil),
+      });
+    }
+    return out;
+  }
+
+  private kraftFuer(massKg: number, gewalt: number, anteil: number): number {
+    const schalen = GripSystem.SCHLIESSKRAFT_N * this.closureJetzt * anteil;
+    const last = massKg * 9.81 * GripSystem.LASTANTEIL;
+    return (schalen + last) * (1 + gewalt * GripSystem.GEWALT_ZUSCHLAG);
+  }
+
+  private meldeKontakt(body: RAPIER.RigidBody, punkt: THREE.Vector3): void {
+    if (!this.onKontakt) return;
+    const gewalt = this.getViolence?.() ?? 0;
+    this.onKontakt({
+      body,
+      punkt: punkt.clone(),
+      kraftN: this.kraftFuer(body.mass(), gewalt, 1),
+    });
+  }
+
   /** Körper per Fixed Joint an den Greifer koppeln (auch von der Reiß-Mechanik genutzt). */
   attachBody(body: RAPIER.RigidBody): boolean {
     if (this.items.length >= MAX_ITEMS) return false;
@@ -253,19 +335,6 @@ export class GripSystem {
     );
     const vonQuat = gQuatInv.clone().multiply(new THREE.Quaternion(r.x, r.y, r.z, r.w));
 
-    // Haltepose: seitlich in den Korb, Hoehe unveraendert. Das Zentrieren ist
-    // der sichtbare Unterschied — vorher hing ein Teil dort, wo man es erwischt
-    // hatte, auch halb neben der Spinne. Die Hoehe bleibt bewusst: Ein Teil am
-    // Boden darf nicht in die Spinne gesaugt werden.
-    // In den Korb ziehen, aber die Anordnung behalten: Wuerden alle Teile auf
-    // die Achse zentriert, steckten sie bei mehreren ineinander. Jedes behaelt
-    // seine Richtung und rueckt nur nach innen — hoechstens bis 0,35 m, das ist
-    // sicher im Schalenkorb.
-    const quer = Math.hypot(vonPos.x, vonPos.z);
-    const f = quer > 1e-4 ? Math.min(0.35, quer * 0.3) / quer : 0;
-    const zuPos = new THREE.Vector3(vonPos.x * f, vonPos.y, vonPos.z * f);
-    const zuQuat = vonQuat.clone();
-
     // Kinematisch statt per Gelenk (Vorbild v2, Entscheidung M2-1). Gelenke
     // zappeln unter Last, explodieren bei Kollisionen und lassen sich nicht in
     // eine Pose fuehren.
@@ -273,7 +342,23 @@ export class GripSystem {
     body.setLinvel({ x: 0, y: 0, z: 0 }, false);
     body.setAngvel({ x: 0, y: 0, z: 0 }, false);
     body.wakeUp();
-    this.items.push({ body, massKg: body.mass(), vonPos, vonQuat, zuPos, zuQuat, t: 0 });
+    // Greifstelle: der Punkt der Oberflaeche, der der Spinnenmitte am
+    // naechsten liegt. Den meldet die Schnittstelle ans Schadensmodell
+    // weiter (Phase 1.6) — dort wird die Beule eingedrueckt, nicht
+    // irgendwo in der Mitte des Teils.
+    const kontakt = new THREE.Vector3(gPos.x, gPos.y, gPos.z);
+    const col = body.collider(0);
+    if (col) {
+      const proj = col.projectPoint({ x: gPos.x, y: gPos.y, z: gPos.z }, true);
+      if (proj) kontakt.set(proj.point.x, proj.point.y, proj.point.z);
+    }
+    // relativ zur Spinne merken, damit die Greifstelle mitfaehrt
+    const kontaktRel = kontakt
+      .clone()
+      .sub(new THREE.Vector3(gPos.x, gPos.y, gPos.z))
+      .applyQuaternion(gQuatInv);
+    this.items.push({ body, massKg: body.mass(), vonPos, vonQuat, kontaktRel });
+    this.meldeKontakt(body, kontakt);
     return true;
   }
 
@@ -281,18 +366,16 @@ export class GripSystem {
    * Gefasste Teile der Spinne nachfuehren. Je Schritt aufrufen, nachdem die
    * Spinne ihre neue Pose hat.
    */
-  private carryHeld(dt: number): void {
+  private carryHeld(): void {
     if (this.items.length === 0) return;
     const gPos = this.grappleBody.translation();
     const gRot = this.grappleBody.rotation();
     this.tmpQ.set(gRot.x, gRot.y, gRot.z, gRot.w);
     for (const it of this.items) {
       if (!it.body.isValid()) continue;
-      it.t = Math.min(1, it.t + dt / HOLD_POSE_S);
-      // weicher Verlauf, damit das Teil nicht ruckt
-      const k = it.t * it.t * (3 - 2 * it.t);
-      this.tmpA.copy(it.vonPos).lerp(it.zuPos, k);
-      this.tmpQ2.copy(it.vonQuat).slerp(it.zuQuat, k);
+      // Pose halten, nicht verschieben: Das Teil haengt da, wo es gefasst wurde
+      this.tmpA.copy(it.vonPos);
+      this.tmpQ2.copy(it.vonQuat);
       this.tmpA.applyQuaternion(this.tmpQ);
       it.body.setNextKinematicTranslation({
         x: gPos.x + this.tmpA.x,
