@@ -86,6 +86,21 @@ const AUFPRALL_FENSTER_S = 0.14;
  */
 const SFX_TIEFPASS_HZ = 1600;
 
+/**
+ * Platzkulisse: Wind, ferne Schlaege, Hammer, Flex, Kraehen, Hupe.
+ *
+ * Abgeschaltet auf Ansage vom 11.09.2026 ("die Soundkulisse muss auch
+ * zurueckgesetzt werden"). Sie klang nach Geraeuschkulisse, nicht nach
+ * Schrottplatz — das Urteil dazu steht in docs/tonkonzept.md: Was den Platz
+ * traegt, ist die Maschine und der Stahl, nicht Wind und Kraehen. Der Code
+ * bleibt stehen, weil die Kulisse im ueberarbeiteten Tonkonzept als Schicht C
+ * wiederkommt; bis dahin laeuft sie nicht.
+ *
+ * Der Rueckfahrwarner ist davon ausgenommen: Der sagt etwas ueber den Platz
+ * aus, er schmueckt nicht.
+ */
+const PLATZKULISSE = false;
+
 export class AudioManager {
   /**
    * Die Klangwelt haengt an einem Kontext. Normalerweise legt sie ihn selbst
@@ -278,6 +293,12 @@ export class AudioManager {
   private warnTakt = 0;
 
   private starteUmgebung(): void {
+    if (!PLATZKULISSE) {
+      // Nur der Rueckfahrwarner bleibt: Der sagt etwas ueber den Platz aus,
+      // er schmueckt nicht.
+      this.baueRueckfahrwarner();
+      return;
+    }
     if (!this.ctx || !this.sfx) return;
     // Windbett: tiefes Rauschen, langsam an- und abschwellend
     const wind = this.ctx.createBufferSource();
@@ -297,7 +318,12 @@ export class AudioManager {
     boe.connect(boeGain).connect(this.windGain.gain);
     boe.start();
 
-    // Rueckfahrwarner: liegt bereit und wird nur auf- und zugeblendet
+    this.baueRueckfahrwarner();
+  }
+
+  /** Rueckfahrwarner: liegt bereit und wird nur auf- und zugeblendet. */
+  private baueRueckfahrwarner(): void {
+    if (!this.ctx || !this.sfx) return;
     this.warnOsc = this.ctx.createOscillator();
     this.warnOsc.type = "square";
     this.warnOsc.frequency.value = 1050;
@@ -317,11 +343,13 @@ export class AudioManager {
   tickUmgebung(dt: number): void {
     if (!this.ctx) return;
     this.spieleAufprallPuffer(dt);
-    this.kulisseRest -= dt;
-    if (this.kulisseRest <= 0) {
-      const [a, b] = AudioManager.KULISSE_PAUSE;
-      this.kulisseRest = a + Math.random() * (b - a);
-      this.zufallsgeraeusch();
+    if (PLATZKULISSE) {
+      this.kulisseRest -= dt;
+      if (this.kulisseRest <= 0) {
+        const [a, b] = AudioManager.KULISSE_PAUSE;
+        this.kulisseRest = a + Math.random() * (b - a);
+        this.zufallsgeraeusch();
+      }
     }
     if (this.warnGain) {
       this.warnTakt += dt;

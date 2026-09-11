@@ -82,15 +82,37 @@ function cableCoilGeometry(r: number, tube: number): THREE.BufferGeometry {
  * seitlich davonzufliegen. Der alte Kommentar behauptete, Fallen bleibe
  * unberührt; das stimmte nicht.
  *
- * Jetzt: Ein 20-kg-Blech kommt auf 12 m/s, ein 500-kg-Brocken auf 4 m/s. Nach
- * unten gilt die Grenze gar nicht (siehe FALL_MAX) — dort arbeitet die
- * Schwerkraft.
+ * Jetzt gilt zusaetzlich eine harte Obergrenze: WERKZEUG_MAX.
+ *
+ * Ein geschobenes Teil kann nicht schneller sein als das, was es geschoben
+ * hat — bei einem Stoss ohne Federung gibt es nichts, woraus mehr Tempo
+ * kommen koennte. Gemessen am 11.09.2026 flog ein 7-kg-Stueck mit 9,33 m/s
+ * (33,6 km/h), waehrend die Spitze der Spinne sich mit 3,8 m/s bewegte — das
+ * Zweieinhalbfache des Werkzeugs. Der Grund ist kein Fehler in der Physik,
+ * sondern die kinematische Spinne: Sie kann beliebig viel Schwung abgeben,
+ * und der Loeser schiesst eingeklemmte Stuecke heraus.
+ *
+ * Die alte Formel gab leichten Teilen ausserdem MEHR Tempo — genau denen,
+ * die als Geschosse auffallen. Physikalisch stimmt das fuer einen festen
+ * Stoss; hier ist der Stoss aber ein Rechenartefakt, kein Impuls. Darum die
+ * Deckelung.
+ *
+ * Nach unten gilt die Grenze weiterhin gar nicht (siehe FALL_MAX) — dort
+ * arbeitet die Schwerkraft.
  */
+
+/**
+ * So schnell wird ein Teil hoechstens, wenn die Maschine es anstoesst (m/s).
+ *
+ * Die Spitze der Spinne laeuft im Schwenk mit 3,8 m/s, die Schalen beim
+ * Schliessen mit gut 4. Schneller darf nichts werden, was sie beruehrt.
+ */
+export const WERKZEUG_MAX = 4.2;
 /** Fraktionen ohne metallischen Glanz — Abfall eben. */
 const NICHTMETALLE = new Set(["wood", "tires", "rubble", "plastic"]);
 
 export function maxSpeedFor(massKg: number): number {
-  return Math.min(8, Math.max(3.5, 45 / Math.sqrt(Math.max(massKg, 1))));
+  return Math.min(WERKZEUG_MAX, Math.max(1.4, 22 / Math.sqrt(Math.max(massKg, 1))));
 }
 
 /**
@@ -108,7 +130,7 @@ export function maxSpeedFor(massKg: number): number {
  * gibt je Schritt 0,16 m/s dazu und bleibt unberuehrt; ein Wurf behaelt seinen
  * Schwung, weil er beim Loslassen gesetzt und nicht gewonnen wird.
  */
-const MAX_ZUWACHS = 0.6;
+const MAX_ZUWACHS = 0.35;
 
 /** Ab diesem Tempoverlust in einem Schritt gilt es als Aufprall (m/s) */
 const AUFPRALL_DV = 1.1;
@@ -1029,7 +1051,13 @@ export class ItemManager {
       // Schwerkraft und keine Uebertragung aus der Spinne.
       const quer = Math.hypot(v.x, v.z);
       const f = quer > maxLinear ? maxLinear / quer : 1;
-      const y = Math.min(Math.max(v.y, -FALL_MAX), maxLinear);
+      /*
+       * Nach oben noch enger als quer. Ein geschobenes Teil rutscht und
+       * kippt; es huepft nicht auf. Die Aufwaertsspitzen kamen fast alle aus
+       * dem Loeser, nicht aus dem Spiel — zusammen mit dem Querwert ergaben
+       * zwei volle Grenzen die gemessenen 9,33 m/s.
+       */
+      const y = Math.min(Math.max(v.y, -FALL_MAX), maxLinear * 0.55);
       if (f < 1 || y !== v.y) {
         item.body.setLinvel({ x: v.x * f, y, z: v.z * f }, true);
       }

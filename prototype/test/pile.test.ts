@@ -11,7 +11,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
-import { ItemManager, maxSpeedFor, FALL_MAX } from "../src/world/scrapItems";
+import { ItemManager, maxSpeedFor, FALL_MAX, WERKZEUG_MAX } from "../src/world/scrapItems";
 import { PhysicsWorld, initPhysics } from "../src/physics/physicsWorld";
 
 beforeAll(async () => {
@@ -152,14 +152,26 @@ function tiefsterKoerper(world: RAPIER.World): number {
 describe("Geschwindigkeitsgrenzen", () => {
   it("hält schwere Teile quer langsamer als leichte", () => {
     expect(maxSpeedFor(20)).toBeGreaterThan(maxSpeedFor(500));
-    expect(maxSpeedFor(2000)).toBeGreaterThanOrEqual(3.5);
+    // Auch ein Brocken muss sich noch schieben lassen, sonst klebt er fest
+    expect(maxSpeedFor(2000)).toBeGreaterThanOrEqual(1.2);
   });
 
-  it("lässt auch schweren Schrott noch geworfen werden", () => {
-    // Die Spinnenspitze kommt bei 45°/s und 8 m auf gut 6 m/s. Ein Wurf muss
-    // als Wurf erkennbar bleiben, sonst fällt alles senkrecht herunter.
-    expect(maxSpeedFor(200)).toBeGreaterThanOrEqual(3.5);
-    expect(maxSpeedFor(20)).toBeGreaterThanOrEqual(7);
+  it("lässt nichts schneller werden als das Werkzeug, das es anstößt", () => {
+    /*
+     * Ein geschobenes Teil kann nicht schneller sein als sein Schieber: Bei
+     * einem Stoss ohne Federung gibt es nichts, woraus mehr Tempo kaeme.
+     * Gemessen am 11.09.2026 flog ein 7-kg-Stueck mit 9,33 m/s, waehrend die
+     * Spitze der Spinne mit 3,8 m/s lief — das Zweieinhalbfache. Ursache ist
+     * die kinematische Spinne, die beliebig viel Schwung abgeben kann.
+     *
+     * Die alte Fassung dieses Tests verlangte das Gegenteil ("ein Wurf muss
+     * als Wurf erkennbar bleiben") und stammte aus einer Zeit, in der das
+     * Drehwerk 45 statt 28 Grad je Sekunde drehte.
+     */
+    for (const masse of [5, 20, 60, 200, 500, 2000]) {
+      expect(maxSpeedFor(masse)).toBeLessThanOrEqual(WERKZEUG_MAX);
+    }
+    expect(WERKZEUG_MAX).toBeLessThanOrEqual(5);
   });
 
   it("deckelt nach unten erst weit jenseits des freien Falls", () => {

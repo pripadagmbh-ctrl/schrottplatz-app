@@ -112,15 +112,17 @@ const STEER_RATE = 0.7; // rad/s
  * beide Richtungen weich war. Die kroch los und riss dann. Nicht das
  * Endtempo war zu hoch, die Reaktion war zu traege.
  *
- * Mit sofort anliegender Hydraulik sind 36 Grad je Sekunde richtig — sechs
- * Umdrehungen je Minute, das untere Ende dessen, was die Maschine kann. Die
- * Spitze laeuft damit auf 8 m Radius mit 5,0 m/s, also 18 km/h.
+ * Danach zurueck auf 36 gestellt mit der Begruendung, die traege Reaktion sei
+ * die Ursache gewesen. War sie nicht: "das Drehwerk ist zu schnell, das merke
+ * ich doch" (11.09.2026). Wer faehrt, hat recht. 28 Grad je Sekunde, knapp
+ * fuenf Umdrehungen je Minute; die Spitze laeuft damit auf 8 m Radius mit
+ * 3,8 m/s, also 14 km/h.
  *
  * Das frueher gemeldete "zu langsam" galt nicht dem Grundtempo, sondern der
  * Last: "alles bis vier, fuenf Tonnen sollte kein Problem sein". Dafuer
  * sorgt tempoFaktor, nicht CAB_MAX.
  */
-export const CAB_MAX = THREE.MathUtils.degToRad(36);
+export const CAB_MAX = THREE.MathUtils.degToRad(28);
 const BOOM_RATE = THREE.MathUtils.degToRad(19);
 const STICK_RATE = THREE.MathUtils.degToRad(24);
 const ROTATOR_STEP = THREE.MathUtils.degToRad(15); // pro Mausrad-Raste

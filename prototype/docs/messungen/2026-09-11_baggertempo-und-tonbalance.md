@@ -268,3 +268,43 @@ Zwei Änderungen:
    früher fertig — das las sich wie ein Spielzeug, das durch Watte fährt.
 
 Im Haufen bleibt damit rund ein Drittel des freien Tempos übrig.
+
+## 7 Teile flogen wie Geschosse
+
+Der wichtigste Befund des Tages, und ich hatte ihn die ganze Zeit falsch
+zugeordnet: Mit „Geschwindigkeit" waren nie das Drehwerk gemeint, sondern die
+**Schrottteile**.
+
+Gemessen beim Durchschwenken durch den Haufen, 106 Teile, 220 Schritte:
+
+| | vorher | nachher |
+|---|---|---|
+| schnellstes Teil | **9,33 m/s = 33,6 km/h** (7 kg) | **1,59 m/s = 5,7 km/h** (110 kg) |
+| Teil-Schritte über 2 m/s | 468 | **0** |
+| über 4 m/s | 43 | **0** |
+| Teile weiter als 3 m verschoben | 5 | **0** |
+| größter Weg | 5,4 m | 0,9 m |
+
+Zum Vergleich: Die Spitze der Spinne bewegt sich mit **3,8 m/s**. Ein 7 kg
+schweres Stück war also zweieinhalbmal so schnell wie das Werkzeug, das es
+angestoßen hat. Bei einem Stoß ohne Federung gibt es nichts, woraus dieses
+Tempo käme — es ist ein Rechenartefakt der kinematischen Spinne, die beliebig
+viel Schwung abgeben kann, plus der Löser, der eingeklemmte Stücke
+herausschießt.
+
+Drei Ursachen:
+
+1. `maxSpeedFor` erlaubte **8 m/s quer und zusätzlich 8 m/s nach oben** —
+   zusammen die gemessenen 9,33.
+2. Die Formel gab **leichten** Teilen mehr Tempo (45/√m). Für einen echten
+   Impuls stimmt das; hier ist der Stoß aber ein Artefakt, und es traf genau
+   die Teile, die als Geschosse auffallen.
+3. Der Zuwachs je Schritt war mit 0,6 m/s großzügig.
+
+Jetzt gilt eine harte Obergrenze `WERKZEUG_MAX = 4,2 m/s`: **Nichts wird
+schneller als das, was es anstößt.** Nach oben nochmal enger (55 %), denn ein
+geschobenes Teil rutscht und kippt, es hüpft nicht auf.
+
+Die beiden Tests in `pile.test.ts`, die das Gegenteil verlangten („ein Wurf
+muss als Wurf erkennbar bleiben"), stammten aus der Zeit mit 45 °/s Drehwerk
+und wurden auf die neue Regel umgeschrieben.
