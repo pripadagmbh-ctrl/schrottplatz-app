@@ -92,6 +92,21 @@
         top: 12px; right: 12px; width: 46px; height: 46px; padding: 0;
         line-height: 46px; font-size: 20px; z-index: 3;
       }
+      /* Rotator: zwei Tasten am rechten Bildrand in Daumenhoehe.
+         Sie hatten ihre Position nur in der Handy-Regel weiter unten; auf dem
+         Tablet fehlte jede Angabe. Ein absolut positioniertes Element ohne
+         Offsets bleibt an seinem Platz im Fluss stehen — beide landeten
+         uebereinander in der linken oberen Ecke, sichtbar war nur eine
+         (Befund iPad 11.09.2026). */
+      /* Mit "#touch" davor, sonst gewinnt "#touch .btn" mit seinem Innenrand
+         und die Tasten werden 22 px hoeher als gedacht — dann ueberlappen sie. */
+      #touch #btn-rot-l, #touch #btn-rot-r {
+        right: 12px; width: 54px; height: 50px; line-height: 46px;
+        padding: 0; font-size: 20px;
+      }
+      #touch #btn-rot-l { bottom: 238px; }
+      #touch #btn-rot-r { bottom: 180px; }
+
       /* Die Funktions-Elemente tragen nur noch ihre Tastencodes; sichtbar wird
          davon nichts. Der Kranz zeichnet sich selbst. */
       .hidden-actions { display: none; }
@@ -127,9 +142,11 @@
         #btn-menu { top: 8px; right: 8px; width: 40px; height: 40px; line-height: 40px; font-size: 18px; }
         #radial .sektor { width: 66px; height: 26px; margin: -13px 0 0 -33px; font-size: 10px; line-height: 22px; }
         /* neben den rechten Stick statt darüber — oben liegt die Tastenleiste */
-        #btn-rot-l, #btn-rot-r { bottom: 14px; width: 46px; height: 40px; line-height: 40px; }
-        #btn-rot-l { right: 190px; }
-        #btn-rot-r { right: 132px; }
+        #touch #btn-rot-l, #touch #btn-rot-r {
+          bottom: 14px; width: 46px; height: 40px; line-height: 36px; font-size: 17px;
+        }
+        #touch #btn-rot-l { right: 190px; }
+        #touch #btn-rot-r { right: 132px; }
         /* endet über dem rechten Stick, sonst legen sich die Tasten darauf */
         #help { display: none; }
         /* Konto und Tagesablauf nach links: rechts oben braucht die

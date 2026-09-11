@@ -11,7 +11,8 @@
  * verschiebt, muss dieses Fenster treffen; der Test sagt es sofort.
  */
 import { describe, it, expect } from "vitest";
-import { hoechsteKrallenspitze } from "../src/excavator/excavator";
+import * as THREE from "three";
+import { hoechsteKrallenspitze, tempoFaktor, anlaufZeit, CAB_MAX } from "../src/excavator/excavator";
 import { CONFIGS } from "../src/world/containers";
 import { ROUTE_IN_REV, TIP_CREEP_M } from "../src/delivery/routes";
 
@@ -65,4 +66,43 @@ describe("Reichweite des Arms", () => {
       ).toBeGreaterThan(wandH + 0.4);
     });
   }
+});
+
+/**
+ * Last und Tempo (Befund 11.09.2026).
+ *
+ * Vorher galt: 1 − 0,5 × (Last / 2000 kg). Zwei Tonnen halbierten also das
+ * Tempo der ganzen Maschine. Für einen Umschlagbagger dieser Größe sind zwei
+ * Tonnen nichts — die Hydraulik ist druckgeregelt, das Drehwerk dreht nahezu
+ * unverändert weiter. Zu spüren ist die Masse im Anlauf.
+ */
+describe("Last am Greifer", () => {
+  it("kostet bis zur Nennlast kaum Endtempo", () => {
+    expect(tempoFaktor(0)).toBe(1);
+    expect(tempoFaktor(2000)).toBeGreaterThan(0.9);
+    expect(tempoFaktor(5000)).toBeGreaterThan(0.8);
+  });
+
+  it("bremst erst jenseits der Nennlast deutlich", () => {
+    expect(tempoFaktor(7500)).toBeLessThan(tempoFaktor(5000));
+    expect(tempoFaktor(10000)).toBeCloseTo(0.5, 2);
+    // und nie ins Stehen
+    expect(tempoFaktor(50000)).toBeGreaterThan(0.4);
+  });
+
+  it("macht den Anlauf träger statt das Tempo kleiner", () => {
+    // Genau darüber wirkt die Masse: Sie läuft langsam an und läuft aus.
+    expect(anlaufZeit(5000)).toBeGreaterThan(anlaufZeit(0) * 1.5);
+    expect(anlaufZeit(0)).toBeGreaterThan(0.2);
+    // Über der Nennlast wächst die Rampe nicht weiter ins Uferlose
+    expect(anlaufZeit(20000)).toBe(anlaufZeit(5000));
+  });
+
+  it("dreht den Turm zügig genug für Umschlagarbeit", () => {
+    // 7 bis 9 Umdrehungen je Minute sind bei dieser Maschinenklasse üblich,
+    // also 42 bis 54 Grad je Sekunde.
+    const gradProSekunde = THREE.MathUtils.radToDeg(CAB_MAX);
+    expect(gradProSekunde).toBeGreaterThanOrEqual(42);
+    expect(gradProSekunde).toBeLessThanOrEqual(54);
+  });
 });

@@ -76,11 +76,14 @@ const STICK_MAX = THREE.MathUtils.degToRad(-25);
 // Geschwindigkeiten (SW aus Briefing Kap. 5.1)
 const DRIVE_MAX = 1.4; // m/s ≈ 5 km/h
 const STEER_RATE = 0.7; // rad/s
-// Tempo eine Stufe zurueckgenommen (Wunsch 10.09.2026: "Bagger scheint zu
-// schnell"). Ein Umschlagbagger von 30 Tonnen dreht sich nicht wie ein Bagger
-// im Garten — er setzt sich schwer in Bewegung und kommt schwer zur Ruhe.
-// Darum auch die laengere Rampe unten.
-const CAB_MAX = THREE.MathUtils.degToRad(30);
+/*
+ * Drehwerk. Ein Umschlagbagger dieser Groesse dreht mit 7 bis 9 Umdrehungen
+ * je Minute, also 42 bis 54 Grad je Sekunde. Mit 30 Grad war der Turm am
+ * unteren Ende und fuehlte sich zaeh an (Befund 11.09.2026). Schwer wirkt die
+ * Maschine ueber die Rampe, nicht ueber ein niedriges Endtempo: Sie laeuft
+ * traege an und kommt traege zur Ruhe — nur eben zu einem ordentlichen Tempo.
+ */
+export const CAB_MAX = THREE.MathUtils.degToRad(45);
 const BOOM_RATE = THREE.MathUtils.degToRad(19);
 const STICK_RATE = THREE.MathUtils.degToRad(23);
 const ROTATOR_STEP = THREE.MathUtils.degToRad(15); // pro Mausrad-Raste
@@ -92,6 +95,36 @@ const ROTATOR_STEP = THREE.MathUtils.degToRad(15); // pro Mausrad-Raste
  * Ein Schrottgreifer dreht die Ladung flott in die Mulde, er zirkelt nicht.
  */
 const ROTATOR_SPEED = THREE.MathUtils.degToRad(160); // rad/s
+/**
+ * Last und Tempo.
+ *
+ * Die Hydraulik ist druckgeregelt: Bis zur Nennlast dreht das Drehwerk fast
+ * genauso schnell wie leer, zu spueren ist die Last im Anlauf. Vorher war es
+ * andersherum modelliert — zwei Tonnen halbierten das Tempo der ganzen
+ * Maschine, und das Arbeiten wurde zaeh, obwohl zwei Tonnen fuer ein Geraet
+ * dieser Groesse nichts sind (Befund 11.09.2026).
+ */
+const NENNLAST_KG = 5000;
+/** Was bei Nennlast an Endtempo fehlt */
+const LAST_TEMPO = 0.15;
+/** Darueber wird es deutlich: bei doppelter Nennlast bleibt die Haelfte. */
+const UEBERLAST_TEMPO = 0.35;
+/** Um so viel laenger braucht der Anlauf bei Nennlast */
+const LAST_ANLAUF = 0.9;
+
+/** Endtempo-Faktor fuer eine Last (1 = leer). */
+export function tempoFaktor(lastKg: number): number {
+  const bisNenn = Math.min(Math.max(lastKg, 0) / NENNLAST_KG, 1);
+  const ueber = Math.min(Math.max(lastKg - NENNLAST_KG, 0) / NENNLAST_KG, 1);
+  return 1 - LAST_TEMPO * bisNenn - UEBERLAST_TEMPO * ueber;
+}
+
+/** Anlauf- und Auslauframpe (s) fuer eine Last. */
+export function anlaufZeit(lastKg: number): number {
+  const bisNenn = Math.min(Math.max(lastKg, 0) / NENNLAST_KG, 1);
+  return RAMP_TIME * (1 + LAST_ANLAUF * bisNenn);
+}
+
 const CLOSE_TIME = 0.4; // s (SW)
 const OPEN_TIME = 0.3; // s (SW)
 const RAMP_TIME = 0.38; // s Anlauf-/Auslauframpe — traeger, die Masse ist zu spueren
@@ -1064,12 +1097,13 @@ export class Excavator {
 
   /** Ein fester Physik-Step (dt = 1/60). Reihenfolge: Achsen → Meshes → kinematische Körper. */
   update(dt: number, input: Input): void {
-    // Lastfaktor (Briefing 6.1): 1 − 0,5 × (Last / 2000 kg). Dazu kommt der
-    // Widerstand des Materials, durch das die Spinne gerade pflügt — beides
-    // zusammen macht schweres Arbeiten spürbar zäh.
+    // Last: kostet kaum Endtempo, aber Anlauf (siehe tempoFaktor/anlaufZeit).
+    // Dazu kommt der Widerstand des Materials, durch das die Spinne gerade
+    // pflügt — der bremst wirklich, denn dagegen arbeitet die Maschine.
     // Der Baggerausbau macht die Hydraulik schneller
     const ausbau = this.getSpeedBonus?.() ?? 1;
-    const carried = (1 - 0.5 * Math.min(this.carriedMassKg / 2000, 1)) * ausbau;
+    const carried = tempoFaktor(this.carriedMassKg) * ausbau;
+    const rampe = anlaufZeit(this.carriedMassKg);
     this.plowFactor += (this.collision.plowFactor() - this.plowFactor) * Math.min(dt * 6, 1);
     const loadFactor = carried * this.plowFactor;
     // Zustand vor der Bewegung merken (für die Fahrzeug-Sperre unten)
@@ -1107,15 +1141,15 @@ export class Excavator {
     this.inBoom = clamp1(axis2(input, "KeyF", "KeyR", "PageDown", "PageUp") + (t?.boom ?? 0));
     this.inStick = clamp1(axis2(input, "KeyG", "KeyT", "ArrowDown", "ArrowUp") + (t?.stick ?? 0));
     const cabTarget = this.inCab * CAB_MAX * loadFactor;
-    this.cabVel = ramp(this.cabVel, cabTarget, (CAB_MAX / RAMP_TIME) * dt);
+    this.cabVel = ramp(this.cabVel, cabTarget, (CAB_MAX / rampe) * dt);
     this.cabYaw += this.cabVel * dt;
 
     const boomTarget = this.inBoom * BOOM_RATE * loadFactor;
-    this.boomVel = ramp(this.boomVel, boomTarget, (BOOM_RATE / RAMP_TIME) * dt);
+    this.boomVel = ramp(this.boomVel, boomTarget, (BOOM_RATE / rampe) * dt);
     this.boomAngle = THREE.MathUtils.clamp(this.boomAngle + this.boomVel * dt, BOOM_MIN, BOOM_MAX);
 
     const stickTarget = this.inStick * STICK_RATE * loadFactor;
-    this.stickVel = ramp(this.stickVel, stickTarget, (STICK_RATE / RAMP_TIME) * dt);
+    this.stickVel = ramp(this.stickVel, stickTarget, (STICK_RATE / rampe) * dt);
     this.stickAngle = THREE.MathUtils.clamp(
       this.stickAngle + this.stickVel * dt,
       STICK_MIN,
@@ -1251,7 +1285,7 @@ export class Excavator {
   private currentSplay(): number {
     const minSplay = Math.min(
       0.5,
-      this.carriedCount * 0.06 + Math.min(this.carriedMassKg / 2000, 1) * 0.28
+      this.carriedCount * 0.06 + Math.min(this.carriedMassKg / NENNLAST_KG, 1) * 0.28
     );
     return THREE.MathUtils.lerp(CLAW_OPEN_SPLAY, minSplay, this.closure);
   }
@@ -1578,7 +1612,7 @@ export class Excavator {
     const L = 1.5; // wirksame Pendellänge Gelenk→Lastschwerpunkt (SW)
     const G = 9.81;
     // schwere Last: weniger Dämpfung → längeres Nachpendeln (SW)
-    const damping = THREE.MathUtils.lerp(2.4, 0.9, Math.min(this.carriedMassKg / 2000, 1));
+    const damping = THREE.MathUtils.lerp(2.4, 0.9, Math.min(this.carriedMassKg / NENNLAST_KG, 1));
     this.swingVel.x += (-(G / L) * Math.sin(this.swing.x) - damping * this.swingVel.x + az / L) * dt;
     this.swingVel.y += (-(G / L) * Math.sin(this.swing.y) - damping * this.swingVel.y - ax / L) * dt;
     this.swing.x = THREE.MathUtils.clamp(this.swing.x + this.swingVel.x * dt, -0.45, 0.45);
