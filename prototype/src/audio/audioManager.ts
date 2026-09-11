@@ -17,7 +17,13 @@ const AUFPRALL_FENSTER_S = 0.14;
 const SFX_TIEFPASS_HZ = 1600;
 
 export class AudioManager {
-  private ctx: AudioContext | null = null;
+  /**
+   * Die Klangwelt haengt an einem Kontext. Normalerweise legt sie ihn selbst
+   * an; fuer Hoerproben laesst sich ein OfflineAudioContext hineinreichen,
+   * der dieselben Klaenge in eine Datei rechnet statt auf den Lautsprecher.
+   * Deshalb der breitere Typ.
+   */
+  private ctx: BaseAudioContext | null = null;
   private master: GainNode | null = null;
   private music: Music | null = null;
   /** Musikwunsch des Spielers — gilt auch, bevor der Ton überhaupt läuft */
@@ -30,7 +36,7 @@ export class AudioManager {
   /** Sammelweg aller Geraeusche — gefiltert, damit es dumpf bleibt */
   private sfx: GainNode | null = null;
 
-  constructor() {
+  constructor(private vorgabe?: BaseAudioContext) {
     const start = () => this.ensureStarted();
     // Mobile Browser geben den Ton erst nach einer echten Geste frei, und
     // welches Ereignis dabei zählt, unterscheidet sich je nach System — daher
@@ -63,16 +69,18 @@ export class AudioManager {
     };
   }
 
-  private ensureStarted(): void {
+  ensureStarted(): void {
     if (this.ctx) {
       // Auf dem Handy kann der Ton jederzeit wieder einschlafen (Anruf,
       // Bildschirm aus, Tabwechsel) — bei jeder Geste erneut aufwecken.
-      if (this.ctx.state !== "running") this.ctx.resume().catch(() => {});
+      if (this.ctx instanceof AudioContext && this.ctx.state !== "running") {
+        this.ctx.resume().catch(() => {});
+      }
       if (this.musicWanted) this.music?.start();
       return;
     }
     try {
-      this.ctx = new AudioContext();
+      this.ctx = this.vorgabe ?? new AudioContext();
       this.master = this.ctx.createGain();
       this.master.gain.value = 0.62;
       this.master.connect(this.ctx.destination);

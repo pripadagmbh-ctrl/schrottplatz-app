@@ -42,7 +42,7 @@ export class Music {
   private running = false;
 
   constructor(
-    private ctx: AudioContext,
+    private ctx: BaseAudioContext,
     destination: AudioNode
   ) {
     this.gain = ctx.createGain();

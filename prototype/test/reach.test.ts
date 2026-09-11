@@ -28,11 +28,21 @@ function abstand(x: number, z: number): number {
 
 describe("Reichweite des Arms", () => {
   it("der Arm hat eine tote Zone in Baggernähe", () => {
-    // Der Befund, der die Reihe zum Umziehen gezwungen hat — er soll
-    // dokumentiert bleiben, damit niemand die Mulden wieder heranrückt.
-    expect(hoechsteKrallenspitze(4.6)).toBeLessThan(2.0);
-    expect(hoechsteKrallenspitze(6.0)).toBeLessThan(3.0);
+    /*
+     * Der Befund, der die Muldenreihe zum Umziehen gezwungen hat: Ganz nah am
+     * Bagger bleibt der Arm eingeklappt. Seit der Drehpunkt hoeher sitzt und
+     * der Ausleger steiler stehen darf (11.09.2026), reicht er frueher hoch —
+     * die tote Zone ist kleiner, aber es gibt sie:
+     *
+     *          3,0 m   4,6 m   6,0 m   7,5 m   9,5 m
+     *   vorher  -1,68    1,48    2,52    6,28    1,73
+     *   nachher -1,28    2,55    8,11    6,68    2,13
+     */
+    expect(hoechsteKrallenspitze(3.0)).toBeLessThan(0);
+    expect(hoechsteKrallenspitze(4.6)).toBeLessThan(3.0);
     expect(hoechsteKrallenspitze(7.5)).toBeGreaterThan(4.0);
+    // ... und ueber eine 3-m-Muldenwand kommt er jetzt schon bei 6 m
+    expect(hoechsteKrallenspitze(6.0)).toBeGreaterThan(3.0);
   });
 
   it("alles, was ein Kipper ablaedt, bleibt in Reichweite", () => {

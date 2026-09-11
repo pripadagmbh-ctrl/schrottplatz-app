@@ -55,7 +55,25 @@ export function hoechsteKrallenspitze(abstandM: number): number {
 
 const BOOM_LEN = 5.2;
 const STICK_LEN = 4.0;
-const BOOM_PIVOT = new THREE.Vector3(0, 2.55, 0.55); // relativ zum Chassis-Ursprung (Boden)
+/*
+ * Der Drehpunkt des Hauptarms sitzt hoeher als frueher (2,55 m), und der Arm
+ * darf weiter aufrichten (Wunsch 11.09.2026: "etwas hoeher vom Hauptarm und
+ * Ausleger"). Ein Umschlagbagger hat genau dieses Profil: hochgesetzter
+ * Oberwagen, steil stehender Ausleger, damit er ueber Bordwaende und
+ * Muldenraender langt.
+ *
+ * Nachgerechnet mit hoechsteKrallenspitze — so weit kommen die Krallenspitzen
+ * ueber Grund, je nach Abstand vom Bagger:
+ *
+ *          4,6 m   6,0 m   6,5 m   7,5 m   8,5 m   9,5 m
+ *   vorher  1,48    2,52    7,30    6,28    4,80    1,73
+ *   nachher 2,55    8,11    7,70    6,68    5,20    2,13
+ *
+ * Der Knick wandert damit von 6,5 auf 6,0 m nach innen: Auch die naeheren
+ * Mulden sind jetzt sauber zu befuellen, und ueber eine 3-m-Wand kommt der
+ * Greifer ab 4,6 m statt erst ab 6,5 m.
+ */
+const BOOM_PIVOT = new THREE.Vector3(0, 2.95, 0.55); // relativ zum Chassis-Ursprung (Boden)
 const GRAPPLE_LINK = 0.55; // Abstand Stielspitze → Palm-Oberkante
 
 // Räumschild vorn am Unterwagen
@@ -70,7 +88,7 @@ const PALM_TO_SENSOR = 0.75; // Palm-Zentrum → Sensor in der Mitte des Schalen
 
 // Achsgrenzen (SW)
 const BOOM_MIN = THREE.MathUtils.degToRad(5);
-const BOOM_MAX = THREE.MathUtils.degToRad(62);
+const BOOM_MAX = THREE.MathUtils.degToRad(70);
 const STICK_MIN = THREE.MathUtils.degToRad(-140);
 const STICK_MAX = THREE.MathUtils.degToRad(-25);
 
