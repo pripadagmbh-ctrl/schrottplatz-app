@@ -155,6 +155,7 @@ export class AudioManager {
       scrapeNoise.connect(scrapeFilter).connect(this.scrapeGain).connect(this.sfx);
       scrapeNoise.start();
 
+      this.baueKlangwege();
       this.starteUmgebung();
     } catch {
       this.ctx = null; // Audio bleibt aus, Spiel läuft weiter
@@ -257,12 +258,9 @@ export class AudioManager {
 
   /** Irgendwo faellt etwas Schweres — der haeufigste Klang auf dem Platz. */
   private fernerSchlag(pegel: number, fern: number): void {
-    this.metalHit(
-      [88, 132, 196, 279],
-      [0.5, 0.36, 0.24, 0.16],
-      0.1 * pegel,
-      { transient: 300 - fern * 120, transientGain: 0.12 * pegel, spread: 0.03 }
-    );
+    // Weiter weg heisst dumpfer: weniger Guete, tiefere Anteile
+    const d = 1 - fern * 0.45;
+    this.scheppern([86 * d, 131 * d, 198 * d, 287 * d], [50, 38, 28, 20], 0.3 * pegel, true);
   }
 
   /** Jemand schlaegt mit dem Vorschlaghammer: drei Schlaege, ungleich verteilt. */
@@ -271,12 +269,9 @@ export class AudioManager {
     const start = this.ctx.currentTime;
     for (let i = 0; i < 3; i++) {
       const t = start + i * (0.26 + Math.random() * 0.12);
+      const d = 1 - fern * 0.4;
       this.spaeter(t - start, () =>
-        this.metalHit([150, 232, 338], [0.28, 0.2, 0.13], 0.085 * pegel, {
-          transient: 420 - fern * 160,
-          transientGain: 0.1 * pegel,
-          spread: 0.02,
-        })
+        this.anschlag([156 * d, 241 * d, 352 * d], [45, 34, 26], 0.3 * pegel, 0.004)
       );
     }
   }
@@ -373,11 +368,15 @@ export class AudioManager {
    */
   playClawSnap(haerte = 1): void {
     const h = Math.max(0.15, Math.min(haerte, 1));
-    this.metalHit([330, 505, 742, 1058], [0.36 * h, 0.27 * h, 0.19 * h, 0.12 * h], 0.12 + 0.14 * h, {
-      transient: 434,
-      transientGain: 0.34 * h,
-      spread: 0.012,
-    });
+    /*
+     * Zwei Stahlschalen schlagen aufeinander: ein harter, kurzer Krach mit
+     * Nachklappern. Tiefer gelegt (Wunsch 11.09.2026: "Pitch zu hoch") und
+     * ueber Resonanzen gebaut statt aus Oszillatoren — sonst klingt es nach
+     * Glockenspiel.
+     */
+    this.burst([58], 0.14, 0.24 * h, "triangle");
+    this.anschlag([168, 252, 371, 523, 742], [55, 42, 34, 26, 20], 0.5 * h, 0.004);
+    this.anschlag([180, 268, 398], [40, 30, 24], 0.2 * h, 0.007, 0.045 + Math.random() * 0.03);
   }
 
   /**
@@ -436,31 +435,27 @@ export class AudioManager {
       materialId === "rubble" ||
       materialId === "cable";
 
-    if (aufStahl) {
-      /*
-       * Ladeflaeche und Bordwaende sind grosse, duenne Stahlbleche. Sie
-       * antworten mit einem tiefen Wummern und einem laenger stehenden,
-       * leicht verstimmten Nachklang — das ist der Klang, den man von einem
-       * Schrottplatz kennt.
-       */
-      this.metalHit(
-        [72, 108, 163, 241, 352],
-        [0.85, 0.7, 0.52, 0.36, 0.24],
-        (weich ? 0.1 : 0.22) * w,
-        { transient: 240, transientGain: 0.22 * w, spread: 0.035 }
-      );
-      this.burst([44, 58], 0.26 + 0.2 * w, 0.16 * w, "sine"); // das Blech wummert
-      if (!weich) this.noiseBurst(520, 0.12, 0.1 * w); // Scheppern obendrauf
+    if (weich) {
+      // Holz, Gummi, Kunststoff: ein Plumps, kein Klang. Wenige, stark
+      // gedaempfte Resonanzen und viel Rauschen.
+      this.anschlag([78, 121, 205], [7, 5, 4], 0.5 * w, 0.02);
+      this.noiseBurst(260, 0.12, 0.16 * w);
       return;
     }
-    // Auf Beton: kurz, dumpf, kaum Nachklang
-    this.metalHit(
-      [96, 141, 208],
-      [0.3, 0.2, 0.13],
-      (weich ? 0.08 : 0.16) * w,
-      { transient: 260, transientGain: 0.2 * w, spread: 0.02 }
-    );
-    this.noiseBurst(220, 0.09, 0.12 * w);
+
+    if (aufStahl) {
+      /*
+       * Ladeflaeche und Bordwaende: grosse, duenne Bleche. Sie haben tiefe,
+       * dicht beieinander liegende Eigenfrequenzen und klingen lange nach —
+       * daher hohe Guete und viele Anschlaege hintereinander.
+       */
+      this.scheppern([94, 147, 223, 331, 468, 651], [90, 70, 55, 45, 35, 28], 0.55 * w, true);
+      this.burst([41, 55], 0.3 + 0.25 * w, 0.14 * w, "sine"); // das Blech wummert
+      return;
+    }
+    // Beton: kurz, trocken, wenig Nachklang
+    this.scheppern([128, 196, 289, 402], [30, 24, 18, 14], 0.42 * w, false);
+    this.noiseBurst(300, 0.08, 0.12 * w);
   }
 
   /**
@@ -502,90 +497,168 @@ export class AudioManager {
    * Abklingen — genau das bildet metalHit nach. Dazu ein kurzer Aufprall-
    * Transient, der Masse und Härte vermittelt.
    */
+  /**
+   * Abwurfklang je Material (Kap. 15), jetzt ueber Resonanzen statt addierter
+   * Toene: Metall klingt nicht harmonisch wie ein Instrument, sondern
+   * rauschhaft mit einigen stehenden Eigenfrequenzen — und es scheppert nach.
+   */
   playDrop(materialId: string): void {
     switch (materialId) {
       case "steel":
-        // schwerer Stahl: tiefer Anschlag, langes metallisches Nachklingen
-        this.metalHit([132, 205, 301, 441, 646], [1.0, 0.78, 0.55, 0.36, 0.24], 0.3, {
-          transient: 992,
-          transientGain: 0.3,
-          spread: 0.05,
-        });
+      case "mixed":
+        // schwerer Stahl: tief, lang, mit Nachklappern
+        this.scheppern([104, 158, 236, 347, 498], [80, 62, 48, 38, 30], 0.5, true);
         break;
       case "va":
-        // Edelstahl: heller und klarer, klingt am längsten nach
-        this.metalHit([243, 379, 566, 823, 1180], [1.3, 1.0, 0.72, 0.46, 0.3], 0.24, {
-          transient: 1400,
-          transientGain: 0.2,
-          spread: 0.03,
-        });
+        // Edelstahl: heller und praeziser, kuerzeres Scheppern
+        this.scheppern([186, 281, 412, 588], [70, 55, 42, 32], 0.42, false);
         break;
       case "alu":
-        // Aluminium: leicht, hell, kurzer Nachhall
-        this.metalHit([324, 500, 736, 1037], [0.55, 0.38, 0.25, 0.17], 0.22, {
-          transient: 1400,
-          transientGain: 0.22,
-          spread: 0.04,
-        });
+        // Alu: leicht, klirrt kurz
+        this.scheppern([243, 366, 537, 761], [45, 36, 28, 22], 0.34, false);
         break;
       case "copper":
-        // Kupfer/Messing: weicher, dunkler Klang mit tragendem Sustain
-        this.metalHit([184, 278, 414, 590], [1.05, 0.82, 0.56, 0.36], 0.26, {
-          transient: 682,
-          transientGain: 0.18,
-          spread: 0.06,
-        });
+        // Kupfer: dumpfer als Stahl, kaum Nachklang
+        this.scheppern([152, 226, 332], [26, 20, 15], 0.34, false);
         break;
       case "cable":
-        // Kabelbund: fast tonlos, dumpfes Poltern mit Raschelanteil
-        this.metalHit([88, 126], [0.26, 0.2], 0.24, {
-          transient: 558,
-          transientGain: 0.3,
-          spread: 0.09,
-        });
-        this.noiseBurst(1600, 0.22, 0.16);
+        // Kabelbund: klatscht, klingt nicht
+        this.anschlag([88, 132], [6, 5], 0.42, 0.03);
+        this.noiseBurst(320, 0.14, 0.18);
         break;
       default:
-        // Störstoff (Holz, Beton, Kunststoff): Schlag ohne metallisches Klingen
-        this.metalHit([72, 104], [0.16, 0.12], 0.34, {
-          transient: 260,
-          transientGain: 0.26,
-          spread: 0.02,
-        });
+        // Holz, Reifen, Baumisch, Kunststoff: Plumps ohne Klang
+        this.anschlag([72, 108, 176], [7, 5, 4], 0.44, 0.025);
+        this.noiseBurst(240, 0.16, 0.2);
     }
   }
 
-  /**
-   * Ein Metallschlag: kurzer Aufprall-Transient plus inharmonische Partialtöne,
-   * die unterschiedlich schnell verklingen.
-   * @param partials Teiltonfrequenzen (bewusst nicht harmonisch)
-   * @param decays Abklingzeit je Teilton in Sekunden
-   * @param gain Grundlautstärke
+  /*
+   * --- Schrottklang: Rauschen durch Resonanzen statt addierter Toene ---
+   *
+   * Befund 11.09.2026: "Das klingt alles noch sehr kindlich." Zu Recht. Bis
+   * hierher wurde jeder Schlag aus einer Handvoll Sinus- und Dreieckstoenen
+   * addiert. Solche Toene sind sauber und periodisch — das Ohr hoert ein
+   * Xylophon, kein Blech. Echter Schrott klingt anders:
+   *
+   *   RAUSCHHAFT   Der Klang entsteht, weil Material breitbandig angeregt wird
+   *                und nur einige Eigenfrequenzen stehen bleiben. Also kurzes
+   *                Rauschen durch schmale Bandpaesse mit hoher Guete, statt
+   *                Oszillatoren.
+   *   SCHMUTZIG    Ein Waveshaper saettigt leicht und setzt Obertoene dazu —
+   *                das ist der Unterschied zwischen "Ton" und "Krach".
+   *   UNREGELMAESSIG  Ein Aufschlag ist nie EIN Schlag: Das Stueck springt,
+   *                kippt, rutscht. Eine Kaskade mit fallender Lautstaerke und
+   *                zufaelligem Abstand — das ist das Scheppern.
+   *   MIT RAUM     Ein kurzer, dichter Nachhall aus prozeduralem Rauschen
+   *                setzt alles auf denselben Platz.
    */
-  private metalHit(
-    partials: number[],
-    decays: number[],
+
+  /** Gemeinsamer Platzhall — kurz und dicht, damit nichts nach Studio klingt. */
+  private hall: ConvolverNode | null = null;
+  private hallSend: GainNode | null = null;
+  /** Leichte Saettigung fuer alle Schlaege */
+  private dreck: WaveShaperNode | null = null;
+
+  private baueKlangwege(): void {
+    if (!this.ctx || !this.sfx) return;
+    this.dreck = this.ctx.createWaveShaper();
+    const n = 1024;
+    const kurve = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const x = (i / (n - 1)) * 2 - 1;
+      kurve[i] = Math.tanh(x * 2.4);
+    }
+    this.dreck.curve = kurve;
+    this.dreck.oversample = "2x";
+    this.dreck.connect(this.sfx);
+
+    this.hall = this.ctx.createConvolver();
+    const dauer = 0.55;
+    const len = Math.floor(this.ctx.sampleRate * dauer);
+    const buf = this.ctx.createBuffer(2, len, this.ctx.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = buf.getChannelData(ch);
+      for (let i = 0; i < len; i++) {
+        const t = i / len;
+        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 3.2);
+      }
+      // ein paar harte frueh Reflexionen — Wand, Mulde, Container
+      for (const ms of [11, 19, 31, 47]) {
+        const idx = Math.floor((ms / 1000) * this.ctx.sampleRate);
+        if (idx < len) d[idx] += (Math.random() * 2 - 1) * 0.6;
+      }
+    }
+    this.hall.buffer = buf;
+    this.hallSend = this.ctx.createGain();
+    this.hallSend.gain.value = 0.28;
+    this.hallSend.connect(this.hall).connect(this.sfx);
+  }
+
+  /**
+   * Ein Anschlag: kurzes Rauschen durch mehrere Resonanzen.
+   *
+   * @param freqs Eigenfrequenzen (bewusst unharmonisch)
+   * @param guete Guete je Resonanz — hoch heisst langes Nachklingen
+   * @param gain Lautstaerke
+   * @param anregung Dauer der Anregung (kurz = harter Schlag)
+   * @param wann Versatz in Sekunden
+   */
+  private anschlag(
+    freqs: number[],
+    guete: number[],
     gain: number,
-    opts: { transient: number; transientGain: number; spread: number }
+    anregung: number,
+    wann = 0
   ): void {
-    if (!this.ctx || !this.master) return;
-    const t = this.ctx.currentTime;
-    // Aufprall: sehr kurzer, gefilterter Rauschimpuls
-    this.noiseBurst(opts.transient, 0.045, opts.transientGain);
-    partials.forEach((f, i) => {
-      const osc = this.ctx!.createOscillator();
-      // leichte Verstimmung je Anschlag — kein Ton klingt exakt wie der vorige
-      osc.frequency.value = f * (1 + (Math.random() - 0.5) * opts.spread);
-      osc.type = i === 0 ? "triangle" : "sine";
+    if (!this.ctx || !this.sfx || !this.dreck) return;
+    const t = this.ctx.currentTime + wann;
+    const src = this.ctx.createBufferSource();
+    src.buffer = this.noiseBuffer();
+    src.playbackRate.value = 0.8 + Math.random() * 0.5;
+    const anreg = this.ctx.createGain();
+    anreg.gain.setValueAtTime(gain, t);
+    anreg.gain.exponentialRampToValueAtTime(0.0001, t + anregung);
+    src.connect(anreg);
+
+    freqs.forEach((f, i) => {
+      const bp = this.ctx!.createBiquadFilter();
+      bp.type = "bandpass";
+      // leicht verstimmt — kein Schlag klingt wie der vorige
+      bp.frequency.value = f * (0.93 + Math.random() * 0.14);
+      bp.Q.value = guete[i] ?? 40;
       const g = this.ctx!.createGain();
-      const amp = (gain / (i + 1.4)) * (0.85 + Math.random() * 0.3);
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(amp, t + 0.006); // harter Anschlag
-      g.gain.exponentialRampToValueAtTime(0.0001, t + decays[i]);
-      osc.connect(g).connect(this.sfx!);
-      osc.start(t);
-      osc.stop(t + decays[i] + 0.05);
+      g.gain.value = 1 / (1 + i * 0.55);
+      anreg.connect(bp).connect(g);
+      g.connect(this.dreck!);
+      if (this.hallSend) g.connect(this.hallSend);
     });
+    src.start(t);
+    src.stop(t + anregung + 1.2);
+  }
+
+  /**
+   * Scheppern: eine Kaskade von Anschlaegen. Das Stueck springt, kippt und
+   * rutscht aus — genau das unterscheidet Krach von einem einzelnen "Pling".
+   */
+  private scheppern(freqs: number[], guete: number[], wucht: number, stahl: boolean): void {
+    const schlaege = stahl ? 3 + Math.floor(Math.random() * 5) : 2 + Math.floor(Math.random() * 3);
+    let wann = 0;
+    for (let i = 0; i < schlaege; i++) {
+      const staerke = wucht * Math.pow(0.62, i) * (0.7 + Math.random() * 0.6);
+      this.anschlag(
+        freqs.map((f) => f * (0.9 + Math.random() * 0.25)),
+        guete,
+        staerke,
+        i === 0 ? 0.004 : 0.006 + Math.random() * 0.01,
+        wann
+      );
+      wann += 0.035 + Math.random() * (stahl ? 0.13 : 0.07);
+    }
+    // Auslaufen: kurzes Rutschen und Wackeln am Ende
+    if (wucht > 0.25) {
+      this.noiseBurst(stahl ? 900 : 380, 0.12 + Math.random() * 0.12, 0.05 * wucht);
+    }
   }
 
   /** Metall-Kreischen beim Abreißen einer Baugruppe. */
