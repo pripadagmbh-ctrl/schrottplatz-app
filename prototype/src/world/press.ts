@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { CONFIGS } from "./containers";
 import RAPIER from "@dimforge/rapier3d-compat";
 import type { ItemManager } from "./scrapItems";
 import type { CompositeManager } from "../dismantle/composites";
@@ -23,8 +24,19 @@ import type { CompositeManager } from "../dismantle/composites";
 // hier steht sie frei neben dem Stahlschrotthaufen, und die offene Seite
 // bleibt in Reichweite (Design-Fix 29.08.2026).
 const CENTER = new THREE.Vector3(-8.5, 0, -7.0);
-/** Ballenlager: dorthin kommt, was fertig gepresst ist */
-const BALE_YARD = new THREE.Vector3(-2.6, 0, -7.0);
+/** Ab diesem Anteil einer Fraktion gilt ein Paket noch als sortenrein. */
+const SORTENREIN_AB = 0.92;
+/**
+ * Ballenlager: dorthin kommt, was fertig gepresst ist. Der Platz steht in
+ * containers.ts — hier stand er ein zweites Mal und war seit dem Umbau falsch:
+ * Die Pakete landeten unter dem Zylinderbock der Presse und liessen sich nicht
+ * greifen (Befund 11.09.2026).
+ */
+function baleYard(): { x: number; z: number; w: number; d: number } {
+  const c = CONFIGS.find((k) => k.id === "c_bales");
+  if (!c) return { x: -0.5, z: -8.5, w: 3.2, d: 4.2 };
+  return { x: c.x, z: c.z, w: c.size[0], d: c.size[1] };
+}
 /**
  * Die Mulde liegt längs Ost–West, in einer Flucht mit dem Stahlschrottplatz
  * darüber: Die 10 m lange Seite läuft parallel zum Haufen (x −13,5 bis −3,5),
@@ -454,10 +466,23 @@ export class PressManager {
       }
       // Das fertige Paket wandert ins Ballenlager östlich der Kammer —
       // dort liegt es griffbereit für den Abholer, statt der Presse im Weg
+      /*
+       * Was zusammen in die Presse geht, kommt als Mischschrott heraus — eine
+       * Presse sortiert nicht (Wunsch 11.09.2026). Nur wenn praktisch nichts
+       * Fremdes dabei war, bleibt das Paket sortenrein und bringt den besseren
+       * Preis. Genau darin liegt der Anreiz, vorher zu trennen.
+       */
+      const reinheit = dominant.massKg / Math.max(kg, 1);
+      const paketMaterial = reinheit >= SORTENREIN_AB ? dominant.materialId : "mixed";
+      const lager = baleYard();
       this.items.spawnBale(
-        dominant.materialId,
+        paketMaterial,
         kg,
-        new THREE.Vector3(BALE_YARD.x + (Math.random() - 0.5) * 1.6, 1.4, BALE_YARD.z + (Math.random() - 0.5) * 2.6),
+        new THREE.Vector3(
+          lager.x + (Math.random() - 0.5) * (lager.w - 1.2),
+          1.4,
+          lager.z + (Math.random() - 0.5) * (lager.d - 1.4)
+        ),
         composition
       );
       count += inChamber.length;

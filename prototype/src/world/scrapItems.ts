@@ -86,6 +86,9 @@ function cableCoilGeometry(r: number, tube: number): THREE.BufferGeometry {
  * unten gilt die Grenze gar nicht (siehe FALL_MAX) — dort arbeitet die
  * Schwerkraft.
  */
+/** Fraktionen ohne metallischen Glanz — Abfall eben. */
+const NICHTMETALLE = new Set(["wood", "tires", "rubble", "plastic"]);
+
 export function maxSpeedFor(massKg: number): number {
   return Math.min(12, Math.max(4, 60 / Math.sqrt(Math.max(massKg, 1))));
 }
@@ -205,8 +208,8 @@ const SPECS: PileSpec[] = [
   { materialId: "cable", massKg: 9, kind: "torus", dims: [0.18, 0.07] },
   { materialId: "cable", massKg: 7, kind: "torus", dims: [0.15, 0.06] },
   { materialId: "cable", massKg: 12, kind: "torus", dims: [0.2, 0.08] },
-  { materialId: "contaminant", massKg: 14, kind: "box", dims: [0.12, 0.12, 1.2] },
-  { materialId: "contaminant", massKg: 8, kind: "box", dims: [0.5, 0.05, 0.9] },
+  { materialId: "wood", massKg: 14, kind: "box", dims: [0.12, 0.12, 1.2] },
+  { materialId: "plastic", massKg: 8, kind: "box", dims: [0.5, 0.05, 0.9] },
   // Maschendraht-Bündel: sperrig + leicht — eignet sich als „Kehrbesen" zum
   // Freischieben von Pritsche und Boden (Design-Wunsch 2026-08-27)
   { materialId: "steel", massKg: 22, kind: "wire", dims: [0.55] },
@@ -232,7 +235,7 @@ const SPECS: PileSpec[] = [
   { materialId: "steel", massKg: 46, kind: "cyl", dims: [0.28, 0.32] }, // LKW-Felge
   { materialId: "alu", massKg: 16, kind: "box", dims: [0.7, 0.5, 0.15] }, // Motorradmotor
   { materialId: "copper", massKg: 22, kind: "box", dims: [0.45, 0.4, 0.35] }, // Elektromotor
-  { materialId: "contaminant", massKg: 11, kind: "torus", dims: [0.31, 0.11] }, // Traktorreifen
+  { materialId: "tires", massKg: 11, kind: "torus", dims: [0.31, 0.11] }, // Traktorreifen
 ];
 
 /**
@@ -283,8 +286,8 @@ const BIG_SPECS: PileSpec[] = [
   { materialId: "copper", massKg: 48, kind: "torus", dims: [0.45, 0.16] }, // Kupferrohr-Bund
   { materialId: "cable", massKg: 55, kind: "torus", dims: [0.55, 0.22] }, // Kabelbund
   { materialId: "cable", massKg: 120, kind: "cyl", dims: [0.85, 0.9] }, // Kabeltrommel
-  { materialId: "contaminant", massKg: 90, kind: "box", dims: [1.4, 0.5, 0.9] }, // Holzkiste
-  { materialId: "contaminant", massKg: 130, kind: "box", dims: [1.1, 1.1, 1.1] }, // Betonblock
+  { materialId: "wood", massKg: 90, kind: "box", dims: [1.4, 0.5, 0.9] }, // Holzkiste
+  { materialId: "rubble", massKg: 130, kind: "box", dims: [1.1, 1.1, 1.1] }, // Betonblock
 ];
 
 const CABLE_COLORS = [0xb0682a, 0x71646a, 0x315e75];
@@ -323,7 +326,11 @@ export function randomCargo(
     const r = Math.random();
     const wanted =
       onlyMaterial ??
-      (r < 0.6 ? "steel" : r < 0.8 ? "alu" : ["va", "copper", "cable", "contaminant"][Math.floor(Math.random() * 4)]);
+      (r < 0.6
+        ? "steel"
+        : r < 0.8
+          ? "alu"
+          : ["va", "copper", "cable", "wood", "plastic", "rubble"][Math.floor(Math.random() * 6)]);
     let matching = pool.filter((s) => s.materialId === wanted);
     // Sortenreine Ladung: notfalls in der anderen Größenklasse suchen, damit
     // die Fraktion auf jeden Fall stimmt
@@ -523,7 +530,7 @@ export class ItemManager {
     const material = new THREE.MeshStandardMaterial({
       color: shape.color,
       roughness: materialId === "copper" || materialId === "alu" ? 0.35 : 0.75,
-      metalness: materialId === "contaminant" || materialId === "cable" ? 0 : 0.4,
+      metalness: NICHTMETALLE.has(materialId) || materialId === "cable" ? 0 : 0.4,
     });
     let geo: THREE.BufferGeometry;
     let collider: RAPIER.ColliderDesc;
@@ -722,7 +729,9 @@ export class ItemManager {
     const geo = new THREE.BoxGeometry(dims[0], dims[1], dims[2], 3, 2, 3);
     const p = geo.getAttribute("position") as THREE.BufferAttribute;
     for (let i = 0; i < p.count; i++) {
-      const n = 0.055 * w;
+      // Kraeftiger verbeult als frueher: Ein Paket kommt nicht glatt aus der
+      // Kammer, es quillt an den Kanten.
+      const n = 0.1 * w;
       p.setXYZ(
         i,
         p.getX(i) + (Math.random() - 0.5) * n,
@@ -734,8 +743,51 @@ export class ItemManager {
     const mat = getMaterial(materialId);
     const mesh = new THREE.Mesh(
       geo,
-      new THREE.MeshStandardMaterial({ color: mat.color, roughness: 0.85, metalness: 0.35 })
+      new THREE.MeshStandardMaterial({ color: mat.color, roughness: 0.9, metalness: 0.3 })
     );
+    /*
+     * Ein Presspaket ist kein sauberes Paket (Wunsch 11.09.2026): Aus den
+     * Kanten haengen Blechfetzen, Rohrenden und Kabelschwaenze heraus, und man
+     * sieht noch, woraus es gepresst wurde. Die Fransen tragen deshalb die
+     * Farben der Zusammensetzung — ein gemischtes Paket ist auch bunt.
+     */
+    const farben = (composition ?? [{ materialId, massKg }])
+      .filter((c) => c.massKg > 0)
+      .map((c) => getMaterial(c.materialId).color);
+    const fransen = 5 + Math.floor(Math.random() * 5);
+    for (let i = 0; i < fransen; i++) {
+      const lang = w * (0.3 + Math.random() * 0.5);
+      const duenn = w * (0.03 + Math.random() * 0.06);
+      const zipfel = new THREE.Mesh(
+        new THREE.BoxGeometry(duenn, duenn * (0.5 + Math.random()), lang),
+        new THREE.MeshStandardMaterial({
+          color: farben[Math.floor(Math.random() * farben.length)] ?? mat.color,
+          roughness: 0.95,
+          metalness: 0.25,
+        })
+      );
+      // Aus einer Seitenflaeche heraus, schraeg — nicht ordentlich angesetzt
+      const seite = Math.floor(Math.random() * 6);
+      const rand = (a: number): number => (Math.random() - 0.5) * a;
+      const [hx, hy, hz] = [dims[0] / 2, dims[1] / 2, dims[2] / 2];
+      const punkte: Array<[number, number, number]> = [
+        [hx, rand(dims[1]), rand(dims[2])],
+        [-hx, rand(dims[1]), rand(dims[2])],
+        [rand(dims[0]), hy, rand(dims[2])],
+        [rand(dims[0]), -hy, rand(dims[2])],
+        [rand(dims[0]), rand(dims[1]), hz],
+        [rand(dims[0]), rand(dims[1]), -hz],
+      ];
+      const [px, py, pz] = punkte[seite];
+      zipfel.position.set(px * 0.92, py * 0.92, pz * 0.92);
+      zipfel.rotation.set(
+        Math.random() * Math.PI,
+        Math.random() * Math.PI,
+        Math.random() * Math.PI
+      );
+      zipfel.castShadow = true;
+      mesh.add(zipfel);
+    }
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     this.scene.add(mesh);

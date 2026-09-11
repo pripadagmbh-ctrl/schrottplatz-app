@@ -37,7 +37,7 @@ import {
   saveConfig,
 } from "./core/controlConfig";
 import { Account, PURCHASE_PRICE_PER_KG } from "./economy/account";
-import { getMaterial } from "./materials/catalog";
+import { getMaterial, ABFALL } from "./materials/catalog";
 import { StaffManager } from "./world/people";
 import { WEIGH_X, WEIGH_Z, KAFFEE_POS } from "./world/yard";
 import { clearSave, readSave, storeSave, type SaveData } from "./core/save";
@@ -363,7 +363,7 @@ async function main(): Promise<void> {
       pickupListEl.appendChild(b);
     };
     for (const id of [...kg.keys()].sort((a, b) => (kg.get(b) ?? 0) - (kg.get(a) ?? 0))) {
-      if (id === "contaminant") continue; // Störstoff bestellt niemand
+      if (ABFALL.has(id)) continue; // Abfall bestellt kein Abnehmer
       bestellen(id, getMaterial(id).name);
     }
     bestellen(null, "Gemischt (schlechter Preis)");

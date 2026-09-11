@@ -80,7 +80,7 @@ export const CAR_DEF: CarDef = {
       ([x, z], i): PartDef => ({
         id: `wheel_${i}`,
         name: "Rad",
-        materialId: "contaminant", // Reifen mit Felge → Störstoff (eigene Fraktion erst V1)
+        materialId: "tires", // Reifen mit Felge gehen in die Reifenmulde
         massKg: 25,
         tearSeconds: 1.2,
         grabRadius: 0.5,

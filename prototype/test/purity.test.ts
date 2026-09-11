@@ -34,8 +34,8 @@ describe("containerValue", () => {
   });
   it("Entsorgungsfraktion kostet unabhängig von Reinheit", () => {
     // 100 kg Störstoff à −0,08 €/kg
-    expect(containerValue(MATERIALS.contaminant, 100, 0)).toBeCloseTo(-8);
-    expect(containerValue(MATERIALS.contaminant, 100, 40)).toBeCloseTo(-8);
+    expect(containerValue(MATERIALS.rubble, 100, 0)).toBeCloseTo(-4);
+    expect(containerValue(MATERIALS.rubble, 100, 40)).toBeCloseTo(-4);
   });
   it("leerer Container ist wertlos", () => {
     expect(containerValue(MATERIALS.steel, 0, 0)).toBe(0);
@@ -50,7 +50,7 @@ describe("euroIndicator (Griff-Info Kap. 14)", () => {
     expect(euroIndicator(MATERIALS.cable)).toBe("€€€");
     expect(euroIndicator(MATERIALS.copper)).toBe("€€€€");
   });
-  it("Störstoffe zeigen Gebühr", () => {
-    expect(euroIndicator(MATERIALS.contaminant)).toBe("Gebühr");
+  it("Abfallfraktionen zeigen Gebühr", () => {
+    expect(euroIndicator(MATERIALS.rubble)).toBe("Gebühr");
   });
 });

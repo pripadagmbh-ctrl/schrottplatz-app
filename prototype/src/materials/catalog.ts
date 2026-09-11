@@ -23,17 +23,31 @@ export const MATERIALS: Record<string, MaterialClass> = {
   alu: { id: "alu", name: "Aluminium", buyPricePerKg: 1.1, sellPricePerKg: 1.5, color: 0xc4c8cc },
   copper: { id: "copper", name: "Kupfer/Messing", buyPricePerKg: 6.0, sellPricePerKg: 7.2, color: 0xc7622b },
   cable: { id: "cable", name: "Kabel", buyPricePerKg: 1.6, sellPricePerKg: 2.2, color: 0xb0682a },
-  contaminant: { id: "contaminant", name: "Störstoff", buyPricePerKg: 0, sellPricePerKg: -0.08, color: 0x7a6a52 },
-  // Nichtmetalle: Sie kommen als Beifang mit und müssen getrennt entsorgt
-  // werden. Verdienen lässt sich daran nichts — wer sie sauber trennt, zahlt
-  // aber weniger drauf, als wenn sie im Mischschrott landen.
+  /**
+   * Mischschrott: alles, was zusammen in die Presse geht. Er laesst sich
+   * verkaufen, bringt aber deutlich weniger als sortenreiner Stahl — genau das
+   * ist der Anreiz, vorher zu trennen (Wunsch 11.09.2026).
+   */
+  mixed: { id: "mixed", name: "Mischschrott", buyPricePerKg: 0.1, sellPricePerKg: 0.16, color: 0x5f5a52 },
+  /*
+   * Abfallfraktionen. "Stoerstoff" hiess das frueher in einem Topf — aber
+   * niemand weiss, was Stoerstoff ist (Befund 11.09.2026). Jetzt beim Namen
+   * genannt: Holz, Baumisch, Reifen, Kunststoff. Sie kommen als Beifang mit
+   * und muessen entsorgt werden; wer sie sauber trennt, zahlt weniger drauf,
+   * als wenn sie im Mischschrott landen.
+   */
   wood: { id: "wood", name: "Holz", buyPricePerKg: 0, sellPricePerKg: -0.02, color: 0x8a6a42 },
   tires: { id: "tires", name: "Reifen", buyPricePerKg: 0, sellPricePerKg: -0.05, color: 0x2e2c2b },
   rubble: { id: "rubble", name: "Baumischabfall", buyPricePerKg: 0, sellPricePerKg: -0.04, color: 0x9a9083 },
+  plastic: { id: "plastic", name: "Kunststoff", buyPricePerKg: 0, sellPricePerKg: -0.06, color: 0x3f6d8a },
 };
 
-/** Alte Fraktionen aus früheren Spielständen auf die aktuellen abbilden. */
-const ALIASES: Record<string, string> = { cast: "steel", brass: "copper" };
+/**
+ * Alte Fraktionen aus früheren Spielständen auf die aktuellen abbilden.
+ * "contaminant" war der Sammeltopf, bevor die Abfaelle ihre eigenen Namen
+ * bekamen; er landet im Baumischabfall.
+ */
+const ALIASES: Record<string, string> = { cast: "steel", brass: "copper", contaminant: "rubble" };
 
 export function getMaterial(id: string): MaterialClass {
   const m = MATERIALS[id] ?? MATERIALS[ALIASES[id] ?? ""];
@@ -44,4 +58,15 @@ export function getMaterial(id: string): MaterialClass {
 /** Kanonische Fraktions-ID (für Save-Migration und Zonen-Zuordnung). */
 export function normalizeMaterialId(id: string): string {
   return MATERIALS[id] ? id : (ALIASES[id] ?? "steel");
+}
+
+/**
+ * Abfallfraktionen: Sie bringen kein Geld, sie kosten. Ein Abnehmer bestellt
+ * sie nie — sie werden entsorgt.
+ */
+export const ABFALL = new Set(["wood", "tires", "rubble", "plastic"]);
+
+/** Ist das eine Abfallfraktion? */
+export function istAbfall(id: string): boolean {
+  return ABFALL.has(normalizeMaterialId(id));
 }
