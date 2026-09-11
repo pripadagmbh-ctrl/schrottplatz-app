@@ -106,18 +106,23 @@ const STEER_RATE = 0.7; // rad/s
  * Anschlag. Das Endtempo muss darum ein Arbeitstempo sein, nicht das Maximum
  * der Maschine.
  *
- * 45 Grad je Sekunde waren zu viel, 36 immer noch ("scheint trotzdem noch zu
- * schnell", 11.09.2026). Jetzt 28 — knapp fuenf Umdrehungen je Minute. Die
- * Spitze der Spinne laeuft damit auf 8 m Radius mit 3,9 statt 6,3 m/s durch
- * die Luft, also 14 statt 23 km/h.
+ * 45 Grad je Sekunde waren zu viel. Danach ging es auf 36 und dann auf 28 —
+ * beides Reaktionen auf "zu schnell", beide falsch abgeleitet: Beurteilt
+ * wurde eine Maschine, die 0,5 s zum Anlaufen brauchte und deren Rampe in
+ * beide Richtungen weich war. Die kroch los und riss dann. Nicht das
+ * Endtempo war zu hoch, die Reaktion war zu traege.
+ *
+ * Mit sofort anliegender Hydraulik sind 36 Grad je Sekunde richtig — sechs
+ * Umdrehungen je Minute, das untere Ende dessen, was die Maschine kann. Die
+ * Spitze laeuft damit auf 8 m Radius mit 5,0 m/s, also 18 km/h.
  *
  * Das frueher gemeldete "zu langsam" galt nicht dem Grundtempo, sondern der
  * Last: "alles bis vier, fuenf Tonnen sollte kein Problem sein". Dafuer
  * sorgt tempoFaktor, nicht CAB_MAX.
  */
-export const CAB_MAX = THREE.MathUtils.degToRad(28);
+export const CAB_MAX = THREE.MathUtils.degToRad(36);
 const BOOM_RATE = THREE.MathUtils.degToRad(19);
-const STICK_RATE = THREE.MathUtils.degToRad(20);
+const STICK_RATE = THREE.MathUtils.degToRad(24);
 const ROTATOR_STEP = THREE.MathUtils.degToRad(15); // pro Mausrad-Raste
 /**
  * Dauerdrehung des Rotators. Vorher wurde je Bild ein fester Winkel addiert,
@@ -132,7 +137,7 @@ const ROTATOR_STEP = THREE.MathUtils.degToRad(15); // pro Mausrad-Raste
  * dreht spuerbar langsamer als frei; 105 Grad je Sekunde sind zuegig genug,
  * um die Mulde zu treffen, ohne dass die Ladung herumgeschleudert wird.
  */
-const ROTATOR_SPEED = THREE.MathUtils.degToRad(105); // rad/s
+const ROTATOR_SPEED = THREE.MathUtils.degToRad(120); // rad/s
 /**
  * Last und Tempo.
  *
@@ -183,7 +188,7 @@ const ANSCHLAG_GRAD = THREE.MathUtils.degToRad(4.5);
 const ANSCHLAG_S = 0.22;
 
 /** Um so viel traeger laeuft der Arm an, wenn er ganz im Material steckt */
-const PFLUG_TRAEGHEIT = 2.2;
+const PFLUG_TRAEGHEIT = 1.5;
 /** Zeitkonstante, mit der die Spitzenbeschleunigung fuers Pendel geglaettet wird (s) */
 const ACC_GLAETTUNG_S = 0.09;
 /**
@@ -203,7 +208,19 @@ const UNTERWAGEN_R = 2.6;
 
 const CLOSE_TIME = 0.4; // s (SW)
 const OPEN_TIME = 0.3; // s (SW)
-const RAMP_TIME = 0.5; // s Anlauf-/Auslauframpe — traeger, die Masse ist zu spueren
+/*
+ * Anlauf- und Auslauframpe.
+ *
+ * War 0,38, wurde im Lauf des 11.09.2026 auf 0,5 erhoeht, um die Maschine
+ * schwer wirken zu lassen. Zusammen mit einem halbierten Endtempo, weichen
+ * Rampenecken und einem beissenden Pflugwiderstand wurde daraus aber zaeh
+ * statt schwer ("die Mechanik ist im Verlauf schlechter geworden").
+ *
+ * Schwer heisst nicht langsam, sondern: sofort reagieren und dabei Masse
+ * haben. Die Masse steckt im Pendel, im Pfluegen und im Auslauf — nicht
+ * darin, dass der Hebel erst mal nichts tut. 0,3 s.
+ */
+const RAMP_TIME = 0.3;
 const CAB_LIFT_MAX = 2.6; // m Kabinenhub für besseren Überblick (SW)
 const CAB_LIFT_SPEED = 0.75; // m/s (SW)
 
@@ -2271,9 +2288,18 @@ export class Excavator {
 function ramp(current: number, target: number, maxStep: number): number {
   const diff = target - current;
   if (Math.abs(diff) <= maxStep) return target;
-  const naehe = Math.min(1, Math.abs(diff) / (maxStep * 12));
-  const schritt = maxStep * (0.35 + 0.65 * naehe);
-  return current + Math.sign(diff) * schritt;
+  /*
+   * Weiche Ecke nur beim Ausrollen, nicht beim Anfahren.
+   *
+   * Zuerst wurde in beide Richtungen gedaempft — damit fuehlte sich auch der
+   * Hebeldruck weich an, und die Maschine wirkte teigig statt schwer. Beim
+   * Anfahren soll sie sofort anliegen; nur der letzte Rest beim Ausrollen
+   * wird weich, denn dort sitzt der Ruck.
+   */
+  const bremst = Math.abs(target) < Math.abs(current);
+  if (!bremst) return current + Math.sign(diff) * maxStep;
+  const naehe = Math.min(1, Math.abs(diff) / (maxStep * 10));
+  return current + Math.sign(diff) * maxStep * (0.4 + 0.6 * naehe);
 }
 
 function clamp1(v: number): number {
