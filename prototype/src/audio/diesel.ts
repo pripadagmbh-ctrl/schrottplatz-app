@@ -127,19 +127,29 @@ function streu(zylinder: number, welle: number): number {
 export function dieselSchleife(
   rate: number,
   form: DieselForm,
-  anteil: "block" | "klopfen" = "block"
+  anteil: "block" | "klopfen" = "block",
+  zyklen = ZYKLEN_JE_SCHLEIFE
 ): Float32Array {
   const dauer = zyklusDauer(form);
-  const laenge = Math.max(64, Math.round(rate * dauer));
+  const laenge = Math.max(64, Math.round(rate * dauer * zyklen));
   const buf = new Float32Array(laenge);
   const teile = anteil === "block" ? form.block : form.klopfen;
-  const abstand = laenge / form.zylinder;
+  const zuendungen = form.zylinder * zyklen;
+  const abstand = laenge / zuendungen;
 
-  for (let z = 0; z < form.zylinder; z++) {
-    // Jeder Zylinder: eigene Stärke, eigener kleiner Versatz.
-    const staerke = 1 + streu(z, 1) * form.streuung;
-    const versatz = streu(z, 2) * form.streuung * abstand * 0.12;
-    const start = Math.round(z * abstand + versatz);
+  for (let i = 0; i < zuendungen; i++) {
+    const z = i % form.zylinder;
+    /*
+     * Jeder Zylinder hat seine feste Eigenart — die wiederholt sich in jedem
+     * Zyklus. Dazu kommt eine kleine Schwankung von Zyklus zu Zyklus: Ein
+     * Motor arbeitet nie zweimal genau gleich, und ohne diese Schwankung
+     * klingt die Schleife nach Summer statt nach Maschine.
+     */
+    const staerke =
+      (1 + streu(z, 1) * form.streuung) * (1 + streu(i, 7) * form.streuung * 0.3);
+    const versatz =
+      (streu(z, 2) * form.streuung + streu(i, 8) * form.streuung * 0.35) * abstand * 0.12;
+    const start = Math.round(i * abstand + versatz);
 
     for (const t of teile) {
       const zerfall = Math.exp(-1 / (t.tau * rate));
@@ -154,16 +164,30 @@ export function dieselSchleife(
       }
     }
 
-    // Der Auspuffstoß: ein kurzer Druckberg. Seine Tonhöhe steht nirgends —
-    // sie entsteht daraus, dass er sich im Zündtakt wiederholt, und steigt
-    // deshalb von selbst mit der Drehzahl.
+    /*
+     * Der Auspuffstoß. Seine Tonhöhe steht nirgends — sie entsteht daraus,
+     * dass er sich im Zündtakt wiederholt, und steigt darum von selbst mit
+     * der Drehzahl.
+     *
+     * Wichtig ist, dass er **zweiseitig** ist: erst Überdruck, dann Unterdruck.
+     * Zuerst war er ein reiner Druckberg, und ein einseitiger Pulszug hat
+     * einen Gleichanteil — gemessen 0,125 bei 0,318 Effektivwert. Das ist
+     * physikalisch kein Auspuff, sondern eine Hupe, und genau so klang es
+     * auch. Der Stoß wird darum um seinen eigenen Mittelwert bereinigt.
+     */
     if (anteil === "block") {
-      const stossLaenge = Math.max(4, Math.round(abstand * form.stossAnteil));
+      const stossLaenge = Math.max(6, Math.round(abstand * form.stossAnteil));
+      const stoss = new Float32Array(stossLaenge);
+      let summe = 0;
       for (let k = 0; k < stossLaenge; k++) {
         const x = k / stossLaenge;
-        // vorne steil, hinten flach — ein Stoß, kein Sinus
-        const huelle = Math.sin(Math.PI * Math.pow(x, 0.65));
-        buf[(start + k) % laenge] += huelle * staerke;
+        // Positive Flanke kurz und steil, negative lang und flach
+        stoss[k] = Math.sin(2 * Math.PI * Math.pow(x, 0.72));
+        summe += stoss[k];
+      }
+      const mittel = summe / stossLaenge;
+      for (let k = 0; k < stossLaenge; k++) {
+        buf[(start + k) % laenge] += (stoss[k] - mittel) * staerke;
       }
     }
 
@@ -178,8 +202,16 @@ export function dieselSchleife(
     }
   }
 
+  // Gleichanteil restlos raus: Was übrig bleibt, kostet nur Aussteuerung und
+  // lässt jeden Kompressor dahinter arbeiten, ohne dass man es hört.
+  let mittel = 0;
+  for (const x of buf) mittel += x;
+  mittel /= laenge;
   let spitze = 0;
-  for (const x of buf) spitze = Math.max(spitze, Math.abs(x));
+  for (let i = 0; i < laenge; i++) {
+    buf[i] -= mittel;
+    spitze = Math.max(spitze, Math.abs(buf[i]));
+  }
   if (spitze > 0) for (let i = 0; i < laenge; i++) buf[i] /= spitze;
   return buf;
 }
@@ -193,6 +225,17 @@ export function dieselSchleife(
  * verschiebt sich der Klang des Blocks noch nicht hörbar.
  */
 export const DREHZAHL_STUETZEN = [700, 1150, 1700];
+
+/**
+ * Wie viele Arbeitszyklen in einer Schleife stehen.
+ *
+ * Mit einem einzigen Zyklus wiederholt sich alles exakt alle 167 ms. Exakte
+ * Wiederholung ist genau das, was eine Maschine von einem Summer
+ * unterscheidet — und zwar zugunsten des Summers: Kein Motor arbeitet zwei
+ * Zyklen lang gleich. Sechs Zyklen ergeben rund eine Sekunde, und jeder
+ * bekommt seine eigene kleine Abweichung.
+ */
+export const ZYKLEN_JE_SCHLEIFE = 6;
 
 /** Drehzahl aus Bedienung und Last (1/min). */
 export function drehzahlFuer(aktivitaet: number, last: number): number {

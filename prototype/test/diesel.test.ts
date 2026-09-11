@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DREHZAHL_STUETZEN,
+  ZYKLEN_JE_SCHLEIFE,
   UMSCHLAGBAGGER,
   dieselSchleife,
   drehzahlFuer,
@@ -61,15 +62,21 @@ describe("Diesel", () => {
 
   it("legt genau einen Schlag je Zylinder in die Schleife", () => {
     for (const drehzahl of DREHZAHL_STUETZEN) {
-      const buf = dieselSchleife(RATE, form(drehzahl), "klopfen");
+      const buf = dieselSchleife(RATE, form(drehzahl), "klopfen", 1);
       expect(schlaege(buf, RATE)).toBe(UMSCHLAGBAGGER.zylinder);
     }
   });
 
   it("ist eine Schleife über einen vollen Arbeitszyklus", () => {
     const drehzahl = 1150;
-    const buf = dieselSchleife(RATE, form(drehzahl), "block");
+    const buf = dieselSchleife(RATE, form(drehzahl), "block", 1);
     expect(buf.length).toBe(Math.round(RATE * zyklusDauer({ takt: 4, drehzahl })));
+    // Im Betrieb stehen mehrere Zyklen in einer Schleife, damit sich nicht
+    // alles alle 167 ms exakt wiederholt.
+    const lang = dieselSchleife(RATE, form(drehzahl), "block");
+    expect(lang.length).toBe(
+      Math.round(RATE * zyklusDauer({ takt: 4, drehzahl }) * ZYKLEN_JE_SCHLEIFE)
+    );
   });
 
   it("läuft nahtlos: der Nachklang wird vorne wieder aufaddiert", () => {
@@ -111,6 +118,39 @@ describe("Diesel", () => {
     }
   });
 
+  it("hat keinen Gleichanteil", () => {
+    // Ein einseitiger Pulszug ist keine Maschine, sondern eine Hupe: Er hat
+    // einen Gleichanteil, kostet Aussteuerung und klingt danach (gemessen
+    // 11.09.2026: 0,125 bei 0,318 Effektivwert).
+    for (const anteil of ["block", "klopfen"] as const) {
+      const buf = dieselSchleife(RATE, form(720), anteil);
+      let mittel = 0;
+      let quadrat = 0;
+      for (const x of buf) {
+        mittel += x;
+        quadrat += x * x;
+      }
+      mittel /= buf.length;
+      const rms = Math.sqrt(quadrat / buf.length);
+      expect(Math.abs(mittel)).toBeLessThan(rms * 0.02);
+    }
+  });
+
+  it("wiederholt sich nicht in jedem Zyklus gleich", () => {
+    const buf = dieselSchleife(RATE, form(900), "block");
+    const zyklus = Math.floor(buf.length / ZYKLEN_JE_SCHLEIFE);
+    const staerken: number[] = [];
+    for (let c = 0; c < ZYKLEN_JE_SCHLEIFE; c++) {
+      let m = 0;
+      for (let i = c * zyklus; i < (c + 1) * zyklus; i++) m = Math.max(m, Math.abs(buf[i]));
+      staerken.push(m);
+    }
+    const mittel = staerken.reduce((a, b) => a + b, 0) / staerken.length;
+    const streuung =
+      Math.sqrt(staerken.reduce((a, x) => a + (x - mittel) ** 2, 0) / staerken.length) / mittel;
+    expect(streuung).toBeGreaterThan(0.005);
+  });
+
   it("blendet zwischen den Stützstellen über, ohne lauter zu werden", () => {
     for (const drehzahl of [500, 700, 900, 1150, 1400, 1700, 2200]) {
       const a = mischung(drehzahl);
@@ -136,8 +176,8 @@ describe("Diesel", () => {
   it("klingt bei jeder Drehzahl gleich, nur schneller", () => {
     // Dieselbe Maschine: Die Form der Zuendung haengt nicht von der Drehzahl
     // ab, nur ihr Abstand. Sonst waere es ein anderer Motor je Gasstellung.
-    const langsam = dieselSchleife(RATE, form(700), "block");
-    const schnell = dieselSchleife(RATE, form(1700), "block");
+    const langsam = dieselSchleife(RATE, form(700), "block", 1);
+    const schnell = dieselSchleife(RATE, form(1700), "block", 1);
     expect(langsam.length).toBeGreaterThan(schnell.length);
     expect(schlaege(langsam, RATE)).toBe(schlaege(schnell, RATE));
   });

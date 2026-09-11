@@ -131,6 +131,17 @@ export class AudioManager {
     klopfQuelle: AudioBufferSourceNode;
     klopfGain: GainNode;
   }[] = [];
+  /**
+   * Eigener Weg fuer die Maschine.
+   *
+   * Der Kompressor auf dem Geraeuschweg ist fuer Schlaege gebaut: schnelles
+   * Ansprechen, 120 ms Loslassen. Ein Motor zuendet im Leerlauf alle 28 ms —
+   * der Kompressor kann dem nicht folgen und pumpt im Zuendtakt (gemessen
+   * 11.09.2026: 14,7 Prozent Pegelschwankung). Darum laeuft die Maschine
+   * daran vorbei. Das ist Schritt 5 des Tonkonzepts, vorgezogen, weil es hier
+   * hoerbar war.
+   */
+  private maschine: GainNode | null = null;
   /** Gesamtpegel des Motors */
   private motorGain: GainNode | null = null;
   /** Pegel des Nagelns — folgt der Last */
@@ -247,6 +258,7 @@ export class AudioManager {
       this.music = new Music(this.ctx, this.master);
       if (this.musicWanted) this.music.start();
 
+      this.baueMaschinenweg();
       this.baueMotor();
 
       // Hydraulik: kein Zischen mehr, sondern ein dezenter Pumpenton, der beim
@@ -259,7 +271,7 @@ export class AudioManager {
       hydFilter.frequency.value = 520;
       this.hydraulicGain = this.ctx.createGain();
       this.hydraulicGain.gain.value = 0;
-      this.hydOsc.connect(hydFilter).connect(this.hydraulicGain).connect(this.sfx);
+      this.hydOsc.connect(hydFilter).connect(this.hydraulicGain).connect(this.maschine!);
       this.hydOsc.start();
       // leichtes Pulsieren der Pumpe
       const lfo = this.ctx.createOscillator();
@@ -479,11 +491,28 @@ export class AudioManager {
    * ueberblendet und die Abspielgeschwindigkeit nachgefuehrt. Das kostet
    * unabhaengig von der Drehzahl immer gleich wenig.
    */
+  /** Der Weg, auf dem alles Laufende liegt: Motor, Hydraulik, Fahrwerk. */
+  private baueMaschinenweg(): void {
+    if (!this.ctx || !this.master) return;
+    this.maschine = this.ctx.createGain();
+    this.maschine.gain.value = 1;
+    // Unterhalb von gut 30 Hz steht nichts Nuetzliches, es kostet nur
+    // Aussteuerung — und ein Gleichanteil faellt hier auf jeden Fall weg.
+    const tief = this.ctx.createBiquadFilter();
+    tief.type = "highpass";
+    tief.frequency.value = 32;
+    const hoch = this.ctx.createBiquadFilter();
+    hoch.type = "lowpass";
+    hoch.frequency.value = 7000;
+    hoch.Q.value = 0.5;
+    this.maschine.connect(tief).connect(hoch).connect(this.master);
+  }
+
   private baueMotor(): void {
-    if (!this.ctx || !this.sfx) return;
+    if (!this.ctx || !this.maschine) return;
     this.motorGain = this.ctx.createGain();
     this.motorGain.gain.value = 0.32;
-    this.motorGain.connect(this.sfx);
+    this.motorGain.connect(this.maschine);
     this.klopfSumme = this.ctx.createGain();
     this.klopfSumme.gain.value = 0.12;
     this.klopfSumme.connect(this.motorGain);
@@ -578,7 +607,7 @@ export class AudioManager {
      * doppelten Pegel und kaum noch Spanne nach oben.
      */
     const gas = (drehzahl - DREHZAHL_STUETZEN[0]) / 1000;
-    this.motorGain?.gain.setTargetAtTime(0.085 + 0.38 * gas, t, 0.15);
+    this.motorGain?.gain.setTargetAtTime(0.24 + 0.5 * gas, t, 0.15);
     this.klopfSumme?.gain.setTargetAtTime(0.07 + 0.16 * load + 0.06 * gas, t, 0.2);
     this.luefterGain?.gain.setTargetAtTime(0.015 + 0.03 * gas, t, 0.2);
     this.luefterFilter?.frequency.setTargetAtTime(380 + 260 * gas, t, 0.2);
