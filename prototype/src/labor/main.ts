@@ -267,19 +267,15 @@ async function main(): Promise<void> {
       pkw = composites.spawnCar(new THREE.Vector3(-6.5, 0.8, -4));
       void pkw;
     }
+    if (input.wasPressed("Digit3")) {
+      for (const it of items.items) if (it.body.isValid()) it.body.wakeUp();
+    }
+    if (input.wasPressed("KeyN")) {
+      // Der Fall, der wehtut: Haufen bleibt waehrend der ganzen Messung wach
+      zeigeLauf("MESSLAUF wach", messlauf(300, true));
+    }
     if (input.wasPressed("KeyM")) {
-      const r = messlauf(300);
-      messEl.innerHTML =
-        `<b>MESSLAUF ${r.schritte} Schritte</b>
-` +
-        `Spinne+Greifer ${r.spinneMs.toFixed(2).padStart(6)} ms/Schritt
-` +
-        `Physik         ${r.physikMs.toFixed(2).padStart(6)} ms/Schritt
-` +
-        `Summe          ${r.gesamtMs.toFixed(2).padStart(6)} ms/Schritt
-` +
-        `beweglich ${r.koerper.dynamic} (wach ${r.koerper.dynAwake})`;
-      messUhr = -4; // Ergebnis vier Sekunden stehen lassen
+      zeigeLauf("MESSLAUF ruhig", messlauf(300));
     }
     if (input.wasPressed("Digit0")) {
       spitzePhysik = 0;
@@ -334,6 +330,21 @@ async function main(): Promise<void> {
     };
   }
 
+  /** Ergebnis eines Messlaufs anzeigen und ein paar Sekunden stehen lassen. */
+  function zeigeLauf(titel: string, r: ReturnType<typeof messlauf>): void {
+    messEl.innerHTML =
+      `<b>${titel} · ${r.schritte} Schritte</b>
+` +
+      `Spinne+Greifer ${r.spinneMs.toFixed(2).padStart(6)} ms/Schritt
+` +
+      `Physik         ${r.physikMs.toFixed(2).padStart(6)} ms/Schritt
+` +
+      `Summe          ${r.gesamtMs.toFixed(2).padStart(6)} ms/Schritt
+` +
+      `beweglich ${r.koerper.dynamic} (wach ${r.koerper.dynAwake})`;
+    messUhr = -6; // sechs Sekunden stehen lassen
+  }
+
   function zeigeMessung(): void {
     const c = physics.counts();
     const info = renderer.info.render;
@@ -353,6 +364,25 @@ async function main(): Promise<void> {
       `Zeichenrufe ${info.calls} · ${(info.triangles / 1000).toFixed(0)}k Dreiecke\n` +
       `Gegriffen ${grip.grippedCount} / ${grip.totalMassKg.toFixed(0)} kg`;
   }
+
+  /*
+   * Dieselben Befehle als Knoepfe: Gemessen wird auf dem iPad, und dort gibt
+   * es keine Tastatur. Ohne die Knoepfe kaeme vom Geraet nur der ruhende
+   * Haufen zurueck — also genau der Fall, der nichts kostet.
+   */
+  const knopf = (id: string, tue: () => void): void => {
+    const el = document.getElementById(id);
+    el?.addEventListener("click", (e) => {
+      e.preventDefault();
+      tue();
+    });
+  };
+  knopf("k-teile", () => legeTeile(8));
+  knopf("k-wecken", () => {
+    for (const it of items.items) if (it.body.isValid()) it.body.wakeUp();
+  });
+  knopf("k-mess", () => zeigeLauf("MESSLAUF ruhig", messlauf(300)));
+  knopf("k-mess-wach", () => zeigeLauf("MESSLAUF wach", messlauf(300, true)));
 
   window.addEventListener("resize", () => {
     renderer.setSize(window.innerWidth, window.innerHeight);

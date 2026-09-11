@@ -50,6 +50,35 @@ Und die Spinne selbst, bei wachem Haufen:
 | Spinne schließt | 0,42 ms | 1,31 ms |
 | Spinne zu, Oberwagen schwenkt | 0,51 ms | 1,31 ms |
 
+### Ergebnis (iPad, Safari, ruhender Haufen)
+
+Aus dem Gerätetest am 11.09.2026, abgelesen an der Anzeige im Labor:
+
+| | iPad | Rechner |
+|---|---|---|
+| FPS | **60** | — |
+| Spinne + Greifzone | 0,49 ms (19 %) | 0,28 ms |
+| Physik | 0,36 ms (14 %) | 0,15 ms |
+| Rest + Bild | 1,77 ms (68 %) | — |
+| Summe je Bild | **2,62 ms** | 0,43 ms |
+| Spitzen | Spinne 3,00 · Physik 2,00 ms | — |
+| Zeichenrufe | 254 · 16k Dreiecke | 532 · 25k |
+
+Bei 60 fps stehen 16,7 ms je Bild zur Verfügung; belegt sind 2,62 ms, also
+16 Prozent. Die Spinne skaliert gut: Auf dem Gerät kostet sie nur das
+1,8-fache des Rechners. Der größte Posten ist mit 68 Prozent das Zeichnen,
+nicht die Physik.
+
+**Der teure Fall fehlt in dieser Messung**: Der Haufen schlief (beweglich 27,
+wach 0). Dafür gibt es jetzt die Knöpfe „WECKEN" und „MESSEN WACH" im Labor —
+auf dem iPad gibt es keine Tastatur, und ohne Knöpfe käme vom Gerät nur der
+Fall zurück, der nichts kostet.
+
+Hochgerechnet aus dem Verhältnis Gerät/Rechner (Physik 2,4-fach): 27 wache
+Teile kosten auf dem iPad etwa 1,3 ms, 67 wache etwa 3,4 ms. Mit Zeichnen und
+Spinne wären das rund 5,5 ms — immer noch ein Drittel des Budgets. Zu
+bestätigen ist das am Gerät.
+
 ### Was daraus folgt
 
 1. **Die Spinne ist nicht das Problem.** Sie kostet 0,26 bis 0,51 ms je

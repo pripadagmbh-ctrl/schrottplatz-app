@@ -39,6 +39,17 @@
         position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
         color: #e8e8e4; font: 16px "Consolas", monospace; background: #1a1c1e;
       }
+      #laborknoepfe {
+        position: fixed; left: 10px; bottom: 10px; z-index: 6;
+        display: flex; gap: 6px; flex-wrap: wrap; max-width: 60vw;
+      }
+      #laborknoepfe button {
+        font: 600 12px/1 "Consolas", monospace; color: #e8e8e4;
+        background: rgba(20, 24, 26, 0.82); border: 1px solid rgba(255, 255, 255, 0.28);
+        border-radius: 8px; padding: 11px 12px; touch-action: manipulation;
+      }
+      #laborknoepfe button:active { background: rgba(240, 180, 41, 0.7); color: #1a1c1e; }
+
       /* --- Touch: dieselben schwebenden Sticks wie im Spiel --- */
       #touch { display: none; position: fixed; inset: 0; pointer-events: none; z-index: 5; }
       #touch .zone {
@@ -69,6 +80,12 @@
       }
       #touch #btn-rot-l { bottom: 238px; }
       #touch #btn-rot-r { bottom: 180px; }
+      /* Auf schmalen Schirmen ueberdecken sich die beiden Karten (auf dem
+         iPad im geteilten Bild gesehen). Dann zaehlt die Messung. */
+      @media (max-width: 900px) {
+        #hilfe { display: none; }
+        #mess { font-size: 12px; padding: 6px 9px; }
+      }
       @media (max-height: 430px) {
         #touch .pad { width: 108px; height: 108px; margin: -54px 0 0 -54px; }
         #touch .knob { width: 44px; height: 44px; margin: -22px 0 0 -22px; }
@@ -88,8 +105,17 @@ T/G Stiel · LMB Spinne schließen
 ↺ ↻ / Mausrad Rotator
 C Ansicht · O Stützen · X Kabine
 1 Teile nachlegen · 2 Pkw neu
-M Messlauf (300 Schritte)
+3 Haufen wecken
+M Messlauf ruhig · N Messlauf wach
 0 Spitzen zurücksetzen</div>
+    <!-- Knoepfe fuers Geraet: Auf dem iPad gibt es keine Tastatur, und genau
+         dort wird gemessen. -->
+    <div id="laborknoepfe">
+      <button id="k-teile">+ TEILE</button>
+      <button id="k-wecken">WECKEN</button>
+      <button id="k-mess">MESSEN</button>
+      <button id="k-mess-wach">MESSEN WACH</button>
+    </div>
     <div id="touch">
       <div class="zone" id="zone-left"></div>
       <div class="zone" id="zone-right"></div>
