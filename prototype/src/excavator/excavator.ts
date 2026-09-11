@@ -169,6 +169,20 @@ const ANSCHLAG_GRAD = THREE.MathUtils.degToRad(4.5);
 /** Wie lange der Rueckprall nachschwingt (s) */
 const ANSCHLAG_S = 0.22;
 
+/** Zeitkonstante, mit der die Spitzenbeschleunigung fuers Pendel geglaettet wird (s) */
+const ACC_GLAETTUNG_S = 0.09;
+/**
+ * Zusaetzliche Rueckstellung des Kardangelenks, als Vielfaches der
+ * Schwerkraftrueckstellung. 1 halbiert den Ausschlag gegenueber einem frei
+ * haengenden Pendel.
+ */
+const GELENK_STEIFE = 1.0;
+/** Dämpfung des Pendels leer und bei Nennlast */
+const PENDEL_DAEMPFUNG_LEER = 5.0;
+const PENDEL_DAEMPFUNG_LAST = 4.0;
+/** Groesster Ausschlag je Achse (rad) — darueber wird es zur Abrissbirne */
+const PENDEL_MAX = THREE.MathUtils.degToRad(17);
+
 /** Halbe Breite des Unterwagens — damit rechnet die Fahrzeugsperre. */
 const UNTERWAGEN_R = 2.6;
 
@@ -285,6 +299,8 @@ export class Excavator {
   // Pendel der Spinne am Kardan-Gelenk (x: Kippen um Welt-X, y: um Welt-Z)
   private swing = new THREE.Vector2();
   private swingVel = new THREE.Vector2();
+  /** Geglaettete Beschleunigung der Stielspitze (m/s²) */
+  private tipAcc = new THREE.Vector2();
   private prevTip = new THREE.Vector3();
   private prevTipVel = new THREE.Vector3();
   private pendulumInit = false;
@@ -1889,14 +1905,43 @@ export class Excavator {
     this.prevTipVel.set(velX, 0, velZ);
     this.prevTip.copy(tip);
 
+    /*
+     * Die Beschleunigung wird zweimal aus Positionsdifferenzen gebildet, und
+     * das rauscht: Gemessen am 11.09.2026 zitterte die Spinne im gleichmaessigen
+     * Schwenk um ±3,5 Grad, obwohl ein gedaempftes Pendel unter
+     * gleichbleibender Fliehkraft ruhig stehen muss. Das war Zahlenrauschen,
+     * keine Physik. Darum wird die Beschleunigung geglaettet, bevor sie das
+     * Pendel antreibt.
+     */
+    const glatt = Math.min(dt / ACC_GLAETTUNG_S, 1);
+    this.tipAcc.x += (ax - this.tipAcc.x) * glatt;
+    this.tipAcc.y += (az - this.tipAcc.y) * glatt;
+
     const L = 1.5; // wirksame Pendellänge Gelenk→Lastschwerpunkt (SW)
     const G = 9.81;
+    /*
+     * Rueckstellung: Schwerkraft **und** Gelenk.
+     *
+     * Ein frei haengendes Pendel stellt sich bei 45 Grad Schwenk auf gut
+     * 27 Grad schraeg (gemessen) — rechnerisch richtig, sieht aber aus wie
+     * eine Abrissbirne. Eine echte Spinne haengt nicht frei: Im Kardangelenk
+     * sitzt Reibung, und der Schlauchbaum zieht sie zurueck. Das ist hier als
+     * zusaetzliche Rueckstellung modelliert; sie halbiert den Ausschlag,
+     * ohne das Pendeln als solches wegzunehmen.
+     */
+    const rueck = (G / L) * (1 + GELENK_STEIFE);
     // schwere Last: weniger Dämpfung → längeres Nachpendeln (SW)
-    const damping = THREE.MathUtils.lerp(2.4, 0.9, Math.min(this.carriedMassKg / NENNLAST_KG, 1));
-    this.swingVel.x += (-(G / L) * Math.sin(this.swing.x) - damping * this.swingVel.x + az / L) * dt;
-    this.swingVel.y += (-(G / L) * Math.sin(this.swing.y) - damping * this.swingVel.y - ax / L) * dt;
-    this.swing.x = THREE.MathUtils.clamp(this.swing.x + this.swingVel.x * dt, -0.45, 0.45);
-    this.swing.y = THREE.MathUtils.clamp(this.swing.y + this.swingVel.y * dt, -0.45, 0.45);
+    const damping = THREE.MathUtils.lerp(
+      PENDEL_DAEMPFUNG_LEER,
+      PENDEL_DAEMPFUNG_LAST,
+      Math.min(this.carriedMassKg / NENNLAST_KG, 1)
+    );
+    this.swingVel.x +=
+      (-rueck * Math.sin(this.swing.x) - damping * this.swingVel.x + this.tipAcc.y / L) * dt;
+    this.swingVel.y +=
+      (-rueck * Math.sin(this.swing.y) - damping * this.swingVel.y - this.tipAcc.x / L) * dt;
+    this.swing.x = THREE.MathUtils.clamp(this.swing.x + this.swingVel.x * dt, -PENDEL_MAX, PENDEL_MAX);
+    this.swing.y = THREE.MathUtils.clamp(this.swing.y + this.swingVel.y * dt, -PENDEL_MAX, PENDEL_MAX);
     if (this.groundContact.active) {
       this.swing.multiplyScalar(0.75);
       this.swingVel.multiplyScalar(0.5);

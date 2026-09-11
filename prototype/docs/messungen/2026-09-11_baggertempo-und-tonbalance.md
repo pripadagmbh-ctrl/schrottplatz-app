@@ -159,3 +159,68 @@ Balance zurueck ins Dumpfe. Gegengemessen nach dem Ausduennen:
 Die Aufnahmen selbst wurden **nicht** eingebaut, nur als Zielwert benutzt
 (E-049). Wer nachjustieren will: Ein Wert, `SFX_FERNE_DB` in
 `audio/audioManager.ts`, verschiebt die ganze Balance zwischen dumpf und hell.
+
+## 4 Nachtrag: das Pendel der Spinne
+
+Rückmeldung nach dem Tempo-Umbau: „der Bagger ist zu wild" — trotz 45 statt
+61 °/s. Das Tempo war also nicht die Ursache. Gemessen wurde stattdessen die
+Neigung der Spinne gegen die Senkrechte während eines Schwenks.
+
+| | vorher | nachher |
+|---|---|---|
+| Beharrungsneigung im Schwenk | **27,4°** | **14,2°** |
+| Spitze | 32,7° | 17,5° |
+| **Zittern im gleichmäßigen Schwenk** | **±3,5°** | **±0,73°** |
+| Nachpendeln bis unter 2° (leer) | 2,48 s | 0,62 s |
+| Nachpendeln mit 4 t | — | 2,1 s |
+
+Zwei Befunde:
+
+1. **Das Zittern war Zahlenrauschen.** Die Beschleunigung, die das Pendel
+   antreibt, wird zweimal aus Positionsdifferenzen gebildet. Ein gedämpftes
+   Pendel unter gleichbleibender Fliehkraft muss ruhig stehen; es zitterte um
+   ±3,5°. Die Beschleunigung wird jetzt geglättet (0,09 s).
+2. **27,4° sind rechnerisch richtig und trotzdem falsch.** Bei 45 °/s und 8 m
+   Radius wirken 4,9 m/s² Fliehkraft; ein frei hängendes Pendel stellt sich
+   dann auf 26,7° schräg. Eine echte Spinne hängt aber nicht frei: Im
+   Kardangelenk sitzt Reibung, der Schlauchbaum zieht zurück. Das ist jetzt
+   als zusätzliche Rückstellung modelliert (`GELENK_STEIFE`), sie halbiert
+   den Ausschlag. Dazu ein Anschlag bei 17° je Achse.
+
+Die Dämpfung bleibt lastabhängig: leer beruhigt sie sich in 0,6 s, mit vier
+Tonnen pendelt sie 2,1 s nach. Das soll man sehen.
+
+## 5 Was am Schrott gemessen wurde — und warum nichts geändert wurde
+
+Zweiter Teil der Rückmeldung: „die Spinne und der Schrott verhalten sich zu
+wenig realistisch". Vermutung war: Alle Kollisionskörper der Schrottteile sind
+Quader (`cuboid`), und Quader können sich nicht verhaken — daher flache,
+aufgeräumte Haufen.
+
+Der erste Messwert schien das zu bestätigen: Der gewachsene Haufen auf dem
+Platz schüttet mit **14,5°** (122 Teile, 9,2 m Radius, 2,38 m hoch). Echter
+Schrott schüttet mit 45 bis 60°.
+
+**Die Vermutung hielt der Nachprüfung nicht stand.** Im kontrollierten Versuch
+— 40 gleiche Profile aus 3,2 m auf freie Fläche geschüttet — ergab dieselbe,
+unveränderte Fassung:
+
+| Lauf | Schüttwinkel |
+|---|---|
+| A | 38,8° |
+| B | 24,1° |
+
+Die Streuung zwischen zwei Läufen derselben Fassung ist größer als jeder
+Effekt, den die Änderung hätte haben können. Die Physik schüttet also mit
+24 bis 39°, nicht mit 14,5. Die 14,5° des Platzhaufens kommen nicht von den
+Kollisionskörpern, sondern davon, **wo** abgeladen wird und dass der Radlader
+den Haufen flachschiebt.
+
+Eine gebaute Änderung (Querstück am Ende langer Teile, sichtbar und im
+Kollisionskörper) wurde deshalb **nicht übernommen**: Sie ließ sich nicht als
+Verbesserung belegen, und eine Änderung ohne Beleg gehört nicht in den Stand.
+
+Was daraus folgt: Der Schrott braucht denselben Aufbau wie die Spinne — ein
+Labor mit wiederholbaren Läufen, in dem ein Schüttwinkel über zehn Versuche
+gemittelt wird, statt einmal zu messen und sich zu freuen. Vorher lohnt es
+nicht, an Formen oder Reibung zu drehen.
