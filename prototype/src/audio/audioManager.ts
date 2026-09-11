@@ -6,6 +6,76 @@
  */
 import { Music } from "./music";
 
+/**
+ * Klangprofile der Greifer (Wunsch 11.09.2026: "Muster fuer unterschiedliche
+ * Greifer").
+ *
+ * Die Groesse bestimmt die Tonlage, die Bauart das Nachklingen: Ein kleiner
+ * Polypgreifer schnappt hell und kurz, ein schwerer Schrottgreifer dumpf und
+ * lange, zwei Schalen treffen flaechig und dröhnen nach, ein Magnet schnappt
+ * gar nicht — er saugt an und schlaegt einmal dumpf auf.
+ */
+export type GreiferKlang = "polyp" | "schrott" | "zweischalen" | "magnet";
+
+interface GreiferProfil {
+  freqs: number[];
+  guete: number[];
+  wumms: number;
+  wummsVon: number;
+  wummsBis: number;
+  wummsDauer: number;
+  nachschlag: boolean;
+  /** Rauschanteil (Hz) — Schmutz und Dreck zwischen den Schalen */
+  rauschen?: number;
+}
+
+const GREIFER_KLANG: Record<GreiferKlang, GreiferProfil> = {
+  // klein und leicht: hoeher, kurz, wenig Bass
+  polyp: {
+    freqs: [268, 402, 589, 831, 1146],
+    guete: [40, 32, 26, 20, 16],
+    wumms: 0.18,
+    wummsVon: 128,
+    wummsBis: 74,
+    wummsDauer: 0.1,
+    nachschlag: true,
+    rauschen: 900,
+  },
+  // der grosse Schrottgreifer: tief, satt, langes Nachklappern
+  schrott: {
+    freqs: [168, 252, 371, 523, 742],
+    guete: [55, 42, 34, 26, 20],
+    wumms: 0.36,
+    wummsVon: 104,
+    wummsBis: 52,
+    wummsDauer: 0.18,
+    nachschlag: true,
+    rauschen: 620,
+  },
+  // zwei grosse Schalen: flaechiger Schlag, droehnt nach
+  zweischalen: {
+    freqs: [96, 143, 214, 318, 472],
+    guete: [85, 66, 52, 40, 30],
+    wumms: 0.55,
+    wummsVon: 88,
+    wummsBis: 40,
+    wummsDauer: 0.34,
+    nachschlag: false,
+    rauschen: 420,
+  },
+  // Magnet: kein Schnappen, ein dumpfer Aufschlag mit Brummen
+  magnet: {
+    freqs: [62, 94, 141],
+    guete: [14, 10, 8],
+    wumms: 0.42,
+    wummsVon: 72,
+    wummsBis: 46,
+    wummsDauer: 0.5,
+    nachschlag: false,
+    rauschen: 240,
+  },
+};
+
 /** So oft hoechstens ein Aufschlag (s) — der staerkste im Fenster gewinnt */
 const AUFPRALL_FENSTER_S = 0.14;
 
@@ -388,17 +458,26 @@ export class AudioManager {
    * aufeinandertreffen. Liegt Material dazwischen, daempft das: dann kommt
    * `haerte` kleiner herein und der Klang wird kuerzer und leiser.
    */
-  playClawSnap(haerte = 1): void {
+  playClawSnap(haerte = 1, typ: GreiferKlang = "schrott"): void {
     const h = Math.max(0.15, Math.min(haerte, 1));
+    const k = GREIFER_KLANG[typ] ?? GREIFER_KLANG.schrott;
     /*
-     * Zwei Stahlschalen schlagen aufeinander: ein harter, kurzer Krach mit
-     * Nachklappern. Tiefer gelegt (Wunsch 11.09.2026: "Pitch zu hoch") und
-     * ueber Resonanzen gebaut statt aus Oszillatoren — sonst klingt es nach
-     * Glockenspiel.
+     * Zwei Schalen aus Stahl schlagen aufeinander: ein harter, kurzer Krach
+     * mit Nachklappern, kein Ton. Wie tief und wie lang, haengt vom Greifer
+     * ab — ein kleiner Polyp klingt anders als ein grosser Schrottgreifer.
      */
-    this.wumms(0.36 * h, 104, 52, 0.18);
-    this.anschlag([168, 252, 371, 523, 742], [55, 42, 34, 26, 20], 0.5 * h, 0.004);
-    this.anschlag([180, 268, 398], [40, 30, 24], 0.2 * h, 0.007, 0.045 + Math.random() * 0.03);
+    this.wumms(k.wumms * h, k.wummsVon, k.wummsBis, k.wummsDauer);
+    this.anschlag(k.freqs, k.guete, 0.5 * h, 0.004);
+    if (k.nachschlag) {
+      this.anschlag(
+        k.freqs.slice(0, 3).map((f) => f * 1.06),
+        k.guete,
+        0.2 * h,
+        0.007,
+        0.045 + Math.random() * 0.03
+      );
+    }
+    if (k.rauschen) this.noiseBurst(k.rauschen, 0.1, 0.12 * h);
   }
 
   /**
