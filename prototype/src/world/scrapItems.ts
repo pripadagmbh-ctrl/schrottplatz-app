@@ -110,6 +110,11 @@ export function maxSpeedFor(massKg: number): number {
  */
 const MAX_ZUWACHS = 0.6;
 
+/** Ab diesem Tempoverlust in einem Schritt gilt es als Aufprall (m/s) */
+const AUFPRALL_DV = 1.1;
+/** So lange meldet dasselbe Teil keinen zweiten Aufprall (s) */
+const AUFPRALL_PAUSE_S = 0.18;
+
 /**
  * Deckelung nach unten — nur als Netz gegen Rechenausreisser. Aus 5 m freiem
  * Fall kommt ein Teil auf 10 m/s; hier ist viel Luft bis dahin.
@@ -952,18 +957,37 @@ export class ItemManager {
    * weit durch die Gegend — schwerer Schrott springt nicht, er rutscht.
    */
   private tempoVorher = new Map<number, number>();
+  /** Wann ein Teil zuletzt einen Aufprall gemeldet hat (Sekunden seit Start) */
+  private letzterAufprall = new Map<number, number>();
+  private aufprallUhr = 0;
+  private gesamtVorher = new Map<number, number>();
+
+  /**
+   * Aufprall eines Teils (Wunsch 11.09.2026: Kollisionen mit Ladeflaeche,
+   * Bordwaenden, Fallenlassen).
+   *
+   * Erkannt wird an der Vollbremsung: Wer in einem Schritt viel Tempo
+   * verliert, ist auf etwas getroffen. Das braucht keine Kontaktereignisse in
+   * der Physik — die kosten fuer jedes Teil im Haufen, und gebraucht wird nur
+   * der eine Moment.
+   *
+   * @param wucht Tempoverlust in m/s — daraus macht der Ton die Lautstaerke
+   */
+  onAufprall: ((item: ScrapItem, wucht: number) => void) | null = null;
   /**
    * Messschalter: Mit `true` gilt die Zuwachsgrenze nicht mehr. Nur fuer den
    * Vorher-Nachher-Vergleich im Labor; im Spiel bleibt sie an.
    */
   zuwachsGrenzeAus = false;
 
-  clampSpeeds(): void {
+  clampSpeeds(dt = 1 / 60): void {
+    this.aufprallUhr += dt;
     for (const item of this.items) {
       if (!item.body.isDynamic()) {
         // Getragene Teile sind kinematisch. Beim Loslassen sollen sie ihren
         // Schwung behalten, also faengt die Zuwachsregel bei ihnen neu an.
         this.tempoVorher.delete(item.body.handle);
+        this.gesamtVorher.delete(item.body.handle);
         continue;
       }
       // Trägheit nach Masse: Die Spinne ist ein kinematischer Körper und
@@ -1016,6 +1040,21 @@ export class ItemManager {
         item.body.setAngvel({ x: w.x * f, y: w.y * f, z: w.z * f }, true);
       }
       const jetzt = item.body.linvel();
+      // Aufprall: In einem Schritt viel Tempo verloren. Der Betrag zaehlt in
+      // alle Richtungen — ein Teil faellt senkrecht auf die Ladeflaeche.
+      if (this.onAufprall) {
+        const vorherGesamt = this.gesamtVorher.get(handle);
+        const jetztGesamt = Math.hypot(jetzt.x, jetzt.y, jetzt.z);
+        if (vorherGesamt !== undefined) {
+          const verlust = vorherGesamt - jetztGesamt;
+          const letzte = this.letzterAufprall.get(handle) ?? -9;
+          if (verlust > AUFPRALL_DV && this.aufprallUhr - letzte > AUFPRALL_PAUSE_S) {
+            this.letzterAufprall.set(handle, this.aufprallUhr);
+            this.onAufprall(item, verlust);
+          }
+        }
+        this.gesamtVorher.set(handle, jetztGesamt);
+      }
       this.tempoVorher.set(handle, Math.hypot(jetzt.x, jetzt.z));
       // Ausreißer einsammeln: Material geht nie verloren, es landet auf der
       // Annahmefläche. Die Grenzen liegen weit außerhalb der LKW-Route.

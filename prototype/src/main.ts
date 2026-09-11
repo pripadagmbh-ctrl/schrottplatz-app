@@ -27,6 +27,7 @@ import { haggle, leavesOnRefusal, hint, OFFER_FACTOR, OFFER_LABEL, type Offer } 
 import { LaneWatch } from "./delivery/laneWatch";
 import { Daylight, Floodlights } from "./world/daylight";
 import { hitsObstacle } from "./world/obstacles";
+import { findeBox } from "./world/boxen";
 import { OfficeBuilding, BUERO_TUER } from "./world/office";
 import { Police } from "./world/police";
 import { Signage } from "./world/signage";
@@ -401,6 +402,17 @@ async function main(): Promise<void> {
     for (const b of bodies) fence.notifyGrabbed(b); // verankertes Zaunfeld? → losreißen
   };
   grip.onTear = () => audio.playTear();
+  /*
+   * Aufschlaege: Der wichtigste Klang auf dem Platz. Ob es metallisch
+   * wummert oder dumpf auf Beton klatscht, haengt daran, ob das Teil auf
+   * einer Ladeflaeche landet — dafuer dienen dieselben Standflaechen, die
+   * auch Bagger und Radlader vom Durchfahren abhalten.
+   */
+  items.onAufprall = (item, wucht) => {
+    const p = item.body.translation();
+    const aufStahl = findeBox(p.x, p.z, alleFahrzeugBoxen(), 0.4) !== null;
+    audio.playAufprall(item.materialId, wucht, aufStahl);
+  };
   // Zaehne treffen aufeinander — hoerbar, auch wenn nichts drin ist
   excavator.onClawSnap = (haerte) => audio.playClawSnap(haerte);
   grip.partResolver = (pos) => composites.findPartNear(pos);
@@ -748,7 +760,7 @@ async function main(): Promise<void> {
       if (car.body.isValid()) excavator.obstacleBodies.add(car.body.handle);
     }
     physics.step();
-    items.clampSpeeds();
+    items.clampSpeeds(FIXED_DT);
     // Haufen zur Ruhe bringen: Ohne die Schlafhilfe bleiben rund drei Viertel
     // der Teile dauerhaft wach und kosten jeden Frame Rechenzeit (gemessen:
     // 89 von 118 nach 30 s). Teile am Greifer bleiben ausgenommen.
@@ -1046,6 +1058,10 @@ async function main(): Promise<void> {
     }
     hud.updateMoney(account.moneyEur, containers.totalValue());
     audio.updateEngine(excavator.activity, Math.min(grip.totalMassKg / 2000, 1));
+    // Platzkulisse: Wind, ferne Schlaege, Flex, Kraehen — und der
+    // Rueckfahrwarner, solange ein LKW rangiert.
+    audio.tickUmgebung(frameDt);
+    audio.setRueckfahrwarner(vehicles.maneuveringTruck() !== null);
 
     // Bodenkontakt: Kratzen + Staub, bei hoher Intensität Funken (Kap. 6.1)
     frameCount++;

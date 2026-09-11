@@ -6,6 +6,9 @@
  */
 import { Music } from "./music";
 
+/** So oft hoechstens ein Aufschlag (s) — der staerkste im Fenster gewinnt */
+const AUFPRALL_FENSTER_S = 0.14;
+
 /**
  * Obere Grenzfrequenz der Geraeusche (Hz). Darueber klingt es nach Werkstatt
  * mit Fliesen, nicht nach Schrottplatz — und auf kleinen Lautsprechern nur
@@ -151,9 +154,193 @@ export class AudioManager {
       this.scrapeGain.gain.value = 0;
       scrapeNoise.connect(scrapeFilter).connect(this.scrapeGain).connect(this.sfx);
       scrapeNoise.start();
+
+      this.starteUmgebung();
     } catch {
       this.ctx = null; // Audio bleibt aus, Spiel läuft weiter
     }
+  }
+
+  /*
+   * --- Platzkulisse (Wunsch 11.09.2026: "mehr Tonkulisse wie auf echtem
+   * Schrottplatz") ---
+   *
+   * Ein Schrottplatz ist nie still, aber auch nicht laut: Wind ueber freier
+   * Flaeche, weit weg ein Schlag, wenn jemand etwas abkippt, das Kreischen
+   * einer Flex aus der Halle, Kraehen. Dazu der Rueckfahrwarner, ohne den
+   * kein Hof auskommt.
+   *
+   * Alles prozedural wie der Rest — keine Aufnahmen, also auch keine
+   * Rechtefragen. Die Einzelgeraeusche kommen unregelmaessig und mit
+   * zufaelliger Entfernung: Weiter weg heisst leiser UND dumpfer, das ist der
+   * halbe Realismus.
+   */
+  /** Abstand zweier Zufallsgeraeusche (s) */
+  private static readonly KULISSE_PAUSE: [number, number] = [6, 17];
+  private kulisseRest = 4;
+  private windGain: GainNode | null = null;
+  private warnOsc: OscillatorNode | null = null;
+  private warnGain: GainNode | null = null;
+  private warnAn = false;
+  private warnTakt = 0;
+
+  private starteUmgebung(): void {
+    if (!this.ctx || !this.sfx) return;
+    // Windbett: tiefes Rauschen, langsam an- und abschwellend
+    const wind = this.ctx.createBufferSource();
+    wind.buffer = this.noiseBuffer();
+    wind.loop = true;
+    const windFilter = this.ctx.createBiquadFilter();
+    windFilter.type = "lowpass";
+    windFilter.frequency.value = 320;
+    this.windGain = this.ctx.createGain();
+    this.windGain.gain.value = 0.035;
+    wind.connect(windFilter).connect(this.windGain).connect(this.sfx);
+    wind.start();
+    const boe = this.ctx.createOscillator();
+    boe.frequency.value = 0.07; // eine Boe alle gut vierzehn Sekunden
+    const boeGain = this.ctx.createGain();
+    boeGain.gain.value = 0.022;
+    boe.connect(boeGain).connect(this.windGain.gain);
+    boe.start();
+
+    // Rueckfahrwarner: liegt bereit und wird nur auf- und zugeblendet
+    this.warnOsc = this.ctx.createOscillator();
+    this.warnOsc.type = "square";
+    this.warnOsc.frequency.value = 1050;
+    const warnFilter = this.ctx.createBiquadFilter();
+    warnFilter.type = "lowpass";
+    warnFilter.frequency.value = 1500; // aus der Ferne, nicht schrill
+    this.warnGain = this.ctx.createGain();
+    this.warnGain.gain.value = 0;
+    this.warnOsc.connect(warnFilter).connect(this.warnGain).connect(this.sfx);
+    this.warnOsc.start();
+  }
+
+  /**
+   * Je Bild aufrufen. Zaehlt die Kulisse weiter und schaltet den
+   * Rueckfahrwarner im Takt.
+   */
+  tickUmgebung(dt: number): void {
+    if (!this.ctx) return;
+    this.spieleAufprallPuffer(dt);
+    this.kulisseRest -= dt;
+    if (this.kulisseRest <= 0) {
+      const [a, b] = AudioManager.KULISSE_PAUSE;
+      this.kulisseRest = a + Math.random() * (b - a);
+      this.zufallsgeraeusch();
+    }
+    if (this.warnGain) {
+      this.warnTakt += dt;
+      const an = this.warnAn && this.warnTakt % 0.74 < 0.37;
+      this.warnGain.gain.setTargetAtTime(an ? 0.028 : 0, this.ctx.currentTime, 0.01);
+    }
+  }
+
+  /** Rueckfahrwarner an/aus — von der Fahrzeugverwaltung gesetzt. */
+  setRueckfahrwarner(an: boolean): void {
+    this.warnAn = an;
+  }
+
+  /** Ein zufaelliges Geraeusch vom Platz, mit zufaelliger Entfernung. */
+  private zufallsgeraeusch(): void {
+    // 0 = direkt daneben, 1 = am anderen Ende des Platzes
+    const fern = 0.25 + Math.random() * 0.75;
+    const leise = (1 - fern) * 0.8 + 0.12;
+    const wuerfel = Math.random();
+    if (wuerfel < 0.34) this.fernerSchlag(leise, fern);
+    else if (wuerfel < 0.55) this.hammer(leise, fern);
+    else if (wuerfel < 0.72) this.flex(leise, fern);
+    else if (wuerfel < 0.9) this.kraehe(leise);
+    else this.ferneHupe(leise, fern);
+  }
+
+  /** Irgendwo faellt etwas Schweres — der haeufigste Klang auf dem Platz. */
+  private fernerSchlag(pegel: number, fern: number): void {
+    this.metalHit(
+      [88, 132, 196, 279],
+      [0.5, 0.36, 0.24, 0.16],
+      0.1 * pegel,
+      { transient: 300 - fern * 120, transientGain: 0.12 * pegel, spread: 0.03 }
+    );
+  }
+
+  /** Jemand schlaegt mit dem Vorschlaghammer: drei Schlaege, ungleich verteilt. */
+  private hammer(pegel: number, fern: number): void {
+    if (!this.ctx) return;
+    const start = this.ctx.currentTime;
+    for (let i = 0; i < 3; i++) {
+      const t = start + i * (0.26 + Math.random() * 0.12);
+      this.spaeter(t - start, () =>
+        this.metalHit([150, 232, 338], [0.28, 0.2, 0.13], 0.085 * pegel, {
+          transient: 420 - fern * 160,
+          transientGain: 0.1 * pegel,
+          spread: 0.02,
+        })
+      );
+    }
+  }
+
+  /** Trennschleifer aus der Halle: Rauschband, das kurz hochzieht. */
+  private flex(pegel: number, fern: number): void {
+    if (!this.ctx || !this.sfx) return;
+    const t = this.ctx.currentTime;
+    const dauer = 0.7 + Math.random() * 0.9;
+    const src = this.ctx.createBufferSource();
+    src.buffer = this.noiseBuffer();
+    src.loop = true;
+    const bp = this.ctx.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.Q.value = 6;
+    const f0 = 900 - fern * 250;
+    bp.frequency.setValueAtTime(f0, t);
+    bp.frequency.linearRampToValueAtTime(f0 * 1.45, t + dauer * 0.35);
+    bp.frequency.linearRampToValueAtTime(f0 * 1.1, t + dauer);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.05 * pegel, t + 0.08);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dauer);
+    src.connect(bp).connect(g).connect(this.sfx);
+    src.start(t);
+    src.stop(t + dauer + 0.05);
+  }
+
+  /** Kraehe ueber dem Platz — zwei, drei Rufe. */
+  private kraehe(pegel: number): void {
+    if (!this.ctx || !this.sfx) return;
+    const rufe = 2 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < rufe; i++) {
+      this.spaeter(i * (0.32 + Math.random() * 0.18), () => {
+        if (!this.ctx || !this.sfx) return;
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        osc.type = "sawtooth";
+        const f = 620 + Math.random() * 140;
+        osc.frequency.setValueAtTime(f, t);
+        osc.frequency.exponentialRampToValueAtTime(f * 0.72, t + 0.22);
+        const bp = this.ctx.createBiquadFilter();
+        bp.type = "bandpass";
+        bp.frequency.value = 900;
+        bp.Q.value = 2.5;
+        const g = this.ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.05 * pegel, t + 0.03);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.26);
+        osc.connect(bp).connect(g).connect(this.sfx);
+        osc.start(t);
+        osc.stop(t + 0.3);
+      });
+    }
+  }
+
+  /** Weit weg hupt jemand — kurz, zweitoenig. */
+  private ferneHupe(pegel: number, fern: number): void {
+    this.burst([196, 262], 0.35, 0.05 * pegel * (1 - fern * 0.4), "square");
+  }
+
+  /** Kleiner Zeitversatz ohne eigenen Scheduler. */
+  private spaeter(sekunden: number, tue: () => void): void {
+    window.setTimeout(tue, Math.max(0, sekunden * 1000));
   }
 
   /** Pro Frame: activity 0..1 (Achsbewegung), load 0..1 (Traglast-Anteil). */
@@ -191,6 +378,89 @@ export class AudioManager {
       transientGain: 0.34 * h,
       spread: 0.012,
     });
+  }
+
+  /**
+   * Aufprall eines Teils (Wunsch 11.09.2026).
+   *
+   * Der wichtigste Klang auf dem Platz: Blech faellt auf die Ladeflaeche,
+   * Traeger schlaegt gegen die Bordwand, Brocken landet auf Beton. Drei
+   * Groessen faerben ihn:
+   *
+   *   WUCHT     wie schnell das Teil war — Lautstaerke und Laenge
+   *   MATERIAL  was aufschlaegt — Stahl klingt nach, Holz nicht
+   *   UNTERGRUND Stahl unter dem Teil laesst die ganze Flaeche mitschwingen,
+   *              Beton schluckt es
+   *
+   * @param wucht Tempoverlust beim Aufschlag (m/s)
+   * @param aufStahl true = Ladeflaeche oder Bordwand, false = Boden
+   */
+  playAufprall(materialId: string, wucht: number, aufStahl: boolean): void {
+    /*
+     * Gesammelt statt sofort gespielt. Beim Abkippen schlagen binnen einer
+     * Sekunde ein Dutzend Teile auf (gemessen: 169 Aufschlaege in zwoelf
+     * Sekunden, in Spitzen 14 je Sekunde). Einzeln abgespielt waere das ein
+     * Maschinengewehr; in Wirklichkeit hoert man ein einziges, rollendes
+     * Krachen. Also wird je Fenster der staerkste Aufschlag gespielt, und die
+     * Zahl der gesammelten hebt ihn etwas an.
+     */
+    if (wucht > this.puffer.wucht) {
+      this.puffer = { materialId, wucht, aufStahl, zahl: this.puffer.zahl + 1 };
+    } else {
+      this.puffer.zahl++;
+    }
+  }
+
+  private puffer = { materialId: "steel", wucht: 0, aufStahl: false, zahl: 0 };
+  private aufprallRest = 0;
+
+  /** Gesammelte Aufschlaege ausgeben — aus tickUmgebung gerufen. */
+  private spieleAufprallPuffer(dt: number): void {
+    this.aufprallRest -= dt;
+    if (this.aufprallRest > 0 || this.puffer.zahl === 0) return;
+    this.aufprallRest = AUFPRALL_FENSTER_S;
+    const { materialId, wucht, aufStahl, zahl } = this.puffer;
+    this.puffer = { materialId: "steel", wucht: 0, aufStahl: false, zahl: 0 };
+    // Mehrere Teile zugleich: lauter, aber nicht linear — sonst uebersteuert
+    // eine volle Fuhre alles andere.
+    this.aufprallJetzt(materialId, wucht * (1 + Math.log10(zahl) * 0.6), aufStahl);
+  }
+
+  private aufprallJetzt(materialId: string, wucht: number, aufStahl: boolean): void {
+    if (!this.ctx || !this.sfx) return;
+    const w = Math.min(Math.max(wucht / 4, 0.12), 1);
+    const weich =
+      materialId === "wood" ||
+      materialId === "plastic" ||
+      materialId === "tires" ||
+      materialId === "rubble" ||
+      materialId === "cable";
+
+    if (aufStahl) {
+      /*
+       * Ladeflaeche und Bordwaende sind grosse, duenne Stahlbleche. Sie
+       * antworten mit einem tiefen Wummern und einem laenger stehenden,
+       * leicht verstimmten Nachklang — das ist der Klang, den man von einem
+       * Schrottplatz kennt.
+       */
+      this.metalHit(
+        [72, 108, 163, 241, 352],
+        [0.85, 0.7, 0.52, 0.36, 0.24],
+        (weich ? 0.1 : 0.22) * w,
+        { transient: 240, transientGain: 0.22 * w, spread: 0.035 }
+      );
+      this.burst([44, 58], 0.26 + 0.2 * w, 0.16 * w, "sine"); // das Blech wummert
+      if (!weich) this.noiseBurst(520, 0.12, 0.1 * w); // Scheppern obendrauf
+      return;
+    }
+    // Auf Beton: kurz, dumpf, kaum Nachklang
+    this.metalHit(
+      [96, 141, 208],
+      [0.3, 0.2, 0.13],
+      (weich ? 0.08 : 0.16) * w,
+      { transient: 260, transientGain: 0.2 * w, spread: 0.02 }
+    );
+    this.noiseBurst(220, 0.09, 0.12 * w);
   }
 
   /**

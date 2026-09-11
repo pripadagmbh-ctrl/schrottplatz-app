@@ -243,6 +243,7 @@ async function main(): Promise<void> {
     );
     renderer.render(scene, orbit.camera);
     const rest = performance.now() - tRest0;
+    audio.tickUmgebung(frameDt); // Platzkulisse laeuft auch im Labor mit
 
     /*
      * Die ersten Bilder zaehlen nicht: Da werden Shader uebersetzt und
