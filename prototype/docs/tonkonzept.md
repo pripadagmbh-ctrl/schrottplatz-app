@@ -94,7 +94,7 @@ durch Glas. Draußen umgekehrt. Der Umschalter existiert schon im Spiel.
 
 | Schritt | Inhalt | Stand |
 |---|---|---|
-| 1 | **Diesel aus Zündungen** statt Oszillator | **fertig** |
+| 1 | **Diesel aus Zündungen** statt Oszillator | **gebaut und wieder zurückgenommen**, siehe unten |
 | 2 | Hydraulik, Drehwerk, Unterwagen als echte Maschinenklänge | offen |
 | 3 | Raum: Panner, Entfernungsdämpfung, entfernungsabhängiger Hall | offen |
 | 4 | Rasselbett und Ereignisbudget | offen |
@@ -102,14 +102,17 @@ durch Glas. Draußen umgekehrt. Der Umschalter existiert schon im Spiel.
 | 6 | Kabine gegen Außenansicht | offen |
 | 7 | Platzschicht: zweite Maschine, Verkehr, Halle, Druckluft | offen |
 
-Schritt 1 ist gemacht, weil er den größten Anteil an der Spielzeit hat.
-Schritt 3 ist der zweitgrößte Hebel: Ohne Raum bleibt es eine Tonspur, egal
-wie gut die Einzelklänge sind.
+Schritt 1 wurde zuerst angegangen, weil er den größten Anteil an der
+Spielzeit hat — und wieder zurückgenommen (Abschnitt 6). Schritt 3 ist der
+zweitgrößte Hebel: Ohne Raum bleibt es eine Tonspur, egal wie gut die
+Einzelklänge sind.
 
-## 6 Schritt 1: der Diesel
+## 6 Schritt 1: der Diesel — Versuch und Rücknahme
 
-Umgesetzt in `audio/diesel.ts` — reine Rechnung, kein WebAudio, in Node
-testbar (9 Tests).
+**Ergebnis vorweg: zurückgenommen.** Der Code ist nicht mehr im Stand; was
+hier steht, ist das, was daraus zu lernen war. Umgesetzt war es in
+`audio/diesel.ts` — reine Rechnung, kein WebAudio, in Node testbar (11
+Tests). Wiederherstellbar über `git revert` der beiden Rücknahme-Commits.
 
 Ein Diesel klingt nicht, weil er eine Tonhöhe hat, sondern weil er **schlägt**.
 Ein Sechszylinder-Viertakter zündet bei 900/min 45-mal je Sekunde. Gebaut
@@ -147,9 +150,35 @@ Kosten: Die Schleifen werden einmal beim Start gerechnet. Im Betrieb kostet
 der Motor sechs dauerhaft laufende Abspielknoten — unabhängig von der
 Drehzahl, statt fünfzig neuer Knoten je Sekunde.
 
-### Was dabei auffiel und in Schritt 5 gehört
+### Warum es trotzdem zurückgenommen wurde
 
-Der Kompressor über allem drückt die Spanne des Motors von 7,6 auf 6,6 dB
-zusammen: Ein durchgehender Klang gehört nicht auf denselben Kompressor wie
-ein Schlag. Deshalb steht in Schritt 5 „Begrenzer statt Kompressor über
-allem".
+Beurteilung des Auftraggebers nach dem Anhören: „das klingt grausam".
+Daraufhin zwei weitere Fehler gemessen und behoben — ein **Gleichanteil von
+0,125** (der Auspuffstoß war einseitig, also physikalisch kein Auspuff,
+sondern eine Hupe) und ein **Kompressor, der im Zündtakt pumpte** (120 ms
+Loslassen gegen 28 ms Zündabstand). Danach: „ich glaub wir verrennen uns
+hier."
+
+Das ist der eigentliche Befund, und er ist wichtiger als jede Frequenz:
+
+> Bei jedem Durchgang wurde ein Fehler gemessen und behoben, und der nächste
+> kam zum Vorschein. Das ist kein Pech, das ist die Methode. Ein Diesel
+> besteht aus einem Dutzend Anteilen, die zusammenpassen müssen. Messen
+> ersetzt das Hören nicht — es findet, was *falsch* ist, aber nicht, was
+> *gut* ist.
+
+Was bleibt:
+
+1. **Der Befund gilt weiter.** Ein Sägezahn-Oszillator ist kein Motor, und
+   man hört ihn neunzig Prozent der Spielzeit. Schritt 1 ist damit nicht
+   erledigt, sondern offen.
+2. **Der Weg über Synthese ist dafür vermutlich der falsche.** Was ein Spiel
+   an Maschinengeräusch braucht, wird normalerweise aufgenommen, nicht
+   gerechnet. Die Entscheidung darüber steht aus (siehe E-049: Lizenzfrage).
+3. **Drei Erkenntnisse sind unabhängig davon richtig** und gehören in jede
+   spätere Lösung: kein Gleichanteil, Dauerklänge nicht auf den
+   Schlag-Kompressor, und nichts darf sich exakt wiederholen.
+
+Wenn der Ton wieder drankommt: **erst ein Prüfstand, dann bauen.** Ohne eine
+Seite, auf der sich ein Klang in zehn Sekunden beurteilen lässt, kostet jede
+Runde eine Spielrunde — und genau daran ist dieser Versuch gescheitert.

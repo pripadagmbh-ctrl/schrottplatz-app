@@ -15,14 +15,6 @@ import { Music } from "./music";
  * lange, zwei Schalen treffen flaechig und dröhnen nach, ein Magnet schnappt
  * gar nicht — er saugt an und schlaegt einmal dumpf auf.
  */
-import {
-  DREHZAHL_STUETZEN,
-  UMSCHLAGBAGGER,
-  dieselSchleife,
-  drehzahlFuer,
-  mischung,
-} from "./diesel";
-
 export type GreiferKlang = "polyp" | "schrott" | "zweischalen" | "magnet";
 
 interface GreiferProfil {
@@ -123,35 +115,8 @@ export class AudioManager {
   private music: Music | null = null;
   /** Musikwunsch des Spielers — gilt auch, bevor der Ton überhaupt läuft */
   private musicWanted = true;
-  /** Je Drehzahl-Stuetzstelle eine laufende Schleife, Block und Nageln getrennt */
-  private motorStimmen: {
-    stuetze: number;
-    quelle: AudioBufferSourceNode;
-    gain: GainNode;
-    klopfQuelle: AudioBufferSourceNode;
-    klopfGain: GainNode;
-  }[] = [];
-  /**
-   * Eigener Weg fuer die Maschine.
-   *
-   * Der Kompressor auf dem Geraeuschweg ist fuer Schlaege gebaut: schnelles
-   * Ansprechen, 120 ms Loslassen. Ein Motor zuendet im Leerlauf alle 28 ms —
-   * der Kompressor kann dem nicht folgen und pumpt im Zuendtakt (gemessen
-   * 11.09.2026: 14,7 Prozent Pegelschwankung). Darum laeuft die Maschine
-   * daran vorbei. Das ist Schritt 5 des Tonkonzepts, vorgezogen, weil es hier
-   * hoerbar war.
-   */
-  private maschine: GainNode | null = null;
-  /** Gesamtpegel des Motors */
-  private motorGain: GainNode | null = null;
-  /** Pegel des Nagelns — folgt der Last */
-  private klopfSumme: GainNode | null = null;
-  /** Luefter und Kuehler: breitbandig, folgt der Drehzahl */
-  private luefterGain: GainNode | null = null;
-  private luefterFilter: BiquadFilterNode | null = null;
-  /** Turbolader: steigt mit Drehzahl und Last */
-  private turboOsc: OscillatorNode | null = null;
-  private turboGain: GainNode | null = null;
+  private engineOsc: OscillatorNode | null = null;
+  private engineGain: GainNode | null = null;
   private hydraulicGain: GainNode | null = null;
   private hydOsc: OscillatorNode | null = null;
   private scrapeGain: GainNode | null = null;
@@ -258,8 +223,17 @@ export class AudioManager {
       this.music = new Music(this.ctx, this.master);
       if (this.musicWanted) this.music.start();
 
-      this.baueMaschinenweg();
-      this.baueMotor();
+      // Diesel-Loop: tiefer Sägezahn + Tiefpass, Drehzahl folgt der Aktivität
+      this.engineOsc = this.ctx.createOscillator();
+      this.engineOsc.type = "sawtooth";
+      this.engineOsc.frequency.value = 48;
+      const engineFilter = this.ctx.createBiquadFilter();
+      engineFilter.type = "lowpass";
+      engineFilter.frequency.value = 220;
+      this.engineGain = this.ctx.createGain();
+      this.engineGain.gain.value = 0.05;
+      this.engineOsc.connect(engineFilter).connect(this.engineGain).connect(this.sfx);
+      this.engineOsc.start();
 
       // Hydraulik: kein Zischen mehr, sondern ein dezenter Pumpenton, der beim
       // Bedienen mitläuft (Design-Wunsch 2026-08-29)
@@ -271,7 +245,7 @@ export class AudioManager {
       hydFilter.frequency.value = 520;
       this.hydraulicGain = this.ctx.createGain();
       this.hydraulicGain.gain.value = 0;
-      this.hydOsc.connect(hydFilter).connect(this.hydraulicGain).connect(this.maschine!);
+      this.hydOsc.connect(hydFilter).connect(this.hydraulicGain).connect(this.sfx);
       this.hydOsc.start();
       // leichtes Pulsieren der Pumpe
       const lfo = this.ctx.createOscillator();
@@ -483,137 +457,12 @@ export class AudioManager {
   }
 
   /** Pro Frame: activity 0..1 (Achsbewegung), load 0..1 (Traglast-Anteil). */
-  /**
-   * Den Motor aufbauen: je Stuetzdrehzahl eine Schleife aus Zuendungen, dazu
-   * Luefter und Turbolader.
-   *
-   * Die Schleifen laufen von Anfang bis Ende durch; im Betrieb wird nur
-   * ueberblendet und die Abspielgeschwindigkeit nachgefuehrt. Das kostet
-   * unabhaengig von der Drehzahl immer gleich wenig.
-   */
-  /** Der Weg, auf dem alles Laufende liegt: Motor, Hydraulik, Fahrwerk. */
-  private baueMaschinenweg(): void {
-    if (!this.ctx || !this.master) return;
-    this.maschine = this.ctx.createGain();
-    this.maschine.gain.value = 1;
-    // Unterhalb von gut 30 Hz steht nichts Nuetzliches, es kostet nur
-    // Aussteuerung — und ein Gleichanteil faellt hier auf jeden Fall weg.
-    const tief = this.ctx.createBiquadFilter();
-    tief.type = "highpass";
-    tief.frequency.value = 32;
-    const hoch = this.ctx.createBiquadFilter();
-    hoch.type = "lowpass";
-    hoch.frequency.value = 7000;
-    hoch.Q.value = 0.5;
-    this.maschine.connect(tief).connect(hoch).connect(this.master);
-  }
-
-  private baueMotor(): void {
-    if (!this.ctx || !this.maschine) return;
-    this.motorGain = this.ctx.createGain();
-    this.motorGain.gain.value = 0.32;
-    this.motorGain.connect(this.maschine);
-    this.klopfSumme = this.ctx.createGain();
-    this.klopfSumme.gain.value = 0.12;
-    this.klopfSumme.connect(this.motorGain);
-
-    for (const stuetze of DREHZAHL_STUETZEN) {
-      const form = { ...UMSCHLAGBAGGER, drehzahl: stuetze };
-      const mach = (anteil: "block" | "klopfen") => {
-        const daten = dieselSchleife(this.ctx!.sampleRate, form, anteil);
-        const buf = this.ctx!.createBuffer(1, daten.length, this.ctx!.sampleRate);
-        buf.copyToChannel(daten, 0);
-        const q = this.ctx!.createBufferSource();
-        q.buffer = buf;
-        q.loop = true;
-        const g = this.ctx!.createGain();
-        g.gain.value = 0;
-        q.connect(g);
-        return { q, g };
-      };
-      const block = mach("block");
-      const klopf = mach("klopfen");
-      block.g.connect(this.motorGain);
-      klopf.g.connect(this.klopfSumme);
-      // Versetzt starten, damit die drei Schleifen nicht im Gleichtakt
-      // laufen und sich zu einem Brummen addieren.
-      const t0 = this.ctx.currentTime + 0.02;
-      block.q.start(t0);
-      klopf.q.start(t0);
-      this.motorStimmen.push({
-        stuetze,
-        quelle: block.q,
-        gain: block.g,
-        klopfQuelle: klopf.q,
-        klopfGain: klopf.g,
-      });
-    }
-    // Ganz unten der Motor, ganz oben der Wind vom Kuehler.
-    const luft = this.ctx.createBufferSource();
-    luft.buffer = this.noiseBuffer();
-    luft.loop = true;
-    this.luefterFilter = this.ctx.createBiquadFilter();
-    this.luefterFilter.type = "bandpass";
-    this.luefterFilter.frequency.value = 420;
-    this.luefterFilter.Q.value = 0.5;
-    this.luefterGain = this.ctx.createGain();
-    this.luefterGain.gain.value = 0.02;
-    luft.connect(this.luefterFilter).connect(this.luefterGain).connect(this.motorGain);
-    luft.start();
-
-    // Der Turbolader pfeift erst, wenn Last anliegt — das ist der Laut, den
-    // man hoert, wenn eine volle Spinne hochgeht.
-    this.turboOsc = this.ctx.createOscillator();
-    this.turboOsc.type = "sawtooth";
-    this.turboOsc.frequency.value = 1800;
-    const turboFilter = this.ctx.createBiquadFilter();
-    turboFilter.type = "bandpass";
-    turboFilter.frequency.value = 2600;
-    turboFilter.Q.value = 2.2;
-    this.turboGain = this.ctx.createGain();
-    this.turboGain.gain.value = 0;
-    this.turboOsc.connect(turboFilter).connect(this.turboGain).connect(this.motorGain);
-    this.turboOsc.start();
-  }
-
-  /** Zuletzt gestellte Drehzahl (1/min) — fuers Ablesen bei Messungen. */
-  get drehzahl(): number {
-    return this.letzteDrehzahl;
-  }
-  private letzteDrehzahl = DREHZAHL_STUETZEN[0];
-
   updateEngine(activity: number, load: number): void {
-    if (!this.ctx || !this.hydraulicGain) return;
+    if (!this.ctx || !this.engineOsc || !this.engineGain || !this.hydraulicGain) return;
     const t = this.ctx.currentTime;
-    const drehzahl = drehzahlFuer(activity, load);
-    this.letzteDrehzahl = drehzahl;
-    const anteile = mischung(drehzahl);
-    this.motorStimmen.forEach((st, i) => {
-      // Abspielgeschwindigkeit traegt die Feinabstimmung zwischen den
-      // Stuetzstellen: Die Schleife ist bei ihrer Stuetzdrehzahl gerechnet.
-      const tempo = drehzahl / st.stuetze;
-      st.quelle.playbackRate.setTargetAtTime(tempo, t, 0.08);
-      st.klopfQuelle.playbackRate.setTargetAtTime(tempo, t, 0.08);
-      st.gain.gain.setTargetAtTime(anteile[i], t, 0.1);
-      st.klopfGain.gain.setTargetAtTime(anteile[i], t, 0.1);
-    });
-    /*
-     * Lauter wird der Motor mit der Drehzahl, das Nageln mit der Last.
-     *
-     * Die Pegel sind gegen den alten Saegezahn gemessen (11.09.2026), damit
-     * der Platz nicht ploetzlich vom Motor zugedeckt wird: im Leerlauf rund
-     * 0,05 Effektivwert, unter Volllast rund 0,13 — und dazwischen ein
-     * hoerbarer Unterschied. Der neue Motor hatte zunaechst im Leerlauf den
-     * doppelten Pegel und kaum noch Spanne nach oben.
-     */
-    const gas = (drehzahl - DREHZAHL_STUETZEN[0]) / 1000;
-    this.motorGain?.gain.setTargetAtTime(0.24 + 0.5 * gas, t, 0.15);
-    this.klopfSumme?.gain.setTargetAtTime(0.07 + 0.16 * load + 0.06 * gas, t, 0.2);
-    this.luefterGain?.gain.setTargetAtTime(0.015 + 0.03 * gas, t, 0.2);
-    this.luefterFilter?.frequency.setTargetAtTime(380 + 260 * gas, t, 0.2);
-    // Der Lader dreht deutlich schneller als der Motor.
-    this.turboOsc?.frequency.setTargetAtTime(1500 + 1500 * gas, t, 0.25);
-    this.turboGain?.gain.setTargetAtTime(0.006 * load * (0.3 + gas), t, 0.3);
+    // Beim Bedienen geht der Motor spürbar hoch — das trägt das Feedback
+    this.engineOsc.frequency.setTargetAtTime(46 * (1 + 0.55 * activity + 0.22 * load), t, 0.12);
+    this.engineGain.gain.setTargetAtTime(0.05 + 0.085 * activity + 0.02 * load, t, 0.15);
     // Hydraulikpumpe nur dezent darunter, Tonhöhe folgt der Last
     if (this.hydOsc) {
       this.hydOsc.frequency.setTargetAtTime(112 + 26 * activity + 14 * load, t, 0.1);
