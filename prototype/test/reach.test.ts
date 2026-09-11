@@ -113,11 +113,11 @@ describe("Last am Greifer", () => {
      * Das Datenblatt nennt 7 bis 9 Umdrehungen je Minute (42 bis 54 Grad je
      * Sekunde) — das ist das Hoechste, was die Maschine kann. Ein Fahrer
      * benutzt es kaum; im Spiel faehrt die Taste aber immer Anschlag. Darum
-     * liegt das Endtempo bewusst darunter, bei fuenf bis sieben Umdrehungen.
-     * Unter 30 Grad fuehlt sich der Turm zaeh an, ueber 42 wird er wild.
+     * liegt das Endtempo bewusst darunter, bei vier bis sieben Umdrehungen.
+     * Unter 24 Grad wird der Turm zaeh, ueber 42 wird er wild.
      */
     const gradProSekunde = THREE.MathUtils.radToDeg(CAB_MAX);
-    expect(gradProSekunde).toBeGreaterThanOrEqual(30);
+    expect(gradProSekunde).toBeGreaterThanOrEqual(24);
     expect(gradProSekunde).toBeLessThanOrEqual(42);
   });
 });

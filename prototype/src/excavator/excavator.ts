@@ -106,14 +106,16 @@ const STEER_RATE = 0.7; // rad/s
  * Anschlag. Das Endtempo muss darum ein Arbeitstempo sein, nicht das Maximum
  * der Maschine.
  *
- * 45 Grad je Sekunde waren zu viel (Befund 11.09.2026: "der Turm ist zu
- * schnell"). 36 sind sechs Umdrehungen je Minute — ruhiges Arbeitstempo.
+ * 45 Grad je Sekunde waren zu viel, 36 immer noch ("scheint trotzdem noch zu
+ * schnell", 11.09.2026). Jetzt 28 — knapp fuenf Umdrehungen je Minute. Die
+ * Spitze der Spinne laeuft damit auf 8 m Radius mit 3,9 statt 6,3 m/s durch
+ * die Luft, also 14 statt 23 km/h.
  *
  * Das frueher gemeldete "zu langsam" galt nicht dem Grundtempo, sondern der
  * Last: "alles bis vier, fuenf Tonnen sollte kein Problem sein". Dafuer
  * sorgt tempoFaktor, nicht CAB_MAX.
  */
-export const CAB_MAX = THREE.MathUtils.degToRad(36);
+export const CAB_MAX = THREE.MathUtils.degToRad(28);
 const BOOM_RATE = THREE.MathUtils.degToRad(19);
 const STICK_RATE = THREE.MathUtils.degToRad(20);
 const ROTATOR_STEP = THREE.MathUtils.degToRad(15); // pro Mausrad-Raste
