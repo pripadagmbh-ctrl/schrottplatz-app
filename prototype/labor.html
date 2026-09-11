@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <title>Spinnen-Labor — PRIPADA</title>
+    <style>
+      /*
+       * Spinnen-Labor (Auftrag 11.09.2026, Phase 1.1).
+       *
+       * Eigene Seite neben dem Spiel: Hier wird die Spinne gemessen und
+       * umgebaut, ohne dass jemand den laufenden Betrieb dabei anfasst. Die
+       * Bedienung ist absichtlich die gleiche wie im Spiel — sonst misst man
+       * ein anderes Gerät als das, das gespielt wird.
+       */
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1c1e; }
+      canvas { display: block; touch-action: none; }
+      .karte {
+        position: fixed;
+        color: #e8e8e4;
+        font: 13px/1.45 "Consolas", "SF Mono", monospace;
+        background: rgba(20, 24, 26, 0.82);
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 6px;
+        padding: 8px 12px;
+        pointer-events: none;
+        user-select: none;
+        white-space: pre;
+      }
+      #mess { top: 10px; right: 10px; color: #f0d060; }
+      #mess b { color: #8fd18f; }
+      #hilfe { top: 10px; left: 10px; }
+      #hilfe i { color: #f0b429; font-style: normal; }
+      #laden {
+        position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+        color: #e8e8e4; font: 16px "Consolas", monospace; background: #1a1c1e;
+      }
+      /* --- Touch: dieselben schwebenden Sticks wie im Spiel --- */
+      #touch { display: none; position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+      #touch .zone {
+        position: absolute; top: 0; bottom: 0; width: 50%;
+        pointer-events: auto; touch-action: none; z-index: 0;
+      }
+      #zone-left { left: 0; }
+      #zone-right { right: 0; }
+      #touch .pad {
+        position: absolute; width: 138px; height: 138px; margin: -69px 0 0 -69px;
+        border-radius: 50%; background: rgba(20, 22, 24, 0.35);
+        border: 2px solid rgba(255, 255, 255, 0.25); pointer-events: none; z-index: 1;
+      }
+      #touch .pad[hidden] { display: none; }
+      #touch .knob {
+        position: absolute; left: 50%; top: 50%; width: 56px; height: 56px;
+        margin: -28px 0 0 -28px; border-radius: 50%; background: rgba(240, 180, 41, 0.75);
+      }
+      #touch .btn {
+        position: absolute; pointer-events: auto; touch-action: none; user-select: none;
+        z-index: 2; background: rgba(20, 22, 24, 0.6);
+        border: 2px solid rgba(255, 255, 255, 0.28); color: #e8e8e4;
+        font: 600 12px/1 "Consolas", monospace; border-radius: 10px; text-align: center;
+      }
+      #touch .btn.down { background: rgba(240, 180, 41, 0.65); color: #1a1c1e; }
+      #touch #btn-rot-l, #touch #btn-rot-r {
+        right: 12px; width: 54px; height: 50px; line-height: 46px; padding: 0; font-size: 20px;
+      }
+      #touch #btn-rot-l { bottom: 238px; }
+      #touch #btn-rot-r { bottom: 180px; }
+      @media (max-height: 430px) {
+        #touch .pad { width: 108px; height: 108px; margin: -54px 0 0 -54px; }
+        #touch .knob { width: 44px; height: 44px; margin: -22px 0 0 -22px; }
+        #hilfe { display: none; }
+        #mess { font-size: 11px; padding: 5px 8px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="laden">Labor lädt …</div>
+    <div class="karte" id="mess"></div>
+    <div class="karte" id="hilfe">
+<i>SPINNEN-LABOR</i>
+W/S Fahren · A/D Lenken
+Q/E Oberwagen · R/F Ausleger
+T/G Stiel · LMB Spinne schließen
+↺ ↻ / Mausrad Rotator
+C Ansicht · O Stützen · X Kabine
+1 Teile nachlegen · 2 Pkw neu
+M Messlauf (300 Schritte)
+0 Spitzen zurücksetzen</div>
+    <div id="touch">
+      <div class="zone" id="zone-left"></div>
+      <div class="zone" id="zone-right"></div>
+      <div class="pad" id="touch-left" hidden><div class="knob"></div></div>
+      <div class="pad" id="touch-right" hidden><div class="knob"></div></div>
+      <div class="btn" id="btn-rot-l">↺</div>
+      <div class="btn" id="btn-rot-r">↻</div>
+    </div>
+    <script type="module" src="/src/labor/main.ts"></script>
+  </body>
+</html>
