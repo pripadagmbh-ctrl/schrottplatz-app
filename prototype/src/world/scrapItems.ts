@@ -69,14 +69,32 @@ function cableCoilGeometry(r: number, tube: number): THREE.BufferGeometry {
  * so zahm wirken wie Bleche.
  */
 /**
- * Höchstgeschwindigkeit nach Masse. Ein 20-kg-Blech kommt auf gut 4 m/s,
- * ein 500-kg-Brocken auf keine 1 m/s, ein 2-Tonnen-Teil rührt sich kaum.
- * Fallen bleibt davon unberührt — die Grenze greift erst über der Fallhöhe,
- * aus der Schrott üblicherweise abgekippt wird.
+ * Höchstgeschwindigkeit QUER nach Masse.
+ *
+ * Die Grenze gibt es, weil die Spinne ein kinematischer Körper ist: Sie
+ * überträgt beim Anschlagen beliebig viel Schwung, und ohne Deckelung fliegt
+ * ein Motorblock so weit wie ein Blech.
+ *
+ * Sie war aber viel zu eng und galt für JEDE Richtung, also auch fürs Fallen.
+ * Gemessen (11.09.2026): Ein 180-kg-Teil fiel mit konstant 1,5 m/s statt mit
+ * 9,81 m/s² zu beschleunigen — genau das Schweben, das im Spiel zu sehen war.
+ * Und ein weggeschleudertes Teil verlor seinen Schwung sofort wieder, statt
+ * seitlich davonzufliegen. Der alte Kommentar behauptete, Fallen bleibe
+ * unberührt; das stimmte nicht.
+ *
+ * Jetzt: Ein 20-kg-Blech kommt auf 12 m/s, ein 500-kg-Brocken auf 4 m/s. Nach
+ * unten gilt die Grenze gar nicht (siehe FALL_MAX) — dort arbeitet die
+ * Schwerkraft.
  */
 export function maxSpeedFor(massKg: number): number {
-  return Math.min(5.5, Math.max(0.55, 19 / Math.sqrt(Math.max(massKg, 1))));
+  return Math.min(12, Math.max(4, 60 / Math.sqrt(Math.max(massKg, 1))));
 }
+
+/**
+ * Deckelung nach unten — nur als Netz gegen Rechenausreisser. Aus 5 m freiem
+ * Fall kommt ein Teil auf 10 m/s; hier ist viel Luft bis dahin.
+ */
+export const FALL_MAX = 35;
 
 /**
  * Achtkant-Prisma statt Zylinder (v2 E-011).
@@ -875,10 +893,13 @@ export class ItemManager {
       const maxLinear = maxSpeedFor(item.massKg);
       const maxAngular = maxLinear * 1.4;
       const v = item.body.linvel();
-      const s = Math.hypot(v.x, v.y, v.z);
-      if (s > maxLinear) {
-        const f = maxLinear / s;
-        item.body.setLinvel({ x: v.x * f, y: v.y * f, z: v.z * f }, true);
+      // Quer und nach oben wird gedeckelt, nach unten nicht: Fallen ist
+      // Schwerkraft und keine Uebertragung aus der Spinne.
+      const quer = Math.hypot(v.x, v.z);
+      const f = quer > maxLinear ? maxLinear / quer : 1;
+      const y = Math.min(Math.max(v.y, -FALL_MAX), maxLinear);
+      if (f < 1 || y !== v.y) {
+        item.body.setLinvel({ x: v.x * f, y, z: v.z * f }, true);
       }
       const w = item.body.angvel();
       const a = Math.hypot(w.x, w.y, w.z);

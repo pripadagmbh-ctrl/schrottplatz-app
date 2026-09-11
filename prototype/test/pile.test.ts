@@ -11,7 +11,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
-import { ItemManager } from "../src/world/scrapItems";
+import { ItemManager, maxSpeedFor, FALL_MAX } from "../src/world/scrapItems";
 import { PhysicsWorld, initPhysics } from "../src/physics/physicsWorld";
 
 beforeAll(async () => {
@@ -141,3 +141,29 @@ function tiefsterKoerper(world: RAPIER.World): number {
   });
   return tief;
 }
+
+/**
+ * Fallen und Werfen (Messung 11.09.2026).
+ *
+ * Die Geschwindigkeitsdeckelung galt für jede Richtung. Ein 180-kg-Teil fiel
+ * dadurch mit konstant 1,5 m/s statt zu beschleunigen — das sah aus wie
+ * Schweben —, und ein weggeschleudertes Teil verlor seinen Schwung sofort.
+ */
+describe("Geschwindigkeitsgrenzen", () => {
+  it("hält schwere Teile quer langsamer als leichte", () => {
+    expect(maxSpeedFor(20)).toBeGreaterThan(maxSpeedFor(500));
+    expect(maxSpeedFor(2000)).toBeGreaterThanOrEqual(4);
+  });
+
+  it("lässt auch schweren Schrott noch geworfen werden", () => {
+    // Die Spinnenspitze kommt bei 45°/s und 8 m auf gut 6 m/s. Ein Wurf muss
+    // als Wurf erkennbar bleiben, sonst fällt alles senkrecht herunter.
+    expect(maxSpeedFor(200)).toBeGreaterThanOrEqual(4);
+    expect(maxSpeedFor(20)).toBeGreaterThanOrEqual(10);
+  });
+
+  it("deckelt nach unten erst weit jenseits des freien Falls", () => {
+    // Aus 5 m freiem Fall kommt ein Teil auf 10 m/s.
+    expect(FALL_MAX).toBeGreaterThan(20);
+  });
+});
