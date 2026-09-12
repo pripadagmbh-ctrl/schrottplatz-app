@@ -4,8 +4,8 @@ import {
   ROUTE_IN_FWD,
   routeApproach,
   routeInRev,
-  PICKUP_APPROACH,
-  PICKUP_IN_REV,
+  pickupApproach,
+  pickupInRev,
   TIP_APPROACH,
   TIP_IN_REV,
 } from "./routes";
@@ -42,8 +42,8 @@ function lanes(): Array<[string, Array<[number, number]>]> {
     ["Einfahrt", ROUTE_IN_FWD],
     ["Zufahrt", routeApproach()],
     ["Abladeplatz", routeInRev()],
-    ["Abholerspur", PICKUP_APPROACH],
-    ["Verladeplatz", PICKUP_IN_REV],
+    ["Abholerspur", pickupApproach()],
+    ["Verladeplatz", pickupInRev()],
     ["Kipperspur", TIP_APPROACH],
     ["Kipperhalt", TIP_IN_REV],
   ];

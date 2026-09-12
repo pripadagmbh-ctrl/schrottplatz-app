@@ -16,10 +16,12 @@ import { hoechsteKrallenspitze, tempoFaktor, anlaufZeit, CAB_MAX } from "../src/
 import { CONFIGS } from "../src/world/containers";
 import {
   neueAbladestelle,
+  neueAbholstelle,
   routeInRev,
   setBaggerOrt,
   TIP_CREEP_M,
 } from "../src/delivery/routes";
+import { baleYard, setPressBaggerOrt } from "../src/world/press";
 
 /** Standplatz des Baggers — siehe `position` in excavator.ts. */
 const BAGGER = { x: -2.0, z: -19.5 };
@@ -133,4 +135,66 @@ describe("Reichweite des Arms", () => {
       ).not.toBeNull();
     });
   }
+
+  /*
+   * Zwei Stellen, die der Spieler nicht selbst waehlt und trotzdem erreichen
+   * muss: der Halteplatz des Abholers und die Stelle, an der die Presse das
+   * fertige Paket auswirft. Beide werden zur Laufzeit aus der Baggerstellung
+   * gerechnet, beide koennten dabei aus dem Greifring rutschen — und beide
+   * waeren dann eine Sackgasse: Was man nicht greifen kann, kann man weder
+   * verladen noch verkaufen.
+   */
+  it("der Abholer haelt im Greifring, egal wo der Bagger steht", () => {
+    for (const b of [
+      { x: -2.0, z: -19.5 },
+      { x: -2.0, z: -14.0 },
+      { x: 2.0, z: -22.0 },
+      { x: -6.0, z: -12.0 },
+    ]) {
+      setBaggerOrt(() => b);
+      const [x, z] = neueAbholstelle();
+      const d = Math.hypot(x - b.x, z - b.z);
+      expect(d, `Abholer bei Bagger (${b.x}|${b.z})`).toBeGreaterThanOrEqual(4.0);
+      expect(d, `Abholer bei Bagger (${b.x}|${b.z})`).toBeLessThanOrEqual(9.5);
+      // Ueber die Bordwand muss der Greifer auch noch kommen.
+      expect(hoechsteKrallenspitze(d), `Hubhoehe bei ${d.toFixed(1)} m`).toBeGreaterThan(2.5);
+    }
+  });
+
+  it("das Presspaket faellt dorthin, wo der Bagger es aufnehmen kann", () => {
+    for (const b of [
+      { x: -2.0, z: -19.5 },
+      { x: -2.0, z: -14.0 },
+      { x: 2.0, z: -22.0 },
+      { x: -6.0, z: -12.0 },
+    ]) {
+      setPressBaggerOrt(() => b);
+      const y = baleYard();
+      const d = Math.hypot(y.x - b.x, y.z - b.z);
+      expect(d, `Paket bei Bagger (${b.x}|${b.z})`).toBeGreaterThanOrEqual(4.0);
+      expect(d, `Paket bei Bagger (${b.x}|${b.z})`).toBeLessThanOrEqual(9.5);
+    }
+  });
+
+  it("das Paket kommt zur Baggerseite heraus, nicht nach hinten", () => {
+    /*
+     * „Die Presse soll doch Ballen ausspucken, in Baggerrichtung" (12.09.2026).
+     * Geprueft wird die Richtung, nicht die Stelle: Der Auswurf muss auf der
+     * Haelfte der Kammer liegen, die zum Bagger zeigt. Fiele er nach hinten,
+     * laege das Paket hinter der Maschine an der Suedwand.
+     */
+    const PRESSE = { x: -10.0, z: -21.5 };
+    for (const b of [
+      { x: -2.0, z: -19.5 },
+      { x: -2.0, z: -14.0 },
+      { x: 2.0, z: -22.0 },
+    ]) {
+      setPressBaggerOrt(() => b);
+      const y = baleYard();
+      const zumBagger = [b.x - PRESSE.x, b.z - PRESSE.z];
+      const zumPaket = [y.x - PRESSE.x, y.z - PRESSE.z];
+      const skalar = zumBagger[0] * zumPaket[0] + zumBagger[1] * zumPaket[1];
+      expect(skalar, `Auswurfrichtung bei Bagger (${b.x}|${b.z})`).toBeGreaterThan(0);
+    }
+  });
 });

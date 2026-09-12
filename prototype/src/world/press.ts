@@ -3,6 +3,7 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import { SORTENREIN_AB } from "../materials/purity";
 import type { ItemManager } from "./scrapItems";
 import type { CompositeManager } from "../dismantle/composites";
+import { hitsObstacle } from "./obstacles";
 
 /**
  * Schrottschere / Paketierpresse (Design 2026-08-29):
@@ -31,24 +32,79 @@ import type { CompositeManager } from "../dismantle/composites";
 // einer Reihe mit Stahlmulde und Halde.
 const CENTER = new THREE.Vector3(-10.0, 0, -21.5);
 // Die Schwelle gilt fuer Objekte wie fuer Pakete — sie steht in materials/purity.ts.
+let baggerOrt: (() => { x: number; z: number }) | null = null;
 /**
- * Wo das fertige Paket liegen bleibt: in der Kammer.
+ * Woher die Presse weiss, wo der Bagger steht. Einmal beim Aufbau setzen.
  *
- * Es gibt kein Ballenlager mehr (Ansage 12.09.2026: „es gibt in dem Fall kein
- * Ballenlager, gepresstes Material muss rausgebaggert werden"). Das Paket
- * bleibt also da, wo es entstanden ist, und wandert von dort in den Behaelter
- * seiner Fraktion — Stahlballen in den 40er, Alupaket in den Alucontainer.
- * Solange es in der Kammer liegt, blockiert es die naechste Fuhre, und genau
- * das soll es auch.
+ * Sie braucht das, weil das fertige Paket zum Bagger hin ausgeworfen wird und
+ * nicht auf eine feste Stelle faellt. Steht die Maschine woanders, kommt das
+ * Paket woanders heraus.
  */
-function baleYard(): { x: number; z: number; w: number; d: number } {
-  /*
-   * Das Paket bleibt in der Kammer (Ansage 12.09.2026: „ich haette gerne
-   * aktuell nur, dass es gepresst wird und in der Mulde verharrt, bis ich es
-   * rausbaggere"). Es faellt nirgendwo mehr heraus — solange es drin liegt,
-   * blockiert es die naechste Fuhre, und genau das soll es.
-   */
-  return { x: CENTER.x, z: CENTER.z, w: INNER_W - 2.2, d: INNER_D - 1.2 };
+export function setPressBaggerOrt(f: () => { x: number; z: number }): void {
+  baggerOrt = f;
+}
+
+/*
+ * Wie weit der Bagger greifen kann. Aus der Armgeometrie gemessen: Unter 4,0 m
+ * erreichen die Krallenspitzen den Boden nicht mehr, ueber 9,5 m ist der Arm am
+ * Ende. Hier steht der Ring etwas enger, damit die Stelle nicht auf der Kante
+ * liegt. Ein Paket ausserhalb dieses Rings waere verloren: Herausbaggern geht
+ * nicht, und abholen kann es auch niemand.
+ */
+const GREIF_MIN = 4.6;
+const GREIF_MAX = 9.0;
+/** Abstand der Auswurfstelle vom Rand der Kammer. */
+const AUSWURF_LUFT = 1.3;
+
+/**
+ * Wohin das fertige Paket ausgeworfen wird: nach draussen, in Baggerrichtung.
+ *
+ * Ansage 12.09.2026: "die Presse soll doch Ballen ausspucken, in
+ * Baggerrichtung." Vorher blieb das Paket in der Kammer liegen und musste von
+ * dort herausgebaggert werden; das blockierte die naechste Fuhre.
+ *
+ * Die Stelle ist nicht fest, sondern wird gesucht, und der Grund dafuer ist der
+ * enge Stand: Die Presse liegt seit dem Platzumbau gut vier Meter neben dem
+ * Bagger. Genau zwischen beiden ist der Greifring zu eng — ein Paket, das
+ * schnurgerade auf den Sitz zu ausgeworfen wird, landet naeher als 4,0 m und
+ * ist damit nicht mehr zu greifen. Darum wandert die Suche vom Punkt "direkt
+ * auf den Bagger zu" am Kammerrand entlang, bis eine Stelle frei ist und im
+ * Ring liegt. Findet sich keine, bleibt das Paket in der Kammer: lieber im Weg
+ * als unerreichbar.
+ */
+export function baleYard(): { x: number; z: number; w: number; d: number } {
+  const kammer = { x: CENTER.x, z: CENTER.z, w: INNER_W - 2.2, d: INNER_D - 1.2 };
+  const b = baggerOrt?.();
+  if (!b) return kammer;
+
+  const zumBagger = Math.atan2(b.x - CENTER.x, b.z - CENTER.z);
+  // Halbe Aussenmasse der Kammer plus Luft: So weit muss das Paket mindestens
+  // heraus, sonst liegt es auf der Wand statt daneben.
+  const hx = INNER_W / 2 + AUSWURF_LUFT;
+  const hz = INNER_D / 2 + AUSWURF_LUFT;
+
+  // Erst genau in Baggerrichtung, dann schrittweise daneben — abwechselnd nach
+  // beiden Seiten, damit die Stelle so dicht wie moeglich an der gewuenschten
+  // Richtung bleibt.
+  for (let schritt = 0; schritt <= 18; schritt++) {
+    for (const vorz of schritt === 0 ? [1] : [1, -1]) {
+      const w = zumBagger + vorz * schritt * (Math.PI / 18);
+      const sx = Math.sin(w);
+      const sz = Math.cos(w);
+      // Punkt auf dem Rand des Kammerrechtecks in dieser Richtung
+      const t = Math.min(
+        Math.abs(sx) < 1e-6 ? Infinity : hx / Math.abs(sx),
+        Math.abs(sz) < 1e-6 ? Infinity : hz / Math.abs(sz)
+      );
+      const x = CENTER.x + sx * t;
+      const z = CENTER.z + sz * t;
+      const d = Math.hypot(b.x - x, b.z - z);
+      if (d < GREIF_MIN || d > GREIF_MAX) continue;
+      if (hitsObstacle(x, z, 0.9)) continue;
+      return { x, z, w: 1.5, d: 1.5 };
+    }
+  }
+  return kammer;
 }
 /**
  * Die Mulde liegt längs Ost–West, in einer Flucht mit dem Stahlschrottplatz
