@@ -341,10 +341,15 @@ describe("Reichweite des Baggers", () => {
     expect(Math.abs(Math.hypot(p.x, p.z))).toBeLessThan(0.05);
   });
 
-  it("passt geöffnet zwischen die Muldenwände", () => {
-    const span = clawSpan(CLAW_OPEN_SPLAY);
-    expect(span).toBeGreaterThan(3); // muss ordentlich fassen
-    expect(span, "Innenbreite der Mulde ist 3,8 m").toBeLessThan(3.8);
+  it("öffnet weit genug, um etwas zu fassen", () => {
+    /*
+     * Hier stand auch eine Obergrenze: „Innenbreite der Mulde ist 3,8 m".
+     * Eine abgeschriebene Zahl, die nach jedem Umbau der Behälter falsch war —
+     * zuletzt schlug sie an, obwohl die Behälter längst 4,7 m messen. Ob die
+     * Spinne in einen Behälter passt, prüft `test/spinnenmass.test.ts` gegen
+     * die echten Maße aus CONFIGS. Eine Regel, ein Besitzer.
+     */
+    expect(clawSpan(CLAW_OPEN_SPLAY)).toBeGreaterThan(3);
   });
 
   it("öffnet weiter, als es schließt", () => {
@@ -358,7 +363,17 @@ describe("Reichweite des Baggers", () => {
     const zu = clawTipDepth(0);
     expect(offen).toBeGreaterThan(1.5);
     expect(zu).toBeGreaterThan(offen);
-    expect(zu).toBeLessThan(2.6);
+    /*
+     * Obergrenze der Spitzentiefe. Sie hütet, dass der Greifer nicht so lang
+     * wird, dass der Arm ihn nicht mehr über eine Wand hebt: Die 5-m-Wand des
+     * Mischschrottplatzes plus Greiferlänge muss der Arm noch schaffen.
+     *
+     * Von 2,6 auf 3,0 angehoben, als die Schale nach der Vorlage länger wurde
+     * (E-121). Dass es weiterhin reicht, prüft nicht diese Zahl, sondern
+     * `test/reach.test.ts`: dort wird für jede Mulde nachgerechnet, ob der Arm
+     * von der Arbeitslinie aus über ihre Wand kommt.
+     */
+    expect(zu).toBeLessThan(3.0);
   });
 
   it("wächst monoton vom Gelenk zur Spitze", () => {

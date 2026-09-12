@@ -11,11 +11,11 @@ import * as THREE from "three";
  */
 
 /** Gelenkkreis der Schalen = ØC/2 laut Datenblatt (1514 mm) */
-export const CLAW_RING_R = 0.757;
+export const CLAW_RING_R = 0.82;
 /** Unterkante Traverse, gemessen ab Kardangelenk */
 export const CLAW_RING_Y = -0.9;
 /** Länge eines Krallensegments */
-export const CLAW_SEG_LEN = 0.21;
+export const CLAW_SEG_LEN = 0.2786;
 /** Segmente je Kralle */
 export const CLAW_SEGMENTS = 8;
 /**
@@ -27,16 +27,25 @@ export const CLAW_SEGMENTS = 8;
  * senkrecht, unten hakt sie scharf nach innen:
  *
  *   Station        1    2    3    4    5    6    7    8
- *   gleichmäßig   0°   9°  17°  26°  35°  43°  52°  61°
- *   so            0°   4°  10°  19°  30°  44°  61°  80°
+ *   gleichmäßig   0°   8°  16°  24°  31°  39°  47°  55°
+ *   so            0°   4°   9°  16°  24°  33°  43°  55°
+ *
+ * Der Endwinkel ist nicht frei wählbar, er bestimmt die Bauform. Am Foto des
+ * Sennebogen-Greifers nachgemessen ist die Schale rund 1,2-mal so tief wie der
+ * Gelenkring breit. Das Verhältnis hängt allein an diesem Profil:
+ *
+ *   Endwinkel   45°    50°    55°    60°    65°    70°    80°
+ *   Tiefe/Ring  1,48   1,32   1,19   1,08   0,99   0,91   0,77
+ *
+ * 55° trifft die Vorlage. Vorher standen hier 80° — daher war die Spinne
+ * gedrungen statt schlank (Befund 12.09.2026: „wie im Bild, gerne größer").
  *
  * Die Zahlen sind so skaliert, dass die Spitzen bei geschlossener Spinne genau
- * auf der Achse zusammenkommen (Radius 0,000 an Station 8) und die Tiefe von
- * 1,30 m erhalten bleibt. Wer daran dreht, muss beides nachrechnen — sonst
+ * auf der Achse zusammenkommen. Wer daran dreht, muss das nachrechnen — sonst
  * laufen die Schalen übereinander oder es bleibt ein Loch.
  */
 const BEND_PROFIL = Array.from({ length: CLAW_SEGMENTS }, (_, i) =>
-  0.207 * (0.3 + 1.55 * (i / (CLAW_SEGMENTS - 1)))
+  0.22855 * (0.3 + 0.7 * (i / (CLAW_SEGMENTS - 1)))
 );
 /** Aufsummierte Krümmung bis Station `i`. */
 export const CLAW_BEND_KUM: number[] = BEND_PROFIL.reduce<number[]>(
@@ -46,11 +55,18 @@ export const CLAW_BEND_KUM: number[] = BEND_PROFIL.reduce<number[]>(
 /** Zahl der Krallen */
 export const CLAW_COUNT = 5;
 /**
- * Spreizung der ganz offenen Spinne (rad). Das Datenblatt nennt 2225 mm
- * Öffnungsweite (entspräche 0,8) — zum Spielen ist das zu eng, der Greifer
- * soll weit aufreißen und ordentlich Volumen fassen.
+ * Spreizung der ganz offenen Spinne (rad).
+ *
+ * Von 1,25 auf 0,94 zurückgenommen, als die Schale länger wurde. Die beiden
+ * hängen zusammen: Eine längere, weniger eingerollte Schale schwenkt beim
+ * Öffnen viel weiter aus. Mit 1,25 hätte dieselbe Spinne 4,83 m aufgerissen —
+ * dann müsste jeder Behälter auf dem Platz 5,6 m messen, und von den sechs
+ * Absetzcontainern passten nur noch vier neben den Bagger.
+ *
+ *   Spreizung     0,85   0,90   0,94   1,00   1,25
+ *   Öffnungsweite 3,49   3,68   3,83   4,04   4,83  (m)
  */
-export const CLAW_OPEN_SPLAY = 1.25;
+export const CLAW_OPEN_SPLAY = 0.94;
 
 /**
  * Halbe Winkelbreite einer Schale (rad).
@@ -61,9 +77,16 @@ export const CLAW_OPEN_SPLAY = 1.25;
  * Jede hat 0,95 m Bogen zur Verfügung und füllt 0,40 m davon. Mehr als die
  * Hälfte des Umfangs war Lücke, und deshalb schloss der Korb nie.
  *
- * Eine Schale bekommt jetzt ihren Anteil am Kreis: 360°/5 = 72°, also 36° zu
- * jeder Seite, davon 2° Luft für das Gelenk. Damit stoßen die Schalen über
- * ihre ganze Länge aneinander.
+ * Eine Schale bekommt ihren Anteil am Kreis: 360°/5 = 72°, also 36° zu jeder
+ * Seite, davon 2° Luft für das Gelenk. Damit stoßen die Schalen über ihre
+ * ganze Länge aneinander.
+ *
+ * Zwischendurch waren es 21°, weil die offenen Greifer auf den Vorlagen breite
+ * Lücken zeigen. Am zweiten Foto (Sennebogen-Mehrschalengreifer, 12.09.2026)
+ * nachgemessen ist das ein Trugschluss: Der Zinkenkreis misst dort rund 330 px,
+ * sein Umfang also 1040 px, macht 207 px je Schale — und jede Schale ist etwa
+ * 180 px breit, also 87 % ihres Abschnitts. Die Lücken entstehen erst durch das
+ * Öffnen, wenn die Schalen auseinanderschwenken.
  *
  * Nebenbei erledigt sich damit der zweite Wunsch von selbst: „gern oben
  * breiter als unten". Bei fester Winkelbreite folgt die Bogenbreite dem
@@ -73,7 +96,7 @@ export const CLAW_OPEN_SPLAY = 1.25;
  *   Radius  0,757  0,757  0,744  0,708  0,642  0,536  0,390  0,207  ~0
  *   Breite  0,79   0,79   0,78   0,74   0,67   0,56   0,41   0,22   0  (m)
  */
-export const CLAW_SHELL_HALF = (Math.PI / CLAW_COUNT) * (30 / 36);
+export const CLAW_SHELL_HALF = (Math.PI / CLAW_COUNT) * (34 / 36);
 /** Blechstärke der Schale (m) — sie ist ein Hohlkörper, kein Vollprofil. */
 export const CLAW_SHELL_DICKE = 0.085;
 /**
@@ -106,7 +129,25 @@ const SCHALE_MIN_R = 0.055;
  * Innenfläche eine Blechstärke weiter innen, dazu die beiden Seitenwangen, der
  * Rand oben und die stumpfe Spitze.
  */
-export function schalenGeometrie(vonStation = 0): THREE.BufferGeometry {
+/**
+ * Rippe auf dem Ruecken einer Schale.
+ *
+ * Auf den Vorlagen laeuft ueber jede Schale ein erhabener Steg — daran
+ * erkennt man, dass es ein Gussteil ist und keine gebogene Platte. Ohne ihn
+ * ist die Schale eine glatte Flaeche, und glatte Flaechen dieser Groesse
+ * lesen sich als Kunststoff (Befund 12.09.2026).
+ *
+ * Gebaut wie die Schale selbst, nur schmal und ein Stueck weiter aussen.
+ */
+export function rippenGeometrie(): THREE.BufferGeometry {
+  return schalenGeometrie(0, CLAW_SHELL_HALF * 0.26, 0.075);
+}
+
+export function schalenGeometrie(
+  vonStation = 0,
+  halbWinkel = CLAW_SHELL_HALF,
+  hinaus = 0
+): THREE.BufferGeometry {
   const BOGEN = 10; // Unterteilungen über die Breite
   const stationen: Array<{ y: number; r: number }> = [];
   let y = 0;
@@ -135,10 +176,10 @@ export function schalenGeometrie(vonStation = 0): THREE.BufferGeometry {
   for (const seite of [0, 1]) {
     const lagen: number[][] = [];
     for (const st of teil) {
-      const r = Math.max(0.012, st.r - seite * CLAW_SHELL_DICKE);
+      const r = Math.max(0.012, st.r + hinaus - seite * CLAW_SHELL_DICKE);
       const reihe: number[] = [];
       for (let j = 0; j <= BOGEN; j++) {
-        const u = -CLAW_SHELL_HALF + (j / BOGEN) * 2 * CLAW_SHELL_HALF;
+        const u = -halbWinkel + (j / BOGEN) * 2 * halbWinkel;
         reihe.push(punkt(r, u, st.y));
       }
       lagen.push(reihe);

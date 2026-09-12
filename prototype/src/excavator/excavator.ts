@@ -12,6 +12,7 @@ import {
   CLAW_RING_Y,
   CLAW_SEGMENTS,
   schalenGeometrie,
+  rippenGeometrie,
   CLAW_SHELL_HALF,
   CLAW_BEND_KUM,
   clawPoint,
@@ -504,14 +505,22 @@ export class Excavator {
     const machineBlue = new THREE.MeshStandardMaterial({ color: 0x5bbf46, roughness: 0.55 });
     const dark = new THREE.MeshStandardMaterial({ color: 0x2b2e31, roughness: 0.8 });
     // Greifer-Farbgebung nach Vorbild: dunkle Hardox-Schalen, fast schwarze Kanten
+    /*
+     * Verwitterter Stahl, nicht fast schwarz.
+     *
+     * 0x40474b war so dunkel, dass die Schalen zu einer einzigen Masse
+     * verschmolzen — man sah keine Kanten mehr, und ohne Kanten liest sich das
+     * Ding als glatter Koerper statt als Maschine. Auf den Vorlagen ist der
+     * Greifer helles, abgeschabtes Grau mit dunklen Laufspuren.
+     */
     const shellMat = new THREE.MeshStandardMaterial({
-      color: 0x40474b,
+      color: 0x7c848b,
       roughness: 0.5,
       metalness: 0.55,
       side: THREE.DoubleSide, // Innenseite ist bei geöffneter Spinne sichtbar
     });
     const edgeMat = new THREE.MeshStandardMaterial({
-      color: 0x23282b,
+      color: 0x4a5158,
       roughness: 0.45,
       metalness: 0.7,
     });
@@ -626,12 +635,35 @@ export class Excavator {
     rotatorCap.position.y = -0.3;
     this.grappleGroup.add(rotatorCap);
 
-    // Traverse: Stahlgussblock, nach unten verjüngt
-    const traverse = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.5, 0.4, 5), shellMat);
-    traverse.position.y = -0.75;
-    traverse.rotation.y = Math.PI / 5;
-    traverse.castShadow = true;
-    this.grappleGroup.add(traverse);
+    /*
+     * Kopf: ein hoher, sich nach unten verjuengender Gussblock.
+     *
+     * Vorher war das eine Scheibe — 0,72 m Radius bei 0,40 m Hoehe, also fast
+     * so breit wie der Gelenkring mit 0,757 m. Darauf standen die Zylinder wie
+     * Stummel, und geschlossen sah die ganze Spinne aus wie eine fliegende
+     * Untertasse (Befund 12.09.2026: „Ist das ein UFO?").
+     *
+     * Am Foto nachgemessen (Sennebogen-Mehrschalengreifer): Der Zinkenkreis
+     * ist dort rund 330 px breit, der Kopf an seiner breitesten Stelle 200 px
+     * — also gut die Haelfte. Und er ist hoch, nicht flach. Genau daran
+     * erkennt man die Maschine: schlanker Turm ueber einem weiten Zinkenkreis.
+     */
+    const kopf = new THREE.Mesh(new THREE.CylinderGeometry(0.40, 0.27, 0.62, 6), shellMat);
+    kopf.position.y = -0.60;
+    kopf.rotation.y = Math.PI / 6;
+    kopf.castShadow = true;
+    this.grappleGroup.add(kopf);
+    // Schulter, an der die Zylinder haengen — sie kragt ueber den Kopf hinaus
+    const schulter = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.44, 0.16, 6), edgeMat);
+    schulter.position.y = -0.40;
+    schulter.rotation.y = Math.PI / 6;
+    schulter.castShadow = true;
+    this.grappleGroup.add(schulter);
+    // Fuss des Kopfes, auf dem der Gelenkring sitzt
+    const fuss = new THREE.Mesh(new THREE.CylinderGeometry(0.30, 0.34, 0.2, 6), edgeMat);
+    fuss.position.y = -0.88;
+    fuss.rotation.y = Math.PI / 6;
+    this.grappleGroup.add(fuss);
     const ring = new THREE.Mesh(new THREE.TorusGeometry(RING_R, 0.075, 8, 22), edgeMat);
     ring.rotation.x = Math.PI / 2;
     ring.position.y = ringY;
@@ -677,9 +709,13 @@ export class Excavator {
        * sah geschlossen aus wie eine schwarze Kugel. Jetzt nur noch die
        * untersten Stationen.
        */
+      // Abgesetzte Schneidkante am unteren Drittel
       const schneide = new THREE.Mesh(schalenGeometrie(5), edgeMat);
       schneide.scale.set(1.012, 1, 1.012);
       pivot.add(schneide);
+      // Erhabener Steg ueber den Ruecken — das Erkennungszeichen eines Gussteils
+      const rippe = new THREE.Mesh(rippenGeometrie(), edgeMat);
+      pivot.add(rippe);
       /*
        * Spitzer Verschleisszahn an der Schalenspitze (Vorlage 12.09.2026).
        *
@@ -689,15 +725,39 @@ export class Excavator {
        * der Form, und auf jedem Schrottgreifer sitzt vorn ein Zahn.
        */
       const zahnP = clawPoint(0, 0, CLAW_SEGMENTS, new THREE.Vector3());
-      const zahn = new THREE.Mesh(new THREE.ConeGeometry(0.085, 0.26, 4), edgeMat);
+      /*
+       * Lang und schlank, nicht der kurze Stummel von vorher. Auf den Vorlagen
+       * ragt die Spitze deutlich ueber den Schalenkoerper hinaus und ist
+       * sichtbar schmaler als er — sie sitzt vorn wie ein aufgeschweisster
+       * Zahn.
+       */
+      const zahn = new THREE.Mesh(new THREE.ConeGeometry(0.075, 0.42, 4), edgeMat);
       /*
        * `clawPoint` liefert Weltkoordinaten der Spinne, das Gelenk hat seine
        * eigenen. Umrechnung: y minus Ringhoehe, z minus Ringradius. Beim
        * ersten Versuch stand hier ein Plus vor dem Radius — dann sassen alle
        * fuenf Zaehne in der Mitte der Spinne statt an ihren Spitzen.
        */
-      zahn.position.set(0, zahnP.y - CLAW_RING_Y - 0.05, zahnP.z - CLAW_RING_R);
-      zahn.rotation.x = Math.PI - (CLAW_BEND_KUM[CLAW_SEGMENTS - 1] ?? 0);
+      /*
+       * Der Zahn sitzt auf der Spitze und zeigt in Laufrichtung der Schale —
+       * beides gerechnet, nicht geschaetzt.
+       *
+       * Die Schale endet mit dem Winkel `th` gegen die Senkrechte, laeuft dort
+       * also in Richtung (0, −cos th, −sin th). Ein Kegel zeigt von Haus aus
+       * nach +y; eine Drehung um x um φ bringt +y auf (0, cos φ, sin φ). Aus
+       * cos φ = −cos th und sin φ = −sin th folgt φ = π + th.
+       *
+       * Beim ersten Versuch stand hier π − th. Der Zahn zeigte damit nach
+       * aussen statt in Laufrichtung und schwebte sichtbar neben der Schale.
+       */
+      const zahnTh = CLAW_BEND_KUM[CLAW_SEGMENTS - 1] ?? 0;
+      const zahnHalb = 0.21; // halbe Kegellaenge
+      zahn.position.set(
+        0,
+        zahnP.y - CLAW_RING_Y - zahnHalb * Math.cos(zahnTh),
+        zahnP.z - CLAW_RING_R - zahnHalb * Math.sin(zahnTh)
+      );
+      zahn.rotation.x = Math.PI + zahnTh;
       zahn.name = "tineTip";
       zahn.castShadow = true;
       pivot.add(zahn);
@@ -711,9 +771,15 @@ export class Excavator {
        * Jetzt 11 cm Rohr und 7 cm Stange — ein Zylinder, der fuenf Tonnen
        * zudrueckt, ist kein Bleistift.
        */
+      /*
+       * Zylinder in Maschinengruen, wie auf der Vorlage. Sie sind dort kurz und
+       * dick und sitzen hoch am Kopf — der auffaellige Farbtupfer an einer
+       * sonst grauen Maschine. Dunkelgrau gingen sie vor dem grauen Kopf
+       * vollstaendig unter.
+       */
       const barrel = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.11, 0.115, 1, 14),
-        new THREE.MeshStandardMaterial({ color: 0x2b3034, roughness: 0.42, metalness: 0.55 })
+        new THREE.CylinderGeometry(0.125, 0.13, 1, 14),
+        new THREE.MeshStandardMaterial({ color: 0x5fbe3f, roughness: 0.45, metalness: 0.3 })
       );
       const rod = new THREE.Mesh(
         new THREE.CylinderGeometry(0.07, 0.07, 1, 12),
