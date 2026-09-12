@@ -14,6 +14,7 @@ import {
   type Zone,
 } from "./weg";
 import { KAFFEE_THEKE } from "./yard";
+import { HALL1_Z, OFFICE_X } from "./office";
 import {
   WheelLoader,
   LOADER_SPEED,
@@ -243,6 +244,19 @@ const PAUSE_KURZ_MAX_S = 15;
 const PRUEF_INTERVALL_S: [number, number] = [3, 5];
 /** Korridorbreite zu Fuss — ein Mensch steigt ueber Kleinteile */
 const FUSS_BREITE = 0.9;
+/**
+ * Faehrt Lambert den Radlader?
+ *
+ * Auf false steht die Maschine abgestellt in der Halle und Lambert arbeitet
+ * zu Fuss — er raeumt dann nur noch, was er tragen kann. Zum Wiedereinschalten
+ * genuegt `true`; die Logik des Radladers ist unveraendert vorhanden.
+ */
+const RADLADER_IN_BETRIEB = false;
+/** Abstellplatz: vorne in der ersten Halle, Schaufel zum Tor. */
+const RADLADER_PARKPLATZ = new THREE.Vector3(OFFICE_X + 1.5, 0, HALL1_Z);
+/** Blickrichtung dort — aus der Halle heraus (+X). */
+const RADLADER_PARKYAW = Math.PI / 2;
+
 /** Bis hierher traegt er von Hand, wenn der Radlader nicht hinkommt (kg) */
 const HANDLAST_KG = 60;
 /** So lange setzt er zurueck, wenn ihm etwas den Weg versperrt (s) */
@@ -387,8 +401,36 @@ export class StaffManager {
   /**
    * Radlader freischalten. Von da an fährt Lambert statt zu laufen und kann
    * auch schwere Brocken von den Fahrspuren räumen.
+   *
+   * Steht `RADLADER_IN_BETRIEB` auf false, wird er trotzdem gebaut und
+   * gezeigt — nur eben abgestellt in der Halle, und Lambert bleibt zu Fuß.
    */
   setLoader(on: boolean): void {
+    if (on && !RADLADER_IN_BETRIEB) {
+      /*
+       * Ausser Betrieb (Ansage 12.09.2026: "koennen wir den Radlader ausser
+       * Funktion setzen fuer den Moment und in der Halle parken?").
+       *
+       * `_hasLoader` bleibt false — daran haengt die ganze Entscheidung, ob
+       * Lambert faehrt oder laeuft, ob er schwere Brocken raeumt und ob er
+       * zur Maschine zurueckgeht. So ist der Radlader mit einem Wert
+       * vollstaendig aus dem Spiel, ohne dass an seiner Logik etwas
+       * auseinandergenommen wird.
+       *
+       * Sichtbar bleibt er: Ein Hof, auf dem die Maschine verschwunden ist,
+       * sieht falsch aus. Er steht vorne in der ersten Halle, Schaufel zum
+       * Tor.
+       */
+      this._hasLoader = false;
+      this.loader?.setVisible(true);
+      this.maschinePos.copy(RADLADER_PARKPLATZ);
+      this.loaderYaw = RADLADER_PARKYAW;
+      // dt von 1 s, damit er die Parkstellung sofort einnimmt statt sie
+      // ueber die naechsten Bilder anzufahren
+      this.loader?.update(1, RADLADER_PARKPLATZ, RADLADER_PARKYAW, false);
+      this.zeigeRichtige();
+      return;
+    }
     this._hasLoader = on;
     this.loader?.setVisible(on);
     if (on) this.maschinePos.copy(this.lambert.group.position);
