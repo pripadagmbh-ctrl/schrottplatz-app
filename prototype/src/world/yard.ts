@@ -43,7 +43,8 @@ export const KAFFEE_THEKE = new THREE.Vector3(KAFFEE_POS.x, 0, KAFFEE_POS.z - 2.
  */
 export class Yard {
   /** Zentrum der Annahmefläche (nördlich vor dem Bagger) — hier landet die Anlieferung */
-  readonly pileCenter = new THREE.Vector3(0, 0, 7);
+  /** Vorplatz vor dem Bagger — dort haelt der LKW zum Abladen. */
+  readonly pileCenter = new THREE.Vector3(-8.0, 0, -7);
 
   constructor(scene: THREE.Scene, world: RAPIER.World) {
     this.buildGround(scene, world);
@@ -98,16 +99,29 @@ export class Yard {
     tex.anisotropy = 4;
     const boardW = 14;
     const boardH = 7;
-    const z = -YARD_D / 2 - 3;
+    /*
+     * Neben der Einfahrt statt hinter der Suedwand (Ansage 12.09.2026: „das
+     * PRIPADA Schild soll eh immer im sichtbaren Bereich der Default-
+     * Baggerauslegung sein, ich wuerde es in der Naehe der Toreinfahrt
+     * platzieren").
+     *
+     * Der Bagger steht auf (−8 | −16) und blickt nach +z. Bei x −10 liegt die
+     * Tafel damit knapp rechts der Blickachse und ist im Startbild zu sehen.
+     * Die Schauflaeche muss dafuer herumgedreht werden — sie zeigte bisher
+     * nach +z, jetzt nach −z, also auf den Platz.
+     */
+    const schildX = -10;
+    const z = YARD_D / 2 + 3;
     const board = new THREE.Mesh(
       new THREE.PlaneGeometry(boardW, boardH),
       new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7, side: THREE.DoubleSide })
     );
-    board.position.set(6, 7.5, z);
+    board.position.set(schildX, 7.5, z);
+    board.rotation.y = Math.PI;
     scene.add(board);
     const frameMat = new THREE.MeshStandardMaterial({ color: 0x3a4045, roughness: 0.8 });
     const frame = new THREE.Mesh(new THREE.BoxGeometry(boardW + 0.5, boardH + 0.5, 0.25), frameMat);
-    frame.position.set(6, 7.5, z - 0.2);
+    frame.position.set(schildX, 7.5, z + 0.2);
     frame.castShadow = true;
     scene.add(frame);
     const body = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
@@ -115,11 +129,11 @@ export class Yard {
     // Kanten in die Schrift. Die Schaufläche bleibt plan (Wunsch 02.09.2026).
     for (const px of [-4.5, 4.5]) {
       const post = new THREE.Mesh(new THREE.BoxGeometry(0.5, 8, 0.5), frameMat);
-      post.position.set(6 + px, 4, z - 0.62);
+      post.position.set(schildX + px, 4, z + 0.62);
       post.castShadow = true;
       scene.add(post);
       world.createCollider(
-        RAPIER.ColliderDesc.cuboid(0.25, 4, 0.25).setTranslation(6 + px, 4, z - 0.62),
+        RAPIER.ColliderDesc.cuboid(0.25, 4, 0.25).setTranslation(schildX + px, 4, z + 0.62),
         body
       );
     }

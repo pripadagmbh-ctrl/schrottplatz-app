@@ -374,6 +374,8 @@ const PRESSPROFIL: Record<string, Pressprofil> = {
   // Kupfer noch dichter — das schwerste Paket bei gleichem Volumen
   copper: { dichte: 1900, fransen: [3, 7], lang: 0.28, dick: 0.05, beule: 0.06, rauheit: 0.45, glanz: 0.65 },
   brass: { dichte: 1800, fransen: [3, 6], lang: 0.26, dick: 0.055, beule: 0.05, rauheit: 0.4, glanz: 0.7 },
+  zinc: { dichte: 1450, fransen: [4, 8], lang: 0.34, dick: 0.035, beule: 0.09, rauheit: 0.55, glanz: 0.4 },
+  battery: { dichte: 1600, fransen: [2, 4], lang: 0.18, dick: 0.09, beule: 0.03, rauheit: 0.7, glanz: 0.1 },
   // Kabel bleibt ein Knaeuel: locker, ueberall Schwaenze
   cable: { dichte: 800, fransen: [14, 22], lang: 0.75, dick: 0.035, beule: 0.16, rauheit: 0.95, glanz: 0.1 },
   // Nichtmetalle pressen sich schlecht und sehen zerfetzt aus
@@ -567,8 +569,8 @@ export function randomCargo(
           ? "mixed"
           : r < 0.8
             ? "alu"
-            : ["va", "copper", "brass", "cable", "wood", "plastic", "rubble"][
-                Math.floor(Math.random() * 7)
+            : ["va", "copper", "brass", "zinc", "battery", "cable", "wood", "plastic", "rubble"][
+                Math.floor(Math.random() * 9)
               ]);
     let matching = pool.filter((s) => s.materialId === wanted);
     // Sortenreine Ladung: notfalls in der anderen Größenklasse suchen, damit

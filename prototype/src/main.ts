@@ -133,7 +133,7 @@ async function main(): Promise<void> {
     // Auf die Stahlflaeche, nicht auf die Grenze zur Mischschrottflaeche.
     // Der Haufen ist am Anfang unsortiert — dass er als Verunreinigung zaehlt,
     // ist gewollt: Aufraeumen ist die Aufgabe.
-    items.spawnPile(new THREE.Vector3(-9, 0, 1));
+    items.spawnPile(new THREE.Vector3(3.8, 0, -21));
     // Altfahrzeuge stehen von Anfang an am Rand des Stahlschrott-Haufens
     composites.spawnCar(new THREE.Vector3(-15.8, 0.5, 3.5));
     composites.spawnCar(new THREE.Vector3(-15.8, 0.5, -2.5));

@@ -253,7 +253,9 @@ const FUSS_BREITE = 0.9;
  * zu Fuss — er raeumt dann nur noch, was er tragen kann. Zum Wiedereinschalten
  * genuegt `true`; die Logik des Radladers ist unveraendert vorhanden.
  */
-const RADLADER_IN_BETRIEB = false;
+// Wieder in Betrieb (Ansage 12.09.2026): Er bedient die weit aussen
+// liegenden Silos und faehrt das Zwischenlager ab.
+const RADLADER_IN_BETRIEB = true;
 /** Abstellplatz: vorne in der ersten Halle, Schaufel zum Tor. */
 const RADLADER_PARKPLATZ = new THREE.Vector3(OFFICE_X + 1.5, 0, HALL1_Z);
 /** Blickrichtung dort — aus der Halle heraus (+X). */
@@ -278,7 +280,7 @@ const HANDLAST_KG = 60;
 /** So lange setzt er zurueck, wenn ihm etwas den Weg versperrt (s) */
 const RUECKWAERTS_S = 1.6;
 /** Abkippplatz vor dem Bagger — dort landet die Fuhre, da faehrt er nicht hinein */
-const ABKIPP = { x: 0, z: 7, hw: 4.5, hd: 4.5 };
+const ABKIPP = { x: -8.0, z: -7, hw: 4.5, hd: 4.5 };
 /** In diesem Umkreis muss ein Teil frei liegen, damit er es holt (m) */
 /** Um so viel wird eine Zone fuer die Wegpruefung geschrumpft (m) */
 const ZONE_RAND = 1.0;
@@ -336,12 +338,12 @@ export class StaffManager {
     // Beide Posten liegen ausserhalb des Abkippplatzes (0/7, 8 x 8 m) und
     // neben der Einfahrtsspur. Vorher stand er mitten in der Abladestelle —
     // gemessen 92 Prozent der Zeit (11.09.2026).
-    new THREE.Vector3(5.2, 0, 13.5),
-    new THREE.Vector3(-6.5, 0, 13.0),
+    new THREE.Vector3(-3.0, 0, -3.0),
+    new THREE.Vector3(-20.0, 0, -3.0),
   ];
   /** Einweisplatz neben dem Abkippplatz */
   /** Einweisplatz: am Rand des Abkippplatzes, nicht darin */
-  private readonly guidePos = new THREE.Vector3(6.0, 0, 11.5);
+  private readonly guidePos = new THREE.Vector3(-4.5, 0, -5.0);
 
   /** Baggerposition — um die Maschine selbst geht er herum */
   getExcavatorPos: (() => THREE.Vector3) | null = null;

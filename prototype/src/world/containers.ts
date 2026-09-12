@@ -17,10 +17,14 @@ export interface ContainerConfig {
   fractionId: string;
   label: string;
   /**
-   * pile = offener Haufen · bay = Betonlego-Box (3 Wände, vorn offen) ·
-   * box = feste Kleinbox · rolloff = Absetzcontainer, vom Bagger versetzbar
+   * pile   offene Fläche, nur markiert — Reifendepot
+   * halde  Mischschrottplatz: doppelt gesetzte, sehr hohe Wände, nach Norden offen
+   * bay    Betonlego-Box (3 Wände, vorn offen) — Silos und Batteriemulde
+   * box    feste Kleinbox
+   * rolloff        kleiner Absetzcontainer, vom Bagger versetzbar
+   * grosscontainer 40-m³-Abrollcontainer, fest — den zieht der LKW herauf
    */
-  kind: "pile" | "bay" | "box" | "rolloff";
+  kind: "pile" | "halde" | "bay" | "box" | "rolloff" | "grosscontainer";
   x: number;
   z: number;
   /** Zonenmaße [Breite, Tiefe, Wandhöhe] */
@@ -49,94 +53,110 @@ export interface ContainerConfig {
  */
 export const CONFIGS: ContainerConfig[] = [
   /*
-   * HAUPTPLATZ — eine einzige Fläche, kein geteilter Haufen mehr.
+   * ORTSKONZEPT (Ansage 12.09.2026, aus der Sicht des Fahrers beschrieben):
+   * „Der Bagger steht und schaut Richtung Janine, rechts neben mir der
+   * Stahlschrottcontainer, hinter mir die Presse im Süden, und in
+   * West-West-Süd-Richtung der Mischschrott."
    *
-   * Stahl und Mischschrott lagen hier bis heute in zwei Zonen nebeneinander.
-   * Das war falsch herum gedacht: Auf den Hauptplatz kippt der LKW, was er
-   * gerade bringt, und das ist nie sortiert. Erst danach wird gegriffen und
-   * getrennt. Wer schon beim Abkippen zwei Zonen treffen soll, sortiert mit
-   * dem Lastwagen — das tut niemand (Ansage 12.09.2026: „Es soll aber nicht
-   * unterteilt werden zwischen Misch und Stahlschrott").
+   * Janine steht bei +z, also blickt die Maschine dorthin.
    *
-   * Die Fläche ist die Vereinigung der beiden alten Zonen, also genau so groß
-   * wie vorher, und zählt als Mischschrott: Was hier liegt, ist unsortiert.
+   * ACHTUNG, hier ist zweimal etwas schiefgegangen: Der Code nennt +z Norden
+   * und +x Osten, aber wer nach +z blickt, hat +x LINKS auf dem Schirm.
+   * Gemessen am 12.09.2026 durch Projektion mit der echten Spielkamera. Die
+   * Himmelsrichtungen im Quelltext bilden also einen gespiegelten Kompass —
+   * verlass dich nicht darauf, sondern auf diese Regel:
+   *
+   *   rechts vom Sitz = −x        links vom Sitz = +x
+   *   vor dem Sitz    = +z        hinter dem Sitz = −z
+   *
+   * Daraus folgt der Platz (Ansage 12.09.2026, aus der Sicht des Fahrers):
+   *
+   *   hinten   Presse (an der Wand)        rechts        Stahlcontainer 40 m³
+   *   rechts hinten  Reifendepot           links hinten  Mischschrott
+   *   rechts vorne   sechs Absetzcontainer links vorne   Batteriemulde
+   *   rechts aussen  Silos, am Büro vorbei fährt der Abholer sie ab
+   *
+   * Der Bagger arbeitet auf einer kurzen Linie von (−8 | −16) nach
+   * (−8 | −11,5). Ein Ring von 4,0 bis 9,5 m fasst nicht elf Ziele, und ein
+   * Umschlagbagger fährt im Betrieb ohnehin ein paar Meter hin und her.
+   * Geprüft wird das in `test/reach.test.ts`.
    */
-  { id: "c_yard", fractionId: "mixed", label: "SCHROTTPLATZ", kind: "pile", x: -9, z: 1.1,
-    size: [11, 12.2, 0] },
 
   /*
-   * SORTIERREIHE OST — hierhin wird aus dem Haufen sortiert.
+   * MISCHSCHROTT — links hinten, die große Fläche des Platzes.
    *
-   * Die Reihe liegt auf x = 7,0, weil der Arm nur zwischen 5,5 und 9,0 m über
-   * eine 4-m-Wand kommt (gemessen mit `hoechsteKrallenspitze`, 12.09.2026):
-   *
-   *   5,0 m → 2,87   5,5 m → 8,46   7,0 m → 7,24   8,5 m → 5,20
-   *   9,0 m → 4,11   9,5 m → 2,13   10,0 m → gar nicht
-   *
-   * Daraus folgt das ganze Muster: Die Stahlmulde steht direkt östlich vom
-   * Bagger (7,0 m, Spitze 7,2 m), Alu und VA schließen nach Norden und Süden
-   * an (8,7–8,8 m, Spitze rund 4,7 m) und bekommen darum niedrigere Wände.
-   * Weiter außen ginge nichts mehr: bei 9,5 m kommt der Greifer keine zwei
-   * Meter hoch.
-   *
-   * Die Stahlmulde ist die größte des Platzes — breiter, tiefer und zwei
-   * Lagen höher als die übrigen (Ansage 12.09.2026). Sie muss es sein: Stahl
-   * ist die Fraktion, die in Tonnen anfällt, alles andere in Zentnern.
+   * Hier kippt jeder ab, der gemischt anliefert, und von hier holt der Bagger
+   * alles Weitere. Die Wände sind doppelt gesetzt und fünf Meter hoch (Ansage
+   * 12.09.2026: „da müssten natürlich die Wände doppelt sein und sehr hoch,
+   * damit wir den Mischschrott auch ohne Probleme stapeln können"). Nach
+   * Norden offen — dort setzt der Kipper zurück.
    */
-  { id: "c_steel", fractionId: "steel", label: "STAHLSCHROTT", kind: "bay", x: 7.0, z: -1.2,
-    size: [4.5, 5.6, 4.0] },
-  { id: "c_alu", fractionId: "alu", label: "ALU", kind: "bay", x: 7.0, z: 4.2,
-    size: [3.6, 4.0, 3.2] },
-  { id: "c_va", fractionId: "va", label: "EDELSTAHL VA", kind: "bay", x: 7.0, z: -6.4,
-    size: [3.6, 4.0, 3.2] },
+  { id: "c_mixed", fractionId: "mixed", label: "MISCHSCHROTT", kind: "halde", x: 3.8,
+    z: -21.5, size: [12.5, 12.5, 5.0] },
 
   /*
-   * ABROLLCONTAINER — Kabel, Kupfer und Messing.
+   * STAHLSCHROTT — fester 40-m³-Abrollcontainer, direkt rechts vom Bagger.
    *
-   * Für diese drei eine Betonlego-Mulde zu bauen wäre Platzverschwendung: Was
-   * an einem Tag zusammenkommt, passt in eine Schubkarre, und der Abnehmer
-   * holt am Ende den ganzen Behälter. Also kleine Container statt Mulden
-   * (Ansage 12.09.2026).
-   *
-   * Sie stehen nordöstlich abgestellt, nicht im Schwenkkranz. Das ist kein
-   * Versehen: Der Ring zwischen 4,0 und 9,5 m um den Bagger ist mit den drei
-   * Mulden ausgereizt, und was dort noch hineingestellt wird, steht vor einer
-   * Muldenöffnung oder in einer Fahrspur. Abgestellt sind sie dort, wo sie
-   * niemanden stören — und weil sie beweglich sind, zieht man sich den
-   * Behälter heran, mit dem man gerade arbeitet.
+   * „Stahlschrott kommt in den 40er Container und sollte direkt neben Bagger,
+   * damit er erreicht werden kann." Er bleibt stehen: Der Abholer zieht ihn
+   * samt Inhalt auf den LKW, der Bagger versetzt ihn nicht.
    */
-  { id: "r_cable", fractionId: "cable", label: "KABEL", kind: "rolloff", x: 8.0, z: 8.6,
-    size: [2.0, 3.4, 1.1] },
-  { id: "r_copper", fractionId: "copper", label: "KUPFER", kind: "rolloff", x: 8.0, z: 11.8,
-    size: [2.0, 3.4, 1.1] },
-  { id: "r_brass", fractionId: "brass", label: "MESSING", kind: "rolloff", x: 8.0, z: 15.0,
-    size: [2.0, 3.4, 1.1] },
+  { id: "c_steel", fractionId: "steel", label: "STAHLSCHROTT", kind: "grosscontainer", x: -17.5,
+    z: -16.5, size: [6.6, 2.6, 2.4] },
 
   /*
-   * ABFALL UND HORTGUT — außerhalb des Schwenkbereichs, dorthin wird gefahren.
+   * REIFENDEPOT — rechts hinten, offene Fläche ohne Wände.
    *
-   * Holz, Reifen und Baumisch fallen selten an und dürfen liegenbleiben; ganz
-   * hinten an der Südwand stehen die Hortmulden für sperriges Buntmetall
-   * (Ansage 12.09.2026: Mulden „wo man's dann auch horten kann"). Ein
-   * Kupferkessel passt in keinen Absetzcontainer.
+   * Reifen fallen ständig an und werden selten abgeholt; sie brauchen Fläche,
+   * keine Mulde. Heinz kümmert sich darum (Ansage 12.09.2026).
    */
-  { id: "c_wood", fractionId: "wood", label: "HOLZ", kind: "bay", x: 7.0, z: -10.25,
-    size: [3.0, 3.3, 3.0] },
-  { id: "c_tires", fractionId: "tires", label: "REIFEN", kind: "bay", x: 7.0, z: -13.95,
-    size: [3.0, 3.3, 3.0] },
-  { id: "c_rubble", fractionId: "rubble", label: "BAUMISCH", kind: "bay", x: 7.0, z: -17.65,
-    size: [3.0, 3.3, 3.0] },
-  { id: "c_copper_lager", fractionId: "copper", label: "KUPFER LAGER", kind: "bay", x: 7.0,
-    z: -21.35, size: [3.0, 3.3, 3.0] },
-  { id: "c_brass_lager", fractionId: "brass", label: "MESSING LAGER", kind: "bay", x: 7.0,
-    z: -25.05, size: [3.0, 3.3, 3.0] },
+  { id: "c_tires", fractionId: "tires", label: "REIFEN", kind: "pile", x: -20.0,
+    z: -24.0, size: [8.0, 7.0, 0] },
 
-  // Ballenlager direkt neben der Schere: Was gepresst aus der Kammer kommt,
-  // wandert hierher und wartet auf den Abholer. Offene Fläche statt Mulde
-  // (Wunsch 10.09.2026) — ein Ballenlager ist ein markierter Platz, kein
-  // Behälter: Man stellt Pakete ab, man schüttet sie nicht ein.
-  { id: "c_bales", fractionId: "steel", label: "BALLEN", kind: "pile", x: -0.5, z: -8.5,
-    size: [3.2, 4.2, 0] },
+  /*
+   * BATTERIEN — links vorne, niedrige Mulde, Öffnung zum Bagger.
+   *
+   * Bleiakkus dürfen nicht in den Mischschrott. Elektromotoren landen
+   * daneben: Die sind keine Fraktion, sondern Verbundteile, die Lambert mit
+   * Werkzeug zerlegt.
+   */
+  { id: "c_battery", fractionId: "battery", label: "BATTERIEN", kind: "bay", x: -1.5,
+    z: -10.5, size: [5.5, 5.0, 1.4] },
+
+  /*
+   * ABSETZCONTAINER — sechs Stück rechts vorne, in Reichweite.
+   *
+   * Kabel, VA, Kupfer, Alu, Zink, Messing. Beweglich, damit man sich den
+   * heranzieht, mit dem man gerade arbeitet. Kupfer und Messing bleiben
+   * getrennt: doppelter Preisunterschied, und wer beides in einen Behälter
+   * wirft, bekommt für alles den Messingpreis.
+   */
+  { id: "r_cable", fractionId: "cable", label: "KABEL", kind: "rolloff", x: -12.5,
+    z: -11.0, size: [2.8, 1.8, 1.1] },
+  { id: "r_va", fractionId: "va", label: "EDELSTAHL VA", kind: "rolloff", x: -15.5,
+    z: -11.0, size: [2.8, 1.8, 1.1] },
+  { id: "r_copper", fractionId: "copper", label: "KUPFER", kind: "rolloff", x: -12.5,
+    z: -8.5, size: [2.8, 1.8, 1.1] },
+  { id: "r_alu", fractionId: "alu", label: "ALU", kind: "rolloff", x: -15.5,
+    z: -8.5, size: [2.8, 1.8, 1.1] },
+  { id: "r_zinc", fractionId: "zinc", label: "ZINK", kind: "rolloff", x: -12.5,
+    z: -6.0, size: [2.8, 1.8, 1.1] },
+  { id: "r_brass", fractionId: "brass", label: "MESSING", kind: "rolloff", x: -15.5,
+    z: -6.0, size: [2.8, 1.8, 1.1] },
+
+  /*
+   * SILOS an der Ostwand — dorthin fährt der Abholer entlang, ohne den
+   * Arbeitsbereich zu kreuzen (Ansage 12.09.2026). Was liegenbleiben darf,
+   * bis genug für eine Fuhre zusammen ist; gefüllt vom Radlader.
+   */
+  { id: "c_wood", fractionId: "wood", label: "HOLZ", kind: "bay", x: -34.5,
+    z: -2.0, size: [3.6, 6.0, 3.0], facing: "east" },
+  { id: "c_rubble", fractionId: "rubble", label: "BAUMISCH", kind: "bay", x: -34.5,
+    z: -9.0, size: [3.6, 6.0, 3.0], facing: "east" },
+  { id: "c_plastic", fractionId: "plastic", label: "KUNSTSTOFF", kind: "bay", x: -34.5,
+    z: -16.0, size: [3.6, 6.0, 3.0], facing: "east" },
+  { id: "c_va_lager", fractionId: "va", label: "VA-LAGER", kind: "bay", x: -34.5,
+    z: -23.0, size: [3.6, 6.0, 3.5], facing: "east" },
 ];
 
 /** Fangbereich über einer Haufen-Zone (Zonen-Zählung + Ampel) */
@@ -188,7 +208,114 @@ class GameContainer {
     this.px = cfg.x;
     this.pz = cfg.z;
 
-    if (cfg.kind === "bay") {
+    if (cfg.kind === "halde") {
+      /*
+       * Mischschrottplatz: drei Wände aus doppelt gesetzten Betonlegos, fünf
+       * Meter hoch, nach Norden offen.
+       *
+       * Doppelt heißt wirklich zwei Steinreihen hintereinander, nicht ein
+       * dickerer Stein — wer ein paar Tonnen dagegen kippt, drückt eine
+       * einreihige Wand um. Gebaut in Weltachsen ohne die Drehung der Mulden:
+       * bei fünf Metern Höhe waere eine gedrehte Gruppe nur schwerer
+       * nachzurechnen.
+       */
+      const [hw, hd, hh] = cfg.size;
+      const boden = new THREE.Mesh(
+        new THREE.PlaneGeometry(hw, hd),
+        new THREE.MeshStandardMaterial({
+          color: fraction.color,
+          roughness: 1,
+          transparent: true,
+          opacity: 0.2,
+        })
+      );
+      boden.rotation.x = -Math.PI / 2;
+      boden.position.y = 0.02;
+      group.add(boden);
+
+      const BL = 1.5;
+      const BH = 0.5;
+      const BT = 0.55;
+      const REIHEN = Math.round(hh / BH);
+      const farben = [0x9b9b94, 0x8d8d86, 0xa4a49c, 0x94908a, 0xaaa89f].map(
+        (c) => new THREE.Color(c)
+      );
+      const bloecke: Array<{ m: THREE.Matrix4; f: THREE.Color }> = [];
+      const nieten: Array<{ m: THREE.Matrix4; f: THREE.Color }> = [];
+      const block = new THREE.Object3D();
+      const niete = new THREE.Object3D();
+      let bi = 0;
+      const setze = (bx: number, by: number, bz: number, alongX: boolean): void => {
+        const f = farben[bi % 5]!;
+        const j = (n: number): number => ((bi * 9301 + n * 49297) % 233280) / 233280 - 0.5;
+        block.position.set(bx + j(1) * 0.05, by + j(2) * 0.02, bz + j(3) * 0.05);
+        block.rotation.set(j(4) * 0.02, (alongX ? 0 : Math.PI / 2) + j(5) * 0.035, j(6) * 0.018);
+        block.updateMatrix();
+        bi++;
+        bloecke.push({ m: block.matrix.clone(), f });
+        for (const sv of [-0.4, 0.4]) {
+          niete.position.set(alongX ? sv : 0, BH / 2 + 0.045, alongX ? 0 : sv);
+          niete.updateMatrix();
+          nieten.push({ m: block.matrix.clone().multiply(niete.matrix), f });
+        }
+      };
+      for (let r = 0; r < REIHEN; r++) {
+        const y = BH / 2 + r * BH;
+        const off = (r % 2) * (BL / 2);
+        for (let lage = 0; lage < 2; lage++) {
+          const tt = BT * (0.5 + lage);
+          for (let bx = -hw / 2 + BL / 2 - off; bx < hw / 2 + 0.4; bx += BL) {
+            setze(bx, y, -(hd / 2 + tt), true);
+          }
+          for (let bz = -hd / 2 + BL / 2 - off; bz < hd / 2 + 0.4; bz += BL) {
+            setze(hw / 2 + tt, y, bz, false);
+            setze(-(hw / 2 + tt), y, bz, false);
+          }
+        }
+      }
+      const wandMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.98 });
+      const bauen = (
+        geo: THREE.BufferGeometry,
+        liste: Array<{ m: THREE.Matrix4; f: THREE.Color }>
+      ): void => {
+        const im = new THREE.InstancedMesh(geo, wandMat, liste.length);
+        liste.forEach((e, i) => {
+          im.setMatrixAt(i, e.m);
+          im.setColorAt(i, e.f);
+        });
+        im.instanceMatrix.needsUpdate = true;
+        if (im.instanceColor) im.instanceColor.needsUpdate = true;
+        im.castShadow = true;
+        im.receiveShadow = true;
+        group.add(im);
+      };
+      bauen(new THREE.BoxGeometry(BL, BH, BT), bloecke);
+      bauen(new THREE.CylinderGeometry(0.13, 0.13, 0.09, 10), nieten);
+
+      const body = world.createRigidBody(
+        RAPIER.RigidBodyDesc.fixed().setTranslation(cfg.x, 0, cfg.z)
+      );
+      world.createCollider(
+        RAPIER.ColliderDesc.cuboid(hw / 2 + BT, hh / 2, BT).setTranslation(
+          0,
+          hh / 2,
+          -(hd / 2 + BT)
+        ),
+        body
+      );
+      for (const sx of [-1, 1]) {
+        world.createCollider(
+          RAPIER.ColliderDesc.cuboid(BT, hh / 2, hd / 2 + BT).setTranslation(
+            sx * (hw / 2 + BT),
+            hh / 2,
+            0
+          ),
+          body
+        );
+      }
+      this.label = new ContainerLabel(cfg.label, fraction.color);
+      this.label.sprite.position.set(cfg.x, hh + 1.4, cfg.z + hd / 2 + 1.0);
+    } else if (cfg.kind === "bay") {
       // Betonlego-Box (Design-Wunsch 2026-08-27): drei Wände aus gestapelten
       // Beton-Legosteinen mit Noppen, vorn offen — wie auf echten Schrottplätzen.
       const ground = new THREE.Mesh(
@@ -325,7 +452,7 @@ class GameContainer {
       this.label = new ContainerLabel(cfg.label, fraction.color);
       // Schild am hinteren (geschlossenen) Ende — so steht es nicht im Blickfeld
       this.label.sprite.position.set(cfg.x + w / 2 + 0.6, wallH + 1.1, cfg.z);
-    } else if (cfg.kind === "rolloff") {
+    } else if (cfg.kind === "rolloff" || cfg.kind === "grosscontainer") {
       /*
        * Absetzcontainer: flache Wanne auf zwei Kufen, Rungen außen, vorn die
        * Öse für den Haken des Abrollkippers. Er ist ein dynamischer Körper
@@ -395,8 +522,14 @@ class GameContainer {
       oese.position.set(0, KUFE + T + h * 0.75, -(d / 2 + 0.16));
       group.add(oese);
 
+      /*
+       * Der grosse Stahlcontainer steht fest: Ihn holt der Abrollkipper, nicht
+       * der Bagger (Ansage 12.09.2026). Die kleinen sind dynamisch und lassen
+       * sich mit dem Greifer herumschleifen.
+       */
+      const fest = cfg.kind === "grosscontainer";
       const body = world.createRigidBody(
-        RAPIER.RigidBodyDesc.dynamic()
+        (fest ? RAPIER.RigidBodyDesc.fixed() : RAPIER.RigidBodyDesc.dynamic())
           .setTranslation(cfg.x, 0, cfg.z)
           // Stark gedämpft und nur um die Hochachse drehbar. Gemessen
           // (12.09.2026): Mit 1,8 rutschte die leere Wanne nach einem Ruck
@@ -421,7 +554,7 @@ class GameContainer {
       for (const [wx, wz, sx, sz] of waende) {
         teil(sx / 2, h / 2, sz / 2, wx, wandY, wz);
       }
-      this.koerper = body;
+      this.koerper = fest ? null : body;
       this.label = new ContainerLabel(cfg.label, fraction.color);
       this.label.sprite.position.set(cfg.x, KUFE + T + h + 0.9, cfg.z);
     } else if (cfg.kind === "pile") {
@@ -521,8 +654,10 @@ class GameContainer {
   /** Liegt der Punkt in der Zone (Haufen/Bay: bis Fanghöhe; Box: bis knapp überm Rand)? */
   containsPoint(p: { x: number; y: number; z: number }, marginXZ = 0, marginY = 0.4): boolean {
     const [w, d, h] = this.cfg.size;
-    const offen = this.cfg.kind === "pile" || this.cfg.kind === "bay";
-    const maxY = offen ? PILE_CATCH_HEIGHT : h + marginY;
+    // Offene Flaechen fangen bis Fanghoehe, umwandete bis Oberkante: In einer
+    // 5-m-Halde liegt der Schrott sonst zur Haelfte ausserhalb der Zaehlung.
+    const offen = this.cfg.kind === "pile";
+    const maxY = offen ? PILE_CATCH_HEIGHT : Math.max(PILE_CATCH_HEIGHT, h) + marginY;
     const mXZ = marginXZ + (this.cfg.kind === "pile" ? 0.35 : 0);
     const [lx, lz] = this.lokal(p.x, p.z);
     return Math.abs(lx) < w / 2 + mXZ && Math.abs(lz) < d / 2 + mXZ && p.y < maxY;

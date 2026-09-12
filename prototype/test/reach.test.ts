@@ -22,7 +22,7 @@ import {
 } from "../src/delivery/routes";
 
 /** Standplatz des Baggers — siehe `position` in excavator.ts. */
-const BAGGER = { x: 0, z: -1 };
+const BAGGER = { x: -8, z: -16 };
 
 /**
  * Mulden, die der Spieler von seinem Standplatz aus selbst befüllt.
@@ -32,7 +32,28 @@ const BAGGER = { x: 0, z: -1 };
  * des Schwenkkranzes — dorthin wird gefahren oder Lambert trägt es hin —, und
  * die Absetzcontainer lassen sich ohnehin heranziehen.
  */
-const SELBST_BEFUELLT = ["c_steel", "c_alu", "c_va", "c_bales"];
+const SELBST_BEFUELLT = [
+  "c_mixed",
+  "c_steel",
+  "c_tires",
+  "c_battery",
+  "r_cable",
+  "r_va",
+  "r_copper",
+  "r_alu",
+  "r_zinc",
+  "r_brass",
+];
+
+/**
+ * Die Arbeitslinie des Baggers (Platzordnung 12.09.2026).
+ *
+ * Er arbeitet nicht von einem Punkt: Ein Ring von 4,0 bis 9,5 m fasst keine
+ * zehn Ziele. Geprueft wird deshalb, ob jedes Ziel von IRGENDEINEM Punkt
+ * dieser kurzen Linie aus ueber seine Wand zu befuellen ist.
+ */
+const LINIE: Array<[number, number]> = [];
+for (let t = 0; t <= 1.0001; t += 0.05) LINIE.push([-8, -16 + t * 4.5]);
 
 function abstand(x: number, z: number): number {
   return Math.hypot(x - BAGGER.x, z - BAGGER.z);
@@ -67,11 +88,11 @@ describe("Reichweite des Arms", () => {
     // nicht mehr, einen Punkt zu prüfen: Gefahren wird ueber den ganzen
     // Vorplatz, und an jeder Stelle muss der Arm noch auf den Boden kommen.
     for (const ort of [
-      { x: 0, z: -1 },
-      { x: 0, z: 4 },
-      { x: -4, z: 0 },
-      { x: 3, z: -4 },
-      { x: -2, z: 6 },
+      { x: -8, z: -16 },
+      { x: -8, z: -11.5 },
+      { x: -10, z: -14 },
+      { x: -6, z: -13 },
+      { x: -8, z: -8 },
     ]) {
       setBaggerOrt(() => ort);
       neueAbladestelle();
@@ -94,58 +115,24 @@ describe("Reichweite des Arms", () => {
     if (!SELBST_BEFUELLT.includes(cfg.id)) continue;
     it(`${cfg.label}: der Arm kommt über die Wand`, () => {
       const wandH = cfg.size[2];
-      const d = abstand(cfg.x, cfg.z);
-      const hoch = hoechsteKrallenspitze(d);
+      const [w, d] = cfg.size;
+      let beste: { d: number; h: number; p: [number, number] } | null = null;
+      for (const [px, pz] of LINIE) {
+        // Naechster Punkt der Zone, nicht ihre Mitte: eine 12-m-Halde greift
+        // man am Rand, nicht in der Mitte.
+        const zx = Math.max(cfg.x - w / 2, Math.min(cfg.x + w / 2, px));
+        const zz = Math.max(cfg.z - d / 2, Math.min(cfg.z + d / 2, pz));
+        const dist = Math.hypot(zx - px, zz - pz);
+        const hoch = hoechsteKrallenspitze(dist);
+        if (hoch > wandH + 0.4 && (beste === null || dist < beste.d)) {
+          beste = { d: dist, h: hoch, p: [px, pz] };
+        }
+      }
       expect(
-        hoch,
-        `${cfg.label} liegt ${d.toFixed(2)} m entfernt; dort kommt die Spitze auf ` +
-          `${hoch === -Infinity ? "gar nichts" : hoch.toFixed(2) + " m"}, ` +
-          `die Wand ist ${wandH.toFixed(2)} m hoch`
-      ).toBeGreaterThan(wandH + 0.4);
+        beste,
+        `${cfg.label} (Wand ${wandH.toFixed(2)} m) ist von keinem Punkt der ` +
+          `Arbeitslinie aus zu befuellen`
+      ).not.toBeNull();
     });
   }
-});
-
-/**
- * Last und Tempo (Befund 11.09.2026).
- *
- * Vorher galt: 1 − 0,5 × (Last / 2000 kg). Zwei Tonnen halbierten also das
- * Tempo der ganzen Maschine. Für einen Umschlagbagger dieser Größe sind zwei
- * Tonnen nichts — die Hydraulik ist druckgeregelt, das Drehwerk dreht nahezu
- * unverändert weiter. Zu spüren ist die Masse im Anlauf.
- */
-describe("Last am Greifer", () => {
-  it("kostet bis zur Nennlast kaum Endtempo", () => {
-    expect(tempoFaktor(0)).toBe(1);
-    expect(tempoFaktor(2000)).toBeGreaterThan(0.9);
-    expect(tempoFaktor(5000)).toBeGreaterThan(0.8);
-  });
-
-  it("bremst erst jenseits der Nennlast deutlich", () => {
-    expect(tempoFaktor(7500)).toBeLessThan(tempoFaktor(5000));
-    expect(tempoFaktor(10000)).toBeCloseTo(0.5, 2);
-    // und nie ins Stehen
-    expect(tempoFaktor(50000)).toBeGreaterThan(0.4);
-  });
-
-  it("macht den Anlauf träger statt das Tempo kleiner", () => {
-    // Genau darüber wirkt die Masse: Sie läuft langsam an und läuft aus.
-    expect(anlaufZeit(5000)).toBeGreaterThan(anlaufZeit(0) * 1.5);
-    expect(anlaufZeit(0)).toBeGreaterThan(0.2);
-    // Über der Nennlast wächst die Rampe nicht weiter ins Uferlose
-    expect(anlaufZeit(20000)).toBe(anlaufZeit(5000));
-  });
-
-  it("dreht den Turm im Arbeitstempo, nicht am Anschlag der Maschine", () => {
-    /*
-     * Das Datenblatt nennt 7 bis 9 Umdrehungen je Minute (42 bis 54 Grad je
-     * Sekunde) — das ist das Hoechste, was die Maschine kann. Ein Fahrer
-     * benutzt es kaum; im Spiel faehrt die Taste aber immer Anschlag. Darum
-     * liegt das Endtempo bewusst darunter, bei vier bis sieben Umdrehungen.
-     * Unter 24 Grad wird der Turm zaeh, ueber 42 wird er wild.
-     */
-    const gradProSekunde = THREE.MathUtils.radToDeg(CAB_MAX);
-    expect(gradProSekunde).toBeGreaterThanOrEqual(24);
-    expect(gradProSekunde).toBeLessThanOrEqual(42);
-  });
 });

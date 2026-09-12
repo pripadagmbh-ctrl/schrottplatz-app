@@ -59,7 +59,22 @@ const BAY_T = 0.35;
 const RUECKWAND_PLUS = 1.0;
 
 function bayObstacles(cfg: ContainerConfig): Obstacle[] {
-  if (cfg.kind !== "bay") return []; // Haufen und offene Flächen haben keine Wände
+  if (cfg.kind === "halde") {
+    /*
+     * Der Mischschrottplatz: drei doppelt gesetzte Wände, nach Norden offen.
+     * Er steht hier, weil sonst Lambert, die Streife und die LKW quer
+     * hindurchliefen — die Wände sind fünf Meter hoch und sehr real.
+     */
+    const [hw, hd, top] = cfg.size;
+    const T = 0.55;
+    const L = cfg.label;
+    return [
+      { x: cfg.x, z: cfg.z - hd / 2 - T, hw: hw / 2 + T, hd: T, top, label: `${L} Süd` },
+      { x: cfg.x + hw / 2 + T, z: cfg.z, hw: T, hd: hd / 2 + T, top, label: `${L} Ost` },
+      { x: cfg.x - hw / 2 - T, z: cfg.z, hw: T, hd: hd / 2 + T, top, label: `${L} West` },
+    ];
+  }
+  if (cfg.kind !== "bay") return []; // Haufen, Container und offene Flächen haben keine Wände
   const [w, d, top] = cfg.size;
   // Bei Öffnung nach Norden ist die Mulde gedreht: Breite und Tiefe tauschen
   const nord = cfg.facing === "north";
@@ -111,7 +126,7 @@ export const STATIC_OBSTACLES: Obstacle[] = [
   ...CONFIGS.flatMap(bayObstacles),
 
   // --- Schere und Presse, südlich hinter dem Bagger ---
-  { x: -8.5, z: -7.0, hw: 5.4, hd: 2.4, top: 2.2, label: "Schere" },
+  { x: -8.0, z: -25.0, hw: 5.4, hd: 2.4, top: 2.2, label: "Schere" },
 
 
   // --- Betriebsgebäude: Büro und Halle, hinten rechts an der Wand ---

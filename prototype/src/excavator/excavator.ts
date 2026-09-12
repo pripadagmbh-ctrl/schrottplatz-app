@@ -229,7 +229,12 @@ const CAB_LIFT_SPEED = 0.75; // m/s (SW)
 export class Excavator {
   // Spielzustand
   // Standplatz mittig: Stahlhaufen links, Boxenreihe rechts, Presse hinten
-  readonly position = new THREE.Vector3(0, 0, -1);
+  /**
+  * Standplatz: vor der Presse, Blick nach Norden zu Janine (Ansage
+  * 12.09.2026). Von hier liegt die Presse bei +180°, der Stahlcontainer bei
+  * +93°, der Mischschrott bei −116°.
+  */
+  readonly position = new THREE.Vector3(-8, 0, -16);
   heading = 0; // rad, 0 = +Z
   cabYaw = 0;
   boomAngle = THREE.MathUtils.degToRad(35);

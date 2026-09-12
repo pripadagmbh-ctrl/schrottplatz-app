@@ -28,6 +28,22 @@ export const MATERIALS: Record<string, MaterialClass> = {
   alu: { id: "alu", name: "Aluminium", buyPricePerKg: 1.1, sellPricePerKg: 1.5, color: 0xc4c8cc },
   copper: { id: "copper", name: "Kupfer", buyPricePerKg: 6.0, sellPricePerKg: 7.2, color: 0xc7622b },
   brass: { id: "brass", name: "Messing", buyPricePerKg: 3.4, sellPricePerKg: 4.3, color: 0xc9a227 },
+  /*
+   * Zink und Batterien kommen mit der neuen Platzordnung dazu (Ansage
+   * 12.09.2026). Beide sind auf einem echten Schrottplatz eigene Stroeme:
+   * Zink aus Dachrinnen, Fallrohren und Verzinktem, Bleiakkus aus allem, was
+   * einen Anlasser hat. Akkus sind ausserdem gefaehrlicher Abfall — sie
+   * duerfen nicht in den Mischschrott, und genau deshalb lohnt die eigene
+   * Mulde.
+   */
+  zinc: { id: "zinc", name: "Zink", buyPricePerKg: 0.62, sellPricePerKg: 0.82, color: 0x9aa6ad },
+  battery: {
+    id: "battery",
+    name: "Batterien",
+    buyPricePerKg: 0.38,
+    sellPricePerKg: 0.55,
+    color: 0x3d4b57,
+  },
   cable: { id: "cable", name: "Kabel", buyPricePerKg: 1.6, sellPricePerKg: 2.2, color: 0xb0682a },
   /**
    * Mischschrott: alles, was zusammen in die Presse geht. Er laesst sich

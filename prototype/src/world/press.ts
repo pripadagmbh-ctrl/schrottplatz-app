@@ -1,5 +1,4 @@
 import * as THREE from "three";
-import { CONFIGS } from "./containers";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { SORTENREIN_AB } from "../materials/purity";
 import type { ItemManager } from "./scrapItems";
@@ -24,18 +23,22 @@ import type { CompositeManager } from "../dismantle/composites";
 // hinter der Maschine schnitt die Schere in die vorderste Sortiermulde;
 // hier steht sie frei neben dem Stahlschrotthaufen, und die offene Seite
 // bleibt in Reichweite (Design-Fix 29.08.2026).
-const CENTER = new THREE.Vector3(-8.5, 0, -7.0);
+// Seit der neuen Platzordnung (12.09.2026) steht sie an der Suedgrenze,
+// direkt hinter dem Bagger: „hinter mir die Presse im Sueden".
+const CENTER = new THREE.Vector3(-8.0, 0, -25.0);
 // Die Schwelle gilt fuer Objekte wie fuer Pakete — sie steht in materials/purity.ts.
 /**
- * Ballenlager: dorthin kommt, was fertig gepresst ist. Der Platz steht in
- * containers.ts — hier stand er ein zweites Mal und war seit dem Umbau falsch:
- * Die Pakete landeten unter dem Zylinderbock der Presse und liessen sich nicht
- * greifen (Befund 11.09.2026).
+ * Wo das fertige Paket liegen bleibt: in der Kammer.
+ *
+ * Es gibt kein Ballenlager mehr (Ansage 12.09.2026: „es gibt in dem Fall kein
+ * Ballenlager, gepresstes Material muss rausgebaggert werden"). Das Paket
+ * bleibt also da, wo es entstanden ist, und wandert von dort in den Behaelter
+ * seiner Fraktion — Stahlballen in den 40er, Alupaket in den Alucontainer.
+ * Solange es in der Kammer liegt, blockiert es die naechste Fuhre, und genau
+ * das soll es auch.
  */
 function baleYard(): { x: number; z: number; w: number; d: number } {
-  const c = CONFIGS.find((k) => k.id === "c_bales");
-  if (!c) return { x: -0.5, z: -8.5, w: 3.2, d: 4.2 };
-  return { x: c.x, z: c.z, w: c.size[0], d: c.size[1] };
+  return { x: CENTER.x, z: CENTER.z, w: 5.0, d: 2.4 };
 }
 /**
  * Die Mulde liegt längs Ost–West, in einer Flucht mit dem Stahlschrottplatz

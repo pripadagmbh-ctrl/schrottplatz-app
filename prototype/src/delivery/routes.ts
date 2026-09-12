@@ -40,13 +40,20 @@ export const ROUTE_IN_FWD: Array<[number, number]> = [
  * seinem gewohnten Platz, kommt genau die alte Stelle heraus.
  */
 const ABLADE_ABSTAND = 8.0;
-/** Rangierpunkt, von dem aus rückwärts gesetzt wird. */
-const RANGIER_Z = 16.5;
 /**
- * Der Vorplatz, über den der Punkt nicht hinauswandert. Dahinter beginnen
- * Mulden, Presse und Fahrspuren — dort kippt kein LKW ab.
+ * Rangierpunkt, von dem aus rückwärts gesetzt wird.
+ *
+ * Seit der Platzumstellung (12.09.2026) sitzt der Betrieb im Süden: Der
+ * Bagger steht auf (−6 | −16), die Presse hinter ihm an der Südgrenze. Der
+ * LKW kommt also von Norden die Gasse herunter und setzt auf den Vorplatz
+ * vor der Maschine zurück.
  */
-const VORPLATZ = { xMin: -4.5, xMax: 3.5, zMin: 3.0, zMax: 13.0 };
+const RANGIER_Z = 2.0;
+/**
+ * Der Vorplatz, über den der Punkt nicht hinauswandert. Östlich beginnen die
+ * Absetzcontainer, westlich die Batteriemulde, südlich der Bagger selbst.
+ */
+const VORPLATZ = { xMin: -10.5, xMax: -5.5, zMin: -11.0, zMax: 0.0 };
 
 let abladeStelle: [number, number] = [0, 7.0];
 let baggerOrt: (() => { x: number; z: number }) | null = null;
@@ -64,7 +71,7 @@ export function setBaggerOrt(f: () => { x: number; z: number }): void {
 export function neueAbladestelle(): [number, number] {
   const b = baggerOrt?.();
   if (b) {
-    const rx = 0 - b.x;
+    const rx = -8.0 - b.x;
     const rz = RANGIER_Z - b.z;
     const len = Math.hypot(rx, rz) || 1;
     const x = b.x + (rx / len) * ABLADE_ABSTAND;
@@ -87,7 +94,8 @@ export function routeApproach(): Array<[number, number]> {
   const [x] = abladeStelle;
   return [
     [GATE_X, 24],
-    [-14, RANGIER_Z],
+    [-16, 14],
+    [-8, 6],
     [x, RANGIER_Z],
   ];
 }
@@ -103,7 +111,8 @@ export function routeOut(): Array<[number, number]> {
   return [
     [x, z],
     [x, RANGIER_Z],
-    [-14, RANGIER_Z],
+    [-8, 6],
+    [-16, 14],
     [GATE_X, 24],
     [GATE_X, 40],
   ];
@@ -115,40 +124,53 @@ export const PICKUP_IN_FWD: Array<[number, number]> = [
   [GATE_X, 40],
   [GATE_X, 24],
 ];
+/*
+ * Der Abholer fährt an der Ostwand entlang (Ansage 12.09.2026: „von der Waage
+ * am Büro vorbei entlang der Silos und kommt von Osten, was nicht der
+ * Arbeitsbereich des Baggers wäre"). Die Spur läuft zwischen den
+ * Absetzcontainern und den Silos nach Süden und endet östlich vom
+ * Stahlcontainer — der Bagger muss dafür nicht ausweichen.
+ */
 export const PICKUP_APPROACH: Array<[number, number]> = [
   [GATE_X, 24],
-  [-14, 16.5],
-  [-3.5, 16.5],
+  [-27, 20],
+  [-29, 10],
+  [-29, -8],
 ];
-// Rückwärts nach Westen direkt neben die Presse — Heck (Container-Öffnung)
-// zeigt zur Schere, der Bagger lädt von dort um (Design-Fix 2026-08-29)
 export const PICKUP_IN_REV: Array<[number, number]> = [
-  [-3.5, 16.5],
-  [-3.5, 8.0],
+  [-29, -8],
+  [-25.5, -16.5],
 ];
 export const PICKUP_OUT: Array<[number, number]> = [
-  [-3.5, 8.0],
-  [-3.5, 16.5],
-  [-14, 16.5],
+  [-25.5, -16.5],
+  [-29, -8],
+  [-29, 10],
+  [-27, 20],
   [GATE_X, 24],
   [GATE_X, 40],
 ];
 // KIPPER: Wer selbst abkippen kann, muss nicht vor dem Bagger halten. Er fährt
 // rückwärts an die Nordkante des Stahlschrotthaufens (Mitte bei x −9, z 1) und
 // kippt seine Ladung direkt dort ab (Design-Fix 29.08.2026).
+/*
+ * Wer selbst abkippen kann, faehrt nicht vor den Bagger, sondern rueckwaerts
+ * in die offene Nordseite des Mischschrottplatzes (Mitte x −19) und kippt
+ * dort ab. Lambert faehrt seit 12.09.2026 nicht mehr durch den Mischschrott;
+ * die Spur endet deshalb an seiner Kante, nicht darin.
+ */
 export const TIP_APPROACH: Array<[number, number]> = [
   [GATE_X, 24],
-  [-14, 16.5],
-  [-9, 13],
+  [-14, 12],
+  [3.8, 2],
 ];
 export const TIP_IN_REV: Array<[number, number]> = [
-  [-9, 13],
-  [-9, 7.5],
+  [3.8, 2],
+  [3.8, -13.0],
 ];
 export const TIP_OUT: Array<[number, number]> = [
-  [-9, 7.5],
-  [-9, 13],
-  [-14, 16.5],
+  [3.8, -13.0],
+  [3.8, 2],
+  [-14, 12],
   [GATE_X, 24],
   [GATE_X, 40],
 ];

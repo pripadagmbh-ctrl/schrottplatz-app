@@ -57,6 +57,15 @@ export interface PileSpec {
 /* ------------------------------------------------------------------------ */
 
 export const KATALOG_SPECS: PileSpec[] = [
+  // --- Zink und Batterien (Ansage 12.09.2026) ---
+  { materialId: "zinc", massKg: 14, kind: "box", dims: [0.25, 0.25, 2.4], bau: "buendel", name: "Zink-Dachrinne" },
+  { materialId: "zinc", massKg: 22, kind: "box", dims: [0.6, 0.12, 1.8], bau: "platte", name: "Zinkblech-Tafel" },
+  { materialId: "zinc", massKg: 31, kind: "box", dims: [0.45, 0.5, 0.9], bau: "buendel", name: "Fallrohr-Bund" },
+  { materialId: "zinc", massKg: 58, kind: "box", dims: [0.7, 0.6, 1.2], bau: "stapel", name: "Verzinkte Gitterroste" },
+  { materialId: "battery", massKg: 19, kind: "box", dims: [0.35, 0.22, 0.19], bau: "rahmenbox", name: "Starterbatterie" },
+  { materialId: "battery", massKg: 46, kind: "box", dims: [0.52, 0.24, 0.28], bau: "rahmenbox", name: "LKW-Batterie" },
+  { materialId: "battery", massKg: 180, kind: "box", dims: [0.9, 0.7, 0.75], bau: "stapel", name: "Batteriepalette" },
+  { materialId: "battery", massKg: 320, kind: "box", dims: [1.2, 0.8, 0.9], bau: "rahmenbox", name: "Staplerbatterie" },
   // --- Landwirtschaft ---
   { materialId: "steel", massKg: 95, kind: "box", dims: [1.9, 1.1, 0.3], bau: "stapel", name: "Silo-Blechsegment" },
   { materialId: "steel", massKg: 140, kind: "box", dims: [0.45, 0.45, 2.2], bau: "rahmenbox", name: "Melkstand-Gitterwerk" },
