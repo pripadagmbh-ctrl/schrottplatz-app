@@ -47,7 +47,7 @@ export interface ContainerConfig {
    * Zwei Halden nebeneinander teilen sich eine Trennwand — die zweite
    * daneben zu stellen sähe aus wie ein Baufehler.
    */
-  haldeWaende?: { rueck?: boolean; aussen?: boolean; trenn?: boolean };
+  haldeWaende?: { rueck?: boolean; aussen?: boolean; trenn?: boolean; nord?: boolean };
   /** Rückwand weglassen — die Nachbarmulde dahinter bringt sie mit */
   shareEast?: boolean;
   shareWest?: boolean;
@@ -112,16 +112,26 @@ export const CONFIGS: ContainerConfig[] = [
     z: -24.0, size: [8.0, 8.0, 5.0] },
 
   /*
-   * STAHLSCHROTT — eine Mulde, kein Container mehr.
+   * STAHLSCHROTT — rechts neben der Presse, im Winkel ihrer Fassung.
    *
-   * Ansage 12.09.2026: „die Stahlcontainer kommen weg und da kommt jetzt auf
-   * jeden Fall noch eine Mulde hin … damit wir das dort sortieren können."
-   * Sie liegt direkt hinter dem Bagger und teilt sich die linke Trennwand mit
-   * dem Mischschrott; rechts bekommt sie ihre eigene. Dazwischen wird
-   * sortiert, ohne dass ein Behälter im Weg steht.
+   * Ansage 12.09.2026: „die Muldenabgrenzung wird versetzt, sodass die Presse
+   * genau reinpasst. Die rechte Abgrenzung wird verlaengert und nach rechts im
+   * 90-Grad-Winkel erweitert, und schliesst mit Container-Positionen ab."
+   *
+   * Die Mulde bringt genau dieses Winkeleisen mit: Ihre Aussenwand steht dicht
+   * an der rechten Flanke der Presse, ihre Nordwand knickt davon ab und laeuft
+   * nach rechts bis zu den Absetzcontainern. Zusammen mit der Suedwand des
+   * Platzes und der angedeuteten Trennwand des Mischschrotts bildet das die
+   * Fassung, in der die Presse steht — und zugleich die Mulde, in der sortiert
+   * wird. Zum Bagger hin (−x, offene Seite) bleibt sie offen.
+   *
+   * Der Preis dafuer steht in den Messungen: Die Mulde liegt jetzt weiter weg
+   * als der Arm vom Standplatz aus reicht. Sie wird von einem Schritt nach
+   * rechts befuellt, nicht vom Sitzplatz aus (E-090, Arbeitslinie).
    */
-  { id: "c_steel", fractionId: "steel", label: "STAHLSCHROTT", kind: "halde", x: -1.75,
-    z: -26.0, size: [6.5, 5.0, 3.0], haldeWaende: { rueck: true, trenn: true } },
+  { id: "c_steel", fractionId: "steel", label: "STAHLSCHROTT", kind: "halde", x: -11.4,
+    z: -25.9, size: [6.5, 5.0, 3.0],
+    haldeWaende: { rueck: false, aussen: true, nord: true, trenn: false } },
 
   /*
    * GROSSTEILE — offene Fläche rechts neben der Stahlmulde.
@@ -132,8 +142,8 @@ export const CONFIGS: ContainerConfig[] = [
    * die Silos bringen." Keine Wände: Was hier liegt, soll der Lader von der
    * Seite aufnehmen können.
    */
-  { id: "c_alu_gross", fractionId: "alu", label: "GROSSTEILE ALU", kind: "pile", x: -10.75,
-    z: -26.0, size: [6.5, 5.0, 0] },
+  { id: "c_alu_gross", fractionId: "alu", label: "GROSSTEILE ALU", kind: "pile", x: -18.5,
+    z: -25.5, size: [6.5, 5.0, 0] },
   /*
    * REIFENDEPOT — rechts hinten, offene Fläche ohne Wände.
    *
@@ -151,18 +161,18 @@ export const CONFIGS: ContainerConfig[] = [
    * getrennt: doppelter Preisunterschied, und wer beides in einen Behälter
    * wirft, bekommt für alles den Messingpreis.
    */
-  { id: "r_cable", fractionId: "cable", label: "KABEL", kind: "rolloff", x: -8.0,
-    z: -17.5, size: [2.8, 1.8, 1.1] },
-  { id: "r_va", fractionId: "va", label: "EDELSTAHL VA", kind: "rolloff", x: -11.0,
-    z: -17.5, size: [2.8, 1.8, 1.1] },
-  { id: "r_copper", fractionId: "copper", label: "KUPFER", kind: "rolloff", x: -8.0,
-    z: -15.0, size: [2.8, 1.8, 1.1] },
-  { id: "r_alu", fractionId: "alu", label: "ALU", kind: "rolloff", x: -11.0,
-    z: -15.0, size: [2.8, 1.8, 1.1] },
-  { id: "r_zinc", fractionId: "zinc", label: "ZINK", kind: "rolloff", x: -8.0,
-    z: -12.5, size: [2.8, 1.8, 1.1] },
-  { id: "r_brass", fractionId: "brass", label: "MESSING", kind: "rolloff", x: -11.0,
-    z: -12.5, size: [2.8, 1.8, 1.1] },
+  { id: "r_cable", fractionId: "cable", label: "KABEL", kind: "rolloff", x: -8.2,
+    z: -17.8, size: [3.2, 2.3, 1.5] },
+  { id: "r_va", fractionId: "va", label: "EDELSTAHL VA", kind: "rolloff", x: -11.6,
+    z: -17.8, size: [3.2, 2.3, 1.5] },
+  { id: "r_copper", fractionId: "copper", label: "KUPFER", kind: "rolloff", x: -8.2,
+    z: -15.2, size: [3.2, 2.3, 1.5] },
+  { id: "r_alu", fractionId: "alu", label: "ALU", kind: "rolloff", x: -11.6,
+    z: -15.2, size: [3.2, 2.3, 1.5] },
+  { id: "r_zinc", fractionId: "zinc", label: "ZINK", kind: "rolloff", x: -8.2,
+    z: -12.6, size: [3.2, 2.3, 1.5] },
+  { id: "r_brass", fractionId: "brass", label: "MESSING", kind: "rolloff", x: -11.6,
+    z: -12.6, size: [3.2, 2.3, 1.5] },
 
   /*
    * SILOS an der Ostwand — dorthin fährt der Abholer entlang, ohne den
@@ -317,6 +327,28 @@ class GameContainer {
          * hoch"). Zwei Steinlängen ab der hinteren Ecke, halbe Höhe. Das
          * genügt, um die Kante zu lesen, und versperrt nichts.
          */
+        /*
+         * Nordwand — der abgewinkelte Schenkel (Ansage 12.09.2026: "die rechte
+         * Abgrenzung wird verlaengert und nach rechts im 90-Grad-Winkel
+         * erweitert, und schliesst mit Container-Positionen ab").
+         *
+         * Sie laeuft zur offenen Seite (−x) hin aus wie die anderen auch, und
+         * sie ist der Grund, warum die Presse ueberhaupt in eine Fassung
+         * passt: Aussenwand und Nordwand bilden zusammen das Winkeleisen, das
+         * Presse und Stahlmulde voneinander trennt.
+         */
+        if (wnd.nord === true)
+        for (let bx = -hw / 2 + BL / 2; bx < hw / 2 + 0.4; bx += BL) {
+          // Halbe Hoehe: Sie zeigt zur Maschine, und darueber muss der Greifer
+          // kommen. Auf voller Hoehe waere die Mulde dicht — gemessen reicht
+          // der Arm aus dem Gang dahinter (6,2 m) auf 8,1 m ueber Grund, also
+          // ueber 1,5 m locker und ueber 3,0 m gerade so.
+          const n = Math.max(2, Math.round(reihenBei((bx + hw / 2) / hw) / 2));
+          for (let r = 0; r < n; r++) {
+            const off = (r % 2) * (BL / 2);
+            setze(bx - off, BH / 2 + r * BH, hd / 2 + tt, true);
+          }
+        }
         const andeutung = Math.max(2, Math.round(REIHEN / 2));
         if (wnd.trenn !== false)
         for (let bz = -hd / 2 + BL / 2; bz < -hd / 2 + 2 * BL; bz += BL) {
@@ -387,6 +419,15 @@ class GameContainer {
               hw / 2 + BT,
               hoch / 2,
               (-vorz * hd) / 4
+            ),
+            body
+          );
+        if (wnd.nord === true)
+          world.createCollider(
+            RAPIER.ColliderDesc.cuboid(hw / 4 + BT / 2, hoch / 4, BT).setTranslation(
+              (vorz * hw) / 4,
+              hoch / 4,
+              hd / 2 + BT
             ),
             body
           );

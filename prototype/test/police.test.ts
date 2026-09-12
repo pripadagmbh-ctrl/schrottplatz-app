@@ -11,7 +11,7 @@ import { GATE_X, KAFFEE_POS, YARD_MAX_X, YARD_MIN_X, YARD_D } from "../src/world
  * Derselbe Fehler ist bei den LKW-Routen schon zweimal passiert.
  */
 /** Standplatz des Baggers — siehe `position` in excavator.ts. */
-const BAGGER = { x: -2.0, z: -19.5 };
+const BAGGER = { x: -2.5, z: -19.5 };
 
 describe("Streifenwagen", () => {
   it("fährt eine Runde, die an allen Bauwerken vorbeiführt", () => {

@@ -79,6 +79,16 @@ function bayObstacles(cfg: ContainerConfig): Obstacle[] {
       out.push({ x: cfg.x, z: cfg.z - hd / 2 - T, hw: hw / 2 + T, hd: T, top, label: `${L} Rueck` });
     if (wnd.aussen !== false)
       out.push({ x: cfg.x + hw / 2 + T, z: cfg.z, hw: T, hd: hd / 2 + T, top, label: `${L} Aussen` });
+    if (wnd.nord === true)
+      out.push({
+        x: cfg.x,
+        z: cfg.z + hd / 2 + T,
+        hw: hw / 2 + T,
+        hd: T,
+        // Halbe Hoehe — der Arm greift darueber hinweg (siehe containers.ts)
+        top: top / 2,
+        label: `${L} Nord`,
+      });
     if (wnd.trenn !== false)
       out.push({
         x: cfg.x - hw / 2 - T,
@@ -142,7 +152,7 @@ export const STATIC_OBSTACLES: Obstacle[] = [
   ...CONFIGS.flatMap(bayObstacles),
 
   // --- Schere und Presse, südlich hinter dem Bagger ---
-  { x: -10.0, z: -21.5, hw: 3.9, hd: 2.0, top: 2.2, label: "Schere" },
+  { x: -3.0, z: -25.5, hw: 3.9, hd: 2.0, top: 2.2, label: "Schere" },
 
 
   // --- Betriebsgebäude: Büro und Halle, hinten rechts an der Wand ---

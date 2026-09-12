@@ -17,7 +17,7 @@ import { Particles } from "./world/particles";
 import { CompositeManager } from "./dismantle/composites";
 import { FenceManager } from "./world/fence";
 import { VehicleManager } from "./delivery/vehicles";
-import { PressManager, setPressBaggerOrt } from "./world/press";
+import { PressManager } from "./world/press";
 import { randomCargo } from "./world/scrapItems";
 import { Shift } from "./economy/shift";
 import { Tutorial } from "./ui/tutorial";
@@ -248,9 +248,6 @@ async function main(): Promise<void> {
    * Deshalb muessen die Routen wissen, wo er steht.
    */
   setBaggerOrt(() => excavator.position);
-  // Die Presse wirft das Paket zum Bagger hin aus — dafuer muss sie wissen,
-  // wo er gerade steht.
-  setPressBaggerOrt(() => excavator.position);
   let stoerfallGemeldet = false;
   // Geführter Einstieg — zeigt den Kreislauf einmal und hält sich dann raus
   const tutorial = new Tutorial();

@@ -21,10 +21,10 @@ import {
   setBaggerOrt,
   TIP_CREEP_M,
 } from "../src/delivery/routes";
-import { baleYard, setPressBaggerOrt } from "../src/world/press";
+import { baleYard, PRESS_CENTER as PRESSE } from "../src/world/press";
 
 /** Standplatz des Baggers — siehe `position` in excavator.ts. */
-const BAGGER = { x: -2.0, z: -19.5 };
+const BAGGER = { x: -2.5, z: -19.5 };
 
 /**
  * Mulden, die der Spieler von seinem Standplatz aus selbst befüllt.
@@ -53,7 +53,19 @@ const SELBST_BEFUELLT = [
  * dieser kurzen Linie aus ueber seine Wand zu befuellen ist.
  */
 const LINIE: Array<[number, number]> = [];
-for (let t = 0; t <= 1.0001; t += 0.05) LINIE.push([-2.0, -19.5 + t * 5]);
+// Nach vorn, an den Absetzcontainern entlang
+for (let t = 0; t <= 1.0001; t += 0.05) LINIE.push([-2.5, -19.5 + t * 5]);
+/*
+ * Und nach rechts, in den Gang zwischen Containerreihe und Stahlmulde.
+ *
+ * Seit die Presse wieder mittig hinter dem Bagger steht (12.09.2026), liegt
+ * die Stahlmulde rechts daneben — gemessen 10,7 m vom Sitz, also ausserhalb
+ * jeder Reichweite. Sie wird aus diesem Gang befuellt: von dort sind es 6,2 m
+ * auf die Muldenmitte, und der Arm kommt auf 8,1 m ueber Grund. Der Gang ist
+ * 3,7 m breit, zwischen der Suedkante der Container (z −19,0) und der halben
+ * Nordwand der Mulde (z −22,7).
+ */
+for (let t = 0; t <= 1.0001; t += 0.1) LINIE.push([-2.5 - t * 6.0, -19.5 - t * 1.0]);
 
 function abstand(x: number, z: number): number {
   return Math.hypot(x - BAGGER.x, z - BAGGER.z);
@@ -161,40 +173,16 @@ describe("Reichweite des Arms", () => {
     }
   });
 
-  it("das Presspaket faellt dorthin, wo der Bagger es aufnehmen kann", () => {
-    for (const b of [
-      { x: -2.0, z: -19.5 },
-      { x: -2.0, z: -14.0 },
-      { x: 2.0, z: -22.0 },
-      { x: -6.0, z: -12.0 },
-    ]) {
-      setPressBaggerOrt(() => b);
-      const y = baleYard();
-      const d = Math.hypot(y.x - b.x, y.z - b.z);
-      expect(d, `Paket bei Bagger (${b.x}|${b.z})`).toBeGreaterThanOrEqual(4.0);
-      expect(d, `Paket bei Bagger (${b.x}|${b.z})`).toBeLessThanOrEqual(9.5);
-    }
-  });
-
-  it("das Paket kommt zur Baggerseite heraus, nicht nach hinten", () => {
+  it("das Presspaket bleibt in der Kammer", () => {
     /*
-     * „Die Presse soll doch Ballen ausspucken, in Baggerrichtung" (12.09.2026).
-     * Geprueft wird die Richtung, nicht die Stelle: Der Auswurf muss auf der
-     * Haelfte der Kammer liegen, die zum Bagger zeigt. Fiele er nach hinten,
-     * laege das Paket hinter der Maschine an der Suedwand.
+     * "Ballen bleiben in Presse, ohne Abscheiden" (12.09.2026). Dazwischen
+     * warf die Presse zum Bagger hin aus; der Test hielt fest, dass die
+     * Auswurfstelle im Greifring liegt. Jetzt haelt er das Gegenteil fest:
+     * Es gibt keine Auswurfstelle, das Paket liegt in der Kammer — und weil
+     * es dort liegt, blockiert es die naechste Fuhre. Das ist gewollt.
      */
-    const PRESSE = { x: -10.0, z: -21.5 };
-    for (const b of [
-      { x: -2.0, z: -19.5 },
-      { x: -2.0, z: -14.0 },
-      { x: 2.0, z: -22.0 },
-    ]) {
-      setPressBaggerOrt(() => b);
-      const y = baleYard();
-      const zumBagger = [b.x - PRESSE.x, b.z - PRESSE.z];
-      const zumPaket = [y.x - PRESSE.x, y.z - PRESSE.z];
-      const skalar = zumBagger[0] * zumPaket[0] + zumBagger[1] * zumPaket[1];
-      expect(skalar, `Auswurfrichtung bei Bagger (${b.x}|${b.z})`).toBeGreaterThan(0);
-    }
+    const y = baleYard();
+    expect(y.x).toBeCloseTo(PRESSE.x, 5);
+    expect(y.z).toBeCloseTo(PRESSE.z, 5);
   });
 });
