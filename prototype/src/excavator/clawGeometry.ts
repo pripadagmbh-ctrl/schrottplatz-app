@@ -77,6 +77,16 @@ export function clawTipDepth(splay: number): number {
  * Nachsetzen, nicht als abrupter Stopp.
  */
 export const NACHDRUECK_RESERVE = 0.12;
+/**
+ * Dasselbe fuer Nachgiebiges: Blech, Faesser, Weisse Ware, Kabinen.
+ *
+ * Der Zahn drueckt sich hier deutlich weiter hinein als in massiven Stahl —
+ * gut das Dreifache, am Zahnende rund 45 cm — und steht dann. Vorher gab es
+ * fuer solches Material gar keine Grenze: Es galt nicht als Hindernis, der
+ * Zahn lief bis zum Anschlag durch das Teil hindurch (Ansage 12.09.2026:
+ * „eine gewisse Starre bzw. Kraft muss jeder Zahn haben").
+ */
+export const WEICH_RESERVE = 0.4;
 /** Wie langsam das Nachdrücken gegenüber freier Bewegung läuft. */
 const NACHDRUECK_TEMPO = 0.25;
 

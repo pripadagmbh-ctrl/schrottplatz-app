@@ -316,6 +316,29 @@ const SPAWN_ABSTAND = 0.06;
  * darum ist die Kugel das richtige Mass — ein Quader ragt in der Diagonale
  * weiter als seine laengste Kante halbiert.
  */
+/*
+ * Der Bau-Aufschlag steht hier als Befund, nicht als Rechnung.
+ *
+ * Gemessen am 12.09.2026 an allen Bauarten im laufenden Spiel, als Verhaeltnis
+ * der echten Umkugel zur gerechneten: Kabelrolle 1,57, Motor 1,41, Rohr 1,36,
+ * Tank 1,31, Buendel 1,30, Mittelwert 1,1. Der Bau haengt Sattel, Stutzen,
+ * Rahmen und Fuesse an den Grundkoerper, und die ragen heraus — die Teile im
+ * Haufen stehen also dichter, als diese Rechnung annimmt.
+ *
+ * Eingebaut wurde der Aufschlag trotzdem nicht: Er kostet mehr, als er bringt.
+ * Gemessen fanden mit Faktor 1,6 nur noch 61 von ueber 90 Teilen Platz, mit
+ * 1,25 noch 78; die Lagenzahl hochzusetzen fuellt den Haufen wieder, macht ihn
+ * aber so hoch, dass beim Aufloesen ein Stueck 21,9 m weit flog. Der
+ * eigentliche Grund fuer eingesunkene Teile war ohnehin ein anderer — der
+ * Kollider stimmte nicht mit dem Aussehen ueberein, siehe weiter unten beim
+ * Bau. Wer den Haufen spaeter dichter setzen will, faengt hier an.
+ */
+
+/**
+ * Radius der Umkugel einer Form. Beim Spawn wird jedes Teil zufaellig verdreht,
+ * darum ist die Kugel das richtige Mass — ein Quader ragt in der Diagonale
+ * weiter als seine laengste Kante halbiert.
+ */
 export function umkugelRadius(shape: ScrapShape): number {
   const d = shape.dims;
   if (shape.kind === "box") return Math.hypot(d[0], d[1], d[2]) / 2;
@@ -651,6 +674,15 @@ const SCHLAF_TAKT_S = 0.25;
 /** Teile so nah an der Spinne bleiben wach (v2 E-041: schlafend durch den Boden gesackt). */
 const SCHLAF_ABSTAND_SPINNE = 3.0;
 
+/**
+ * Bauarten, deren Geometrie NaN-Punkte enthaelt — fuer die Diagnose.
+ *
+ * Sie sind ein echter Fehler im Bau, kein Sonderfall: Ein Netz mit NaN hat
+ * keine Ausdehnung, wirft keinen Schatten richtig und liesse sich nicht
+ * picken. Solange die Liste nicht leer ist, gibt es etwas zu reparieren.
+ */
+export const unsaubereBauten = new Set<string>();
+
 export class ItemManager {
   readonly items: ScrapItem[] = [];
   private byHandle = new Map<number, ScrapItem>();
@@ -939,6 +971,38 @@ export class ItemManager {
       const bauteil = baueGeometrie(shape.bau, shape.dims, shape.kind);
       geo = bauteil.koerper;
       glasGeo = bauteil.glas;
+      /*
+       * Der Kollider kommt aus dem gebauten Koerper, nicht mehr aus dem
+       * Grundkoerper des Katalogs.
+       *
+       * Befund 12.09.2026: „die Objekte tauchen ein." Nachgemessen steckten 20
+       * von 71 Teilen im Boden, das schlimmste 1,14 m tief. Die Ursache stand
+       * als Absicht im Code — der Bau ersetzte nur das Aussehen, der Kollider
+       * blieb der Quader oder Zylinder aus dem Katalog. Ein Tank mit den Massen
+       * [0,85 | 0,90] wird als Behaelter mit Sattel und Stutzen gebaut und ist
+       * dann 2,37 m hoch: Er liegt auf seinem 0,9-m-Zylinder auf, und
+       * anderthalb Meter Blech ragen durch die Platte.
+       *
+       * Die konvexe Huelle der gebauten Ecken trifft genau das, was man sieht.
+       * Sie ist teurer als ein Quader, aber nur beim Bauen — im Lauf ist sie
+       * eine Form wie jede andere. Faellt sie aus (zu wenige Punkte), bleibt es
+       * beim Grundkoerper.
+       */
+      const ecken = geo.getAttribute("position") as THREE.BufferAttribute | null;
+      const punkte = ecken && ecken.count >= 4 ? (ecken.array as Float32Array) : null;
+      /*
+       * Vorher pruefen, ob ueberhaupt Zahlen drinstehen. Rapier rechnet die
+       * Huelle in WebAssembly, und ein einziges NaN beendet dort nicht die
+       * Funktion, sondern das Modul: „RuntimeError: unreachable", und das
+       * ganze Spiel startet nicht mehr. Drei.js meldet dieselben Geometrien
+       * seit jeher nur als Warnung („Computed radius is NaN") — harmlos beim
+       * Zeichnen, toedlich beim Kollider. Wer NaN mitbringt, behaelt seinen
+       * Grundkoerper.
+       */
+      const sauber = punkte !== null && punkte.every((v) => Number.isFinite(v));
+      const huelle = sauber ? RAPIER.ColliderDesc.convexHull(punkte) : null;
+      if (huelle) collider = huelle;
+      else if (!sauber) unsaubereBauten.add(shape.bau);
     }
 
     const isWire = shape.kind === "wire";

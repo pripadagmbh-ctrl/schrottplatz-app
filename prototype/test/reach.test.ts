@@ -52,20 +52,22 @@ const SELBST_BEFUELLT = [
  * zehn Ziele. Geprueft wird deshalb, ob jedes Ziel von IRGENDEINEM Punkt
  * dieser kurzen Linie aus ueber seine Wand zu befuellen ist.
  */
+const HUB_CACHE = new Map<number, number>();
 const LINIE: Array<[number, number]> = [];
-// Nach vorn, an den Absetzcontainern entlang
+// Nach vorn, an der Containerreihe entlang
 for (let t = 0; t <= 1.0001; t += 0.05) LINIE.push([-2.5, -19.5 + t * 5]);
 /*
- * Und nach rechts, in den Gang zwischen Containerreihe und Stahlmulde.
+ * Und einmal herum zur offenen Westseite der Stahlmulde.
  *
- * Seit die Presse wieder mittig hinter dem Bagger steht (12.09.2026), liegt
- * die Stahlmulde rechts daneben — gemessen 10,7 m vom Sitz, also ausserhalb
- * jeder Reichweite. Sie wird aus diesem Gang befuellt: von dort sind es 6,2 m
- * auf die Muldenmitte, und der Arm kommt auf 8,1 m ueber Grund. Der Gang ist
- * 3,7 m breit, zwischen der Suedkante der Container (z −19,0) und der halben
- * Nordwand der Mulde (z −22,7).
+ * Die Mulde liegt seit dem 12.09.2026 rechts neben der Presse und ist vom
+ * Sitz aus 11,0 m entfernt — ausserhalb jeder Reichweite. Der Gang hinter der
+ * Containerreihe, aus dem sie vorher befuellt wurde, ist zu, seit die
+ * Container an der Muldenwand stehen. Bleibt die offene Westseite: nordlich an
+ * den Containern vorbei, dann nach Sueden. Von (−15,5 | −21) sind es 6,4 m auf
+ * die Muldenmitte bei 8,1 m Hubhoehe.
  */
-for (let t = 0; t <= 1.0001; t += 0.1) LINIE.push([-2.5 - t * 6.0, -19.5 - t * 1.0]);
+for (let t = 0; t <= 1.0001; t += 0.1) LINIE.push([-2.5 - t * 13.0, -13.5]);
+for (let t = 0; t <= 1.0001; t += 0.1) LINIE.push([-15.5, -13.5 - t * 8.5]);
 
 function abstand(x: number, z: number): number {
   return Math.hypot(x - BAGGER.x, z - BAGGER.z);
@@ -128,16 +130,39 @@ describe("Reichweite des Arms", () => {
     it(`${cfg.label}: der Arm kommt über die Wand`, () => {
       const wandH = cfg.size[2];
       const [w, d] = cfg.size;
+      /*
+       * Geprueft wird, ob IRGENDEIN Punkt der Zone von IRGENDEINEM Punkt der
+       * Arbeitslinie aus zu treffen ist — nicht nur die naechste Ecke.
+       *
+       * Vorher stand hier die naechste Ecke, und das ergab einen falschen
+       * Alarm, sobald ein Behaelter dicht an der Linie steht: Bei einem
+       * 3,6-m-Container liegt die nahe Kante dann in der toten Zone (3,3 m),
+       * die Mitte aber bei 6,1 m mit 8,1 m Hubhoehe. Man greift auch nicht die
+       * Kante an, sondern laesst in den Kasten fallen.
+       */
       let beste: { d: number; h: number; p: [number, number] } | null = null;
+      const SCHRITT = 0.5;
+      // `hoechsteKrallenspitze` rechnet die ganze Armgeometrie ab; ueber ein
+      // Raster aufgerufen dauert der Test sonst Minuten. Auf 10 cm gerundet
+      // gemerkt — feiner als die Schrittweite des Rasters ohnehin ist.
+      const hubBei = (dist: number): number => {
+        const k = Math.round(dist * 10);
+        let v = HUB_CACHE.get(k);
+        if (v === undefined) {
+          v = hoechsteKrallenspitze(k / 10);
+          HUB_CACHE.set(k, v);
+        }
+        return v;
+      };
       for (const [px, pz] of LINIE) {
-        // Naechster Punkt der Zone, nicht ihre Mitte: eine 12-m-Halde greift
-        // man am Rand, nicht in der Mitte.
-        const zx = Math.max(cfg.x - w / 2, Math.min(cfg.x + w / 2, px));
-        const zz = Math.max(cfg.z - d / 2, Math.min(cfg.z + d / 2, pz));
-        const dist = Math.hypot(zx - px, zz - pz);
-        const hoch = hoechsteKrallenspitze(dist);
-        if (hoch > wandH + 0.4 && (beste === null || dist < beste.d)) {
-          beste = { d: dist, h: hoch, p: [px, pz] };
+        for (let zx = cfg.x - w / 2; zx <= cfg.x + w / 2 + 1e-6; zx += SCHRITT) {
+          for (let zz = cfg.z - d / 2; zz <= cfg.z + d / 2 + 1e-6; zz += SCHRITT) {
+            const dist = Math.hypot(zx - px, zz - pz);
+            const hoch = hubBei(dist);
+            if (hoch > wandH + 0.4 && (beste === null || dist < beste.d)) {
+              beste = { d: dist, h: hoch, p: [px, pz] };
+            }
+          }
         }
       }
       expect(

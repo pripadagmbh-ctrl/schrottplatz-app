@@ -29,7 +29,7 @@ import type { CompositeManager } from "../dismantle/composites";
 // naeher an den Mischschrottplatz rueckt. Und quergestellt: Sie lag vom Sitz
 // aus waagerecht im Bild und nahm die ganze Breite ein; hochkant steht sie in
 // einer Reihe mit Stahlmulde und Halde.
-const CENTER = new THREE.Vector3(-3.0, 0, -25.5);
+const CENTER = new THREE.Vector3(-3.0, 0, -26.0);
 /** Mitte der Presskammer — auch fuer Hindernisliste und Tests. */
 export const PRESS_CENTER = CENTER;
 // Die Schwelle gilt fuer Objekte wie fuer Pakete — sie steht in materials/purity.ts.
@@ -69,7 +69,19 @@ const ROT = 0;
 const INNER_W = 7.0; // x — Länge, Pressweg (rechts → links)
 // Schmaler (Ansage 12.09.2026: „die Presse erscheint immer noch zu tief,
 // die kann ruhig noch ein bisschen schmaler werden").
-const INNER_D = 3.2; // z — Tiefe; bestimmt die Klappenlänge
+/*
+ * z — Tiefe der Kammer. Sie bestimmt, ob die Spinne ueberhaupt hineinkommt.
+ *
+ * Befund 12.09.2026: „bei Presse kam ich nicht an Boden." Gemessen ist die
+ * Spinne offen 3,38 m breit (`clawSpan(CLAW_OPEN_SPLAY)`), die Kammer war
+ * 3,20 m tief — der Greifer setzte auf den beiden Laengswaenden auf, bevor
+ * er unten war. 4,20 m lassen beidseits gut 40 cm Luft, und das ist das
+ * Mindestmass fuer jeden Behaelter auf dem Platz: Was man befuellen soll,
+ * muss man auch ausraeumen koennen.
+ */
+const INNER_D = 4.2;
+/** Lichte Masse der Kammer — fuer Tests und Platzplanung. */
+export const PRESS_INNER = { laenge: INNER_W, tiefe: INNER_D };
 const WALL_H = 1.9;
 const PLATE_T = 0.3; // dicke Eisenplatten (SW)
 const LID_HINGE_Y = WALL_H - 0.1;

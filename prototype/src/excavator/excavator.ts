@@ -16,6 +16,7 @@ import {
   clawPoint,
   naechsteSpreizung,
   NACHDRUECK_RESERVE,
+  WEICH_RESERVE,
   clawTipDepth,
 } from "./clawGeometry";
 
@@ -1556,6 +1557,8 @@ export class Excavator {
   private clawGraceS = 0;
   /** Verbleibendes Nachdruecken je Kralle, damit sie nicht schlagartig steht */
   private clawReserve: number[] = new Array(CLAW_COUNT).fill(NACHDRUECK_RESERVE);
+  /** Was jeder Zahn zuletzt vorgefunden hat: 0 frei, 1 weich, 2 hart. */
+  private clawArt: Array<0 | 1 | 2> = new Array(CLAW_COUNT).fill(0);
   private blockTmp = new THREE.Vector3();
   // Feine Tastkugel: Mit 0,14 blieb der Zahn sichtbar auf Abstand stehen,
   // als griffe er ins Leere. Er soll bis fast an das Teil heran.
@@ -1599,12 +1602,22 @@ export class Excavator {
    */
   onClawSnap: ((haerte: number) => void) | null = null;
 
-  private clawBlocked(a: number, splay: number): boolean {
+  /**
+   * Was ein Zahn an dieser Stelle vorfindet.
+   *
+   * FREI: nichts im Weg. WEICH: etwas Nachgiebiges — Blech, ein Fass, eine
+   * Waschmaschine. HART: massiver Stahl, ein Traeger, ein Motorblock.
+   *
+   * Der Unterschied zwischen WEICH und HART ist nicht mehr „geht hindurch"
+   * gegen „steht", sondern nur noch, wie weit der Zahn eindringt (Ansage
+   * 12.09.2026: „die Spinne soll die Zaehne bei Bedarf dem Objekt angepasst
+   * schliessen, aber eine gewisse Starre bzw. Kraft muss jeder Zahn haben").
+   */
+  private clawBlocked(a: number, splay: number): { art: 0 | 1 | 2; koerper: RAPIER.RigidBody | null } {
     clawPoint(a, splay, CLAW_SEGMENTS, this.blockTmp);
     this.grappleGroup.localToWorld(this.blockTmp);
-    let blockiert = false;
-    // Eine Abfrage fuer beides: Was haelt, stoppt den Zahn. Was nachgibt,
-    // bekommt seine Beule — der Zahn geht hindurch.
+    let art: 0 | 1 | 2 = 0;
+    let koerper: RAPIER.RigidBody | null = null;
     this.world.intersectionsWithShape(
       this.blockTmp,
       Excavator.IDENT,
@@ -1614,18 +1627,22 @@ export class Excavator {
         if (!b) return true;
         if (this.selfHandles.has(b.handle)) return true;
         if (!b.isDynamic()) return true;
-        // Ein Greifer bleibt an Blech nicht stehen — er quetscht es platt
-        // oder schiebt es beiseite. Stehen bleibt er an massivem Stahl:
-        // Traeger, dicke Platten, ein Motorblock.
         if (this.clawBlockedBy ? this.clawBlockedBy(b) : true) {
-          blockiert = true;
-          return false; // haelt — weitersuchen bringt nichts
+          art = 2;
+          koerper = b;
+          return false; // massiv — weitersuchen bringt nichts
         }
-        this.onClawPierce?.(b);
+        // Nachgiebig: Der Zahn drueckt sich hinein, aber er faehrt nicht mehr
+        // glatt hindurch. Ein weiches Teil bleibt der weichste Fund, falls
+        // nebenan noch etwas Massives liegt — darum weitersuchen.
+        if (art === 0) {
+          art = 1;
+          koerper = b;
+        }
         return true;
       }
     );
-    return blockiert;
+    return { art, koerper };
   }
 
   /**
@@ -1645,15 +1662,40 @@ export class Excavator {
         const auf = naechsteSpreizung(ist, ziel, schritt, false, this.clawReserve[c]!);
         this.clawSplayIst[c] = auf.winkel;
         this.clawReserve[c] = auf.reserve;
+        // Beim Oeffnen hat der Zahn nichts mehr vor sich; sonst behielte er
+        // seinen alten Fund und bekaeme beim naechsten Schliessen kein
+        // frisches Weggeld.
+        this.clawArt[c] = 0;
         continue;
       }
       const naechste = Math.max(ziel, ist - schritt);
       const a = (c / CLAW_COUNT) * Math.PI * 2;
-      const blockiert = this.clawBlocked(a, naechste);
-      if (blockiert) this.krallenBlockiert = true;
-      const zu = naechsteSpreizung(ist, ziel, schritt, blockiert, this.clawReserve[c]!);
+      const fund = this.clawBlocked(a, naechste);
+      if (fund.art !== 0) this.krallenBlockiert = true;
+      /*
+       * Jeder Zahn hat sein eigenes Weggeld. Trifft er auf etwas anderes als
+       * eben noch, bekommt er den Vorrat dieser Haerte: an massivem Stahl
+       * einen Ruck, an Nachgiebigem gut das Dreifache — so weit drueckt er
+       * sich hinein, und dann steht er. Vorher gab es fuer Nachgiebiges gar
+       * keine Grenze: Der Zahn lief durch das Teil hindurch bis zum Anschlag,
+       * und das Objekt sah aus, als haette es der Greifer gar nicht beruehrt.
+       */
+      if (fund.art !== this.clawArt[c]) {
+        this.clawArt[c] = fund.art;
+        this.clawReserve[c] = fund.art === 1 ? WEICH_RESERVE : NACHDRUECK_RESERVE;
+      }
+      const vorher = this.clawReserve[c]!;
+      const zu = naechsteSpreizung(ist, ziel, schritt, fund.art !== 0, vorher);
       this.clawSplayIst[c] = zu.winkel;
       this.clawReserve[c] = zu.reserve;
+      /*
+       * Die Beule kommt erst, wenn der Zahn sein Weggeld aufgebraucht hat —
+       * also wirklich hineingedrueckt hat. Ein Antippen soll noch nichts
+       * verformen.
+       */
+      if (fund.art === 1 && vorher > 0 && zu.reserve <= 0 && fund.koerper) {
+        this.onClawPierce?.(fund.koerper);
+      }
     }
   }
 
