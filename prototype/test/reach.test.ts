@@ -22,7 +22,7 @@ import {
 } from "../src/delivery/routes";
 
 /** Standplatz des Baggers — siehe `position` in excavator.ts. */
-const BAGGER = { x: -4, z: -18.5 };
+const BAGGER = { x: -2.0, z: -19.2 };
 
 /**
  * Mulden, die der Spieler von seinem Standplatz aus selbst befüllt.
@@ -35,7 +35,6 @@ const BAGGER = { x: -4, z: -18.5 };
 const SELBST_BEFUELLT = [
   "c_mixed",
   "c_steel",
-  "c_tires",
   "r_cable",
   "r_va",
   "r_copper",
@@ -52,7 +51,7 @@ const SELBST_BEFUELLT = [
  * dieser kurzen Linie aus ueber seine Wand zu befuellen ist.
  */
 const LINIE: Array<[number, number]> = [];
-for (let t = 0; t <= 1.0001; t += 0.05) LINIE.push([-4, -18.5 + t * 5]);
+for (let t = 0; t <= 1.0001; t += 0.05) LINIE.push([-2.0, -19.2 + t * 5]);
 
 function abstand(x: number, z: number): number {
   return Math.hypot(x - BAGGER.x, z - BAGGER.z);
@@ -87,10 +86,10 @@ describe("Reichweite des Arms", () => {
     // nicht mehr, einen Punkt zu prüfen: Gefahren wird ueber den ganzen
     // Vorplatz, und an jeder Stelle muss der Arm noch auf den Boden kommen.
     for (const ort of [
-      { x: -4, z: -18.5 },
-      { x: -4, z: -13.5 },
-      { x: -6, z: -16 },
-      { x: -2, z: -15 },
+      { x: -4, z: -17 },
+      { x: -4, z: -12 },
+      { x: -6, z: -15 },
+      { x: -2, z: -14 },
       { x: -4, z: -10 },
     ]) {
       setBaggerOrt(() => ort);

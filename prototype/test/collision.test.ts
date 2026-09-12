@@ -54,8 +54,8 @@ const SORTIERMULDEN = CONFIGS.filter((c) =>
   ["r_cable", "r_va", "r_copper", "r_alu", "r_zinc", "r_brass"].includes(c.id)
 );
 /** Standplatz des Baggers — siehe `position` in excavator.ts. */
-const BAGGER_X = -4;
-const BAGGER_Z = -18.5;
+const BAGGER_X = -2.0;
+const BAGGER_Z = -19.2;
 /** Die Silos an der Ostwand, an denen der Abholer entlangfaehrt. */
 const SILOS = CONFIGS.filter((c) =>
   ["c_wood", "c_rubble", "c_plastic", "c_va_lager"].includes(c.id)
@@ -194,10 +194,15 @@ describe("Feste Bauten", () => {
     expect(hitsObstacle(h.x + w / 2 + 0.4, h.z, 0), "Aussenwand sperrt").not.toBeNull();
     // Zur Maschine hin steht KEINE Wand (Ansage 12.09.2026): dort ist der
     // Bagger selbst die Abgrenzung, und eine Wand waere nur im Weg.
+    // Vorn offen, hinten die halbe Trennwand (12.09.2026)
     expect(
       hitsObstacle(h.x - w / 2 - 0.4, h.z + d / 2 - 1, 0),
-      "Seite zum Bagger muss offen sein"
+      "Vordere Haelfte zum Bagger muss offen sein"
     ).toBeNull();
+    expect(
+      hitsObstacle(h.x - w / 2 - 0.4, h.z - d / 4, 0),
+      "hintere Haelfte braucht die Trennwand"
+    ).not.toBeNull();
   });
 
   it("alles steht innerhalb der Platzgrenzen", () => {
@@ -302,23 +307,28 @@ describe("Reichweite des Baggers", () => {
     expect(wand.top).toBeGreaterThan(flanke.top);
   });
 
-  it("der Stahlcontainer steht rechts vom Bagger, die Presse im Ruecken", () => {
+  it("Halde, Stahlmulde und Presse stehen in einer Reihe hinter dem Bagger", () => {
     /*
-     * Die Platzordnung ist aus der Sicht des Fahrers beschrieben (12.09.2026):
-     * Blick nach Norden zu Janine, Container rechts, Presse hinten. Geprueft
-     * wird der Schwenkwinkel, nicht die Koordinate — so haelt der Test auch,
-     * wenn der ganze Platz noch einmal ein paar Meter wandert.
+     * Die Reihe an der hinteren Grenze (Ansage 12.09.2026): aussen der
+     * Mischschrott in der Ecke, daneben durch die halbe Trennwand getrennt die
+     * Stahlmulde, daneben — noch erreichbar — die Presse. Geprueft wird die
+     * Reihenfolge, nicht die Koordinate: So haelt der Test auch, wenn die
+     * Reihe noch einmal ein paar Meter wandert.
      */
-    const winkel = (c: { x: number; z: number }): number =>
-      (Math.atan2(c.x - BAGGER_X, c.z - BAGGER_Z) * 180) / Math.PI;
-    const stahl = CONFIGS.find((c) => c.id === "c_steel")!;
     const halde = CONFIGS.find((c) => c.id === "c_mixed")!;
+    const stahl = CONFIGS.find((c) => c.id === "c_steel")!;
     const presse = STATIC_OBSTACLES.find((o) => o.label === "Schere")!;
-    // Rechts vom Sitz ist -x (gemessen 12.09.2026), darum das Minuszeichen.
-    expect(winkel(stahl), "Stahlcontainer nicht rechts").toBeLessThan(-60);
-    expect(winkel(stahl), "Stahlcontainer nicht rechts").toBeGreaterThan(-120);
-    expect(Math.abs(winkel(presse)), "Presse nicht im Ruecken").toBeGreaterThan(150);
-    expect(winkel(halde), "Mischschrott nicht links hinten").toBeGreaterThan(90);
+    // Links vom Sitz ist +x: die Halde liegt am weitesten aussen
+    expect(halde.x, "Halde nicht aussen").toBeGreaterThan(stahl.x);
+    expect(stahl.x, "Stahlmulde nicht zwischen Halde und Presse").toBeGreaterThan(presse.x);
+    // Alle drei liegen hinter der Maschine
+    for (const [name, z] of [
+      ["Halde", halde.z],
+      ["Stahlmulde", stahl.z],
+      ["Presse", presse.z],
+    ] as Array<[string, number]>) {
+      expect(z, `${name} liegt nicht hinter dem Bagger`).toBeLessThan(BAGGER_Z);
+    }
   });
 
   it("schließt mittig, ohne dass die Spitzen sich überlappen", () => {

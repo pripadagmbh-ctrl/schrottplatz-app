@@ -161,15 +161,15 @@ export const PICKUP_OUT: Array<[number, number]> = [
 export const TIP_APPROACH: Array<[number, number]> = [
   [GATE_X, 24],
   [-14, 12],
-  [5.0, 2],
+  [6.0, 2],
 ];
 export const TIP_IN_REV: Array<[number, number]> = [
-  [5.0, 2],
-  [5.0, -16.0],
+  [6.0, 2],
+  [6.0, -17.5],
 ];
 export const TIP_OUT: Array<[number, number]> = [
-  [5.0, -16.0],
-  [5.0, 2],
+  [6.0, -17.5],
+  [6.0, 2],
   [-14, 12],
   [GATE_X, 24],
   [GATE_X, 40],

@@ -917,30 +917,14 @@ export class Yard {
   }
 
   /** Markierte Annahmefläche 8 × 8 m (Kap. 12) — rein visuell. */
-  private buildReceivingArea(scene: THREE.Scene): void {
-    const marker = new THREE.Mesh(
-      new THREE.PlaneGeometry(8, 8),
-      new THREE.MeshStandardMaterial({ color: 0x776b58, roughness: 1 })
-    );
-    marker.rotation.x = -Math.PI / 2;
-    marker.position.set(this.pileCenter.x, 0.01, this.pileCenter.z);
-    marker.receiveShadow = true;
-    scene.add(marker);
-    // gelbe Eckwinkel als Markierung
-    const corner = new THREE.MeshStandardMaterial({ color: 0xf0b429, roughness: 0.9 });
-    for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) {
-      for (const [w, d, ox, oz] of [
-        [1.2, 0.15, 0.6, 0.075],
-        [0.15, 1.2, 0.075, 0.6],
-      ] as const) {
-        const m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.02, d), corner);
-        m.position.set(
-          this.pileCenter.x + sx * (4 - ox),
-          0.02,
-          this.pileCenter.z + sz * (4 - oz)
-        );
-        scene.add(m);
-      }
-    }
-  }
+  /**
+   * Die Annahmeflaeche ist nicht mehr markiert (Ansage 12.09.2026: „wir
+   * brauchen keinen andersfarbigen Platz, das kann gerne durch Dreck und
+   * Verschmutzung ersichtlich sein, dass das die Anfahrt ist").
+   *
+   * Die Zone selbst gibt es weiter — sie steht in `pileCenter` und wird von
+   * den Routen benutzt. Nur der braune Teppich mit den gelben Eckwinkeln ist
+   * weg; die Reifenspuren im Boden zeigen ohnehin, wo gefahren wird.
+   */
+  private buildReceivingArea(_scene: THREE.Scene): void {}
 }

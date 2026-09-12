@@ -35,7 +35,7 @@ const SIGNS: SignSpec[] = [
   { text: "SORTIERUNG", hint: "Kabel · VA · Kupfer · Alu · Zink · Messing", x: -16.6, z: -10.5,
     rot: 0.6 },
   // Nordseite der Presskammer — von dort schaut man hin
-  { text: "SCHERE / PRESSE", hint: "Mischschrott pressen (Taste B)", x: -7.5, z: -22.4, rot: 0 },
+  { text: "SCHERE / PRESSE", hint: "Mischschrott pressen (Taste B)", x: -11.9, z: -22.0, rot: -1.571 },
 ];
 
 export class Signage {

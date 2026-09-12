@@ -26,7 +26,7 @@ import { UPGRADES, UpgradeState, type UpgradeId } from "./economy/upgrades";
 import { haggle, leavesOnRefusal, hint, OFFER_FACTOR, OFFER_LABEL, type Offer } from "./economy/haggle";
 import { LaneWatch } from "./delivery/laneWatch";
 import { Daylight, Floodlights } from "./world/daylight";
-import { hitsObstacle } from "./world/obstacles";
+import { hitsObstacle, setBuildingObstacles } from "./world/obstacles";
 import { findeBox } from "./world/boxen";
 import { OfficeBuilding, BUERO_TUER } from "./world/office";
 import { Police } from "./world/police";
@@ -83,13 +83,20 @@ async function main(): Promise<void> {
   const daylight = new Daylight(scene, hemi, sun);
   // Masten stehen dicht an der Umrandung, damit die Arbeitsflächen frei
   // bleiben — der Platz misst 80 x 58 m
+  /*
+   * Der Mast auf (0 | −26) ist weg (Ansage 12.09.2026: „der eine Strahler
+   * muss da jetzt weg, weil der ein bisschen im Weg steht") — seit der
+   * Betrieb an der hinteren Grenze sitzt, stand er mitten in der Muldenreihe.
+   * Die beiden auf x 37 lagen ohnehin weit ausserhalb der Mauer, seit die
+   * Ostgrenze auf 10,5 gerueckt ist; sie stehen jetzt innen.
+   */
   const floodlights = new Floodlights(scene, [
     [-37, 26],
-    [37, 26],
     [-37, -26],
-    [37, -26],
+    [-37, 2],
+    [9, 26],
+    [9, 8],
     [0, 26],
-    [0, -26],
   ]);
 
   // --- Spielobjekte ---
@@ -133,10 +140,12 @@ async function main(): Promise<void> {
     // Auf die Stahlflaeche, nicht auf die Grenze zur Mischschrottflaeche.
     // Der Haufen ist am Anfang unsortiert — dass er als Verunreinigung zaehlt,
     // ist gewollt: Aufraeumen ist die Aufgabe.
-    items.spawnPile(new THREE.Vector3(5.0, 0, -22.75), 85, 3.2);
+    items.spawnPile(new THREE.Vector3(6.0, 0, -24.0), 85, 2.9);
     // Altfahrzeuge stehen von Anfang an am Rand des Stahlschrott-Haufens
-    composites.spawnCar(new THREE.Vector3(-15.8, 0.5, 3.5));
-    composites.spawnCar(new THREE.Vector3(-15.8, 0.5, -2.5));
+    // Zu den uebrigen Teilen in den Mischschrott (Ansage 12.09.2026): Sie
+    // standen noch am Platz von vor dem Umbau.
+    composites.spawnCar(new THREE.Vector3(4.2, 0.5, -21.5));
+    composites.spawnCar(new THREE.Vector3(8.0, 0.5, -26.0));
     // Etwas Streuschrott neben dem Stahlhaufen — er lag frueher an den
     // Schrottbergen, und die stehen jetzt ausserhalb der Mauer. Auf dem Platz
     // soll alles, was nach Material aussieht, auch aufzunehmen sein.
@@ -146,7 +155,9 @@ async function main(): Promise<void> {
         sp.materialId,
         sp.massKg,
         sp.shape,
-        new THREE.Vector3(-9 + Math.cos(a) * 6.2, 0.8 + (i % 3) * 0.7, 1 + Math.sin(a) * 5.4)
+        // An den Mischschrott statt an den alten Platz (Ansage 12.09.2026:
+        // „es fallen immer noch am alten Platz Schrottteile runter").
+        new THREE.Vector3(6 + Math.cos(a) * 3.0, 0.8 + (i % 3) * 0.7, -24 + Math.sin(a) * 3.0)
       );
     });
     // Erst jetzt setzen lassen, wenn alles Anfaengliche steht — Haufen, Autos
@@ -433,6 +444,7 @@ async function main(): Promise<void> {
    * macht der ItemManager — der Platzwart meldet nur, dass die Arbeit getan
    * ist, und kennt darum weder Fraktionen noch Preise.
    */
+  staff.getMuldenOrt = (id) => containers.ortVon(id);
   staff.onFunken = (x, y, z) => {
     particles.spawn(evPos.set(x, y, z), 5, 0xffc46b, 3.0, 0.5, 0.35);
   };
@@ -1095,6 +1107,9 @@ async function main(): Promise<void> {
     hud.updateShift(`${daylight.clock} · ${shift.statusText(looseKg)}`, shift.jammed);
     excavator.updateInstruments(frameDt);
     containers.updateLabels(orbit.camera.position);
+    // Bewegliche Behaelter sind Hindernisse wie jedes Bauwerk — nur wandern
+    // sie, also melden sie sich jedes Bild neu.
+    setBuildingObstacles(containers.hindernisse());
 
     // Wartet ein Abholer, zählt nur eins: wie sortenrein ist die Ladung?
     // Daran hängt der Erlös, also gehört es laufend ins Bild.

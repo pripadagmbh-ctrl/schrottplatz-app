@@ -406,6 +406,13 @@ export class StaffManager {
   /** Funken beim Flexen — Ort fuer Partikel und Klang. */
   onFunken: ((x: number, y: number, z: number) => void) | null = null;
 
+  /**
+   * Wo ein Behaelter gerade steht. Absetzcontainer lassen sich vom Bagger
+   * verschieben; ohne diese Abfrage wuerfe Lambert weiter an die Stelle, an
+   * der der Container beim Aufbau stand.
+   */
+  getMuldenOrt: ((id: string) => { x: number; z: number } | null) | null = null;
+
   /** Wo der Radlader steht, solange Lambert zu Fuss unterwegs ist. */
   private readonly maschinePos = new THREE.Vector3();
   /** Restliche Pausenzeit (s) */
@@ -1001,13 +1008,26 @@ export class StaffManager {
       if (it && it.body.isValid()) {
         const mulde = StaffManager.muldeFuer(it.materialId);
         if (mulde) {
-          // Ueber die Wand gekippt: aus Schaufelhoehe in die Mulde fallen
-          // lassen, nicht am Boden absetzen — sonst haengt es in der Wand.
+          /*
+           * ÜBER die Kante fallen lassen, nicht hinein.
+           *
+           * Vorher lag die Absetzhoehe bei `size[2] − 0,6`. Bei einem
+           * Absetzcontainer mit 1,1 m Wand sind das 0,5 m — also mitten im
+           * Boden des Behaelters. Rapier drueckt die Durchdringung mit voller
+           * Wucht auseinander, und weil der Container ein beweglicher Koerper
+           * ist, schoss er quer ueber den Platz (Befund 12.09.2026: „der
+           * Radlader verschiebt jetzt immer wieder Container").
+           *
+           * Und an die Stelle, an der der Behaelter JETZT steht, nicht an die
+           * aus der Aufbauliste — er laesst sich ja verschieben.
+           */
+          const ort = this.getMuldenOrt?.(mulde.id) ?? { x: mulde.x, z: mulde.z };
+          const streu = Math.min(1.2, mulde.size[0] - 1.4);
           it.body.setTranslation(
             {
-              x: mulde.x + (Math.random() - 0.5) * 1.2,
-              y: mulde.size[2] - 0.6,
-              z: mulde.z + (Math.random() - 0.5) * 1.2,
+              x: ort.x + (Math.random() - 0.5) * streu,
+              y: mulde.size[2] + 0.9,
+              z: ort.z + (Math.random() - 0.5) * streu,
             },
             true
           );
@@ -1334,6 +1354,10 @@ export class StaffManager {
       const [zx, zz] = schiebeZiel(p.x, p.z, ex.x, ex.z);
       if (Math.hypot(zx - ex.x, zz - ex.z) < SCHIEB_MIN_M) continue;
       if (hitsObstacle(zx, zz, 0.8)) continue;
+      // Und es darf nicht in einem Behaelter enden: Absetzcontainer stehen in
+      // keiner Hindernisliste, weil sie sich bewegen — ohne diese Pruefung
+      // schoebe er das Stueck mitsamt Container vor sich her.
+      if (StaffManager.inZone(zx, zz)) continue;
       const [ax, az] = anstellPunkt(p.x, p.z, ex.x, ex.z);
       if (!this.reachable(ax, az)) continue;
       // Nicht durch den Haufen pfluegen: Der Anstellpunkt muss anfahrbar sein
@@ -1382,7 +1406,21 @@ export class StaffManager {
    * Meterschritten gegen die festen Bauten. Was nur um Ecken erreichbar wäre,
    * lässt er stehen — dafür ist der Bagger da.
    */
+  /**
+   * Sperrgebiet fuer Lambert: der Arbeitsbereich des Baggers.
+   *
+   * Ansage 12.09.2026: „der Lambert soll erst mal nicht in der Abladezone
+   * fahren koennen, sondern nur von der Ostseite kommen koennen, also rechts
+   * von den Containern und der Presse, weil der macht eigentlich nur
+   * Scheisse." Er hatte dort nichts zu suchen und stand staendig im Weg oder
+   * schob etwas an, das gerade gegriffen werden sollte.
+   */
+  private static imBaggerrevier(x: number, z: number): boolean {
+    return x > -6.0 && z < 2.0 && z > -29.0;
+  }
+
   private reachable(tx: number, tz: number): boolean {
+    if (StaffManager.imBaggerrevier(tx, tz)) return false;
     const from = this.lambert.group.position;
     const dx = tx - from.x;
     const dz = tz - from.z;

@@ -234,7 +234,16 @@ export class Excavator {
   * 12.09.2026). Von hier liegt die Presse bei +180°, der Stahlcontainer bei
   * +93°, der Mischschrott bei −116°.
   */
-  readonly position = new THREE.Vector3(-4, 0, -18.5);
+  /*
+   * So dicht an den Stahlcontainern, wie der Arm es zulaesst.
+   *
+   * Gewuenscht waren 20 bis 50 cm Luft (12.09.2026). Das geht nicht: Der Arm
+   * hat einen Mindestradius von 4,0 m — naeher kommt die Krallenspitze gar
+   * nicht auf den Boden. Bei 0,5 m Abstand stuende die Maschine am Container
+   * und koennte ihn nicht befuellen. 4,0 m ist die Untergrenze, und genau
+   * darauf steht sie jetzt.
+   */
+  readonly position = new THREE.Vector3(-2.0, 0, -19.2);
   heading = 0; // rad, 0 = +Z
   cabYaw = 0;
   boomAngle = THREE.MathUtils.degToRad(35);
@@ -719,8 +728,14 @@ export class Excavator {
   }
   /** Abstützpratzen: eingefahren (0) bis ausgefahren (1), Taste O */
   private outriggerGroups: THREE.Group[] = [];
-  private outriggerDown = 1;
-  private outriggerTarget = 1;
+  /*
+   * Eingefahren beim Start (Ansage 12.09.2026: „die Stützen sollen immer oben
+   * sein, damit man grade am Anfang des Spiels direkt losfahren kann"). Auf
+   * ausgefahrenen Stützen ist das Fahren gesperrt — wer neu anfängt, drückte
+   * sonst auf Gas und verstand nicht, warum nichts passiert.
+   */
+  private outriggerDown = 0;
+  private outriggerTarget = 0;
   /** true, solange der Spieler auf Stützen zu fahren versucht (für HUD/Ton) */
   blockedByOutriggers = false;
   /** Aufbockhöhe: so weit hebt sich die Maschine auf den Stützen (m) */
@@ -969,12 +984,23 @@ export class Excavator {
       [-1, -1],
       [1, -1],
     ] as const) {
-      // Ansatz am Unterwagen → Fußpunkt schräg nach außen unten
-      const from = new THREE.Vector3(sx * 1.05, 0.95, sz * 1.5);
-      const to = new THREE.Vector3(sx * 2.35, 0.62, sz * 2.5);
+      /*
+       * Kurze Pratzen, gerade zur Seite (Ansage 12.09.2026: „einfach nur vom
+       * Bagger links und rechts weg … die duerften da keinen Meter weit
+       * rausgucken, sondern eher fuenfzig Zentimeter oder dreissig").
+       *
+       * Vorher spreizten sie sich diagonal nach aussen-hinten und standen
+       * 1,3 m ueber den Unterwagen hinaus — auf einem Platz, auf dem jetzt
+       * alles dicht beieinandersteht, war das die Maschine mit dem groessten
+       * Fussabdruck. Jetzt sind es massive Anbauteile: quer heraus, 45 cm
+       * ueber die Kante, und sie folgen der Laengsachse statt ins Kreuz zu
+       * gehen.
+       */
+      const from = new THREE.Vector3(sx * 1.05, 0.85, sz * 1.35);
+      const to = new THREE.Vector3(sx * 1.8, 0.7, sz * 1.35);
       const dir = to.clone().sub(from);
       const len = dir.length();
-      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.26, len), darkMat);
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.34, len + 0.3), darkMat);
       arm.position.copy(from).addScaledVector(dir.clone().normalize(), len / 2);
       arm.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir.clone().normalize());
       arm.castShadow = true;
@@ -984,14 +1010,21 @@ export class Excavator {
       foot.position.set(to.x, 0, to.z);
       this.root.add(foot);
       this.outriggerGroups.push(foot);
-      const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.5, 10), frameMat);
+      /*
+       * Eckig statt rund (Ansage 12.09.2026: „nicht so runde Stuetzen,
+       * sondern schmale herausstehende Stuetzen mit eckigen Bodenplatten").
+       * Ein Zylinder liest sich als Hydraulikstempel; hier soll es nach
+       * angeschweisstem Stahl aussehen, also ein schlankes Kastenprofil, das
+       * nach unten leicht zulaeuft.
+       */
+      const cyl = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.5, 0.26), frameMat);
       cyl.position.y = 0.42;
       cyl.castShadow = true;
       foot.add(cyl);
-      const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.35, 8), rodMat);
+      const rod = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.35, 0.17), rodMat);
       rod.position.y = 0.14;
       foot.add(rod);
-      const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.38, 0.14, 12), darkMat);
+      const pad = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.14, 0.62), darkMat);
       pad.position.y = 0.07;
       pad.castShadow = true;
       foot.add(pad);
