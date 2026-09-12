@@ -90,6 +90,62 @@ export class WheelLoader {
     );
     beacon.position.set(0.42, 2.58, -0.6);
     rear.add(beacon);
+
+    /*
+     * Was eine Arbeitsmaschine von einem gelben Kasten unterscheidet, haengt
+     * aussen dran: Auspuff, Spiegel, Arbeitsscheinwerfer, Aufstieg. Aus zehn
+     * Metern sieht man genau das — und ohne es wirkt die Maschine wie ein
+     * Modell, nicht wie ein Geraet, mit dem jemand arbeitet.
+     */
+    const auspuff = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.75, 8), dark);
+    auspuff.position.set(0.5, 1.42, -1.95);
+    auspuff.castShadow = true;
+    rear.add(auspuff);
+    const haube = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.06, 8), steel);
+    haube.position.set(0.5, 1.83, -1.95);
+    rear.add(haube);
+    // Ansaugvorfilter auf der anderen Seite — beim Radlader immer paarweise
+    const filter = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.4, 8), steel);
+    filter.position.set(-0.5, 1.25, -1.95);
+    rear.add(filter);
+    // Spiegel auf Auslegern, links und rechts an der Kabine
+    for (const sx of [-1, 1]) {
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.04, 0.04), dark);
+      arm.position.set(sx * 0.74, 2.36, -0.15);
+      rear.add(arm);
+      const spiegel = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.3, 0.14), dark);
+      spiegel.position.set(sx * 0.88, 2.22, -0.15);
+      rear.add(spiegel);
+    }
+    // Arbeitsscheinwerfer: zwei nach vorn, einer nach hinten
+    const lampe = new THREE.MeshStandardMaterial({
+      color: 0xf2eddc,
+      roughness: 0.25,
+      emissive: 0x2a2418,
+    });
+    for (const sx of [-0.42, 0.42]) {
+      const l = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.12, 0.08), lampe);
+      l.position.set(sx, 2.42, -0.04);
+      rear.add(l);
+    }
+    const rueck = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.12, 0.08), lampe);
+    rueck.position.set(0, 2.42, -1.18);
+    rear.add(rueck);
+    // Aufstieg zur Kabine: drei Tritte und ein Handlauf
+    for (let i = 0; i < 3; i++) {
+      const tritt = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.05, 0.22), dark);
+      tritt.position.set(-0.8, 0.55 + i * 0.32, -0.35);
+      rear.add(tritt);
+    }
+    const handlauf = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.15, 6), steel);
+    handlauf.position.set(-0.68, 1.42, -0.02);
+    rear.add(handlauf);
+    // Kotflügel über den Hinterrädern
+    for (const sx of [-1, 1]) {
+      const kf = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.07, 1.35), yellow);
+      kf.position.set(sx * 0.72, 1.06, -1.15);
+      rear.add(kf);
+    }
     this.group.add(rear);
 
     // --- Vorderwagen: dreht am Knickgelenk ---
@@ -101,6 +157,11 @@ export class WheelLoader {
     const joint = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.7, 10), steel);
     joint.position.set(0, 0.85, 0);
     this.front.add(joint);
+    for (const sx of [-1, 1]) {
+      const kf = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.07, 1.3), yellow);
+      kf.position.set(sx * 0.72, 1.06, 0.72);
+      this.front.add(kf);
+    }
 
     // Hubarm und Schaufel hängen am Vorderwagen
     this.armPivot.position.set(0, 0.95, 1.1);
@@ -128,6 +189,15 @@ export class WheelLoader {
     const edge = new THREE.Mesh(new THREE.BoxGeometry(1.72, 0.06, 0.16), dark);
     edge.position.set(0, -0.07, 0.72);
     bucket.add(edge);
+    // Zähne an der Schneide. Eine glatte Kante gehört an eine Schaufel für
+    // Sand; wer Schrott schiebt, fährt Zähne — und man erkennt die Maschine
+    // schon daran, was vorne dran ist.
+    for (let i = 0; i < 5; i++) {
+      const zahn = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.07, 0.2), steel);
+      zahn.position.set(-0.68 + i * 0.34, -0.07, 0.88);
+      zahn.castShadow = true;
+      bucket.add(zahn);
+    }
     for (const side of [-1, 1]) {
       const wall = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.5, 0.72), steel);
       wall.position.set(side * 0.85, 0.18, 0.34);

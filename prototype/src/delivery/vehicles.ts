@@ -504,6 +504,8 @@ class DeliveryVehicle {
       // der klassische Rungenaufbau, mal ein geschlossener Kasten. Gewerbe und
       // Privat bleiben flach — sie liefern kein Schuettgut.
       bodyStyle: this.bodyStyleName,
+      // Der Lackton haengt am Halter: Derselbe Haendler faehrt denselben Wagen
+      halter: this.customer?.name,
       group: this.group,
       bedGroup: this.bedGroup,
       world: this.world,
