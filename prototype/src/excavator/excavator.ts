@@ -13,7 +13,9 @@ import {
   CLAW_SEGMENTS,
   schalenGeometrie,
   rippenGeometrie,
+  flanschGeometrie,
   CLAW_SHELL_HALF,
+  HAUT_RUECKSPRUNG,
   CLAW_BEND_KUM,
   clawPoint,
   naechsteSpreizung,
@@ -519,8 +521,16 @@ export class Excavator {
       metalness: 0.55,
       side: THREE.DoubleSide, // Innenseite ist bei geöffneter Spinne sichtbar
     });
+    /*
+     * Nur eine Spur dunkler als die Schale.
+     *
+     * Im direkten Vergleich mit der Vorlage (12.09.2026) faellt auf: Dort ist
+     * die ganze Maschine ein Grau — Kopf, Schalen, Kanten, Zaehne. Mit einem
+     * deutlich dunkleren Kantenmaterial zerfiel der Greifer in schwarze
+     * Einzelteile, und die Zaehne stachen als Pfeile heraus.
+     */
     const edgeMat = new THREE.MeshStandardMaterial({
-      color: 0x4a5158,
+      color: 0x6a7278,
       roughness: 0.45,
       metalness: 0.7,
     });
@@ -648,19 +658,19 @@ export class Excavator {
      * — also gut die Haelfte. Und er ist hoch, nicht flach. Genau daran
      * erkennt man die Maschine: schlanker Turm ueber einem weiten Zinkenkreis.
      */
-    const kopf = new THREE.Mesh(new THREE.CylinderGeometry(0.40, 0.27, 0.62, 6), shellMat);
-    kopf.position.y = -0.60;
+    const kopf = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.50, 0.86, 6), shellMat);
+    kopf.position.y = -0.50;
     kopf.rotation.y = Math.PI / 6;
     kopf.castShadow = true;
     this.grappleGroup.add(kopf);
     // Schulter, an der die Zylinder haengen — sie kragt ueber den Kopf hinaus
-    const schulter = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.44, 0.16, 6), edgeMat);
-    schulter.position.y = -0.40;
+    const schulter = new THREE.Mesh(new THREE.CylinderGeometry(0.70, 0.62, 0.20, 6), shellMat);
+    schulter.position.y = -0.26;
     schulter.rotation.y = Math.PI / 6;
     schulter.castShadow = true;
     this.grappleGroup.add(schulter);
     // Fuss des Kopfes, auf dem der Gelenkring sitzt
-    const fuss = new THREE.Mesh(new THREE.CylinderGeometry(0.30, 0.34, 0.2, 6), edgeMat);
+    const fuss = new THREE.Mesh(new THREE.CylinderGeometry(0.50, 0.56, 0.24, 6), shellMat);
     fuss.position.y = -0.88;
     fuss.rotation.y = Math.PI / 6;
     this.grappleGroup.add(fuss);
@@ -696,7 +706,12 @@ export class Excavator {
        * wie bei einem echten Mehrschalengreifer: Sie sitzt fest am Gelenk, und
        * bewegt wird nur das Gelenk selbst.
        */
-      const schale = new THREE.Mesh(schalenGeometrie(), shellMat);
+      // Die Haut liegt hinter der Aussenkante der Wangen zurueck — dadurch
+      // steht das Blech vor und die Schale bekommt ihr Profil.
+      const schale = new THREE.Mesh(
+        schalenGeometrie(0, CLAW_SHELL_HALF, -HAUT_RUECKSPRUNG),
+        shellMat
+      );
       schale.castShadow = true;
       schale.receiveShadow = true;
       pivot.add(schale);
@@ -710,12 +725,25 @@ export class Excavator {
        * untersten Stationen.
        */
       // Abgesetzte Schneidkante am unteren Drittel
-      const schneide = new THREE.Mesh(schalenGeometrie(5), edgeMat);
+      const schneide = new THREE.Mesh(schalenGeometrie(5, CLAW_SHELL_HALF, -HAUT_RUECKSPRUNG), edgeMat);
       schneide.scale.set(1.012, 1, 1.012);
       pivot.add(schneide);
       // Erhabener Steg ueber den Ruecken — das Erkennungszeichen eines Gussteils
       const rippe = new THREE.Mesh(rippenGeometrie(), edgeMat);
       pivot.add(rippe);
+      /*
+       * Seitenflansche an beiden Kanten der Schale.
+       *
+       * Auf der Vorlage steht jede Schale nicht als glattes Blech da, sondern
+       * als Profil: Die Raender sind dicke, erhabene Wangen, die Mitte liegt
+       * dazwischen zurueck. Das ist der Unterschied zwischen einem Blech und
+       * einem Gussteil — und der Grund, warum die echte Schale Kanten hat, an
+       * denen sich Licht faengt.
+       */
+      for (const seite of [-1, 1]) {
+        const flansch = new THREE.Mesh(flanschGeometrie(seite), edgeMat);
+        pivot.add(flansch);
+      }
       /*
        * Spitzer Verschleisszahn an der Schalenspitze (Vorlage 12.09.2026).
        *
@@ -731,7 +759,7 @@ export class Excavator {
        * sichtbar schmaler als er — sie sitzt vorn wie ein aufgeschweisster
        * Zahn.
        */
-      const zahn = new THREE.Mesh(new THREE.ConeGeometry(0.075, 0.42, 4), edgeMat);
+      const zahn = new THREE.Mesh(new THREE.ConeGeometry(0.115, 0.16, 4), shellMat);
       /*
        * `clawPoint` liefert Weltkoordinaten der Spinne, das Gelenk hat seine
        * eigenen. Umrechnung: y minus Ringhoehe, z minus Ringradius. Beim
@@ -751,7 +779,7 @@ export class Excavator {
        * aussen statt in Laufrichtung und schwebte sichtbar neben der Schale.
        */
       const zahnTh = CLAW_BEND_KUM[CLAW_SEGMENTS - 1] ?? 0;
-      const zahnHalb = 0.21; // halbe Kegellaenge
+      const zahnHalb = 0.08; // halbe Kegellaenge
       zahn.position.set(
         0,
         zahnP.y - CLAW_RING_Y - zahnHalb * Math.cos(zahnTh),

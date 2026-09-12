@@ -15,7 +15,7 @@ export const CLAW_RING_R = 0.82;
 /** Unterkante Traverse, gemessen ab Kardangelenk */
 export const CLAW_RING_Y = -0.9;
 /** Länge eines Krallensegments */
-export const CLAW_SEG_LEN = 0.2786;
+export const CLAW_SEG_LEN = 0.2140;
 /** Segmente je Kralle */
 export const CLAW_SEGMENTS = 8;
 /**
@@ -26,26 +26,29 @@ export const CLAW_SEGMENTS = 8;
  * (Vorlage 12.09.2026, Rotobec-Mehrschalengreifer). Oben läuft die Schale fast
  * senkrecht, unten hakt sie scharf nach innen:
  *
- *   Station        1    2    3    4    5    6    7    8
- *   gleichmäßig   0°   8°  16°  24°  31°  39°  47°  55°
- *   so            0°   4°   9°  16°  24°  33°  43°  55°
+ *   Station   1    2    3    4    5    6    7    8
+ *   Winkel   0°   6°  13°  22°  33°  46°  61°  78°
  *
- * Der Endwinkel ist nicht frei wählbar, er bestimmt die Bauform. Am Foto des
- * Sennebogen-Greifers nachgemessen ist die Schale rund 1,2-mal so tief wie der
- * Gelenkring breit. Das Verhältnis hängt allein an diesem Profil:
+ * Der Endwinkel bestimmt die Bauform, und zwar allein. Gemessen wurde er am
+ * Foto des Sennebogen-Greifers, im direkten Vergleich mit dem gebauten Modell
+ * nebeneinander — aus dem Gedächtnis ging es dreimal daneben. Das Maß ist die
+ * Breite der offenen Schalen geteilt durch ihre Tiefe, auf der Vorlage rund 2,8:
  *
- *   Endwinkel   45°    50°    55°    60°    65°    70°    80°
- *   Tiefe/Ring  1,48   1,32   1,19   1,08   0,99   0,91   0,77
+ *   Endwinkel      55°    70°    78°    85°    95°   115°
+ *   Breite/Tiefe  1,94   2,55   2,93   3,23   3,64   4,15
+ *   Tiefe/Ring    1,19   0,91   0,80   0,72   0,62   0,47
  *
- * 55° trifft die Vorlage. Vorher standen hier 80° — daher war die Spinne
- * gedrungen statt schlank (Befund 12.09.2026: „wie im Bild, gerne größer").
+ * Zwischendurch standen hier 55°. Das war ein Fehlschluss aus dem ersten Foto
+ * (Rotobec): Dessen Zinken sind lang und schlank, die Schalen des Sennebogen
+ * dagegen breit, rund und gedrungen — zwei verschiedene Bauarten. Maßgeblich
+ * ist die zweite.
  *
  * Die Zahlen sind so skaliert, dass die Spitzen bei geschlossener Spinne genau
  * auf der Achse zusammenkommen. Wer daran dreht, muss das nachrechnen — sonst
  * laufen die Schalen übereinander oder es bleibt ein Loch.
  */
 const BEND_PROFIL = Array.from({ length: CLAW_SEGMENTS }, (_, i) =>
-  0.22855 * (0.3 + 0.7 * (i / (CLAW_SEGMENTS - 1)))
+  0.32413 * (0.3 + 0.7 * (i / (CLAW_SEGMENTS - 1)))
 );
 /** Aufsummierte Krümmung bis Station `i`. */
 export const CLAW_BEND_KUM: number[] = BEND_PROFIL.reduce<number[]>(
@@ -57,16 +60,16 @@ export const CLAW_COUNT = 5;
 /**
  * Spreizung der ganz offenen Spinne (rad).
  *
- * Von 1,25 auf 0,94 zurückgenommen, als die Schale länger wurde. Die beiden
- * hängen zusammen: Eine längere, weniger eingerollte Schale schwenkt beim
- * Öffnen viel weiter aus. Mit 1,25 hätte dieselbe Spinne 4,83 m aufgerissen —
- * dann müsste jeder Behälter auf dem Platz 5,6 m messen, und von den sechs
- * Absetzcontainern passten nur noch vier neben den Bagger.
+ * Sie hängt am Krümmungsprofil: Je stärker die Schale eingerollt ist, desto
+ * weiter muss sie schwenken, um dieselbe Weite zu öffnen. Mit dem 78°-Profil:
  *
- *   Spreizung     0,85   0,90   0,94   1,00   1,25
- *   Öffnungsweite 3,49   3,68   3,83   4,04   4,83  (m)
+ *   Spreizung     1,20   1,30   1,35   1,40
+ *   Öffnungsweite 3,48   3,72   3,83   3,94  (m)
+ *
+ * 1,30 gewählt: 3,72 m Weite. Die Behälter auf dem Platz messen 4,7 m licht,
+ * das reicht mit Luft.
  */
-export const CLAW_OPEN_SPLAY = 0.94;
+export const CLAW_OPEN_SPLAY = 1.30;
 
 /**
  * Halbe Winkelbreite einer Schale (rad).
@@ -143,12 +146,49 @@ export function rippenGeometrie(): THREE.BufferGeometry {
   return schalenGeometrie(0, CLAW_SHELL_HALF * 0.26, 0.075);
 }
 
+/**
+ * Seitenwange an einer Kante der Schale.
+ *
+ * `seite` ist −1 oder +1. Die Wange ist ein schmaler Streifen genau auf der
+ * Kante und steht ein Stueck weiter aussen als die Schale — daraus wird ein
+ * Profil, das Licht faengt, statt einer glatten Flaeche.
+ */
+/**
+ * Seitenwange einer Schale — das tragende Blech, nicht nur eine Kante.
+ *
+ * Die Schale ist kein Spaltstueck einer Glocke, sondern ein geschweisster
+ * Trog: zwei ebene Wangen, dazwischen eine Haut (Befund 12.09.2026: „ich
+ * glaub dein Ansatz ist falsch"). Die Wange steht darum nicht als schmale
+ * Rippe auf der Flaeche, sondern reicht als tiefes Blech nach innen — 34 cm
+ * gegenueber 8,5 cm Hautstaerke. Genau daran sieht man von der Seite, dass da
+ * Blech steht und nicht eine gewoelbte Flaeche.
+ */
+export function flanschGeometrie(seite: number): THREE.BufferGeometry {
+  return schalenGeometrie(0, 0.055, 0.03, CLAW_SHELL_HALF * seite, WANGEN_TIEFE);
+}
+
+/** Wie tief die Wangen nach innen reichen (m). */
+export const WANGEN_TIEFE = 0.34;
+/** Wie weit die Haut hinter der Aussenkante der Wangen zurueckliegt (m). */
+export const HAUT_RUECKSPRUNG = 0.1;
+
 export function schalenGeometrie(
   vonStation = 0,
   halbWinkel = CLAW_SHELL_HALF,
-  hinaus = 0
+  hinaus = 0,
+  mitte = 0,
+  dicke = CLAW_SHELL_DICKE
 ): THREE.BufferGeometry {
-  const BOGEN = 10; // Unterteilungen über die Breite
+  /*
+   * Fünf Facetten über die Breite, nicht zehn.
+   *
+   * Der ganze Platz ist flächig gebaut — Bäume, Fahrzeuge, Container, alles
+   * hat sichtbare Facetten. Eine fein unterteilte, weich schattierte Schale
+   * liest sich dazwischen wie ein Körper aus einem anderen Spiel: aufgeblasen
+   * und organisch statt gekantet (Befund 12.09.2026: „so sieht doch keine
+   * Spinne aus"). Wenige Facetten und harte Kanten machen daraus Blech.
+   */
+  const BOGEN = 5;
   const stationen: Array<{ y: number; r: number }> = [];
   let y = 0;
   let z = 0;
@@ -176,10 +216,10 @@ export function schalenGeometrie(
   for (const seite of [0, 1]) {
     const lagen: number[][] = [];
     for (const st of teil) {
-      const r = Math.max(0.012, st.r + hinaus - seite * CLAW_SHELL_DICKE);
+      const r = Math.max(0.012, st.r + hinaus - seite * dicke);
       const reihe: number[] = [];
       for (let j = 0; j <= BOGEN; j++) {
-        const u = -halbWinkel + (j / BOGEN) * 2 * halbWinkel;
+        const u = mitte - halbWinkel + (j / BOGEN) * 2 * halbWinkel;
         reihe.push(punkt(r, u, st.y));
       }
       lagen.push(reihe);
@@ -210,8 +250,17 @@ export function schalenGeometrie(
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
   geo.setIndex(idx);
-  geo.computeVertexNormals();
-  return geo;
+  /*
+   * Ohne Index heisst: jede Facette hat ihre eigenen Ecken und damit ihre
+   * eigene Normale. Genau das gibt die harten Kanten. Mit gemeinsamen Ecken
+   * mittelt `computeVertexNormals` ueber die Nachbarflaechen und glaettet die
+   * Schale zu einer weichen Wölbung — das war der Grund, warum sie aussah wie
+   * ein Blütenblatt.
+   */
+  const flach = geo.toNonIndexed();
+  geo.dispose();
+  flach.computeVertexNormals();
+  return flach;
 }
 
 /**
