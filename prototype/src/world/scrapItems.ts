@@ -618,6 +618,36 @@ export class ItemManager {
   }
 
   /** Teil aus Form-Spec erzeugen (Haufen, Ladung, Save-Restore). */
+  /**
+   * Bau aus dem Katalog nachtragen.
+   *
+   * Ein Spielstand speichert die Form eines Teils, wie sie beim Anlegen war —
+   * und aeltere Staende kennen das Feld `bau` noch nicht. Ohne diesen Nachtrag
+   * blieben auf jedem vorhandenen Platz alle Teile Quader, egal wie viele
+   * Bauten es gibt (Befund 12.09.2026: "ich seh sie nicht auf dem iPad").
+   *
+   * Gesucht wird ueber Fraktion, Masse, Form und Masse — genau die vier Werte,
+   * mit denen das Teil einmal aus dem Katalog gezogen wurde. Findet sich nichts,
+   * bleibt es der Grundkoerper; falsch wird dadurch nichts.
+   */
+  private static bauKarte: Map<string, BauId> | null = null;
+
+  private static bauFuer(materialId: string, massKg: number, shape: ScrapShape): BauId | undefined {
+    if (!ItemManager.bauKarte) {
+      const karte = new Map<string, BauId>();
+      for (const liste of [SPECS, BIG_SPECS, HUGE_SPECS]) {
+        for (const sp of liste) {
+          if (!sp.bau) continue;
+          karte.set(`${sp.materialId}|${sp.massKg}|${sp.kind}|${sp.dims.join(",")}`, sp.bau);
+        }
+      }
+      ItemManager.bauKarte = karte;
+    }
+    return ItemManager.bauKarte.get(
+      `${materialId}|${massKg}|${shape.kind}|${shape.dims.join(",")}`
+    );
+  }
+
   spawnScrap(
     materialId: string,
     massKg: number,
@@ -630,6 +660,11 @@ export class ItemManager {
      * darum Grundfarbe weiss und `vertexColors`. Nur so bleibt ein Objekt aus
      * zwoelf Bauteilen ein einziger Zeichenruf mit einem einzigen Material.
      */
+    // Aus einem alten Spielstand geladen? Dann fehlt der Bau — nachtragen.
+    if (!shape.bau) {
+      const nachgetragen = ItemManager.bauFuer(materialId, massKg, shape);
+      if (nachgetragen) shape = { ...shape, bau: nachgetragen };
+    }
     const material = new THREE.MeshStandardMaterial({
       color: shape.bau ? 0xffffff : shape.color,
       vertexColors: !!shape.bau,
