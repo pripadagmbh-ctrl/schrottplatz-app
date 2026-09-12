@@ -1,5 +1,5 @@
 import { getMaterial } from "../materials/catalog";
-import { euroIndicator } from "../materials/purity";
+import { euroIndicator, masseText, preisProTonne } from "../materials/purity";
 import type { ScrapItem } from "../world/scrapItems";
 import type { AmpelState } from "../world/containers";
 
@@ -16,6 +16,29 @@ const GROSS_AB_KG = 60;
 /** So viele Namen hoechstens — danach wird zusammengefasst. */
 const GROSS_MAX = 3;
 
+/**
+ * Woraus das Stueck vorwiegend besteht.
+ *
+ * Ansage 12.09.2026: „Bei Spinne sollte immer das Hauptmaterial wie Alu, VA
+ * etc. mit angezeigt werden." Bei sortenreinem Schrott ist das die Fraktion
+ * selbst; bei einem Verbundteil die groesste Fraktion darin — sonst stuende da
+ * nur „Mischschrott", und man wuesste nicht, ob man eine Waschmaschine oder
+ * einen Kupfermotor in der Schale hat.
+ */
+function hauptMaterial(item: ScrapItem): string {
+  const eigen = getMaterial(item.materialId).name;
+  if (!item.composition || item.composition.length === 0) return eigen;
+  let groesster = item.composition[0];
+  let summe = 0;
+  for (const c of item.composition) {
+    summe += c.massKg;
+    if (c.massKg > groesster.massKg) groesster = c;
+  }
+  if (groesster.materialId === item.materialId || summe <= 0) return eigen;
+  const anteil = Math.round((groesster.massKg / summe) * 100);
+  return `${eigen} · ${anteil} % ${getMaterial(groesster.materialId).name}`;
+}
+
 export class Hud {
   private gripEl = document.getElementById("gripinfo")!;
   private moneyEl = document.getElementById("money")!;
@@ -30,8 +53,9 @@ export class Hud {
     const mat = getMaterial(item.materialId);
     // Der Name zuerst: Man greift einen Kuehlschrank, nicht "Stahlschrott".
     const name = item.shape?.name;
-    const kopf = name ? `${name} · ${mat.name}` : mat.name;
-    this.gripEl.textContent = `▼ ${kopf} · ${item.massKg.toFixed(0)} kg · ${euroIndicator(mat)}`;
+    const kopf = name ? `${name} · ${hauptMaterial(item)}` : hauptMaterial(item);
+    this.gripEl.textContent =
+      `▼ ${kopf} · ${masseText(item.massKg)} · ${preisProTonne(mat)} ${euroIndicator(mat)}`;
   }
 
   /**
@@ -61,7 +85,7 @@ export class Hud {
     ];
     const gezeigt = parts.slice(0, GROSS_MAX + 2);
     if (parts.length > gezeigt.length) gezeigt.push(`+${parts.length - gezeigt.length} weitere`);
-    let text = `Greifer: ${gezeigt.join(", ")} · ${total.toFixed(0)} kg`;
+    let text = `Greifer: ${gezeigt.join(", ")} · ${masseText(total)}`;
     if (hover) {
       // Zielzone unter dem Greifer samt Bewertung — nicht das Material selbst
       const verdict =
@@ -113,7 +137,7 @@ export class Hud {
       return;
     }
     const balken = "█".repeat(Math.round(p / 10)) + "░".repeat(10 - Math.round(p / 10));
-    el.textContent = `${ziel}: ${Math.round(kg)} kg · ${balken} ${p} % sortenrein`;
+    el.textContent = `${ziel}: ${masseText(kg)} · ${balken} ${p} % sortenrein`;
     // Ab 90 % lohnt das Abfahren, darunter drückt die Reinheit den Preis
     el.style.color = p >= 90 ? "#7ec96a" : p >= 65 ? "#f0d060" : "#e08a5a";
   }

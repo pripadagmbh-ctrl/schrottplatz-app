@@ -26,6 +26,24 @@ export function containerValue(
   return contentKg * fraction.sellPricePerKg * purity * purity;
 }
 
+/**
+ * Preis als Zahl, die im Handel benutzt wird: **Euro je Tonne**.
+ *
+ * Intern rechnet alles in Euro je Kilogramm, weil die Massen der Teile in
+ * Kilogramm stehen. Nach aussen ist das die falsche Einheit: Schrott wird in
+ * Tonnen gehandelt, und „0,25 €/kg" liest niemand, der mit dem Zeug zu tun hat
+ * (Ansage 12.09.2026: „bitte mache Angaben immer pro Tonne").
+ */
+export function preisProTonne(mat: MaterialClass): string {
+  const t = Math.round(mat.sellPricePerKg * 1000);
+  return t < 0 ? `${t} €/t` : `${t} €/t`;
+}
+
+/** Masse lesbar: unter einer Tonne in Kilogramm, darüber in Tonnen. */
+export function masseText(kg: number): string {
+  return kg >= 1000 ? `${(kg / 1000).toFixed(kg >= 10000 ? 0 : 1)} t` : `${Math.round(kg)} kg`;
+}
+
 /** €-Indikator fürs Griff-Info-HUD (Briefing Kap. 14): 1–4 €-Symbole bzw. „Gebühr". */
 export function euroIndicator(mat: MaterialClass): string {
   if (mat.sellPricePerKg <= 0) return "Gebühr";

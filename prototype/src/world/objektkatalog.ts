@@ -48,6 +48,8 @@ export interface PileSpec {
   zusammensetzung?: Anteil[];
   /** Faellt beim Zerquetschen in seine Bestandteile (Kabeltrommel, Lattenrost). */
   trennbar?: boolean;
+  /** Trennbar, aber nur mit Werkzeug — Arbeit fuer Lambert, nicht fuer die Spinne. */
+  nurWerkzeug?: boolean;
 }
 
 /* ------------------------------------------------------------------------ */
@@ -109,6 +111,9 @@ export const KATALOG_SPECS: PileSpec[] = [
   // --- Fahrzeugschrott ---
   { materialId: "tires", massKg: 45, kind: "cyl", dims: [0.32, 1.0], bau: "stapel", name: "Reifenstapel (Pkw)" },
   { materialId: "tires", massKg: 120, kind: "cyl", dims: [0.55, 1.2], bau: "stapel", name: "Reifenstapel (LKW)" },
+  // Alufelge statt Stahlfelge: Das lohnt zu trennen — aber nicht mit der
+  // Spinne, sondern mit Flex oder Abdrueckmaschine (Ansage 12.09.2026).
+  { materialId: "mixed", massKg: 24, kind: "cyl", dims: [0.34, 0.24], name: "Rad mit Alufelge", trennbar: true, nurWerkzeug: true, zusammensetzung: [{ materialId: "tires", anteil: 0.58 }, { materialId: "alu", anteil: 0.42 }] },
   { materialId: "steel", massKg: 95, kind: "cyl", dims: [0.28, 1.1], bau: "stapel", name: "Felgenstapel (Stahl)" },
   { materialId: "steel", massKg: 190, kind: "box", dims: [0.75, 0.7, 0.8], bau: "motor", name: "Motorblock (V8, ausgebaut)", zusammensetzung: [{ materialId: "steel", anteil: 0.82 }, { materialId: "alu", anteil: 0.14 }, { materialId: "copper", anteil: 0.04 }] },
   { materialId: "alu", massKg: 85, kind: "box", dims: [0.6, 0.65, 0.9], bau: "maschine", name: "Automatikgetriebe" },

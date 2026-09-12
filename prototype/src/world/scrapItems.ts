@@ -40,6 +40,15 @@ export interface ScrapShape {
    */
   name?: string;
   /**
+   * Braucht Werkzeug statt roher Gewalt.
+   *
+   * Manches trennt sich nicht durch Zusammendruecken, sondern nur mit Flex
+   * oder Abdrueckmaschine — eine Alufelge etwa gibt man nicht mit der Spinne
+   * vom Reifen frei, dabei ginge die Felge kaputt (Ansage 12.09.2026). Solche
+   * Stuecke sind Arbeit fuer Lambert, nicht fuer den Bagger.
+   */
+  nurWerkzeug?: boolean;
+  /**
    * Faellt es beim Zerquetschen in seine Bestandteile?
    *
    * Manche Verbundteile trennen sich von selbst, wenn man sie zusammendrueckt
@@ -217,6 +226,7 @@ interface KatalogZusatz {
   name?: string;
   zusammensetzung?: Anteil[];
   trennbar?: boolean;
+  nurWerkzeug?: boolean;
 }
 
 /** Fraktionen ohne metallischen Glanz — Abfall eben. */
@@ -570,6 +580,7 @@ export function randomCargo(
         name: spec.name,
         zusammensetzung: spec.zusammensetzung,
         trennbar: spec.trennbar,
+        nurWerkzeug: spec.nurWerkzeug,
       },
     });
   }
@@ -813,6 +824,7 @@ export class ItemManager {
             name: sp.name,
             zusammensetzung: sp.zusammensetzung,
             trennbar: sp.trennbar,
+            nurWerkzeug: sp.nurWerkzeug,
           });
         }
       }
@@ -846,6 +858,7 @@ export class ItemManager {
           name: shape.name ?? k.name,
           zusammensetzung: shape.zusammensetzung ?? k.zusammensetzung,
           trennbar: shape.trennbar ?? k.trennbar,
+          nurWerkzeug: shape.nurWerkzeug ?? k.nurWerkzeug,
         };
       }
     }
@@ -1093,7 +1106,16 @@ export class ItemManager {
    */
   /** Faellt das Ding beim Zusammendruecken auseinander? */
   istTrennbar(item: ScrapItem): boolean {
-    return !!item.shape?.trennbar && (item.composition?.length ?? 0) >= 2;
+    return (
+      !!item.shape?.trennbar &&
+      !item.shape?.nurWerkzeug &&
+      (item.composition?.length ?? 0) >= 2
+    );
+  }
+
+  /** Trennbar, aber nur mit Werkzeug — Arbeit fuer den Platzwart. */
+  brauchtWerkzeug(item: ScrapItem): boolean {
+    return !!item.shape?.trennbar && !!item.shape?.nurWerkzeug;
   }
 
   isCrushable(item: ScrapItem): boolean {

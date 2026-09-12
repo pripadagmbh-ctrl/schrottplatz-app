@@ -84,3 +84,13 @@ erledigt ist, bekommt den Commit dazu.
       Vorschlag: Der Wert eines Mischschrott-Teils ist die Summe seiner
       Bestandteile, vermindert um einen Abschlag fürs Unsortierte. Dann ist
       Zerlegen nie ein Verlust, nur manchmal wenig Gewinn.
+
+## Personal
+
+- [ ] **Lambert trennt mit Werkzeug** — Flex und Abdrückmaschine. Alles, was
+      `nurWerkzeug` trägt, ist seine Arbeit: Alufelge vom Reifen, später mehr.
+      Er holt das Stück, arbeitet eine Weile daran, und danach liegen die
+      Fraktionen getrennt da. Die Datenseite steht schon (`trennbar` +
+      `nurWerkzeug`, `items.zerlege`), es fehlt sein Arbeitsgang.
+- [ ] **Heinz als Hilfsarbeiter** — zweiter Mann, damit zwei Arbeitsgänge
+      parallel laufen. Ausbaustufe wie Radlader und Bulldozer.

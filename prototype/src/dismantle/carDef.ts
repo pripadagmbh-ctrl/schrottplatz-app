@@ -4,7 +4,7 @@
  * Alle Zahlen Startwerte (SW).
  */
 
-import { type Anteil, fraktionAus } from "../materials/purity";
+import { type Anteil } from "../materials/purity";
 
 export interface PartDef {
   id: string;
@@ -87,19 +87,13 @@ export const CAR_DEF: CarDef = {
         id: `wheel_${i}`,
         name: "Rad",
         /*
-         * Reifen plus Felge ist ein Verbundteil und damit Mischschrott
-         * (Ansage 12.09.2026). Wer die Spinne zudrueckt, sprengt den Reifen
-         * von der Felge — danach liegt beides sortenrein da.
+         * Reifen mit Stahlfelge gehen ungetrennt in die Reifenmulde (Ansage
+         * 12.09.2026: „Reifen muessen nicht zerlegt werden, es sei denn, es
+         * ist ne Alufelge"). Das Trennen lohnt hier auch rechnerisch nicht:
+         * Gemessen brachte ein Rad ungetrennt 160 €/t und zerlegt weniger,
+         * weil die Reifen Entsorgung kosten.
          */
-        materialId: fraktionAus([
-          { materialId: "tires", anteil: 0.7 },
-          { materialId: "steel", anteil: 0.3 },
-        ]),
-        zusammensetzung: [
-          { materialId: "tires", anteil: 0.7 },
-          { materialId: "steel", anteil: 0.3 },
-        ],
-        trennbar: true,
+        materialId: "tires",
         massKg: 25,
         tearSeconds: 1.2,
         grabRadius: 0.5,

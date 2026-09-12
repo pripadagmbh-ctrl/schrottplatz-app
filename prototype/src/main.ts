@@ -474,6 +474,10 @@ async function main(): Promise<void> {
      * quetschbar — es ist ja voll —, aber sehr wohl zu sprengen. Stuende die
      * Pruefung zuerst, kaeme das Zerlegen nie dran.
      */
+    if (it && items.brauchtWerkzeug(it)) {
+      hud.toast(`${it.shape?.name ?? "Das Teil"} braucht Werkzeug — Arbeit für Lambert.`);
+      return false;
+    }
     if (!it || (!items.isCrushable(it) && !items.istTrennbar(it))) return false;
     const p = body.translation();
     const ort = new THREE.Vector3(p.x, p.y, p.z);
