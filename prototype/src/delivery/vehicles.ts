@@ -1,6 +1,11 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
-import { randomCargo, type ItemManager, type ScrapItem } from "../world/scrapItems";
+import {
+  randomCargo,
+  type ItemManager,
+  type ScrapItem,
+  type ScrapShape,
+} from "../world/scrapItems";
 import type { CompositeManager, CarComposite } from "../dismantle/composites";
 import { WEIGH_Z, KAFFEE_THEKE } from "../world/yard";
 import { buildPerson, type PersonParts } from "../world/people";
@@ -13,8 +18,6 @@ const WIEGE_HALT_S = 6;
 const PARK_RUECK_SPEED = 1.6;
 /** So weit darf die Ladung ueber die Bordwand ragen (m). */
 const LADUNG_UEBERSTAND = 0.35;
-/** Hoechster Ausgleichsfaktor, wenn Stuecke wegfallen. */
-const LADUNG_AUSGLEICH_MAX = 2.2;
 /** Oberkante des Flaechenbodens im Ladeflaechen-System. */
 const LADE_BODEN = 0.1;
 /** Rand vorn und hinten, damit nichts ueber die Kante steht. */
@@ -612,6 +615,15 @@ class DeliveryVehicle {
    * dann wird sie für die Fahrt verriegelt. Kinematisch spawnen würde beim
    * Freigeben explodieren.
    */
+  /**
+   * Wie voll die Ladefläche beladen wurde (0..1, Hüllvolumen der Stücke).
+   *
+   * Nach außen sichtbar, weil genau daran die Ansage hängt: „Händler kommen
+   * erst, wenn der Wagen voll beladen ist, sollten aber nie unter 30 %
+   * liegen" (12.09.2026). Ohne Messwert wäre das eine Behauptung.
+   */
+  ladeFuellung = 0;
+
   loadCargo(items: ItemManager, composites: CompositeManager): void {
     this.group.updateWorldMatrix(true, true);
     if (this.isPickup) return; // Abholer kommt leer — der Spieler belädt ihn
@@ -624,65 +636,172 @@ class DeliveryVehicle {
       this.cargo.car.body.setRotation({ x: q.x, y: q.y, z: q.z, w: q.w }, true);
       return;
     }
-    // Händler liefern volle Ladungen mit viel Großteil-Anteil (SW)
-    // Nicht bis unter die Bordwand vollpacken: zu volle Ladungen quollen beim
-    // Kippen über und blieben halb auf der Fläche hängen.
-    // Menge nach Kundschaft: der Privatmann bringt einen Kofferraum voll,
-    // der Händler eine ganze Fuhre.
+    /*
+     * Wie voll ein Wagen ankommt.
+     *
+     * Befund 12.09.2026: „die Schrott-LKW sind viel zu oft zu leer.
+     * Normalerweise kommen Haendler erst, wenn der Wagen voll beladen ist,
+     * sollten aber nie unter 30 % liegen."
+     *
+     * Vorher wurde eine feste Stueckzahl gewuerfelt — zehn bis dreizehn, davon
+     * die Haelfte Grossteile — und danach gepackt. Was nicht passte, fiel weg.
+     * Gemessen landeten so oft nur ein oder zwei Stuecke auf der Flaeche, und
+     * weil die angekuendigte Menge hinterher auf das heruntergeschrieben wird,
+     * was wirklich oben liegt, kam ein Haendler mit 251 kg an statt mit den
+     * gewuerfelten 2,5 bis 9 Tonnen.
+     *
+     * Jetzt wird nicht mehr gewuerfelt, sondern geladen, bis der Wagen voll
+     * ist: Erst ein paar Brocken, dann Nachschub in kleineren Stuecken, bis
+     * der Fuellgrad stimmt. Ein Haendler faehrt nicht mit einem Blech auf der
+     * Pritsche los.
+     */
     const c = this.customer;
     const klein = c?.group === "privat";
-    // Jede vierte große Fuhre bringt ein Schwergewicht — Tank, Fahrerhaus,
+    // Jede vierte grosse Fuhre bringt ein Schwergewicht — Tank, Fahrerhaus,
     // Drehgestell. Dann passt weniger daneben, das ist gewollt.
     const schwer = !klein && !this.sortedMaterial && Math.random() < 0.28;
-    const count = schwer ? 4 : klein ? 5 : this.kind === "kipper" ? 13 : 10;
-    const specs = randomCargo(
-      count,
-      0.5,
-      schwer ? 0.55 : 0,
-      this.sortedMaterial ?? undefined
-    );
-    // Ladung auf die Liefermenge des Kunden bringen. Auf eine Ladefläche
-    // passen nur begrenzt Stücke, also werden sie schwerer statt zahlreicher
-    // — ein Händler bringt eben Brocken, kein Kleinzeug. Der Faktor ist
-    // gedeckelt, damit kein Blech zwei Tonnen wiegt (Design 02.09.2026).
-    if (c) {
-      const summe = specs.reduce((a, sp) => a + sp.massKg, 0);
-      if (summe > 0) {
-        const faktor = THREE.MathUtils.clamp(c.massKg / summe, 0.3, 8);
-        for (const sp of specs) sp.massKg = Math.round(sp.massKg * faktor);
+    /*
+     * Zielfuellung der Ladeflaeche. Der Haendler kommt voll — er faehrt nicht
+     * zweimal fuer dieselbe Strecke. Privatleute bringen einen Kofferraum,
+     * aber auch die nie weniger als knapp ein Drittel: Wer mit fast leerem
+     * Anhaenger vorfaehrt, haette zu Hause bleiben koennen.
+     */
+    const MINDEST_FUELLUNG = 0.3;
+    const zielFuellung = klein
+      ? MINDEST_FUELLUNG + Math.random() * 0.3
+      : c?.group === "gewerbe"
+        ? 0.68 + Math.random() * 0.24
+        : 0.78 + Math.random() * 0.18;
+
+    const halbBreite = BED_HALF_W - 0.08;
+    const nutzLaenge = this.bedLen - 2 * LADE_RAND;
+    const maxHoehe = wandHoehe(this.kind, this.bodyStyleName) + LADUNG_UEBERSTAND;
+    const raum = halbBreite * 2 * nutzLaenge * maxHoehe;
+
+    type Spec = { materialId: string; massKg: number; shape: ScrapShape };
+    let specs: Spec[] = [];
+    let stuecke = [] as ReturnType<typeof stueckMass>[];
+    let plaetze: Array<ReturnType<typeof packeLadung>[number]> = [];
+    let fuellung = 0;
+    /*
+     * Runde fuer Runde nachladen. Die erste Runde bringt die Brocken, jede
+     * weitere kleineres Zeug, das in die Luecken geht — genau so packt man
+     * einen Wagen auch in Wirklichkeit. `packeLadung` sortiert intern
+     * ohnehin gross zuerst, deshalb wird jedes Mal neu gepackt statt
+     * angestueckelt.
+     */
+    let leerlauf = 0;
+    for (let runde = 0; runde < 12 && fuellung < zielFuellung; runde++) {
+      const erste = runde === 0;
+      const nachschub = randomCargo(
+        erste ? (klein ? 4 : 8) : 6,
+        erste ? 0.5 : 0.08,
+        erste && schwer ? 0.55 : 0,
+        this.sortedMaterial ?? undefined
+      );
+      const kandidaten = [...specs, ...nachschub];
+      const st = kandidaten.map((sp) => stueckMass(sp.shape.kind, sp.shape.dims));
+      const pl = packeLadung(st, halbBreite, nutzLaenge, maxHoehe);
+      const liegen = pl.filter(Boolean).length;
+      // Deckel auf die Stueckzahl: Jedes Stueck ist ein eigener Physikkoerper.
+      // Bei sortenreinen Fuhren aus Kleinteilen kamen gemessen 42 auf eine
+      // Flaeche — das fuellt zwar schoen, kostet aber jedes Bild Rechenzeit.
+      if (liegen > 28 && !erste) break;
+      const belegt = st.reduce(
+        (a2, t, i) => a2 + (pl[i] ? t.r * 2 * (t.r * 2) * t.hoehe : 0),
+        0
+      );
+      const neueFuellung = raum > 0 ? belegt / raum : 0;
+      const dazu = neueFuellung - fuellung;
+      specs = kandidaten;
+      stuecke = st;
+      plaetze = pl;
+      fuellung = neueFuellung;
+      /*
+       * Abbrechen erst, wenn zwei Runden hintereinander nichts mehr bringen
+       * UND die Mindestfuellung steht. Mit nur einer Runde Geduld blieb es
+       * gelegentlich bei fuenf Stuecken haengen: Der erste Wurf legte ein
+       * Grossteil quer, und der naechste Nachschub fand zufaellig nichts, was
+       * daneben passte (gemessen: ein Haendler mit 305 kg).
+       */
+      if (!erste && dazu < 0.01) {
+        leerlauf++;
+        if (leerlauf >= 2 && fuellung >= MINDEST_FUELLUNG) break;
+        if (leerlauf >= 5) break;
+      } else {
+        leerlauf = 0;
       }
     }
+
     const bedQuat = new THREE.Quaternion();
     this.bedGroup.getWorldQuaternion(bedQuat);
     /*
-     * Packen wie in eine Kiste: Die Ladung folgt der Flaeche, liegt dicht und
-     * endet knapp ueber der Bordwand. Vorher wurde gewuerfelt, und was keinen
-     * Platz fand, kam auf einen Stapel in der Mitte — daher die Tuerme, die
-     * weit ueber die Bordwand ragten (Befund 11.09.2026).
+     * Gewicht auf die angekuendigte Menge bringen — und zwar an den Stuecken,
+     * die wirklich oben liegen.
+     *
+     * Vorher lief das in zwei Stufen: erst alle Specs auf die Kundenmenge
+     * skalieren, dann das Fehlende der weggefallenen Stuecke auf die
+     * liegenden umlegen. Beide Stufen waren gedeckelt, und beide rechneten
+     * mit Stuecken, die nachher gar nicht auf der Flaeche lagen — gemessen
+     * kam ein Haendler mit 1,7 t an statt mit den gewuerfelten 2,5 bis 9 t.
+     *
+     * Jetzt zaehlt nur, was liegt: Die Summe der liegenden Stuecke wird auf
+     * die Kundenmenge gezogen. Der Deckel bleibt, damit kein Blech zwei
+     * Tonnen wiegt — greift er, faehrt der Kunde eben mit weniger vor, und
+     * die Waage sagt das auch.
      */
-    const stuecke = specs.map((sp) => stueckMass(sp.shape.kind, sp.shape.dims));
-    const maxHoehe = wandHoehe(this.kind, this.bodyStyleName) + LADUNG_UEBERSTAND;
-    const plaetze = packeLadung(
-      stuecke,
-      BED_HALF_W - 0.08,
-      this.bedLen - 2 * LADE_RAND,
-      maxHoehe
-    );
+    this.ladeFuellung = fuellung;
+
+    const draufIdx = specs.map((_, i) => i).filter((i) => plaetze[i]);
+    const summeDrauf = draufIdx.reduce((a2, i) => a2 + specs[i]!.massKg, 0);
     /*
-     * Was nicht mehr passt, faellt weg — aber nicht seine Tonnage: Sie wird
-     * auf die liegenden Stuecke verteilt. Ein Haendler bringt eben Brocken,
-     * keine Tuerme. Der Faktor ist gedeckelt, damit kein Blech zwei Tonnen
-     * wiegt.
+     * Der Deckel haengt an der Dichte, nicht an einem festen Faktor.
+     *
+     * Vorher stand hier ein Ausgleich von hoechstens 2,2 — und der reichte
+     * nie: Zehn Stuecke wiegen von Natur aus rund eine Tonne, ein Haendler
+     * bringt zwei bis neun. Gemessen kam er mit 1,7 t an. Ein fester Faktor
+     * ist dafuer auch das falsche Mass; die Frage ist nicht, wie stark man
+     * skaliert, sondern was ein Stueck dieser Groesse ueberhaupt wiegen kann.
+     *
+     * 2600 kg/m³ ist die Grenze: dichter Stahlschrott liegt bei 2000 bis
+     * 2500, massiver Stahl bei 7850 — aber ein massiver Block dieser Groesse
+     * waere kein Schrottstueck mehr, sondern ein Amboss. Der Faktor 0,55 auf
+     * das Huellvolumen traegt dem Rechnung, dass kaum ein Stueck seinen
+     * Quader ausfuellt.
      */
-    const summeAlle = specs.reduce((a, sp) => a + sp.massKg, 0);
-    const summeDrauf = specs.reduce((a, sp, i) => a + (plaetze[i] ? sp.massKg : 0), 0);
-    const ausgleich =
-      summeDrauf > 0 ? Math.min(summeAlle / summeDrauf, LADUNG_AUSGLEICH_MAX) : 1;
+    const DICHTE_MAX = 2600;
+    const grenze = (i: number): number =>
+      DICHTE_MAX * Math.pow(stuecke[i]!.r * 2, 2) * stuecke[i]!.hoehe * 0.55;
+    const gewicht = new Map<number, number>();
+    for (const i of draufIdx) gewicht.set(i, specs[i]!.massKg);
+    if (c && summeDrauf > 0) {
+      let rest = c.massKg;
+      // Zwei Durchgaenge: erst proportional verteilen, dann das, was am
+      // Deckel haengengeblieben ist, auf die Stuecke mit Luft umlegen.
+      for (let runde = 0; runde < 2 && rest > 0; runde++) {
+        const offen = draufIdx.filter((i) => gewicht.get(i)! < grenze(i) - 1);
+        if (offen.length === 0) break;
+        const basis = offen.reduce((a2, i) => a2 + specs[i]!.massKg, 0) || 1;
+        const zuVerteilen = rest;
+        rest = 0;
+        for (const i of offen) {
+          const anteil = (specs[i]!.massKg / basis) * zuVerteilen;
+          const neu2 = Math.min(anteil, grenze(i));
+          gewicht.set(i, neu2);
+          rest += anteil - neu2;
+        }
+      }
+      // Was die Flaeche wirklich traegt, ist die Wahrheit — die Waage sagt es
+      // ohnehin, und der Kunde soll an der Waage nicht mehr versprechen.
+      (c as { massKg: number }).massKg = Math.round(
+        draufIdx.reduce((a2, i) => a2 + gewicht.get(i)!, 0)
+      );
+    }
 
     specs.forEach((sp, i) => {
       const platz = plaetze[i];
       if (!platz) return;
-      sp.massKg = Math.round(sp.massKg * ausgleich);
+      sp.massKg = Math.max(1, Math.round(gewicht.get(i) ?? sp.massKg));
       const local = new THREE.Vector3(
         platz.x,
         LADE_BODEN + platz.y + stuecke[i].hoehe / 2,
@@ -695,14 +814,6 @@ class DeliveryVehicle {
       it.mesh.visible = false;
       this.cargo.items.push(it);
     });
-    // Angekuendigte Menge auf das bringen, was wirklich oben liegt — sonst
-    // verspricht der Kunde an der Waage mehr, als der Wagen traegt.
-    if (c) {
-      (c as { massKg: number }).massKg = specs.reduce(
-        (a, sp, i) => a + (plaetze[i] ? sp.massKg : 0),
-        0
-      );
-    }
   }
 
   /**
