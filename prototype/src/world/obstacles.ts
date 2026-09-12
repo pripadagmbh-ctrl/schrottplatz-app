@@ -152,7 +152,7 @@ export const STATIC_OBSTACLES: Obstacle[] = [
   ...CONFIGS.flatMap(bayObstacles),
 
   // --- Schere und Presse, südlich hinter dem Bagger ---
-  { x: -3.0, z: -25.5, hw: 3.9, hd: 2.0, top: 2.2, label: "Schere" },
+  { x: -3.0, z: -26.0, hw: 3.9, hd: 2.5, top: 2.2, label: "Schere" },
 
 
   // --- Betriebsgebäude: Büro und Halle, hinten rechts an der Wand ---

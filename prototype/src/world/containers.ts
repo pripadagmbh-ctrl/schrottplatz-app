@@ -161,31 +161,35 @@ export const CONFIGS: ContainerConfig[] = [
    * getrennt: doppelter Preisunterschied, und wer beides in einen Behälter
    * wirft, bekommt für alles den Messingpreis.
    *
-   * Groesser und an die Muldenwand geschoben (Ansage 12.09.2026:
-   * „vergroessere Container fuer Metalle und schieb sie an die neue
-   * Muldenwand"). 3,6 x 2,3 x 1,8 m statt 2,8 x 1,8 x 1,1 — ein echter
-   * 7-m³-Absetzcontainer, nicht mehr ein Moertelkuebel; das Volumen steigt
-   * dabei auf das Doppelte.
+   * Das Mass kommt nicht aus dem Gefuehl, sondern aus dem Greifer (Ansage
+   * 12.09.2026: „Container und Presse muessen mindestens so gross sein, dass
+   * ich mit der Spinne reinfassen kann"). Offen ist die Spinne 3,38 m breit;
+   * mit 30 cm Luft beidseits ergibt das 3,98 m lichte Weite. Das Aussenmass
+   * liegt darueber, weil die Waende Dicke haben: Bei 4,20 m aussen sind es
+   * nachgemessen 4,08 x 4,15 m innen. `test/spinnenmass.test.ts` haelt das
+   * fest, damit kein spaeterer Umbau sie wieder zu eng macht.
    *
-   * Die Reihe endet 15 cm vor der halbhohen Nordwand der Stahlmulde. Dadurch
-   * liegen alle sechs im Greifring: gemessen 5,2 bis 9,5 m vom Sitz, vorher
-   * lagen zwei bei 10,1 und 11,4 m und waren nur durch Heranziehen zu
-   * erreichen. Der Preis steht dafuer in E-100: Der Gang hinter den
-   * Containern ist zu, und die Stahlmulde wird von ihrer offenen Westseite
-   * befuellt statt von dort.
+   * Vorher waren es 2,8 x 1,8 und zuletzt 3,6 x 2,3 m. In beiden Faellen kam
+   * der Greifer offen nicht hinein: Er setzte auf den Raendern auf. Befuellen
+   * ging noch — man laesst von oben fallen —, Ausraeumen nicht mehr. Ein
+   * Behaelter, den man nicht leeren kann, ist eine Sackgasse.
+   *
+   * Der Preis steht in E-106: Bei dieser Groesse liegt die linke Spalte
+   * ausserhalb des Greifrings. Sie ist beweglich (E-081) — man zieht sich den
+   * Behaelter heran, mit dem man gerade arbeitet.
    */
-  { id: "r_cable", fractionId: "cable", label: "KABEL", kind: "rolloff", x: -7.6,
-    z: -16.2, size: [3.6, 2.3, 1.8] },
-  { id: "r_va", fractionId: "va", label: "EDELSTAHL VA", kind: "rolloff", x: -11.4,
-    z: -16.2, size: [3.6, 2.3, 1.8] },
-  { id: "r_copper", fractionId: "copper", label: "KUPFER", kind: "rolloff", x: -7.6,
-    z: -18.6, size: [3.6, 2.3, 1.8] },
-  { id: "r_alu", fractionId: "alu", label: "ALU", kind: "rolloff", x: -11.4,
-    z: -18.6, size: [3.6, 2.3, 1.8] },
-  { id: "r_zinc", fractionId: "zinc", label: "ZINK", kind: "rolloff", x: -7.6,
-    z: -21.0, size: [3.6, 2.3, 1.8] },
-  { id: "r_brass", fractionId: "brass", label: "MESSING", kind: "rolloff", x: -11.4,
-    z: -21.0, size: [3.6, 2.3, 1.8] },
+  { id: "r_cable", fractionId: "cable", label: "KABEL", kind: "rolloff", x: -7.5,
+    z: -11.5, size: [4.2, 4.2, 1.8] },
+  { id: "r_va", fractionId: "va", label: "EDELSTAHL VA", kind: "rolloff", x: -11.8,
+    z: -11.5, size: [4.2, 4.2, 1.8] },
+  { id: "r_copper", fractionId: "copper", label: "KUPFER", kind: "rolloff", x: -7.5,
+    z: -15.8, size: [4.2, 4.2, 1.8] },
+  { id: "r_alu", fractionId: "alu", label: "ALU", kind: "rolloff", x: -11.8,
+    z: -15.8, size: [4.2, 4.2, 1.8] },
+  { id: "r_zinc", fractionId: "zinc", label: "ZINK", kind: "rolloff", x: -7.5,
+    z: -20.1, size: [4.2, 4.2, 1.8] },
+  { id: "r_brass", fractionId: "brass", label: "MESSING", kind: "rolloff", x: -11.8,
+    z: -20.1, size: [4.2, 4.2, 1.8] },
 
   /*
    * SILOS an der Ostwand — dorthin fährt der Abholer entlang, ohne den
