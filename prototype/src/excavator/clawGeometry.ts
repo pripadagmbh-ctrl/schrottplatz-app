@@ -30,6 +30,127 @@ export const CLAW_COUNT = 5;
 export const CLAW_OPEN_SPLAY = 1.25;
 
 /**
+ * Halbe Winkelbreite einer Schale (rad).
+ *
+ * Das ist der Kern der Neufassung vom 12.09.2026 („die Schalen müssen komplett
+ * abschließen"). Vorher war jede Kralle ein Finger von fester Breite — 0,40 m
+ * oben, 0,15 m an der Spitze. Fünf davon auf einem Kreis von 0,757 m Radius:
+ * Jede hat 0,95 m Bogen zur Verfügung und füllt 0,40 m davon. Mehr als die
+ * Hälfte des Umfangs war Lücke, und deshalb schloss der Korb nie.
+ *
+ * Eine Schale bekommt jetzt ihren Anteil am Kreis: 360°/5 = 72°, also 36° zu
+ * jeder Seite, davon 2° Luft für das Gelenk. Damit stoßen die Schalen über
+ * ihre ganze Länge aneinander.
+ *
+ * Nebenbei erledigt sich damit der zweite Wunsch von selbst: „gern oben
+ * breiter als unten". Bei fester Winkelbreite folgt die Bogenbreite dem
+ * Radius, und der schrumpft zur Spitze hin:
+ *
+ *   Station   0      1      2      3      4      5      6
+ *   Radius  0,757  0,757  0,700  0,590  0,430  0,230  ~0
+ *   Breite  0,90   0,90   0,83   0,70   0,51   0,27   0   (m)
+ */
+export const CLAW_SHELL_HALF = (Math.PI / CLAW_COUNT) * (34 / 36);
+/** Blechstärke der Schale (m) — sie ist ein Hohlkörper, kein Vollprofil. */
+export const CLAW_SHELL_DICKE = 0.085;
+/**
+ * Kleinster Radius, bis zu dem die Schale läuft.
+ *
+ * Genau auf der Achse liefen alle fünf Spitzen in einen Punkt; dort
+ * durchdringen sie sich und flackern. Sie hören darum kurz davor auf. Das
+ * verbleibende Loch von gut zehn Zentimetern hat ein echter Greifer auch.
+ */
+const SCHALE_MIN_R = 0.055;
+
+/**
+ * Geometrie einer Schale, im Frame ihres Gelenks.
+ *
+ * `vonStation` schneidet oben ab: 0 ist die ganze Schale, 5 nur noch der
+ * unterste Abschnitt. Damit laesst sich derselbe Bau fuer den dunklen
+ * Schneidenrand verwenden, ohne die Form ein zweites Mal zu beschreiben.
+ *
+ * Die Umrechnung ist einfacher, als sie aussieht: Ein Punkt, der im Frame der
+ * Spinne bei Radius `r`, Winkel `a + u` und Höhe `y` liegt, hat im Frame des
+ * Gelenks — das bei Radius `CLAW_RING_R` unter dem Winkel `a` sitzt und um `a`
+ * gedreht ist — immer die Koordinaten
+ *
+ *     (r·sin u, y, r·cos u − CLAW_RING_R)
+ *
+ * unabhängig davon, um welche der fünf Schalen es geht. Damit lässt sich die
+ * Schale einmal bauen und fünfmal verwenden.
+ *
+ * Gebaut wird sie als Hohlkörper: Außenfläche auf dem Radius der Krallenkurve,
+ * Innenfläche eine Blechstärke weiter innen, dazu die beiden Seitenwangen, der
+ * Rand oben und die stumpfe Spitze.
+ */
+export function schalenGeometrie(vonStation = 0): THREE.BufferGeometry {
+  const BOGEN = 10; // Unterteilungen über die Breite
+  const stationen: Array<{ y: number; r: number }> = [];
+  let y = 0;
+  let z = 0;
+  for (let k = 0; k <= CLAW_SEGMENTS; k++) {
+    stationen.push({ y, r: Math.max(SCHALE_MIN_R, CLAW_RING_R + z) });
+    const th = k * CLAW_SEG_BEND;
+    y -= CLAW_SEG_LEN * Math.cos(th);
+    z -= CLAW_SEG_LEN * Math.sin(th);
+  }
+
+  const pos: number[] = [];
+  const idx: number[] = [];
+  const punkt = (r: number, u: number, yy: number): number => {
+    const i = pos.length / 3;
+    pos.push(r * Math.sin(u), yy, r * Math.cos(u) - CLAW_RING_R);
+    return i;
+  };
+  const quad = (a: number, b: number, c: number, d: number): void => {
+    idx.push(a, b, c, a, c, d);
+  };
+
+  // Gitter: [aussen | innen] × Station × Bogen
+  const gitter: number[][][] = [];
+  const teil = stationen.slice(vonStation);
+  for (const seite of [0, 1]) {
+    const lagen: number[][] = [];
+    for (const st of teil) {
+      const r = Math.max(0.012, st.r - seite * CLAW_SHELL_DICKE);
+      const reihe: number[] = [];
+      for (let j = 0; j <= BOGEN; j++) {
+        const u = -CLAW_SHELL_HALF + (j / BOGEN) * 2 * CLAW_SHELL_HALF;
+        reihe.push(punkt(r, u, st.y));
+      }
+      lagen.push(reihe);
+    }
+    gitter.push(lagen);
+  }
+  const [aussen, innen] = gitter as [number[][], number[][]];
+
+  const letzte = teil.length - 1;
+  for (let k = 0; k < letzte; k++) {
+    for (let j = 0; j < BOGEN; j++) {
+      // Aussenhaut zeigt nach aussen, Innenhaut nach innen — daher die
+      // umgekehrte Reihenfolge.
+      quad(aussen[k]![j]!, aussen[k]![j + 1]!, aussen[k + 1]![j + 1]!, aussen[k + 1]![j]!);
+      quad(innen[k]![j + 1]!, innen[k]![j]!, innen[k + 1]![j]!, innen[k + 1]![j + 1]!);
+    }
+    // Seitenwangen links und rechts
+    quad(aussen[k]![0]!, innen[k]![0]!, innen[k + 1]![0]!, aussen[k + 1]![0]!);
+    quad(innen[k]![BOGEN]!, aussen[k]![BOGEN]!, aussen[k + 1]![BOGEN]!, innen[k + 1]![BOGEN]!);
+  }
+  // Rand oben und stumpfe Spitze unten
+  for (let j = 0; j < BOGEN; j++) {
+    quad(innen[0]![j]!, innen[0]![j + 1]!, aussen[0]![j + 1]!, aussen[0]![j]!);
+    const e = letzte;
+    quad(aussen[e]![j]!, aussen[e]![j + 1]!, innen[e]![j + 1]!, innen[e]![j]!);
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/**
  * Punkt auf einer Kralle nach `k` Segmenten, im Frame der Spinne.
  *
  * @param a Umfangswinkel der Kralle (0 … 2π)

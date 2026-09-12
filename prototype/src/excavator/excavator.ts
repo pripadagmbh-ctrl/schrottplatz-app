@@ -11,8 +11,8 @@ import {
   CLAW_RING_R,
   CLAW_RING_Y,
   CLAW_SEGMENTS,
-  CLAW_SEG_BEND,
-  CLAW_SEG_LEN,
+  schalenGeometrie,
+  CLAW_SHELL_HALF,
   clawPoint,
   naechsteSpreizung,
   NACHDRUECK_RESERVE,
@@ -172,6 +172,11 @@ export function anlaufZeit(lastKg: number): number {
 }
 
 /** Ab diesem Schliessgrad treffen sich die Krallenspitzen. */
+/** Kollider-Reihen je Schale, quer zur Krallenrichtung. */
+const KOLLIDER_REIHEN = 3;
+/** Seitenversatz der aeusseren Reihen (rad Umfangswinkel). */
+const KOLLIDER_ABSTAND = CLAW_SHELL_HALF * 1.2;
+
 const SCHNAPP_AB = 0.93;
 /** Bis hierher gilt eine Kralle als am Teil anliegend (m) */
 const KONTAKT_NAH = 0.14;
@@ -612,11 +617,6 @@ export class Excavator {
     const RING_R = CLAW_RING_R;
     const CYL_R = 0.42; // Anlenkkreis der Zylinder am Gehäuse
     const ringY = CLAW_RING_Y;
-    const SEG_LEN = CLAW_SEG_LEN;
-    const SEG_BEND = CLAW_SEG_BEND;
-    const SEGMENTS = 6;
-    const segWidth = [0.4, 0.37, 0.33, 0.28, 0.22, 0.15];
-    const segThick = [0.16, 0.15, 0.135, 0.12, 0.105, 0.085];
 
     const rotator = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.36, 0.5), edgeMat);
     rotator.position.y = -0.48;
@@ -651,40 +651,35 @@ export class Excavator {
       knuckle.position.y = 0.02;
       pivot.add(knuckle);
 
-      // Sichelkralle: Kette gebogener Schalensegmente, zur Spitze verjüngt
-      let parent: THREE.Object3D = pivot;
-      for (let sIdx = 0; sIdx < SEGMENTS; sIdx++) {
-        const seg = new THREE.Group();
-        if (sIdx > 0) {
-          seg.position.y = -SEG_LEN;
-          seg.rotation.x = SEG_BEND;
-        }
-        const mesh = new THREE.Mesh(
-          new THREE.BoxGeometry(segWidth[sIdx], SEG_LEN + 0.04, segThick[sIdx]),
-          shellMat
-        );
-        mesh.position.y = -SEG_LEN / 2;
-        mesh.castShadow = true;
-        seg.add(mesh);
-        // dunkler Steg auf der Außenseite gibt der Schale Profil
-        const edge = new THREE.Mesh(
-          new THREE.BoxGeometry(segWidth[sIdx] + 0.03, SEG_LEN + 0.05, 0.045),
-          edgeMat
-        );
-        edge.position.set(0, -SEG_LEN / 2, segThick[sIdx] / 2);
-        seg.add(edge);
-        parent.add(seg);
-        parent = seg;
-      }
-      // Stumpfes Schalenende statt 24-cm-Vierkantkegel (Angleich an v2):
-      // Sortiergreifer laufen wie ein Loeffelrand aus, nicht wie ein Spiess.
-      // Das erklaert nebenbei, warum Bleche aufgespiesst wurden.
-      const tip = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.075, 0.14, 8), edgeMat);
-      tip.position.y = -SEG_LEN - 0.03;
-      tip.castShadow = true;
-      tip.name = "tineTip";
-      parent.add(tip);
-
+      /*
+       * Eine Schale statt einer Fingerkette.
+       *
+       * Vorher war jede Kralle ein Stapel aus sechs Kaesten, 0,40 m breit oben
+       * und 0,15 m an der Spitze. Fuenf davon auf einem Kreis von 0,757 m
+       * Radius liessen mehr als die Haelfte des Umfangs offen — der Korb
+       * schloss nie (Befund 12.09.2026: „wichtig ist, dass sie komplett
+       * abschliessen").
+       *
+       * Jetzt bekommt jede Schale ihren Anteil am Kreis. Die Form ist starr,
+       * wie bei einem echten Mehrschalengreifer: Sie sitzt fest am Gelenk, und
+       * bewegt wird nur das Gelenk selbst.
+       */
+      const schale = new THREE.Mesh(schalenGeometrie(), shellMat);
+      schale.castShadow = true;
+      schale.receiveShadow = true;
+      pivot.add(schale);
+      /*
+       * Dunkler Schneidenrand am unteren Drittel — er zeigt, wo die Schale
+       * beisst, und gibt ihr Profil.
+       *
+       * Der erste Anlauf legte eine dunkle Kopie der GANZEN Schale mit 1,004
+       * darueber. Das war keine Kante, das war ein zweites Blech: Die Spinne
+       * sah geschlossen aus wie eine schwarze Kugel. Jetzt nur noch die
+       * untersten Stationen.
+       */
+      const schneide = new THREE.Mesh(schalenGeometrie(4), edgeMat);
+      schneide.scale.set(1.012, 1, 1.012);
+      pivot.add(schneide);
       // Hydraulikzylinder: Traverse → Krallen-Lagerbock
       const barrel = new THREE.Mesh(
         new THREE.CylinderGeometry(0.066, 0.066, 1, 10),
@@ -1167,9 +1162,19 @@ export class Excavator {
     this.selfHandles.add(this.grappleBody.handle);
     // Die Krallen bekommen eigene Kollider — je zwei Kapseln bilden die Sichel
     // grob nach. Ohne sie fuhr die Spinne sichtbar durch Schrottteile hindurch.
-    for (let i = 0; i < CLAW_COUNT * 2; i++) {
+    /*
+     * Drei Kollider-Reihen je Schale statt einer.
+     *
+     * Eine Schale ist oben 0,90 m breit. Mit einer einzigen Kapselkette auf
+     * der Mittellinie war sie physisch ein 20 cm dicker Draht — Material fiel
+     * links und rechts daran vorbei, obwohl man die Schale davor sah. Die
+     * Reihen liegen auf der Mitte und auf 60 % der halben Breite zu jeder
+     * Seite; an der Spitze laufen sie ohnehin zusammen, weil die Schale dort
+     * schmal wird.
+     */
+    for (let i = 0; i < CLAW_COUNT * KOLLIDER_REIHEN * 2; i++) {
       this.clawColliders.push(
-        world.createCollider(RAPIER.ColliderDesc.capsule(0.16, 0.1), this.grappleBody)
+        world.createCollider(RAPIER.ColliderDesc.capsule(0.16, 0.09), this.grappleBody)
       );
     }
   }
@@ -1185,12 +1190,20 @@ export class Excavator {
       // Jede Kralle mit ihrem eigenen Winkel — sonst stuenden die Kollider
       // woanders als die Zacken, die man sieht
       const splay = this.clawSplayIst[c] ?? this.currentSplay();
+      for (let reihe = 0; reihe < KOLLIDER_REIHEN; reihe++) {
+      /*
+       * Die Reihe sitzt um `u` neben der Mittellinie. `clawPoint` nimmt den
+       * Umfangswinkel als ersten Parameter — ein Punkt der Schale bei
+       * Seitenversatz u ist deshalb schlicht `clawPoint(a + u, …)`. Der Radius
+       * haengt nicht vom Winkel ab, also stimmt das ohne Umrechnung.
+       */
+      const u = (reihe - (KOLLIDER_REIHEN - 1) / 2) * KOLLIDER_ABSTAND;
       for (let h = 0; h < 2; h++) {
-        const col = this.clawColliders[c * 2 + h];
+        const col = this.clawColliders[(c * KOLLIDER_REIHEN + reihe) * 2 + h];
         col.setEnabled(!carrying);
         if (carrying) continue;
-        clawPoint(a, splay, h * (CLAW_SEGMENTS / 2), this.clawA);
-        clawPoint(a, splay, (h + 1) * (CLAW_SEGMENTS / 2), this.clawB);
+        clawPoint(a + u, splay, h * (CLAW_SEGMENTS / 2), this.clawA);
+        clawPoint(a + u, splay, (h + 1) * (CLAW_SEGMENTS / 2), this.clawB);
         this.clawMid.addVectors(this.clawA, this.clawB).multiplyScalar(0.5);
         this.clawDir.subVectors(this.clawB, this.clawA);
         const len = this.clawDir.length();
@@ -1200,6 +1213,7 @@ export class Excavator {
         col.setHalfHeight(Math.max(len / 2 - 0.1, 0.03));
         col.setTranslationWrtParent(this.clawMid);
         col.setRotationWrtParent(this.clawQuat);
+      }
       }
     }
   }
