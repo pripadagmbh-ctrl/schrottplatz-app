@@ -45,9 +45,10 @@ import {
   routeInRev,
   routeOut,
   PICKUP_IN_FWD,
-  PICKUP_APPROACH,
-  PICKUP_IN_REV,
-  PICKUP_OUT,
+  neueAbholstelle,
+  pickupApproach,
+  pickupInRev,
+  pickupOut,
   TIP_APPROACH,
   TIP_IN_REV,
   TIP_OUT,
@@ -447,8 +448,21 @@ class DeliveryVehicle {
   private meinRueckweg: Array<[number, number]> | null = null;
   private meineAusfahrt: Array<[number, number]> | null = null;
 
-  /** Abladestelle nach der aktuellen Baggerstellung festlegen. */
+  /**
+   * Halteposition nach der aktuellen Baggerstellung festlegen.
+   *
+   * Gilt fuer beide Richtungen: Der Anlieferer setzt auf den Vorplatz vor der
+   * Maschine, der Abholer in die Ostgasse daneben. Beide Stellen wandern mit
+   * dem Bagger mit, beide werden hier eingefroren.
+   */
   private legeAbladestelleFest(): void {
+    if (this.isPickup) {
+      neueAbholstelle();
+      this.meineAnfahrt = pickupApproach();
+      this.meinRueckweg = pickupInRev();
+      this.meineAusfahrt = pickupOut();
+      return;
+    }
     neueAbladestelle();
     this.meineAnfahrt = routeApproach();
     this.meinRueckweg = routeInRev();
@@ -456,17 +470,17 @@ class DeliveryVehicle {
   }
 
   private get routeApproach(): Array<[number, number]> {
-    if (this.isPickup) return PICKUP_APPROACH;
+    if (this.isPickup) return this.meineAnfahrt ?? pickupApproach();
     if (this.isSelfTipping) return TIP_APPROACH;
     return this.meineAnfahrt ?? routeApproach();
   }
   private get routeRev(): Array<[number, number]> {
-    if (this.isPickup) return PICKUP_IN_REV;
+    if (this.isPickup) return this.meinRueckweg ?? pickupInRev();
     if (this.isSelfTipping) return TIP_IN_REV;
     return this.meinRueckweg ?? routeInRev();
   }
   private get routeOut(): Array<[number, number]> {
-    if (this.isPickup) return PICKUP_OUT;
+    if (this.isPickup) return this.meineAusfahrt ?? pickupOut();
     if (this.isSelfTipping) return TIP_OUT;
     return this.meineAusfahrt ?? routeOut();
   }
@@ -995,7 +1009,12 @@ class DeliveryVehicle {
       case "in":
         this.advance(this.routeIn, SPEED * dt, false, dt);
         if (this.routeS >= this.routeLength(this.routeIn)) {
-          // Anlieferer stehen jetzt auf der Brückenwaage
+          // Anlieferer stehen jetzt auf der Brückenwaage; der Abholer kommt
+          // leer und faehrt durch. Fuer ihn steht hier fest, wo er haelt —
+          // sonst nirgends: Er ueberspringt `weighIn`, und genau darum stand
+          // er lange auf dem Vorgabewert und damit 9,9 m vom Bagger weg
+          // (gemessen 12.09.2026), statt an der gerechneten Stelle.
+          if (this.isPickup) this.legeAbladestelleFest();
           this.phase = this.isPickup ? "approach" : "weighIn";
           this.phaseT = 0;
           this.routeS = 0;
@@ -1442,17 +1461,63 @@ export class VehicleManager {
    */
   pickupOrder: string | null = null;
 
-  requestPickup(order?: string | null): "gerufen" | "abgefahren" | "belegt" {
+  /**
+   * Eine bestellte Abholung, die noch nicht fahren konnte.
+   *
+   * `null` heisst: nichts vorgemerkt. Sonst steht hier die bestellte Fraktion
+   * (die ihrerseits `null` sein darf, wenn gemischt geladen wird) — darum das
+   * Objekt drumherum statt eines blanken Strings.
+   */
+  private vorgemerkt: { order: string | null } | null = null;
+
+  /** Ist eine Abholung vorgemerkt? Fuer HUD und Tests. */
+  get abholungVorgemerkt(): boolean {
+    return this.vorgemerkt !== null;
+  }
+
+  /**
+   * Abholung anfordern bzw. wartenden Abhol-LKW abfahren lassen.
+   *
+   * Die Abholung hat Vorrang (Ansage 12.09.2026: „Abholung soll Vorrang
+   * bekommen“). Frueher fiel eine Bestellung ersatzlos aus, solange noch ein
+   * Anlieferer auf dem Hof war — man drueckte V, bekam „erst muss das Fahrzeug
+   * fertig werden“ und musste sich selbst merken, es spaeter nochmal zu
+   * versuchen. Jetzt wird sie vorgemerkt und faehrt als naechstes los, ohne die
+   * uebliche Wartezeit und noch vor jedem weiteren Anlieferer.
+   *
+   * Den laufenden Anlieferer schickt sie nicht weg. Der steht mit bezahlter
+   * Ladung auf dem Platz; ihn abzuwuergen waere kein Vorrang, sondern ein
+   * Verlust.
+   */
+  requestPickup(order?: string | null): "gerufen" | "abgefahren" | "vorgemerkt" {
     if (this.active) {
       if (this.active.kind === "abholer" && this.active.waitingForLoad) {
         this.active.requestRelease();
         return "abgefahren";
       }
-      return "belegt";
+      this.vorgemerkt = { order: order ?? null };
+      return "vorgemerkt";
     }
     this.pickupOrder = order ?? null;
     this.spawnNow("abholer");
     return "gerufen";
+  }
+
+  /**
+   * Alle Fahrzeuge sofort vom Hof nehmen.
+   *
+   * Gebraucht beim harten Szenenwechsel — Spielstand laden, Schicht neu
+   * beginnen —, wo ein halb abgeladener LKW aus dem alten Zustand stehen
+   * bliebe. Eine vorgemerkte Abholung bleibt bestehen: Die hat der Spieler
+   * bestellt, und sie gehoert nicht zum Fuhrpark, sondern zu seinem Auftrag.
+   */
+  raeumePlatz(): void {
+    this.active?.despawn();
+    this.active = null;
+    for (const v of this.parked) v.despawn();
+    this.parked.length = 0;
+    this.t = 0;
+    this.nextSpawnT = FIRST_DELAY_S;
   }
 
   /** Position des Fahrzeugs, solange es auf dem Platz rangiert/ablädt (für den Platzwart). */
@@ -1591,6 +1656,14 @@ export class VehicleManager {
       }
     }
     if (!this.active) {
+      // Vorrang: Eine vorgemerkte Abholung faehrt sofort, ohne Wartezeit und
+      // auch dann, wenn die Einfahrt fuer Anlieferer gerade zu ist.
+      if (this.vorgemerkt) {
+        this.pickupOrder = this.vorgemerkt.order;
+        this.vorgemerkt = null;
+        this.spawnNow("abholer");
+        return;
+      }
       if (this.acceptDeliveries && this.t >= this.nextSpawnT) this.spawnNow();
       return;
     }

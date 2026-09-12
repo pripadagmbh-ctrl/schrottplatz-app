@@ -29,25 +29,26 @@ import type { CompositeManager } from "../dismantle/composites";
 // naeher an den Mischschrottplatz rueckt. Und quergestellt: Sie lag vom Sitz
 // aus waagerecht im Bild und nahm die ganze Breite ein; hochkant steht sie in
 // einer Reihe mit Stahlmulde und Halde.
-const CENTER = new THREE.Vector3(-10.0, 0, -21.5);
+const CENTER = new THREE.Vector3(-3.0, 0, -25.5);
+/** Mitte der Presskammer — auch fuer Hindernisliste und Tests. */
+export const PRESS_CENTER = CENTER;
 // Die Schwelle gilt fuer Objekte wie fuer Pakete — sie steht in materials/purity.ts.
 /**
  * Wo das fertige Paket liegen bleibt: in der Kammer.
  *
- * Es gibt kein Ballenlager mehr (Ansage 12.09.2026: „es gibt in dem Fall kein
- * Ballenlager, gepresstes Material muss rausgebaggert werden"). Das Paket
- * bleibt also da, wo es entstanden ist, und wandert von dort in den Behaelter
- * seiner Fraktion — Stahlballen in den 40er, Alupaket in den Alucontainer.
- * Solange es in der Kammer liegt, blockiert es die naechste Fuhre, und genau
- * das soll es auch.
+ * Es gibt kein Ballenlager, und ausgeworfen wird auch nichts (Ansage
+ * 12.09.2026: "Ballen bleiben in Presse, ohne Abscheiden"). Das Paket bleibt
+ * da, wo es entstanden ist, und wandert von dort in den Behaelter seiner
+ * Fraktion — Stahlballen in den 40er, Alupaket in den Alucontainer. Solange es
+ * in der Kammer liegt, blockiert es die naechste Fuhre, und genau das soll es
+ * auch.
+ *
+ * Dazwischen war es einmal anders: Die Presse warf das Paket zum Bagger hin
+ * aus, und weil die Maschine nur gut vier Meter danebensteht, musste die
+ * Auswurfstelle gesucht werden, damit sie ueberhaupt im Greifring landet. Der
+ * Aufwand ist mit der Ansage weggefallen — die Kammer ist die Stelle.
  */
-function baleYard(): { x: number; z: number; w: number; d: number } {
-  /*
-   * Das Paket bleibt in der Kammer (Ansage 12.09.2026: „ich haette gerne
-   * aktuell nur, dass es gepresst wird und in der Mulde verharrt, bis ich es
-   * rausbaggere"). Es faellt nirgendwo mehr heraus — solange es drin liegt,
-   * blockiert es die naechste Fuhre, und genau das soll es.
-   */
+export function baleYard(): { x: number; z: number; w: number; d: number } {
   return { x: CENTER.x, z: CENTER.z, w: INNER_W - 2.2, d: INNER_D - 1.2 };
 }
 /**

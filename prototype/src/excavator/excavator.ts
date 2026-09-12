@@ -243,7 +243,7 @@ export class Excavator {
    * und koennte ihn nicht befuellen. 4,0 m ist die Untergrenze, und genau
    * darauf steht sie jetzt.
    */
-  readonly position = new THREE.Vector3(-2.0, 0, -19.5);
+  readonly position = new THREE.Vector3(-2.5, 0, -19.5);
   heading = 0; // rad, 0 = +Z
   cabYaw = 0;
   boomAngle = THREE.MathUtils.degToRad(35);

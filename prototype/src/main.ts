@@ -387,12 +387,15 @@ async function main(): Promise<void> {
       b.innerHTML = `${label}<span class="kg">${Math.round(menge)} kg</span>`;
       b.addEventListener("click", () => {
         showPickup(false);
-        vehicles.requestPickup(order);
+        const r = vehicles.requestPickup(order);
         tutAbholer = true;
+        const was = order ? `für ${getMaterial(order).name}` : "für gemischte Ladung";
         hud.toast(
-          order
-            ? `Abholung für ${getMaterial(order).name} bestellt — sortenrein laden!`
-            : "Abholung für gemischte Ladung bestellt."
+          r === "vorgemerkt"
+            ? `Abholung ${was} vorgemerkt — sie fährt als nächstes vor.`
+            : order
+              ? `Abholung ${was} bestellt — sortenrein laden!`
+              : `Abholung ${was} bestellt.`
         );
       });
       pickupListEl.appendChild(b);
@@ -946,9 +949,11 @@ async function main(): Promise<void> {
       if (vehicles.pickupTruck?.waitingForLoad) {
         vehicles.requestPickup();
         hud.toast("Container geht raus …");
-      } else if (vehicles.activeKind) {
-        hud.toast("Erst muss das Fahrzeug auf dem Platz fertig werden.");
+      } else if (vehicles.abholungVorgemerkt) {
+        hud.toast("Die Abholung ist schon vorgemerkt und fährt als nächstes vor.");
       } else {
+        // Auch bei belegtem Platz bestellbar: Die Abholung hat Vorrang und
+        // wird vorgemerkt, statt an einem laufenden Anlieferer zu scheitern.
         showPickup(true);
       }
     }

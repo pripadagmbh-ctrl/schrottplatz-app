@@ -118,37 +118,109 @@ export function routeOut(): Array<[number, number]> {
   ];
 }
 
-// ABHOLUNG: Ostspur nach Süden, dann rückwärts an den Verladeplatz neben der
-// Presse — dort lädt der Spieler den Container mit sortenreinem Material.
+/*
+ * ABHOLUNG — eigene Anfahrt auf der Ostspur, bis an den Baggerplatz.
+ *
+ * Ansage 12.09.2026: „Abholer soll andere Route zum Baggerplatz nehmen."
+ * Vorher fuhr er die Westspur am Buero und den Silos entlang und hielt neben
+ * dem Reifendepot bei (−21,5 | −17). Das waren 19,6 m bis zur Maschine —
+ * doppelt so weit, wie der Arm reicht. Beladen liess sich dort nichts; man
+ * musste erst den ganzen Bagger umsetzen.
+ *
+ * Der Grund fuer den Umweg war die Presse: Sie und die Absetzcontainer bilden
+ * zwischen x −5 und −15 eine durchgehende Sperre von z −11 bis −27. Von Westen
+ * kommt man nicht an den Bagger heran, um sie herum auch nicht. Die einzige
+ * offene Gasse liegt oestlich der Maschine, zwischen ihr und dem
+ * Mischschrottplatz — und genau die faehrt der Abholer jetzt.
+ *
+ * Damit haben Anlieferung und Abholung getrennte Wege: Der Kipper setzt von
+ * Nordwesten auf den Vorplatz, der Abholer kommt von Nordosten an die Flanke.
+ * Sie kreuzen sich nicht, und beide stehen im Greifbereich.
+ */
 export const PICKUP_IN_FWD: Array<[number, number]> = [
   [GATE_X, 40],
   [GATE_X, 24],
 ];
-/*
- * Der Abholer fährt an der Ostwand entlang (Ansage 12.09.2026: „von der Waage
- * am Büro vorbei entlang der Silos und kommt von Osten, was nicht der
- * Arbeitsbereich des Baggers wäre"). Die Spur läuft zwischen den
- * Absetzcontainern und den Silos nach Süden und endet östlich vom
- * Stahlcontainer — der Bagger muss dafür nicht ausweichen.
+/** Nordende der Ostgasse — von hier setzt der Abholer zurueck. */
+const ABHOL_RANGIER: [number, number] = [5.5, -2.0];
+/**
+ * Wie weit vor dem Bagger der Abholer haelt.
+ *
+ * Etwas weiter weg als der Kipper (8,0 m), weil hier nicht abgekippt, sondern
+ * Stueck fuer Stueck in den Container gelegt wird: Der Arm braucht Hoehe ueber
+ * der Bordwand, und die hat er im mittleren Ring am ehesten.
  */
-export const PICKUP_APPROACH: Array<[number, number]> = [
-  [GATE_X, 24],
-  [-27, 20],
-  [-29, 10],
-  [-29, -8],
-];
-export const PICKUP_IN_REV: Array<[number, number]> = [
-  [-29, -8],
-  [-21.5, -17.0],
-];
-export const PICKUP_OUT: Array<[number, number]> = [
-  [-21.5, -17.0],
-  [-29, -8],
-  [-29, 10],
-  [-27, 20],
-  [GATE_X, 24],
-  [GATE_X, 40],
-];
+const ABHOL_ABSTAND = 7.5;
+/**
+ * Der Streifen, in dem die Halteposition liegen darf.
+ *
+ * Oestlich beginnt bei x 10 die Aussenwand des Mischschrottplatzes, suedlich
+ * bei z −20 seine offene Kippkante. Und x 3,0 ist die Grenze nach Westen: Naeher
+ * an den Bagger darf der Wagen nicht, sonst steht er im Heckschwenk.
+ */
+const ABHOLPLATZ = { xMin: 3.0, xMax: 8.0, zMin: -18.0, zMax: -6.0 };
+
+let abholStelle: [number, number] = [5.5, -13.0];
+
+/** Wie weit seitlich neben dem Bagger die Gasse liegt. */
+const ABHOL_SEITLICH = 5.5;
+
+/**
+ * Halteposition des Abholers bestimmen — wie bei der Anlieferung einmal beim
+ * Losfahren, danach steht sie fest.
+ *
+ * Gerechnet wird nicht auf der Luftlinie zum Rangierpunkt, sondern entlang der
+ * Gasse: Erst legt sich fest, auf welcher Spurhoehe der Wagen steht (x), dann
+ * wird er so weit nach Norden geschoben, dass der Abstand zum Bagger stimmt.
+ *
+ * Der Umweg ueber die Gasse ist noetig, weil die Luftlinie sie verlaesst,
+ * sobald der Bagger nach Westen faehrt. Gemessen mit der Maschine auf
+ * (−6 | −12): Die Luftlinie ergab einen Halt 10,3 m entfernt — anderthalb
+ * Meter ausserhalb des Greifrings, der Container waere nicht zu beladen
+ * gewesen. Diese Rechnung haelt ihn bei 9,0 m.
+ */
+export function neueAbholstelle(): [number, number] {
+  const b = baggerOrt?.();
+  if (b) {
+    const x = Math.min(ABHOLPLATZ.xMax, Math.max(ABHOLPLATZ.xMin, b.x + ABHOL_SEITLICH));
+    // Was der seitliche Versatz vom Sollabstand uebrig laesst, geht nach Norden.
+    const quer = x - b.x;
+    const laengs = Math.sqrt(Math.max(0, ABHOL_ABSTAND * ABHOL_ABSTAND - quer * quer));
+    abholStelle = [
+      x,
+      Math.min(ABHOLPLATZ.zMax, Math.max(ABHOLPLATZ.zMin, b.z + laengs)),
+    ];
+  }
+  return abholStelle;
+}
+
+/** Wo gerade verladen wird — fuer die Spurueberwachung. */
+export function abholstelle(): [number, number] {
+  return abholStelle;
+}
+
+export function pickupApproach(): Array<[number, number]> {
+  return [
+    [GATE_X, 24],
+    [-12, 18],
+    [4, 10],
+    ABHOL_RANGIER,
+  ];
+}
+export function pickupInRev(): Array<[number, number]> {
+  return [ABHOL_RANGIER, abholStelle];
+}
+export function pickupOut(): Array<[number, number]> {
+  return [
+    abholStelle,
+    ABHOL_RANGIER,
+    [4, 10],
+    [-12, 18],
+    [GATE_X, 24],
+    [GATE_X, 40],
+  ];
+}
+
 // KIPPER: Wer selbst abkippen kann, muss nicht vor dem Bagger halten. Er fährt
 // rückwärts an die Nordkante des Stahlschrotthaufens (Mitte bei x −9, z 1) und
 // kippt seine Ladung direkt dort ab (Design-Fix 29.08.2026).
@@ -214,9 +286,12 @@ export const BED_HALF_W = 1.35;
  * [x, z, radius]
  */
 export const WORK_ZONES: Array<[number, number, number]> = [
-  [0, 9, 11], // Abkippplatz vor dem Bagger inkl. Halteposition
-  [-3.5, 10, 8], // Verladeplatz westlich neben dem Abladeplatz
-  [-9, 4, 10], // Stahlschrotthaufen — dorthin kippen die Kipper selbst ab
+  // Vorplatz vor dem Bagger — dorthin kippt die Anlieferung ab
+  [-4, -6, 11],
+  // Ostgasse neben dem Bagger — dort steht der Abholer beim Verladen
+  [5, -12, 8],
+  // Kippkante des Mischschrottplatzes — dorthin kippen die Kipper selbst ab
+  [6, -18, 9],
 ];
 /** Nach so langer Blockade fährt der Fahrer vorsichtig weiter (kein Deadlock) */
 export const BLOCK_GIVEUP_S = 35;

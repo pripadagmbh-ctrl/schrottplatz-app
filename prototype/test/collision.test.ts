@@ -23,9 +23,9 @@ import {
   routeApproach,
   routeInRev,
   routeOut,
-  PICKUP_APPROACH,
-  PICKUP_IN_REV,
-  PICKUP_OUT,
+  pickupApproach,
+  pickupInRev,
+  pickupOut,
   TIP_APPROACH,
   TIP_IN_REV,
   TIP_OUT,
@@ -54,7 +54,7 @@ const SORTIERMULDEN = CONFIGS.filter((c) =>
   ["r_cable", "r_va", "r_copper", "r_alu", "r_zinc", "r_brass"].includes(c.id)
 );
 /** Standplatz des Baggers — siehe `position` in excavator.ts. */
-const BAGGER_X = -2.0;
+const BAGGER_X = -2.5;
 const BAGGER_Z = -19.5;
 /** Die Silos an der Ostwand, an denen der Abholer entlangfaehrt. */
 const SILOS = CONFIGS.filter((c) =>
@@ -122,9 +122,9 @@ describe("Feste Bauten", () => {
       ["Anfahrt", routeApproach()],
       ["Rangieren", routeInRev()],
       ["Ausfahrt", routeOut()],
-      ["Abholer-Anfahrt", PICKUP_APPROACH],
-      ["Abholer-Rangieren", PICKUP_IN_REV],
-      ["Abholer-Ausfahrt", PICKUP_OUT],
+      ["Abholer-Anfahrt", pickupApproach()],
+      ["Abholer-Rangieren", pickupInRev()],
+      ["Abholer-Ausfahrt", pickupOut()],
       ["Kipper-Anfahrt", TIP_APPROACH],
       ["Kipper-Rangieren", TIP_IN_REV],
       ["Kipper-Ausfahrt", TIP_OUT],
@@ -155,8 +155,8 @@ describe("Feste Bauten", () => {
     const spuren: Array<[string, Array<[number, number]>]> = [
       ["Anfahrt", routeApproach()],
       ["Rangieren", routeInRev()],
-      ["Abholer", PICKUP_APPROACH],
-      ["Abholer-Rangieren", PICKUP_IN_REV],
+      ["Abholer", pickupApproach()],
+      ["Abholer-Rangieren", pickupInRev()],
       ["Kipper", TIP_APPROACH],
       ["Kipper-Rangieren", TIP_IN_REV],
     ];
@@ -308,21 +308,24 @@ describe("Reichweite des Baggers", () => {
     expect(wand.top).toBeGreaterThan(flanke.top);
   });
 
-  it("Halde, Stahlmulde und Presse stehen in einer Reihe hinter dem Bagger", () => {
+  it("die Presse steht mittig hinter dem Bagger, Halde links und Stahl rechts", () => {
     /*
-     * Die Reihe an der hinteren Grenze (Ansage 12.09.2026): aussen der
-     * Mischschrott in der Ecke, daneben durch die halbe Trennwand getrennt die
-     * Stahlmulde, daneben — noch erreichbar — die Presse. Geprueft wird die
-     * Reihenfolge, nicht die Koordinate: So haelt der Test auch, wenn die
-     * Reihe noch einmal ein paar Meter wandert.
+     * Ansage 12.09.2026: „die Presse kommt wieder hinter den Bagger."
+     * Vorher stand sie zur Seite gerueckt, damit der Bagger naeher an den
+     * Mischschrott kam; jetzt ist sie wieder die Wand im Ruecken, und die
+     * Stahlmulde ist dafuer nach rechts gewandert.
+     *
+     * Geprueft wird die Anordnung aus der Sitzperspektive, nicht die
+     * Koordinate — links vom Sitz ist +x (E-086). Die Presse liegt zwischen
+     * Halde und Stahlmulde und fluchtet mit der Maschine.
      */
     const halde = CONFIGS.find((c) => c.id === "c_mixed")!;
     const stahl = CONFIGS.find((c) => c.id === "c_steel")!;
     const presse = STATIC_OBSTACLES.find((o) => o.label === "Schere")!;
-    // Links vom Sitz ist +x: die Halde liegt am weitesten aussen
-    expect(halde.x, "Halde nicht aussen").toBeGreaterThan(stahl.x);
-    expect(stahl.x, "Stahlmulde nicht zwischen Halde und Presse").toBeGreaterThan(presse.x);
-    // Alle drei liegen hinter der Maschine
+    expect(halde.x, "Halde nicht links aussen").toBeGreaterThan(presse.x);
+    expect(presse.x, "Presse nicht zwischen Halde und Stahlmulde").toBeGreaterThan(stahl.x);
+    // Mittig heisst: in der Sitzachse, nicht zur Seite gerueckt
+    expect(Math.abs(presse.x - BAGGER_X), "Presse nicht in der Sitzachse").toBeLessThan(1.0);
     for (const [name, z] of [
       ["Halde", halde.z],
       ["Stahlmulde", stahl.z],

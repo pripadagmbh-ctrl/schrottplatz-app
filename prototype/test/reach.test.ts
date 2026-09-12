@@ -16,13 +16,15 @@ import { hoechsteKrallenspitze, tempoFaktor, anlaufZeit, CAB_MAX } from "../src/
 import { CONFIGS } from "../src/world/containers";
 import {
   neueAbladestelle,
+  neueAbholstelle,
   routeInRev,
   setBaggerOrt,
   TIP_CREEP_M,
 } from "../src/delivery/routes";
+import { baleYard, PRESS_CENTER as PRESSE } from "../src/world/press";
 
 /** Standplatz des Baggers — siehe `position` in excavator.ts. */
-const BAGGER = { x: -2.0, z: -19.5 };
+const BAGGER = { x: -2.5, z: -19.5 };
 
 /**
  * Mulden, die der Spieler von seinem Standplatz aus selbst befüllt.
@@ -51,7 +53,19 @@ const SELBST_BEFUELLT = [
  * dieser kurzen Linie aus ueber seine Wand zu befuellen ist.
  */
 const LINIE: Array<[number, number]> = [];
-for (let t = 0; t <= 1.0001; t += 0.05) LINIE.push([-2.0, -19.5 + t * 5]);
+// Nach vorn, an den Absetzcontainern entlang
+for (let t = 0; t <= 1.0001; t += 0.05) LINIE.push([-2.5, -19.5 + t * 5]);
+/*
+ * Und nach rechts, in den Gang zwischen Containerreihe und Stahlmulde.
+ *
+ * Seit die Presse wieder mittig hinter dem Bagger steht (12.09.2026), liegt
+ * die Stahlmulde rechts daneben — gemessen 10,7 m vom Sitz, also ausserhalb
+ * jeder Reichweite. Sie wird aus diesem Gang befuellt: von dort sind es 6,2 m
+ * auf die Muldenmitte, und der Arm kommt auf 8,1 m ueber Grund. Der Gang ist
+ * 3,7 m breit, zwischen der Suedkante der Container (z −19,0) und der halben
+ * Nordwand der Mulde (z −22,7).
+ */
+for (let t = 0; t <= 1.0001; t += 0.1) LINIE.push([-2.5 - t * 6.0, -19.5 - t * 1.0]);
 
 function abstand(x: number, z: number): number {
   return Math.hypot(x - BAGGER.x, z - BAGGER.z);
@@ -133,4 +147,42 @@ describe("Reichweite des Arms", () => {
       ).not.toBeNull();
     });
   }
+
+  /*
+   * Zwei Stellen, die der Spieler nicht selbst waehlt und trotzdem erreichen
+   * muss: der Halteplatz des Abholers und die Stelle, an der die Presse das
+   * fertige Paket auswirft. Beide werden zur Laufzeit aus der Baggerstellung
+   * gerechnet, beide koennten dabei aus dem Greifring rutschen — und beide
+   * waeren dann eine Sackgasse: Was man nicht greifen kann, kann man weder
+   * verladen noch verkaufen.
+   */
+  it("der Abholer haelt im Greifring, egal wo der Bagger steht", () => {
+    for (const b of [
+      { x: -2.0, z: -19.5 },
+      { x: -2.0, z: -14.0 },
+      { x: 2.0, z: -22.0 },
+      { x: -6.0, z: -12.0 },
+    ]) {
+      setBaggerOrt(() => b);
+      const [x, z] = neueAbholstelle();
+      const d = Math.hypot(x - b.x, z - b.z);
+      expect(d, `Abholer bei Bagger (${b.x}|${b.z})`).toBeGreaterThanOrEqual(4.0);
+      expect(d, `Abholer bei Bagger (${b.x}|${b.z})`).toBeLessThanOrEqual(9.5);
+      // Ueber die Bordwand muss der Greifer auch noch kommen.
+      expect(hoechsteKrallenspitze(d), `Hubhoehe bei ${d.toFixed(1)} m`).toBeGreaterThan(2.5);
+    }
+  });
+
+  it("das Presspaket bleibt in der Kammer", () => {
+    /*
+     * "Ballen bleiben in Presse, ohne Abscheiden" (12.09.2026). Dazwischen
+     * warf die Presse zum Bagger hin aus; der Test hielt fest, dass die
+     * Auswurfstelle im Greifring liegt. Jetzt haelt er das Gegenteil fest:
+     * Es gibt keine Auswurfstelle, das Paket liegt in der Kammer — und weil
+     * es dort liegt, blockiert es die naechste Fuhre. Das ist gewollt.
+     */
+    const y = baleYard();
+    expect(y.x).toBeCloseTo(PRESSE.x, 5);
+    expect(y.z).toBeCloseTo(PRESSE.z, 5);
+  });
 });
