@@ -97,7 +97,13 @@ export const CLAW_CLOSED_SPLAY = 0.85;
  * Hälfte des Umfangs war Lücke, und deshalb schloss der Korb nie.
  *
  * Halbe Breite einer Schale in METERN, nicht als Winkel. Eine Schale ist also
- * 0,68 m breit, vom Bolzen bis zur Spitze gleich.
+ * 0,90 m breit — so weit, wie ihr Anteil am Kreis es an der breitesten Stelle
+ * ueberhaupt zulaesst. Die Vorlagen zeigen schwere, breite Schaufeln, keine
+ * Klingen; mit 0,68 m blieb zwischen den Schalen zu viel Luft.
+ *
+ * Nah am Bolzen greift die Deckelung auf 72°: Dort ist der Radius so klein,
+ * dass 0,90 m gar nicht danebenpassen — die Schalen laufen zusammen und
+ * werden erst nach aussen hin breit. Genau so sieht es an der Maschine aus.
  *
  * Zwischendurch waren es 21°, weil die offenen Greifer auf den Vorlagen breite
  * Lücken zeigen. Am zweiten Foto (Sennebogen-Mehrschalengreifer, 12.09.2026)
@@ -114,7 +120,7 @@ export const CLAW_CLOSED_SPLAY = 0.85;
  *   Radius  0,757  0,757  0,744  0,708  0,642  0,536  0,390  0,207  ~0
  *   Breite  0,79   0,79   0,78   0,74   0,67   0,56   0,41   0,22   0  (m)
  */
-export const CLAW_SHELL_BREITE = 0.34;
+export const CLAW_SHELL_BREITE = 0.45;
 /** Blechstärke der Schale (m) — sie ist ein Hohlkörper, kein Vollprofil. */
 export const CLAW_SHELL_DICKE = 0.085;
 /**
