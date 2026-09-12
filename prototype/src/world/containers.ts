@@ -160,19 +160,32 @@ export const CONFIGS: ContainerConfig[] = [
    * heranzieht, mit dem man gerade arbeitet. Kupfer und Messing bleiben
    * getrennt: doppelter Preisunterschied, und wer beides in einen Behälter
    * wirft, bekommt für alles den Messingpreis.
+   *
+   * Groesser und an die Muldenwand geschoben (Ansage 12.09.2026:
+   * „vergroessere Container fuer Metalle und schieb sie an die neue
+   * Muldenwand"). 3,6 x 2,3 x 1,8 m statt 2,8 x 1,8 x 1,1 — ein echter
+   * 7-m³-Absetzcontainer, nicht mehr ein Moertelkuebel; das Volumen steigt
+   * dabei auf das Doppelte.
+   *
+   * Die Reihe endet 15 cm vor der halbhohen Nordwand der Stahlmulde. Dadurch
+   * liegen alle sechs im Greifring: gemessen 5,2 bis 9,5 m vom Sitz, vorher
+   * lagen zwei bei 10,1 und 11,4 m und waren nur durch Heranziehen zu
+   * erreichen. Der Preis steht dafuer in E-100: Der Gang hinter den
+   * Containern ist zu, und die Stahlmulde wird von ihrer offenen Westseite
+   * befuellt statt von dort.
    */
-  { id: "r_cable", fractionId: "cable", label: "KABEL", kind: "rolloff", x: -8.2,
-    z: -17.8, size: [3.2, 2.3, 1.5] },
-  { id: "r_va", fractionId: "va", label: "EDELSTAHL VA", kind: "rolloff", x: -11.6,
-    z: -17.8, size: [3.2, 2.3, 1.5] },
-  { id: "r_copper", fractionId: "copper", label: "KUPFER", kind: "rolloff", x: -8.2,
-    z: -15.2, size: [3.2, 2.3, 1.5] },
-  { id: "r_alu", fractionId: "alu", label: "ALU", kind: "rolloff", x: -11.6,
-    z: -15.2, size: [3.2, 2.3, 1.5] },
-  { id: "r_zinc", fractionId: "zinc", label: "ZINK", kind: "rolloff", x: -8.2,
-    z: -12.6, size: [3.2, 2.3, 1.5] },
-  { id: "r_brass", fractionId: "brass", label: "MESSING", kind: "rolloff", x: -11.6,
-    z: -12.6, size: [3.2, 2.3, 1.5] },
+  { id: "r_cable", fractionId: "cable", label: "KABEL", kind: "rolloff", x: -7.6,
+    z: -16.2, size: [3.6, 2.3, 1.8] },
+  { id: "r_va", fractionId: "va", label: "EDELSTAHL VA", kind: "rolloff", x: -11.4,
+    z: -16.2, size: [3.6, 2.3, 1.8] },
+  { id: "r_copper", fractionId: "copper", label: "KUPFER", kind: "rolloff", x: -7.6,
+    z: -18.6, size: [3.6, 2.3, 1.8] },
+  { id: "r_alu", fractionId: "alu", label: "ALU", kind: "rolloff", x: -11.4,
+    z: -18.6, size: [3.6, 2.3, 1.8] },
+  { id: "r_zinc", fractionId: "zinc", label: "ZINK", kind: "rolloff", x: -7.6,
+    z: -21.0, size: [3.6, 2.3, 1.8] },
+  { id: "r_brass", fractionId: "brass", label: "MESSING", kind: "rolloff", x: -11.4,
+    z: -21.0, size: [3.6, 2.3, 1.8] },
 
   /*
    * SILOS an der Ostwand — dorthin fährt der Abholer entlang, ohne den
