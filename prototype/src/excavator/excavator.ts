@@ -13,6 +13,7 @@ import {
   CLAW_SEGMENTS,
   schalenGeometrie,
   CLAW_SHELL_HALF,
+  CLAW_BEND_KUM,
   clawPoint,
   naechsteSpreizung,
   NACHDRUECK_RESERVE,
@@ -615,7 +616,6 @@ export class Excavator {
     // Krümmung sind so gewählt, dass die Spitzen bei geschlossener Spinne
     // exakt in der Mitte zusammenkommen — vorher liefen sie übereinander.
     const RING_R = CLAW_RING_R;
-    const CYL_R = 0.42; // Anlenkkreis der Zylinder am Gehäuse
     const ringY = CLAW_RING_Y;
 
     const rotator = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.36, 0.5), edgeMat);
@@ -677,28 +677,75 @@ export class Excavator {
        * sah geschlossen aus wie eine schwarze Kugel. Jetzt nur noch die
        * untersten Stationen.
        */
-      const schneide = new THREE.Mesh(schalenGeometrie(4), edgeMat);
+      const schneide = new THREE.Mesh(schalenGeometrie(5), edgeMat);
       schneide.scale.set(1.012, 1, 1.012);
       pivot.add(schneide);
-      // Hydraulikzylinder: Traverse → Krallen-Lagerbock
+      /*
+       * Spitzer Verschleisszahn an der Schalenspitze (Vorlage 12.09.2026).
+       *
+       * Die alte Fassung lief bewusst stumpf aus — "Sortiergreifer laufen wie
+       * ein Loeffelrand aus, nicht wie ein Spiess" —, weil damals Bleche
+       * aufgespiesst wurden. Das Problem haengt aber am Zahnverhalten, nicht an
+       * der Form, und auf jedem Schrottgreifer sitzt vorn ein Zahn.
+       */
+      const zahnP = clawPoint(0, 0, CLAW_SEGMENTS, new THREE.Vector3());
+      const zahn = new THREE.Mesh(new THREE.ConeGeometry(0.085, 0.26, 4), edgeMat);
+      /*
+       * `clawPoint` liefert Weltkoordinaten der Spinne, das Gelenk hat seine
+       * eigenen. Umrechnung: y minus Ringhoehe, z minus Ringradius. Beim
+       * ersten Versuch stand hier ein Plus vor dem Radius — dann sassen alle
+       * fuenf Zaehne in der Mitte der Spinne statt an ihren Spitzen.
+       */
+      zahn.position.set(0, zahnP.y - CLAW_RING_Y - 0.05, zahnP.z - CLAW_RING_R);
+      zahn.rotation.x = Math.PI - (CLAW_BEND_KUM[CLAW_SEGMENTS - 1] ?? 0);
+      zahn.name = "tineTip";
+      zahn.castShadow = true;
+      pivot.add(zahn);
+      /*
+       * Hydraulikzylinder: Traverse → Krallen-Lagerbock.
+       *
+       * Auf der Vorlage (12.09.2026) sind sie das Auffaelligste an der ganzen
+       * Maschine: fuenf dicke, fast senkrecht stehende Zylinder in einem Ring,
+       * blanke Kolbenstangen, dazwischen die Schlaeuche. Vorher waren es hier
+       * dünne Schraegstreben von 6,6 cm Durchmesser, die im Bild untergingen.
+       * Jetzt 11 cm Rohr und 7 cm Stange — ein Zylinder, der fuenf Tonnen
+       * zudrueckt, ist kein Bleistift.
+       */
       const barrel = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.066, 0.066, 1, 10),
-        new THREE.MeshStandardMaterial({ color: 0x62c94b, roughness: 0.4, metalness: 0.35 })
+        new THREE.CylinderGeometry(0.11, 0.115, 1, 14),
+        new THREE.MeshStandardMaterial({ color: 0x2b3034, roughness: 0.42, metalness: 0.55 })
       );
       const rod = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.042, 0.042, 1, 8),
-        new THREE.MeshStandardMaterial({ color: 0xb8bec4, roughness: 0.22, metalness: 0.85 })
+        new THREE.CylinderGeometry(0.07, 0.07, 1, 12),
+        new THREE.MeshStandardMaterial({ color: 0xd0d6dc, roughness: 0.14, metalness: 0.92 })
       );
       barrel.castShadow = true;
       this.grappleGroup.add(barrel);
       this.grappleGroup.add(rod);
       this.grappleCylinders.push({
         pivot,
-        fromLocal: new THREE.Vector3(Math.sin(a) * CYL_R, -0.56, Math.cos(a) * CYL_R),
-        toLocalOnShell: new THREE.Vector3(0, -0.3, 0.19),
+        /*
+         * Oben dicht an der Achse, unten aussen an der Schale — dadurch steht
+         * der Zylinder steil statt schraeg, wie auf der Vorlage. Vorher lag der
+         * obere Anlenkpunkt auf 0,42 m Radius und der untere fast senkrecht
+         * darunter; die Zylinder lagen dann flach ueber den Schalen.
+         */
+        /*
+         * Der Zylinder steht fast senkrecht, wie auf der Vorlage: oben am
+         * aeusseren Rand des Kopfes, unten an einem Lagerbock, der ueber dem
+         * Gelenk aus der Schale ragt. Weil der Bock oberhalb des Drehpunkts
+         * sitzt, schwenkt er beim Oeffnen nach aussen — die Kolbenstange faehrt
+         * dabei aus, genau wie bei der echten Maschine.
+         *
+         * Der erste Anlauf setzte ihn oben nah an die Achse und unten weit
+         * aussen an die Schale. Der Zylinder lag dann quer ueber dem Kopf wie
+         * ein hingelegter Baumstamm.
+         */
+        fromLocal: new THREE.Vector3(Math.sin(a) * 0.78, -0.06, Math.cos(a) * 0.78),
+        toLocalOnShell: new THREE.Vector3(0, 0.13, 0.11),
         barrel,
         rod,
-        barrelLen: 0.3,
+        barrelLen: 0.46,
       });
 
       this.grappleGroup.add(pivot);

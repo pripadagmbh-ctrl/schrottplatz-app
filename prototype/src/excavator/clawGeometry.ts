@@ -15,11 +15,34 @@ export const CLAW_RING_R = 0.757;
 /** Unterkante Traverse, gemessen ab Kardangelenk */
 export const CLAW_RING_Y = -0.9;
 /** Länge eines Krallensegments */
-export const CLAW_SEG_LEN = 0.26;
-/** Krümmung je Segment nach innen (rad) — macht aus der Kralle eine Sichel */
-export const CLAW_SEG_BEND = 0.22;
+export const CLAW_SEG_LEN = 0.21;
 /** Segmente je Kralle */
-export const CLAW_SEGMENTS = 6;
+export const CLAW_SEGMENTS = 8;
+/**
+ * Krümmung der Sichel, Station für Station (rad).
+ *
+ * Nicht gleichmäßig, sondern nach hinten zunehmend — das ist der Unterschied
+ * zwischen einem Kreisbogen und der Sichel eines echten Schrottgreifers
+ * (Vorlage 12.09.2026, Rotobec-Mehrschalengreifer). Oben läuft die Schale fast
+ * senkrecht, unten hakt sie scharf nach innen:
+ *
+ *   Station        1    2    3    4    5    6    7    8
+ *   gleichmäßig   0°   9°  17°  26°  35°  43°  52°  61°
+ *   so            0°   4°  10°  19°  30°  44°  61°  80°
+ *
+ * Die Zahlen sind so skaliert, dass die Spitzen bei geschlossener Spinne genau
+ * auf der Achse zusammenkommen (Radius 0,000 an Station 8) und die Tiefe von
+ * 1,30 m erhalten bleibt. Wer daran dreht, muss beides nachrechnen — sonst
+ * laufen die Schalen übereinander oder es bleibt ein Loch.
+ */
+const BEND_PROFIL = Array.from({ length: CLAW_SEGMENTS }, (_, i) =>
+  0.207 * (0.3 + 1.55 * (i / (CLAW_SEGMENTS - 1)))
+);
+/** Aufsummierte Krümmung bis Station `i`. */
+export const CLAW_BEND_KUM: number[] = BEND_PROFIL.reduce<number[]>(
+  (acc, b2) => [...acc, (acc[acc.length - 1] ?? 0) + b2],
+  [0]
+);
 /** Zahl der Krallen */
 export const CLAW_COUNT = 5;
 /**
@@ -46,11 +69,11 @@ export const CLAW_OPEN_SPLAY = 1.25;
  * breiter als unten". Bei fester Winkelbreite folgt die Bogenbreite dem
  * Radius, und der schrumpft zur Spitze hin:
  *
- *   Station   0      1      2      3      4      5      6
- *   Radius  0,757  0,757  0,700  0,590  0,430  0,230  ~0
- *   Breite  0,90   0,90   0,83   0,70   0,51   0,27   0   (m)
+ *   Station   0      1      2      3      4      5      6      7      8
+ *   Radius  0,757  0,757  0,744  0,708  0,642  0,536  0,390  0,207  ~0
+ *   Breite  0,79   0,79   0,78   0,74   0,67   0,56   0,41   0,22   0  (m)
  */
-export const CLAW_SHELL_HALF = (Math.PI / CLAW_COUNT) * (34 / 36);
+export const CLAW_SHELL_HALF = (Math.PI / CLAW_COUNT) * (30 / 36);
 /** Blechstärke der Schale (m) — sie ist ein Hohlkörper, kein Vollprofil. */
 export const CLAW_SHELL_DICKE = 0.085;
 /**
@@ -90,7 +113,7 @@ export function schalenGeometrie(vonStation = 0): THREE.BufferGeometry {
   let z = 0;
   for (let k = 0; k <= CLAW_SEGMENTS; k++) {
     stationen.push({ y, r: Math.max(SCHALE_MIN_R, CLAW_RING_R + z) });
-    const th = k * CLAW_SEG_BEND;
+    const th = CLAW_BEND_KUM[k] ?? 0;
     y -= CLAW_SEG_LEN * Math.cos(th);
     z -= CLAW_SEG_LEN * Math.sin(th);
   }
@@ -166,7 +189,7 @@ export function clawPoint(
   let y = 0;
   let z = 0;
   for (let i = 0; i < k; i++) {
-    const th = -splay + i * CLAW_SEG_BEND;
+    const th = -splay + (CLAW_BEND_KUM[i] ?? 0);
     y -= CLAW_SEG_LEN * Math.cos(th);
     z -= CLAW_SEG_LEN * Math.sin(th);
   }
