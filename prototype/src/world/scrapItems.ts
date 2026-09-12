@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { getMaterial } from "../materials/catalog";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { baueGeometrie, type BauId } from "./objektbau";
 import {
   KATALOG_BIG,
@@ -29,6 +30,14 @@ export interface ScrapShape {
    * bleiben die alten Einträge unverändert.
    */
   bau?: BauId;
+  /**
+   * Wie das Ding heißt — „Kühlschrank", „Traktor-Hinterachse".
+   *
+   * Steht hier und nicht nur im Kommentar des Katalogs, weil der Spieler im
+   * Greifer lesen soll, was er gefasst hat (Wunsch 12.09.2026). Liegt in der
+   * Form und nicht am Teil, damit es ohne Zutun im Spielstand landet.
+   */
+  name?: string;
 }
 
 /**
@@ -230,6 +239,43 @@ function flatColliderDesc(shape: ScrapShape): RAPIER.ColliderDesc {
 }
 
 /**
+ * Wie sich eine Fraktion pressen laesst.
+ *
+ * `dichte` in kg je Kubikmeter Paket — daraus ergibt sich die Groesse bei
+ * gegebener Masse. `fransen` ist die Spanne, `lang` und `dick` sind Anteile
+ * der Paketkante, `beule` die Unruhe der Oberflaeche.
+ */
+interface Pressprofil {
+  dichte: number;
+  fransen: [number, number];
+  lang: number;
+  dick: number;
+  beule: number;
+  rauheit: number;
+  glanz: number;
+}
+
+const PRESSPROFIL: Record<string, Pressprofil> = {
+  // Stahl federt zurueck: mittlere Dichte, viele Blechfetzen, kraeftig gebeult
+  steel: { dichte: 1250, fransen: [7, 13], lang: 0.45, dick: 0.05, beule: 0.11, rauheit: 0.9, glanz: 0.3 },
+  // Mischschrott ist das Unruhigste, was aus der Kammer kommt
+  mixed: { dichte: 1050, fransen: [10, 17], lang: 0.55, dick: 0.06, beule: 0.15, rauheit: 0.95, glanz: 0.25 },
+  // Edelstahl ist stur: bleibt sperrig, spreizt lange Zipfel ab
+  va: { dichte: 1150, fransen: [9, 15], lang: 0.6, dick: 0.04, beule: 0.12, rauheit: 0.55, glanz: 0.7 },
+  // Alu geht weich zusammen: dicht, klein, fast glatt
+  alu: { dichte: 1450, fransen: [3, 6], lang: 0.3, dick: 0.045, beule: 0.07, rauheit: 0.5, glanz: 0.55 },
+  // Kupfer noch dichter — das schwerste Paket bei gleichem Volumen
+  copper: { dichte: 1900, fransen: [3, 7], lang: 0.28, dick: 0.05, beule: 0.06, rauheit: 0.45, glanz: 0.65 },
+  // Kabel bleibt ein Knaeuel: locker, ueberall Schwaenze
+  cable: { dichte: 800, fransen: [14, 22], lang: 0.75, dick: 0.035, beule: 0.16, rauheit: 0.95, glanz: 0.1 },
+  // Nichtmetalle pressen sich schlecht und sehen zerfetzt aus
+  wood: { dichte: 620, fransen: [12, 18], lang: 0.6, dick: 0.07, beule: 0.17, rauheit: 1.0, glanz: 0 },
+  plastic: { dichte: 540, fransen: [10, 16], lang: 0.5, dick: 0.06, beule: 0.15, rauheit: 0.85, glanz: 0.05 },
+  tires: { dichte: 700, fransen: [8, 14], lang: 0.4, dick: 0.09, beule: 0.13, rauheit: 1.0, glanz: 0 },
+  rubble: { dichte: 1400, fransen: [6, 11], lang: 0.3, dick: 0.08, beule: 0.14, rauheit: 1.0, glanz: 0 },
+};
+
+/**
  * Wie stark ein Teil beim Quetschen zusammengeht. 0,18 hat die Ursprungsform
  * völlig ausgelöscht — aus allem wurde eine Platte. 0,55 verbeult das Stück
  * sichtbar, man erkennt aber noch, was es einmal war.
@@ -239,23 +285,23 @@ const FLAT_SCALE_Y = 0.55;
 
 // Basis-Sortiment (SW) — Starthaufen und Zufalls-Ladungen speisen sich hieraus
 const SPECS: PileSpec[] = [
-  { materialId: "steel", massKg: 60, kind: "box", dims: [0.15, 0.15, 1.3], bau: "buendel" }, // Profilstahl
-  { materialId: "steel", massKg: 45, kind: "cyl", dims: [0.09, 1.1], bau: "rohrFlansch" }, // Rohr
+  { materialId: "steel", massKg: 60, kind: "box", dims: [0.15, 0.15, 1.3], bau: "buendel", name: "Profilstahl" },
+  { materialId: "steel", massKg: 45, kind: "cyl", dims: [0.09, 1.1], bau: "rohrFlansch", name: "Rohr" },
   { materialId: "steel", massKg: 35, kind: "box", dims: [0.12, 0.12, 0.9] },
-  { materialId: "steel", massKg: 55, kind: "box", dims: [0.7, 0.06, 0.9], bau: "platte" }, // Blech
-  { materialId: "steel", massKg: 90, kind: "box", dims: [0.7, 0.5, 0.15], bau: "platte" }, // Heizkörper (früher Guss)
-  { materialId: "steel", massKg: 110, kind: "box", dims: [0.4, 0.4, 0.4], bau: "motor" }, // Motorblock-Rest
+  { materialId: "steel", massKg: 55, kind: "box", dims: [0.7, 0.06, 0.9], bau: "platte", name: "Blech" },
+  { materialId: "steel", massKg: 90, kind: "box", dims: [0.7, 0.5, 0.15], bau: "platte", name: "Heizkörper (früher Guss)" },
+  { materialId: "steel", massKg: 110, kind: "box", dims: [0.4, 0.4, 0.4], bau: "motor", name: "Motorblock-Rest" },
   { materialId: "steel", massKg: 70, kind: "box", dims: [0.18, 0.18, 1.1] },
-  { materialId: "va", massKg: 26, kind: "box", dims: [0.9, 0.18, 0.6], bau: "weisseWare" }, // Spülbecken
-  { materialId: "va", massKg: 34, kind: "cyl", dims: [0.34, 0.8], bau: "tank" }, // VA-Behälter
-  { materialId: "va", massKg: 18, kind: "box", dims: [0.06, 0.06, 1.5], bau: "buendel" }, // VA-Geländerrohr
-  { materialId: "alu", massKg: 12, kind: "cyl", dims: [0.32, 0.22] }, // Felge
-  { materialId: "alu", massKg: 8, kind: "box", dims: [0.08, 0.08, 1.4] }, // Profil
-  { materialId: "alu", massKg: 10, kind: "box", dims: [0.6, 0.04, 0.8], bau: "platte" }, // Tafel
+  { materialId: "va", massKg: 26, kind: "box", dims: [0.9, 0.18, 0.6], bau: "weisseWare", name: "Spülbecken" },
+  { materialId: "va", massKg: 34, kind: "cyl", dims: [0.34, 0.8], bau: "tank", name: "VA-Behälter" },
+  { materialId: "va", massKg: 18, kind: "box", dims: [0.06, 0.06, 1.5], bau: "buendel", name: "VA-Geländerrohr" },
+  { materialId: "alu", massKg: 12, kind: "cyl", dims: [0.32, 0.22], name: "Felge" },
+  { materialId: "alu", massKg: 8, kind: "box", dims: [0.08, 0.08, 1.4], name: "Profil" },
+  { materialId: "alu", massKg: 10, kind: "box", dims: [0.6, 0.04, 0.8], bau: "platte", name: "Tafel" },
   { materialId: "alu", massKg: 11, kind: "cyl", dims: [0.3, 0.2] },
-  { materialId: "copper", massKg: 12, kind: "cyl", dims: [0.05, 0.8], bau: "buendel" }, // Kupferrohr
-  { materialId: "copper", massKg: 18, kind: "torus", dims: [0.14, 0.05] }, // Kupferbund
-  { materialId: "copper", massKg: 15, kind: "box", dims: [0.3, 0.25, 0.3], bau: "maschine" }, // Messingarmaturen
+  { materialId: "copper", massKg: 12, kind: "cyl", dims: [0.05, 0.8], bau: "buendel", name: "Kupferrohr" },
+  { materialId: "copper", massKg: 18, kind: "torus", dims: [0.14, 0.05], name: "Kupferbund" },
+  { materialId: "copper", massKg: 15, kind: "box", dims: [0.3, 0.25, 0.3], bau: "maschine", name: "Messingarmaturen" },
   { materialId: "cable", massKg: 9, kind: "torus", dims: [0.18, 0.07] },
   { materialId: "cable", massKg: 7, kind: "torus", dims: [0.15, 0.06] },
   { materialId: "cable", massKg: 12, kind: "torus", dims: [0.2, 0.08] },
@@ -269,24 +315,24 @@ const SPECS: PileSpec[] = [
   // war das Sortiment sehr nach Baustelle: Profile, Rohre, Bleche. Ein Platz
   // lebt aber von dem, was die Leute anschleppen — Hausrat, Zweiraeder,
   // Landmaschinen, ausgeschlachtete Fahrzeugteile.
-  { materialId: "steel", massKg: 42, kind: "box", dims: [0.55, 0.85, 0.55], bau: "weisseWare" }, // Waschmaschine
-  { materialId: "steel", massKg: 38, kind: "box", dims: [0.6, 0.85, 0.6], bau: "weisseWare" }, // Spuelmaschine
-  { materialId: "steel", massKg: 30, kind: "box", dims: [0.65, 0.9, 0.6], bau: "weisseWare" }, // Elektroherd
-  { materialId: "steel", massKg: 52, kind: "cyl", dims: [0.28, 1.4], bau: "tank" }, // Warmwasserspeicher
-  { materialId: "steel", massKg: 48, kind: "box", dims: [1.6, 0.55, 0.7] }, // Badewanne
-  { materialId: "steel", massKg: 26, kind: "box", dims: [0.6, 0.9, 1.9], bau: "kleinfahrzeug" }, // Motorradrahmen
-  { materialId: "steel", massKg: 14, kind: "box", dims: [0.5, 0.7, 1.6], bau: "kleinfahrzeug" }, // Mopedrahmen
-  { materialId: "steel", massKg: 120, kind: "box", dims: [1.1, 0.35, 0.9], bau: "schaufel" }, // Pflugschar
-  { materialId: "steel", massKg: 85, kind: "cyl", dims: [0.34, 1.7], bau: "trommel" }, // Eggenwalze
-  { materialId: "steel", massKg: 160, kind: "box", dims: [0.5, 0.5, 1.4], bau: "motor" }, // Traktor-Frontgewicht
-  { materialId: "steel", massKg: 95, kind: "box", dims: [2.1, 0.25, 0.35], bau: "ausleger" }, // Heuwender-Ausleger
-  { materialId: "steel", massKg: 210, kind: "cyl", dims: [0.16, 2.2], bau: "achse" }, // LKW-Achse
-  { materialId: "steel", massKg: 130, kind: "box", dims: [0.8, 0.7, 0.9], bau: "motor" }, // LKW-Getriebe
-  { materialId: "steel", massKg: 75, kind: "box", dims: [0.9, 0.75, 0.12], bau: "maschine" }, // LKW-Kuehler
-  { materialId: "steel", massKg: 46, kind: "cyl", dims: [0.28, 0.32] }, // LKW-Felge
-  { materialId: "alu", massKg: 16, kind: "box", dims: [0.7, 0.5, 0.15], bau: "motor" }, // Motorradmotor
-  { materialId: "copper", massKg: 22, kind: "box", dims: [0.45, 0.4, 0.35], bau: "elektromotor" }, // Elektromotor
-  { materialId: "tires", massKg: 11, kind: "torus", dims: [0.31, 0.11] }, // Traktorreifen
+  { materialId: "steel", massKg: 42, kind: "box", dims: [0.55, 0.85, 0.55], bau: "weisseWare", name: "Waschmaschine" },
+  { materialId: "steel", massKg: 38, kind: "box", dims: [0.6, 0.85, 0.6], bau: "weisseWare", name: "Spuelmaschine" },
+  { materialId: "steel", massKg: 30, kind: "box", dims: [0.65, 0.9, 0.6], bau: "weisseWare", name: "Elektroherd" },
+  { materialId: "steel", massKg: 52, kind: "cyl", dims: [0.28, 1.4], bau: "tank", name: "Warmwasserspeicher" },
+  { materialId: "steel", massKg: 48, kind: "box", dims: [1.6, 0.55, 0.7], name: "Badewanne" },
+  { materialId: "steel", massKg: 26, kind: "box", dims: [0.6, 0.9, 1.9], bau: "kleinfahrzeug", name: "Motorradrahmen" },
+  { materialId: "steel", massKg: 14, kind: "box", dims: [0.5, 0.7, 1.6], bau: "kleinfahrzeug", name: "Mopedrahmen" },
+  { materialId: "steel", massKg: 120, kind: "box", dims: [1.1, 0.35, 0.9], bau: "schaufel", name: "Pflugschar" },
+  { materialId: "steel", massKg: 85, kind: "cyl", dims: [0.34, 1.7], bau: "trommel", name: "Eggenwalze" },
+  { materialId: "steel", massKg: 160, kind: "box", dims: [0.5, 0.5, 1.4], bau: "motor", name: "Traktor-Frontgewicht" },
+  { materialId: "steel", massKg: 95, kind: "box", dims: [2.1, 0.25, 0.35], bau: "ausleger", name: "Heuwender-Ausleger" },
+  { materialId: "steel", massKg: 210, kind: "cyl", dims: [0.16, 2.2], bau: "achse", name: "LKW-Achse" },
+  { materialId: "steel", massKg: 130, kind: "box", dims: [0.8, 0.7, 0.9], bau: "motor", name: "LKW-Getriebe" },
+  { materialId: "steel", massKg: 75, kind: "box", dims: [0.9, 0.75, 0.12], bau: "maschine", name: "LKW-Kuehler" },
+  { materialId: "steel", massKg: 46, kind: "cyl", dims: [0.28, 0.32], name: "LKW-Felge" },
+  { materialId: "alu", massKg: 16, kind: "box", dims: [0.7, 0.5, 0.15], bau: "motor", name: "Motorradmotor" },
+  { materialId: "copper", massKg: 22, kind: "box", dims: [0.45, 0.4, 0.35], bau: "elektromotor", name: "Elektromotor" },
+  { materialId: "tires", massKg: 11, kind: "torus", dims: [0.31, 0.11], name: "Traktorreifen" },
 
   // Erweiterung 12.09.2026 — siehe world/objektkatalog.ts
   ...KATALOG_SPECS,
@@ -302,49 +348,49 @@ const SPECS: PileSpec[] = [
  * einzufädeln ist die eigentliche Aufgabe am Bagger (Wunsch 29.08.2026).
  */
 const HUGE_SPECS: PileSpec[] = [
-  { materialId: "steel", massKg: 2400, kind: "box", dims: [2.4, 1.1, 1.9], bau: "achse" }, // Waggon-Drehgestell
-  { materialId: "steel", massKg: 2200, kind: "box", dims: [3.2, 0.9, 0.8], bau: "fahrgestell" }, // Kettenlaufwerk
-  { materialId: "steel", massKg: 1800, kind: "cyl", dims: [1.1, 3.6], bau: "tank" }, // Kesselwagen-Segment
-  { materialId: "steel", massKg: 1400, kind: "cyl", dims: [1.2, 3.1], bau: "tank" }, // Lagertank
-  { materialId: "steel", massKg: 1100, kind: "cyl", dims: [0.9, 2.0], bau: "tank" }, // Turbinengehäuse
-  { materialId: "steel", massKg: 900, kind: "box", dims: [2.2, 1.9, 1.8], bau: "karosserie" }, // LKW-Fahrerhaus
-  { materialId: "steel", massKg: 1600, kind: "box", dims: [2.8, 1.2, 1.1], bau: "motor" }, // Pressenrahmen
-  { materialId: "va", massKg: 950, kind: "cyl", dims: [1.0, 2.8], bau: "tank" }, // VA-Prozesstank
-  { materialId: "va", massKg: 700, kind: "box", dims: [2.6, 0.9, 1.2], bau: "tank" }, // VA-Behälter
-  { materialId: "alu", massKg: 700, kind: "box", dims: [3.5, 0.35, 1.6], bau: "platte" }, // Tragflächenstück
-  { materialId: "alu", massKg: 800, kind: "cyl", dims: [1.3, 3.0], bau: "rohrFlansch" }, // Rumpfsegment
-  { materialId: "alu", massKg: 550, kind: "box", dims: [2.9, 1.1, 0.9], bau: "container" }, // Aufbau/Kofferaufbau
+  { materialId: "steel", massKg: 2400, kind: "box", dims: [2.4, 1.1, 1.9], bau: "achse", name: "Waggon-Drehgestell" },
+  { materialId: "steel", massKg: 2200, kind: "box", dims: [3.2, 0.9, 0.8], bau: "fahrgestell", name: "Kettenlaufwerk" },
+  { materialId: "steel", massKg: 1800, kind: "cyl", dims: [1.1, 3.6], bau: "tank", name: "Kesselwagen-Segment" },
+  { materialId: "steel", massKg: 1400, kind: "cyl", dims: [1.2, 3.1], bau: "tank", name: "Lagertank" },
+  { materialId: "steel", massKg: 1100, kind: "cyl", dims: [0.9, 2.0], bau: "tank", name: "Turbinengehäuse" },
+  { materialId: "steel", massKg: 900, kind: "box", dims: [2.2, 1.9, 1.8], bau: "karosserie", name: "LKW-Fahrerhaus" },
+  { materialId: "steel", massKg: 1600, kind: "box", dims: [2.8, 1.2, 1.1], bau: "motor", name: "Pressenrahmen" },
+  { materialId: "va", massKg: 950, kind: "cyl", dims: [1.0, 2.8], bau: "tank", name: "VA-Prozesstank" },
+  { materialId: "va", massKg: 700, kind: "box", dims: [2.6, 0.9, 1.2], bau: "tank", name: "VA-Behälter" },
+  { materialId: "alu", massKg: 700, kind: "box", dims: [3.5, 0.35, 1.6], bau: "platte", name: "Tragflächenstück" },
+  { materialId: "alu", massKg: 800, kind: "cyl", dims: [1.3, 3.0], bau: "rohrFlansch", name: "Rumpfsegment" },
+  { materialId: "alu", massKg: 550, kind: "box", dims: [2.9, 1.1, 0.9], bau: "container", name: "Aufbau/Kofferaufbau" },
 
   // Erweiterung 12.09.2026 — siehe world/objektkatalog.ts
   ...KATALOG_HUGE,
 ];
 
 const BIG_SPECS: PileSpec[] = [
-  { materialId: "steel", massKg: 180, kind: "box", dims: [0.28, 0.28, 2.9], bau: "traeger" }, // Doppel-T-Träger
-  { materialId: "steel", massKg: 220, kind: "box", dims: [1.9, 0.08, 1.5], bau: "platte" }, // Blechtafel
-  { materialId: "steel", massKg: 160, kind: "cyl", dims: [0.22, 2.6], bau: "rohrFlansch" }, // dickes Rohr
-  { materialId: "steel", massKg: 140, kind: "box", dims: [1.2, 0.9, 0.75], bau: "tank" }, // Kessel
-  { materialId: "steel", massKg: 95, kind: "box", dims: [0.75, 1.5, 0.7], bau: "weisseWare" }, // Waschmaschine
-  { materialId: "steel", massKg: 420, kind: "box", dims: [0.9, 0.7, 0.95], bau: "motor" }, // Maschinenblock
-  { materialId: "steel", massKg: 300, kind: "cyl", dims: [0.6, 0.9], bau: "trommel" }, // Schwungrad
-  { materialId: "steel", massKg: 260, kind: "box", dims: [1.5, 1.1, 0.8], bau: "moebel" }, // Stahlschrank
-  { materialId: "steel", massKg: 195, kind: "box", dims: [2.4, 0.9, 0.12], bau: "platte" }, // Stahltür/Tor
-  { materialId: "steel", massKg: 240, kind: "cyl", dims: [0.75, 1.9], bau: "tank" }, // Öltank/Boiler
-  { materialId: "steel", massKg: 150, kind: "wire", dims: [1.15], bau: "haufen" }, // Drahtballen
-  { materialId: "va", massKg: 210, kind: "cyl", dims: [0.7, 1.8], bau: "tank" }, // VA-Tank
-  { materialId: "va", massKg: 130, kind: "box", dims: [1.8, 0.1, 1.1], bau: "platte" }, // VA-Tafel
-  { materialId: "va", massKg: 95, kind: "box", dims: [1.2, 0.85, 0.7], bau: "moebel" }, // Gastro-Spültisch
-  { materialId: "va", massKg: 70, kind: "box", dims: [0.14, 0.14, 2.6], bau: "buendel" }, // VA-Rohrbündel
-  { materialId: "alu", massKg: 60, kind: "box", dims: [0.3, 0.3, 2.8], bau: "buendel" }, // Profilbündel
-  { materialId: "alu", massKg: 45, kind: "box", dims: [1.6, 0.06, 1.2], bau: "platte" }, // Alutafel
-  { materialId: "alu", massKg: 85, kind: "box", dims: [1.4, 1.2, 0.25], bau: "platte" }, // Alu-Fensterrahmen
-  { materialId: "alu", massKg: 110, kind: "cyl", dims: [0.55, 1.4], bau: "tank" }, // Alu-Kessel
-  { materialId: "copper", massKg: 65, kind: "cyl", dims: [0.35, 1.2], bau: "tank" }, // Kupfer-Boiler
-  { materialId: "copper", massKg: 48, kind: "torus", dims: [0.45, 0.16], bau: "buendel" }, // Kupferrohr-Bund
-  { materialId: "cable", massKg: 55, kind: "torus", dims: [0.55, 0.22] }, // Kabelbund
-  { materialId: "cable", massKg: 120, kind: "cyl", dims: [0.85, 0.9], bau: "trommel" }, // Kabeltrommel
-  { materialId: "wood", massKg: 90, kind: "box", dims: [1.4, 0.5, 0.9], bau: "moebel" }, // Holzkiste
-  { materialId: "rubble", massKg: 130, kind: "box", dims: [1.1, 1.1, 1.1], bau: "beton" }, // Betonblock
+  { materialId: "steel", massKg: 180, kind: "box", dims: [0.28, 0.28, 2.9], bau: "traeger", name: "Doppel-T-Träger" },
+  { materialId: "steel", massKg: 220, kind: "box", dims: [1.9, 0.08, 1.5], bau: "platte", name: "Blechtafel" },
+  { materialId: "steel", massKg: 160, kind: "cyl", dims: [0.22, 2.6], bau: "rohrFlansch", name: "dickes Rohr" },
+  { materialId: "steel", massKg: 140, kind: "box", dims: [1.2, 0.9, 0.75], bau: "tank", name: "Kessel" },
+  { materialId: "steel", massKg: 95, kind: "box", dims: [0.75, 1.5, 0.7], bau: "weisseWare", name: "Waschmaschine" },
+  { materialId: "steel", massKg: 420, kind: "box", dims: [0.9, 0.7, 0.95], bau: "motor", name: "Maschinenblock" },
+  { materialId: "steel", massKg: 300, kind: "cyl", dims: [0.6, 0.9], bau: "trommel", name: "Schwungrad" },
+  { materialId: "steel", massKg: 260, kind: "box", dims: [1.5, 1.1, 0.8], bau: "moebel", name: "Stahlschrank" },
+  { materialId: "steel", massKg: 195, kind: "box", dims: [2.4, 0.9, 0.12], bau: "platte", name: "Stahltür/Tor" },
+  { materialId: "steel", massKg: 240, kind: "cyl", dims: [0.75, 1.9], bau: "tank", name: "Öltank/Boiler" },
+  { materialId: "steel", massKg: 150, kind: "wire", dims: [1.15], bau: "haufen", name: "Drahtballen" },
+  { materialId: "va", massKg: 210, kind: "cyl", dims: [0.7, 1.8], bau: "tank", name: "VA-Tank" },
+  { materialId: "va", massKg: 130, kind: "box", dims: [1.8, 0.1, 1.1], bau: "platte", name: "VA-Tafel" },
+  { materialId: "va", massKg: 95, kind: "box", dims: [1.2, 0.85, 0.7], bau: "moebel", name: "Gastro-Spültisch" },
+  { materialId: "va", massKg: 70, kind: "box", dims: [0.14, 0.14, 2.6], bau: "buendel", name: "VA-Rohrbündel" },
+  { materialId: "alu", massKg: 60, kind: "box", dims: [0.3, 0.3, 2.8], bau: "buendel", name: "Profilbündel" },
+  { materialId: "alu", massKg: 45, kind: "box", dims: [1.6, 0.06, 1.2], bau: "platte", name: "Alutafel" },
+  { materialId: "alu", massKg: 85, kind: "box", dims: [1.4, 1.2, 0.25], bau: "platte", name: "Alu-Fensterrahmen" },
+  { materialId: "alu", massKg: 110, kind: "cyl", dims: [0.55, 1.4], bau: "tank", name: "Alu-Kessel" },
+  { materialId: "copper", massKg: 65, kind: "cyl", dims: [0.35, 1.2], bau: "tank", name: "Kupfer-Boiler" },
+  { materialId: "copper", massKg: 48, kind: "torus", dims: [0.45, 0.16], bau: "buendel", name: "Kupferrohr-Bund" },
+  { materialId: "cable", massKg: 55, kind: "torus", dims: [0.55, 0.22], name: "Kabelbund" },
+  { materialId: "cable", massKg: 120, kind: "cyl", dims: [0.85, 0.9], bau: "trommel", name: "Kabeltrommel" },
+  { materialId: "wood", massKg: 90, kind: "box", dims: [1.4, 0.5, 0.9], bau: "moebel", name: "Holzkiste" },
+  { materialId: "rubble", massKg: 130, kind: "box", dims: [1.1, 1.1, 1.1], bau: "beton", name: "Betonblock" },
 
   // Erweiterung 12.09.2026 — siehe world/objektkatalog.ts
   ...KATALOG_BIG,
@@ -404,7 +450,13 @@ export function randomCargo(
     out.push({
       materialId: spec.materialId,
       massKg: spec.massKg,
-      shape: { kind: spec.kind, dims: spec.dims, color: colorFor(spec, i), bau: spec.bau },
+      shape: {
+        kind: spec.kind,
+        dims: spec.dims,
+        color: colorFor(spec, i),
+        bau: spec.bau,
+        name: spec.name,
+      },
     });
   }
   return out;
@@ -630,20 +682,27 @@ export class ItemManager {
    * mit denen das Teil einmal aus dem Katalog gezogen wurde. Findet sich nichts,
    * bleibt es der Grundkoerper; falsch wird dadurch nichts.
    */
-  private static bauKarte: Map<string, BauId> | null = null;
+  private static katalogKarte: Map<string, { bau?: BauId; name?: string }> | null = null;
 
-  private static bauFuer(materialId: string, massKg: number, shape: ScrapShape): BauId | undefined {
-    if (!ItemManager.bauKarte) {
-      const karte = new Map<string, BauId>();
+  private static katalogFuer(
+    materialId: string,
+    massKg: number,
+    shape: ScrapShape
+  ): { bau?: BauId; name?: string } | undefined {
+    if (!ItemManager.katalogKarte) {
+      const karte = new Map<string, { bau?: BauId; name?: string }>();
       for (const liste of [SPECS, BIG_SPECS, HUGE_SPECS]) {
         for (const sp of liste) {
-          if (!sp.bau) continue;
-          karte.set(`${sp.materialId}|${sp.massKg}|${sp.kind}|${sp.dims.join(",")}`, sp.bau);
+          if (!sp.bau && !sp.name) continue;
+          karte.set(`${sp.materialId}|${sp.massKg}|${sp.kind}|${sp.dims.join(",")}`, {
+            bau: sp.bau,
+            name: sp.name,
+          });
         }
       }
-      ItemManager.bauKarte = karte;
+      ItemManager.katalogKarte = karte;
     }
-    return ItemManager.bauKarte.get(
+    return ItemManager.katalogKarte.get(
       `${materialId}|${massKg}|${shape.kind}|${shape.dims.join(",")}`
     );
   }
@@ -660,10 +719,10 @@ export class ItemManager {
      * darum Grundfarbe weiss und `vertexColors`. Nur so bleibt ein Objekt aus
      * zwoelf Bauteilen ein einziger Zeichenruf mit einem einzigen Material.
      */
-    // Aus einem alten Spielstand geladen? Dann fehlt der Bau — nachtragen.
-    if (!shape.bau) {
-      const nachgetragen = ItemManager.bauFuer(materialId, massKg, shape);
-      if (nachgetragen) shape = { ...shape, bau: nachgetragen };
+    // Aus einem alten Spielstand geladen? Dann fehlen Bau und Name — nachtragen.
+    if (!shape.bau || !shape.name) {
+      const k = ItemManager.katalogFuer(materialId, massKg, shape);
+      if (k) shape = { ...shape, bau: shape.bau ?? k.bau, name: shape.name ?? k.name };
     }
     const material = new THREE.MeshStandardMaterial({
       color: shape.bau ? 0xffffff : shape.color,
@@ -889,60 +948,116 @@ export class ItemManager {
    * fasst. Die zerknautschte Oberfläche entsteht aus einem verrauschten
    * Quader — glatt sähe es aus wie ein Umzugskarton.
    */
+  /**
+   * Presspaket.
+   *
+   * Ein Paket ist kein Quader von der Stange (Wunsch 12.09.2026): „Je Material
+   * und Stauchung sollten die farblich anders fransen, aussehen und
+   * unterschiedlich gross sein." Drei Dinge richten sich deshalb nach dem, was
+   * hineingegangen ist:
+   *
+   * - **Dichte** — Alu und Kupfer lassen sich weich zusammenschieben und
+   *   ergeben ein dichtes, kleines Paket. Stahl federt zurueck, VA ist stur,
+   *   Kabel bleibt ein Knaeuel. Bei gleicher Masse kommt darum ein sehr
+   *   unterschiedlich grosser Wuerfel heraus.
+   * - **Fransen** — wie viele, wie lang, wie duenn. Ein Kabelpaket haengt
+   *   ueberall voll Schwaenze, ein Alupaket ist fast glatt.
+   * - **Farbe** — nicht die dominante Fraktion, sondern Flecken aus allem, was
+   *   drin ist, gewichtet nach Masse. Ein gemischtes Paket ist auch bunt.
+   *
+   * Dazu eine Toleranz von rund einem Zehntel auf Groesse und Seitenverhaeltnis:
+   * Zwei Pakete aus derselben Fuhre sehen nie gleich aus.
+   *
+   * Alles wird zu **einer** Geometrie verschmolzen, die Farben stecken in den
+   * Eckpunkten. Ein Paket mit vierzehn Fransen kostet damit einen Zeichenruf
+   * statt fuenfzehn.
+   */
   spawnBale(
     materialId: string,
     massKg: number,
     pos: THREE.Vector3,
     composition?: Array<{ materialId: string; massKg: number }>
   ): ScrapItem {
-    // Richtwert: rund 1,2 t je Kubikmeter Paket
-    const vol = THREE.MathUtils.clamp(massKg / 1200, 0.12, 1.5);
+    const profil = PRESSPROFIL[materialId] ?? PRESSPROFIL.steel;
+    const streu = (a: number): number => (Math.random() - 0.5) * 2 * a;
+
+    /*
+     * Groesse aus Dichte und Masse, mit Toleranz.
+     *
+     * Die Toleranz war zuerst zu breit: plus/minus zwoelf Prozent auf jede
+     * Kante ergeben zusammen einen Faktor zwei aufs Volumen — damit kam ein
+     * Alupaket groesser heraus als ein Stahlpaket, obwohl Alu dichter presst
+     * (gemessen 12.09.2026: 0,86 gegen 0,54 Kubikmeter bei je 900 kg). Die
+     * Streuung soll zwei Pakete derselben Fuhre unterscheiden, nicht die
+     * Materialien vertauschen. Jetzt rund plus/minus fuenfzehn Prozent aufs
+     * Volumen, waehrend die Dichten von 540 bis 1900 reichen.
+     */
+    const vol = THREE.MathUtils.clamp(massKg / (profil.dichte * (1 + streu(0.05))), 0.1, 1.8);
     const w = Math.cbrt(vol);
-    const dims: [number, number, number] = [w * 1.25, w * 0.85, w];
-    const geo = new THREE.BoxGeometry(dims[0], dims[1], dims[2], 3, 2, 3);
+    const dims: [number, number, number] = [
+      w * (1.25 + streu(0.06)),
+      w * (0.85 + streu(0.06)),
+      w * (1.0 + streu(0.05)),
+    ];
+
+    // Farbanteile nach Masse — daraus werden die Flecken und die Fransen
+    const anteile = (composition ?? [{ materialId, massKg }]).filter((c) => c.massKg > 0);
+    const summe = anteile.reduce((a, c) => a + c.massKg, 0) || 1;
+    const paletteFarben = anteile.map((c) => getMaterial(c.materialId).color);
+    const paletteAnteil = anteile.map((c) => c.massKg / summe);
+    const waehleFarbe = (r: number): number => {
+      let acc = 0;
+      for (let i = 0; i < paletteFarben.length; i++) {
+        acc += paletteAnteil[i];
+        if (r <= acc) return paletteFarben[i];
+      }
+      return paletteFarben[paletteFarben.length - 1] ?? getMaterial(materialId).color;
+    };
+
+    const stuecke: THREE.BufferGeometry[] = [];
+    const farbeHilf = new THREE.Color();
+    const faerbe = (geo: THREE.BufferGeometry, waehler: (i: number) => number): void => {
+      const p2 = geo.getAttribute("position");
+      const c = new Float32Array(p2.count * 3);
+      for (let i = 0; i < p2.count; i++) {
+        farbeHilf.set(waehler(i));
+        c[i * 3] = farbeHilf.r;
+        c[i * 3 + 1] = farbeHilf.g;
+        c[i * 3 + 2] = farbeHilf.b;
+      }
+      geo.setAttribute("color", new THREE.BufferAttribute(c, 3));
+      geo.deleteAttribute("uv1");
+      stuecke.push(geo);
+    };
+
+    // Koerper: gebeult, und die Beule ist materialabhaengig
+    const geo = new THREE.BoxGeometry(dims[0], dims[1], dims[2], 4, 3, 4);
     const p = geo.getAttribute("position") as THREE.BufferAttribute;
     for (let i = 0; i < p.count; i++) {
-      // Kraeftiger verbeult als frueher: Ein Paket kommt nicht glatt aus der
-      // Kammer, es quillt an den Kanten.
-      const n = 0.1 * w;
-      p.setXYZ(
-        i,
-        p.getX(i) + (Math.random() - 0.5) * n,
-        p.getY(i) + (Math.random() - 0.5) * n,
-        p.getZ(i) + (Math.random() - 0.5) * n
-      );
+      const n = profil.beule * w;
+      p.setXYZ(i, p.getX(i) + streu(n), p.getY(i) + streu(n), p.getZ(i) + streu(n));
     }
     geo.computeVertexNormals();
-    const mat = getMaterial(materialId);
-    const mesh = new THREE.Mesh(
-      geo,
-      new THREE.MeshStandardMaterial({ color: mat.color, roughness: 0.9, metalness: 0.3 })
-    );
-    /*
-     * Ein Presspaket ist kein sauberes Paket (Wunsch 11.09.2026): Aus den
-     * Kanten haengen Blechfetzen, Rohrenden und Kabelschwaenze heraus, und man
-     * sieht noch, woraus es gepresst wurde. Die Fransen tragen deshalb die
-     * Farben der Zusammensetzung — ein gemischtes Paket ist auch bunt.
-     */
-    const farben = (composition ?? [{ materialId, massKg }])
-      .filter((c) => c.massKg > 0)
-      .map((c) => getMaterial(c.materialId).color);
-    const fransen = 5 + Math.floor(Math.random() * 5);
+    // Flecken: benachbarte Eckpunkte bekommen dieselbe Farbe, sonst flimmert es
+    faerbe(geo, (i) => {
+      const x = p.getX(i);
+      const y = p.getY(i);
+      const z = p.getZ(i);
+      const k = Math.abs(Math.sin(x * 12.1 + y * 7.3 + z * 9.7) * 43758.5);
+      return waehleFarbe(k - Math.floor(k));
+    });
+
+    // Fransen: Zahl, Laenge und Dicke nach Profil
+    const fransen = profil.fransen[0] + Math.floor(Math.random() * (profil.fransen[1] - profil.fransen[0] + 1));
+    const [hx, hy, hz] = [dims[0] / 2, dims[1] / 2, dims[2] / 2];
+    const rand = (a: number): number => (Math.random() - 0.5) * a;
     for (let i = 0; i < fransen; i++) {
-      const lang = w * (0.3 + Math.random() * 0.5);
-      const duenn = w * (0.03 + Math.random() * 0.06);
-      const zipfel = new THREE.Mesh(
-        new THREE.BoxGeometry(duenn, duenn * (0.5 + Math.random()), lang),
-        new THREE.MeshStandardMaterial({
-          color: farben[Math.floor(Math.random() * farben.length)] ?? mat.color,
-          roughness: 0.95,
-          metalness: 0.25,
-        })
-      );
-      // Aus einer Seitenflaeche heraus, schraeg — nicht ordentlich angesetzt
-      const seite = Math.floor(Math.random() * 6);
-      const rand = (a: number): number => (Math.random() - 0.5) * a;
-      const [hx, hy, hz] = [dims[0] / 2, dims[1] / 2, dims[2] / 2];
+      const lang = w * profil.lang * (0.6 + Math.random() * 0.8);
+      const duenn = w * profil.dick * (0.6 + Math.random() * 0.9);
+      const zipfel = new THREE.BoxGeometry(duenn, duenn * (0.5 + Math.random()), lang);
+      zipfel.rotateX(Math.random() * Math.PI);
+      zipfel.rotateY(Math.random() * Math.PI);
+      zipfel.rotateZ(Math.random() * Math.PI);
       const punkte: Array<[number, number, number]> = [
         [hx, rand(dims[1]), rand(dims[2])],
         [-hx, rand(dims[1]), rand(dims[2])],
@@ -951,16 +1066,26 @@ export class ItemManager {
         [rand(dims[0]), rand(dims[1]), hz],
         [rand(dims[0]), rand(dims[1]), -hz],
       ];
-      const [px, py, pz] = punkte[seite];
-      zipfel.position.set(px * 0.92, py * 0.92, pz * 0.92);
-      zipfel.rotation.set(
-        Math.random() * Math.PI,
-        Math.random() * Math.PI,
-        Math.random() * Math.PI
-      );
-      zipfel.castShadow = true;
-      mesh.add(zipfel);
+      const [px, py, pz] = punkte[Math.floor(Math.random() * 6)];
+      zipfel.translate(px * 0.92, py * 0.92, pz * 0.92);
+      const farbe = waehleFarbe(Math.random());
+      faerbe(zipfel, () => farbe);
     }
+
+    const gesamt = mergeGeometries(stuecke, false) ?? geo;
+    gesamt.computeVertexNormals();
+    for (const g2 of stuecke) if (g2 !== gesamt) g2.dispose();
+
+    const mat = getMaterial(materialId);
+    const mesh = new THREE.Mesh(
+      gesamt,
+      new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        vertexColors: true,
+        roughness: profil.rauheit,
+        metalness: profil.glanz,
+      })
+    );
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     this.scene.add(mesh);

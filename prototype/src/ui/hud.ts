@@ -7,6 +7,15 @@ import type { AmpelState } from "../world/containers";
  * HUD M1 (Briefing Kap. 14): Griff-Info (Material, Gewicht, €-Indikator),
  * Sortierwert-Anzeige mit Ticker, Abwurf-Ampel-Text.
  */
+/**
+ * Ab dieser Masse wird ein Stueck beim Namen genannt statt nur nach Fraktion
+ * gezaehlt. Darunter sind es Bleche und Profile, bei denen der Name nichts
+ * hilft.
+ */
+const GROSS_AB_KG = 60;
+/** So viele Namen hoechstens — danach wird zusammengefasst. */
+const GROSS_MAX = 3;
+
 export class Hud {
   private gripEl = document.getElementById("gripinfo")!;
   private moneyEl = document.getElementById("money")!;
@@ -19,19 +28,40 @@ export class Hud {
       return;
     }
     const mat = getMaterial(item.materialId);
-    this.gripEl.textContent = `▼ ${mat.name} · ${item.massKg.toFixed(0)} kg · ${euroIndicator(mat)}`;
+    // Der Name zuerst: Man greift einen Kuehlschrank, nicht "Stahlschrott".
+    const name = item.shape?.name;
+    const kopf = name ? `${name} · ${mat.name}` : mat.name;
+    this.gripEl.textContent = `▼ ${kopf} · ${item.massKg.toFixed(0)} kg · ${euroIndicator(mat)}`;
   }
 
-  /** Griff-Info beim Tragen: Ladungsliste + Ampel. */
+  /**
+   * Griff-Info beim Tragen: Ladungsliste + Ampel.
+   *
+   * Grosse Stuecke werden beim Namen genannt, kleine nach Fraktion
+   * zusammengefasst (Wunsch 12.09.2026: „evtl. Listenbeschreibung einbauen, was
+   * in Spinne liegt, zumindest fuer grosse Teile"). Sonst stuende bei einer
+   * vollen Spinne eine Zeile aus zwoelf Namen da, die niemand liest.
+   */
   showCarry(items: ScrapItem[], hover: { container: string; ampel: AmpelState } | null): void {
     const byMat = new Map<string, number>();
+    const gross: string[] = [];
     let total = 0;
     for (const it of items) {
-      byMat.set(it.materialId, (byMat.get(it.materialId) ?? 0) + 1);
       total += it.massKg;
+      const name = it.shape?.name;
+      if (name && it.massKg >= GROSS_AB_KG && gross.length < GROSS_MAX) {
+        gross.push(name);
+        continue;
+      }
+      byMat.set(it.materialId, (byMat.get(it.materialId) ?? 0) + 1);
     }
-    const parts = [...byMat.entries()].map(([id, n]) => `${n}× ${getMaterial(id).name}`);
-    let text = `Greifer: ${parts.join(", ")} · ${total.toFixed(0)} kg`;
+    const parts = [
+      ...gross,
+      ...[...byMat.entries()].map(([id, n]) => `${n}× ${getMaterial(id).name}`),
+    ];
+    const gezeigt = parts.slice(0, GROSS_MAX + 2);
+    if (parts.length > gezeigt.length) gezeigt.push(`+${parts.length - gezeigt.length} weitere`);
+    let text = `Greifer: ${gezeigt.join(", ")} · ${total.toFixed(0)} kg`;
     if (hover) {
       // Zielzone unter dem Greifer samt Bewertung — nicht das Material selbst
       const verdict =
