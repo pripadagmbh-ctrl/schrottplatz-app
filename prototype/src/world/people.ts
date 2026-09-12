@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { umkugelRadius, type ItemManager } from "./scrapItems";
+import { umkugelRadius, type ItemManager, type ScrapItem } from "./scrapItems";
 import { hitsObstacle, slideAround } from "./obstacles";
 import { CONFIGS, type ContainerConfig } from "./containers";
 import { KAFFEE_ROT } from "./yard";
@@ -106,6 +106,8 @@ export function buildPerson(colors: PersonColors): PersonParts {
  *   carry   bringt es in seine Mulde
  *   shove   faehrt hinter ein Teil, das der Bagger nicht erreicht
  *   shoving schiebt es in die Reichweite des Baggers
+ *   werkzeug geht zu einem Stueck, das Flex oder Abdrueckmaschine braucht
+ *   trennt  arbeitet daran, bis es in seine Fraktionen faellt
  *   zurBude geht zu Janine, weil gerade nichts zu holen ist
  *   kaffee  steht an der Theke
  *   zurueckZurMaschine geht zurueck zum Radlader
@@ -257,6 +259,20 @@ const RADLADER_PARKPLATZ = new THREE.Vector3(OFFICE_X + 1.5, 0, HALL1_Z);
 /** Blickrichtung dort — aus der Halle heraus (+X). */
 const RADLADER_PARKYAW = Math.PI / 2;
 
+/**
+ * Wie lange er an einem Stueck arbeitet (s).
+ *
+ * Eine Alufelge vom Reifen zu bekommen ist keine Sekundensache: Ventil raus,
+ * Wulst abdruecken, Felge heraushebeln. Neun Sekunden sind im Spiel lang genug,
+ * dass man ihn dabei sieht, und kurz genug, dass er nicht den halben Tag an
+ * einem Rad steht.
+ */
+const WERKZEUG_S = 9;
+/** So weit laeuft er hoechstens zu einer Werkzeugarbeit (m) */
+const WERKZEUG_WEITE = 26;
+/** Abstand zwischen zwei Funkengarben (s) */
+const FUNKEN_TAKT = 0.35;
+
 /** Bis hierher traegt er von Hand, wenn der Radlader nicht hinkommt (kg) */
 const HANDLAST_KG = 60;
 /** So lange setzt er zurueck, wenn ihm etwas den Weg versperrt (s) */
@@ -284,6 +300,8 @@ type LambertState =
   | "carry"
   | "shove"
   | "shoving"
+  | "werkzeug"
+  | "trennt"
   | "zurBude"
   | "kaffee"
   | "zurueckZurMaschine";
@@ -371,6 +389,21 @@ export class StaffManager {
    * oder geht Kaffee trinken (Auftrag 11.09.2026, Rangfolge in Phase 0.2).
    */
   private zuFuss = false;
+  /** Restzeit an der aktuellen Werkzeugarbeit (s) */
+  private trennRestS = 0;
+  /** Taktgeber fuer die Funken */
+  private funkenRestS = 0;
+  /**
+   * Ein Stueck ist fertig getrennt — das Spiel macht daraus die Fraktionen.
+   *
+   * Die Trennung selbst steht in `ItemManager.zerlege`; hier wird nur
+   * gemeldet, dass die Arbeit getan ist. So kennt der Platzwart weder
+   * Fraktionen noch Preise.
+   */
+  onTrennen: ((item: ScrapItem) => void) | null = null;
+  /** Funken beim Flexen — Ort fuer Partikel und Klang. */
+  onFunken: ((x: number, y: number, z: number) => void) | null = null;
+
   /** Wo der Radlader steht, solange Lambert zu Fuss unterwegs ist. */
   private readonly maschinePos = new THREE.Vector3();
   /** Restliche Pausenzeit (s) */
@@ -555,6 +588,34 @@ export class StaffManager {
     this.pruefUhr += dt;
     const g = this.lambert.group;
     this.zaehleGeweckte(dt);
+
+    // --- Werkzeugarbeit: er steht am Stueck und flext ---
+    if (this.lambertState === "trennt") {
+      const it = this.items.items.find((i) => i.id === this.carriedItemId);
+      if (!it || !it.body.isValid() || !it.body.isDynamic()) {
+        // Weggeraeumt, waehrend er daran arbeitete — dann eben nicht.
+        this.giveUpTarget();
+        return;
+      }
+      this.trennRestS -= dt;
+      // Arm auf und ab, damit man die Arbeit sieht
+      this.lambert.armRight.rotation.x = -0.9 + Math.sin(this.stateT * 9) * 0.35;
+      this.funkenRestS -= dt;
+      if (this.funkenRestS <= 0) {
+        this.funkenRestS = FUNKEN_TAKT;
+        const p = it.body.translation();
+        this.onFunken?.(p.x, p.y + 0.25, p.z);
+      }
+      if (this.trennRestS <= 0) {
+        this.lambert.armRight.rotation.x = 0;
+        this.onTrennen?.(it);
+        this.carriedItemId = null;
+        this.lambertState = "patrol";
+        this.lambertTarget.copy(this.patrol[this.patrolIdx]);
+      }
+      this.loader?.update(dt, this.maschinePos, this.loaderYaw, false);
+      return;
+    }
 
     // --- Kaffeepause ---
     if (this.lambertState === "kaffee") {
@@ -898,6 +959,17 @@ export class StaffManager {
       this.lambertTarget.copy(this.patrol[this.patrolIdx]);
       return;
     }
+    if (this.lambertState === "werkzeug") {
+      const it = this.items.items.find((i) => i.id === this.carriedItemId);
+      if (it && it.body.isValid() && this.items.brauchtWerkzeug(it)) {
+        this.lambertState = "trennt";
+        this.trennRestS = WERKZEUG_S;
+        this.funkenRestS = 0;
+      } else {
+        this.giveUpTarget();
+      }
+      return;
+    }
     if (this.lambertState === "fetch") {
       // Aufgenommen — jetzt zur Box, in die das Material gehört
       const it = this.items.items.find((i) => i.id === this.carriedItemId);
@@ -1005,6 +1077,20 @@ export class StaffManager {
     const blocker = this.findBlocker();
     if (blocker) {
       hol(blocker);
+      return;
+    }
+    /*
+     * Werkzeugarbeit vor dem Sortieren: Ein Rad mit Alufelge bringt getrennt
+     * 602 statt 160 Euro je Tonne, und niemand sonst auf dem Platz kann es
+     * trennen — der Bagger wuerde die Felge zerdruecken. Nur eine blockierte
+     * Fahrspur hat noch Vorrang, daran haengt der ganze Betrieb.
+     */
+    const werkzeug = this.findWerkzeugTeil();
+    if (werkzeug) {
+      const p = werkzeug.body.translation();
+      this.carriedItemId = werkzeug.id;
+      this.lambertTarget.set(p.x, 0, p.z);
+      this.lambertState = "werkzeug";
       return;
     }
     const weit = this.findSchiebegut();
@@ -1407,6 +1493,29 @@ export class StaffManager {
   }
 
   /** Kleinteil, das frei herumliegt (nicht in einer Zone, nicht gegriffen). */
+  /**
+   * Das naechste Stueck, das Werkzeug braucht.
+   *
+   * Was in der Spinne haengt, ist kinematisch und faellt damit heraus — er
+   * soll nicht unter dem Bagger stehen und an etwas saegen, das gerade
+   * hochgeht.
+   */
+  private findWerkzeugTeil(): ScrapItem | null {
+    const von = this.lambert.group.position;
+    let best: ScrapItem | null = null;
+    let bestD = Infinity;
+    for (const it of this.items.items) {
+      if (!it.body.isValid() || !it.body.isDynamic()) continue;
+      if (!this.items.brauchtWerkzeug(it)) continue;
+      const p = it.body.translation();
+      const d = Math.hypot(p.x - von.x, p.z - von.z);
+      if (d > WERKZEUG_WEITE || d >= bestD) continue;
+      best = it;
+      bestD = d;
+    }
+    return best;
+  }
+
   private findStray(): (typeof this.items.items)[number] | null {
     // Lamberts Hauptaufgabe: Buntmetall aus dem Stahlschrott holen und in die
     // passende Box legen. Stahl und Störstoff lässt er liegen — der eine ist

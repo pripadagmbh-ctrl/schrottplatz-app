@@ -174,7 +174,7 @@ export const WERKZEUG_MAX = 4.2;
  * Bund, Holz bricht in Latten, Blech bleibt Blech. Die Groesse kommt aus der
  * Masse — bei rund 900 kg je Kubikmeter losem Schrott.
  */
-function trennForm(materialId: string, massKg: number): ScrapShape {
+function trennForm(materialId: string, massKg: number, herkunft?: string): ScrapShape {
   const vol = Math.max(massKg / 900, 0.004);
   const w = Math.cbrt(vol);
   const farbe = getMaterial(materialId).color;
@@ -182,6 +182,14 @@ function trennForm(materialId: string, massKg: number): ScrapShape {
     return { kind: "torus", dims: [w * 1.1, w * 0.42], color: farbe, name: "Kabelbund" };
   if (materialId === "tires")
     return { kind: "torus", dims: [w * 1.0, w * 0.38], color: farbe, name: "Reifen" };
+  // Was aus einem Rad faellt, ist eine Felge — nicht "Aluminium-Reste".
+  if (/felge|rad/i.test(herkunft ?? "") && (materialId === "alu" || materialId === "steel"))
+    return {
+      kind: "cyl",
+      dims: [w * 1.1, w * 0.7],
+      color: farbe,
+      name: materialId === "alu" ? "Alufelge" : "Stahlfelge",
+    };
   if (materialId === "wood")
     return { kind: "box", dims: [w * 0.8, w * 0.7, w * 2.4], color: farbe, name: "Holzbruch" };
   if (materialId === "plastic")
@@ -1473,7 +1481,9 @@ export class ItemManager {
         p.y + 0.25,
         p.z + Math.sin(winkel) * 0.45
       );
-      neu.push(this.spawnScrap(c.materialId, c.massKg, trennForm(c.materialId, c.massKg), ort));
+      neu.push(
+        this.spawnScrap(c.materialId, c.massKg, trennForm(c.materialId, c.massKg, shape.name), ort)
+      );
     });
     return neu;
   }

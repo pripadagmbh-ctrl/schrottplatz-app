@@ -87,10 +87,10 @@ erledigt ist, bekommt den Commit dazu.
 
 ## Personal
 
-- [ ] **Lambert trennt mit Werkzeug** — Flex und Abdrückmaschine. Alles, was
-      `nurWerkzeug` trägt, ist seine Arbeit: Alufelge vom Reifen, später mehr.
-      Er holt das Stück, arbeitet eine Weile daran, und danach liegen die
-      Fraktionen getrennt da. Die Datenseite steht schon (`trennbar` +
-      `nurWerkzeug`, `items.zerlege`), es fehlt sein Arbeitsgang.
+- [x] **Lambert trennt mit Werkzeug** — zwei neue Zustände `werkzeug`
+      (hinlaufen) und `trennt` (neun Sekunden arbeiten, mit Funken). Danach
+      liegen die Fraktionen getrennt da, und er sortiert sie im nächsten
+      Arbeitsgang selbst in die Mulden. Gemessen: patrol → werkzeug → trennt →
+      patrol → carry.
 - [ ] **Heinz als Hilfsarbeiter** — zweiter Mann, damit zwei Arbeitsgänge
       parallel laufen. Ausbaustufe wie Radlader und Bulldozer.

@@ -421,6 +421,22 @@ async function main(): Promise<void> {
    * auch Bagger und Radlader vom Durchfahren abhalten.
    */
   items.onGlasBruch = (x, y, z) => bus.emit("glassShattered", { x, y, z });
+  /*
+   * Lambert am Werkzeug: Er flext die Alufelge vom Reifen. Das Trennen selbst
+   * macht der ItemManager — der Platzwart meldet nur, dass die Arbeit getan
+   * ist, und kennt darum weder Fraktionen noch Preise.
+   */
+  staff.onFunken = (x, y, z) => {
+    particles.spawn(evPos.set(x, y, z), 5, 0xffc46b, 3.0, 0.5, 0.35);
+  };
+  staff.onTrennen = (it) => {
+    const name = it.shape?.name ?? getMaterial(it.materialId).name;
+    const teile = items.zerlege(it);
+    if (!teile) return;
+    audio.playTear();
+    const namen = teile.map((x) => getMaterial(x.materialId).name).join(" + ");
+    hud.toast(`Lambert hat ${name} getrennt: ${namen}`);
+  };
   items.onAufprall = (item, wucht) => {
     const p = item.body.translation();
     const aufStahl = findeBox(p.x, p.z, alleFahrzeugBoxen(), 0.4) !== null;
