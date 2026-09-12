@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { getMaterial } from "../materials/catalog";
+import { type Anteil, istPressbar } from "../materials/purity";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { baueGeometrie, type BauId } from "./objektbau";
 import {
@@ -38,6 +39,16 @@ export interface ScrapShape {
    * Form und nicht am Teil, damit es ohne Zutun im Spielstand landet.
    */
   name?: string;
+  /**
+   * Woraus es besteht, nach Massenanteilen.
+   *
+   * Ein Objekt aus Verbundteilen ist nie sortenrein (Ansage 12.09.2026): Ein
+   * Kühlschrank ist Blech, Alu, Kupfer, Styropor und Kunststoff — das ist
+   * Mischschrott, bis jemand es trennt. Eine Baggerschaufel mit Gumminoppen
+   * bleibt dagegen Stahlschrott, weil der Gummi nicht ins Gewicht fällt.
+   * Wo die Grenze liegt, steht in `SORTENREIN_AB`.
+   */
+  zusammensetzung?: Anteil[];
 }
 
 /**
@@ -290,7 +301,7 @@ const SPECS: PileSpec[] = [
   { materialId: "steel", massKg: 35, kind: "box", dims: [0.12, 0.12, 0.9] },
   { materialId: "steel", massKg: 55, kind: "box", dims: [0.7, 0.06, 0.9], bau: "platte", name: "Blech" },
   { materialId: "steel", massKg: 90, kind: "box", dims: [0.7, 0.5, 0.15], bau: "platte", name: "Heizkörper (früher Guss)" },
-  { materialId: "steel", massKg: 110, kind: "box", dims: [0.4, 0.4, 0.4], bau: "motor", name: "Motorblock-Rest" },
+  { materialId: "steel", massKg: 110, kind: "box", dims: [0.4, 0.4, 0.4], bau: "motor", name: "Motorblock-Rest", zusammensetzung: [{ materialId: "steel", anteil: 0.82 }, { materialId: "alu", anteil: 0.14 }, { materialId: "copper", anteil: 0.04 }] },
   { materialId: "steel", massKg: 70, kind: "box", dims: [0.18, 0.18, 1.1] },
   { materialId: "va", massKg: 26, kind: "box", dims: [0.9, 0.18, 0.6], bau: "weisseWare", name: "Spülbecken" },
   { materialId: "va", massKg: 34, kind: "cyl", dims: [0.34, 0.8], bau: "tank", name: "VA-Behälter" },
@@ -315,8 +326,8 @@ const SPECS: PileSpec[] = [
   // war das Sortiment sehr nach Baustelle: Profile, Rohre, Bleche. Ein Platz
   // lebt aber von dem, was die Leute anschleppen — Hausrat, Zweiraeder,
   // Landmaschinen, ausgeschlachtete Fahrzeugteile.
-  { materialId: "steel", massKg: 42, kind: "box", dims: [0.55, 0.85, 0.55], bau: "weisseWare", name: "Waschmaschine" },
-  { materialId: "steel", massKg: 38, kind: "box", dims: [0.6, 0.85, 0.6], bau: "weisseWare", name: "Spuelmaschine" },
+  { materialId: "steel", massKg: 42, kind: "box", dims: [0.55, 0.85, 0.55], bau: "weisseWare", name: "Waschmaschine", zusammensetzung: [{ materialId: "steel", anteil: 0.62 }, { materialId: "rubble", anteil: 0.18 }, { materialId: "copper", anteil: 0.08 }, { materialId: "plastic", anteil: 0.12 }] },
+  { materialId: "steel", massKg: 38, kind: "box", dims: [0.6, 0.85, 0.6], bau: "weisseWare", name: "Spuelmaschine", zusammensetzung: [{ materialId: "steel", anteil: 0.6 }, { materialId: "plastic", anteil: 0.28 }, { materialId: "copper", anteil: 0.06 }, { materialId: "alu", anteil: 0.06 }] },
   { materialId: "steel", massKg: 30, kind: "box", dims: [0.65, 0.9, 0.6], bau: "weisseWare", name: "Elektroherd" },
   { materialId: "steel", massKg: 52, kind: "cyl", dims: [0.28, 1.4], bau: "tank", name: "Warmwasserspeicher" },
   { materialId: "steel", massKg: 48, kind: "box", dims: [1.6, 0.55, 0.7], name: "Badewanne" },
@@ -331,7 +342,7 @@ const SPECS: PileSpec[] = [
   { materialId: "steel", massKg: 75, kind: "box", dims: [0.9, 0.75, 0.12], bau: "maschine", name: "LKW-Kuehler" },
   { materialId: "steel", massKg: 46, kind: "cyl", dims: [0.28, 0.32], name: "LKW-Felge" },
   { materialId: "alu", massKg: 16, kind: "box", dims: [0.7, 0.5, 0.15], bau: "motor", name: "Motorradmotor" },
-  { materialId: "copper", massKg: 22, kind: "box", dims: [0.45, 0.4, 0.35], bau: "elektromotor", name: "Elektromotor" },
+  { materialId: "copper", massKg: 22, kind: "box", dims: [0.45, 0.4, 0.35], bau: "elektromotor", name: "Elektromotor", zusammensetzung: [{ materialId: "steel", anteil: 0.58 }, { materialId: "copper", anteil: 0.38 }, { materialId: "alu", anteil: 0.04 }] },
   { materialId: "tires", massKg: 11, kind: "torus", dims: [0.31, 0.11], name: "Traktorreifen" },
 
   // Erweiterung 12.09.2026 — siehe world/objektkatalog.ts
@@ -370,7 +381,7 @@ const BIG_SPECS: PileSpec[] = [
   { materialId: "steel", massKg: 220, kind: "box", dims: [1.9, 0.08, 1.5], bau: "platte", name: "Blechtafel" },
   { materialId: "steel", massKg: 160, kind: "cyl", dims: [0.22, 2.6], bau: "rohrFlansch", name: "dickes Rohr" },
   { materialId: "steel", massKg: 140, kind: "box", dims: [1.2, 0.9, 0.75], bau: "tank", name: "Kessel" },
-  { materialId: "steel", massKg: 95, kind: "box", dims: [0.75, 1.5, 0.7], bau: "weisseWare", name: "Waschmaschine" },
+  { materialId: "steel", massKg: 95, kind: "box", dims: [0.75, 1.5, 0.7], bau: "weisseWare", name: "Waschmaschine", zusammensetzung: [{ materialId: "steel", anteil: 0.62 }, { materialId: "rubble", anteil: 0.18 }, { materialId: "copper", anteil: 0.08 }, { materialId: "plastic", anteil: 0.12 }] },
   { materialId: "steel", massKg: 420, kind: "box", dims: [0.9, 0.7, 0.95], bau: "motor", name: "Maschinenblock" },
   { materialId: "steel", massKg: 300, kind: "cyl", dims: [0.6, 0.9], bau: "trommel", name: "Schwungrad" },
   { materialId: "steel", massKg: 260, kind: "box", dims: [1.5, 1.1, 0.8], bau: "moebel", name: "Stahlschrank" },
@@ -388,7 +399,7 @@ const BIG_SPECS: PileSpec[] = [
   { materialId: "copper", massKg: 65, kind: "cyl", dims: [0.35, 1.2], bau: "tank", name: "Kupfer-Boiler" },
   { materialId: "copper", massKg: 48, kind: "torus", dims: [0.45, 0.16], bau: "buendel", name: "Kupferrohr-Bund" },
   { materialId: "cable", massKg: 55, kind: "torus", dims: [0.55, 0.22], name: "Kabelbund" },
-  { materialId: "cable", massKg: 120, kind: "cyl", dims: [0.85, 0.9], bau: "trommel", name: "Kabeltrommel" },
+  { materialId: "cable", massKg: 120, kind: "cyl", dims: [0.85, 0.9], bau: "trommel", name: "Kabeltrommel", zusammensetzung: [{ materialId: "cable", anteil: 0.62 }, { materialId: "wood", anteil: 0.38 }] },
   { materialId: "wood", massKg: 90, kind: "box", dims: [1.4, 0.5, 0.9], bau: "moebel", name: "Holzkiste" },
   { materialId: "rubble", massKg: 130, kind: "box", dims: [1.1, 1.1, 1.1], bau: "beton", name: "Betonblock" },
 
@@ -427,16 +438,27 @@ export function randomCargo(
         : Math.random() < bigShare
           ? BIG_SPECS
           : SPECS;
-    // Fraktionsmix der Anlieferungen (SW): 60 % Misch-/Stahlschrott,
-    // 20 % Aluminium, der Rest verteilt sich auf VA, Kupfer, Kabel, Störstoff
+    /*
+     * Fraktionsmix der Anlieferungen.
+     *
+     * "mixed" musste dazu (Befund 12.09.2026): Seit ein Objekt aus
+     * Verbundteilen als Mischschrott gilt — Kuehlschrank, Karosserie, Kabine,
+     * Wohnwagen —, haengen daran neunundvierzig Eintraege. Ohne die Fraktion
+     * in dieser Liste wurde keiner davon je gezogen, und sie waren mit einem
+     * Schlag aus dem Spiel.
+     *
+     * 42 % Stahl, 22 % Mischschrott, 16 % Alu, der Rest verteilt sich.
+     */
     const r = Math.random();
     const wanted =
       onlyMaterial ??
-      (r < 0.6
+      (r < 0.42
         ? "steel"
-        : r < 0.8
-          ? "alu"
-          : ["va", "copper", "cable", "wood", "plastic", "rubble"][Math.floor(Math.random() * 6)]);
+        : r < 0.64
+          ? "mixed"
+          : r < 0.8
+            ? "alu"
+            : ["va", "copper", "cable", "wood", "plastic", "rubble"][Math.floor(Math.random() * 6)]);
     let matching = pool.filter((s) => s.materialId === wanted);
     // Sortenreine Ladung: notfalls in der anderen Größenklasse suchen, damit
     // die Fraktion auf jeden Fall stimmt
@@ -933,13 +955,16 @@ export class ItemManager {
    * Stahlschrott — Träger und dicke Platten — nicht: den bekommt man nur in
    * der Presse klein.
    */
+  /**
+   * Laesst sich das Ding zusammendruecken — in der Spinne wie in der Presse?
+   *
+   * Die Regel steht in materials/purity.ts und rechnet mit Dichte und Dicke:
+   * Was hohl ist, geht zusammen; was massiv ist, bleibt (Ansage 12.09.2026:
+   * "starre und massive Traeger sollten von der Presse unberuehrt bleiben").
+   */
   isCrushable(item: ScrapItem): boolean {
     if (!item.shape || item.shape.flat) return false;
-    if (item.materialId !== "steel") return true;
-    // Stahl gibt nur nach, solange er dünn und leicht ist (Blech statt Träger)
-    const dims = item.shape.dims;
-    const dickste = Math.min(...dims);
-    return item.massKg < 140 && dickste < 0.22;
+    return istPressbar(item.massKg, item.shape.dims);
   }
 
   /**

@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { CONFIGS } from "./containers";
 import RAPIER from "@dimforge/rapier3d-compat";
+import { SORTENREIN_AB } from "../materials/purity";
 import type { ItemManager } from "./scrapItems";
 import type { CompositeManager } from "../dismantle/composites";
 
@@ -24,8 +25,7 @@ import type { CompositeManager } from "../dismantle/composites";
 // hier steht sie frei neben dem Stahlschrotthaufen, und die offene Seite
 // bleibt in Reichweite (Design-Fix 29.08.2026).
 const CENTER = new THREE.Vector3(-8.5, 0, -7.0);
-/** Ab diesem Anteil einer Fraktion gilt ein Paket noch als sortenrein. */
-const SORTENREIN_AB = 0.92;
+// Die Schwelle gilt fuer Objekte wie fuer Pakete — sie steht in materials/purity.ts.
 /**
  * Ballenlager: dorthin kommt, was fertig gepresst ist. Der Platz steht in
  * containers.ts — hier stand er ein zweites Mal und war seit dem Umbau falsch:

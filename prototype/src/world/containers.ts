@@ -45,8 +45,22 @@ export interface ContainerConfig {
  * einer Reihe — alles im Schwenkbereich, damit kaum gefahren werden muss.
  */
 export const CONFIGS: ContainerConfig[] = [
-  // Riesiger Stahlhaufen direkt links neben dem Bagger (Guss läuft mit)
-  { id: "c_steel", fractionId: "steel", label: "STAHLSCHROTT", kind: "pile", x: -9, z: 1, size: [11, 12, 0] },
+  /*
+   * Die Flaeche links vom Bagger ist geteilt (Ansage 12.09.2026).
+   *
+   * Seit ein Objekt aus Verbundteilen als Mischschrott gilt — Kuehlschrank,
+   * Karosserie, Wohnwagen —, faellt davon so viel an wie von reinem Stahl.
+   * Beides kommt haeufig, also gehoert beides in Baggerreichweite; die
+   * selteneren Fraktionen stehen weiter oestlich und werden von Lambert
+   * bedient. Statt eine neue Flaeche zu suchen (der Kranz um den Bagger ist
+   * voll) wird die vorhandene 11 x 12 m geteilt: zweimal 11 x 6, beide gut
+   * neun Meter vom Drehpunkt und damit im selben Fenster wie vorher.
+   *
+   * Reiner Stahl bringt deutlich mehr als Mischschrott — das ist der Grund,
+   * die beiden ueberhaupt zu trennen.
+   */
+  { id: "c_steel", fractionId: "steel", label: "STAHLSCHROTT", kind: "pile", x: -9, z: -2, size: [11, 6, 0] },
+  { id: "c_mixed", fractionId: "mixed", label: "MISCHSCHROTT", kind: "pile", x: -9.5, z: 4.2, size: [10, 6, 0] },
   // Boxenreihe rechts, von Süd nach Nord aufgereiht.
   // Vier Betonlego-Mulden in einer Reihe, Öffnung zeigt nach Westen zum Bagger.
   //

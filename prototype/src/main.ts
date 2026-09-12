@@ -129,7 +129,10 @@ async function main(): Promise<void> {
     fence = new FenceManager(scene, physics.world, items, bus);
     // Großer Berg auf der Stahlschrottfläche. Die Annahmefläche bleibt frei,
     // dort laden die Pritschen ab.
-    items.spawnPile(new THREE.Vector3(-9, 0, 1));
+    // Auf die Stahlflaeche, nicht auf die Grenze zur Mischschrottflaeche.
+    // Der Haufen ist am Anfang unsortiert — dass er als Verunreinigung zaehlt,
+    // ist gewollt: Aufraeumen ist die Aufgabe.
+    items.spawnPile(new THREE.Vector3(-9, 0, -2));
     // Altfahrzeuge stehen von Anfang an am Rand des Stahlschrott-Haufens
     composites.spawnCar(new THREE.Vector3(-15.8, 0.5, 3.5));
     composites.spawnCar(new THREE.Vector3(-15.8, 0.5, -2.5));
