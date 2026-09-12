@@ -18,8 +18,15 @@ erledigt ist, bekommt den Commit dazu.
 
 ## Physik und Ladung
 
-- [ ] **Nichts schwebt, nichts fällt vom Himmel** — Teile sollen dem Gewicht
-      nach fallen und möglichst schon liegen, bevor das Bild eingeblendet wird.
+- [x] **Nichts schwebt, nichts fällt vom Himmel** — der Vorlauf legte am Ende
+      *alles* schlafen, auch was noch in der Luft war. Gemessen hing ein
+      75-kg-Stück in 7,01 m Höhe und fiel 6,66 m, sobald es geweckt wurde.
+      Jetzt wird nach dem Setzen noch einmal alles geweckt und weitergerechnet,
+      bis nichts mehr fällt. Danach: höchstes Teil 2,38 m statt 7,01, und von
+      den zwölf höchsten sackt noch eines um 41 cm.
+- [ ] **Teile liegen beim Start ineinander** — beim Wecken drückt der Löser
+      einzelne um bis zu 55 cm nach oben. Kein Schweben, aber unsauber: Der
+      Haufen wird beim Setzen zu dicht gepackt.
 
 ## Presse und Schere
 

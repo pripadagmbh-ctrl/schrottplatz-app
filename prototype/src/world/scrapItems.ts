@@ -554,10 +554,48 @@ export class ItemManager {
    * Ohne das beginnt jede Partie mit einem zappelnden Berg, und der Spieler
    * sieht die Teile erst zurechtrutschen (v2: `Simulation.settle()`).
    */
+  /**
+   * Den Platz setzen lassen, bevor das erste Bild kommt.
+   *
+   * Der erste Durchgang allein genuegte nicht. Gemessen am 12.09.2026 hing
+   * nach dem Setzen ein 75-kg-Stueck in **7,01 m Hoehe** und fiel 6,66 m,
+   * sobald es geweckt wurde. Der Grund steckt in der gemeinsamen Schlafregel:
+   * Wird eine Gruppe als ruhig eingestuft, schlaeft auch ein Stueck ein, das
+   * noch faellt — und wer in der Luft einschlaeft, bleibt in der Luft, bis
+   * ihn zufaellig etwas weckt. Im Spiel sah das aus, als fiele Schrott vom
+   * Himmel.
+   *
+   * Darum wird nach dem Setzen noch einmal alles geweckt und weitergerechnet,
+   * bis nichts mehr faellt. Wer wirklich liegt, schlaeft sofort wieder ein;
+   * wer in der Luft hing, faellt jetzt. Das kostet nur Ladezeit, keine
+   * Bildzeit.
+   */
   settle(world: RAPIER.World, schritte = 240): void {
-    for (let i = 0; i < schritte; i++) {
-      world.step();
-      this.settleSleep(1 / 60);
+    const runde = (n: number) => {
+      for (let i = 0; i < n; i++) {
+        world.step();
+        this.settleSleep(1 / 60);
+      }
+    };
+    runde(schritte);
+    for (let durchgang = 0; durchgang < 4; durchgang++) {
+      let geweckt = 0;
+      for (const item of this.items) {
+        if (item.body.isDynamic() && item.body.isSleeping()) {
+          item.body.wakeUp();
+          geweckt++;
+        }
+      }
+      if (geweckt === 0) break;
+      runde(90);
+      // Faellt noch etwas nennenswert? Dann noch eine Runde.
+      let faellt = 0;
+      for (const item of this.items) {
+        if (!item.body.isDynamic()) continue;
+        const v = item.body.linvel();
+        if (Math.abs(v.y) > 0.25) faellt++;
+      }
+      if (faellt === 0) break;
     }
     for (const item of this.items) if (item.body.isDynamic()) item.body.sleep();
     this.syncMeshes();
