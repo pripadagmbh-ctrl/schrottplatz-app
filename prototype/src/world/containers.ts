@@ -120,8 +120,8 @@ export const CONFIGS: ContainerConfig[] = [
    * dem Mischschrott; rechts bekommt sie ihre eigene. Dazwischen wird
    * sortiert, ohne dass ein Behälter im Weg steht.
    */
-  { id: "c_steel", fractionId: "steel", label: "STAHLSCHROTT", kind: "halde", x: -2.5,
-    z: -25.5, size: [8.0, 6.0, 3.0], haldeWaende: { rueck: true, trenn: true } },
+  { id: "c_steel", fractionId: "steel", label: "STAHLSCHROTT", kind: "halde", x: -1.75,
+    z: -26.0, size: [6.5, 5.0, 3.0], haldeWaende: { rueck: true, trenn: true } },
 
   /*
    * GROSSTEILE — offene Fläche rechts neben der Stahlmulde.
@@ -133,7 +133,7 @@ export const CONFIGS: ContainerConfig[] = [
    * Seite aufnehmen können.
    */
   { id: "c_alu_gross", fractionId: "alu", label: "GROSSTEILE ALU", kind: "pile", x: -10.75,
-    z: -25.5, size: [6.5, 6.0, 0] },
+    z: -26.0, size: [6.5, 5.0, 0] },
   /*
    * REIFENDEPOT — rechts hinten, offene Fläche ohne Wände.
    *
@@ -152,17 +152,17 @@ export const CONFIGS: ContainerConfig[] = [
    * wirft, bekommt für alles den Messingpreis.
    */
   { id: "r_cable", fractionId: "cable", label: "KABEL", kind: "rolloff", x: -8.0,
-    z: -15.5, size: [2.8, 1.8, 1.1] },
+    z: -17.5, size: [2.8, 1.8, 1.1] },
   { id: "r_va", fractionId: "va", label: "EDELSTAHL VA", kind: "rolloff", x: -11.0,
-    z: -15.5, size: [2.8, 1.8, 1.1] },
+    z: -17.5, size: [2.8, 1.8, 1.1] },
   { id: "r_copper", fractionId: "copper", label: "KUPFER", kind: "rolloff", x: -8.0,
-    z: -13.0, size: [2.8, 1.8, 1.1] },
+    z: -15.0, size: [2.8, 1.8, 1.1] },
   { id: "r_alu", fractionId: "alu", label: "ALU", kind: "rolloff", x: -11.0,
-    z: -13.0, size: [2.8, 1.8, 1.1] },
+    z: -15.0, size: [2.8, 1.8, 1.1] },
   { id: "r_zinc", fractionId: "zinc", label: "ZINK", kind: "rolloff", x: -8.0,
-    z: -11.0, size: [2.8, 1.8, 1.1] },
+    z: -12.5, size: [2.8, 1.8, 1.1] },
   { id: "r_brass", fractionId: "brass", label: "MESSING", kind: "rolloff", x: -11.0,
-    z: -11.0, size: [2.8, 1.8, 1.1] },
+    z: -12.5, size: [2.8, 1.8, 1.1] },
 
   /*
    * SILOS an der Ostwand — dorthin fährt der Abholer entlang, ohne den

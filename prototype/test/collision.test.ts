@@ -55,7 +55,7 @@ const SORTIERMULDEN = CONFIGS.filter((c) =>
 );
 /** Standplatz des Baggers — siehe `position` in excavator.ts. */
 const BAGGER_X = -2.0;
-const BAGGER_Z = -18.3;
+const BAGGER_Z = -19.5;
 /** Die Silos an der Ostwand, an denen der Abholer entlangfaehrt. */
 const SILOS = CONFIGS.filter((c) =>
   ["c_wood", "c_rubble", "c_plastic", "c_va_lager"].includes(c.id)

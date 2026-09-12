@@ -29,7 +29,7 @@ import type { CompositeManager } from "../dismantle/composites";
 // naeher an den Mischschrottplatz rueckt. Und quergestellt: Sie lag vom Sitz
 // aus waagerecht im Bild und nahm die ganze Breite ein; hochkant steht sie in
 // einer Reihe mit Stahlmulde und Halde.
-const CENTER = new THREE.Vector3(-10.0, 0, -19.0);
+const CENTER = new THREE.Vector3(-10.0, 0, -21.5);
 // Die Schwelle gilt fuer Objekte wie fuer Pakete — sie steht in materials/purity.ts.
 /**
  * Wo das fertige Paket liegen bleibt: in der Kammer.
@@ -42,12 +42,13 @@ const CENTER = new THREE.Vector3(-10.0, 0, -19.0);
  * das soll es auch.
  */
 function baleYard(): { x: number; z: number; w: number; d: number } {
-  // Zur Seite des Stahlcontainers heraus (Ansage 12.09.2026): „die Ballen
-  // sollen aber quasi da, wo der Stahlcontainer steht, von der Seite sollen
-  // die da rausfallen". Von dort holt der Bagger sie in den Container.
-  // Quergestellt faellt das Paket nicht mehr laengs, sondern zur Seite des
-  // Stahlcontainers heraus — dorthin, wo es hinsoll.
-  return { x: CENTER.x + INNER_W / 2 + 1.6, z: CENTER.z, w: 2.4, d: 2.2 };
+  /*
+   * Das Paket bleibt in der Kammer (Ansage 12.09.2026: „ich haette gerne
+   * aktuell nur, dass es gepresst wird und in der Mulde verharrt, bis ich es
+   * rausbaggere"). Es faellt nirgendwo mehr heraus — solange es drin liegt,
+   * blockiert es die naechste Fuhre, und genau das soll es.
+   */
+  return { x: CENTER.x, z: CENTER.z, w: INNER_W - 2.2, d: INNER_D - 1.2 };
 }
 /**
  * Die Mulde liegt längs Ost–West, in einer Flucht mit dem Stahlschrottplatz
@@ -65,7 +66,9 @@ const ROT = 0;
 // Schere mit dem Haufen eine Flucht. Die geringe Tiefe hält die Deckelklappen
 // kurz — die Spinne reicht bequem darüber (Wunsch 02.09.2026).
 const INNER_W = 7.0; // x — Länge, Pressweg (rechts → links)
-const INNER_D = 4.0; // z — Tiefe; bestimmt die Klappenlänge
+// Schmaler (Ansage 12.09.2026: „die Presse erscheint immer noch zu tief,
+// die kann ruhig noch ein bisschen schmaler werden").
+const INNER_D = 3.2; // z — Tiefe; bestimmt die Klappenlänge
 const WALL_H = 1.9;
 const PLATE_T = 0.3; // dicke Eisenplatten (SW)
 const LID_HINGE_Y = WALL_H - 0.1;
