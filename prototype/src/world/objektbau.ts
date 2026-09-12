@@ -57,7 +57,8 @@ export type BauId =
   | "kleinfahrzeug"
   | "moebel"
   | "beton"
-  | "trommel";
+  | "trommel"
+  | "fensterflaeche";
 
 /* ------------------------------------------------------------------------ */
 /* Werkzeug                                                                   */
@@ -69,12 +70,22 @@ interface Teil {
 }
 
 const teile: Teil[] = [];
+/**
+ * Scheiben liegen getrennt.
+ *
+ * Sie sollen zerspringen koennen (Ansage 12.09.2026: „Glas zerspringt beim
+ * Greifen, Fallenlassen ... sollte immer angewandt sein"), und was zerspringt,
+ * muss verschwinden koennen. Waere es in den Koerper verschmolzen, bliebe es
+ * fuer immer drin. Ein Objekt mit Scheiben kostet darum einen zweiten
+ * Zeichenruf — das ist der Preis fuers Brechen.
+ */
+const scheiben: Teil[] = [];
 
 /** Quader an eine Stelle setzen. */
 function q(w: number, h: number, d: number, farbe: number, x = 0, y = 0, z = 0): void {
   const geo = new THREE.BoxGeometry(Math.max(w, 0.01), Math.max(h, 0.01), Math.max(d, 0.01));
   geo.translate(x, y, z);
-  teile.push({ geo, farbe });
+  (farbe === GLAS ? scheiben : teile).push({ geo, farbe });
 }
 
 /** Zylinder, wahlweise liegend. */
@@ -103,9 +114,10 @@ function z(
  * was ein `MeshStandardMaterial` mit `vertexColors` erwartet. Ohne diese
  * Umrechnung wären alle Farben zu hell.
  */
-function fertig(): THREE.BufferGeometry {
+function faerbeUndVerschmelze(liste: Teil[]): THREE.BufferGeometry | null {
+  if (liste.length === 0) return null;
   const farbe = new THREE.Color();
-  for (const t of teile) {
+  for (const t of liste) {
     const n = t.geo.getAttribute("position").count;
     const c = new Float32Array(n * 3);
     farbe.set(t.farbe);
@@ -120,14 +132,26 @@ function fertig(): THREE.BufferGeometry {
     t.geo.deleteAttribute("uv1");
   }
   const geo = mergeGeometries(
-    teile.map((t) => t.geo),
+    liste.map((t) => t.geo),
     false
   );
-  for (const t of teile) t.geo.dispose();
-  teile.length = 0;
-  if (!geo) return new THREE.BoxGeometry(1, 1, 1);
+  for (const t of liste) t.geo.dispose();
+  liste.length = 0;
+  if (!geo) return null;
   geo.computeVertexNormals();
   return geo;
+}
+
+/** Was ein Bau liefert: Koerper und, wenn vorhanden, die Scheiben. */
+export interface Bauteil {
+  koerper: THREE.BufferGeometry;
+  glas: THREE.BufferGeometry | null;
+}
+
+function fertig(): Bauteil {
+  const glas = faerbeUndVerschmelze(scheiben);
+  const koerper = faerbeUndVerschmelze(teile) ?? new THREE.BoxGeometry(1, 1, 1);
+  return { koerper, glas };
 }
 
 /* ------------------------------------------------------------------------ */
@@ -168,7 +192,7 @@ function lackton(palette: number[], w: number, h: number, d: number): number {
 /* ------------------------------------------------------------------------ */
 
 /** Weiße Ware: Kühlschrank, Truhe, Trockner, Spülmaschine, Herd. */
-function weisseWare(w: number, h: number, d: number): THREE.BufferGeometry {
+function weisseWare(w: number, h: number, d: number): Bauteil {
   const stehend = h > w * 1.4;
   q(w, h * 0.94, d, WEISS, 0, h * 0.03);
   q(w * 1.01, h * 0.06, d * 1.01, STAHL_DUNKEL, 0, -h * 0.47);
@@ -191,7 +215,7 @@ function weisseWare(w: number, h: number, d: number): THREE.BufferGeometry {
 }
 
 /** Fahrerkabine oder Führerstand: Rahmen mit Glas und Dach. */
-function kabine(w: number, h: number, d: number): THREE.BufferGeometry {
+function kabine(w: number, h: number, d: number): Bauteil {
   const lack = lackton([LACK_GRUEN, LACK_ROT, LACK_GELB, LACK_BLAU], w, h, d);
   q(w, h * 0.22, d, lack, 0, -h * 0.39);
   const s = Math.min(0.1, w * 0.07);
@@ -206,7 +230,7 @@ function kabine(w: number, h: number, d: number): THREE.BufferGeometry {
 }
 
 /** Gitterbox, Regalrahmen, Bauzaun: ein Rahmen aus Kanten. */
-function rahmenbox(w: number, h: number, d: number): THREE.BufferGeometry {
+function rahmenbox(w: number, h: number, d: number): Bauteil {
   const lack = lackton([LACK_BLAU, ROST, STAHL], w, h, d);
   const p = Math.min(0.08, w * 0.07);
   q(w, 0.06, d, lack, 0, -h / 2 + 0.03);
@@ -226,7 +250,7 @@ function rahmenbox(w: number, h: number, d: number): THREE.BufferGeometry {
 }
 
 /** Seecontainer, Büro- und Baustellencontainer: Rippen und Türflügel. */
-function container(w: number, h: number, d: number): THREE.BufferGeometry {
+function container(w: number, h: number, d: number): Bauteil {
   const lack = lackton([LACK_BLAU, ROST, LACK_GRUEN, 0x8a5a2b, LACK_ROT], w, h, d);
   q(w * 0.96, h * 0.96, d * 0.96, lack);
   // Eckbeschläge — daran erkennt man einen Container auf hundert Meter
@@ -251,7 +275,7 @@ function container(w: number, h: number, d: number): THREE.BufferGeometry {
 }
 
 /** Motorblock: Block, Zylinderkopf, Ölwanne, Anbauteile. */
-function motor(w: number, h: number, d: number): THREE.BufferGeometry {
+function motor(w: number, h: number, d: number): Bauteil {
   q(w * 0.8, h * 0.5, d * 0.8, GUSS, 0, -h * 0.08);
   q(w * 0.72, h * 0.22, d * 0.74, STAHL_DUNKEL, 0, h * 0.28); // Zylinderkopf
   q(w * 0.6, h * 0.08, d * 0.6, ALU, 0, h * 0.42); // Ventildeckel
@@ -265,7 +289,7 @@ function motor(w: number, h: number, d: number): THREE.BufferGeometry {
 }
 
 /** Werkzeugmaschine, Aggregat, Pumpenstation: Körper, Verkleidung, Sockel. */
-function maschine(w: number, h: number, d: number): THREE.BufferGeometry {
+function maschine(w: number, h: number, d: number): Bauteil {
   const lack = lackton([LACK_GELB, LACK_BLAU, 0x5a6a5c, STAHL], w, h, d);
   q(w, h * 0.16, d, STAHL_DUNKEL, 0, -h * 0.42); // Grundrahmen
   q(w * 0.94, h * 0.66, d * 0.94, lack, 0, h * 0.02); // Verkleidung
@@ -279,7 +303,7 @@ function maschine(w: number, h: number, d: number): THREE.BufferGeometry {
 }
 
 /** Tank, Kessel, Behälter: liegender Zylinder mit Sattel und Stutzen. */
-function tank(r: number, len: number): THREE.BufferGeometry {
+function tank(r: number, len: number): Bauteil {
   z(r, len * 0.92, STAHL, "z", 0, 0, 0, 16);
   for (const sz of [-1, 1]) z(r * 0.99, len * 0.04, STAHL_DUNKEL, "z", 0, 0, sz * len * 0.46, 16); // Böden
   for (const sz of [-1, 1]) q(r * 1.7, r * 0.5, r * 0.5, STAHL_DUNKEL, 0, -r * 0.85, sz * len * 0.3); // Sattel
@@ -290,7 +314,7 @@ function tank(r: number, len: number): THREE.BufferGeometry {
 }
 
 /** Doppel-T-Träger: drei Platten statt eines Balkens. */
-function traeger(w: number, h: number, d: number): THREE.BufferGeometry {
+function traeger(w: number, h: number, d: number): Bauteil {
   const lang = Math.max(w, h, d);
   const dick = Math.min(w, h, d);
   const flansch = dick * 2.6;
@@ -308,7 +332,7 @@ function traeger(w: number, h: number, d: number): THREE.BufferGeometry {
 }
 
 /** Rohr mit Flanschen an beiden Enden. */
-function rohrFlansch(r: number, len: number): THREE.BufferGeometry {
+function rohrFlansch(r: number, len: number): Bauteil {
   z(r * 0.82, len, STAHL, "z", 0, 0, 0, 14);
   for (const sz of [-1, 1]) z(r * 1.15, len * 0.05, ROST, "z", 0, 0, sz * len * 0.48, 14);
   z(r * 0.9, len * 0.06, STAHL_DUNKEL, "z", 0, 0, 0, 14);
@@ -316,7 +340,7 @@ function rohrFlansch(r: number, len: number): THREE.BufferGeometry {
 }
 
 /** Bund: mehrere Stäbe oder Rohre, mit Spanngurten zusammengehalten. */
-function buendel(w: number, h: number, d: number): THREE.BufferGeometry {
+function buendel(w: number, h: number, d: number): Bauteil {
   const lang = Math.max(w, h, d);
   const r = Math.min(w, h) * 0.16;
   let i = 0;
@@ -339,7 +363,7 @@ function buendel(w: number, h: number, d: number): THREE.BufferGeometry {
 }
 
 /** Stapel: mehrere Platten übereinander, leicht versetzt. */
-function stapel(w: number, h: number, d: number): THREE.BufferGeometry {
+function stapel(w: number, h: number, d: number): Bauteil {
   const lack = lackton([STAHL, ROST, LACK_ROT, LACK_BLAU], w, h, d);
   const n = Math.max(3, Math.min(7, Math.round(h / 0.12)));
   const dicke = h / n;
@@ -352,7 +376,7 @@ function stapel(w: number, h: number, d: number): THREE.BufferGeometry {
 }
 
 /** Elektromotor, Pumpe: Zylinder mit Rippen, Klemmkasten, Fußplatte. */
-function elektromotor(w: number, h: number, d: number): THREE.BufferGeometry {
+function elektromotor(w: number, h: number, d: number): Bauteil {
   const r = Math.min(w, h) * 0.42;
   z(r, d * 0.72, STAHL_DUNKEL, "z", 0, h * 0.06, 0, 14);
   for (let i = 0; i < 7; i++) z(r * 1.12, d * 0.035, STAHL_DUNKEL, "z", 0, h * 0.06, -d * 0.3 + i * d * 0.1, 14);
@@ -364,7 +388,7 @@ function elektromotor(w: number, h: number, d: number): THREE.BufferGeometry {
 }
 
 /** Achse: Rohr mit Naben und Bremstrommeln. */
-function achse(w: number, h: number, d: number): THREE.BufferGeometry {
+function achse(w: number, h: number, d: number): Bauteil {
   const lang = Math.max(w, d);
   const achsRichtung = lang === w ? "x" : "z";
   const r = Math.min(h, Math.min(w, d)) * 0.3;
@@ -380,7 +404,7 @@ function achse(w: number, h: number, d: number): THREE.BufferGeometry {
 }
 
 /** Blech, Tafel, Wandelement: Platte mit umgekanteten Rändern. */
-function platte(w: number, h: number, d: number): THREE.BufferGeometry {
+function platte(w: number, h: number, d: number): Bauteil {
   const lack = lackton([STAHL, ROST, ALU], w, h, d);
   const duenn = Math.min(w, h, d);
   const flach = duenn === h;
@@ -399,7 +423,7 @@ function platte(w: number, h: number, d: number): THREE.BufferGeometry {
 }
 
 /** Karosserie: Wanne, Kabine mit Glas, Raeder. Die Laenge liegt auf Z. */
-function karosserie(w: number, h: number, d: number): THREE.BufferGeometry {
+function karosserie(w: number, h: number, d: number): Bauteil {
   const lack = lackton([LACK_ROT, LACK_BLAU, WEISS_GRAU, 0x2f3a32, ROST], w, h, d);
   q(w, h * 0.34, d, lack, 0, -h * 0.2);
   q(w * 0.92, h * 0.34, d * 0.44, lack, 0, h * 0.16, -d * 0.05);
@@ -415,7 +439,7 @@ function karosserie(w: number, h: number, d: number): THREE.BufferGeometry {
 }
 
 /** Fahrgestell: zwei Laengstraeger, Quertraeger, Achse, Raeder, Deichsel. */
-function fahrgestell(w: number, h: number, d: number): THREE.BufferGeometry {
+function fahrgestell(w: number, h: number, d: number): Bauteil {
   for (const sx of [-1, 1]) q(w * 0.12, h * 0.3, d * 0.92, STAHL_DUNKEL, sx * w * 0.34, h * 0.1, 0);
   const n = Math.max(3, Math.round(d / 1.1));
   for (let i = 0; i < n; i++) q(w * 0.78, h * 0.12, 0.1, ROST, 0, h * 0.1, -d * 0.4 + (i * d * 0.8) / (n - 1));
@@ -427,7 +451,7 @@ function fahrgestell(w: number, h: number, d: number): THREE.BufferGeometry {
 }
 
 /** Ausleger, Schwinge, Gitterausleger: langer Kasten mit Gelenkaugen. */
-function ausleger(w: number, h: number, d: number): THREE.BufferGeometry {
+function ausleger(w: number, h: number, d: number): Bauteil {
   const lack = lackton([LACK_GELB, LACK_GRUEN, ROST, STAHL], w, h, d);
   const lang = Math.max(w, d);
   const laengs: "x" | "z" = lang === d ? "z" : "x";
@@ -449,7 +473,7 @@ function ausleger(w: number, h: number, d: number): THREE.BufferGeometry {
 }
 
 /** Schaufel oder Loeffel: Rueckwand, Boden, Seitenwaende, Zaehne. */
-function schaufel(w: number, h: number, d: number): THREE.BufferGeometry {
+function schaufel(w: number, h: number, d: number): Bauteil {
   const lack = lackton([LACK_GELB, STAHL, ROST], w, h, d);
   q(w, h * 0.9, d * 0.12, lack, 0, 0, -d * 0.42);
   q(w, h * 0.14, d * 0.85, lack, 0, -h * 0.38, d * 0.04);
@@ -463,7 +487,7 @@ function schaufel(w: number, h: number, d: number): THREE.BufferGeometry {
 }
 
 /** Gitterturm, Mastschuss, Geruestrahmen: Gurte mit Riegeln. */
-function gitterturm(w: number, h: number, d: number): THREE.BufferGeometry {
+function gitterturm(w: number, h: number, d: number): Bauteil {
   const lack = lackton([LACK_GELB, ROST, STAHL], w, h, d);
   const lang = Math.max(w, h, d);
   const senkrecht = lang === h;
@@ -490,7 +514,7 @@ function gitterturm(w: number, h: number, d: number): THREE.BufferGeometry {
 }
 
 /** Loser Haufen: viele kleine Brocken durcheinander. */
-function haufen(w: number, h: number, d: number): THREE.BufferGeometry {
+function haufen(w: number, h: number, d: number): Bauteil {
   const toene = [STAHL, ROST, STAHL_DUNKEL, GUSS];
   for (let i = 0; i < 26; i++) {
     const f = (k: number) => (((i * 7919 + k * 104729) % 1000) / 1000 - 0.5) * 2;
@@ -509,7 +533,7 @@ function haufen(w: number, h: number, d: number): THREE.BufferGeometry {
 }
 
 /** Quad, Roller, Jetski, Aufsitzmaeher: kleiner Koerper mit Sitz und Raedern. */
-function kleinfahrzeug(w: number, h: number, d: number): THREE.BufferGeometry {
+function kleinfahrzeug(w: number, h: number, d: number): Bauteil {
   const lack = lackton([LACK_ROT, LACK_BLAU, LACK_GRUEN, 0x1f2226], w, h, d);
   q(w * 0.7, h * 0.34, d * 0.8, lack, 0, -h * 0.06);
   q(w * 0.5, h * 0.2, d * 0.3, 0x24262a, 0, h * 0.2, -d * 0.08);
@@ -522,7 +546,7 @@ function kleinfahrzeug(w: number, h: number, d: number): THREE.BufferGeometry {
 }
 
 /** Sofa, Schrank, Kuechenzeile: Korpus mit Front und Fuessen. */
-function moebel(w: number, h: number, d: number): THREE.BufferGeometry {
+function moebel(w: number, h: number, d: number): Bauteil {
   const holz = lackton([0x7a5a3a, 0x8d7250, 0xbdb5a6, 0x4c4a46], w, h, d);
   const polster = lackton([0x5c6a58, 0x6b5a52, 0x47506a], w, h, d);
   const weich = h < w * 0.75 && d > h * 0.7;
@@ -544,7 +568,7 @@ function moebel(w: number, h: number, d: number): THREE.BufferGeometry {
 }
 
 /** Betonteil: rauer Koerper mit Bewehrungsstummeln. */
-function beton(w: number, h: number, d: number): THREE.BufferGeometry {
+function beton(w: number, h: number, d: number): Bauteil {
   q(w, h, d, 0x9a958c);
   for (let i = 0; i < 6; i++) {
     const f = (k: number) => (((i * 6151 + k * 24593) % 997) / 997 - 0.5) * 2;
@@ -557,10 +581,46 @@ function beton(w: number, h: number, d: number): THREE.BufferGeometry {
 }
 
 /** Kabeltrommel, Seiltrommel: zwei Scheiben mit Wickel dazwischen. */
-function trommel(r: number, len: number): THREE.BufferGeometry {
+function trommel(r: number, len: number): Bauteil {
   for (const s2 of [-1, 1]) z(r, len * 0.12, 0x6b5433, "x", s2 * len * 0.44, 0, 0, 18);
   z(r * 0.72, len * 0.72, 0x3a3330, "x", 0, 0, 0, 18);
   z(r * 0.26, len * 1.02, 0x6b5433, "x", 0, 0, 0, 12);
+  return fertig();
+}
+
+/**
+ * Fensterfront, Schaufenster, Glasfassade, Duschkabine: Rahmen mit Scheiben.
+ *
+ * Eigener Bau statt `platte`, weil hier das Glas die Hauptsache ist — und Glas
+ * gehoert in den Scheibenteil, damit es zerspringen kann.
+ */
+function fensterflaeche(w: number, h: number, d: number): THREE.BufferGeometry | Bauteil {
+  const rahmen = lackton([ALU, STAHL_DUNKEL, WEISS_GRAU], w, h, d);
+  const duenn = Math.min(w, h, d);
+  const flach = duenn === d;
+  const a = flach ? w : w;
+  const b = flach ? h : d;
+  const r = Math.max(0.05, Math.min(a, b) * 0.06);
+  // Aussenrahmen
+  if (flach) {
+    for (const sy of [-1, 1]) q(a, r, duenn * 1.6, rahmen, 0, sy * (b / 2 - r / 2), 0);
+    for (const sx of [-1, 1]) q(r, b, duenn * 1.6, rahmen, sx * (a / 2 - r / 2), 0, 0);
+  } else {
+    for (const sy of [-1, 1]) q(a, duenn * 1.6, r, rahmen, 0, sy * (h / 2 - duenn), 0);
+    for (const sx of [-1, 1]) q(r, duenn * 1.6, b, rahmen, sx * (a / 2 - r / 2), 0, 0);
+  }
+  // Sprossen und Scheiben dazwischen
+  const felder = Math.max(2, Math.round(a / 1.1));
+  for (let i = 1; i < felder; i++) {
+    const x = -a / 2 + (i * a) / felder;
+    if (flach) q(r * 0.7, b - r * 2, duenn * 1.4, rahmen, x, 0, 0);
+    else q(r * 0.7, duenn * 1.4, b - r * 2, rahmen, x, 0, 0);
+  }
+  for (let i = 0; i < felder; i++) {
+    const x = -a / 2 + ((i + 0.5) * a) / felder;
+    if (flach) q(a / felder - r, b - r * 2.4, duenn * 0.5, GLAS, x, 0, 0);
+    else q(a / felder - r, duenn * 0.5, b - r * 2.4, GLAS, x, 0, 0);
+  }
   return fertig();
 }
 
@@ -570,7 +630,7 @@ function trommel(r: number, len: number): THREE.BufferGeometry {
  * Geometrie für einen Bau. `dims` ist dasselbe wie im Katalog:
  * box = [w,h,d], cyl = [r,len].
  */
-export function baueGeometrie(bau: BauId, dims: number[], kind: string): THREE.BufferGeometry {
+export function baueGeometrie(bau: BauId, dims: number[], kind: string): Bauteil {
   const [a, b, c] = dims;
   const w = kind === "cyl" ? a * 2 : a;
   const h = kind === "cyl" ? a * 2 : b;
@@ -625,7 +685,9 @@ export function baueGeometrie(bau: BauId, dims: number[], kind: string): THREE.B
       return beton(w, h, d);
     case "trommel":
       return trommel(kind === "cyl" ? a : Math.min(w, h) / 2, kind === "cyl" ? b : d);
+    case "fensterflaeche":
+      return fensterflaeche(w, h, d) as Bauteil;
     default:
-      return new THREE.BoxGeometry(w, h, d);
+      return { koerper: new THREE.BoxGeometry(w, h, d), glas: null };
   }
 }

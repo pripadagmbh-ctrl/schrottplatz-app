@@ -40,6 +40,14 @@ export interface ScrapShape {
    */
   name?: string;
   /**
+   * Sind die Scheiben schon hin?
+   *
+   * Fehlt der Wert, ist alles heil — so bleiben alte Spielstaende gueltig.
+   * Steht er auf true, wird beim Anlegen gar kein Glas mehr gebaut: Ein Wrack,
+   * das gestern die Scheiben verloren hat, hat sie heute immer noch nicht.
+   */
+  glasKaputt?: boolean;
+  /**
    * Woraus es besteht, nach Massenanteilen.
    *
    * Ein Objekt aus Verbundteilen ist nie sortenrein (Ansage 12.09.2026): Ein
@@ -141,6 +149,32 @@ function cableCoilGeometry(r: number, tube: number): THREE.BufferGeometry {
  * Schliessen mit gut 4. Schneller darf nichts werden, was sie beruehrt.
  */
 export const WERKZEUG_MAX = 4.2;
+/**
+ * Ab diesem Tempoverlust in einem Schritt zerspringt Glas (m/s).
+ *
+ * Absichtlich niedrig (Ansage 12.09.2026: „je nach Einwirkung eigentlich
+ * immer"). Ein Aufschlag, den man ueberhaupt hoert, reicht — Glas ist das
+ * Erste, was auf einem Schrottplatz kaputtgeht, und ein Wrack mit heilen
+ * Scheiben sieht falsch aus.
+ */
+const GLAS_BRUCH_DV = 0.7;
+
+/**
+ * Eine Scheibe fuer alle: geteiltes Material, damit nicht jedes Objekt mit
+ * Fenstern ein eigenes anlegt.
+ */
+let glasMaterial: THREE.MeshStandardMaterial | null = null;
+function glasStoff(): THREE.MeshStandardMaterial {
+  glasMaterial ??= new THREE.MeshStandardMaterial({
+    color: 0x9fc2d2,
+    roughness: 0.12,
+    metalness: 0.05,
+    transparent: true,
+    opacity: 0.42,
+  });
+  return glasMaterial;
+}
+
 /** Fraktionen ohne metallischen Glanz — Abfall eben. */
 const NICHTMETALLE = new Set(["wood", "tires", "rubble", "plastic"]);
 
@@ -394,7 +428,7 @@ const BIG_SPECS: PileSpec[] = [
   { materialId: "va", massKg: 70, kind: "box", dims: [0.14, 0.14, 2.6], bau: "buendel", name: "VA-Rohrbündel" },
   { materialId: "alu", massKg: 60, kind: "box", dims: [0.3, 0.3, 2.8], bau: "buendel", name: "Profilbündel" },
   { materialId: "alu", massKg: 45, kind: "box", dims: [1.6, 0.06, 1.2], bau: "platte", name: "Alutafel" },
-  { materialId: "alu", massKg: 85, kind: "box", dims: [1.4, 1.2, 0.25], bau: "platte", name: "Alu-Fensterrahmen" },
+  { materialId: "alu", massKg: 85, kind: "box", dims: [1.4, 1.2, 0.25], bau: "fensterflaeche", name: "Alu-Fensterrahmen" },
   { materialId: "alu", massKg: 110, kind: "cyl", dims: [0.55, 1.4], bau: "tank", name: "Alu-Kessel" },
   { materialId: "copper", massKg: 65, kind: "cyl", dims: [0.35, 1.2], bau: "tank", name: "Kupfer-Boiler" },
   { materialId: "copper", massKg: 48, kind: "torus", dims: [0.45, 0.16], bau: "buendel", name: "Kupferrohr-Bund" },
@@ -803,9 +837,12 @@ export class ItemManager {
      * aus dem Katalog — Physik und Aussehen sind getrennt, und das Aussehen
      * darf darum beliebig fein werden, ohne dass die Physik teurer wird.
      */
+    let glasGeo: THREE.BufferGeometry | null = null;
     if (shape.bau) {
       geo.dispose();
-      geo = baueGeometrie(shape.bau, shape.dims, shape.kind);
+      const bauteil = baueGeometrie(shape.bau, shape.dims, shape.kind);
+      geo = bauteil.koerper;
+      glasGeo = bauteil.glas;
     }
 
     const isWire = shape.kind === "wire";
@@ -820,6 +857,20 @@ export class ItemManager {
       const inner = new THREE.Mesh(new THREE.IcosahedronGeometry(shape.dims[0] * 0.7, 1), mesh.material);
       inner.rotation.set(0.7, 1.3, 0.4);
       mesh.add(inner);
+    }
+    /*
+     * Scheiben haengen als eigenes Kind am Teil — nicht verschmolzen, sonst
+     * liessen sie sich nie entfernen. Das kostet einen zweiten Zeichenruf,
+     * aber nur bei Objekten, die ueberhaupt Fenster haben.
+     */
+    if (glasGeo) {
+      if (shape.glasKaputt) {
+        glasGeo.dispose();
+      } else {
+        const scheibe = new THREE.Mesh(glasGeo, glasStoff());
+        scheibe.name = "glas";
+        mesh.add(scheibe);
+      }
     }
     mesh.castShadow = true;
     mesh.receiveShadow = true;
@@ -1143,6 +1194,8 @@ export class ItemManager {
   /** Teil in der Presse plattdrücken: Mesh stauchen, Kollider tauschen. */
   flattenItem(item: ScrapItem): boolean {
     if (!item.shape || item.shape.flat) return false;
+    // Was in die Presse geht, hat danach keine Scheiben mehr.
+    this.zerbrichGlas(item);
     item.shape.flat = true;
     // Zusätzlich leicht in die Breite gehen — gequetschtes Metall quillt aus
     item.mesh.scale.y = item.shape.kind === "wire" ? 0.5 : FLAT_SCALE_Y;
@@ -1275,6 +1328,26 @@ export class ItemManager {
    * @param wucht Tempoverlust in m/s — daraus macht der Ton die Lautstaerke
    */
   onAufprall: ((item: ScrapItem, wucht: number) => void) | null = null;
+  /** Eine Scheibe ist zersprungen — Ort fuer Klang und Splitter. */
+  onGlasBruch: ((x: number, y: number, z: number) => void) | null = null;
+
+  /**
+   * Scheiben zerspringen lassen. Gibt true zurueck, wenn tatsaechlich etwas
+   * kaputtgegangen ist — sonst wuerde bei jedem Anstossen ein Klirren kommen,
+   * auch beim zwanzigsten Mal am selben Wrack.
+   */
+  zerbrichGlas(item: ScrapItem): boolean {
+    if (!item.shape || item.shape.glasKaputt) return false;
+    const scheibe = item.mesh.getObjectByName("glas") as THREE.Mesh | undefined;
+    if (!scheibe) return false;
+    const ort = new THREE.Vector3();
+    scheibe.getWorldPosition(ort);
+    scheibe.removeFromParent();
+    scheibe.geometry.dispose();
+    item.shape.glasKaputt = true;
+    this.onGlasBruch?.(ort.x, ort.y, ort.z);
+    return true;
+  }
   /**
    * Messschalter: Mit `true` gilt die Zuwachsgrenze nicht mehr. Nur fuer den
    * Vorher-Nachher-Vergleich im Labor; im Spiel bleibt sie an.
@@ -1359,6 +1432,8 @@ export class ItemManager {
             this.letzterAufprall.set(handle, this.aufprallUhr);
             this.onAufprall(item, verlust);
           }
+          // Glas ist empfindlicher als das Ohr: Es bricht schon darunter.
+          if (verlust > GLAS_BRUCH_DV) this.zerbrichGlas(item);
         }
         this.gesamtVorher.set(handle, jetztGesamt);
       }

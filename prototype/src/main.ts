@@ -402,7 +402,16 @@ async function main(): Promise<void> {
     // Klang nach dem, was tatsaechlich in der Schale liegt
     const erstes = bodies.length > 0 ? items.itemByBody(bodies[0]) : null;
     audio.playGrab(erstes?.materialId);
-    for (const b of bodies) fence.notifyGrabbed(b); // verankertes Zaunfeld? → losreißen
+    for (const b of bodies) {
+      fence.notifyGrabbed(b); // verankertes Zaunfeld? → losreißen
+      /*
+       * Was die Spinne fasst, verliert seine Scheiben. Fuenf Zaehne mit
+       * hundertsechzig Kilonewton nehmen darauf keine Ruecksicht — und ein
+       * Wrack, das nach dem Greifen noch alle Fenster hat, sieht falsch aus.
+       */
+      const it = items.itemByBody(b);
+      if (it) items.zerbrichGlas(it);
+    }
   };
   grip.onTear = () => audio.playTear();
   /*
@@ -411,6 +420,7 @@ async function main(): Promise<void> {
    * einer Ladeflaeche landet — dafuer dienen dieselben Standflaechen, die
    * auch Bagger und Radlader vom Durchfahren abhalten.
    */
+  items.onGlasBruch = (x, y, z) => bus.emit("glassShattered", { x, y, z });
   items.onAufprall = (item, wucht) => {
     const p = item.body.translation();
     const aufStahl = findeBox(p.x, p.z, alleFahrzeugBoxen(), 0.4) !== null;
