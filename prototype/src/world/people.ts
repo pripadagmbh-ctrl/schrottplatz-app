@@ -280,7 +280,7 @@ const HANDLAST_KG = 60;
 /** So lange setzt er zurueck, wenn ihm etwas den Weg versperrt (s) */
 const RUECKWAERTS_S = 1.6;
 /** Abkippplatz vor dem Bagger — dort landet die Fuhre, da faehrt er nicht hinein */
-const ABKIPP = { x: -8.0, z: -7, hw: 4.5, hd: 4.5 };
+const ABKIPP = { x: -4.0, z: -10, hw: 4.5, hd: 4.5 };
 /** In diesem Umkreis muss ein Teil frei liegen, damit er es holt (m) */
 /** Um so viel wird eine Zone fuer die Wegpruefung geschrumpft (m) */
 const ZONE_RAND = 1.0;

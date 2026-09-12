@@ -76,8 +76,12 @@ export const CONFIGS: ContainerConfig[] = [
    *   rechts vorne   sechs Absetzcontainer links vorne   Batteriemulde
    *   rechts aussen  Silos, am Büro vorbei fährt der Abholer sie ab
    *
-   * Der Bagger arbeitet auf einer kurzen Linie von (−8 | −16) nach
-   * (−8 | −11,5). Ein Ring von 4,0 bis 9,5 m fasst nicht elf Ziele, und ein
+   * Der Bagger arbeitet auf einer kurzen Linie von (−5 | −18,5) nach
+   * (−5 | −13,5). Alles steht bewusst eng beieinander (Ansage 12.09.2026:
+   * „Du kannst das alles viel enger aneinanderstellen, der Bagger braucht
+   * nicht so viel Abstand zu der Presse") — die Untergrenze setzt der Arm
+   * selbst: Unter 4,0 m kommt er gar nicht auf den Boden, und über eine Wand
+   * muss die Krallenspitze 40 cm Luft behalten. Ein Ring von 4,0 bis 9,5 m fasst nicht elf Ziele, und ein
    * Umschlagbagger fährt im Betrieb ohnehin ein paar Meter hin und her.
    * Geprüft wird das in `test/reach.test.ts`.
    */
@@ -88,11 +92,17 @@ export const CONFIGS: ContainerConfig[] = [
    * Hier kippt jeder ab, der gemischt anliefert, und von hier holt der Bagger
    * alles Weitere. Die Wände sind doppelt gesetzt und fünf Meter hoch (Ansage
    * 12.09.2026: „da müssten natürlich die Wände doppelt sein und sehr hoch,
-   * damit wir den Mischschrott auch ohne Probleme stapeln können"). Nach
-   * Norden offen — dort setzt der Kipper zurück.
+   * damit wir den Mischschrott auch ohne Probleme stapeln können").
+   *
+   * Aber nur ZWEI Wände, und zwar die, die ohnehin die Platzgrenze sind
+   * (Ansage 12.09.2026: „die natürlichen Abgrenzungen vom Mischschrott soll
+   * eigentlich nur die Außenwand sein und daneben der Bagger, anders braucht's
+   * eigentlich keine Abgrenzung"). Zur Maschine hin ist offen — dort stand
+   * eine Wand, die nur im Weg war. Und die Fläche ist von 156 auf 90 m²
+   * geschrumpft: „die erscheint mir auch viel zu groß".
    */
-  { id: "c_mixed", fractionId: "mixed", label: "MISCHSCHROTT", kind: "halde", x: 3.8,
-    z: -21.5, size: [12.5, 12.5, 5.0] },
+  { id: "c_mixed", fractionId: "mixed", label: "MISCHSCHROTT", kind: "halde", x: 5.0,
+    z: -22.75, size: [9.0, 9.5, 5.0] },
 
   /*
    * STAHLSCHROTT — fester 40-m³-Abrollcontainer, direkt rechts vom Bagger.
@@ -101,8 +111,8 @@ export const CONFIGS: ContainerConfig[] = [
    * damit er erreicht werden kann." Er bleibt stehen: Der Abholer zieht ihn
    * samt Inhalt auf den LKW, der Bagger versetzt ihn nicht.
    */
-  { id: "c_steel", fractionId: "steel", label: "STAHLSCHROTT", kind: "grosscontainer", x: -17.5,
-    z: -16.5, size: [6.6, 2.6, 2.4] },
+  { id: "c_steel", fractionId: "steel", label: "STAHLSCHROTT", kind: "grosscontainer", x: -13.0,
+    z: -17.0, size: [6.6, 2.6, 2.0] },
 
   /*
    * REIFENDEPOT — rechts hinten, offene Fläche ohne Wände.
@@ -110,18 +120,8 @@ export const CONFIGS: ContainerConfig[] = [
    * Reifen fallen ständig an und werden selten abgeholt; sie brauchen Fläche,
    * keine Mulde. Heinz kümmert sich darum (Ansage 12.09.2026).
    */
-  { id: "c_tires", fractionId: "tires", label: "REIFEN", kind: "pile", x: -20.0,
-    z: -24.0, size: [8.0, 7.0, 0] },
-
-  /*
-   * BATTERIEN — links vorne, niedrige Mulde, Öffnung zum Bagger.
-   *
-   * Bleiakkus dürfen nicht in den Mischschrott. Elektromotoren landen
-   * daneben: Die sind keine Fraktion, sondern Verbundteile, die Lambert mit
-   * Werkzeug zerlegt.
-   */
-  { id: "c_battery", fractionId: "battery", label: "BATTERIEN", kind: "bay", x: -1.5,
-    z: -10.5, size: [5.5, 5.0, 1.4] },
+  { id: "c_tires", fractionId: "tires", label: "REIFEN", kind: "pile", x: -17.0,
+    z: -21.0, size: [8.0, 7.0, 0] },
 
   /*
    * ABSETZCONTAINER — sechs Stück rechts vorne, in Reichweite.
@@ -131,18 +131,18 @@ export const CONFIGS: ContainerConfig[] = [
    * getrennt: doppelter Preisunterschied, und wer beides in einen Behälter
    * wirft, bekommt für alles den Messingpreis.
    */
-  { id: "r_cable", fractionId: "cable", label: "KABEL", kind: "rolloff", x: -12.5,
-    z: -11.0, size: [2.8, 1.8, 1.1] },
-  { id: "r_va", fractionId: "va", label: "EDELSTAHL VA", kind: "rolloff", x: -15.5,
-    z: -11.0, size: [2.8, 1.8, 1.1] },
-  { id: "r_copper", fractionId: "copper", label: "KUPFER", kind: "rolloff", x: -12.5,
-    z: -8.5, size: [2.8, 1.8, 1.1] },
-  { id: "r_alu", fractionId: "alu", label: "ALU", kind: "rolloff", x: -15.5,
-    z: -8.5, size: [2.8, 1.8, 1.1] },
-  { id: "r_zinc", fractionId: "zinc", label: "ZINK", kind: "rolloff", x: -12.5,
-    z: -6.0, size: [2.8, 1.8, 1.1] },
-  { id: "r_brass", fractionId: "brass", label: "MESSING", kind: "rolloff", x: -15.5,
-    z: -6.0, size: [2.8, 1.8, 1.1] },
+  { id: "r_cable", fractionId: "cable", label: "KABEL", kind: "rolloff", x: -9.5,
+    z: -13.5, size: [2.8, 1.8, 1.1] },
+  { id: "r_va", fractionId: "va", label: "EDELSTAHL VA", kind: "rolloff", x: -12.5,
+    z: -13.5, size: [2.8, 1.8, 1.1] },
+  { id: "r_copper", fractionId: "copper", label: "KUPFER", kind: "rolloff", x: -9.5,
+    z: -11.5, size: [2.8, 1.8, 1.1] },
+  { id: "r_alu", fractionId: "alu", label: "ALU", kind: "rolloff", x: -12.5,
+    z: -11.5, size: [2.8, 1.8, 1.1] },
+  { id: "r_zinc", fractionId: "zinc", label: "ZINK", kind: "rolloff", x: -9.5,
+    z: -9.5, size: [2.8, 1.8, 1.1] },
+  { id: "r_brass", fractionId: "brass", label: "MESSING", kind: "rolloff", x: -12.5,
+    z: -9.5, size: [2.8, 1.8, 1.1] },
 
   /*
    * SILOS an der Ostwand — dorthin fährt der Abholer entlang, ohne den
@@ -259,17 +259,37 @@ class GameContainer {
           nieten.push({ m: block.matrix.clone().multiply(niete.matrix), f });
         }
       };
-      for (let r = 0; r < REIHEN; r++) {
-        const y = BH / 2 + r * BH;
-        const off = (r % 2) * (BL / 2);
-        for (let lage = 0; lage < 2; lage++) {
-          const tt = BT * (0.5 + lage);
-          for (let bx = -hw / 2 + BL / 2 - off; bx < hw / 2 + 0.4; bx += BL) {
-            setze(bx, y, -(hd / 2 + tt), true);
+      /*
+       * Nur die zwei Wände, die ohnehin Platzgrenze sind: hinten und die
+       * Seite, die von der Maschine wegzeigt. Zum Bagger hin bleibt offen —
+       * dort ist er selbst die Abgrenzung.
+       *
+       * Und sie hören nicht auf einen Schlag auf, sondern laufen zum offenen
+       * Ende hin treppenförmig aus (Ansage 12.09.2026: „wär cool, wenn das so
+       * nicht auf einmal weggeht, sondern so leicht abfallend schräg tiefer
+       * wird"). Eine Wand, die mit voller Höhe endet, sieht aus wie ein
+       * abgebrochenes Bauteil; eine auslaufende sieht aus, als hätte sie
+       * jemand so gesetzt.
+       */
+      const AUSLAUF = 0.4; // Resthöhe am offenen Ende
+      const reihenBei = (t: number): number =>
+        Math.max(2, Math.round(REIHEN * (AUSLAUF + (1 - AUSLAUF) * t)));
+      for (let lage = 0; lage < 2; lage++) {
+        const tt = BT * (0.5 + lage);
+        // Rückwand: läuft zur Maschinenseite (−x) hin aus
+        for (let bx = -hw / 2 + BL / 2; bx < hw / 2 + 0.4; bx += BL) {
+          const n = reihenBei((bx + hw / 2) / hw);
+          for (let r = 0; r < n; r++) {
+            const off = (r % 2) * (BL / 2);
+            setze(bx - off, BH / 2 + r * BH, -(hd / 2 + tt), true);
           }
-          for (let bz = -hd / 2 + BL / 2 - off; bz < hd / 2 + 0.4; bz += BL) {
-            setze(hw / 2 + tt, y, bz, false);
-            setze(-(hw / 2 + tt), y, bz, false);
+        }
+        // Aussenwand: läuft nach vorn (+z) hin aus
+        for (let bz = -hd / 2 + BL / 2; bz < hd / 2 + 0.4; bz += BL) {
+          const n = reihenBei((hd / 2 - bz) / hd);
+          for (let r = 0; r < n; r++) {
+            const off = (r % 2) * (BL / 2);
+            setze(hw / 2 + tt, BH / 2 + r * BH, bz - off, false);
           }
         }
       }
@@ -295,20 +315,30 @@ class GameContainer {
       const body = world.createRigidBody(
         RAPIER.RigidBodyDesc.fixed().setTranslation(cfg.x, 0, cfg.z)
       );
-      world.createCollider(
-        RAPIER.ColliderDesc.cuboid(hw / 2 + BT, hh / 2, BT).setTranslation(
-          0,
-          hh / 2,
-          -(hd / 2 + BT)
-        ),
-        body
-      );
-      for (const sx of [-1, 1]) {
+      /*
+       * Je Wand zwei Kollider, damit der Kollisionskörper dem Auslaufen folgt:
+       * die geschlossene Hälfte auf voller Höhe, die auslaufende auf gut der
+       * halben. Ein einziger Quader auf voller Höhe wäre eine unsichtbare Wand
+       * dort, wo man die Steine schon aufhören sieht.
+       */
+      const halb = hh * 0.55;
+      for (const [hoch, vorz] of [
+        [hh, 1],
+        [halb, -1],
+      ] as Array<[number, number]>) {
         world.createCollider(
-          RAPIER.ColliderDesc.cuboid(BT, hh / 2, hd / 2 + BT).setTranslation(
-            sx * (hw / 2 + BT),
-            hh / 2,
-            0
+          RAPIER.ColliderDesc.cuboid(hw / 4 + BT / 2, hoch / 2, BT).setTranslation(
+            (vorz * hw) / 4,
+            hoch / 2,
+            -(hd / 2 + BT)
+          ),
+          body
+        );
+        world.createCollider(
+          RAPIER.ColliderDesc.cuboid(BT, hoch / 2, hd / 4 + BT / 2).setTranslation(
+            hw / 2 + BT,
+            hoch / 2,
+            (-vorz * hd) / 4
           ),
           body
         );

@@ -25,7 +25,9 @@ import type { CompositeManager } from "../dismantle/composites";
 // bleibt in Reichweite (Design-Fix 29.08.2026).
 // Seit der neuen Platzordnung (12.09.2026) steht sie an der Suedgrenze,
 // direkt hinter dem Bagger: „hinter mir die Presse im Sueden".
-const CENTER = new THREE.Vector3(-8.0, 0, -25.0);
+// Kuerzer und ein Stueck zur Seite (Ansage 12.09.2026), damit der Bagger
+// naeher an den Mischschrottplatz rueckt.
+const CENTER = new THREE.Vector3(-7.5, 0, -25.0);
 // Die Schwelle gilt fuer Objekte wie fuer Pakete — sie steht in materials/purity.ts.
 /**
  * Wo das fertige Paket liegen bleibt: in der Kammer.
@@ -38,7 +40,10 @@ const CENTER = new THREE.Vector3(-8.0, 0, -25.0);
  * das soll es auch.
  */
 function baleYard(): { x: number; z: number; w: number; d: number } {
-  return { x: CENTER.x, z: CENTER.z, w: 5.0, d: 2.4 };
+  // Zur Seite des Stahlcontainers heraus (Ansage 12.09.2026): „die Ballen
+  // sollen aber quasi da, wo der Stahlcontainer steht, von der Seite sollen
+  // die da rausfallen". Von dort holt der Bagger sie in den Container.
+  return { x: CENTER.x - INNER_W / 2 - 1.5, z: CENTER.z - 0.6, w: 2.4, d: 2.0 };
 }
 /**
  * Die Mulde liegt längs Ost–West, in einer Flucht mit dem Stahlschrottplatz
@@ -53,7 +58,7 @@ const ROT = 0;
 // Breite wie der Stahlschrottplatz (11 m), direkt daneben: So bildet die
 // Schere mit dem Haufen eine Flucht. Die geringe Tiefe hält die Deckelklappen
 // kurz — die Spinne reicht bequem darüber (Wunsch 02.09.2026).
-const INNER_W = 10.0; // x — Länge, Pressweg (rechts → links)
+const INNER_W = 7.0; // x — Länge, Pressweg (rechts → links)
 const INNER_D = 4.0; // z — Tiefe; bestimmt die Klappenlänge
 const WALL_H = 1.9;
 const PLATE_T = 0.3; // dicke Eisenplatten (SW)
@@ -153,10 +158,10 @@ export class PressManager {
         body
       );
     }
-    // Warnstreifen auf der Muldenkante (Längsseite zum Platz)
-    const stripe = new THREE.Mesh(new THREE.BoxGeometry(INNER_W + 0.7, 0.16, 0.38), warn);
-    stripe.position.set(0, WALL_H + 0.34, INNER_D / 2 + 0.175);
-    group.add(stripe);
+    // Der gelbe Warnbalken auf der Muldenkante ist weg (Ansage 12.09.2026:
+    // „der gelbe Balken da, der kann sowieso weg, der hat für mich jetzt keine
+    // große Funktion"). Er lag als durchgehender Riegel quer im Bild und war
+    // das Auffaelligste an der ganzen Maschine, ohne etwas zu bedeuten.
 
     // --- Zwei LÄNGS liegende Deckelplatten (Design 2026-08-29) ---
     // Scharniere laufen entlang der langen Muldenseiten; bewegt werden die

@@ -32,10 +32,10 @@ interface SignSpec {
 const SIGNS: SignSpec[] = [
   // Am Nordende der Muldenzeile, zum Bagger gedreht. Die Reihe ist nach Osten
   // gewandert; das Schild stand vorher daneben in der Luft.
-  { text: "SORTIERUNG", hint: "Kabel · VA · Kupfer · Alu · Zink · Messing", x: -14.2, z: -13.2,
+  { text: "SORTIERUNG", hint: "Kabel · VA · Kupfer · Alu · Zink · Messing", x: -16.6, z: -10.5,
     rot: 0.6 },
   // Nordseite der Presskammer — von dort schaut man hin
-  { text: "SCHERE / PRESSE", hint: "Mischschrott pressen (Taste B)", x: -8.0, z: -22.4, rot: 0 },
+  { text: "SCHERE / PRESSE", hint: "Mischschrott pressen (Taste B)", x: -7.5, z: -22.4, rot: 0 },
 ];
 
 export class Signage {

@@ -53,7 +53,7 @@ const RANGIER_Z = 2.0;
  * Der Vorplatz, über den der Punkt nicht hinauswandert. Östlich beginnen die
  * Absetzcontainer, westlich die Batteriemulde, südlich der Bagger selbst.
  */
-const VORPLATZ = { xMin: -10.5, xMax: -5.5, zMin: -11.0, zMax: 0.0 };
+const VORPLATZ = { xMin: -6.5, xMax: -1.5, zMin: -12.5, zMax: 0.0 };
 
 let abladeStelle: [number, number] = [0, 7.0];
 let baggerOrt: (() => { x: number; z: number }) | null = null;
@@ -71,7 +71,7 @@ export function setBaggerOrt(f: () => { x: number; z: number }): void {
 export function neueAbladestelle(): [number, number] {
   const b = baggerOrt?.();
   if (b) {
-    const rx = -8.0 - b.x;
+    const rx = -4.0 - b.x;
     const rz = RANGIER_Z - b.z;
     const len = Math.hypot(rx, rz) || 1;
     const x = b.x + (rx / len) * ABLADE_ABSTAND;
@@ -139,10 +139,10 @@ export const PICKUP_APPROACH: Array<[number, number]> = [
 ];
 export const PICKUP_IN_REV: Array<[number, number]> = [
   [-29, -8],
-  [-25.5, -16.5],
+  [-21.5, -17.0],
 ];
 export const PICKUP_OUT: Array<[number, number]> = [
-  [-25.5, -16.5],
+  [-21.5, -17.0],
   [-29, -8],
   [-29, 10],
   [-27, 20],
@@ -161,15 +161,15 @@ export const PICKUP_OUT: Array<[number, number]> = [
 export const TIP_APPROACH: Array<[number, number]> = [
   [GATE_X, 24],
   [-14, 12],
-  [3.8, 2],
+  [5.0, 2],
 ];
 export const TIP_IN_REV: Array<[number, number]> = [
-  [3.8, 2],
-  [3.8, -13.0],
+  [5.0, 2],
+  [5.0, -16.0],
 ];
 export const TIP_OUT: Array<[number, number]> = [
-  [3.8, -13.0],
-  [3.8, 2],
+  [5.0, -16.0],
+  [5.0, 2],
   [-14, 12],
   [GATE_X, 24],
   [GATE_X, 40],

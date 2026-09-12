@@ -68,10 +68,10 @@ function bayObstacles(cfg: ContainerConfig): Obstacle[] {
     const [hw, hd, top] = cfg.size;
     const T = 0.55;
     const L = cfg.label;
+    // Nur zwei Wände: zur Maschine hin ist die Halde offen (12.09.2026).
     return [
       { x: cfg.x, z: cfg.z - hd / 2 - T, hw: hw / 2 + T, hd: T, top, label: `${L} Süd` },
       { x: cfg.x + hw / 2 + T, z: cfg.z, hw: T, hd: hd / 2 + T, top, label: `${L} Ost` },
-      { x: cfg.x - hw / 2 - T, z: cfg.z, hw: T, hd: hd / 2 + T, top, label: `${L} West` },
     ];
   }
   if (cfg.kind !== "bay") return []; // Haufen, Container und offene Flächen haben keine Wände
@@ -126,7 +126,7 @@ export const STATIC_OBSTACLES: Obstacle[] = [
   ...CONFIGS.flatMap(bayObstacles),
 
   // --- Schere und Presse, südlich hinter dem Bagger ---
-  { x: -8.0, z: -25.0, hw: 5.4, hd: 2.4, top: 2.2, label: "Schere" },
+  { x: -7.5, z: -25.0, hw: 3.9, hd: 2.4, top: 2.2, label: "Schere" },
 
 
   // --- Betriebsgebäude: Büro und Halle, hinten rechts an der Wand ---

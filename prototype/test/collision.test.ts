@@ -54,8 +54,8 @@ const SORTIERMULDEN = CONFIGS.filter((c) =>
   ["r_cable", "r_va", "r_copper", "r_alu", "r_zinc", "r_brass"].includes(c.id)
 );
 /** Standplatz des Baggers — siehe `position` in excavator.ts. */
-const BAGGER_X = -8;
-const BAGGER_Z = -16;
+const BAGGER_X = -4;
+const BAGGER_Z = -18.5;
 /** Die Silos an der Ostwand, an denen der Abholer entlangfaehrt. */
 const SILOS = CONFIGS.filter((c) =>
   ["c_wood", "c_rubble", "c_plastic", "c_va_lager"].includes(c.id)
@@ -189,10 +189,15 @@ describe("Feste Bauten", () => {
     const h = CONFIGS.find((c) => c.id === "c_mixed")!;
     const [w, d] = h.size;
     expect(hitsObstacle(h.x, h.z, 0), "Innenraum frei").toBeNull();
-    expect(hitsObstacle(h.x, h.z + d / 2 + 1.2, 0), "Nordseite offen").toBeNull();
-    expect(hitsObstacle(h.x, h.z - d / 2 - 0.4, 0), "Südwand sperrt").not.toBeNull();
-    expect(hitsObstacle(h.x + w / 2 + 0.4, h.z, 0), "Ostwand sperrt").not.toBeNull();
-    expect(hitsObstacle(h.x - w / 2 - 0.4, h.z, 0), "Westwand sperrt").not.toBeNull();
+    expect(hitsObstacle(h.x, h.z + d / 2 + 1.2, 0), "Vorderseite offen").toBeNull();
+    expect(hitsObstacle(h.x, h.z - d / 2 - 0.4, 0), "Rückwand sperrt").not.toBeNull();
+    expect(hitsObstacle(h.x + w / 2 + 0.4, h.z, 0), "Aussenwand sperrt").not.toBeNull();
+    // Zur Maschine hin steht KEINE Wand (Ansage 12.09.2026): dort ist der
+    // Bagger selbst die Abgrenzung, und eine Wand waere nur im Weg.
+    expect(
+      hitsObstacle(h.x - w / 2 - 0.4, h.z + d / 2 - 1, 0),
+      "Seite zum Bagger muss offen sein"
+    ).toBeNull();
   });
 
   it("alles steht innerhalb der Platzgrenzen", () => {
@@ -264,7 +269,7 @@ describe("Reichweite des Baggers", () => {
     for (const c of SORTIERMULDEN) {
       let naechste = Infinity;
       for (let t = 0; t <= 1.0001; t += 0.05) {
-        const pz = BAGGER_Z + t * 4.5;
+        const pz = BAGGER_Z + t * 5;
         naechste = Math.min(naechste, Math.hypot(c.x - BAGGER_X, c.z - pz));
       }
       expect(naechste, `${c.label} muss in Reichweite liegen`).toBeLessThan(REICHWEITE_M);

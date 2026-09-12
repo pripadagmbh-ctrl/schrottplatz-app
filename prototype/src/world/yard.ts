@@ -44,7 +44,7 @@ export const KAFFEE_THEKE = new THREE.Vector3(KAFFEE_POS.x, 0, KAFFEE_POS.z - 2.
 export class Yard {
   /** Zentrum der Annahmefläche (nördlich vor dem Bagger) — hier landet die Anlieferung */
   /** Vorplatz vor dem Bagger — dort haelt der LKW zum Abladen. */
-  readonly pileCenter = new THREE.Vector3(-8.0, 0, -7);
+  readonly pileCenter = new THREE.Vector3(-4.0, 0, -10);
 
   constructor(scene: THREE.Scene, world: RAPIER.World) {
     this.buildGround(scene, world);

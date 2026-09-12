@@ -234,7 +234,7 @@ export class Excavator {
   * 12.09.2026). Von hier liegt die Presse bei +180°, der Stahlcontainer bei
   * +93°, der Mischschrott bei −116°.
   */
-  readonly position = new THREE.Vector3(-8, 0, -16);
+  readonly position = new THREE.Vector3(-4, 0, -18.5);
   heading = 0; // rad, 0 = +Z
   cabYaw = 0;
   boomAngle = THREE.MathUtils.degToRad(35);
