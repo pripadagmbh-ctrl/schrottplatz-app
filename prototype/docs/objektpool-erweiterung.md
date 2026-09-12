@@ -1,8 +1,31 @@
 # Objektpool — Erweiterungsvorschlag (12.09.2026)
 
-Vorschlagsliste, keine Umsetzung. Sie erweitert ausschließlich den
-**bestehenden** Objektpool und erfindet weder Spielmechanik noch neue
-Datenstruktur.
+Sie erweitert ausschließlich den **bestehenden** Objektpool und erfindet
+weder Spielmechanik noch neue Datenstruktur.
+
+## Umsetzungsstand (12.09.2026)
+
+**221 der 234 Vorschläge sind eingepflegt**, in `src/world/objektkatalog.ts`,
+angehängt an die drei vorhandenen Listen. Nicht eingepflegt:
+
+- **Zehn lose Schüttgüter** — Bauschutt, Betonbrocken, Ziegel, Asphalt,
+  Naturstein, Felsbrocken, Schotter, Kies, Sand, Erde. Auf Ansage
+  ausgelassen: Was rieselt, ist mit einem Greifer nicht zu fassen und
+  bräuchte eigene Mechanik.
+- **Seecontainer 40 Fuß** und **Containerstapel (drei hoch)** — zwölf Meter
+  lang bzw. knapp acht Meter hoch. Der Ausleger reicht gut acht Meter; beide
+  wären kein Objekt, sondern ein Hindernis. Der 20-Fuß-Container ist drin.
+
+Drei Anpassungen waren nötig, damit der Platz das Sortiment verträgt — jede
+gemessen, keine davon an der Wirtschaft:
+
+| | vorher | nachher | Grund |
+|---|---|---|---|
+| Großteil-Anteil im Starthaufen | 45 % | 12 % | Mit den neuen Großteilen fand fast die Hälfte der Stücke keinen Platz (64 statt über 90 von 150) |
+| Radius des Starthaufens | 4,0 m | 5,2 m | Sperrigere Stücke brauchen Fläche; die Stahlschrottfläche misst 11 × 12 m |
+| Stückzahl im Starthaufen | 150 | 85 | Realistische Massen ergaben **17,6 t** Startgewicht — über der Stauschwelle von 16 t. Der Platz wäre mit geschlossener Einfahrt gestartet |
+
+Gegenprobe über fünf Ziehungen: 9,2 bis 13,0 t, alle unter der Stauschwelle.
 
 ## Was schon da ist
 

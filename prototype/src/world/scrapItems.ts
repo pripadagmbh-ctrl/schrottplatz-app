@@ -1,6 +1,12 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { getMaterial } from "../materials/catalog";
+import {
+  KATALOG_BIG,
+  KATALOG_HUGE,
+  KATALOG_SPECS,
+  type PileSpec,
+} from "./objektkatalog";
 
 /**
  * Schrottteile mit materialtypischen Formen (Briefing Kap. 7).
@@ -223,12 +229,6 @@ function flatColliderDesc(shape: ScrapShape): RAPIER.ColliderDesc {
  */
 const FLAT_SCALE_Y = 0.55;
 
-interface PileSpec {
-  materialId: string;
-  massKg: number;
-  kind: ScrapShape["kind"];
-  dims: number[];
-}
 
 // Basis-Sortiment (SW) — Starthaufen und Zufalls-Ladungen speisen sich hieraus
 const SPECS: PileSpec[] = [
@@ -280,6 +280,9 @@ const SPECS: PileSpec[] = [
   { materialId: "alu", massKg: 16, kind: "box", dims: [0.7, 0.5, 0.15] }, // Motorradmotor
   { materialId: "copper", massKg: 22, kind: "box", dims: [0.45, 0.4, 0.35] }, // Elektromotor
   { materialId: "tires", massKg: 11, kind: "torus", dims: [0.31, 0.11] }, // Traktorreifen
+
+  // Erweiterung 12.09.2026 — siehe world/objektkatalog.ts
+  ...KATALOG_SPECS,
 ];
 
 /**
@@ -304,6 +307,9 @@ const HUGE_SPECS: PileSpec[] = [
   { materialId: "alu", massKg: 700, kind: "box", dims: [3.5, 0.35, 1.6] }, // Tragflächenstück
   { materialId: "alu", massKg: 800, kind: "cyl", dims: [1.3, 3.0] }, // Rumpfsegment
   { materialId: "alu", massKg: 550, kind: "box", dims: [2.9, 1.1, 0.9] }, // Aufbau/Kofferaufbau
+
+  // Erweiterung 12.09.2026 — siehe world/objektkatalog.ts
+  ...KATALOG_HUGE,
 ];
 
 const BIG_SPECS: PileSpec[] = [
@@ -332,6 +338,9 @@ const BIG_SPECS: PileSpec[] = [
   { materialId: "cable", massKg: 120, kind: "cyl", dims: [0.85, 0.9] }, // Kabeltrommel
   { materialId: "wood", massKg: 90, kind: "box", dims: [1.4, 0.5, 0.9] }, // Holzkiste
   { materialId: "rubble", massKg: 130, kind: "box", dims: [1.1, 1.1, 1.1] }, // Betonblock
+
+  // Erweiterung 12.09.2026 — siehe world/objektkatalog.ts
+  ...KATALOG_BIG,
 ];
 
 const CABLE_COLORS = [0xb0682a, 0x71646a, 0x315e75];
@@ -722,9 +731,33 @@ export class ItemManager {
    * Die Teile werden überlappungsfrei gesetzt: klemmen sie beim Spawn
    * ineinander, schleudert die Physik sie über den halben Platz.
    */
-  spawnPile(pileCenter: THREE.Vector3, count = 150, spread = 4.0): void {
+  /*
+   * `spread` ist der Radius, ueber den der Haufen verteilt wird. Er stand auf
+   * 4,0 m. Mit dem erweiterten Sortiment sind die Stuecke im Mittel sperriger,
+   * und bei gleicher Flaeche fand ein Fuenftel keinen Platz mehr. Die
+   * Stahlschrottflaeche misst 11 x 12 m — fuer 5,2 m Radius ist also Platz.
+   *
+   * `count` stand auf 150. Die Stuecke aus dem Objektkatalog haben realistische
+   * Massen, und damit wog der Starthaufen ploetzlich 17,6 t — ueber der
+   * Stauschwelle von 16 t. Der Platz waere mit geschlossener Einfahrt
+   * gestartet, und nicht einmal der Tutorial-Kunde waere hereingekommen.
+   * Weniger Stuecke, dafuer schwerere: Das Gesamtgewicht bleibt, wo die
+   * Wirtschaft es erwartet, ohne dass an ihr gedreht wird.
+   */
+  spawnPile(pileCenter: THREE.Vector3, count = 85, spread = 5.2): void {
     const placed: Array<{ x: number; y: number; z: number; r: number }> = [];
-    const specs = randomCargo(count, 0.45);
+    /*
+     * Anteil Grossteile im Starthaufen.
+     *
+     * Stand auf 0,45. Seit der Objektkatalog dazugekommen ist, enthaelt
+     * BIG_SPECS auch Baggerausleger, Schuttmulden und Kipperbruecken — Stuecke
+     * von ueber drei Metern. Mit 45 Prozent davon fand fast die Haelfte der
+     * Teile keinen Platz mehr (gemessen: 64 statt ueber 90 von 150), und der
+     * Haufen sah aus wie ein Maschinenfriedhof statt wie ein Schrotthaufen.
+     * Grossteile kommen jetzt vor allem mit den Anlieferungen; im Starthaufen
+     * liegen ein paar davon, nicht die Haelfte.
+     */
+    const specs = randomCargo(count, 0.12);
     for (const s of specs) {
       // Umkugel, nicht halbe Kantenlaenge: Ein Teil wird zufaellig verdreht
       // gesetzt, also zaehlt der groesste Abstand von der Mitte zur Ecke. Die
