@@ -41,6 +41,13 @@ export interface ContainerConfig {
    */
   shareSouth?: boolean;
   shareNorth?: boolean;
+  /**
+   * Welche Wände eine `halde` bekommt. Ohne Angabe alle drei.
+   *
+   * Zwei Halden nebeneinander teilen sich eine Trennwand — die zweite
+   * daneben zu stellen sähe aus wie ein Baufehler.
+   */
+  haldeWaende?: { rueck?: boolean; aussen?: boolean; trenn?: boolean };
   /** Rückwand weglassen — die Nachbarmulde dahinter bringt sie mit */
   shareEast?: boolean;
   shareWest?: boolean;
@@ -105,18 +112,28 @@ export const CONFIGS: ContainerConfig[] = [
     z: -24.0, size: [8.0, 8.0, 5.0] },
 
   /*
-   * STAHLSCHROTT — fester 40-m³-Abrollcontainer, direkt rechts vom Bagger.
+   * STAHLSCHROTT — eine Mulde, kein Container mehr.
    *
-   * „Stahlschrott kommt in den 40er Container und sollte direkt neben Bagger,
-   * damit er erreicht werden kann." Er bleibt stehen: Der Abholer zieht ihn
-   * samt Inhalt auf den LKW, der Bagger versetzt ihn nicht.
+   * Ansage 12.09.2026: „die Stahlcontainer kommen weg und da kommt jetzt auf
+   * jeden Fall noch eine Mulde hin … damit wir das dort sortieren können."
+   * Sie liegt direkt hinter dem Bagger und teilt sich die linke Trennwand mit
+   * dem Mischschrott; rechts bekommt sie ihre eigene. Dazwischen wird
+   * sortiert, ohne dass ein Behälter im Weg steht.
    */
-  { id: "c_steel", fractionId: "steel", label: "STAHLSCHROTT", kind: "grosscontainer", x: -2.5,
-    z: -27.4, size: [6.0, 2.6, 2.0] },
-  { id: "c_steel2", fractionId: "steel", label: "STAHLSCHROTT", kind: "grosscontainer",
-    x: -2.5,
-    z: -24.5, size: [6.0, 2.6, 2.0] },
+  { id: "c_steel", fractionId: "steel", label: "STAHLSCHROTT", kind: "halde", x: -2.5,
+    z: -25.5, size: [8.0, 6.0, 3.0], haldeWaende: { rueck: true, trenn: true } },
 
+  /*
+   * GROSSTEILE — offene Fläche rechts neben der Stahlmulde.
+   *
+   * Ansage 12.09.2026: „neben der rechten Muldenbegrenzung würde ich Metalle,
+   * die größer sind, also größere Aluminiumteile und so was, da platzieren,
+   * und damit kann Lambert mit dem Radlader genau die Teile aufladen und in
+   * die Silos bringen." Keine Wände: Was hier liegt, soll der Lader von der
+   * Seite aufnehmen können.
+   */
+  { id: "c_alu_gross", fractionId: "alu", label: "GROSSTEILE ALU", kind: "pile", x: -10.75,
+    z: -25.5, size: [6.5, 6.0, 0] },
   /*
    * REIFENDEPOT — rechts hinten, offene Fläche ohne Wände.
    *
@@ -135,17 +152,17 @@ export const CONFIGS: ContainerConfig[] = [
    * wirft, bekommt für alles den Messingpreis.
    */
   { id: "r_cable", fractionId: "cable", label: "KABEL", kind: "rolloff", x: -8.0,
-    z: -17.0, size: [2.8, 1.8, 1.1] },
-  { id: "r_va", fractionId: "va", label: "EDELSTAHL VA", kind: "rolloff", x: -11.5,
-    z: -17.0, size: [2.8, 1.8, 1.1] },
+    z: -15.5, size: [2.8, 1.8, 1.1] },
+  { id: "r_va", fractionId: "va", label: "EDELSTAHL VA", kind: "rolloff", x: -11.0,
+    z: -15.5, size: [2.8, 1.8, 1.1] },
   { id: "r_copper", fractionId: "copper", label: "KUPFER", kind: "rolloff", x: -8.0,
-    z: -14.5, size: [2.8, 1.8, 1.1] },
-  { id: "r_alu", fractionId: "alu", label: "ALU", kind: "rolloff", x: -11.5,
-    z: -14.5, size: [2.8, 1.8, 1.1] },
+    z: -13.0, size: [2.8, 1.8, 1.1] },
+  { id: "r_alu", fractionId: "alu", label: "ALU", kind: "rolloff", x: -11.0,
+    z: -13.0, size: [2.8, 1.8, 1.1] },
   { id: "r_zinc", fractionId: "zinc", label: "ZINK", kind: "rolloff", x: -8.0,
-    z: -12.0, size: [2.8, 1.8, 1.1] },
-  { id: "r_brass", fractionId: "brass", label: "MESSING", kind: "rolloff", x: -11.5,
-    z: -12.0, size: [2.8, 1.8, 1.1] },
+    z: -11.0, size: [2.8, 1.8, 1.1] },
+  { id: "r_brass", fractionId: "brass", label: "MESSING", kind: "rolloff", x: -11.0,
+    z: -11.0, size: [2.8, 1.8, 1.1] },
 
   /*
    * SILOS an der Ostwand — dorthin fährt der Abholer entlang, ohne den
@@ -271,9 +288,11 @@ class GameContainer {
       const AUSLAUF = 0.4; // Resthöhe am offenen Ende
       const reihenBei = (t: number): number =>
         Math.max(2, Math.round(REIHEN * (AUSLAUF + (1 - AUSLAUF) * t)));
+      const wnd = cfg.haldeWaende ?? { rueck: true, aussen: true, trenn: true };
       for (let lage = 0; lage < 2; lage++) {
         const tt = BT * (0.5 + lage);
         // Rückwand: läuft zur Maschinenseite (−x) hin aus
+        if (wnd.rueck !== false)
         for (let bx = -hw / 2 + BL / 2; bx < hw / 2 + 0.4; bx += BL) {
           const n = reihenBei((bx + hw / 2) / hw);
           for (let r = 0; r < n; r++) {
@@ -282,6 +301,7 @@ class GameContainer {
           }
         }
         // Aussenwand: läuft nach vorn (+z) hin aus
+        if (wnd.aussen !== false)
         for (let bz = -hd / 2 + BL / 2; bz < hd / 2 + 0.4; bz += BL) {
           const n = reihenBei((hd / 2 - bz) / hd);
           for (let r = 0; r < n; r++) {
@@ -298,6 +318,7 @@ class GameContainer {
          * genügt, um die Kante zu lesen, und versperrt nichts.
          */
         const andeutung = Math.max(2, Math.round(REIHEN / 2));
+        if (wnd.trenn !== false)
         for (let bz = -hd / 2 + BL / 2; bz < -hd / 2 + 2 * BL; bz += BL) {
           for (let r = 0; r < andeutung; r++) {
             const off = (r % 2) * (BL / 2);
@@ -336,35 +357,39 @@ class GameContainer {
       const halb = hh * 0.55;
       // Die angedeutete Trennwand bekommt ihren eigenen Kollider — halbe Höhe,
       // zwei Steinlängen ab der hinteren Ecke.
-      const andeutungH = hh / 2;
-      world.createCollider(
-        RAPIER.ColliderDesc.cuboid(BT, andeutungH / 2, BL).setTranslation(
-          -(hw / 2 + BT),
-          andeutungH / 2,
-          -hd / 2 + BL
-        ),
-        body
-      );
+      if (wnd.trenn !== false) {
+        const andeutungH = hh / 2;
+        world.createCollider(
+          RAPIER.ColliderDesc.cuboid(BT, andeutungH / 2, BL).setTranslation(
+            -(hw / 2 + BT),
+            andeutungH / 2,
+            -hd / 2 + BL
+          ),
+          body
+        );
+      }
       for (const [hoch, vorz] of [
         [hh, 1],
         [halb, -1],
       ] as Array<[number, number]>) {
-        world.createCollider(
-          RAPIER.ColliderDesc.cuboid(hw / 4 + BT / 2, hoch / 2, BT).setTranslation(
-            (vorz * hw) / 4,
-            hoch / 2,
-            -(hd / 2 + BT)
-          ),
-          body
-        );
-        world.createCollider(
-          RAPIER.ColliderDesc.cuboid(BT, hoch / 2, hd / 4 + BT / 2).setTranslation(
-            hw / 2 + BT,
-            hoch / 2,
-            (-vorz * hd) / 4
-          ),
-          body
-        );
+        if (wnd.rueck !== false)
+          world.createCollider(
+            RAPIER.ColliderDesc.cuboid(hw / 4 + BT / 2, hoch / 2, BT).setTranslation(
+              (vorz * hw) / 4,
+              hoch / 2,
+              -(hd / 2 + BT)
+            ),
+            body
+          );
+        if (wnd.aussen !== false)
+          world.createCollider(
+            RAPIER.ColliderDesc.cuboid(BT, hoch / 2, hd / 4 + BT / 2).setTranslation(
+              hw / 2 + BT,
+              hoch / 2,
+              (-vorz * hd) / 4
+            ),
+            body
+          );
       }
       this.label = new ContainerLabel(cfg.label, fraction.color);
       this.label.sprite.position.set(cfg.x, hh + 1.4, cfg.z + hd / 2 + 1.0);

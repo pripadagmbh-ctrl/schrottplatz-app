@@ -29,7 +29,7 @@ import type { CompositeManager } from "../dismantle/composites";
 // naeher an den Mischschrottplatz rueckt. Und quergestellt: Sie lag vom Sitz
 // aus waagerecht im Bild und nahm die ganze Breite ein; hochkant steht sie in
 // einer Reihe mit Stahlmulde und Halde.
-const CENTER = new THREE.Vector3(-9.0, 0, -22.0);
+const CENTER = new THREE.Vector3(-10.0, 0, -19.0);
 // Die Schwelle gilt fuer Objekte wie fuer Pakete — sie steht in materials/purity.ts.
 /**
  * Wo das fertige Paket liegen bleibt: in der Kammer.
@@ -47,7 +47,7 @@ function baleYard(): { x: number; z: number; w: number; d: number } {
   // die da rausfallen". Von dort holt der Bagger sie in den Container.
   // Quergestellt faellt das Paket nicht mehr laengs, sondern zur Seite des
   // Stahlcontainers heraus — dorthin, wo es hinsoll.
-  return { x: CENTER.x + INNER_D / 2 + 1.6, z: CENTER.z, w: 2.2, d: 2.4 };
+  return { x: CENTER.x + INNER_W / 2 + 1.6, z: CENTER.z, w: 2.4, d: 2.2 };
 }
 /**
  * Die Mulde liegt längs Ost–West, in einer Flucht mit dem Stahlschrottplatz
@@ -56,7 +56,9 @@ function baleYard(): { x: number; z: number; w: number; d: number } {
  * legen sich dadurch nach Norden und Süden weg, und der Bagger füllt von oben
  * über die lange Seite ein (Design-Fix 02.09.2026).
  */
-const ROT = Math.PI / 2;
+// Wieder laengs gestellt (Ansage 12.09.2026: „es kann auch die Presse
+// gedreht werden, damit ein bisschen mehr Platz auf der Seite entsteht").
+const ROT = 0;
 // Große Mulde: die lange offene Seite zeigt nach Norden zum Baggerplatz,
 // damit von dort bequem eingefüllt werden kann (Design 2026-08-29).
 // Breite wie der Stahlschrottplatz (11 m), direkt daneben: So bildet die
@@ -123,7 +125,6 @@ export class PressManager {
   ) {
     const steel = new THREE.MeshStandardMaterial({ color: 0x4a5157, roughness: 0.6, metalness: 0.55 });
     const heavy = new THREE.MeshStandardMaterial({ color: 0x3a4045, roughness: 0.5, metalness: 0.7 });
-    const warn = new THREE.MeshStandardMaterial({ color: 0xd7a71f, roughness: 0.7 });
 
     const group = new THREE.Group();
     group.position.copy(CENTER);
@@ -238,21 +239,27 @@ export class PressManager {
       if (voll) this.falten.push({ gruppe: falte, seite: side, weg: halbSpann });
       // Quer-Versteifungen auf der Platte
       for (const rx of voll ? [-4.2, -2.5, -0.8, 0.8, 2.5, 4.2] : []) {
-        const rib = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.1, halbSpann - 0.25), warn);
+        const rib = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.1, halbSpann - 0.25), heavy);
         rib.position.set(rx, PLATE_T / 2 + 0.05, -side * (halbSpann / 2));
         pivot.add(rib);
       }
       // Scharnierrohr längs
+      /*
+       * Auch das Scharnierrohr ist nicht mehr gelb. Es lief als durchgehender
+       * Strang ueber die ganze Kammerlaenge und war genau der Balken, der
+       * zweimal beanstandet wurde — die Farbe machte aus einem Bauteil ein
+       * Ausrufezeichen.
+       */
       const hinge = new THREE.Mesh(
         new THREE.CylinderGeometry(0.15, 0.15, lidLen + 0.2, 10),
-        warn
+        heavy
       );
       hinge.rotation.z = Math.PI / 2;
       hinge.visible = voll;
       pivot.add(hinge);
       // Winkelhebel: stehen nach außen-oben ab und werden von den Zylindern gezogen
       for (const lx of voll ? leverX : []) {
-        const lever = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.86, 0.26), warn);
+        const lever = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.86, 0.26), heavy);
         lever.position.set(lx, 0.34, side * 0.2);
         lever.rotation.x = -side * 0.42;
         lever.castShadow = true;

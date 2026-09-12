@@ -55,7 +55,7 @@ const SORTIERMULDEN = CONFIGS.filter((c) =>
 );
 /** Standplatz des Baggers — siehe `position` in excavator.ts. */
 const BAGGER_X = -2.0;
-const BAGGER_Z = -19.2;
+const BAGGER_Z = -18.3;
 /** Die Silos an der Ostwand, an denen der Abholer entlangfaehrt. */
 const SILOS = CONFIGS.filter((c) =>
   ["c_wood", "c_rubble", "c_plastic", "c_va_lager"].includes(c.id)
@@ -237,8 +237,9 @@ describe("Feste Bauten", () => {
 
   it("lässt den Arm über niedrige Mauern schwenken, aber nicht hindurch", () => {
     // Umrandung ist 1,8 m hoch
-    expect(hitsObstacle(0, -29, 0, 1.0), "unterhalb sperrt").not.toBeNull();
-    expect(hitsObstacle(0, -29, 0, 2.5), "darüber ist frei").toBeNull();
+    // Eine Stelle der Suedwand, an der keine Mulde dahintersteht
+    expect(hitsObstacle(-30, -29, 0, 1.0), "unterhalb sperrt").not.toBeNull();
+    expect(hitsObstacle(-30, -29, 0, 2.5), "darüber ist frei").toBeNull();
   });
 
   it("hat für jedes Bauwerk eine sinnvolle Höhe", () => {

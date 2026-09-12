@@ -22,7 +22,7 @@ import {
 } from "../src/delivery/routes";
 
 /** Standplatz des Baggers — siehe `position` in excavator.ts. */
-const BAGGER = { x: -2.0, z: -19.2 };
+const BAGGER = { x: -2.0, z: -18.3 };
 
 /**
  * Mulden, die der Spieler von seinem Standplatz aus selbst befüllt.
@@ -51,7 +51,7 @@ const SELBST_BEFUELLT = [
  * dieser kurzen Linie aus ueber seine Wand zu befuellen ist.
  */
 const LINIE: Array<[number, number]> = [];
-for (let t = 0; t <= 1.0001; t += 0.05) LINIE.push([-2.0, -19.2 + t * 5]);
+for (let t = 0; t <= 1.0001; t += 0.05) LINIE.push([-2.0, -18.3 + t * 5]);
 
 function abstand(x: number, z: number): number {
   return Math.hypot(x - BAGGER.x, z - BAGGER.z);

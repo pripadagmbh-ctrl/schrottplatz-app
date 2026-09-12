@@ -53,7 +53,15 @@ export class Hud {
     const mat = getMaterial(item.materialId);
     // Der Name zuerst: Man greift einen Kuehlschrank, nicht "Stahlschrott".
     const name = item.shape?.name;
-    const kopf = name ? `${name} · ${hauptMaterial(item)}` : hauptMaterial(item);
+    /*
+     * Material IMMER in Klammern hinter den Namen (Ansage 12.09.2026:
+     * „ich muss immer die Materialbeschreibung in Klammern beim Greifen
+     * sehen — Fluggasttreppe sagt nichts über das Material aus").
+     *
+     * Vorher stand es mit Mittelpunkt dahinter und las sich wie ein zweiter
+     * Name; in Klammern ist sofort klar, dass es die Stoffangabe ist.
+     */
+    const kopf = name ? `${name} (${hauptMaterial(item)})` : hauptMaterial(item);
     this.gripEl.textContent =
       `▼ ${kopf} · ${masseText(item.massKg)} · ${preisProTonne(mat)} ${euroIndicator(mat)}`;
   }
@@ -74,7 +82,8 @@ export class Hud {
       total += it.massKg;
       const name = it.shape?.name;
       if (name && it.massKg >= GROSS_AB_KG && gross.length < GROSS_MAX) {
-        gross.push(name);
+        // Auch in der Ladungsliste: Name ohne Material sagt nichts.
+        gross.push(`${name} (${hauptMaterial(it)})`);
         continue;
       }
       byMat.set(it.materialId, (byMat.get(it.materialId) ?? 0) + 1);

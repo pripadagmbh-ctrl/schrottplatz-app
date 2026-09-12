@@ -73,11 +73,22 @@ function bayObstacles(cfg: ContainerConfig): Obstacle[] {
      * (12.09.2026). Die vordere Hälfte bleibt frei — dort greift der Bagger
      * hinein und dort setzt der Kipper zurück.
      */
-    return [
-      { x: cfg.x, z: cfg.z - hd / 2 - T, hw: hw / 2 + T, hd: T, top, label: `${L} Rueck` },
-      { x: cfg.x + hw / 2 + T, z: cfg.z, hw: T, hd: hd / 2 + T, top, label: `${L} Aussen` },
-      { x: cfg.x - hw / 2 - T, z: cfg.z - hd / 4, hw: T, hd: hd / 4, top, label: `${L} Trenn` },
-    ];
+    const wnd = cfg.haldeWaende ?? { rueck: true, aussen: true, trenn: true };
+    const out: Obstacle[] = [];
+    if (wnd.rueck !== false)
+      out.push({ x: cfg.x, z: cfg.z - hd / 2 - T, hw: hw / 2 + T, hd: T, top, label: `${L} Rueck` });
+    if (wnd.aussen !== false)
+      out.push({ x: cfg.x + hw / 2 + T, z: cfg.z, hw: T, hd: hd / 2 + T, top, label: `${L} Aussen` });
+    if (wnd.trenn !== false)
+      out.push({
+        x: cfg.x - hw / 2 - T,
+        z: cfg.z - hd / 4,
+        hw: T,
+        hd: hd / 4,
+        top,
+        label: `${L} Trenn`,
+      });
+    return out;
   }
   if (cfg.kind !== "bay") return []; // Haufen, Container und offene Flächen haben keine Wände
   const [w, d, top] = cfg.size;
@@ -131,7 +142,7 @@ export const STATIC_OBSTACLES: Obstacle[] = [
   ...CONFIGS.flatMap(bayObstacles),
 
   // --- Schere und Presse, südlich hinter dem Bagger ---
-  { x: -9.0, z: -22.0, hw: 2.4, hd: 3.9, top: 2.2, label: "Schere" },
+  { x: -10.0, z: -19.0, hw: 3.9, hd: 2.4, top: 2.2, label: "Schere" },
 
 
   // --- Betriebsgebäude: Büro und Halle, hinten rechts an der Wand ---
