@@ -470,10 +470,26 @@ async function main(): Promise<void> {
   grip.crusher = (body) => {
     const it = items.items.find((i) => i.body.handle === body.handle);
     if (!it || !items.isCrushable(it)) return false;
-    if (!items.flattenItem(it)) return false;
     const p = body.translation();
+    const ort = new THREE.Vector3(p.x, p.y, p.z);
+    /*
+     * Manches faellt beim Zerquetschen auseinander, statt nur flach zu werden:
+     * Bei einer Kabeltrommel zerbricht das Holz, bevor das Kabel nachgibt, und
+     * danach liegt beides getrennt da (Wunsch 12.09.2026). Aus einem
+     * Mischschrott-Teil werden so sortenreine — das ist der Lohn fuer die
+     * Arbeit mit der Spinne.
+     */
+    const teile = items.zerlege(it);
+    if (teile) {
+      audio.playCrash(0.8);
+      particles.spawn(ort, 12, 0x9a8b74, 2.0, 1.4, 0.6);
+      const namen = teile.map((x) => getMaterial(x.materialId).name).join(" + ");
+      hud.toast(`Zerlegt: ${namen}`);
+      return true;
+    }
+    if (!items.flattenItem(it)) return false;
     audio.playDrop(it.materialId);
-    particles.spawn(new THREE.Vector3(p.x, p.y, p.z), 6, 0xb0b6bb, 1.6, 1.2, 0.5);
+    particles.spawn(ort, 6, 0xb0b6bb, 1.6, 1.2, 0.5);
     hud.toast(`${getMaterial(it.materialId).name} zusammengedrückt`);
     return true;
   };

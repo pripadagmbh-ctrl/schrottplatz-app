@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { getMaterial } from "../materials/catalog";
-import { type Anteil, istPressbar } from "../materials/purity";
+import { type Anteil, fraktionAus, istPressbar } from "../materials/purity";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { baueGeometrie, type BauId } from "./objektbau";
 import {
@@ -39,6 +39,15 @@ export interface ScrapShape {
    * Form und nicht am Teil, damit es ohne Zutun im Spielstand landet.
    */
   name?: string;
+  /**
+   * Faellt es beim Zerquetschen in seine Bestandteile?
+   *
+   * Manche Verbundteile trennen sich von selbst, wenn man sie zusammendrueckt
+   * (Ansage 12.09.2026): Bei einer Kabeltrommel ist das Holz zerbrochen, bevor
+   * das Kabel auch nur nachgibt — danach liegt beides getrennt da. Aus einem
+   * Mischschrott-Teil werden so sortenreine, und genau darin liegt der Gewinn.
+   */
+  trennbar?: boolean;
   /**
    * Sind die Scheiben schon hin?
    *
@@ -150,6 +159,33 @@ function cableCoilGeometry(r: number, tube: number): THREE.BufferGeometry {
  */
 export const WERKZEUG_MAX = 4.2;
 /**
+ * Wie eine Fraktion aussieht, wenn sie aus einem Verbundteil faellt.
+ *
+ * Kein Katalogeintrag, sondern eine Form nach Fraktion: Kabel rollt sich zum
+ * Bund, Holz bricht in Latten, Blech bleibt Blech. Die Groesse kommt aus der
+ * Masse — bei rund 900 kg je Kubikmeter losem Schrott.
+ */
+function trennForm(materialId: string, massKg: number): ScrapShape {
+  const vol = Math.max(massKg / 900, 0.004);
+  const w = Math.cbrt(vol);
+  const farbe = getMaterial(materialId).color;
+  if (materialId === "cable")
+    return { kind: "torus", dims: [w * 1.1, w * 0.42], color: farbe, name: "Kabelbund" };
+  if (materialId === "tires")
+    return { kind: "torus", dims: [w * 1.0, w * 0.38], color: farbe, name: "Reifen" };
+  if (materialId === "wood")
+    return { kind: "box", dims: [w * 0.8, w * 0.7, w * 2.4], color: farbe, name: "Holzbruch" };
+  if (materialId === "plastic")
+    return { kind: "box", dims: [w * 1.6, w * 0.5, w * 1.4], color: farbe, name: "Kunststoffreste" };
+  return {
+    kind: "box",
+    dims: [w * 1.2, w * 0.8, w * 1.3],
+    color: farbe,
+    name: `${getMaterial(materialId).name}-Reste`,
+  };
+}
+
+/**
  * Ab diesem Tempoverlust in einem Schritt zerspringt Glas (m/s).
  *
  * Absichtlich niedrig (Ansage 12.09.2026: „je nach Einwirkung eigentlich
@@ -173,6 +209,14 @@ function glasStoff(): THREE.MeshStandardMaterial {
     opacity: 0.42,
   });
   return glasMaterial;
+}
+
+/** Was der Katalog zu einem geladenen Teil noch weiss. */
+interface KatalogZusatz {
+  bau?: BauId;
+  name?: string;
+  zusammensetzung?: Anteil[];
+  trennbar?: boolean;
 }
 
 /** Fraktionen ohne metallischen Glanz — Abfall eben. */
@@ -433,13 +477,25 @@ const BIG_SPECS: PileSpec[] = [
   { materialId: "copper", massKg: 65, kind: "cyl", dims: [0.35, 1.2], bau: "tank", name: "Kupfer-Boiler" },
   { materialId: "copper", massKg: 48, kind: "torus", dims: [0.45, 0.16], bau: "buendel", name: "Kupferrohr-Bund" },
   { materialId: "cable", massKg: 55, kind: "torus", dims: [0.55, 0.22], name: "Kabelbund" },
-  { materialId: "cable", massKg: 120, kind: "cyl", dims: [0.85, 0.9], bau: "trommel", name: "Kabeltrommel", zusammensetzung: [{ materialId: "cable", anteil: 0.62 }, { materialId: "wood", anteil: 0.38 }] },
+  { materialId: "cable", massKg: 120, kind: "cyl", dims: [0.85, 0.9], bau: "trommel", name: "Kabeltrommel", trennbar: true, zusammensetzung: [{ materialId: "cable", anteil: 0.62 }, { materialId: "wood", anteil: 0.38 }] },
   { materialId: "wood", massKg: 90, kind: "box", dims: [1.4, 0.5, 0.9], bau: "moebel", name: "Holzkiste" },
   { materialId: "rubble", massKg: 130, kind: "box", dims: [1.1, 1.1, 1.1], bau: "beton", name: "Betonblock" },
 
   // Erweiterung 12.09.2026 — siehe world/objektkatalog.ts
   ...KATALOG_BIG,
 ];
+
+/*
+ * Auch die drei urspruenglichen Listen bekommen ihre Fraktion aus der
+ * Zusammensetzung. Sonst stuende die Kabeltrommel als "cable" im Katalog und
+ * waere zugleich Mischschrott — die Ableitung lief zuerst nur ueber den neuen
+ * Katalog (Befund 12.09.2026).
+ */
+for (const liste of [SPECS, BIG_SPECS, HUGE_SPECS]) {
+  for (const sp of liste) {
+    if (sp.zusammensetzung) sp.materialId = fraktionAus(sp.zusammensetzung, sp.materialId);
+  }
+}
 
 const CABLE_COLORS = [0xb0682a, 0x71646a, 0x315e75];
 
@@ -512,6 +568,8 @@ export function randomCargo(
         color: colorFor(spec, i),
         bau: spec.bau,
         name: spec.name,
+        zusammensetzung: spec.zusammensetzung,
+        trennbar: spec.trennbar,
       },
     });
   }
@@ -738,21 +796,23 @@ export class ItemManager {
    * mit denen das Teil einmal aus dem Katalog gezogen wurde. Findet sich nichts,
    * bleibt es der Grundkoerper; falsch wird dadurch nichts.
    */
-  private static katalogKarte: Map<string, { bau?: BauId; name?: string }> | null = null;
+  private static katalogKarte: Map<string, KatalogZusatz> | null = null;
 
   private static katalogFuer(
     materialId: string,
     massKg: number,
     shape: ScrapShape
-  ): { bau?: BauId; name?: string } | undefined {
+  ): KatalogZusatz | undefined {
     if (!ItemManager.katalogKarte) {
-      const karte = new Map<string, { bau?: BauId; name?: string }>();
+      const karte = new Map<string, KatalogZusatz>();
       for (const liste of [SPECS, BIG_SPECS, HUGE_SPECS]) {
         for (const sp of liste) {
           if (!sp.bau && !sp.name) continue;
           karte.set(`${sp.materialId}|${sp.massKg}|${sp.kind}|${sp.dims.join(",")}`, {
             bau: sp.bau,
             name: sp.name,
+            zusammensetzung: sp.zusammensetzung,
+            trennbar: sp.trennbar,
           });
         }
       }
@@ -775,10 +835,19 @@ export class ItemManager {
      * darum Grundfarbe weiss und `vertexColors`. Nur so bleibt ein Objekt aus
      * zwoelf Bauteilen ein einziger Zeichenruf mit einem einzigen Material.
      */
-    // Aus einem alten Spielstand geladen? Dann fehlen Bau und Name — nachtragen.
-    if (!shape.bau || !shape.name) {
+    // Aus einem alten Spielstand geladen? Dann fehlt alles, was der Katalog
+    // seither dazubekommen hat — nachtragen.
+    if (!shape.bau || !shape.name || !shape.zusammensetzung) {
       const k = ItemManager.katalogFuer(materialId, massKg, shape);
-      if (k) shape = { ...shape, bau: shape.bau ?? k.bau, name: shape.name ?? k.name };
+      if (k) {
+        shape = {
+          ...shape,
+          bau: shape.bau ?? k.bau,
+          name: shape.name ?? k.name,
+          zusammensetzung: shape.zusammensetzung ?? k.zusammensetzung,
+          trennbar: shape.trennbar ?? k.trennbar,
+        };
+      }
     }
     const material = new THREE.MeshStandardMaterial({
       color: shape.bau ? 0xffffff : shape.color,
@@ -911,7 +980,16 @@ export class ItemManager {
         ),
       body
     );
-    return this.register({ materialId, massKg, mesh, body, shape });
+    /*
+     * Die Zusammensetzung wandert als absolute Massen ans Teil. Sie stand
+     * bisher nur im Katalog, und damit wusste ein Kuehlschrott-Teil im Spiel
+     * nicht, woraus es besteht — die Presse rechnete die Reinheit eines
+     * Pakets aus lauter Einzelstuecken, als waere jedes sortenrein.
+     */
+    const composition = shape.zusammensetzung
+      ? shape.zusammensetzung.map((a) => ({ materialId: a.materialId, massKg: a.anteil * massKg }))
+      : undefined;
+    return this.register({ materialId, massKg, mesh, body, shape, composition });
   }
 
   /**
@@ -1330,6 +1408,39 @@ export class ItemManager {
   onAufprall: ((item: ScrapItem, wucht: number) => void) | null = null;
   /** Eine Scheibe ist zersprungen — Ort fuer Klang und Splitter. */
   onGlasBruch: ((x: number, y: number, z: number) => void) | null = null;
+
+  /**
+   * Ein Verbundteil in seine Fraktionen zerlegen.
+   *
+   * Das Stueck verschwindet und an seiner Stelle liegen so viele neue, wie es
+   * Bestandteile hatte — jedes sortenrein und darum mehr wert. Anteile unter
+   * fuenf Prozent fallen unter den Tisch: Ein Gramm Kupfer als eigenes Teil
+   * herumliegen zu lassen, hilft niemandem.
+   */
+  zerlege(item: ScrapItem): ScrapItem[] | null {
+    const shape = item.shape;
+    if (!shape?.trennbar || !item.composition || item.composition.length < 2) return null;
+    const p = item.body.translation();
+    const summe = item.composition.reduce((a, c) => a + c.massKg, 0);
+    if (summe <= 0) return null;
+    const teile: Array<{ materialId: string; massKg: number }> = item.composition
+      .filter((c) => c.massKg / summe >= 0.05)
+      .map((c) => ({ materialId: c.materialId, massKg: (c.massKg / summe) * item.massKg }));
+    if (teile.length < 2) return null;
+
+    this.remove(item);
+    const neu: ScrapItem[] = [];
+    teile.forEach((c, i) => {
+      const winkel = (i / teile.length) * Math.PI * 2;
+      const ort = new THREE.Vector3(
+        p.x + Math.cos(winkel) * 0.45,
+        p.y + 0.25,
+        p.z + Math.sin(winkel) * 0.45
+      );
+      neu.push(this.spawnScrap(c.materialId, c.massKg, trennForm(c.materialId, c.massKg), ort));
+    });
+    return neu;
+  }
 
   /**
    * Scheiben zerspringen lassen. Gibt true zurueck, wenn tatsaechlich etwas

@@ -46,6 +46,8 @@ export interface PileSpec {
   name?: string;
   /** Woraus es besteht — ohne Angabe gilt es als sortenrein. */
   zusammensetzung?: Anteil[];
+  /** Faellt beim Zerquetschen in seine Bestandteile (Kabeltrommel, Lattenrost). */
+  trennbar?: boolean;
 }
 
 /* ------------------------------------------------------------------------ */
