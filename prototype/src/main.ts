@@ -26,7 +26,7 @@ import { UPGRADES, UpgradeState, type UpgradeId } from "./economy/upgrades";
 import { haggle, leavesOnRefusal, hint, OFFER_FACTOR, OFFER_LABEL, type Offer } from "./economy/haggle";
 import { LaneWatch } from "./delivery/laneWatch";
 import { Daylight, Floodlights } from "./world/daylight";
-import { hitsObstacle } from "./world/obstacles";
+import { hitsObstacle, setBuildingObstacles } from "./world/obstacles";
 import { findeBox } from "./world/boxen";
 import { OfficeBuilding, BUERO_TUER } from "./world/office";
 import { Police } from "./world/police";
@@ -42,6 +42,7 @@ import { Account, PURCHASE_PRICE_PER_KG } from "./economy/account";
 import { getMaterial, ABFALL } from "./materials/catalog";
 import { StaffManager } from "./world/people";
 import { WEIGH_X, WEIGH_Z, KAFFEE_POS } from "./world/yard";
+import { setBaggerOrt } from "./delivery/routes";
 import { clearSave, readSave, storeSave, type SaveData } from "./core/save";
 
 const FIXED_DT = 1 / 60;
@@ -82,13 +83,20 @@ async function main(): Promise<void> {
   const daylight = new Daylight(scene, hemi, sun);
   // Masten stehen dicht an der Umrandung, damit die Arbeitsflächen frei
   // bleiben — der Platz misst 80 x 58 m
+  /*
+   * Der Mast auf (0 | −26) ist weg (Ansage 12.09.2026: „der eine Strahler
+   * muss da jetzt weg, weil der ein bisschen im Weg steht") — seit der
+   * Betrieb an der hinteren Grenze sitzt, stand er mitten in der Muldenreihe.
+   * Die beiden auf x 37 lagen ohnehin weit ausserhalb der Mauer, seit die
+   * Ostgrenze auf 10,5 gerueckt ist; sie stehen jetzt innen.
+   */
   const floodlights = new Floodlights(scene, [
     [-37, 26],
-    [37, 26],
     [-37, -26],
-    [37, -26],
+    [-37, 2],
+    [9, 26],
+    [9, 8],
     [0, 26],
-    [0, -26],
   ]);
 
   // --- Spielobjekte ---
@@ -129,10 +137,15 @@ async function main(): Promise<void> {
     fence = new FenceManager(scene, physics.world, items, bus);
     // Großer Berg auf der Stahlschrottfläche. Die Annahmefläche bleibt frei,
     // dort laden die Pritschen ab.
-    items.spawnPile(new THREE.Vector3(-9, 0, 1));
+    // Auf die Stahlflaeche, nicht auf die Grenze zur Mischschrottflaeche.
+    // Der Haufen ist am Anfang unsortiert — dass er als Verunreinigung zaehlt,
+    // ist gewollt: Aufraeumen ist die Aufgabe.
+    items.spawnPile(new THREE.Vector3(6.0, 0, -24.0), 85, 2.9);
     // Altfahrzeuge stehen von Anfang an am Rand des Stahlschrott-Haufens
-    composites.spawnCar(new THREE.Vector3(-15.8, 0.5, 3.5));
-    composites.spawnCar(new THREE.Vector3(-15.8, 0.5, -2.5));
+    // Zu den uebrigen Teilen in den Mischschrott (Ansage 12.09.2026): Sie
+    // standen noch am Platz von vor dem Umbau.
+    composites.spawnCar(new THREE.Vector3(4.2, 0.5, -21.5));
+    composites.spawnCar(new THREE.Vector3(8.0, 0.5, -26.0));
     // Etwas Streuschrott neben dem Stahlhaufen — er lag frueher an den
     // Schrottbergen, und die stehen jetzt ausserhalb der Mauer. Auf dem Platz
     // soll alles, was nach Material aussieht, auch aufzunehmen sein.
@@ -142,7 +155,9 @@ async function main(): Promise<void> {
         sp.materialId,
         sp.massKg,
         sp.shape,
-        new THREE.Vector3(-9 + Math.cos(a) * 6.2, 0.8 + (i % 3) * 0.7, 1 + Math.sin(a) * 5.4)
+        // An den Mischschrott statt an den alten Platz (Ansage 12.09.2026:
+        // „es fallen immer noch am alten Platz Schrottteile runter").
+        new THREE.Vector3(6 + Math.cos(a) * 3.0, 0.8 + (i % 3) * 0.7, -24 + Math.sin(a) * 3.0)
       );
     });
     // Erst jetzt setzen lassen, wenn alles Anfaengliche steht — Haufen, Autos
@@ -227,6 +242,12 @@ async function main(): Promise<void> {
   // Tagesablauf: Annahme → Sortieren → Annahme (Briefing Kap. 21)
   // Fahrspuren überwachen: liegt Schrott im Weg, steht der Betrieb
   const lanes = new LaneWatch(items);
+  /*
+   * Die Anlieferung richtet sich nach der Maschine (Ansage 12.09.2026): Der
+   * LKW faehrt so nah an den Bagger heran, wie der Vorplatz es zulaesst.
+   * Deshalb muessen die Routen wissen, wo er steht.
+   */
+  setBaggerOrt(() => excavator.position);
   let stoerfallGemeldet = false;
   // Geführter Einstieg — zeigt den Kreislauf einmal und hält sich dann raus
   const tutorial = new Tutorial();
@@ -399,7 +420,16 @@ async function main(): Promise<void> {
     // Klang nach dem, was tatsaechlich in der Schale liegt
     const erstes = bodies.length > 0 ? items.itemByBody(bodies[0]) : null;
     audio.playGrab(erstes?.materialId);
-    for (const b of bodies) fence.notifyGrabbed(b); // verankertes Zaunfeld? → losreißen
+    for (const b of bodies) {
+      fence.notifyGrabbed(b); // verankertes Zaunfeld? → losreißen
+      /*
+       * Was die Spinne fasst, verliert seine Scheiben. Fuenf Zaehne mit
+       * hundertsechzig Kilonewton nehmen darauf keine Ruecksicht — und ein
+       * Wrack, das nach dem Greifen noch alle Fenster hat, sieht falsch aus.
+       */
+      const it = items.itemByBody(b);
+      if (it) items.zerbrichGlas(it);
+    }
   };
   grip.onTear = () => audio.playTear();
   /*
@@ -408,6 +438,24 @@ async function main(): Promise<void> {
    * einer Ladeflaeche landet — dafuer dienen dieselben Standflaechen, die
    * auch Bagger und Radlader vom Durchfahren abhalten.
    */
+  items.onGlasBruch = (x, y, z) => bus.emit("glassShattered", { x, y, z });
+  /*
+   * Lambert am Werkzeug: Er flext die Alufelge vom Reifen. Das Trennen selbst
+   * macht der ItemManager — der Platzwart meldet nur, dass die Arbeit getan
+   * ist, und kennt darum weder Fraktionen noch Preise.
+   */
+  staff.getMuldenOrt = (id) => containers.ortVon(id);
+  staff.onFunken = (x, y, z) => {
+    particles.spawn(evPos.set(x, y, z), 5, 0xffc46b, 3.0, 0.5, 0.35);
+  };
+  staff.onTrennen = (it) => {
+    const name = it.shape?.name ?? getMaterial(it.materialId).name;
+    const teile = items.zerlege(it);
+    if (!teile) return;
+    audio.playTear();
+    const namen = teile.map((x) => getMaterial(x.materialId).name).join(" + ");
+    hud.toast(`Lambert hat ${name} getrennt: ${namen}`);
+  };
   items.onAufprall = (item, wucht) => {
     const p = item.body.translation();
     const aufStahl = findeBox(p.x, p.z, alleFahrzeugBoxen(), 0.4) !== null;
@@ -456,11 +504,36 @@ async function main(): Promise<void> {
   // Zudrücken: was nachgibt, wird in der Spinne plattgequetscht
   grip.crusher = (body) => {
     const it = items.items.find((i) => i.body.handle === body.handle);
-    if (!it || !items.isCrushable(it)) return false;
-    if (!items.flattenItem(it)) return false;
+    /*
+     * Trennen geht vor Quetschen. Ein Rad ist nach der Dichteregel nicht
+     * quetschbar — es ist ja voll —, aber sehr wohl zu sprengen. Stuende die
+     * Pruefung zuerst, kaeme das Zerlegen nie dran.
+     */
+    if (it && items.brauchtWerkzeug(it)) {
+      hud.toast(`${it.shape?.name ?? "Das Teil"} braucht Werkzeug — Arbeit für Lambert.`);
+      return false;
+    }
+    if (!it || (!items.isCrushable(it) && !items.istTrennbar(it))) return false;
     const p = body.translation();
+    const ort = new THREE.Vector3(p.x, p.y, p.z);
+    /*
+     * Manches faellt beim Zerquetschen auseinander, statt nur flach zu werden:
+     * Bei einer Kabeltrommel zerbricht das Holz, bevor das Kabel nachgibt, und
+     * danach liegt beides getrennt da (Wunsch 12.09.2026). Aus einem
+     * Mischschrott-Teil werden so sortenreine — das ist der Lohn fuer die
+     * Arbeit mit der Spinne.
+     */
+    const teile = items.zerlege(it);
+    if (teile) {
+      audio.playCrash(0.8);
+      particles.spawn(ort, 12, 0x9a8b74, 2.0, 1.4, 0.6);
+      const namen = teile.map((x) => getMaterial(x.materialId).name).join(" + ");
+      hud.toast(`Zerlegt: ${namen}`);
+      return true;
+    }
+    if (!items.flattenItem(it)) return false;
     audio.playDrop(it.materialId);
-    particles.spawn(new THREE.Vector3(p.x, p.y, p.z), 6, 0xb0b6bb, 1.6, 1.2, 0.5);
+    particles.spawn(ort, 6, 0xb0b6bb, 1.6, 1.2, 0.5);
     hud.toast(`${getMaterial(it.materialId).name} zusammengedrückt`);
     return true;
   };
@@ -1034,6 +1107,9 @@ async function main(): Promise<void> {
     hud.updateShift(`${daylight.clock} · ${shift.statusText(looseKg)}`, shift.jammed);
     excavator.updateInstruments(frameDt);
     containers.updateLabels(orbit.camera.position);
+    // Bewegliche Behaelter sind Hindernisse wie jedes Bauwerk — nur wandern
+    // sie, also melden sie sich jedes Bild neu.
+    setBuildingObstacles(containers.hindernisse());
 
     // Wartet ein Abholer, zählt nur eins: wie sortenrein ist die Ladung?
     // Daran hängt der Erlös, also gehört es laufend ins Bild.

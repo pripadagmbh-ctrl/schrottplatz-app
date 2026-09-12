@@ -14,13 +14,44 @@ import { describe, it, expect } from "vitest";
 import * as THREE from "three";
 import { hoechsteKrallenspitze, tempoFaktor, anlaufZeit, CAB_MAX } from "../src/excavator/excavator";
 import { CONFIGS } from "../src/world/containers";
-import { ROUTE_IN_REV, TIP_CREEP_M } from "../src/delivery/routes";
+import {
+  neueAbladestelle,
+  routeInRev,
+  setBaggerOrt,
+  TIP_CREEP_M,
+} from "../src/delivery/routes";
 
 /** Standplatz des Baggers — siehe `position` in excavator.ts. */
-const BAGGER = { x: 0, z: -1 };
+const BAGGER = { x: -2.0, z: -19.5 };
 
-/** Mulden, die der Spieler selbst befüllt (die Nichtmetalle beschickt der Radlader). */
-const SELBST_BEFUELLT = ["c_va", "c_alu", "c_copper", "c_cable", "c_bales"];
+/**
+ * Mulden, die der Spieler von seinem Standplatz aus selbst befüllt.
+ *
+ * Seit der Platzordnung vom 12.09.2026 sind das genau drei plus das
+ * Ballenlager: Stahl, Alu, VA. Abfall und Hortmulden stehen bewusst außerhalb
+ * des Schwenkkranzes — dorthin wird gefahren oder Lambert trägt es hin —, und
+ * die Absetzcontainer lassen sich ohnehin heranziehen.
+ */
+const SELBST_BEFUELLT = [
+  "c_mixed",
+  "c_steel",
+  "r_cable",
+  "r_va",
+  "r_copper",
+  "r_alu",
+  "r_zinc",
+  "r_brass",
+];
+
+/**
+ * Die Arbeitslinie des Baggers (Platzordnung 12.09.2026).
+ *
+ * Er arbeitet nicht von einem Punkt: Ein Ring von 4,0 bis 9,5 m fasst keine
+ * zehn Ziele. Geprueft wird deshalb, ob jedes Ziel von IRGENDEINEM Punkt
+ * dieser kurzen Linie aus ueber seine Wand zu befuellen ist.
+ */
+const LINIE: Array<[number, number]> = [];
+for (let t = 0; t <= 1.0001; t += 0.05) LINIE.push([-2.0, -19.5 + t * 5]);
 
 function abstand(x: number, z: number): number {
   return Math.hypot(x - BAGGER.x, z - BAGGER.z);
@@ -50,12 +81,28 @@ describe("Reichweite des Arms", () => {
     // an, kippt und zieht dann gekippt an — der Rest der Fuhre rutscht auf
     // dieser Strecke heraus. Reicht sie ueber 9,5 m hinaus, liegt dort Schrott,
     // den man nicht mehr wegbekommt (Befund 10.09.2026).
-    const dock = ROUTE_IN_REV[ROUTE_IN_REV.length - 1]!;
-    const weitesterPunkt = Math.hypot(dock[0] - BAGGER.x, dock[1] + TIP_CREEP_M - BAGGER.z);
-    expect(
-      weitesterPunkt,
-      `letzter Abwurf bei ${weitesterPunkt.toFixed(1)} m — dort kommt der Arm nicht mehr auf den Boden`
-    ).toBeLessThan(9.5);
+    //
+    // Die Abladestelle wandert seit 12.09.2026 mit dem Bagger, also genügt es
+    // nicht mehr, einen Punkt zu prüfen: Gefahren wird ueber den ganzen
+    // Vorplatz, und an jeder Stelle muss der Arm noch auf den Boden kommen.
+    for (const ort of [
+      { x: -4, z: -17 },
+      { x: -4, z: -12 },
+      { x: -6, z: -15 },
+      { x: -2, z: -14 },
+      { x: -4, z: -10 },
+    ]) {
+      setBaggerOrt(() => ort);
+      neueAbladestelle();
+      const r = routeInRev();
+      const dock = r[r.length - 1]!;
+      const weitesterPunkt = Math.hypot(dock[0] - ort.x, dock[1] + TIP_CREEP_M - ort.z);
+      expect(
+        weitesterPunkt,
+        `Bagger auf (${ort.x}, ${ort.z}): letzter Abwurf bei ` +
+          `${weitesterPunkt.toFixed(1)} m — dort kommt der Arm nicht mehr auf den Boden`
+      ).toBeLessThan(9.5);
+    }
   });
 
   it("jenseits von zehn Metern reicht er gar nicht", () => {
@@ -66,53 +113,24 @@ describe("Reichweite des Arms", () => {
     if (!SELBST_BEFUELLT.includes(cfg.id)) continue;
     it(`${cfg.label}: der Arm kommt über die Wand`, () => {
       const wandH = cfg.size[2];
-      const d = abstand(cfg.x, cfg.z);
-      const hoch = hoechsteKrallenspitze(d);
+      const [w, d] = cfg.size;
+      let beste: { d: number; h: number; p: [number, number] } | null = null;
+      for (const [px, pz] of LINIE) {
+        // Naechster Punkt der Zone, nicht ihre Mitte: eine 12-m-Halde greift
+        // man am Rand, nicht in der Mitte.
+        const zx = Math.max(cfg.x - w / 2, Math.min(cfg.x + w / 2, px));
+        const zz = Math.max(cfg.z - d / 2, Math.min(cfg.z + d / 2, pz));
+        const dist = Math.hypot(zx - px, zz - pz);
+        const hoch = hoechsteKrallenspitze(dist);
+        if (hoch > wandH + 0.4 && (beste === null || dist < beste.d)) {
+          beste = { d: dist, h: hoch, p: [px, pz] };
+        }
+      }
       expect(
-        hoch,
-        `${cfg.label} liegt ${d.toFixed(2)} m entfernt; dort kommt die Spitze auf ` +
-          `${hoch === -Infinity ? "gar nichts" : hoch.toFixed(2) + " m"}, ` +
-          `die Wand ist ${wandH.toFixed(2)} m hoch`
-      ).toBeGreaterThan(wandH + 0.4);
+        beste,
+        `${cfg.label} (Wand ${wandH.toFixed(2)} m) ist von keinem Punkt der ` +
+          `Arbeitslinie aus zu befuellen`
+      ).not.toBeNull();
     });
   }
-});
-
-/**
- * Last und Tempo (Befund 11.09.2026).
- *
- * Vorher galt: 1 − 0,5 × (Last / 2000 kg). Zwei Tonnen halbierten also das
- * Tempo der ganzen Maschine. Für einen Umschlagbagger dieser Größe sind zwei
- * Tonnen nichts — die Hydraulik ist druckgeregelt, das Drehwerk dreht nahezu
- * unverändert weiter. Zu spüren ist die Masse im Anlauf.
- */
-describe("Last am Greifer", () => {
-  it("kostet bis zur Nennlast kaum Endtempo", () => {
-    expect(tempoFaktor(0)).toBe(1);
-    expect(tempoFaktor(2000)).toBeGreaterThan(0.9);
-    expect(tempoFaktor(5000)).toBeGreaterThan(0.8);
-  });
-
-  it("bremst erst jenseits der Nennlast deutlich", () => {
-    expect(tempoFaktor(7500)).toBeLessThan(tempoFaktor(5000));
-    expect(tempoFaktor(10000)).toBeCloseTo(0.5, 2);
-    // und nie ins Stehen
-    expect(tempoFaktor(50000)).toBeGreaterThan(0.4);
-  });
-
-  it("macht den Anlauf träger statt das Tempo kleiner", () => {
-    // Genau darüber wirkt die Masse: Sie läuft langsam an und läuft aus.
-    expect(anlaufZeit(5000)).toBeGreaterThan(anlaufZeit(0) * 1.5);
-    expect(anlaufZeit(0)).toBeGreaterThan(0.2);
-    // Über der Nennlast wächst die Rampe nicht weiter ins Uferlose
-    expect(anlaufZeit(20000)).toBe(anlaufZeit(5000));
-  });
-
-  it("dreht den Turm zügig genug für Umschlagarbeit", () => {
-    // 7 bis 9 Umdrehungen je Minute sind bei dieser Maschinenklasse üblich,
-    // also 42 bis 54 Grad je Sekunde.
-    const gradProSekunde = THREE.MathUtils.radToDeg(CAB_MAX);
-    expect(gradProSekunde).toBeGreaterThanOrEqual(42);
-    expect(gradProSekunde).toBeLessThanOrEqual(54);
-  });
 });

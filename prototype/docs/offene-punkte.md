@@ -18,8 +18,15 @@ erledigt ist, bekommt den Commit dazu.
 
 ## Physik und Ladung
 
-- [ ] **Nichts schwebt, nichts fällt vom Himmel** — Teile sollen dem Gewicht
-      nach fallen und möglichst schon liegen, bevor das Bild eingeblendet wird.
+- [x] **Nichts schwebt, nichts fällt vom Himmel** — der Vorlauf legte am Ende
+      *alles* schlafen, auch was noch in der Luft war. Gemessen hing ein
+      75-kg-Stück in 7,01 m Höhe und fiel 6,66 m, sobald es geweckt wurde.
+      Jetzt wird nach dem Setzen noch einmal alles geweckt und weitergerechnet,
+      bis nichts mehr fällt. Danach: höchstes Teil 2,38 m statt 7,01, und von
+      den zwölf höchsten sackt noch eines um 41 cm.
+- [ ] **Teile liegen beim Start ineinander** — beim Wecken drückt der Löser
+      einzelne um bis zu 55 cm nach oben. Kein Schweben, aber unsauber: Der
+      Haufen wird beim Setzen zu dicht gepackt.
 
 ## Presse und Schere
 
@@ -67,3 +74,41 @@ erledigt ist, bekommt den Commit dazu.
 - [ ] **Heisse Ware** — Händler mit heissem Haufen wollen schnellen Umschlag:
       direkt verladen, Autos direkt in die Presse. Volle Ladungen, sonst
       lohnt es nicht; zu durchmischt drückt den Preis.
+
+## Wirtschaft
+
+- [ ] **Mischschrott wird pauschal bepreist, nicht nach Inhalt** — gemessen
+      12.09.2026: Ein Rad (Reifen 70 %, Felge 30 %) bringt ungetrennt 4,00 €,
+      zerlegt nur 1,00 €, weil Reifen Entsorgungskosten verursachen. Damit
+      lohnt es sich, Reifen **nicht** zu trennen — das Gegenteil der Absicht.
+      Vorschlag: Der Wert eines Mischschrott-Teils ist die Summe seiner
+      Bestandteile, vermindert um einen Abschlag fürs Unsortierte. Dann ist
+      Zerlegen nie ein Verlust, nur manchmal wenig Gewinn.
+
+## Personal
+
+- [x] **Lambert trennt mit Werkzeug** — zwei neue Zustände `werkzeug`
+      (hinlaufen) und `trennt` (neun Sekunden arbeiten, mit Funken). Danach
+      liegen die Fraktionen getrennt da, und er sortiert sie im nächsten
+      Arbeitsgang selbst in die Mulden. Gemessen: patrol → werkzeug → trennt →
+      patrol → carry.
+- [ ] **Heinz als Hilfsarbeiter** — zweiter Mann, damit zwei Arbeitsgänge
+      parallel laufen. Ausbaustufe wie Radlader und Bulldozer.
+
+## Platz
+
+- [ ] **Absetzcontainer stehen außerhalb des Schwenkkranzes** — Kabel, Kupfer
+      und Messing sind 11,6 bis 17,9 m entfernt abgestellt, weil der Ring
+      zwischen 4,0 und 9,5 m mit Stahl, Alu und VA voll ist. Gedacht ist es so:
+      Lambert trägt Buntmetall hin (er bevorzugt jetzt Container vor Mulden),
+      und wer selbst hinein sortieren will, zieht sich den Behälter heran. Ob
+      das im Spiel trägt, muss sich zeigen — sonst müsste die VA-Mulde weichen.
+- [ ] **Bewegliche Container sind für Fußgänger und LKW unsichtbar** — sie
+      stehen nicht in `obstacles.ts` (die Liste ist für Feststehendes), also
+      laufen Lambert und die Fahrer dagegen und schieben sie an. Bisher steht
+      keiner in einer Fahrspur; sobald der Spieler einen dorthin zieht, fällt es
+      auf.
+- [ ] **Hortmulden für Kupfer und Messing sind 21 bzw. 25 m entfernt** — an der
+      Südwand, wie besprochen zum Horten großer Teile. Dorthin muss gefahren
+      werden; ob sich das lohnt, entscheidet sich erst, wenn es wirklich
+      sperriges Buntmetall gibt (bisher nur die Schiffsschraube mit 180 kg).

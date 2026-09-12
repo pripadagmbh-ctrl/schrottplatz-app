@@ -16,8 +16,15 @@ export interface ContainerConfig {
   id: string;
   fractionId: string;
   label: string;
-  /** pile = offener Haufen · bay = Betonlego-Box (3 Wände, vorn offen) · box = Kleinbox */
-  kind: "pile" | "bay" | "box";
+  /**
+   * pile   offene Fläche, nur markiert — Reifendepot
+   * halde  Mischschrottplatz: doppelt gesetzte, sehr hohe Wände, nach Norden offen
+   * bay    Betonlego-Box (3 Wände, vorn offen) — Silos und Batteriemulde
+   * box    feste Kleinbox
+   * rolloff        kleiner Absetzcontainer, vom Bagger versetzbar
+   * grosscontainer 40-m³-Abrollcontainer, fest — den zieht der LKW herauf
+   */
+  kind: "pile" | "halde" | "bay" | "box" | "rolloff" | "grosscontainer";
   x: number;
   z: number;
   /** Zonenmaße [Breite, Tiefe, Wandhöhe] */
@@ -34,6 +41,13 @@ export interface ContainerConfig {
    */
   shareSouth?: boolean;
   shareNorth?: boolean;
+  /**
+   * Welche Wände eine `halde` bekommt. Ohne Angabe alle drei.
+   *
+   * Zwei Halden nebeneinander teilen sich eine Trennwand — die zweite
+   * daneben zu stellen sähe aus wie ein Baufehler.
+   */
+  haldeWaende?: { rueck?: boolean; aussen?: boolean; trenn?: boolean };
   /** Rückwand weglassen — die Nachbarmulde dahinter bringt sie mit */
   shareEast?: boolean;
   shareWest?: boolean;
@@ -45,62 +59,124 @@ export interface ContainerConfig {
  * einer Reihe — alles im Schwenkbereich, damit kaum gefahren werden muss.
  */
 export const CONFIGS: ContainerConfig[] = [
-  // Riesiger Stahlhaufen direkt links neben dem Bagger (Guss läuft mit)
-  { id: "c_steel", fractionId: "steel", label: "STAHLSCHROTT", kind: "pile", x: -9, z: 1, size: [11, 12, 0] },
-  // Boxenreihe rechts, von Süd nach Nord aufgereiht.
-  // Vier Betonlego-Mulden in einer Reihe, Öffnung zeigt nach Westen zum Bagger.
-  //
-  // Abstand nachgerechnet (Boom 5,2 m, Stiel 4,0 m, Drehpunkt 2,55 m, Grenzen
-  // 5..62° und -140..-25°, Krallenspitzen 2,01 m unter der Stielspitze). Wie
-  // hoch die Spitzen bei welchem Abstand vom Bagger kommen:
-  //
-  //   4,5 m → 1,43 m   5,5 m → 2,03 m   6,0 m → 2,51 m
-  //   6,5 m → 7,30 m   8,5 m → 4,79 m   9,5 m → 1,66 m   10,0 m → gar nicht
-  //
-  // Der Arm hat einen scharfen Knick bei 6,5 m: Näher dran bleibt er
-  // eingeklappt und kommt nicht über eine 2,5-m-Wand. Die Reihe stand bei
-  // x = 4,6 mitten in dieser toten Zone — von der Standposition aus war keine
-  // Mulde zu befüllen. Jetzt x = 7,0, und die Reihe ist auf den Bagger (z = -1)
-  // zentriert: So liegen alle vier zwischen 7,2 und 8,9 m, also im Fenster.
-  // Weiter östlich ginge nicht — die äußeren Mulden kämen über 9,5 m und wären
-  // wieder unerreichbar.
-  //
-  // Wandhöhe 3,0 m (sechs Lagen, Wunsch 10.09.2026), die Rückwand zwei Lagen
-  // darüber. Der Arm kommt über der Muldenmitte auf gut 5 m — Luft genug.
-  // Höhere Wände halten mehr Material in der Mulde, statt es davor zu haben.
-  // Nach Norden gerückt: die westliche Öffnung darf nicht von der Presse
-  // versperrt werden
-  { id: "c_va", fractionId: "va", label: "EDELSTAHL VA", kind: "bay", x: 7.0, z: -6.55, size: [3.0, 3.3, 3.0] },
-  { id: "c_alu", fractionId: "alu", label: "ALU", kind: "bay", x: 7.0, z: -2.85, size: [3.0, 3.3, 3.0] },
-  { id: "c_copper", fractionId: "copper", label: "KUPFER/MS", kind: "bay", x: 7.0, z: 0.85, size: [3.0, 3.3, 3.0] },
-  { id: "c_cable", fractionId: "cable", label: "KABEL", kind: "bay", x: 7.0, z: 4.55, size: [3.0, 3.3, 3.0] },
-  // Nichtmetalle schliessen die Sortierreihe nach Sueden ab (Wunsch
-  // 10.09.2026). Sie standen erst hinter der Sortierreihe, dann hinter der
-  // Presse — beides sah nach Ausweichquartier aus. In einer Flucht mit den
-  // Buntmetallen ergibt sich eine durchgehende Muldenzeile, und der Radlader
-  // faehrt sie in einem Zug ab. Gleiche Masse und Oeffnung wie die anderen.
-  { id: "c_wood", fractionId: "wood", label: "HOLZ", kind: "bay", x: 7.0, z: -10.25,
-    size: [3.0, 3.3, 3.0] },
-  { id: "c_tires", fractionId: "tires", label: "REIFEN", kind: "bay", x: 7.0, z: -13.95,
-    size: [3.0, 3.3, 3.0] },
-  { id: "c_rubble", fractionId: "rubble", label: "BAUMISCH", kind: "bay", x: 7.0, z: -17.65,
-    size: [3.0, 3.3, 3.0] },
-  // Ballenlager direkt neben der Schere: Was gepresst aus der Kammer kommt,
-  // wandert hierher und wartet auf den Abholer.
-  //
-  // Offene Flaeche statt Betonlego-Mulde (Wunsch 10.09.2026): Die Wanne sah aus
-  // wie ein Versehen — eine leere Mulde neben der Presse, in der ohne Zutun
-  // Pakete auftauchen. Die Zone bleibt, sie zaehlt und verkauft weiterhin; nur
-  // die Waende sind weg. Ein Ballenlager ist ohnehin ein markierter Platz, kein
-  // Behaelter: Man stellt Pakete ab, man schuettet sie nicht ein.
-  // Abgerueckt von der Presskammer (Wunsch 10.09.2026): Sie endet bei x -3,5,
-  // und ein Ballen unmittelbar davor lag halb unter dem Maschinenrand — man
-  // bekam ihn nicht zu fassen. Jetzt oestlich davon, gut 7,5 m vom Bagger und
-  // damit im gut erreichbaren Bereich des Arms.
-  { id: "c_bales", fractionId: "steel", label: "BALLEN", kind: "pile", x: -0.5, z: -8.5,
-    size: [3.2, 4.2, 0] },
-  // Nichtmetalle südlich, im Bogen um den Bagger gelegt, damit alle drei in
-  // Reichweite bleiben. Öffnung nach Norden zur Maschine.
+  /*
+   * ORTSKONZEPT (Ansage 12.09.2026, aus der Sicht des Fahrers beschrieben):
+   * „Der Bagger steht und schaut Richtung Janine, rechts neben mir der
+   * Stahlschrottcontainer, hinter mir die Presse im Süden, und in
+   * West-West-Süd-Richtung der Mischschrott."
+   *
+   * Janine steht bei +z, also blickt die Maschine dorthin.
+   *
+   * ACHTUNG, hier ist zweimal etwas schiefgegangen: Der Code nennt +z Norden
+   * und +x Osten, aber wer nach +z blickt, hat +x LINKS auf dem Schirm.
+   * Gemessen am 12.09.2026 durch Projektion mit der echten Spielkamera. Die
+   * Himmelsrichtungen im Quelltext bilden also einen gespiegelten Kompass —
+   * verlass dich nicht darauf, sondern auf diese Regel:
+   *
+   *   rechts vom Sitz = −x        links vom Sitz = +x
+   *   vor dem Sitz    = +z        hinter dem Sitz = −z
+   *
+   * Daraus folgt der Platz (Ansage 12.09.2026, aus der Sicht des Fahrers):
+   *
+   *   hinten   Presse (an der Wand)        rechts        Stahlcontainer 40 m³
+   *   rechts hinten  Reifendepot           links hinten  Mischschrott
+   *   rechts vorne   sechs Absetzcontainer links vorne   Batteriemulde
+   *   rechts aussen  Silos, am Büro vorbei fährt der Abholer sie ab
+   *
+   * Der Bagger arbeitet auf einer kurzen Linie von (−5 | −18,5) nach
+   * (−5 | −13,5). Alles steht bewusst eng beieinander (Ansage 12.09.2026:
+   * „Du kannst das alles viel enger aneinanderstellen, der Bagger braucht
+   * nicht so viel Abstand zu der Presse") — die Untergrenze setzt der Arm
+   * selbst: Unter 4,0 m kommt er gar nicht auf den Boden, und über eine Wand
+   * muss die Krallenspitze 40 cm Luft behalten. Ein Ring von 4,0 bis 9,5 m fasst nicht elf Ziele, und ein
+   * Umschlagbagger fährt im Betrieb ohnehin ein paar Meter hin und her.
+   * Geprüft wird das in `test/reach.test.ts`.
+   */
+
+  /*
+   * MISCHSCHROTT — links hinten, die große Fläche des Platzes.
+   *
+   * Hier kippt jeder ab, der gemischt anliefert, und von hier holt der Bagger
+   * alles Weitere. Die Wände sind doppelt gesetzt und fünf Meter hoch (Ansage
+   * 12.09.2026: „da müssten natürlich die Wände doppelt sein und sehr hoch,
+   * damit wir den Mischschrott auch ohne Probleme stapeln können").
+   *
+   * Aber nur ZWEI Wände, und zwar die, die ohnehin die Platzgrenze sind
+   * (Ansage 12.09.2026: „die natürlichen Abgrenzungen vom Mischschrott soll
+   * eigentlich nur die Außenwand sein und daneben der Bagger, anders braucht's
+   * eigentlich keine Abgrenzung"). Zur Maschine hin ist offen — dort stand
+   * eine Wand, die nur im Weg war. Und die Fläche ist von 156 auf 90 m²
+   * geschrumpft: „die erscheint mir auch viel zu groß".
+   */
+  { id: "c_mixed", fractionId: "mixed", label: "MISCHSCHROTT", kind: "halde", x: 6.0,
+    z: -24.0, size: [8.0, 8.0, 5.0] },
+
+  /*
+   * STAHLSCHROTT — eine Mulde, kein Container mehr.
+   *
+   * Ansage 12.09.2026: „die Stahlcontainer kommen weg und da kommt jetzt auf
+   * jeden Fall noch eine Mulde hin … damit wir das dort sortieren können."
+   * Sie liegt direkt hinter dem Bagger und teilt sich die linke Trennwand mit
+   * dem Mischschrott; rechts bekommt sie ihre eigene. Dazwischen wird
+   * sortiert, ohne dass ein Behälter im Weg steht.
+   */
+  { id: "c_steel", fractionId: "steel", label: "STAHLSCHROTT", kind: "halde", x: -1.75,
+    z: -26.0, size: [6.5, 5.0, 3.0], haldeWaende: { rueck: true, trenn: true } },
+
+  /*
+   * GROSSTEILE — offene Fläche rechts neben der Stahlmulde.
+   *
+   * Ansage 12.09.2026: „neben der rechten Muldenbegrenzung würde ich Metalle,
+   * die größer sind, also größere Aluminiumteile und so was, da platzieren,
+   * und damit kann Lambert mit dem Radlader genau die Teile aufladen und in
+   * die Silos bringen." Keine Wände: Was hier liegt, soll der Lader von der
+   * Seite aufnehmen können.
+   */
+  { id: "c_alu_gross", fractionId: "alu", label: "GROSSTEILE ALU", kind: "pile", x: -10.75,
+    z: -26.0, size: [6.5, 5.0, 0] },
+  /*
+   * REIFENDEPOT — rechts hinten, offene Fläche ohne Wände.
+   *
+   * Reifen fallen ständig an und werden selten abgeholt; sie brauchen Fläche,
+   * keine Mulde. Heinz kümmert sich darum (Ansage 12.09.2026).
+   */
+  { id: "c_tires", fractionId: "tires", label: "REIFEN", kind: "pile", x: -19.0,
+    z: -22.0, size: [8.0, 7.0, 0] },
+
+  /*
+   * ABSETZCONTAINER — sechs Stück rechts vorne, in Reichweite.
+   *
+   * Kabel, VA, Kupfer, Alu, Zink, Messing. Beweglich, damit man sich den
+   * heranzieht, mit dem man gerade arbeitet. Kupfer und Messing bleiben
+   * getrennt: doppelter Preisunterschied, und wer beides in einen Behälter
+   * wirft, bekommt für alles den Messingpreis.
+   */
+  { id: "r_cable", fractionId: "cable", label: "KABEL", kind: "rolloff", x: -8.0,
+    z: -17.5, size: [2.8, 1.8, 1.1] },
+  { id: "r_va", fractionId: "va", label: "EDELSTAHL VA", kind: "rolloff", x: -11.0,
+    z: -17.5, size: [2.8, 1.8, 1.1] },
+  { id: "r_copper", fractionId: "copper", label: "KUPFER", kind: "rolloff", x: -8.0,
+    z: -15.0, size: [2.8, 1.8, 1.1] },
+  { id: "r_alu", fractionId: "alu", label: "ALU", kind: "rolloff", x: -11.0,
+    z: -15.0, size: [2.8, 1.8, 1.1] },
+  { id: "r_zinc", fractionId: "zinc", label: "ZINK", kind: "rolloff", x: -8.0,
+    z: -12.5, size: [2.8, 1.8, 1.1] },
+  { id: "r_brass", fractionId: "brass", label: "MESSING", kind: "rolloff", x: -11.0,
+    z: -12.5, size: [2.8, 1.8, 1.1] },
+
+  /*
+   * SILOS an der Ostwand — dorthin fährt der Abholer entlang, ohne den
+   * Arbeitsbereich zu kreuzen (Ansage 12.09.2026). Was liegenbleiben darf,
+   * bis genug für eine Fuhre zusammen ist; gefüllt vom Radlader.
+   */
+  { id: "c_wood", fractionId: "wood", label: "HOLZ", kind: "bay", x: -34.5,
+    z: -2.0, size: [3.6, 6.0, 3.0], facing: "east" },
+  { id: "c_rubble", fractionId: "rubble", label: "BAUMISCH", kind: "bay", x: -34.5,
+    z: -9.0, size: [3.6, 6.0, 3.0], facing: "east" },
+  { id: "c_plastic", fractionId: "plastic", label: "KUNSTSTOFF", kind: "bay", x: -34.5,
+    z: -16.0, size: [3.6, 6.0, 3.0], facing: "east" },
+  { id: "c_va_lager", fractionId: "va", label: "VA-LAGER", kind: "bay", x: -34.5,
+    z: -23.0, size: [3.6, 6.0, 3.5], facing: "east" },
 ];
 
 /** Fangbereich über einer Haufen-Zone (Zonen-Zählung + Ampel) */
@@ -115,6 +191,20 @@ class GameContainer {
   contaminationKg = 0;
   readonly itemIds = new Set<string>();
   private label: ContainerLabel;
+  /**
+   * Wo der Behälter gerade steht.
+   *
+   * Für Mulden und Haufen ist das die Angabe aus CONFIGS und ändert sich nie.
+   * Ein Absetzcontainer dagegen wird vom Bagger über den Platz geschleift
+   * (Ansage 12.09.2026) — dann wandert die Zählzone mit ihm, sonst zählte
+   * weiter das Loch, an dem er einmal stand.
+   */
+  private px: number;
+  private pz: number;
+  private pyaw = 0;
+  /** Der bewegliche Körper eines Absetzcontainers, sonst null. */
+  private koerper: RAPIER.RigidBody | null = null;
+  private group: THREE.Group;
 
   /** Schild nach Entfernung zur Kamera ein- oder ausblenden. */
   updateLabelDistance(camPos: THREE.Vector3): void {
@@ -134,23 +224,178 @@ class GameContainer {
     const group = new THREE.Group();
     group.position.set(cfg.x, 0, cfg.z);
     scene.add(group);
+    this.group = group;
+    this.px = cfg.x;
+    this.pz = cfg.z;
 
-    if (cfg.kind === "bay") {
+    if (cfg.kind === "halde") {
+      /*
+       * Mischschrottplatz: drei Wände aus doppelt gesetzten Betonlegos, fünf
+       * Meter hoch, nach Norden offen.
+       *
+       * Doppelt heißt wirklich zwei Steinreihen hintereinander, nicht ein
+       * dickerer Stein — wer ein paar Tonnen dagegen kippt, drückt eine
+       * einreihige Wand um. Gebaut in Weltachsen ohne die Drehung der Mulden:
+       * bei fünf Metern Höhe waere eine gedrehte Gruppe nur schwerer
+       * nachzurechnen.
+       */
+      const [hw, hd, hh] = cfg.size;
+      /*
+       * Keine getönte Bodenfläche mehr (Ansage 12.09.2026: „diese Andeutung
+       * von den Plätzen, die braucht's eigentlich gar nicht, das kann gerne
+       * durch Dreck und Verschmutzung ersichtlich sein"). Ein Schrottplatz
+       * hat keine eingefärbten Felder; er hat Spuren.
+       */
+
+      const BL = 1.5;
+      const BH = 0.5;
+      const BT = 0.55;
+      const REIHEN = Math.round(hh / BH);
+      const farben = [0x9b9b94, 0x8d8d86, 0xa4a49c, 0x94908a, 0xaaa89f].map(
+        (c) => new THREE.Color(c)
+      );
+      const bloecke: Array<{ m: THREE.Matrix4; f: THREE.Color }> = [];
+      const nieten: Array<{ m: THREE.Matrix4; f: THREE.Color }> = [];
+      const block = new THREE.Object3D();
+      const niete = new THREE.Object3D();
+      let bi = 0;
+      const setze = (bx: number, by: number, bz: number, alongX: boolean): void => {
+        const f = farben[bi % 5]!;
+        const j = (n: number): number => ((bi * 9301 + n * 49297) % 233280) / 233280 - 0.5;
+        block.position.set(bx + j(1) * 0.05, by + j(2) * 0.02, bz + j(3) * 0.05);
+        block.rotation.set(j(4) * 0.02, (alongX ? 0 : Math.PI / 2) + j(5) * 0.035, j(6) * 0.018);
+        block.updateMatrix();
+        bi++;
+        bloecke.push({ m: block.matrix.clone(), f });
+        for (const sv of [-0.4, 0.4]) {
+          niete.position.set(alongX ? sv : 0, BH / 2 + 0.045, alongX ? 0 : sv);
+          niete.updateMatrix();
+          nieten.push({ m: block.matrix.clone().multiply(niete.matrix), f });
+        }
+      };
+      /*
+       * Nur die zwei Wände, die ohnehin Platzgrenze sind: hinten und die
+       * Seite, die von der Maschine wegzeigt. Zum Bagger hin bleibt offen —
+       * dort ist er selbst die Abgrenzung.
+       *
+       * Und sie hören nicht auf einen Schlag auf, sondern laufen zum offenen
+       * Ende hin treppenförmig aus (Ansage 12.09.2026: „wär cool, wenn das so
+       * nicht auf einmal weggeht, sondern so leicht abfallend schräg tiefer
+       * wird"). Eine Wand, die mit voller Höhe endet, sieht aus wie ein
+       * abgebrochenes Bauteil; eine auslaufende sieht aus, als hätte sie
+       * jemand so gesetzt.
+       */
+      const AUSLAUF = 0.4; // Resthöhe am offenen Ende
+      const reihenBei = (t: number): number =>
+        Math.max(2, Math.round(REIHEN * (AUSLAUF + (1 - AUSLAUF) * t)));
+      const wnd = cfg.haldeWaende ?? { rueck: true, aussen: true, trenn: true };
+      for (let lage = 0; lage < 2; lage++) {
+        const tt = BT * (0.5 + lage);
+        // Rückwand: läuft zur Maschinenseite (−x) hin aus
+        if (wnd.rueck !== false)
+        for (let bx = -hw / 2 + BL / 2; bx < hw / 2 + 0.4; bx += BL) {
+          const n = reihenBei((bx + hw / 2) / hw);
+          for (let r = 0; r < n; r++) {
+            const off = (r % 2) * (BL / 2);
+            setze(bx - off, BH / 2 + r * BH, -(hd / 2 + tt), true);
+          }
+        }
+        // Aussenwand: läuft nach vorn (+z) hin aus
+        if (wnd.aussen !== false)
+        for (let bz = -hd / 2 + BL / 2; bz < hd / 2 + 0.4; bz += BL) {
+          const n = reihenBei((hd / 2 - bz) / hd);
+          for (let r = 0; r < n; r++) {
+            const off = (r % 2) * (BL / 2);
+            setze(hw / 2 + tt, BH / 2 + r * BH, bz - off, false);
+          }
+        }
+        /*
+         * Trennwand zur Maschine hin — nur noch angedeutet (Ansage
+         * 12.09.2026: „ich würde aber trotzdem noch ein Element wegsetzen,
+         * also wirklich nur, dass es andeutet, dass da eine Abgrenzung ist …
+         * die Abgrenzung flacher zum Mischschrottplatz und nur die Hälfte
+         * hoch"). Zwei Steinlängen ab der hinteren Ecke, halbe Höhe. Das
+         * genügt, um die Kante zu lesen, und versperrt nichts.
+         */
+        const andeutung = Math.max(2, Math.round(REIHEN / 2));
+        if (wnd.trenn !== false)
+        for (let bz = -hd / 2 + BL / 2; bz < -hd / 2 + 2 * BL; bz += BL) {
+          for (let r = 0; r < andeutung; r++) {
+            const off = (r % 2) * (BL / 2);
+            setze(-(hw / 2 + tt), BH / 2 + r * BH, bz - off, false);
+          }
+        }
+      }
+      const wandMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.98 });
+      const bauen = (
+        geo: THREE.BufferGeometry,
+        liste: Array<{ m: THREE.Matrix4; f: THREE.Color }>
+      ): void => {
+        const im = new THREE.InstancedMesh(geo, wandMat, liste.length);
+        liste.forEach((e, i) => {
+          im.setMatrixAt(i, e.m);
+          im.setColorAt(i, e.f);
+        });
+        im.instanceMatrix.needsUpdate = true;
+        if (im.instanceColor) im.instanceColor.needsUpdate = true;
+        im.castShadow = true;
+        im.receiveShadow = true;
+        group.add(im);
+      };
+      bauen(new THREE.BoxGeometry(BL, BH, BT), bloecke);
+      bauen(new THREE.CylinderGeometry(0.13, 0.13, 0.09, 10), nieten);
+
+      const body = world.createRigidBody(
+        RAPIER.RigidBodyDesc.fixed().setTranslation(cfg.x, 0, cfg.z)
+      );
+      /*
+       * Je Wand zwei Kollider, damit der Kollisionskörper dem Auslaufen folgt:
+       * die geschlossene Hälfte auf voller Höhe, die auslaufende auf gut der
+       * halben. Ein einziger Quader auf voller Höhe wäre eine unsichtbare Wand
+       * dort, wo man die Steine schon aufhören sieht.
+       */
+      const halb = hh * 0.55;
+      // Die angedeutete Trennwand bekommt ihren eigenen Kollider — halbe Höhe,
+      // zwei Steinlängen ab der hinteren Ecke.
+      if (wnd.trenn !== false) {
+        const andeutungH = hh / 2;
+        world.createCollider(
+          RAPIER.ColliderDesc.cuboid(BT, andeutungH / 2, BL).setTranslation(
+            -(hw / 2 + BT),
+            andeutungH / 2,
+            -hd / 2 + BL
+          ),
+          body
+        );
+      }
+      for (const [hoch, vorz] of [
+        [hh, 1],
+        [halb, -1],
+      ] as Array<[number, number]>) {
+        if (wnd.rueck !== false)
+          world.createCollider(
+            RAPIER.ColliderDesc.cuboid(hw / 4 + BT / 2, hoch / 2, BT).setTranslation(
+              (vorz * hw) / 4,
+              hoch / 2,
+              -(hd / 2 + BT)
+            ),
+            body
+          );
+        if (wnd.aussen !== false)
+          world.createCollider(
+            RAPIER.ColliderDesc.cuboid(BT, hoch / 2, hd / 4 + BT / 2).setTranslation(
+              hw / 2 + BT,
+              hoch / 2,
+              (-vorz * hd) / 4
+            ),
+            body
+          );
+      }
+      this.label = new ContainerLabel(cfg.label, fraction.color);
+      this.label.sprite.position.set(cfg.x, hh + 1.4, cfg.z + hd / 2 + 1.0);
+    } else if (cfg.kind === "bay") {
       // Betonlego-Box (Design-Wunsch 2026-08-27): drei Wände aus gestapelten
       // Beton-Legosteinen mit Noppen, vorn offen — wie auf echten Schrottplätzen.
-      const ground = new THREE.Mesh(
-        new THREE.PlaneGeometry(w, d),
-        new THREE.MeshStandardMaterial({
-          color: fraction.color,
-          roughness: 1,
-          transparent: true,
-          opacity: 0.24,
-        })
-      );
-      ground.rotation.x = -Math.PI / 2;
-      ground.position.y = 0.02;
-      group.add(ground);
-
       // Flachere Betonsteine, dafür eine Reihe mehr: wirkt weniger klotzig
       const BLOCK_L = 1.5;
       const BLOCK_H = 0.5;
@@ -272,31 +517,123 @@ class GameContainer {
       this.label = new ContainerLabel(cfg.label, fraction.color);
       // Schild am hinteren (geschlossenen) Ende — so steht es nicht im Blickfeld
       this.label.sprite.position.set(cfg.x + w / 2 + 0.6, wallH + 1.1, cfg.z);
-    } else if (cfg.kind === "pile") {
-      // Offene Haufen-Zone: getönte Bodenfläche + farbiger Rahmen, keine Wände
-      const ground = new THREE.Mesh(
-        new THREE.PlaneGeometry(w, d),
-        new THREE.MeshStandardMaterial({
-          color: fraction.color,
-          roughness: 1,
-          transparent: true,
-          opacity: 0.28,
-        })
-      );
-      ground.rotation.x = -Math.PI / 2;
-      ground.position.y = 0.02;
-      group.add(ground);
-      const frames: Array<[number, number, number, number]> = [
-        [0, -d / 2, w + 0.14, 0.14],
-        [0, d / 2, w + 0.14, 0.14],
-        [-w / 2, 0, 0.14, d],
-        [w / 2, 0, 0.14, d],
-      ];
-      for (const [fx, fz, sx, sz] of frames) {
-        const strip = new THREE.Mesh(new THREE.BoxGeometry(sx, 0.06, sz), band);
-        strip.position.set(fx, 0.03, fz);
-        group.add(strip);
+    } else if (cfg.kind === "rolloff" || cfg.kind === "grosscontainer") {
+      /*
+       * Absetzcontainer: flache Wanne auf zwei Kufen, Rungen außen, vorn die
+       * Öse für den Haken des Abrollkippers. Er ist ein dynamischer Körper
+       * und damit für den Greifer nichts anderes als ein sehr großes, sehr
+       * schweres Schrottteil — der Bagger fasst ihn an und zieht ihn weg,
+       * ohne dass die Greiflogik davon wissen muss.
+       *
+       * Kippen kann er nicht: nur die Hochachse ist freigegeben. Ein
+       * umgefallener Container voller Kupfer wäre kein Spiel, sondern eine
+       * Aufräumstrafe. Geschleift statt gehoben ist ohnehin das Richtige —
+       * eine volle Mulde hebt kein Umschlagbagger am Greifer an.
+       */
+      const T = 0.055;
+      const KUFE = 0.16;
+      const stahl = new THREE.MeshStandardMaterial({
+        color: fraction.color,
+        roughness: 0.62,
+        metalness: 0.35,
+      });
+      const rahmen = new THREE.MeshStandardMaterial({
+        color: 0x474c52,
+        roughness: 0.78,
+        metalness: 0.45,
+      });
+      const boden = new THREE.Mesh(new THREE.BoxGeometry(w, T, d), rahmen);
+      boden.position.y = KUFE + T / 2;
+      boden.castShadow = true;
+      boden.receiveShadow = true;
+      group.add(boden);
+      for (const sx of [-1, 1]) {
+        const kufe = new THREE.Mesh(new THREE.BoxGeometry(0.16, KUFE, d), rahmen);
+        kufe.position.set((sx * (w - 0.3)) / 2, KUFE / 2, 0);
+        kufe.castShadow = true;
+        group.add(kufe);
       }
+      const wandY = KUFE + T + h / 2;
+      const waende: Array<[number, number, number, number]> = [
+        [0, -(d / 2 - T / 2), w, T],
+        [0, d / 2 - T / 2, w, T],
+        [-(w / 2 - T / 2), 0, T, d],
+        [w / 2 - T / 2, 0, T, d],
+      ];
+      for (const [wx, wz, sx, sz] of waende) {
+        const wand = new THREE.Mesh(new THREE.BoxGeometry(sx, h, sz), stahl);
+        wand.position.set(wx, wandY, wz);
+        wand.castShadow = true;
+        wand.receiveShadow = true;
+        group.add(wand);
+      }
+      // Rungen: senkrechte Profile außen auf den Längsseiten
+      for (const sz of [-1, 1]) {
+        for (const rx of [-w / 2 + 0.35, 0, w / 2 - 0.35]) {
+          const runge = new THREE.Mesh(new THREE.BoxGeometry(0.12, h, 0.07), rahmen);
+          runge.position.set(rx, wandY, sz * (d / 2 + 0.03));
+          group.add(runge);
+        }
+      }
+      // Obere Kante als durchlaufender Riegel — daran erkennt man die Mulde
+      for (const sz of [-1, 1]) {
+        const kante = new THREE.Mesh(new THREE.BoxGeometry(w + 0.1, 0.09, 0.12), rahmen);
+        kante.position.set(0, KUFE + T + h, sz * (d / 2));
+        group.add(kante);
+      }
+      // Haken-Öse an der Stirnseite: ohne sie ist es eine Kiste, keine Mulde
+      const oese = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.045, 6, 12), rahmen);
+      oese.rotation.y = Math.PI / 2;
+      oese.position.set(0, KUFE + T + h * 0.75, -(d / 2 + 0.16));
+      group.add(oese);
+
+      /*
+       * Auch der grosse Stahlcontainer ist beweglich (Ansage 12.09.2026: „ich
+       * kann die auch bewegen mit dem Bagger, natürlich, wenn sie voll sind,
+       * gemäß des Gewichtes wahrscheinlich nicht mehr, vielleicht kann ich sie
+       * da nur noch schieben, aber nicht mehr anheben").
+       *
+       * Genau so ist es gebaut: Das Eigengewicht steht in der Dichte, das
+       * Ladegewicht kommt in `recount` als Zusatzmasse dazu. Ob man ihn noch
+       * hebt, entscheidet damit die Physik und keine Abfrage — leer geht es,
+       * voll zieht ihn die Schwerkraft aus der Spinne.
+       */
+      const gross = cfg.kind === "grosscontainer";
+      const body = world.createRigidBody(
+        RAPIER.RigidBodyDesc.dynamic()
+          .setTranslation(cfg.x, 0, cfg.z)
+          // Stark gedämpft und nur um die Hochachse drehbar. Gemessen
+          // (12.09.2026): Mit 1,8 rutschte die leere Wanne nach einem Ruck
+          // 48 m weit bis an die Westwand — ein Schlitten, kein Container.
+          // Eine Stahlwanne auf Sand kommt nach einem Meter zum Stehen.
+          .setLinearDamping(6.0)
+          .setAngularDamping(8.0)
+          .enabledRotations(false, true, false)
+      );
+      const teil = (hx: number, hy: number, hz: number, x: number, y: number, z: number): void => {
+        world.createCollider(
+          RAPIER.ColliderDesc.cuboid(hx, hy, hz)
+            // Rund 640 kg für eine 7-m³-Wanne, gut 2,4 t für den 40er — so
+            // schwer, dass der Greifer sie schleift statt sie zu werfen.
+            .setDensity(gross ? 620 : 300)
+            .setFriction(1.4)
+            .setTranslation(x, y, z),
+          body
+        );
+      };
+      teil(w / 2, (KUFE + T) / 2, d / 2, 0, (KUFE + T) / 2, 0);
+      for (const [wx, wz, sx, sz] of waende) {
+        teil(sx / 2, h / 2, sz / 2, wx, wandY, wz);
+      }
+      this.koerper = body;
+      this.label = new ContainerLabel(cfg.label, fraction.color);
+      this.label.sprite.position.set(cfg.x, KUFE + T + h + 0.9, cfg.z);
+    } else if (cfg.kind === "pile") {
+      /*
+       * Offene Zone ohne jede Markierung (Ansage 12.09.2026): kein getönter
+       * Boden, kein farbiger Rahmen. Nur das Schild am Pfosten sagt, wofür
+       * die Fläche gedacht ist — den Rest macht der Dreck.
+       */
       // Schild an Pfosten hinter der Zone
       const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.3, 8), gray);
       pole.position.set(0, 1.15, d / 2 + 0.3);
@@ -344,23 +681,89 @@ class GameContainer {
     this.refreshLabel();
   }
 
+  /**
+   * Stellung eines beweglichen Behälters übernehmen. Einmal je Bild.
+   *
+   * Für alles Feststehende passiert hier nichts — die Abfrage kostet einen
+   * Vergleich, und dafür steht die Position der Zone an einer einzigen
+   * Stelle statt zweimal.
+   */
+  syncBeweglich(): void {
+    const b = this.koerper;
+    if (!b) return;
+    const t = b.translation();
+    const r = b.rotation();
+    this.px = t.x;
+    this.pz = t.z;
+    // Nur die Hochachse ist freigegeben, also genügt der Gierwinkel
+    this.pyaw = Math.atan2(2 * (r.w * r.y), 1 - 2 * r.y * r.y);
+    this.group.position.set(t.x, t.y, t.z);
+    this.group.quaternion.set(r.x, r.y, r.z, r.w);
+    const [, , h] = this.cfg.size;
+    this.label.sprite.position.set(t.x, t.y + h + 1.1, t.z);
+  }
+
+  /**
+   * Umriss für die Hindernisliste — nur bewegliche Behälter liefern einen.
+   *
+   * Feststehendes steht schon in `obstacles.ts`; bewegliche können dort nicht
+   * stehen, weil die Liste statisch ist. Stattdessen melden sie sich jedes
+   * Bild neu (Ansage 12.09.2026: „das sollen natürlich auch Elemente sein, die
+   * Störer sind, ich darf da nicht durchfahren können").
+   */
+  get hindernis(): { x: number; z: number; hw: number; hd: number; top: number } | null {
+    if (!this.koerper) return null;
+    const [w, d, h] = this.cfg.size;
+    // Gedreht geschleift: der Umriss waechst auf den Hüllkreis, statt sich zu
+    // drehen — eine achsenparallele Liste kann keinen schiefen Kasten führen.
+    const schief = Math.abs(Math.sin(this.pyaw)) > 0.15;
+    const hw = schief ? Math.max(w, d) / 2 : w / 2;
+    const hd = schief ? Math.max(w, d) / 2 : d / 2;
+    return { x: this.px, z: this.pz, hw, hd, top: h + 0.2 };
+  }
+
+  /**
+   * Ladegewicht als Zusatzmasse an den Körper geben.
+   *
+   * Damit wird ein voller Behälter von selbst zu schwer zum Anheben, ohne dass
+   * es dafür eine Sonderabfrage im Greifer bräuchte.
+   */
+  wiegeLadung(): void {
+    this.koerper?.setAdditionalMass(this.contentKg, true);
+  }
+
+  /** Wo der Behälter gerade wirklich steht — bei beweglichen wandert das. */
+  get ort(): { x: number; z: number } {
+    return { x: this.px, z: this.pz };
+  }
+
   /** Liegt der Punkt in der Zone (Haufen/Bay: bis Fanghöhe; Box: bis knapp überm Rand)? */
   containsPoint(p: { x: number; y: number; z: number }, marginXZ = 0, marginY = 0.4): boolean {
     const [w, d, h] = this.cfg.size;
-    const open = this.cfg.kind !== "box";
-    const maxY = open ? PILE_CATCH_HEIGHT : h + marginY;
+    // Offene Flaechen fangen bis Fanghoehe, umwandete bis Oberkante: In einer
+    // 5-m-Halde liegt der Schrott sonst zur Haelfte ausserhalb der Zaehlung.
+    const offen = this.cfg.kind === "pile";
+    const maxY = offen ? PILE_CATCH_HEIGHT : Math.max(PILE_CATCH_HEIGHT, h) + marginY;
     const mXZ = marginXZ + (this.cfg.kind === "pile" ? 0.35 : 0);
-    return (
-      Math.abs(p.x - this.cfg.x) < w / 2 + mXZ &&
-      Math.abs(p.z - this.cfg.z) < d / 2 + mXZ &&
-      p.y < maxY
-    );
+    const [lx, lz] = this.lokal(p.x, p.z);
+    return Math.abs(lx) < w / 2 + mXZ && Math.abs(lz) < d / 2 + mXZ && p.y < maxY;
+  }
+
+  /** Punkt in die Achsen des Behälters drehen — ein gezogener Container steht schief. */
+  private lokal(x: number, z: number): [number, number] {
+    const dx = x - this.px;
+    const dz = z - this.pz;
+    if (this.pyaw === 0) return [dx, dz];
+    const c = Math.cos(-this.pyaw);
+    const s = Math.sin(-this.pyaw);
+    return [dx * c - dz * s, dx * s + dz * c];
   }
 
   /** Für die Abwurf-Ampel: großzügigere XZ-Zone, Höhe egal. */
   isOverhead(x: number, z: number): boolean {
     const [w, d] = this.cfg.size;
-    return Math.abs(x - this.cfg.x) < w / 2 + 0.35 && Math.abs(z - this.cfg.z) < d / 2 + 0.35;
+    const [lx, lz] = this.lokal(x, z);
+    return Math.abs(lx) < w / 2 + 0.35 && Math.abs(lz) < d / 2 + 0.35;
   }
 
   get purity(): number {
@@ -485,12 +888,24 @@ export class ContainerManager {
    * Zonen-Zählung (alle ~10 Steps): Items den Containern zuordnen, Aggregate
    * neu berechnen, Enter/Leave-Events feuern. Gegriffene Items zählen nicht.
    */
-  /** Schilder nach Entfernung ein- und ausblenden. Jedes Bild aufrufen. */
+  /**
+   * Schilder nach Entfernung ein- und ausblenden und bewegliche Behälter
+   * ihrer Physik nachführen. Jedes Bild aufrufen.
+   */
   updateLabels(camPos: THREE.Vector3): void {
-    for (const c of this.containers) c.updateLabelDistance(camPos);
+    for (const c of this.containers) {
+      c.syncBeweglich();
+      c.updateLabelDistance(camPos);
+    }
   }
 
   recount(itemManager: ItemManager, grippedBodies: Set<number>): void {
+    /*
+     * Erst die Stellung der beweglichen Behälter holen, dann zählen. Sonst
+     * zählt die Zählung gegen den Ort des vorigen Bildes — beim Schleifen
+     * eines vollen Containers wandert die Zone dann eine Fuhre hinterher.
+     */
+    for (const c of this.containers) c.syncBeweglich();
     const changes: Array<{ item: ScrapItem; from: string | null; to: string | null }> = [];
     for (const item of itemManager.items) {
       let to: string | null = null;
@@ -522,7 +937,10 @@ export class ContainerManager {
       c.contentKg += item.massKg;
       if (item.materialId !== c.cfg.fractionId) c.contaminationKg += item.massKg;
     }
-    for (const c of this.containers) c.refreshLabel(c === this.hovered ? this.hoverAmpel : null);
+    for (const c of this.containers) {
+      c.refreshLabel(c === this.hovered ? this.hoverAmpel : null);
+      c.wiegeLadung();
+    }
 
     for (const { item, from, to } of changes) {
       if (from) this.bus.emit("itemLeft", { itemId: item.id, containerId: from });
@@ -573,6 +991,22 @@ export class ContainerManager {
   /** Zonen-Schilder ein-/ausblenden (Taste M bzw. Touch-Knopf). */
   setLabelsVisible(v: boolean): void {
     for (const c of this.containers) c.setLabelVisible(v);
+  }
+
+  /** Umrisse aller beweglichen Behälter, für `setBuildingObstacles`. */
+  hindernisse(): Array<{ x: number; z: number; hw: number; hd: number; top: number; label: string }> {
+    const out: Array<{ x: number; z: number; hw: number; hd: number; top: number; label: string }> = [];
+    for (const c of this.containers) {
+      const h = c.hindernis;
+      if (h) out.push({ ...h, label: c.cfg.label });
+    }
+    return out;
+  }
+
+  /** Aktuelle Stellung eines Behälters, oder null wenn es ihn nicht gibt. */
+  ortVon(id: string): { x: number; z: number } | null {
+    const c = this.containers.find((k) => k.cfg.id === id);
+    return c ? c.ort : null;
   }
 
   byId(id: string): GameContainer {

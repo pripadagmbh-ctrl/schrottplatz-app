@@ -47,27 +47,33 @@ const BUERO_HALT = new THREE.Vector3(OFFICE_FRONT_X + 4.5, 0, OFFICE_Z - 1.5);
  * geprüft in `test/police.test.ts` gegen die Hindernisliste, damit der Wagen
  * nicht durch Mulden oder die Presse fährt.
  */
+/*
+ * Rundfahrt nach der neuen Platzordnung (12.09.2026). Sie laeuft aussen
+ * herum: Der Betrieb sitzt jetzt im Sueden, und ein Streifenwagen hat weder
+ * in der Muldenreihe noch zwischen Presse und Halde etwas zu suchen.
+ */
 const RUNDE: Array<[number, number]> = [
   [-24, 20],
   [-16, 16],
-  [-2, 13],
-  [4, 2],
-  [2, -12],
-  [-6, -16],
-  [-16, -12],
-  [-24, -2],
-  [-27, 10],
+  [-8, 10],
+  [-2, 2],
+  [-4, -4],
+  [-9, -4],
+  [-16, -4],
+  [-24, -6],
+  [-30, 2],
+  [-28, 12],
 ];
 
 /**
  * Halteplätze beim Bagger, relativ zu seiner Position — der erste freie
  * gewinnt. Nach Osten stehen die Mulden, nach Westen der Stahlhaufen.
  */
-const HALT_KANDIDATEN: Array<[number, number]> = [
-  [4.5, 9.5],
-  [-1.5, 11.0],
-  [4.5, -11.0],
-  [-6.0, 12.5],
+export const HALT_KANDIDATEN: Array<[number, number]> = [
+  [11.0, 10.0],
+  [8.0, 14.0],
+  [-14.0, 12.0],
+  [4.0, 18.0],
 ];
 
 /** Einfahrt und Ausfahrt am Tor */

@@ -24,26 +24,99 @@ export const ROUTE_IN_FWD: Array<[number, number]> = [
   [GATE_X, 40],
   [GATE_X, 24],
 ];
+/**
+ * Die Abladestelle ist kein fester Punkt mehr (Ansage 12.09.2026).
+ *
+ * „Je nachdem, wie der Bagger positioniert ist, sollte er auch nicht immer
+ * auf derselben Stelle platziert sein, sondern so nah wie möglich an den
+ * Bagger heranfahren." Vorher hielt jeder LKW auf (0 | 7), egal wo die
+ * Maschine stand — wer nach Süden gefahren war, musste zurückfahren, um an
+ * die eigene Anlieferung zu kommen.
+ *
+ * Der Punkt liegt auf der Verbindung Bagger–Rangierpunkt, acht Meter vor der
+ * Maschine, und wird auf den Vorplatz begrenzt. Acht Meter, weil die
+ * Ladefläche dann im Greifbereich liegt (4,0–9,5 m) und die Blockadeprüfung
+ * ringsum die Maschine (5,5 m) noch nicht anspricht. Steht der Bagger an
+ * seinem gewohnten Platz, kommt genau die alte Stelle heraus.
+ */
+const ABLADE_ABSTAND = 8.0;
+/**
+ * Rangierpunkt, von dem aus rückwärts gesetzt wird.
+ *
+ * Seit der Platzumstellung (12.09.2026) sitzt der Betrieb im Süden: Der
+ * Bagger steht auf (−6 | −16), die Presse hinter ihm an der Südgrenze. Der
+ * LKW kommt also von Norden die Gasse herunter und setzt auf den Vorplatz
+ * vor der Maschine zurück.
+ */
+const RANGIER_Z = 2.0;
+/**
+ * Der Vorplatz, über den der Punkt nicht hinauswandert. Östlich beginnen die
+ * Absetzcontainer, westlich die Batteriemulde, südlich der Bagger selbst.
+ */
+const VORPLATZ = { xMin: -6.5, xMax: -1.5, zMin: -12.5, zMax: 0.0 };
+
+let abladeStelle: [number, number] = [0, 7.0];
+let baggerOrt: (() => { x: number; z: number }) | null = null;
+
+/** Woher die Baggerstellung kommt. Einmal beim Aufbau setzen. */
+export function setBaggerOrt(f: () => { x: number; z: number }): void {
+  baggerOrt = f;
+}
+
+/**
+ * Neue Abladestelle bestimmen — beim Losfahren von der Waage aufzurufen.
+ * Danach steht sie fest, solange der LKW unterwegs ist: Eine Strecke, die
+ * sich unter dem fahrenden Wagen verschiebt, ist keine Strecke.
+ */
+export function neueAbladestelle(): [number, number] {
+  const b = baggerOrt?.();
+  if (b) {
+    const rx = -4.0 - b.x;
+    const rz = RANGIER_Z - b.z;
+    const len = Math.hypot(rx, rz) || 1;
+    const x = b.x + (rx / len) * ABLADE_ABSTAND;
+    const z = b.z + (rz / len) * ABLADE_ABSTAND;
+    abladeStelle = [
+      Math.min(VORPLATZ.xMax, Math.max(VORPLATZ.xMin, x)),
+      Math.min(VORPLATZ.zMax, Math.max(VORPLATZ.zMin, z)),
+    ];
+  }
+  return abladeStelle;
+}
+
+/** Wo gerade abgeladen wird — für die Spurüberwachung. */
+export function abladestelle(): [number, number] {
+  return abladeStelle;
+}
+
 // Nach dem Wiegen weiter zum Rangierpunkt vor dem Abkippplatz
-export const ROUTE_APPROACH: Array<[number, number]> = [
-  [GATE_X, 24],
-  [-14, 16.5],
-  [0, 16.5],
-];
-export const ROUTE_IN_REV: Array<[number, number]> = [
-  [0, 16.5],
-  // 7,0 m: so nah, dass der Bagger die ganze Ladefläche bestreicht, und noch
-  // weit genug, dass die Blockadeprüfung (5,5 m um die Maschine) nicht
-  // dauernd anspricht.
-  [0, 7.0],
-];
-export const ROUTE_OUT: Array<[number, number]> = [
-  [0, 7.0],
-  [0, 16.5],
-  [-14, 16.5],
-  [GATE_X, 24],
-  [GATE_X, 40],
-];
+export function routeApproach(): Array<[number, number]> {
+  const [x] = abladeStelle;
+  return [
+    [GATE_X, 24],
+    [-16, 14],
+    [-8, 6],
+    [x, RANGIER_Z],
+  ];
+}
+export function routeInRev(): Array<[number, number]> {
+  const [x, z] = abladeStelle;
+  return [
+    [x, RANGIER_Z],
+    [x, z],
+  ];
+}
+export function routeOut(): Array<[number, number]> {
+  const [x, z] = abladeStelle;
+  return [
+    [x, z],
+    [x, RANGIER_Z],
+    [-8, 6],
+    [-16, 14],
+    [GATE_X, 24],
+    [GATE_X, 40],
+  ];
+}
 
 // ABHOLUNG: Ostspur nach Süden, dann rückwärts an den Verladeplatz neben der
 // Presse — dort lädt der Spieler den Container mit sortenreinem Material.
@@ -51,40 +124,53 @@ export const PICKUP_IN_FWD: Array<[number, number]> = [
   [GATE_X, 40],
   [GATE_X, 24],
 ];
+/*
+ * Der Abholer fährt an der Ostwand entlang (Ansage 12.09.2026: „von der Waage
+ * am Büro vorbei entlang der Silos und kommt von Osten, was nicht der
+ * Arbeitsbereich des Baggers wäre"). Die Spur läuft zwischen den
+ * Absetzcontainern und den Silos nach Süden und endet östlich vom
+ * Stahlcontainer — der Bagger muss dafür nicht ausweichen.
+ */
 export const PICKUP_APPROACH: Array<[number, number]> = [
   [GATE_X, 24],
-  [-14, 16.5],
-  [-3.5, 16.5],
+  [-27, 20],
+  [-29, 10],
+  [-29, -8],
 ];
-// Rückwärts nach Westen direkt neben die Presse — Heck (Container-Öffnung)
-// zeigt zur Schere, der Bagger lädt von dort um (Design-Fix 2026-08-29)
 export const PICKUP_IN_REV: Array<[number, number]> = [
-  [-3.5, 16.5],
-  [-3.5, 8.0],
+  [-29, -8],
+  [-21.5, -17.0],
 ];
 export const PICKUP_OUT: Array<[number, number]> = [
-  [-3.5, 8.0],
-  [-3.5, 16.5],
-  [-14, 16.5],
+  [-21.5, -17.0],
+  [-29, -8],
+  [-29, 10],
+  [-27, 20],
   [GATE_X, 24],
   [GATE_X, 40],
 ];
 // KIPPER: Wer selbst abkippen kann, muss nicht vor dem Bagger halten. Er fährt
 // rückwärts an die Nordkante des Stahlschrotthaufens (Mitte bei x −9, z 1) und
 // kippt seine Ladung direkt dort ab (Design-Fix 29.08.2026).
+/*
+ * Wer selbst abkippen kann, faehrt nicht vor den Bagger, sondern rueckwaerts
+ * in die offene Nordseite des Mischschrottplatzes (Mitte x −19) und kippt
+ * dort ab. Lambert faehrt seit 12.09.2026 nicht mehr durch den Mischschrott;
+ * die Spur endet deshalb an seiner Kante, nicht darin.
+ */
 export const TIP_APPROACH: Array<[number, number]> = [
   [GATE_X, 24],
-  [-14, 16.5],
-  [-9, 13],
+  [-14, 12],
+  [6.0, 2],
 ];
 export const TIP_IN_REV: Array<[number, number]> = [
-  [-9, 13],
-  [-9, 7.5],
+  [6.0, 2],
+  [6.0, -17.5],
 ];
 export const TIP_OUT: Array<[number, number]> = [
-  [-9, 7.5],
-  [-9, 13],
-  [-14, 16.5],
+  [6.0, -17.5],
+  [6.0, 2],
+  [-14, 12],
   [GATE_X, 24],
   [GATE_X, 40],
 ];

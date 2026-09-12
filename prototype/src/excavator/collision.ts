@@ -75,7 +75,20 @@ const PLOW_R = 1.15;
  * nicht laehmend: 900 kg und eine hoehere Untergrenze lassen die Bewegung
  * schwer werden, ohne sie anzuhalten (Befund 10.09.2026).
  */
-const PLOW_HALF_KG = 900;
+/*
+ * Bei dieser verdraengten Masse halbiert sich das Tempo.
+ *
+ * Stand auf 900 kg. Gemessen am 11.09.2026 lagen beim Durchpfluegen des
+ * Haufens 800 bis 1260 kg in der Pruefkugel — der Schwenk fiel damit von 36
+ * auf rund 16 Grad je Sekunde. Das war immer noch zu flott ("es fliegt wie
+ * nichts durch den Schrott"), und zwar zu Recht: Der Arm ist kinematisch, er
+ * kann durch Kontakt gar nicht gebremst werden. Dieser Faktor ist der einzige
+ * Ersatz fuer die Kraft, die eine Tonne verhakter Stahl einem Ausleger
+ * entgegensetzt — und eine Tonne haelt einen Ausleger fast auf.
+ */
+const PLOW_HALF_KG = 500;
+/** So langsam wird es hoechstens — darunter steht die Maschine praktisch */
+const PLOW_MIN = 0.2;
 /** Ab dieser Masse ist ein Brocken nicht mehr wegzuschieben */
 const HEAVY_BLOCK_KG = 700;
 /** So nah darf die tief hängende Spinne an den Platzwart heran */
@@ -138,7 +151,7 @@ export class ExcavatorCollision {
    */
   plowFactor(): number {
     const m = this.plowMassKg();
-    return Math.max(0.35, 1 / (1 + m / PLOW_HALF_KG));
+    return Math.max(PLOW_MIN, 1 / (1 + m / PLOW_HALF_KG));
   }
 
   /** Steht der Unterwagen in einem festen Bauwerk? Rein zweidimensional. */

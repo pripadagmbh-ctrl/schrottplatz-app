@@ -1,6 +1,15 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { getMaterial } from "../materials/catalog";
+import { type Anteil, fraktionAus, istPressbar } from "../materials/purity";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { baueGeometrie, type BauId } from "./objektbau";
+import {
+  KATALOG_BIG,
+  KATALOG_HUGE,
+  KATALOG_SPECS,
+  type PileSpec,
+} from "./objektkatalog";
 
 /**
  * Schrottteile mit materialtypischen Formen (Briefing Kap. 7).
@@ -16,6 +25,56 @@ export interface ScrapShape {
   color: number;
   /** true = wurde in der Presse plattgedrückt (persistiert im Save) */
   flat?: boolean;
+  /**
+   * Aus welchen Bauteilen das Ding zusammengesetzt wird (world/objektbau.ts).
+   * Ohne Angabe bleibt es der nackte Grundkörper mit Fraktionsfarbe — so
+   * bleiben die alten Einträge unverändert.
+   */
+  bau?: BauId;
+  /**
+   * Wie das Ding heißt — „Kühlschrank", „Traktor-Hinterachse".
+   *
+   * Steht hier und nicht nur im Kommentar des Katalogs, weil der Spieler im
+   * Greifer lesen soll, was er gefasst hat (Wunsch 12.09.2026). Liegt in der
+   * Form und nicht am Teil, damit es ohne Zutun im Spielstand landet.
+   */
+  name?: string;
+  /**
+   * Braucht Werkzeug statt roher Gewalt.
+   *
+   * Manches trennt sich nicht durch Zusammendruecken, sondern nur mit Flex
+   * oder Abdrueckmaschine — eine Alufelge etwa gibt man nicht mit der Spinne
+   * vom Reifen frei, dabei ginge die Felge kaputt (Ansage 12.09.2026). Solche
+   * Stuecke sind Arbeit fuer Lambert, nicht fuer den Bagger.
+   */
+  nurWerkzeug?: boolean;
+  /**
+   * Faellt es beim Zerquetschen in seine Bestandteile?
+   *
+   * Manche Verbundteile trennen sich von selbst, wenn man sie zusammendrueckt
+   * (Ansage 12.09.2026): Bei einer Kabeltrommel ist das Holz zerbrochen, bevor
+   * das Kabel auch nur nachgibt — danach liegt beides getrennt da. Aus einem
+   * Mischschrott-Teil werden so sortenreine, und genau darin liegt der Gewinn.
+   */
+  trennbar?: boolean;
+  /**
+   * Sind die Scheiben schon hin?
+   *
+   * Fehlt der Wert, ist alles heil — so bleiben alte Spielstaende gueltig.
+   * Steht er auf true, wird beim Anlegen gar kein Glas mehr gebaut: Ein Wrack,
+   * das gestern die Scheiben verloren hat, hat sie heute immer noch nicht.
+   */
+  glasKaputt?: boolean;
+  /**
+   * Woraus es besteht, nach Massenanteilen.
+   *
+   * Ein Objekt aus Verbundteilen ist nie sortenrein (Ansage 12.09.2026): Ein
+   * Kühlschrank ist Blech, Alu, Kupfer, Styropor und Kunststoff — das ist
+   * Mischschrott, bis jemand es trennt. Eine Baggerschaufel mit Gumminoppen
+   * bleibt dagegen Stahlschrott, weil der Gummi nicht ins Gewicht fällt.
+   * Wo die Grenze liegt, steht in `SORTENREIN_AB`.
+   */
+  zusammensetzung?: Anteil[];
 }
 
 /**
@@ -82,15 +141,107 @@ function cableCoilGeometry(r: number, tube: number): THREE.BufferGeometry {
  * seitlich davonzufliegen. Der alte Kommentar behauptete, Fallen bleibe
  * unberührt; das stimmte nicht.
  *
- * Jetzt: Ein 20-kg-Blech kommt auf 12 m/s, ein 500-kg-Brocken auf 4 m/s. Nach
- * unten gilt die Grenze gar nicht (siehe FALL_MAX) — dort arbeitet die
- * Schwerkraft.
+ * Jetzt gilt zusaetzlich eine harte Obergrenze: WERKZEUG_MAX.
+ *
+ * Ein geschobenes Teil kann nicht schneller sein als das, was es geschoben
+ * hat — bei einem Stoss ohne Federung gibt es nichts, woraus mehr Tempo
+ * kommen koennte. Gemessen am 11.09.2026 flog ein 7-kg-Stueck mit 9,33 m/s
+ * (33,6 km/h), waehrend die Spitze der Spinne sich mit 3,8 m/s bewegte — das
+ * Zweieinhalbfache des Werkzeugs. Der Grund ist kein Fehler in der Physik,
+ * sondern die kinematische Spinne: Sie kann beliebig viel Schwung abgeben,
+ * und der Loeser schiesst eingeklemmte Stuecke heraus.
+ *
+ * Die alte Formel gab leichten Teilen ausserdem MEHR Tempo — genau denen,
+ * die als Geschosse auffallen. Physikalisch stimmt das fuer einen festen
+ * Stoss; hier ist der Stoss aber ein Rechenartefakt, kein Impuls. Darum die
+ * Deckelung.
+ *
+ * Nach unten gilt die Grenze weiterhin gar nicht (siehe FALL_MAX) — dort
+ * arbeitet die Schwerkraft.
  */
+
+/**
+ * So schnell wird ein Teil hoechstens, wenn die Maschine es anstoesst (m/s).
+ *
+ * Die Spitze der Spinne laeuft im Schwenk mit 3,8 m/s, die Schalen beim
+ * Schliessen mit gut 4. Schneller darf nichts werden, was sie beruehrt.
+ */
+export const WERKZEUG_MAX = 4.2;
+/**
+ * Wie eine Fraktion aussieht, wenn sie aus einem Verbundteil faellt.
+ *
+ * Kein Katalogeintrag, sondern eine Form nach Fraktion: Kabel rollt sich zum
+ * Bund, Holz bricht in Latten, Blech bleibt Blech. Die Groesse kommt aus der
+ * Masse — bei rund 900 kg je Kubikmeter losem Schrott.
+ */
+function trennForm(materialId: string, massKg: number, herkunft?: string): ScrapShape {
+  const vol = Math.max(massKg / 900, 0.004);
+  const w = Math.cbrt(vol);
+  const farbe = getMaterial(materialId).color;
+  if (materialId === "cable")
+    return { kind: "torus", dims: [w * 1.1, w * 0.42], color: farbe, name: "Kabelbund" };
+  if (materialId === "tires")
+    return { kind: "torus", dims: [w * 1.0, w * 0.38], color: farbe, name: "Reifen" };
+  // Was aus einem Rad faellt, ist eine Felge — nicht "Aluminium-Reste".
+  if (/felge|rad/i.test(herkunft ?? "") && (materialId === "alu" || materialId === "steel"))
+    return {
+      kind: "cyl",
+      dims: [w * 1.1, w * 0.7],
+      color: farbe,
+      name: materialId === "alu" ? "Alufelge" : "Stahlfelge",
+    };
+  if (materialId === "wood")
+    return { kind: "box", dims: [w * 0.8, w * 0.7, w * 2.4], color: farbe, name: "Holzbruch" };
+  if (materialId === "plastic")
+    return { kind: "box", dims: [w * 1.6, w * 0.5, w * 1.4], color: farbe, name: "Kunststoffreste" };
+  return {
+    kind: "box",
+    dims: [w * 1.2, w * 0.8, w * 1.3],
+    color: farbe,
+    name: `${getMaterial(materialId).name}-Reste`,
+  };
+}
+
+/**
+ * Ab diesem Tempoverlust in einem Schritt zerspringt Glas (m/s).
+ *
+ * Absichtlich niedrig (Ansage 12.09.2026: „je nach Einwirkung eigentlich
+ * immer"). Ein Aufschlag, den man ueberhaupt hoert, reicht — Glas ist das
+ * Erste, was auf einem Schrottplatz kaputtgeht, und ein Wrack mit heilen
+ * Scheiben sieht falsch aus.
+ */
+const GLAS_BRUCH_DV = 0.7;
+
+/**
+ * Eine Scheibe fuer alle: geteiltes Material, damit nicht jedes Objekt mit
+ * Fenstern ein eigenes anlegt.
+ */
+let glasMaterial: THREE.MeshStandardMaterial | null = null;
+function glasStoff(): THREE.MeshStandardMaterial {
+  glasMaterial ??= new THREE.MeshStandardMaterial({
+    color: 0x9fc2d2,
+    roughness: 0.12,
+    metalness: 0.05,
+    transparent: true,
+    opacity: 0.42,
+  });
+  return glasMaterial;
+}
+
+/** Was der Katalog zu einem geladenen Teil noch weiss. */
+interface KatalogZusatz {
+  bau?: BauId;
+  name?: string;
+  zusammensetzung?: Anteil[];
+  trennbar?: boolean;
+  nurWerkzeug?: boolean;
+}
+
 /** Fraktionen ohne metallischen Glanz — Abfall eben. */
 const NICHTMETALLE = new Set(["wood", "tires", "rubble", "plastic"]);
 
 export function maxSpeedFor(massKg: number): number {
-  return Math.min(8, Math.max(3.5, 45 / Math.sqrt(Math.max(massKg, 1))));
+  return Math.min(WERKZEUG_MAX, Math.max(1.4, 22 / Math.sqrt(Math.max(massKg, 1))));
 }
 
 /**
@@ -108,7 +259,7 @@ export function maxSpeedFor(massKg: number): number {
  * gibt je Schritt 0,16 m/s dazu und bleibt unberuehrt; ein Wurf behaelt seinen
  * Schwung, weil er beim Loslassen gesetzt und nicht gewonnen wird.
  */
-const MAX_ZUWACHS = 0.6;
+const MAX_ZUWACHS = 0.35;
 
 /** Ab diesem Tempoverlust in einem Schritt gilt es als Aufprall (m/s) */
 const AUFPRALL_DV = 1.1;
@@ -195,38 +346,72 @@ function flatColliderDesc(shape: ScrapShape): RAPIER.ColliderDesc {
 }
 
 /**
+ * Wie sich eine Fraktion pressen laesst.
+ *
+ * `dichte` in kg je Kubikmeter Paket — daraus ergibt sich die Groesse bei
+ * gegebener Masse. `fransen` ist die Spanne, `lang` und `dick` sind Anteile
+ * der Paketkante, `beule` die Unruhe der Oberflaeche.
+ */
+interface Pressprofil {
+  dichte: number;
+  fransen: [number, number];
+  lang: number;
+  dick: number;
+  beule: number;
+  rauheit: number;
+  glanz: number;
+}
+
+const PRESSPROFIL: Record<string, Pressprofil> = {
+  // Stahl federt zurueck: mittlere Dichte, viele Blechfetzen, kraeftig gebeult
+  steel: { dichte: 1250, fransen: [7, 13], lang: 0.45, dick: 0.05, beule: 0.11, rauheit: 0.9, glanz: 0.3 },
+  // Mischschrott ist das Unruhigste, was aus der Kammer kommt
+  mixed: { dichte: 1050, fransen: [10, 17], lang: 0.55, dick: 0.06, beule: 0.15, rauheit: 0.95, glanz: 0.25 },
+  // Edelstahl ist stur: bleibt sperrig, spreizt lange Zipfel ab
+  va: { dichte: 1150, fransen: [9, 15], lang: 0.6, dick: 0.04, beule: 0.12, rauheit: 0.55, glanz: 0.7 },
+  // Alu geht weich zusammen: dicht, klein, fast glatt
+  alu: { dichte: 1450, fransen: [3, 6], lang: 0.3, dick: 0.045, beule: 0.07, rauheit: 0.5, glanz: 0.55 },
+  // Kupfer noch dichter — das schwerste Paket bei gleichem Volumen
+  copper: { dichte: 1900, fransen: [3, 7], lang: 0.28, dick: 0.05, beule: 0.06, rauheit: 0.45, glanz: 0.65 },
+  brass: { dichte: 1800, fransen: [3, 6], lang: 0.26, dick: 0.055, beule: 0.05, rauheit: 0.4, glanz: 0.7 },
+  zinc: { dichte: 1450, fransen: [4, 8], lang: 0.34, dick: 0.035, beule: 0.09, rauheit: 0.55, glanz: 0.4 },
+  battery: { dichte: 1600, fransen: [2, 4], lang: 0.18, dick: 0.09, beule: 0.03, rauheit: 0.7, glanz: 0.1 },
+  // Kabel bleibt ein Knaeuel: locker, ueberall Schwaenze
+  cable: { dichte: 800, fransen: [14, 22], lang: 0.75, dick: 0.035, beule: 0.16, rauheit: 0.95, glanz: 0.1 },
+  // Nichtmetalle pressen sich schlecht und sehen zerfetzt aus
+  wood: { dichte: 620, fransen: [12, 18], lang: 0.6, dick: 0.07, beule: 0.17, rauheit: 1.0, glanz: 0 },
+  plastic: { dichte: 540, fransen: [10, 16], lang: 0.5, dick: 0.06, beule: 0.15, rauheit: 0.85, glanz: 0.05 },
+  tires: { dichte: 700, fransen: [8, 14], lang: 0.4, dick: 0.09, beule: 0.13, rauheit: 1.0, glanz: 0 },
+  rubble: { dichte: 1400, fransen: [6, 11], lang: 0.3, dick: 0.08, beule: 0.14, rauheit: 1.0, glanz: 0 },
+};
+
+/**
  * Wie stark ein Teil beim Quetschen zusammengeht. 0,18 hat die Ursprungsform
  * völlig ausgelöscht — aus allem wurde eine Platte. 0,55 verbeult das Stück
  * sichtbar, man erkennt aber noch, was es einmal war.
  */
 const FLAT_SCALE_Y = 0.55;
 
-interface PileSpec {
-  materialId: string;
-  massKg: number;
-  kind: ScrapShape["kind"];
-  dims: number[];
-}
 
 // Basis-Sortiment (SW) — Starthaufen und Zufalls-Ladungen speisen sich hieraus
 const SPECS: PileSpec[] = [
-  { materialId: "steel", massKg: 60, kind: "box", dims: [0.15, 0.15, 1.3] }, // Profilstahl
-  { materialId: "steel", massKg: 45, kind: "cyl", dims: [0.09, 1.1] }, // Rohr
+  { materialId: "steel", massKg: 60, kind: "box", dims: [0.15, 0.15, 1.3], bau: "buendel", name: "Profilstahl" },
+  { materialId: "steel", massKg: 45, kind: "cyl", dims: [0.09, 1.1], bau: "rohrFlansch", name: "Rohr" },
   { materialId: "steel", massKg: 35, kind: "box", dims: [0.12, 0.12, 0.9] },
-  { materialId: "steel", massKg: 55, kind: "box", dims: [0.7, 0.06, 0.9] }, // Blech
-  { materialId: "steel", massKg: 90, kind: "box", dims: [0.7, 0.5, 0.15] }, // Heizkörper (früher Guss)
-  { materialId: "steel", massKg: 110, kind: "box", dims: [0.4, 0.4, 0.4] }, // Motorblock-Rest
+  { materialId: "steel", massKg: 55, kind: "box", dims: [0.7, 0.06, 0.9], bau: "platte", name: "Blech" },
+  { materialId: "steel", massKg: 90, kind: "box", dims: [0.7, 0.5, 0.15], bau: "platte", name: "Heizkörper (früher Guss)" },
+  { materialId: "steel", massKg: 110, kind: "box", dims: [0.4, 0.4, 0.4], bau: "motor", name: "Motorblock-Rest", zusammensetzung: [{ materialId: "steel", anteil: 0.82 }, { materialId: "alu", anteil: 0.14 }, { materialId: "copper", anteil: 0.04 }] },
   { materialId: "steel", massKg: 70, kind: "box", dims: [0.18, 0.18, 1.1] },
-  { materialId: "va", massKg: 26, kind: "box", dims: [0.9, 0.18, 0.6] }, // Spülbecken
-  { materialId: "va", massKg: 34, kind: "cyl", dims: [0.34, 0.8] }, // VA-Behälter
-  { materialId: "va", massKg: 18, kind: "box", dims: [0.06, 0.06, 1.5] }, // VA-Geländerrohr
-  { materialId: "alu", massKg: 12, kind: "cyl", dims: [0.32, 0.22] }, // Felge
-  { materialId: "alu", massKg: 8, kind: "box", dims: [0.08, 0.08, 1.4] }, // Profil
-  { materialId: "alu", massKg: 10, kind: "box", dims: [0.6, 0.04, 0.8] }, // Tafel
+  { materialId: "va", massKg: 26, kind: "box", dims: [0.9, 0.18, 0.6], bau: "weisseWare", name: "Spülbecken" },
+  { materialId: "va", massKg: 34, kind: "cyl", dims: [0.34, 0.8], bau: "tank", name: "VA-Behälter" },
+  { materialId: "va", massKg: 18, kind: "box", dims: [0.06, 0.06, 1.5], bau: "buendel", name: "VA-Geländerrohr" },
+  { materialId: "alu", massKg: 12, kind: "cyl", dims: [0.32, 0.22], name: "Felge" },
+  { materialId: "alu", massKg: 8, kind: "box", dims: [0.08, 0.08, 1.4], name: "Profil" },
+  { materialId: "alu", massKg: 10, kind: "box", dims: [0.6, 0.04, 0.8], bau: "platte", name: "Tafel" },
   { materialId: "alu", massKg: 11, kind: "cyl", dims: [0.3, 0.2] },
-  { materialId: "copper", massKg: 12, kind: "cyl", dims: [0.05, 0.8] }, // Kupferrohr
-  { materialId: "copper", massKg: 18, kind: "torus", dims: [0.14, 0.05] }, // Kupferbund
-  { materialId: "copper", massKg: 15, kind: "box", dims: [0.3, 0.25, 0.3] }, // Messingarmaturen
+  { materialId: "copper", massKg: 12, kind: "cyl", dims: [0.05, 0.8], bau: "buendel", name: "Kupferrohr" },
+  { materialId: "copper", massKg: 18, kind: "torus", dims: [0.14, 0.05], name: "Kupferbund" },
+  { materialId: "brass", massKg: 15, kind: "box", dims: [0.3, 0.25, 0.3], bau: "maschine", name: "Messingarmaturen" },
   { materialId: "cable", massKg: 9, kind: "torus", dims: [0.18, 0.07] },
   { materialId: "cable", massKg: 7, kind: "torus", dims: [0.15, 0.06] },
   { materialId: "cable", massKg: 12, kind: "torus", dims: [0.2, 0.08] },
@@ -240,24 +425,27 @@ const SPECS: PileSpec[] = [
   // war das Sortiment sehr nach Baustelle: Profile, Rohre, Bleche. Ein Platz
   // lebt aber von dem, was die Leute anschleppen — Hausrat, Zweiraeder,
   // Landmaschinen, ausgeschlachtete Fahrzeugteile.
-  { materialId: "steel", massKg: 42, kind: "box", dims: [0.55, 0.85, 0.55] }, // Waschmaschine
-  { materialId: "steel", massKg: 38, kind: "box", dims: [0.6, 0.85, 0.6] }, // Spuelmaschine
-  { materialId: "steel", massKg: 30, kind: "box", dims: [0.65, 0.9, 0.6] }, // Elektroherd
-  { materialId: "steel", massKg: 52, kind: "cyl", dims: [0.28, 1.4] }, // Warmwasserspeicher
-  { materialId: "steel", massKg: 48, kind: "box", dims: [1.6, 0.55, 0.7] }, // Badewanne
-  { materialId: "steel", massKg: 26, kind: "box", dims: [0.6, 0.9, 1.9] }, // Motorradrahmen
-  { materialId: "steel", massKg: 14, kind: "box", dims: [0.5, 0.7, 1.6] }, // Mopedrahmen
-  { materialId: "steel", massKg: 120, kind: "box", dims: [1.1, 0.35, 0.9] }, // Pflugschar
-  { materialId: "steel", massKg: 85, kind: "cyl", dims: [0.34, 1.7] }, // Eggenwalze
-  { materialId: "steel", massKg: 160, kind: "box", dims: [0.5, 0.5, 1.4] }, // Traktor-Frontgewicht
-  { materialId: "steel", massKg: 95, kind: "box", dims: [2.1, 0.25, 0.35] }, // Heuwender-Ausleger
-  { materialId: "steel", massKg: 210, kind: "cyl", dims: [0.16, 2.2] }, // LKW-Achse
-  { materialId: "steel", massKg: 130, kind: "box", dims: [0.8, 0.7, 0.9] }, // LKW-Getriebe
-  { materialId: "steel", massKg: 75, kind: "box", dims: [0.9, 0.75, 0.12] }, // LKW-Kuehler
-  { materialId: "steel", massKg: 46, kind: "cyl", dims: [0.28, 0.32] }, // LKW-Felge
-  { materialId: "alu", massKg: 16, kind: "box", dims: [0.7, 0.5, 0.15] }, // Motorradmotor
-  { materialId: "copper", massKg: 22, kind: "box", dims: [0.45, 0.4, 0.35] }, // Elektromotor
-  { materialId: "tires", massKg: 11, kind: "torus", dims: [0.31, 0.11] }, // Traktorreifen
+  { materialId: "steel", massKg: 42, kind: "box", dims: [0.55, 0.85, 0.55], bau: "weisseWare", name: "Waschmaschine", zusammensetzung: [{ materialId: "steel", anteil: 0.62 }, { materialId: "rubble", anteil: 0.18 }, { materialId: "copper", anteil: 0.08 }, { materialId: "plastic", anteil: 0.12 }] },
+  { materialId: "steel", massKg: 38, kind: "box", dims: [0.6, 0.85, 0.6], bau: "weisseWare", name: "Spuelmaschine", zusammensetzung: [{ materialId: "steel", anteil: 0.6 }, { materialId: "plastic", anteil: 0.28 }, { materialId: "copper", anteil: 0.06 }, { materialId: "alu", anteil: 0.06 }] },
+  { materialId: "steel", massKg: 30, kind: "box", dims: [0.65, 0.9, 0.6], bau: "weisseWare", name: "Elektroherd" },
+  { materialId: "steel", massKg: 52, kind: "cyl", dims: [0.28, 1.4], bau: "tank", name: "Warmwasserspeicher" },
+  { materialId: "steel", massKg: 48, kind: "box", dims: [1.6, 0.55, 0.7], name: "Badewanne" },
+  { materialId: "steel", massKg: 26, kind: "box", dims: [0.6, 0.9, 1.9], bau: "kleinfahrzeug", name: "Motorradrahmen" },
+  { materialId: "steel", massKg: 14, kind: "box", dims: [0.5, 0.7, 1.6], bau: "kleinfahrzeug", name: "Mopedrahmen" },
+  { materialId: "steel", massKg: 120, kind: "box", dims: [1.1, 0.35, 0.9], bau: "schaufel", name: "Pflugschar" },
+  { materialId: "steel", massKg: 85, kind: "cyl", dims: [0.34, 1.7], bau: "trommel", name: "Eggenwalze" },
+  { materialId: "steel", massKg: 160, kind: "box", dims: [0.5, 0.5, 1.4], bau: "motor", name: "Traktor-Frontgewicht" },
+  { materialId: "steel", massKg: 95, kind: "box", dims: [2.1, 0.25, 0.35], bau: "ausleger", name: "Heuwender-Ausleger" },
+  { materialId: "steel", massKg: 210, kind: "cyl", dims: [0.16, 2.2], bau: "achse", name: "LKW-Achse" },
+  { materialId: "steel", massKg: 130, kind: "box", dims: [0.8, 0.7, 0.9], bau: "motor", name: "LKW-Getriebe" },
+  { materialId: "steel", massKg: 75, kind: "box", dims: [0.9, 0.75, 0.12], bau: "maschine", name: "LKW-Kuehler" },
+  { materialId: "steel", massKg: 46, kind: "cyl", dims: [0.28, 0.32], name: "LKW-Felge" },
+  { materialId: "alu", massKg: 16, kind: "box", dims: [0.7, 0.5, 0.15], bau: "motor", name: "Motorradmotor" },
+  { materialId: "copper", massKg: 22, kind: "box", dims: [0.45, 0.4, 0.35], bau: "elektromotor", name: "Elektromotor", trennbar: true, zusammensetzung: [{ materialId: "steel", anteil: 0.58 }, { materialId: "copper", anteil: 0.38 }, { materialId: "alu", anteil: 0.04 }] },
+  { materialId: "tires", massKg: 11, kind: "torus", dims: [0.31, 0.11], name: "Traktorreifen" },
+
+  // Erweiterung 12.09.2026 — siehe world/objektkatalog.ts
+  ...KATALOG_SPECS,
 ];
 
 /**
@@ -270,47 +458,65 @@ const SPECS: PileSpec[] = [
  * einzufädeln ist die eigentliche Aufgabe am Bagger (Wunsch 29.08.2026).
  */
 const HUGE_SPECS: PileSpec[] = [
-  { materialId: "steel", massKg: 2400, kind: "box", dims: [2.4, 1.1, 1.9] }, // Waggon-Drehgestell
-  { materialId: "steel", massKg: 2200, kind: "box", dims: [3.2, 0.9, 0.8] }, // Kettenlaufwerk
-  { materialId: "steel", massKg: 1800, kind: "cyl", dims: [1.1, 3.6] }, // Kesselwagen-Segment
-  { materialId: "steel", massKg: 1400, kind: "cyl", dims: [1.2, 3.1] }, // Lagertank
-  { materialId: "steel", massKg: 1100, kind: "cyl", dims: [0.9, 2.0] }, // Turbinengehäuse
-  { materialId: "steel", massKg: 900, kind: "box", dims: [2.2, 1.9, 1.8] }, // LKW-Fahrerhaus
-  { materialId: "steel", massKg: 1600, kind: "box", dims: [2.8, 1.2, 1.1] }, // Pressenrahmen
-  { materialId: "va", massKg: 950, kind: "cyl", dims: [1.0, 2.8] }, // VA-Prozesstank
-  { materialId: "va", massKg: 700, kind: "box", dims: [2.6, 0.9, 1.2] }, // VA-Behälter
-  { materialId: "alu", massKg: 700, kind: "box", dims: [3.5, 0.35, 1.6] }, // Tragflächenstück
-  { materialId: "alu", massKg: 800, kind: "cyl", dims: [1.3, 3.0] }, // Rumpfsegment
-  { materialId: "alu", massKg: 550, kind: "box", dims: [2.9, 1.1, 0.9] }, // Aufbau/Kofferaufbau
+  { materialId: "steel", massKg: 2400, kind: "box", dims: [2.4, 1.1, 1.9], bau: "achse", name: "Waggon-Drehgestell" },
+  { materialId: "steel", massKg: 2200, kind: "box", dims: [3.2, 0.9, 0.8], bau: "fahrgestell", name: "Kettenlaufwerk" },
+  { materialId: "steel", massKg: 1800, kind: "cyl", dims: [1.1, 3.6], bau: "tank", name: "Kesselwagen-Segment" },
+  { materialId: "steel", massKg: 1400, kind: "cyl", dims: [1.2, 3.1], bau: "tank", name: "Lagertank" },
+  { materialId: "steel", massKg: 1100, kind: "cyl", dims: [0.9, 2.0], bau: "tank", name: "Turbinengehäuse" },
+  { materialId: "steel", massKg: 900, kind: "box", dims: [2.2, 1.9, 1.8], bau: "karosserie", name: "LKW-Fahrerhaus" },
+  { materialId: "steel", massKg: 1600, kind: "box", dims: [2.8, 1.2, 1.1], bau: "motor", name: "Pressenrahmen" },
+  { materialId: "va", massKg: 950, kind: "cyl", dims: [1.0, 2.8], bau: "tank", name: "VA-Prozesstank" },
+  { materialId: "va", massKg: 700, kind: "box", dims: [2.6, 0.9, 1.2], bau: "tank", name: "VA-Behälter" },
+  { materialId: "alu", massKg: 700, kind: "box", dims: [3.5, 0.35, 1.6], bau: "platte", name: "Tragflächenstück" },
+  { materialId: "alu", massKg: 800, kind: "cyl", dims: [1.3, 3.0], bau: "rohrFlansch", name: "Rumpfsegment" },
+  { materialId: "alu", massKg: 550, kind: "box", dims: [2.9, 1.1, 0.9], bau: "container", name: "Aufbau/Kofferaufbau" },
+
+  // Erweiterung 12.09.2026 — siehe world/objektkatalog.ts
+  ...KATALOG_HUGE,
 ];
 
 const BIG_SPECS: PileSpec[] = [
-  { materialId: "steel", massKg: 180, kind: "box", dims: [0.28, 0.28, 2.9] }, // Doppel-T-Träger
-  { materialId: "steel", massKg: 220, kind: "box", dims: [1.9, 0.08, 1.5] }, // Blechtafel
-  { materialId: "steel", massKg: 160, kind: "cyl", dims: [0.22, 2.6] }, // dickes Rohr
-  { materialId: "steel", massKg: 140, kind: "box", dims: [1.2, 0.9, 0.75] }, // Kessel
-  { materialId: "steel", massKg: 95, kind: "box", dims: [0.75, 1.5, 0.7] }, // Waschmaschine
-  { materialId: "steel", massKg: 420, kind: "box", dims: [0.9, 0.7, 0.95] }, // Maschinenblock
-  { materialId: "steel", massKg: 300, kind: "cyl", dims: [0.6, 0.9] }, // Schwungrad
-  { materialId: "steel", massKg: 260, kind: "box", dims: [1.5, 1.1, 0.8] }, // Stahlschrank
-  { materialId: "steel", massKg: 195, kind: "box", dims: [2.4, 0.9, 0.12] }, // Stahltür/Tor
-  { materialId: "steel", massKg: 240, kind: "cyl", dims: [0.75, 1.9] }, // Öltank/Boiler
-  { materialId: "steel", massKg: 150, kind: "wire", dims: [1.15] }, // Drahtballen
-  { materialId: "va", massKg: 210, kind: "cyl", dims: [0.7, 1.8] }, // VA-Tank
-  { materialId: "va", massKg: 130, kind: "box", dims: [1.8, 0.1, 1.1] }, // VA-Tafel
-  { materialId: "va", massKg: 95, kind: "box", dims: [1.2, 0.85, 0.7] }, // Gastro-Spültisch
-  { materialId: "va", massKg: 70, kind: "box", dims: [0.14, 0.14, 2.6] }, // VA-Rohrbündel
-  { materialId: "alu", massKg: 60, kind: "box", dims: [0.3, 0.3, 2.8] }, // Profilbündel
-  { materialId: "alu", massKg: 45, kind: "box", dims: [1.6, 0.06, 1.2] }, // Alutafel
-  { materialId: "alu", massKg: 85, kind: "box", dims: [1.4, 1.2, 0.25] }, // Alu-Fensterrahmen
-  { materialId: "alu", massKg: 110, kind: "cyl", dims: [0.55, 1.4] }, // Alu-Kessel
-  { materialId: "copper", massKg: 65, kind: "cyl", dims: [0.35, 1.2] }, // Kupfer-Boiler
-  { materialId: "copper", massKg: 48, kind: "torus", dims: [0.45, 0.16] }, // Kupferrohr-Bund
-  { materialId: "cable", massKg: 55, kind: "torus", dims: [0.55, 0.22] }, // Kabelbund
-  { materialId: "cable", massKg: 120, kind: "cyl", dims: [0.85, 0.9] }, // Kabeltrommel
-  { materialId: "wood", massKg: 90, kind: "box", dims: [1.4, 0.5, 0.9] }, // Holzkiste
-  { materialId: "rubble", massKg: 130, kind: "box", dims: [1.1, 1.1, 1.1] }, // Betonblock
+  { materialId: "steel", massKg: 180, kind: "box", dims: [0.28, 0.28, 2.9], bau: "traeger", name: "Doppel-T-Träger" },
+  { materialId: "steel", massKg: 220, kind: "box", dims: [1.9, 0.08, 1.5], bau: "platte", name: "Blechtafel" },
+  { materialId: "steel", massKg: 160, kind: "cyl", dims: [0.22, 2.6], bau: "rohrFlansch", name: "dickes Rohr" },
+  { materialId: "steel", massKg: 140, kind: "box", dims: [1.2, 0.9, 0.75], bau: "tank", name: "Kessel" },
+  { materialId: "steel", massKg: 95, kind: "box", dims: [0.75, 1.5, 0.7], bau: "weisseWare", name: "Waschmaschine", zusammensetzung: [{ materialId: "steel", anteil: 0.62 }, { materialId: "rubble", anteil: 0.18 }, { materialId: "copper", anteil: 0.08 }, { materialId: "plastic", anteil: 0.12 }] },
+  { materialId: "steel", massKg: 420, kind: "box", dims: [0.9, 0.7, 0.95], bau: "motor", name: "Maschinenblock" },
+  { materialId: "steel", massKg: 300, kind: "cyl", dims: [0.6, 0.9], bau: "trommel", name: "Schwungrad" },
+  { materialId: "steel", massKg: 260, kind: "box", dims: [1.5, 1.1, 0.8], bau: "moebel", name: "Stahlschrank" },
+  { materialId: "steel", massKg: 195, kind: "box", dims: [2.4, 0.9, 0.12], bau: "platte", name: "Stahltür/Tor" },
+  { materialId: "steel", massKg: 240, kind: "cyl", dims: [0.75, 1.9], bau: "tank", name: "Öltank/Boiler" },
+  { materialId: "steel", massKg: 150, kind: "wire", dims: [1.15], bau: "haufen", name: "Drahtballen" },
+  { materialId: "va", massKg: 210, kind: "cyl", dims: [0.7, 1.8], bau: "tank", name: "VA-Tank" },
+  { materialId: "va", massKg: 130, kind: "box", dims: [1.8, 0.1, 1.1], bau: "platte", name: "VA-Tafel" },
+  { materialId: "va", massKg: 95, kind: "box", dims: [1.2, 0.85, 0.7], bau: "moebel", name: "Gastro-Spültisch" },
+  { materialId: "va", massKg: 70, kind: "box", dims: [0.14, 0.14, 2.6], bau: "buendel", name: "VA-Rohrbündel" },
+  { materialId: "alu", massKg: 60, kind: "box", dims: [0.3, 0.3, 2.8], bau: "buendel", name: "Profilbündel" },
+  { materialId: "alu", massKg: 45, kind: "box", dims: [1.6, 0.06, 1.2], bau: "platte", name: "Alutafel" },
+  { materialId: "alu", massKg: 85, kind: "box", dims: [1.4, 1.2, 0.25], bau: "fensterflaeche", name: "Alu-Fensterrahmen" },
+  { materialId: "alu", massKg: 110, kind: "cyl", dims: [0.55, 1.4], bau: "tank", name: "Alu-Kessel" },
+  { materialId: "copper", massKg: 65, kind: "cyl", dims: [0.35, 1.2], bau: "tank", name: "Kupfer-Boiler" },
+  { materialId: "copper", massKg: 48, kind: "torus", dims: [0.45, 0.16], bau: "buendel", name: "Kupferrohr-Bund" },
+  { materialId: "cable", massKg: 55, kind: "torus", dims: [0.55, 0.22], name: "Kabelbund" },
+  { materialId: "cable", massKg: 120, kind: "cyl", dims: [0.85, 0.9], bau: "trommel", name: "Kabeltrommel", trennbar: true, zusammensetzung: [{ materialId: "cable", anteil: 0.62 }, { materialId: "wood", anteil: 0.38 }] },
+  { materialId: "wood", massKg: 90, kind: "box", dims: [1.4, 0.5, 0.9], bau: "moebel", name: "Holzkiste" },
+  { materialId: "rubble", massKg: 130, kind: "box", dims: [1.1, 1.1, 1.1], bau: "beton", name: "Betonblock" },
+
+  // Erweiterung 12.09.2026 — siehe world/objektkatalog.ts
+  ...KATALOG_BIG,
 ];
+
+/*
+ * Auch die drei urspruenglichen Listen bekommen ihre Fraktion aus der
+ * Zusammensetzung. Sonst stuende die Kabeltrommel als "cable" im Katalog und
+ * waere zugleich Mischschrott — die Ableitung lief zuerst nur ueber den neuen
+ * Katalog (Befund 12.09.2026).
+ */
+for (const liste of [SPECS, BIG_SPECS, HUGE_SPECS]) {
+  for (const sp of liste) {
+    if (sp.zusammensetzung) sp.materialId = fraktionAus(sp.zusammensetzung, sp.materialId);
+  }
+}
 
 const CABLE_COLORS = [0xb0682a, 0x71646a, 0x315e75];
 
@@ -343,16 +549,29 @@ export function randomCargo(
         : Math.random() < bigShare
           ? BIG_SPECS
           : SPECS;
-    // Fraktionsmix der Anlieferungen (SW): 60 % Misch-/Stahlschrott,
-    // 20 % Aluminium, der Rest verteilt sich auf VA, Kupfer, Kabel, Störstoff
+    /*
+     * Fraktionsmix der Anlieferungen.
+     *
+     * "mixed" musste dazu (Befund 12.09.2026): Seit ein Objekt aus
+     * Verbundteilen als Mischschrott gilt — Kuehlschrank, Karosserie, Kabine,
+     * Wohnwagen —, haengen daran neunundvierzig Eintraege. Ohne die Fraktion
+     * in dieser Liste wurde keiner davon je gezogen, und sie waren mit einem
+     * Schlag aus dem Spiel.
+     *
+     * 42 % Stahl, 22 % Mischschrott, 16 % Alu, der Rest verteilt sich.
+     */
     const r = Math.random();
     const wanted =
       onlyMaterial ??
-      (r < 0.6
+      (r < 0.42
         ? "steel"
-        : r < 0.8
-          ? "alu"
-          : ["va", "copper", "cable", "wood", "plastic", "rubble"][Math.floor(Math.random() * 6)]);
+        : r < 0.64
+          ? "mixed"
+          : r < 0.8
+            ? "alu"
+            : ["va", "copper", "brass", "zinc", "battery", "cable", "wood", "plastic", "rubble"][
+                Math.floor(Math.random() * 9)
+              ]);
     let matching = pool.filter((s) => s.materialId === wanted);
     // Sortenreine Ladung: notfalls in der anderen Größenklasse suchen, damit
     // die Fraktion auf jeden Fall stimmt
@@ -366,7 +585,16 @@ export function randomCargo(
     out.push({
       materialId: spec.materialId,
       massKg: spec.massKg,
-      shape: { kind: spec.kind, dims: spec.dims, color: colorFor(spec, i) },
+      shape: {
+        kind: spec.kind,
+        dims: spec.dims,
+        color: colorFor(spec, i),
+        bau: spec.bau,
+        name: spec.name,
+        zusammensetzung: spec.zusammensetzung,
+        trennbar: spec.trennbar,
+        nurWerkzeug: spec.nurWerkzeug,
+      },
     });
   }
   return out;
@@ -532,16 +760,94 @@ export class ItemManager {
    * Ohne das beginnt jede Partie mit einem zappelnden Berg, und der Spieler
    * sieht die Teile erst zurechtrutschen (v2: `Simulation.settle()`).
    */
+  /**
+   * Den Platz setzen lassen, bevor das erste Bild kommt.
+   *
+   * Der erste Durchgang allein genuegte nicht. Gemessen am 12.09.2026 hing
+   * nach dem Setzen ein 75-kg-Stueck in **7,01 m Hoehe** und fiel 6,66 m,
+   * sobald es geweckt wurde. Der Grund steckt in der gemeinsamen Schlafregel:
+   * Wird eine Gruppe als ruhig eingestuft, schlaeft auch ein Stueck ein, das
+   * noch faellt — und wer in der Luft einschlaeft, bleibt in der Luft, bis
+   * ihn zufaellig etwas weckt. Im Spiel sah das aus, als fiele Schrott vom
+   * Himmel.
+   *
+   * Darum wird nach dem Setzen noch einmal alles geweckt und weitergerechnet,
+   * bis nichts mehr faellt. Wer wirklich liegt, schlaeft sofort wieder ein;
+   * wer in der Luft hing, faellt jetzt. Das kostet nur Ladezeit, keine
+   * Bildzeit.
+   */
   settle(world: RAPIER.World, schritte = 240): void {
-    for (let i = 0; i < schritte; i++) {
-      world.step();
-      this.settleSleep(1 / 60);
+    const runde = (n: number) => {
+      for (let i = 0; i < n; i++) {
+        world.step();
+        this.settleSleep(1 / 60);
+      }
+    };
+    runde(schritte);
+    for (let durchgang = 0; durchgang < 4; durchgang++) {
+      let geweckt = 0;
+      for (const item of this.items) {
+        if (item.body.isDynamic() && item.body.isSleeping()) {
+          item.body.wakeUp();
+          geweckt++;
+        }
+      }
+      if (geweckt === 0) break;
+      runde(90);
+      // Faellt noch etwas nennenswert? Dann noch eine Runde.
+      let faellt = 0;
+      for (const item of this.items) {
+        if (!item.body.isDynamic()) continue;
+        const v = item.body.linvel();
+        if (Math.abs(v.y) > 0.25) faellt++;
+      }
+      if (faellt === 0) break;
     }
     for (const item of this.items) if (item.body.isDynamic()) item.body.sleep();
     this.syncMeshes();
   }
 
   /** Teil aus Form-Spec erzeugen (Haufen, Ladung, Save-Restore). */
+  /**
+   * Bau aus dem Katalog nachtragen.
+   *
+   * Ein Spielstand speichert die Form eines Teils, wie sie beim Anlegen war —
+   * und aeltere Staende kennen das Feld `bau` noch nicht. Ohne diesen Nachtrag
+   * blieben auf jedem vorhandenen Platz alle Teile Quader, egal wie viele
+   * Bauten es gibt (Befund 12.09.2026: "ich seh sie nicht auf dem iPad").
+   *
+   * Gesucht wird ueber Fraktion, Masse, Form und Masse — genau die vier Werte,
+   * mit denen das Teil einmal aus dem Katalog gezogen wurde. Findet sich nichts,
+   * bleibt es der Grundkoerper; falsch wird dadurch nichts.
+   */
+  private static katalogKarte: Map<string, KatalogZusatz> | null = null;
+
+  private static katalogFuer(
+    materialId: string,
+    massKg: number,
+    shape: ScrapShape
+  ): KatalogZusatz | undefined {
+    if (!ItemManager.katalogKarte) {
+      const karte = new Map<string, KatalogZusatz>();
+      for (const liste of [SPECS, BIG_SPECS, HUGE_SPECS]) {
+        for (const sp of liste) {
+          if (!sp.bau && !sp.name) continue;
+          karte.set(`${sp.materialId}|${sp.massKg}|${sp.kind}|${sp.dims.join(",")}`, {
+            bau: sp.bau,
+            name: sp.name,
+            zusammensetzung: sp.zusammensetzung,
+            trennbar: sp.trennbar,
+            nurWerkzeug: sp.nurWerkzeug,
+          });
+        }
+      }
+      ItemManager.katalogKarte = karte;
+    }
+    return ItemManager.katalogKarte.get(
+      `${materialId}|${massKg}|${shape.kind}|${shape.dims.join(",")}`
+    );
+  }
+
   spawnScrap(
     materialId: string,
     massKg: number,
@@ -549,9 +855,31 @@ export class ItemManager {
     pos: THREE.Vector3,
     rot?: THREE.Quaternion
   ): ScrapItem {
+    /*
+     * Bei einem Bau steckt die Farbe in den Eckpunkten, nicht im Material —
+     * darum Grundfarbe weiss und `vertexColors`. Nur so bleibt ein Objekt aus
+     * zwoelf Bauteilen ein einziger Zeichenruf mit einem einzigen Material.
+     */
+    // Aus einem alten Spielstand geladen? Dann fehlt alles, was der Katalog
+    // seither dazubekommen hat — nachtragen.
+    if (!shape.bau || !shape.name || !shape.zusammensetzung) {
+      const k = ItemManager.katalogFuer(materialId, massKg, shape);
+      if (k) {
+        shape = {
+          ...shape,
+          bau: shape.bau ?? k.bau,
+          name: shape.name ?? k.name,
+          zusammensetzung: shape.zusammensetzung ?? k.zusammensetzung,
+          trennbar: shape.trennbar ?? k.trennbar,
+          nurWerkzeug: shape.nurWerkzeug ?? k.nurWerkzeug,
+        };
+      }
+    }
     const material = new THREE.MeshStandardMaterial({
-      color: shape.color,
-      roughness: materialId === "copper" || materialId === "alu" ? 0.35 : 0.75,
+      color: shape.bau ? 0xffffff : shape.color,
+      vertexColors: !!shape.bau,
+      roughness:
+        materialId === "copper" || materialId === "brass" || materialId === "alu" ? 0.35 : 0.75,
       metalness: NICHTMETALLE.has(materialId) || materialId === "cable" ? 0 : 0.4,
     });
     let geo: THREE.BufferGeometry;
@@ -600,6 +928,19 @@ export class ItemManager {
         RAPIER.ColliderDesc.convexHull(pos.array as Float32Array) ??
         RAPIER.ColliderDesc.ball(r * 0.95);
     }
+    /*
+     * Der Bau ersetzt nur das Aussehen. Der Kollider bleibt der Grundkoerper
+     * aus dem Katalog — Physik und Aussehen sind getrennt, und das Aussehen
+     * darf darum beliebig fein werden, ohne dass die Physik teurer wird.
+     */
+    let glasGeo: THREE.BufferGeometry | null = null;
+    if (shape.bau) {
+      geo.dispose();
+      const bauteil = baueGeometrie(shape.bau, shape.dims, shape.kind);
+      geo = bauteil.koerper;
+      glasGeo = bauteil.glas;
+    }
+
     const isWire = shape.kind === "wire";
     const mesh = new THREE.Mesh(
       geo,
@@ -612,6 +953,20 @@ export class ItemManager {
       const inner = new THREE.Mesh(new THREE.IcosahedronGeometry(shape.dims[0] * 0.7, 1), mesh.material);
       inner.rotation.set(0.7, 1.3, 0.4);
       mesh.add(inner);
+    }
+    /*
+     * Scheiben haengen als eigenes Kind am Teil — nicht verschmolzen, sonst
+     * liessen sie sich nie entfernen. Das kostet einen zweiten Zeichenruf,
+     * aber nur bei Objekten, die ueberhaupt Fenster haben.
+     */
+    if (glasGeo) {
+      if (shape.glasKaputt) {
+        glasGeo.dispose();
+      } else {
+        const scheibe = new THREE.Mesh(glasGeo, glasStoff());
+        scheibe.name = "glas";
+        mesh.add(scheibe);
+      }
     }
     mesh.castShadow = true;
     mesh.receiveShadow = true;
@@ -652,7 +1007,16 @@ export class ItemManager {
         ),
       body
     );
-    return this.register({ materialId, massKg, mesh, body, shape });
+    /*
+     * Die Zusammensetzung wandert als absolute Massen ans Teil. Sie stand
+     * bisher nur im Katalog, und damit wusste ein Kuehlschrott-Teil im Spiel
+     * nicht, woraus es besteht — die Presse rechnete die Reinheit eines
+     * Pakets aus lauter Einzelstuecken, als waere jedes sortenrein.
+     */
+    const composition = shape.zusammensetzung
+      ? shape.zusammensetzung.map((a) => ({ materialId: a.materialId, massKg: a.anteil * massKg }))
+      : undefined;
+    return this.register({ materialId, massKg, mesh, body, shape, composition });
   }
 
   /**
@@ -662,9 +1026,33 @@ export class ItemManager {
    * Die Teile werden überlappungsfrei gesetzt: klemmen sie beim Spawn
    * ineinander, schleudert die Physik sie über den halben Platz.
    */
-  spawnPile(pileCenter: THREE.Vector3, count = 150, spread = 4.0): void {
+  /*
+   * `spread` ist der Radius, ueber den der Haufen verteilt wird. Er stand auf
+   * 4,0 m. Mit dem erweiterten Sortiment sind die Stuecke im Mittel sperriger,
+   * und bei gleicher Flaeche fand ein Fuenftel keinen Platz mehr. Die
+   * Stahlschrottflaeche misst 11 x 12 m — fuer 5,2 m Radius ist also Platz.
+   *
+   * `count` stand auf 150. Die Stuecke aus dem Objektkatalog haben realistische
+   * Massen, und damit wog der Starthaufen ploetzlich 17,6 t — ueber der
+   * Stauschwelle von 16 t. Der Platz waere mit geschlossener Einfahrt
+   * gestartet, und nicht einmal der Tutorial-Kunde waere hereingekommen.
+   * Weniger Stuecke, dafuer schwerere: Das Gesamtgewicht bleibt, wo die
+   * Wirtschaft es erwartet, ohne dass an ihr gedreht wird.
+   */
+  spawnPile(pileCenter: THREE.Vector3, count = 85, spread = 5.2): void {
     const placed: Array<{ x: number; y: number; z: number; r: number }> = [];
-    const specs = randomCargo(count, 0.45);
+    /*
+     * Anteil Grossteile im Starthaufen.
+     *
+     * Stand auf 0,45. Seit der Objektkatalog dazugekommen ist, enthaelt
+     * BIG_SPECS auch Baggerausleger, Schuttmulden und Kipperbruecken — Stuecke
+     * von ueber drei Metern. Mit 45 Prozent davon fand fast die Haelfte der
+     * Teile keinen Platz mehr (gemessen: 64 statt ueber 90 von 150), und der
+     * Haufen sah aus wie ein Maschinenfriedhof statt wie ein Schrotthaufen.
+     * Grossteile kommen jetzt vor allem mit den Anlieferungen; im Starthaufen
+     * liegen ein paar davon, nicht die Haelfte.
+     */
+    const specs = randomCargo(count, 0.12);
     for (const s of specs) {
       // Umkugel, nicht halbe Kantenlaenge: Ein Teil wird zufaellig verdreht
       // gesetzt, also zaehlt der groesste Abstand von der Mitte zur Ecke. Die
@@ -723,13 +1111,30 @@ export class ItemManager {
    * Stahlschrott — Träger und dicke Platten — nicht: den bekommt man nur in
    * der Presse klein.
    */
+  /**
+   * Laesst sich das Ding zusammendruecken — in der Spinne wie in der Presse?
+   *
+   * Die Regel steht in materials/purity.ts und rechnet mit Dichte und Dicke:
+   * Was hohl ist, geht zusammen; was massiv ist, bleibt (Ansage 12.09.2026:
+   * "starre und massive Traeger sollten von der Presse unberuehrt bleiben").
+   */
+  /** Faellt das Ding beim Zusammendruecken auseinander? */
+  istTrennbar(item: ScrapItem): boolean {
+    return (
+      !!item.shape?.trennbar &&
+      !item.shape?.nurWerkzeug &&
+      (item.composition?.length ?? 0) >= 2
+    );
+  }
+
+  /** Trennbar, aber nur mit Werkzeug — Arbeit fuer den Platzwart. */
+  brauchtWerkzeug(item: ScrapItem): boolean {
+    return !!item.shape?.trennbar && !!item.shape?.nurWerkzeug;
+  }
+
   isCrushable(item: ScrapItem): boolean {
     if (!item.shape || item.shape.flat) return false;
-    if (item.materialId !== "steel") return true;
-    // Stahl gibt nur nach, solange er dünn und leicht ist (Blech statt Träger)
-    const dims = item.shape.dims;
-    const dickste = Math.min(...dims);
-    return item.massKg < 140 && dickste < 0.22;
+    return istPressbar(item.massKg, item.shape.dims);
   }
 
   /**
@@ -738,60 +1143,116 @@ export class ItemManager {
    * fasst. Die zerknautschte Oberfläche entsteht aus einem verrauschten
    * Quader — glatt sähe es aus wie ein Umzugskarton.
    */
+  /**
+   * Presspaket.
+   *
+   * Ein Paket ist kein Quader von der Stange (Wunsch 12.09.2026): „Je Material
+   * und Stauchung sollten die farblich anders fransen, aussehen und
+   * unterschiedlich gross sein." Drei Dinge richten sich deshalb nach dem, was
+   * hineingegangen ist:
+   *
+   * - **Dichte** — Alu und Kupfer lassen sich weich zusammenschieben und
+   *   ergeben ein dichtes, kleines Paket. Stahl federt zurueck, VA ist stur,
+   *   Kabel bleibt ein Knaeuel. Bei gleicher Masse kommt darum ein sehr
+   *   unterschiedlich grosser Wuerfel heraus.
+   * - **Fransen** — wie viele, wie lang, wie duenn. Ein Kabelpaket haengt
+   *   ueberall voll Schwaenze, ein Alupaket ist fast glatt.
+   * - **Farbe** — nicht die dominante Fraktion, sondern Flecken aus allem, was
+   *   drin ist, gewichtet nach Masse. Ein gemischtes Paket ist auch bunt.
+   *
+   * Dazu eine Toleranz von rund einem Zehntel auf Groesse und Seitenverhaeltnis:
+   * Zwei Pakete aus derselben Fuhre sehen nie gleich aus.
+   *
+   * Alles wird zu **einer** Geometrie verschmolzen, die Farben stecken in den
+   * Eckpunkten. Ein Paket mit vierzehn Fransen kostet damit einen Zeichenruf
+   * statt fuenfzehn.
+   */
   spawnBale(
     materialId: string,
     massKg: number,
     pos: THREE.Vector3,
     composition?: Array<{ materialId: string; massKg: number }>
   ): ScrapItem {
-    // Richtwert: rund 1,2 t je Kubikmeter Paket
-    const vol = THREE.MathUtils.clamp(massKg / 1200, 0.12, 1.5);
+    const profil = PRESSPROFIL[materialId] ?? PRESSPROFIL.steel;
+    const streu = (a: number): number => (Math.random() - 0.5) * 2 * a;
+
+    /*
+     * Groesse aus Dichte und Masse, mit Toleranz.
+     *
+     * Die Toleranz war zuerst zu breit: plus/minus zwoelf Prozent auf jede
+     * Kante ergeben zusammen einen Faktor zwei aufs Volumen — damit kam ein
+     * Alupaket groesser heraus als ein Stahlpaket, obwohl Alu dichter presst
+     * (gemessen 12.09.2026: 0,86 gegen 0,54 Kubikmeter bei je 900 kg). Die
+     * Streuung soll zwei Pakete derselben Fuhre unterscheiden, nicht die
+     * Materialien vertauschen. Jetzt rund plus/minus fuenfzehn Prozent aufs
+     * Volumen, waehrend die Dichten von 540 bis 1900 reichen.
+     */
+    const vol = THREE.MathUtils.clamp(massKg / (profil.dichte * (1 + streu(0.05))), 0.1, 1.8);
     const w = Math.cbrt(vol);
-    const dims: [number, number, number] = [w * 1.25, w * 0.85, w];
-    const geo = new THREE.BoxGeometry(dims[0], dims[1], dims[2], 3, 2, 3);
+    const dims: [number, number, number] = [
+      w * (1.25 + streu(0.06)),
+      w * (0.85 + streu(0.06)),
+      w * (1.0 + streu(0.05)),
+    ];
+
+    // Farbanteile nach Masse — daraus werden die Flecken und die Fransen
+    const anteile = (composition ?? [{ materialId, massKg }]).filter((c) => c.massKg > 0);
+    const summe = anteile.reduce((a, c) => a + c.massKg, 0) || 1;
+    const paletteFarben = anteile.map((c) => getMaterial(c.materialId).color);
+    const paletteAnteil = anteile.map((c) => c.massKg / summe);
+    const waehleFarbe = (r: number): number => {
+      let acc = 0;
+      for (let i = 0; i < paletteFarben.length; i++) {
+        acc += paletteAnteil[i];
+        if (r <= acc) return paletteFarben[i];
+      }
+      return paletteFarben[paletteFarben.length - 1] ?? getMaterial(materialId).color;
+    };
+
+    const stuecke: THREE.BufferGeometry[] = [];
+    const farbeHilf = new THREE.Color();
+    const faerbe = (geo: THREE.BufferGeometry, waehler: (i: number) => number): void => {
+      const p2 = geo.getAttribute("position");
+      const c = new Float32Array(p2.count * 3);
+      for (let i = 0; i < p2.count; i++) {
+        farbeHilf.set(waehler(i));
+        c[i * 3] = farbeHilf.r;
+        c[i * 3 + 1] = farbeHilf.g;
+        c[i * 3 + 2] = farbeHilf.b;
+      }
+      geo.setAttribute("color", new THREE.BufferAttribute(c, 3));
+      geo.deleteAttribute("uv1");
+      stuecke.push(geo);
+    };
+
+    // Koerper: gebeult, und die Beule ist materialabhaengig
+    const geo = new THREE.BoxGeometry(dims[0], dims[1], dims[2], 4, 3, 4);
     const p = geo.getAttribute("position") as THREE.BufferAttribute;
     for (let i = 0; i < p.count; i++) {
-      // Kraeftiger verbeult als frueher: Ein Paket kommt nicht glatt aus der
-      // Kammer, es quillt an den Kanten.
-      const n = 0.1 * w;
-      p.setXYZ(
-        i,
-        p.getX(i) + (Math.random() - 0.5) * n,
-        p.getY(i) + (Math.random() - 0.5) * n,
-        p.getZ(i) + (Math.random() - 0.5) * n
-      );
+      const n = profil.beule * w;
+      p.setXYZ(i, p.getX(i) + streu(n), p.getY(i) + streu(n), p.getZ(i) + streu(n));
     }
     geo.computeVertexNormals();
-    const mat = getMaterial(materialId);
-    const mesh = new THREE.Mesh(
-      geo,
-      new THREE.MeshStandardMaterial({ color: mat.color, roughness: 0.9, metalness: 0.3 })
-    );
-    /*
-     * Ein Presspaket ist kein sauberes Paket (Wunsch 11.09.2026): Aus den
-     * Kanten haengen Blechfetzen, Rohrenden und Kabelschwaenze heraus, und man
-     * sieht noch, woraus es gepresst wurde. Die Fransen tragen deshalb die
-     * Farben der Zusammensetzung — ein gemischtes Paket ist auch bunt.
-     */
-    const farben = (composition ?? [{ materialId, massKg }])
-      .filter((c) => c.massKg > 0)
-      .map((c) => getMaterial(c.materialId).color);
-    const fransen = 5 + Math.floor(Math.random() * 5);
+    // Flecken: benachbarte Eckpunkte bekommen dieselbe Farbe, sonst flimmert es
+    faerbe(geo, (i) => {
+      const x = p.getX(i);
+      const y = p.getY(i);
+      const z = p.getZ(i);
+      const k = Math.abs(Math.sin(x * 12.1 + y * 7.3 + z * 9.7) * 43758.5);
+      return waehleFarbe(k - Math.floor(k));
+    });
+
+    // Fransen: Zahl, Laenge und Dicke nach Profil
+    const fransen = profil.fransen[0] + Math.floor(Math.random() * (profil.fransen[1] - profil.fransen[0] + 1));
+    const [hx, hy, hz] = [dims[0] / 2, dims[1] / 2, dims[2] / 2];
+    const rand = (a: number): number => (Math.random() - 0.5) * a;
     for (let i = 0; i < fransen; i++) {
-      const lang = w * (0.3 + Math.random() * 0.5);
-      const duenn = w * (0.03 + Math.random() * 0.06);
-      const zipfel = new THREE.Mesh(
-        new THREE.BoxGeometry(duenn, duenn * (0.5 + Math.random()), lang),
-        new THREE.MeshStandardMaterial({
-          color: farben[Math.floor(Math.random() * farben.length)] ?? mat.color,
-          roughness: 0.95,
-          metalness: 0.25,
-        })
-      );
-      // Aus einer Seitenflaeche heraus, schraeg — nicht ordentlich angesetzt
-      const seite = Math.floor(Math.random() * 6);
-      const rand = (a: number): number => (Math.random() - 0.5) * a;
-      const [hx, hy, hz] = [dims[0] / 2, dims[1] / 2, dims[2] / 2];
+      const lang = w * profil.lang * (0.6 + Math.random() * 0.8);
+      const duenn = w * profil.dick * (0.6 + Math.random() * 0.9);
+      const zipfel = new THREE.BoxGeometry(duenn, duenn * (0.5 + Math.random()), lang);
+      zipfel.rotateX(Math.random() * Math.PI);
+      zipfel.rotateY(Math.random() * Math.PI);
+      zipfel.rotateZ(Math.random() * Math.PI);
       const punkte: Array<[number, number, number]> = [
         [hx, rand(dims[1]), rand(dims[2])],
         [-hx, rand(dims[1]), rand(dims[2])],
@@ -800,16 +1261,26 @@ export class ItemManager {
         [rand(dims[0]), rand(dims[1]), hz],
         [rand(dims[0]), rand(dims[1]), -hz],
       ];
-      const [px, py, pz] = punkte[seite];
-      zipfel.position.set(px * 0.92, py * 0.92, pz * 0.92);
-      zipfel.rotation.set(
-        Math.random() * Math.PI,
-        Math.random() * Math.PI,
-        Math.random() * Math.PI
-      );
-      zipfel.castShadow = true;
-      mesh.add(zipfel);
+      const [px, py, pz] = punkte[Math.floor(Math.random() * 6)];
+      zipfel.translate(px * 0.92, py * 0.92, pz * 0.92);
+      const farbe = waehleFarbe(Math.random());
+      faerbe(zipfel, () => farbe);
     }
+
+    const gesamt = mergeGeometries(stuecke, false) ?? geo;
+    gesamt.computeVertexNormals();
+    for (const g2 of stuecke) if (g2 !== gesamt) g2.dispose();
+
+    const mat = getMaterial(materialId);
+    const mesh = new THREE.Mesh(
+      gesamt,
+      new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        vertexColors: true,
+        roughness: profil.rauheit,
+        metalness: profil.glanz,
+      })
+    );
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     this.scene.add(mesh);
@@ -842,6 +1313,8 @@ export class ItemManager {
   /** Teil in der Presse plattdrücken: Mesh stauchen, Kollider tauschen. */
   flattenItem(item: ScrapItem): boolean {
     if (!item.shape || item.shape.flat) return false;
+    // Was in die Presse geht, hat danach keine Scheiben mehr.
+    this.zerbrichGlas(item);
     item.shape.flat = true;
     // Zusätzlich leicht in die Breite gehen — gequetschtes Metall quillt aus
     item.mesh.scale.y = item.shape.kind === "wire" ? 0.5 : FLAT_SCALE_Y;
@@ -974,6 +1447,70 @@ export class ItemManager {
    * @param wucht Tempoverlust in m/s — daraus macht der Ton die Lautstaerke
    */
   onAufprall: ((item: ScrapItem, wucht: number) => void) | null = null;
+  /** Eine Scheibe ist zersprungen — Ort fuer Klang und Splitter. */
+  onGlasBruch: ((x: number, y: number, z: number) => void) | null = null;
+
+  /**
+   * Ein Verbundteil in seine Fraktionen zerlegen.
+   *
+   * Das Stueck verschwindet und an seiner Stelle liegen so viele neue, wie es
+   * Bestandteile hatte — jedes sortenrein und darum mehr wert. Anteile unter
+   * fuenf Prozent fallen unter den Tisch: Ein Gramm Kupfer als eigenes Teil
+   * herumliegen zu lassen, hilft niemandem.
+   */
+  zerlege(item: ScrapItem): ScrapItem[] | null {
+    const shape = item.shape;
+    if (!shape?.trennbar || !item.composition || item.composition.length < 2) return null;
+    const p = item.body.translation();
+    const summe = item.composition.reduce((a, c) => a + c.massKg, 0);
+    if (summe <= 0) return null;
+    const grosse = item.composition.filter((c) => c.massKg / summe >= 0.05);
+    if (grosse.length < 2) return null;
+    /*
+     * Die Reste werden auf die verbleibenden Fraktionen verteilt, nicht
+     * weggeworfen: Sonst verschwaende beim Zerlegen stillschweigend Masse —
+     * beim Elektromotor waeren das die vier Prozent Alu. Was zu klein fuer ein
+     * eigenes Stueck ist, bleibt eben am groesseren haengen.
+     */
+    const rest = grosse.reduce((a, c) => a + c.massKg, 0);
+    const teile: Array<{ materialId: string; massKg: number }> = grosse.map((c) => ({
+      materialId: c.materialId,
+      massKg: (c.massKg / rest) * item.massKg,
+    }));
+
+    this.remove(item);
+    const neu: ScrapItem[] = [];
+    teile.forEach((c, i) => {
+      const winkel = (i / teile.length) * Math.PI * 2;
+      const ort = new THREE.Vector3(
+        p.x + Math.cos(winkel) * 0.45,
+        p.y + 0.25,
+        p.z + Math.sin(winkel) * 0.45
+      );
+      neu.push(
+        this.spawnScrap(c.materialId, c.massKg, trennForm(c.materialId, c.massKg, shape.name), ort)
+      );
+    });
+    return neu;
+  }
+
+  /**
+   * Scheiben zerspringen lassen. Gibt true zurueck, wenn tatsaechlich etwas
+   * kaputtgegangen ist — sonst wuerde bei jedem Anstossen ein Klirren kommen,
+   * auch beim zwanzigsten Mal am selben Wrack.
+   */
+  zerbrichGlas(item: ScrapItem): boolean {
+    if (!item.shape || item.shape.glasKaputt) return false;
+    const scheibe = item.mesh.getObjectByName("glas") as THREE.Mesh | undefined;
+    if (!scheibe) return false;
+    const ort = new THREE.Vector3();
+    scheibe.getWorldPosition(ort);
+    scheibe.removeFromParent();
+    scheibe.geometry.dispose();
+    item.shape.glasKaputt = true;
+    this.onGlasBruch?.(ort.x, ort.y, ort.z);
+    return true;
+  }
   /**
    * Messschalter: Mit `true` gilt die Zuwachsgrenze nicht mehr. Nur fuer den
    * Vorher-Nachher-Vergleich im Labor; im Spiel bleibt sie an.
@@ -1029,7 +1566,13 @@ export class ItemManager {
       // Schwerkraft und keine Uebertragung aus der Spinne.
       const quer = Math.hypot(v.x, v.z);
       const f = quer > maxLinear ? maxLinear / quer : 1;
-      const y = Math.min(Math.max(v.y, -FALL_MAX), maxLinear);
+      /*
+       * Nach oben noch enger als quer. Ein geschobenes Teil rutscht und
+       * kippt; es huepft nicht auf. Die Aufwaertsspitzen kamen fast alle aus
+       * dem Loeser, nicht aus dem Spiel — zusammen mit dem Querwert ergaben
+       * zwei volle Grenzen die gemessenen 9,33 m/s.
+       */
+      const y = Math.min(Math.max(v.y, -FALL_MAX), maxLinear * 0.55);
       if (f < 1 || y !== v.y) {
         item.body.setLinvel({ x: v.x * f, y, z: v.z * f }, true);
       }
@@ -1052,6 +1595,8 @@ export class ItemManager {
             this.letzterAufprall.set(handle, this.aufprallUhr);
             this.onAufprall(item, verlust);
           }
+          // Glas ist empfindlicher als das Ohr: Es bricht schon darunter.
+          if (verlust > GLAS_BRUCH_DV) this.zerbrichGlas(item);
         }
         this.gesamtVorher.set(handle, jetztGesamt);
       }

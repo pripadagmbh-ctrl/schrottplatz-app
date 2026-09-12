@@ -96,15 +96,35 @@ const STICK_MAX = THREE.MathUtils.degToRad(-25);
 const DRIVE_MAX = 1.4; // m/s ≈ 5 km/h
 const STEER_RATE = 0.7; // rad/s
 /*
- * Drehwerk. Ein Umschlagbagger dieser Groesse dreht mit 7 bis 9 Umdrehungen
- * je Minute, also 42 bis 54 Grad je Sekunde. Mit 30 Grad war der Turm am
- * unteren Ende und fuehlte sich zaeh an (Befund 11.09.2026). Schwer wirkt die
- * Maschine ueber die Rampe, nicht ueber ein niedriges Endtempo: Sie laeuft
- * traege an und kommt traege zur Ruhe — nur eben zu einem ordentlichen Tempo.
+ * Drehwerk.
+ *
+ * Das Datenblatt einer solchen Maschine nennt 7 bis 9 Umdrehungen je Minute,
+ * also 42 bis 54 Grad je Sekunde. Das ist aber das **Hoechste, was sie kann**,
+ * und ein Fahrer benutzt es fast nie: Er zieht den Hebel so weit, wie er die
+ * Last noch im Griff hat. Im Spiel gibt es diesen Unterschied nicht — die
+ * Taste kennt nur ganz oder gar nicht, und damit faehrt der Spieler staendig
+ * Anschlag. Das Endtempo muss darum ein Arbeitstempo sein, nicht das Maximum
+ * der Maschine.
+ *
+ * 45 Grad je Sekunde waren zu viel. Danach ging es auf 36 und dann auf 28 —
+ * beides Reaktionen auf "zu schnell", beide falsch abgeleitet: Beurteilt
+ * wurde eine Maschine, die 0,5 s zum Anlaufen brauchte und deren Rampe in
+ * beide Richtungen weich war. Die kroch los und riss dann. Nicht das
+ * Endtempo war zu hoch, die Reaktion war zu traege.
+ *
+ * Danach zurueck auf 36 gestellt mit der Begruendung, die traege Reaktion sei
+ * die Ursache gewesen. War sie nicht: "das Drehwerk ist zu schnell, das merke
+ * ich doch" (11.09.2026). Wer faehrt, hat recht. 28 Grad je Sekunde, knapp
+ * fuenf Umdrehungen je Minute; die Spitze laeuft damit auf 8 m Radius mit
+ * 3,8 m/s, also 14 km/h.
+ *
+ * Das frueher gemeldete "zu langsam" galt nicht dem Grundtempo, sondern der
+ * Last: "alles bis vier, fuenf Tonnen sollte kein Problem sein". Dafuer
+ * sorgt tempoFaktor, nicht CAB_MAX.
  */
-export const CAB_MAX = THREE.MathUtils.degToRad(45);
+export const CAB_MAX = THREE.MathUtils.degToRad(28);
 const BOOM_RATE = THREE.MathUtils.degToRad(19);
-const STICK_RATE = THREE.MathUtils.degToRad(23);
+const STICK_RATE = THREE.MathUtils.degToRad(24);
 const ROTATOR_STEP = THREE.MathUtils.degToRad(15); // pro Mausrad-Raste
 /**
  * Dauerdrehung des Rotators. Vorher wurde je Bild ein fester Winkel addiert,
@@ -113,7 +133,13 @@ const ROTATOR_STEP = THREE.MathUtils.degToRad(15); // pro Mausrad-Raste
  * dass es jemand so gebaut hätte. Jetzt zeitbasiert, und deutlich zügiger:
  * Ein Schrottgreifer dreht die Ladung flott in die Mulde, er zirkelt nicht.
  */
-const ROTATOR_SPEED = THREE.MathUtils.degToRad(160); // rad/s
+/*
+ * Gemessen am 11.09.2026: 160 Grad je Sekunde drehen die Ladung so schnell
+ * herum, dass jede Bewegung nach Zappeln aussieht. Ein Rotator unter Last
+ * dreht spuerbar langsamer als frei; 105 Grad je Sekunde sind zuegig genug,
+ * um die Mulde zu treffen, ohne dass die Ladung herumgeschleudert wird.
+ */
+const ROTATOR_SPEED = THREE.MathUtils.degToRad(120); // rad/s
 /**
  * Last und Tempo.
  *
@@ -163,19 +189,61 @@ const ANSCHLAG_GRAD = THREE.MathUtils.degToRad(4.5);
 /** Wie lange der Rueckprall nachschwingt (s) */
 const ANSCHLAG_S = 0.22;
 
+/** Um so viel traeger laeuft der Arm an, wenn er ganz im Material steckt */
+const PFLUG_TRAEGHEIT = 1.5;
+/** Zeitkonstante, mit der die Spitzenbeschleunigung fuers Pendel geglaettet wird (s) */
+const ACC_GLAETTUNG_S = 0.09;
+/**
+ * Zusaetzliche Rueckstellung des Kardangelenks, als Vielfaches der
+ * Schwerkraftrueckstellung. 1 halbiert den Ausschlag gegenueber einem frei
+ * haengenden Pendel.
+ */
+const GELENK_STEIFE = 1.0;
+/** Dämpfung des Pendels leer und bei Nennlast */
+const PENDEL_DAEMPFUNG_LEER = 5.0;
+const PENDEL_DAEMPFUNG_LAST = 4.0;
+/** Groesster Ausschlag je Achse (rad) — darueber wird es zur Abrissbirne */
+const PENDEL_MAX = THREE.MathUtils.degToRad(17);
+
 /** Halbe Breite des Unterwagens — damit rechnet die Fahrzeugsperre. */
 const UNTERWAGEN_R = 2.6;
 
 const CLOSE_TIME = 0.4; // s (SW)
 const OPEN_TIME = 0.3; // s (SW)
-const RAMP_TIME = 0.38; // s Anlauf-/Auslauframpe — traeger, die Masse ist zu spueren
+/*
+ * Anlauf- und Auslauframpe.
+ *
+ * War 0,38, wurde im Lauf des 11.09.2026 auf 0,5 erhoeht, um die Maschine
+ * schwer wirken zu lassen. Zusammen mit einem halbierten Endtempo, weichen
+ * Rampenecken und einem beissenden Pflugwiderstand wurde daraus aber zaeh
+ * statt schwer ("die Mechanik ist im Verlauf schlechter geworden").
+ *
+ * Schwer heisst nicht langsam, sondern: sofort reagieren und dabei Masse
+ * haben. Die Masse steckt im Pendel, im Pfluegen und im Auslauf — nicht
+ * darin, dass der Hebel erst mal nichts tut. 0,3 s.
+ */
+const RAMP_TIME = 0.3;
 const CAB_LIFT_MAX = 2.6; // m Kabinenhub für besseren Überblick (SW)
 const CAB_LIFT_SPEED = 0.75; // m/s (SW)
 
 export class Excavator {
   // Spielzustand
   // Standplatz mittig: Stahlhaufen links, Boxenreihe rechts, Presse hinten
-  readonly position = new THREE.Vector3(0, 0, -1);
+  /**
+  * Standplatz: vor der Presse, Blick nach Norden zu Janine (Ansage
+  * 12.09.2026). Von hier liegt die Presse bei +180°, der Stahlcontainer bei
+  * +93°, der Mischschrott bei −116°.
+  */
+  /*
+   * So dicht an den Stahlcontainern, wie der Arm es zulaesst.
+   *
+   * Gewuenscht waren 20 bis 50 cm Luft (12.09.2026). Das geht nicht: Der Arm
+   * hat einen Mindestradius von 4,0 m — naeher kommt die Krallenspitze gar
+   * nicht auf den Boden. Bei 0,5 m Abstand stuende die Maschine am Container
+   * und koennte ihn nicht befuellen. 4,0 m ist die Untergrenze, und genau
+   * darauf steht sie jetzt.
+   */
+  readonly position = new THREE.Vector3(-2.0, 0, -19.5);
   heading = 0; // rad, 0 = +Z
   cabYaw = 0;
   boomAngle = THREE.MathUtils.degToRad(35);
@@ -279,6 +347,8 @@ export class Excavator {
   // Pendel der Spinne am Kardan-Gelenk (x: Kippen um Welt-X, y: um Welt-Z)
   private swing = new THREE.Vector2();
   private swingVel = new THREE.Vector2();
+  /** Geglaettete Beschleunigung der Stielspitze (m/s²) */
+  private tipAcc = new THREE.Vector2();
   private prevTip = new THREE.Vector3();
   private prevTipVel = new THREE.Vector3();
   private pendulumInit = false;
@@ -658,8 +728,14 @@ export class Excavator {
   }
   /** Abstützpratzen: eingefahren (0) bis ausgefahren (1), Taste O */
   private outriggerGroups: THREE.Group[] = [];
-  private outriggerDown = 1;
-  private outriggerTarget = 1;
+  /*
+   * Eingefahren beim Start (Ansage 12.09.2026: „die Stützen sollen immer oben
+   * sein, damit man grade am Anfang des Spiels direkt losfahren kann"). Auf
+   * ausgefahrenen Stützen ist das Fahren gesperrt — wer neu anfängt, drückte
+   * sonst auf Gas und verstand nicht, warum nichts passiert.
+   */
+  private outriggerDown = 0;
+  private outriggerTarget = 0;
   /** true, solange der Spieler auf Stützen zu fahren versucht (für HUD/Ton) */
   blockedByOutriggers = false;
   /** Aufbockhöhe: so weit hebt sich die Maschine auf den Stützen (m) */
@@ -908,12 +984,23 @@ export class Excavator {
       [-1, -1],
       [1, -1],
     ] as const) {
-      // Ansatz am Unterwagen → Fußpunkt schräg nach außen unten
-      const from = new THREE.Vector3(sx * 1.05, 0.95, sz * 1.5);
-      const to = new THREE.Vector3(sx * 2.35, 0.62, sz * 2.5);
+      /*
+       * Kurze Pratzen, gerade zur Seite (Ansage 12.09.2026: „einfach nur vom
+       * Bagger links und rechts weg … die duerften da keinen Meter weit
+       * rausgucken, sondern eher fuenfzig Zentimeter oder dreissig").
+       *
+       * Vorher spreizten sie sich diagonal nach aussen-hinten und standen
+       * 1,3 m ueber den Unterwagen hinaus — auf einem Platz, auf dem jetzt
+       * alles dicht beieinandersteht, war das die Maschine mit dem groessten
+       * Fussabdruck. Jetzt sind es massive Anbauteile: quer heraus, 45 cm
+       * ueber die Kante, und sie folgen der Laengsachse statt ins Kreuz zu
+       * gehen.
+       */
+      const from = new THREE.Vector3(sx * 1.05, 0.85, sz * 1.35);
+      const to = new THREE.Vector3(sx * 1.8, 0.7, sz * 1.35);
       const dir = to.clone().sub(from);
       const len = dir.length();
-      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.26, len), darkMat);
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.34, len + 0.3), darkMat);
       arm.position.copy(from).addScaledVector(dir.clone().normalize(), len / 2);
       arm.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir.clone().normalize());
       arm.castShadow = true;
@@ -923,14 +1010,21 @@ export class Excavator {
       foot.position.set(to.x, 0, to.z);
       this.root.add(foot);
       this.outriggerGroups.push(foot);
-      const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.5, 10), frameMat);
+      /*
+       * Eckig statt rund (Ansage 12.09.2026: „nicht so runde Stuetzen,
+       * sondern schmale herausstehende Stuetzen mit eckigen Bodenplatten").
+       * Ein Zylinder liest sich als Hydraulikstempel; hier soll es nach
+       * angeschweisstem Stahl aussehen, also ein schlankes Kastenprofil, das
+       * nach unten leicht zulaeuft.
+       */
+      const cyl = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.5, 0.26), frameMat);
       cyl.position.y = 0.42;
       cyl.castShadow = true;
       foot.add(cyl);
-      const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.35, 8), rodMat);
+      const rod = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.35, 0.17), rodMat);
       rod.position.y = 0.14;
       foot.add(rod);
-      const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.38, 0.14, 12), darkMat);
+      const pad = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.14, 0.62), darkMat);
       pad.position.y = 0.07;
       pad.castShadow = true;
       foot.add(pad);
@@ -1150,9 +1244,28 @@ export class Excavator {
     // Dazu kommt der Widerstand des Materials, durch das die Spinne gerade
     // pflügt — der bremst wirklich, denn dagegen arbeitet die Maschine.
     // Der Baggerausbau macht die Hydraulik schneller
+    /*
+     * Der Ausbau macht die Maschine wacher, nicht schneller.
+     *
+     * Vorher ging der Ausbaubonus aufs Endtempo. Gemessen am 11.09.2026 drehte
+     * das Drehwerk damit 60,8 statt der eingestellten 45 Grad je Sekunde, und
+     * die Spinne lief mit 9,2 m/s — 33 km/h auf 8,7 m Radius. Das war das
+     * "zu wild". Das Endtempo ist eine Eigenschaft der Maschine und bleibt
+     * darum, wo es hingehoert (42 bis 54 Grad je Sekunde, siehe CAB_MAX); der
+     * Bonus verkuerzt stattdessen die Rampe, die Maschine spricht also
+     * schneller an.
+     */
     const ausbau = this.getSpeedBonus?.() ?? 1;
-    const carried = tempoFaktor(this.carriedMassKg) * ausbau;
-    const rampe = anlaufZeit(this.carriedMassKg);
+    const carried = tempoFaktor(this.carriedMassKg);
+    /*
+     * Im Material kommt die Maschine auch langsamer in Fahrt, nicht nur
+     * langsamer voran. Vorher bremste das Pfluegen nur das Endtempo — der
+     * Arm sprang also genauso munter an und war bloss frueher fertig. Das
+     * las sich wie ein Spielzeug, das durch Watte faehrt.
+     */
+    const rampe =
+      (anlaufZeit(this.carriedMassKg) / ausbau) *
+      THREE.MathUtils.lerp(1, PFLUG_TRAEGHEIT, 1 - this.plowFactor);
     this.plowFactor += (this.collision.plowFactor() - this.plowFactor) * Math.min(dt * 6, 1);
     const loadFactor = carried * this.plowFactor;
     // Zustand vor der Bewegung merken (für die Fahrzeug-Sperre unten)
@@ -1872,14 +1985,43 @@ export class Excavator {
     this.prevTipVel.set(velX, 0, velZ);
     this.prevTip.copy(tip);
 
+    /*
+     * Die Beschleunigung wird zweimal aus Positionsdifferenzen gebildet, und
+     * das rauscht: Gemessen am 11.09.2026 zitterte die Spinne im gleichmaessigen
+     * Schwenk um ±3,5 Grad, obwohl ein gedaempftes Pendel unter
+     * gleichbleibender Fliehkraft ruhig stehen muss. Das war Zahlenrauschen,
+     * keine Physik. Darum wird die Beschleunigung geglaettet, bevor sie das
+     * Pendel antreibt.
+     */
+    const glatt = Math.min(dt / ACC_GLAETTUNG_S, 1);
+    this.tipAcc.x += (ax - this.tipAcc.x) * glatt;
+    this.tipAcc.y += (az - this.tipAcc.y) * glatt;
+
     const L = 1.5; // wirksame Pendellänge Gelenk→Lastschwerpunkt (SW)
     const G = 9.81;
+    /*
+     * Rueckstellung: Schwerkraft **und** Gelenk.
+     *
+     * Ein frei haengendes Pendel stellt sich bei 45 Grad Schwenk auf gut
+     * 27 Grad schraeg (gemessen) — rechnerisch richtig, sieht aber aus wie
+     * eine Abrissbirne. Eine echte Spinne haengt nicht frei: Im Kardangelenk
+     * sitzt Reibung, und der Schlauchbaum zieht sie zurueck. Das ist hier als
+     * zusaetzliche Rueckstellung modelliert; sie halbiert den Ausschlag,
+     * ohne das Pendeln als solches wegzunehmen.
+     */
+    const rueck = (G / L) * (1 + GELENK_STEIFE);
     // schwere Last: weniger Dämpfung → längeres Nachpendeln (SW)
-    const damping = THREE.MathUtils.lerp(2.4, 0.9, Math.min(this.carriedMassKg / NENNLAST_KG, 1));
-    this.swingVel.x += (-(G / L) * Math.sin(this.swing.x) - damping * this.swingVel.x + az / L) * dt;
-    this.swingVel.y += (-(G / L) * Math.sin(this.swing.y) - damping * this.swingVel.y - ax / L) * dt;
-    this.swing.x = THREE.MathUtils.clamp(this.swing.x + this.swingVel.x * dt, -0.45, 0.45);
-    this.swing.y = THREE.MathUtils.clamp(this.swing.y + this.swingVel.y * dt, -0.45, 0.45);
+    const damping = THREE.MathUtils.lerp(
+      PENDEL_DAEMPFUNG_LEER,
+      PENDEL_DAEMPFUNG_LAST,
+      Math.min(this.carriedMassKg / NENNLAST_KG, 1)
+    );
+    this.swingVel.x +=
+      (-rueck * Math.sin(this.swing.x) - damping * this.swingVel.x + this.tipAcc.y / L) * dt;
+    this.swingVel.y +=
+      (-rueck * Math.sin(this.swing.y) - damping * this.swingVel.y - this.tipAcc.x / L) * dt;
+    this.swing.x = THREE.MathUtils.clamp(this.swing.x + this.swingVel.x * dt, -PENDEL_MAX, PENDEL_MAX);
+    this.swing.y = THREE.MathUtils.clamp(this.swing.y + this.swingVel.y * dt, -PENDEL_MAX, PENDEL_MAX);
     if (this.groundContact.active) {
       this.swing.multiplyScalar(0.75);
       this.swingVel.multiplyScalar(0.5);
@@ -2174,9 +2316,30 @@ export class Excavator {
 }
 
 /** Wert schrittweise Richtung Ziel bewegen (lineare Rampe). */
+/**
+ * Rampe mit weichen Ecken.
+ *
+ * Eine reine Gerade springt beim Loslassen von voller Beschleunigung auf
+ * null — genau dieser Knick liest sich als Ruck. Nahe am Ziel wird die
+ * Schrittweite darum kleiner: ein S statt einer Geraden. Die letzten rund
+ * zwoelf Schritte (0,2 s) laufen mit gedrosseltem Schritt aus, der Rest der
+ * Rampe bleibt unveraendert schnell.
+ */
 function ramp(current: number, target: number, maxStep: number): number {
   const diff = target - current;
-  return current + THREE.MathUtils.clamp(diff, -maxStep, maxStep);
+  if (Math.abs(diff) <= maxStep) return target;
+  /*
+   * Weiche Ecke nur beim Ausrollen, nicht beim Anfahren.
+   *
+   * Zuerst wurde in beide Richtungen gedaempft — damit fuehlte sich auch der
+   * Hebeldruck weich an, und die Maschine wirkte teigig statt schwer. Beim
+   * Anfahren soll sie sofort anliegen; nur der letzte Rest beim Ausrollen
+   * wird weich, denn dort sitzt der Ruck.
+   */
+  const bremst = Math.abs(target) < Math.abs(current);
+  if (!bremst) return current + Math.sign(diff) * maxStep;
+  const naehe = Math.min(1, Math.abs(diff) / (maxStep * 10));
+  return current + Math.sign(diff) * maxStep * (0.4 + 0.6 * naehe);
 }
 
 function clamp1(v: number): number {

@@ -1,5 +1,5 @@
 import { getMaterial } from "../materials/catalog";
-import { euroIndicator } from "../materials/purity";
+import { euroIndicator, masseText, preisProTonne } from "../materials/purity";
 import type { ScrapItem } from "../world/scrapItems";
 import type { AmpelState } from "../world/containers";
 
@@ -7,6 +7,38 @@ import type { AmpelState } from "../world/containers";
  * HUD M1 (Briefing Kap. 14): Griff-Info (Material, Gewicht, €-Indikator),
  * Sortierwert-Anzeige mit Ticker, Abwurf-Ampel-Text.
  */
+/**
+ * Ab dieser Masse wird ein Stueck beim Namen genannt statt nur nach Fraktion
+ * gezaehlt. Darunter sind es Bleche und Profile, bei denen der Name nichts
+ * hilft.
+ */
+const GROSS_AB_KG = 60;
+/** So viele Namen hoechstens — danach wird zusammengefasst. */
+const GROSS_MAX = 3;
+
+/**
+ * Woraus das Stueck vorwiegend besteht.
+ *
+ * Ansage 12.09.2026: „Bei Spinne sollte immer das Hauptmaterial wie Alu, VA
+ * etc. mit angezeigt werden." Bei sortenreinem Schrott ist das die Fraktion
+ * selbst; bei einem Verbundteil die groesste Fraktion darin — sonst stuende da
+ * nur „Mischschrott", und man wuesste nicht, ob man eine Waschmaschine oder
+ * einen Kupfermotor in der Schale hat.
+ */
+function hauptMaterial(item: ScrapItem): string {
+  const eigen = getMaterial(item.materialId).name;
+  if (!item.composition || item.composition.length === 0) return eigen;
+  let groesster = item.composition[0];
+  let summe = 0;
+  for (const c of item.composition) {
+    summe += c.massKg;
+    if (c.massKg > groesster.massKg) groesster = c;
+  }
+  if (groesster.materialId === item.materialId || summe <= 0) return eigen;
+  const anteil = Math.round((groesster.massKg / summe) * 100);
+  return `${eigen} · ${anteil} % ${getMaterial(groesster.materialId).name}`;
+}
+
 export class Hud {
   private gripEl = document.getElementById("gripinfo")!;
   private moneyEl = document.getElementById("money")!;
@@ -19,19 +51,50 @@ export class Hud {
       return;
     }
     const mat = getMaterial(item.materialId);
-    this.gripEl.textContent = `▼ ${mat.name} · ${item.massKg.toFixed(0)} kg · ${euroIndicator(mat)}`;
+    // Der Name zuerst: Man greift einen Kuehlschrank, nicht "Stahlschrott".
+    const name = item.shape?.name;
+    /*
+     * Material IMMER in Klammern hinter den Namen (Ansage 12.09.2026:
+     * „ich muss immer die Materialbeschreibung in Klammern beim Greifen
+     * sehen — Fluggasttreppe sagt nichts über das Material aus").
+     *
+     * Vorher stand es mit Mittelpunkt dahinter und las sich wie ein zweiter
+     * Name; in Klammern ist sofort klar, dass es die Stoffangabe ist.
+     */
+    const kopf = name ? `${name} (${hauptMaterial(item)})` : hauptMaterial(item);
+    this.gripEl.textContent =
+      `▼ ${kopf} · ${masseText(item.massKg)} · ${preisProTonne(mat)} ${euroIndicator(mat)}`;
   }
 
-  /** Griff-Info beim Tragen: Ladungsliste + Ampel. */
+  /**
+   * Griff-Info beim Tragen: Ladungsliste + Ampel.
+   *
+   * Grosse Stuecke werden beim Namen genannt, kleine nach Fraktion
+   * zusammengefasst (Wunsch 12.09.2026: „evtl. Listenbeschreibung einbauen, was
+   * in Spinne liegt, zumindest fuer grosse Teile"). Sonst stuende bei einer
+   * vollen Spinne eine Zeile aus zwoelf Namen da, die niemand liest.
+   */
   showCarry(items: ScrapItem[], hover: { container: string; ampel: AmpelState } | null): void {
     const byMat = new Map<string, number>();
+    const gross: string[] = [];
     let total = 0;
     for (const it of items) {
-      byMat.set(it.materialId, (byMat.get(it.materialId) ?? 0) + 1);
       total += it.massKg;
+      const name = it.shape?.name;
+      if (name && it.massKg >= GROSS_AB_KG && gross.length < GROSS_MAX) {
+        // Auch in der Ladungsliste: Name ohne Material sagt nichts.
+        gross.push(`${name} (${hauptMaterial(it)})`);
+        continue;
+      }
+      byMat.set(it.materialId, (byMat.get(it.materialId) ?? 0) + 1);
     }
-    const parts = [...byMat.entries()].map(([id, n]) => `${n}× ${getMaterial(id).name}`);
-    let text = `Greifer: ${parts.join(", ")} · ${total.toFixed(0)} kg`;
+    const parts = [
+      ...gross,
+      ...[...byMat.entries()].map(([id, n]) => `${n}× ${getMaterial(id).name}`),
+    ];
+    const gezeigt = parts.slice(0, GROSS_MAX + 2);
+    if (parts.length > gezeigt.length) gezeigt.push(`+${parts.length - gezeigt.length} weitere`);
+    let text = `Greifer: ${gezeigt.join(", ")} · ${masseText(total)}`;
     if (hover) {
       // Zielzone unter dem Greifer samt Bewertung — nicht das Material selbst
       const verdict =
@@ -83,7 +146,7 @@ export class Hud {
       return;
     }
     const balken = "█".repeat(Math.round(p / 10)) + "░".repeat(10 - Math.round(p / 10));
-    el.textContent = `${ziel}: ${Math.round(kg)} kg · ${balken} ${p} % sortenrein`;
+    el.textContent = `${ziel}: ${masseText(kg)} · ${balken} ${p} % sortenrein`;
     // Ab 90 % lohnt das Abfahren, darunter drückt die Reinheit den Preis
     el.style.color = p >= 90 ? "#7ec96a" : p >= 65 ? "#f0d060" : "#e08a5a";
   }

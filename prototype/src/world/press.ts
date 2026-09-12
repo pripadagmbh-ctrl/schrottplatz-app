@@ -1,6 +1,6 @@
 import * as THREE from "three";
-import { CONFIGS } from "./containers";
 import RAPIER from "@dimforge/rapier3d-compat";
+import { SORTENREIN_AB } from "../materials/purity";
 import type { ItemManager } from "./scrapItems";
 import type { CompositeManager } from "../dismantle/composites";
 
@@ -23,19 +23,32 @@ import type { CompositeManager } from "../dismantle/composites";
 // hinter der Maschine schnitt die Schere in die vorderste Sortiermulde;
 // hier steht sie frei neben dem Stahlschrotthaufen, und die offene Seite
 // bleibt in Reichweite (Design-Fix 29.08.2026).
-const CENTER = new THREE.Vector3(-8.5, 0, -7.0);
-/** Ab diesem Anteil einer Fraktion gilt ein Paket noch als sortenrein. */
-const SORTENREIN_AB = 0.92;
+// Seit der neuen Platzordnung (12.09.2026) steht sie an der Suedgrenze,
+// direkt hinter dem Bagger: „hinter mir die Presse im Sueden".
+// Kuerzer und ein Stueck zur Seite (Ansage 12.09.2026), damit der Bagger
+// naeher an den Mischschrottplatz rueckt. Und quergestellt: Sie lag vom Sitz
+// aus waagerecht im Bild und nahm die ganze Breite ein; hochkant steht sie in
+// einer Reihe mit Stahlmulde und Halde.
+const CENTER = new THREE.Vector3(-10.0, 0, -21.5);
+// Die Schwelle gilt fuer Objekte wie fuer Pakete — sie steht in materials/purity.ts.
 /**
- * Ballenlager: dorthin kommt, was fertig gepresst ist. Der Platz steht in
- * containers.ts — hier stand er ein zweites Mal und war seit dem Umbau falsch:
- * Die Pakete landeten unter dem Zylinderbock der Presse und liessen sich nicht
- * greifen (Befund 11.09.2026).
+ * Wo das fertige Paket liegen bleibt: in der Kammer.
+ *
+ * Es gibt kein Ballenlager mehr (Ansage 12.09.2026: „es gibt in dem Fall kein
+ * Ballenlager, gepresstes Material muss rausgebaggert werden"). Das Paket
+ * bleibt also da, wo es entstanden ist, und wandert von dort in den Behaelter
+ * seiner Fraktion — Stahlballen in den 40er, Alupaket in den Alucontainer.
+ * Solange es in der Kammer liegt, blockiert es die naechste Fuhre, und genau
+ * das soll es auch.
  */
 function baleYard(): { x: number; z: number; w: number; d: number } {
-  const c = CONFIGS.find((k) => k.id === "c_bales");
-  if (!c) return { x: -0.5, z: -8.5, w: 3.2, d: 4.2 };
-  return { x: c.x, z: c.z, w: c.size[0], d: c.size[1] };
+  /*
+   * Das Paket bleibt in der Kammer (Ansage 12.09.2026: „ich haette gerne
+   * aktuell nur, dass es gepresst wird und in der Mulde verharrt, bis ich es
+   * rausbaggere"). Es faellt nirgendwo mehr heraus — solange es drin liegt,
+   * blockiert es die naechste Fuhre, und genau das soll es.
+   */
+  return { x: CENTER.x, z: CENTER.z, w: INNER_W - 2.2, d: INNER_D - 1.2 };
 }
 /**
  * Die Mulde liegt längs Ost–West, in einer Flucht mit dem Stahlschrottplatz
@@ -44,14 +57,18 @@ function baleYard(): { x: number; z: number; w: number; d: number } {
  * legen sich dadurch nach Norden und Süden weg, und der Bagger füllt von oben
  * über die lange Seite ein (Design-Fix 02.09.2026).
  */
+// Wieder laengs gestellt (Ansage 12.09.2026: „es kann auch die Presse
+// gedreht werden, damit ein bisschen mehr Platz auf der Seite entsteht").
 const ROT = 0;
 // Große Mulde: die lange offene Seite zeigt nach Norden zum Baggerplatz,
 // damit von dort bequem eingefüllt werden kann (Design 2026-08-29).
 // Breite wie der Stahlschrottplatz (11 m), direkt daneben: So bildet die
 // Schere mit dem Haufen eine Flucht. Die geringe Tiefe hält die Deckelklappen
 // kurz — die Spinne reicht bequem darüber (Wunsch 02.09.2026).
-const INNER_W = 10.0; // x — Länge, Pressweg (rechts → links)
-const INNER_D = 4.0; // z — Tiefe; bestimmt die Klappenlänge
+const INNER_W = 7.0; // x — Länge, Pressweg (rechts → links)
+// Schmaler (Ansage 12.09.2026: „die Presse erscheint immer noch zu tief,
+// die kann ruhig noch ein bisschen schmaler werden").
+const INNER_D = 3.2; // z — Tiefe; bestimmt die Klappenlänge
 const WALL_H = 1.9;
 const PLATE_T = 0.3; // dicke Eisenplatten (SW)
 const LID_HINGE_Y = WALL_H - 0.1;
@@ -91,6 +108,8 @@ export class PressManager {
   private phase: Phase = "idle";
   private t = 0;
   private lidAngle = LID_OPEN_ANGLE; // 0 = zu
+  /** Zweites Gelenk der Klappe: faltet die aeussere Haelfte auf die innere. */
+  private falten: Array<{ gruppe: THREE.Group; seite: -1 | 1; weg: number }> = [];
   private ramX = RAM_HOME_X;
   private ramBackFrom = RAM_END_X;
   private ramTarget = RAM_END_X;
@@ -109,7 +128,6 @@ export class PressManager {
   ) {
     const steel = new THREE.MeshStandardMaterial({ color: 0x4a5157, roughness: 0.6, metalness: 0.55 });
     const heavy = new THREE.MeshStandardMaterial({ color: 0x3a4045, roughness: 0.5, metalness: 0.7 });
-    const warn = new THREE.MeshStandardMaterial({ color: 0xd7a71f, roughness: 0.7 });
 
     const group = new THREE.Group();
     group.position.copy(CENTER);
@@ -150,14 +168,22 @@ export class PressManager {
         body
       );
     }
-    // Warnstreifen auf der Muldenkante (Längsseite zum Platz)
-    const stripe = new THREE.Mesh(new THREE.BoxGeometry(INNER_W + 0.7, 0.16, 0.38), warn);
-    stripe.position.set(0, WALL_H + 0.34, INNER_D / 2 + 0.175);
-    group.add(stripe);
+    // Der gelbe Warnbalken auf der Muldenkante ist weg (Ansage 12.09.2026:
+    // „der gelbe Balken da, der kann sowieso weg, der hat für mich jetzt keine
+    // große Funktion"). Er lag als durchgehender Riegel quer im Bild und war
+    // das Auffaelligste an der ganzen Maschine, ohne etwas zu bedeuten.
 
-    // --- Zwei LÄNGS liegende Deckelplatten (Design 2026-08-29) ---
-    // Scharniere laufen entlang der langen Muldenseiten; bewegt werden die
-    // Platten über Winkelhebel, die von je zwei Hubzylindern angetrieben werden.
+    /*
+     * EINE Deckelplatte statt zweier (Ansage 12.09.2026: „weil's ja eigentlich
+     * nur der Deckel ist, reicht es, wenn wir einen klappbaren Ausleger haben
+     * auf einer Seite … ein Pressenkonzept, das nicht so viel Breite
+     * braucht").
+     *
+     * Zwei Klappen, die sich beim Öffnen nach beiden Seiten flach hinlegen,
+     * brauchten links und rechts je zwei Meter Luft — die Maschine war doppelt
+     * so breit wie ihre Kammer. Jetzt klappt eine einzige Platte zur
+     * baggerabgewandten Seite weg; die andere Seite bleibt eine feste Wand.
+     */
     const lidReach = INNER_D / 2 + 0.14; // wie weit die Platte zur Mitte reicht
     const lidLen = INNER_W + 0.25; // über die ganze Muldenlänge
     // Drei Hebelpaare je Klappe: Bei 10 m Breite trügen zwei die Platte
@@ -169,29 +195,74 @@ export class PressManager {
       metalness: 0.85,
     });
 
-    const makeLid = (side: -1 | 1): { pivot: THREE.Group; body: RAPIER.RigidBody } => {
+    /*
+     * `voll` baut die einzige echte Deckelplatte: Sie spannt jetzt ueber die
+     * ganze Kammerbreite, weil es keine Gegenklappe mehr gibt. Die andere
+     * Seite bleibt als leere Gruppe bestehen, damit der Bewegungsablauf
+     * unveraendert weiterlaeuft — sie zeigt nur nichts mehr.
+     */
+    const makeLid = (
+      side: -1 | 1,
+      voll: boolean
+    ): { pivot: THREE.Group; body: RAPIER.RigidBody } => {
       const pivot = new THREE.Group();
       pivot.position.set(0, LID_HINGE_Y + 0.3, side * (INNER_D / 2 + 0.12));
-      const plate = new THREE.Mesh(new THREE.BoxGeometry(lidLen, PLATE_T, lidReach), heavy);
-      plate.position.z = -side * (lidReach / 2); // ragt zur Muldenmitte
+      /*
+       * Zweiteilig statt einer grossen Platte (Ansage 12.09.2026: „ich wuensch
+       * mir eher, dass die Klappe noch mal geklappt ist").
+       *
+       * Eine Platte, die ueber die ganze Kammer reicht, schwingt beim Oeffnen
+       * als ein Brett nach aussen und braucht dort genauso viel Platz, wie sie
+       * lang ist. Gefaltet legt sich die aeussere Haelfte auf die innere — die
+       * Maschine kommt mit der halben Ausladung aus.
+       */
+      const spann = voll ? INNER_D + 0.28 : 0.001;
+      const halbSpann = spann / 2;
+      const plate = new THREE.Mesh(new THREE.BoxGeometry(lidLen, PLATE_T, halbSpann), heavy);
+      plate.position.z = -side * (halbSpann / 2);
       plate.castShadow = true;
+      plate.visible = voll;
       pivot.add(plate);
+      // Zweites Gelenk am Ende der inneren Haelfte
+      const falte = new THREE.Group();
+      // Ausgangslage: eingefahren; `update` schiebt sie heraus.
+      falte.position.z = 0;
+      pivot.add(falte);
+      const plate2 = new THREE.Mesh(new THREE.BoxGeometry(lidLen, PLATE_T, halbSpann), heavy);
+      plate2.position.z = -side * (halbSpann / 2);
+      plate2.castShadow = true;
+      plate2.visible = voll;
+      falte.add(plate2);
+      // Fuehrungsschiene statt Scharnier: die Haelfte faehrt aus, sie klappt
+      // nicht mehr (Ansage 12.09.2026).
+      const schiene = new THREE.Mesh(new THREE.BoxGeometry(lidLen, 0.12, 0.2), heavy);
+      schiene.position.z = -side * (halbSpann - 0.1);
+      schiene.visible = voll;
+      falte.add(schiene);
+      if (voll) this.falten.push({ gruppe: falte, seite: side, weg: halbSpann });
       // Quer-Versteifungen auf der Platte
-      for (const rx of [-4.2, -2.5, -0.8, 0.8, 2.5, 4.2]) {
-        const rib = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.1, lidReach - 0.25), warn);
-        rib.position.set(rx, PLATE_T / 2 + 0.05, -side * (lidReach / 2));
+      for (const rx of voll ? [-4.2, -2.5, -0.8, 0.8, 2.5, 4.2] : []) {
+        const rib = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.1, halbSpann - 0.25), heavy);
+        rib.position.set(rx, PLATE_T / 2 + 0.05, -side * (halbSpann / 2));
         pivot.add(rib);
       }
       // Scharnierrohr längs
+      /*
+       * Auch das Scharnierrohr ist nicht mehr gelb. Es lief als durchgehender
+       * Strang ueber die ganze Kammerlaenge und war genau der Balken, der
+       * zweimal beanstandet wurde — die Farbe machte aus einem Bauteil ein
+       * Ausrufezeichen.
+       */
       const hinge = new THREE.Mesh(
         new THREE.CylinderGeometry(0.15, 0.15, lidLen + 0.2, 10),
-        warn
+        heavy
       );
       hinge.rotation.z = Math.PI / 2;
+      hinge.visible = voll;
       pivot.add(hinge);
       // Winkelhebel: stehen nach außen-oben ab und werden von den Zylindern gezogen
-      for (const lx of leverX) {
-        const lever = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.86, 0.26), warn);
+      for (const lx of voll ? leverX : []) {
+        const lever = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.86, 0.26), heavy);
         lever.position.set(lx, 0.34, side * 0.2);
         lever.rotation.x = -side * 0.42;
         lever.castShadow = true;
@@ -225,8 +296,8 @@ export class PressManager {
       );
       return { pivot, body: lidBody };
     };
-    const south = makeLid(-1);
-    const north = makeLid(1);
+    const south = makeLid(-1, true);
+    const north = makeLid(1, false);
     this.lidLeft = south.pivot;
     this.lidLeftBody = south.body;
     this.lidRight = north.pivot;
@@ -245,10 +316,13 @@ export class PressManager {
       this.ramBody
     );
     // Zylinderbock rechts hinter dem Stempel
-    const ramHousing = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.0, INNER_D), warn);
-    ramHousing.position.set(INNER_W / 2 + 0.9, WALL_H / 2 + 0.4, 0);
-    ramHousing.castShadow = true;
-    group.add(ramHousing);
+    /*
+     * Der gelbe Stempelbock am Kammerende ist weg (Ansage 12.09.2026: „bei
+     * der Presse ist immer noch der gelbe Balken … das sieht komisch aus und
+     * kann weg, es wird ja sowieso nur noch die Ballen gepresst und es bleibt
+     * in der Presse, deshalb kann man das Anbauteil entfernen"). Er war das
+     * letzte grosse gelbe Stueck an der Maschine und stand quer im Bild.
+     */
 
     this.syncTools();
   }
@@ -388,6 +462,19 @@ export class PressManager {
     // Klappen schwenken um die Längsachse (X): Süd negativ, Nord positiv
     this.lidLeft.rotation.x = -this.lidAngle;
     this.lidRight.rotation.x = this.lidAngle;
+    /*
+     * Die zweite Haelfte FAEHRT AUS, statt zu klappen (Ansage 12.09.2026:
+     * „die zweite Haelfte, um die Mulde zu bedecken, soll ausfahrbar sein,
+     * also hydraulisch ausfahrbar").
+     *
+     * Geschlossen ist sie ganz heraus und deckt die Kammer; beim Oeffnen
+     * zieht sie sich unter die erste Haelfte zurueck. Dadurch schwenkt beim
+     * Oeffnen nur noch eine halbe Plattenlaenge nach aussen.
+     */
+    const ausfahrt = 1 - this.lidAngle / LID_OPEN_ANGLE;
+    for (const f of this.falten) {
+      f.gruppe.position.z = -f.seite * f.weg * ausfahrt;
+    }
     const wp = new THREE.Vector3();
     const wq = new THREE.Quaternion();
     for (const [pivot, lidBody] of [

@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { umkugelRadius, type ItemManager } from "./scrapItems";
+import { umkugelRadius, type ItemManager, type ScrapItem } from "./scrapItems";
 import { hitsObstacle, slideAround } from "./obstacles";
 import { CONFIGS, type ContainerConfig } from "./containers";
 import { KAFFEE_ROT } from "./yard";
@@ -14,6 +14,7 @@ import {
   type Zone,
 } from "./weg";
 import { KAFFEE_THEKE } from "./yard";
+import { HALL1_Z, OFFICE_X } from "./office";
 import {
   WheelLoader,
   LOADER_SPEED,
@@ -105,6 +106,8 @@ export function buildPerson(colors: PersonColors): PersonParts {
  *   carry   bringt es in seine Mulde
  *   shove   faehrt hinter ein Teil, das der Bagger nicht erreicht
  *   shoving schiebt es in die Reichweite des Baggers
+ *   werkzeug geht zu einem Stueck, das Flex oder Abdrueckmaschine braucht
+ *   trennt  arbeitet daran, bis es in seine Fraktionen faellt
  *   zurBude geht zu Janine, weil gerade nichts zu holen ist
  *   kaffee  steht an der Theke
  *   zurueckZurMaschine geht zurueck zum Radlader
@@ -243,12 +246,41 @@ const PAUSE_KURZ_MAX_S = 15;
 const PRUEF_INTERVALL_S: [number, number] = [3, 5];
 /** Korridorbreite zu Fuss — ein Mensch steigt ueber Kleinteile */
 const FUSS_BREITE = 0.9;
+/**
+ * Faehrt Lambert den Radlader?
+ *
+ * Auf false steht die Maschine abgestellt in der Halle und Lambert arbeitet
+ * zu Fuss — er raeumt dann nur noch, was er tragen kann. Zum Wiedereinschalten
+ * genuegt `true`; die Logik des Radladers ist unveraendert vorhanden.
+ */
+// Wieder in Betrieb (Ansage 12.09.2026): Er bedient die weit aussen
+// liegenden Silos und faehrt das Zwischenlager ab.
+const RADLADER_IN_BETRIEB = true;
+/** Abstellplatz: vorne in der ersten Halle, Schaufel zum Tor. */
+const RADLADER_PARKPLATZ = new THREE.Vector3(OFFICE_X + 1.5, 0, HALL1_Z);
+/** Blickrichtung dort — aus der Halle heraus (+X). */
+const RADLADER_PARKYAW = Math.PI / 2;
+
+/**
+ * Wie lange er an einem Stueck arbeitet (s).
+ *
+ * Eine Alufelge vom Reifen zu bekommen ist keine Sekundensache: Ventil raus,
+ * Wulst abdruecken, Felge heraushebeln. Neun Sekunden sind im Spiel lang genug,
+ * dass man ihn dabei sieht, und kurz genug, dass er nicht den halben Tag an
+ * einem Rad steht.
+ */
+const WERKZEUG_S = 9;
+/** So weit laeuft er hoechstens zu einer Werkzeugarbeit (m) */
+const WERKZEUG_WEITE = 26;
+/** Abstand zwischen zwei Funkengarben (s) */
+const FUNKEN_TAKT = 0.35;
+
 /** Bis hierher traegt er von Hand, wenn der Radlader nicht hinkommt (kg) */
 const HANDLAST_KG = 60;
 /** So lange setzt er zurueck, wenn ihm etwas den Weg versperrt (s) */
 const RUECKWAERTS_S = 1.6;
 /** Abkippplatz vor dem Bagger — dort landet die Fuhre, da faehrt er nicht hinein */
-const ABKIPP = { x: 0, z: 7, hw: 4.5, hd: 4.5 };
+const ABKIPP = { x: -4.0, z: -10, hw: 4.5, hd: 4.5 };
 /** In diesem Umkreis muss ein Teil frei liegen, damit er es holt (m) */
 /** Um so viel wird eine Zone fuer die Wegpruefung geschrumpft (m) */
 const ZONE_RAND = 1.0;
@@ -270,6 +302,8 @@ type LambertState =
   | "carry"
   | "shove"
   | "shoving"
+  | "werkzeug"
+  | "trennt"
   | "zurBude"
   | "kaffee"
   | "zurueckZurMaschine";
@@ -304,12 +338,12 @@ export class StaffManager {
     // Beide Posten liegen ausserhalb des Abkippplatzes (0/7, 8 x 8 m) und
     // neben der Einfahrtsspur. Vorher stand er mitten in der Abladestelle —
     // gemessen 92 Prozent der Zeit (11.09.2026).
-    new THREE.Vector3(5.2, 0, 13.5),
-    new THREE.Vector3(-6.5, 0, 13.0),
+    new THREE.Vector3(-3.0, 0, -3.0),
+    new THREE.Vector3(-20.0, 0, -3.0),
   ];
   /** Einweisplatz neben dem Abkippplatz */
   /** Einweisplatz: am Rand des Abkippplatzes, nicht darin */
-  private readonly guidePos = new THREE.Vector3(6.0, 0, 11.5);
+  private readonly guidePos = new THREE.Vector3(-4.5, 0, -5.0);
 
   /** Baggerposition — um die Maschine selbst geht er herum */
   getExcavatorPos: (() => THREE.Vector3) | null = null;
@@ -357,6 +391,28 @@ export class StaffManager {
    * oder geht Kaffee trinken (Auftrag 11.09.2026, Rangfolge in Phase 0.2).
    */
   private zuFuss = false;
+  /** Restzeit an der aktuellen Werkzeugarbeit (s) */
+  private trennRestS = 0;
+  /** Taktgeber fuer die Funken */
+  private funkenRestS = 0;
+  /**
+   * Ein Stueck ist fertig getrennt — das Spiel macht daraus die Fraktionen.
+   *
+   * Die Trennung selbst steht in `ItemManager.zerlege`; hier wird nur
+   * gemeldet, dass die Arbeit getan ist. So kennt der Platzwart weder
+   * Fraktionen noch Preise.
+   */
+  onTrennen: ((item: ScrapItem) => void) | null = null;
+  /** Funken beim Flexen — Ort fuer Partikel und Klang. */
+  onFunken: ((x: number, y: number, z: number) => void) | null = null;
+
+  /**
+   * Wo ein Behaelter gerade steht. Absetzcontainer lassen sich vom Bagger
+   * verschieben; ohne diese Abfrage wuerfe Lambert weiter an die Stelle, an
+   * der der Container beim Aufbau stand.
+   */
+  getMuldenOrt: ((id: string) => { x: number; z: number } | null) | null = null;
+
   /** Wo der Radlader steht, solange Lambert zu Fuss unterwegs ist. */
   private readonly maschinePos = new THREE.Vector3();
   /** Restliche Pausenzeit (s) */
@@ -387,8 +443,36 @@ export class StaffManager {
   /**
    * Radlader freischalten. Von da an fährt Lambert statt zu laufen und kann
    * auch schwere Brocken von den Fahrspuren räumen.
+   *
+   * Steht `RADLADER_IN_BETRIEB` auf false, wird er trotzdem gebaut und
+   * gezeigt — nur eben abgestellt in der Halle, und Lambert bleibt zu Fuß.
    */
   setLoader(on: boolean): void {
+    if (on && !RADLADER_IN_BETRIEB) {
+      /*
+       * Ausser Betrieb (Ansage 12.09.2026: "koennen wir den Radlader ausser
+       * Funktion setzen fuer den Moment und in der Halle parken?").
+       *
+       * `_hasLoader` bleibt false — daran haengt die ganze Entscheidung, ob
+       * Lambert faehrt oder laeuft, ob er schwere Brocken raeumt und ob er
+       * zur Maschine zurueckgeht. So ist der Radlader mit einem Wert
+       * vollstaendig aus dem Spiel, ohne dass an seiner Logik etwas
+       * auseinandergenommen wird.
+       *
+       * Sichtbar bleibt er: Ein Hof, auf dem die Maschine verschwunden ist,
+       * sieht falsch aus. Er steht vorne in der ersten Halle, Schaufel zum
+       * Tor.
+       */
+      this._hasLoader = false;
+      this.loader?.setVisible(true);
+      this.maschinePos.copy(RADLADER_PARKPLATZ);
+      this.loaderYaw = RADLADER_PARKYAW;
+      // dt von 1 s, damit er die Parkstellung sofort einnimmt statt sie
+      // ueber die naechsten Bilder anzufahren
+      this.loader?.update(1, RADLADER_PARKPLATZ, RADLADER_PARKYAW, false);
+      this.zeigeRichtige();
+      return;
+    }
     this._hasLoader = on;
     this.loader?.setVisible(on);
     if (on) this.maschinePos.copy(this.lambert.group.position);
@@ -513,6 +597,34 @@ export class StaffManager {
     this.pruefUhr += dt;
     const g = this.lambert.group;
     this.zaehleGeweckte(dt);
+
+    // --- Werkzeugarbeit: er steht am Stueck und flext ---
+    if (this.lambertState === "trennt") {
+      const it = this.items.items.find((i) => i.id === this.carriedItemId);
+      if (!it || !it.body.isValid() || !it.body.isDynamic()) {
+        // Weggeraeumt, waehrend er daran arbeitete — dann eben nicht.
+        this.giveUpTarget();
+        return;
+      }
+      this.trennRestS -= dt;
+      // Arm auf und ab, damit man die Arbeit sieht
+      this.lambert.armRight.rotation.x = -0.9 + Math.sin(this.stateT * 9) * 0.35;
+      this.funkenRestS -= dt;
+      if (this.funkenRestS <= 0) {
+        this.funkenRestS = FUNKEN_TAKT;
+        const p = it.body.translation();
+        this.onFunken?.(p.x, p.y + 0.25, p.z);
+      }
+      if (this.trennRestS <= 0) {
+        this.lambert.armRight.rotation.x = 0;
+        this.onTrennen?.(it);
+        this.carriedItemId = null;
+        this.lambertState = "patrol";
+        this.lambertTarget.copy(this.patrol[this.patrolIdx]);
+      }
+      this.loader?.update(dt, this.maschinePos, this.loaderYaw, false);
+      return;
+    }
 
     // --- Kaffeepause ---
     if (this.lambertState === "kaffee") {
@@ -856,6 +968,17 @@ export class StaffManager {
       this.lambertTarget.copy(this.patrol[this.patrolIdx]);
       return;
     }
+    if (this.lambertState === "werkzeug") {
+      const it = this.items.items.find((i) => i.id === this.carriedItemId);
+      if (it && it.body.isValid() && this.items.brauchtWerkzeug(it)) {
+        this.lambertState = "trennt";
+        this.trennRestS = WERKZEUG_S;
+        this.funkenRestS = 0;
+      } else {
+        this.giveUpTarget();
+      }
+      return;
+    }
     if (this.lambertState === "fetch") {
       // Aufgenommen — jetzt zur Box, in die das Material gehört
       const it = this.items.items.find((i) => i.id === this.carriedItemId);
@@ -885,13 +1008,26 @@ export class StaffManager {
       if (it && it.body.isValid()) {
         const mulde = StaffManager.muldeFuer(it.materialId);
         if (mulde) {
-          // Ueber die Wand gekippt: aus Schaufelhoehe in die Mulde fallen
-          // lassen, nicht am Boden absetzen — sonst haengt es in der Wand.
+          /*
+           * ÜBER die Kante fallen lassen, nicht hinein.
+           *
+           * Vorher lag die Absetzhoehe bei `size[2] − 0,6`. Bei einem
+           * Absetzcontainer mit 1,1 m Wand sind das 0,5 m — also mitten im
+           * Boden des Behaelters. Rapier drueckt die Durchdringung mit voller
+           * Wucht auseinander, und weil der Container ein beweglicher Koerper
+           * ist, schoss er quer ueber den Platz (Befund 12.09.2026: „der
+           * Radlader verschiebt jetzt immer wieder Container").
+           *
+           * Und an die Stelle, an der der Behaelter JETZT steht, nicht an die
+           * aus der Aufbauliste — er laesst sich ja verschieben.
+           */
+          const ort = this.getMuldenOrt?.(mulde.id) ?? { x: mulde.x, z: mulde.z };
+          const streu = Math.min(1.2, mulde.size[0] - 1.4);
           it.body.setTranslation(
             {
-              x: mulde.x + (Math.random() - 0.5) * 1.2,
-              y: mulde.size[2] - 0.6,
-              z: mulde.z + (Math.random() - 0.5) * 1.2,
+              x: ort.x + (Math.random() - 0.5) * streu,
+              y: mulde.size[2] + 0.9,
+              z: ort.z + (Math.random() - 0.5) * streu,
             },
             true
           );
@@ -963,6 +1099,20 @@ export class StaffManager {
     const blocker = this.findBlocker();
     if (blocker) {
       hol(blocker);
+      return;
+    }
+    /*
+     * Werkzeugarbeit vor dem Sortieren: Ein Rad mit Alufelge bringt getrennt
+     * 602 statt 160 Euro je Tonne, und niemand sonst auf dem Platz kann es
+     * trennen — der Bagger wuerde die Felge zerdruecken. Nur eine blockierte
+     * Fahrspur hat noch Vorrang, daran haengt der ganze Betrieb.
+     */
+    const werkzeug = this.findWerkzeugTeil();
+    if (werkzeug) {
+      const p = werkzeug.body.translation();
+      this.carriedItemId = werkzeug.id;
+      this.lambertTarget.set(p.x, 0, p.z);
+      this.lambertState = "werkzeug";
       return;
     }
     const weit = this.findSchiebegut();
@@ -1204,6 +1354,10 @@ export class StaffManager {
       const [zx, zz] = schiebeZiel(p.x, p.z, ex.x, ex.z);
       if (Math.hypot(zx - ex.x, zz - ex.z) < SCHIEB_MIN_M) continue;
       if (hitsObstacle(zx, zz, 0.8)) continue;
+      // Und es darf nicht in einem Behaelter enden: Absetzcontainer stehen in
+      // keiner Hindernisliste, weil sie sich bewegen — ohne diese Pruefung
+      // schoebe er das Stueck mitsamt Container vor sich her.
+      if (StaffManager.inZone(zx, zz)) continue;
       const [ax, az] = anstellPunkt(p.x, p.z, ex.x, ex.z);
       if (!this.reachable(ax, az)) continue;
       // Nicht durch den Haufen pfluegen: Der Anstellpunkt muss anfahrbar sein
@@ -1226,9 +1380,17 @@ export class StaffManager {
    * Stelle, an der seit dem Umbau nur noch Beton war. Zwei Wahrheiten ueber
    * dieselbe Sache halten nie. Stahl fehlt bewusst: der bleibt Sache des
    * Baggers, und das Ballenlager ist keine Mulde.
+   *
+   * Absetzcontainer gehen vor: Fuer Kupfer gibt es beides — den Container am
+   * Bagger und die Hortmulde ganz hinten an der Suedwand. Wer eine Handvoll
+   * Kupferrohr findet, traegt sie nicht zwanzig Meter weit, wenn drei Meter
+   * weiter der richtige Behaelter steht.
    */
   private static muldeFuer(materialId: string): ContainerConfig | undefined {
-    return CONFIGS.find((c) => c.kind === "bay" && c.fractionId === materialId);
+    const passend = CONFIGS.filter(
+      (c) => (c.kind === "bay" || c.kind === "rolloff") && c.fractionId === materialId
+    );
+    return passend.find((c) => c.kind === "rolloff") ?? passend[0];
   }
 
   /** Halteplatz vor einer Mulde: vor ihrer offenen Seite, nicht darin. */
@@ -1244,7 +1406,21 @@ export class StaffManager {
    * Meterschritten gegen die festen Bauten. Was nur um Ecken erreichbar wäre,
    * lässt er stehen — dafür ist der Bagger da.
    */
+  /**
+   * Sperrgebiet fuer Lambert: der Arbeitsbereich des Baggers.
+   *
+   * Ansage 12.09.2026: „der Lambert soll erst mal nicht in der Abladezone
+   * fahren koennen, sondern nur von der Ostseite kommen koennen, also rechts
+   * von den Containern und der Presse, weil der macht eigentlich nur
+   * Scheisse." Er hatte dort nichts zu suchen und stand staendig im Weg oder
+   * schob etwas an, das gerade gegriffen werden sollte.
+   */
+  private static imBaggerrevier(x: number, z: number): boolean {
+    return x > -6.0 && z < 2.0 && z > -29.0;
+  }
+
   private reachable(tx: number, tz: number): boolean {
+    if (StaffManager.imBaggerrevier(tx, tz)) return false;
     const from = this.lambert.group.position;
     const dx = tx - from.x;
     const dz = tz - from.z;
@@ -1365,6 +1541,29 @@ export class StaffManager {
   }
 
   /** Kleinteil, das frei herumliegt (nicht in einer Zone, nicht gegriffen). */
+  /**
+   * Das naechste Stueck, das Werkzeug braucht.
+   *
+   * Was in der Spinne haengt, ist kinematisch und faellt damit heraus — er
+   * soll nicht unter dem Bagger stehen und an etwas saegen, das gerade
+   * hochgeht.
+   */
+  private findWerkzeugTeil(): ScrapItem | null {
+    const von = this.lambert.group.position;
+    let best: ScrapItem | null = null;
+    let bestD = Infinity;
+    for (const it of this.items.items) {
+      if (!it.body.isValid() || !it.body.isDynamic()) continue;
+      if (!this.items.brauchtWerkzeug(it)) continue;
+      const p = it.body.translation();
+      const d = Math.hypot(p.x - von.x, p.z - von.z);
+      if (d > WERKZEUG_WEITE || d >= bestD) continue;
+      best = it;
+      bestD = d;
+    }
+    return best;
+  }
+
   private findStray(): (typeof this.items.items)[number] | null {
     // Lamberts Hauptaufgabe: Buntmetall aus dem Stahlschrott holen und in die
     // passende Box legen. Stahl und Störstoff lässt er liegen — der eine ist

@@ -13,15 +13,37 @@ export interface MaterialClass {
 }
 
 /**
- * Fraktionen (Stand 2026-08-29): Guss läuft mit im Stahlschrott, dafür gibt es
- * eine eigene Mulde für Edelstahl (VA). Messing wird zusammen mit Kupfer
- * gesammelt — beide gehen an denselben Abnehmer.
+ * Fraktionen (Stand 12.09.2026): Guss läuft mit im Stahlschrott, dafür gibt es
+ * eine eigene Mulde für Edelstahl (VA).
+ *
+ * Kupfer und Messing sind getrennt (Ansage 12.09.2026: „Kupfer Messing soll
+ * getrennt werden"). Zusammengefasst waren sie eine Bequemlichkeit: Messing
+ * bringt gut die Hälfte von Kupfer, und wer beides in eine Mulde wirft,
+ * bekommt am Ende den Messingpreis für alles. Genau diese Entscheidung — den
+ * Hahn nicht zum Rohr zu werfen — ist der Sinn einer eigenen Mulde.
  */
 export const MATERIALS: Record<string, MaterialClass> = {
   steel: { id: "steel", name: "Stahlschrott", buyPricePerKg: 0.18, sellPricePerKg: 0.25, color: 0x6e5a4e },
   va: { id: "va", name: "Edelstahl VA", buyPricePerKg: 1.0, sellPricePerKg: 1.4, color: 0xdfe6ea },
   alu: { id: "alu", name: "Aluminium", buyPricePerKg: 1.1, sellPricePerKg: 1.5, color: 0xc4c8cc },
-  copper: { id: "copper", name: "Kupfer/Messing", buyPricePerKg: 6.0, sellPricePerKg: 7.2, color: 0xc7622b },
+  copper: { id: "copper", name: "Kupfer", buyPricePerKg: 6.0, sellPricePerKg: 7.2, color: 0xc7622b },
+  brass: { id: "brass", name: "Messing", buyPricePerKg: 3.4, sellPricePerKg: 4.3, color: 0xc9a227 },
+  /*
+   * Zink und Batterien kommen mit der neuen Platzordnung dazu (Ansage
+   * 12.09.2026). Beide sind auf einem echten Schrottplatz eigene Stroeme:
+   * Zink aus Dachrinnen, Fallrohren und Verzinktem, Bleiakkus aus allem, was
+   * einen Anlasser hat. Akkus sind ausserdem gefaehrlicher Abfall — sie
+   * duerfen nicht in den Mischschrott, und genau deshalb lohnt die eigene
+   * Mulde.
+   */
+  zinc: { id: "zinc", name: "Zink", buyPricePerKg: 0.62, sellPricePerKg: 0.82, color: 0x9aa6ad },
+  battery: {
+    id: "battery",
+    name: "Batterien",
+    buyPricePerKg: 0.38,
+    sellPricePerKg: 0.55,
+    color: 0x3d4b57,
+  },
   cable: { id: "cable", name: "Kabel", buyPricePerKg: 1.6, sellPricePerKg: 2.2, color: 0xb0682a },
   /**
    * Mischschrott: alles, was zusammen in die Presse geht. Er laesst sich
@@ -47,7 +69,7 @@ export const MATERIALS: Record<string, MaterialClass> = {
  * "contaminant" war der Sammeltopf, bevor die Abfaelle ihre eigenen Namen
  * bekamen; er landet im Baumischabfall.
  */
-const ALIASES: Record<string, string> = { cast: "steel", brass: "copper", contaminant: "rubble" };
+const ALIASES: Record<string, string> = { cast: "steel", contaminant: "rubble" };
 
 export function getMaterial(id: string): MaterialClass {
   const m = MATERIALS[id] ?? MATERIALS[ALIASES[id] ?? ""];

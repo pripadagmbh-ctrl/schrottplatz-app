@@ -24,6 +24,12 @@ export interface VehicleModelContext {
    *   koffer  geschlossener Kastenaufbau, fast schon ein Container
    */
   bodyStyle?: "flach" | "rungen" | "koffer";
+  /**
+   * Name des Kunden. Aus ihm kommt der Lackton — derselbe Händler fährt
+   * damit immer denselben Wagen vor, ohne dass die Farbe gespeichert werden
+   * müsste. Genauso macht es `lackton` beim Schrott (E-061).
+   */
+  halter?: string;
   group: THREE.Group;
   bedGroup: THREE.Group;
   world: RAPIER.World;
@@ -38,6 +44,218 @@ export interface VehicleModelParts {
   crane: THREE.Group | null;
   /** Anhänger des PKW — hängt gelenkig an der Kupplung und wird nachgeführt */
   trailer: THREE.Group | null;
+}
+
+/**
+ * Lacktöne, wie sie auf einem Schrottplatz vorfahren.
+ *
+ * Kein Weiß aus dem Prospekt und kein Metallic: Die Wagen sind alt, die Farbe
+ * ist stumpf. Bisher war jeder LKW derselbe blaue Kasten (0x35618f) — bei
+ * vier Fuhren am Tag sah der Platz aus wie ein Fuhrpark aus einer Hand.
+ */
+const LKW_LACK = [0xcfcdc6, 0x35618f, 0x8d3128, 0x3f6b34, 0xb08a3a, 0x6b6f73, 0x2f4f5e];
+
+/** Lackton fest aus dem Halternamen — gleicher Händler, gleicher Wagen. */
+function lackFuer(halter: string | undefined): number {
+  if (!halter) return LKW_LACK[1];
+  let k = 7;
+  for (let i = 0; i < halter.length; i++) k = (k * 31 + halter.charCodeAt(i)) % 100003;
+  return LKW_LACK[k % LKW_LACK.length];
+}
+
+/**
+ * Ein Rad aus Reifen, Felge und Nabe — bei Bedarf als Zwilling.
+ *
+ * Vorher war jedes Rad eine schwarze Scheibe. Aus zehn Metern sieht man an
+ * einem LKW vor allem zwei Dinge: die Farbe der Kabine und die Räder. Ein
+ * Dreiachser hat hinten Zwillingsbereifung, und genau das macht ihn zum LKW
+ * statt zum Lieferwagen.
+ */
+function baueRad(
+  ziel: THREE.Group,
+  x: number,
+  y: number,
+  z: number,
+  r: number,
+  breite: number,
+  zwilling: boolean
+): void {
+  const gummi = new THREE.MeshStandardMaterial({ color: 0x1d1f21, roughness: 0.95 });
+  const felge = new THREE.MeshStandardMaterial({
+    color: 0x8b9197,
+    roughness: 0.45,
+    metalness: 0.65,
+  });
+  const reifen = new THREE.CylinderGeometry(r, r, breite, 14);
+  reifen.rotateZ(Math.PI / 2);
+  // Die Felge sass zuerst mittig im Reifen und ragte anderthalb Zentimeter
+  // heraus — unsichtbar. Sie gehoert auf die Aussenseite, dort sieht man sie.
+  const scheibe = new THREE.CylinderGeometry(r * 0.62, r * 0.62, breite * 0.4, 10);
+  scheibe.rotateZ(Math.PI / 2);
+  const nabe = new THREE.CylinderGeometry(r * 0.22, r * 0.22, breite * 0.5, 8);
+  nabe.rotateZ(Math.PI / 2);
+  const seite = Math.sign(x) || 1;
+  const plaetze = zwilling ? [x, x - seite * (breite + 0.03)] : [x];
+  for (const px of plaetze) {
+    const rad = new THREE.Mesh(reifen, gummi);
+    rad.position.set(px, y, z);
+    rad.castShadow = true;
+    ziel.add(rad);
+  }
+  // Felge und Nabe nur aussen: innen sieht sie ohnehin niemand
+  const rim = new THREE.Mesh(scheibe, felge);
+  rim.position.set(x + seite * breite * 0.36, y, z);
+  ziel.add(rim);
+  const hub = new THREE.Mesh(nabe, felge);
+  hub.position.set(x + seite * breite * 0.45, y, z);
+  ziel.add(hub);
+}
+
+/**
+ * Das Gesicht des Wagens: Stoßstange, Grill, Leuchten, Spiegel, Auspuff.
+ *
+ * Ein LKW-Fahrerhaus ist nie ein Quader. Es hat unten eine Stoßstange, davor
+ * ein Nummernschild, oben ein Dachspoiler, seitlich Spiegel auf Auslegern und
+ * hinten den Auspuffrohr-Stapel. Ohne das steht dort ein blauer Block, und
+ * jede Fuhre sieht aus wie die vorige.
+ */
+function baueFahrerhaus(
+  v: VehicleModelContext,
+  lack: THREE.MeshStandardMaterial,
+  dark: THREE.MeshStandardMaterial,
+  glas: THREE.Material
+): void {
+  const chrom = new THREE.MeshStandardMaterial({
+    color: 0xb9bec3,
+    roughness: 0.3,
+    metalness: 0.85,
+  });
+  const klar = new THREE.MeshStandardMaterial({
+    color: 0xf2eddc,
+    roughness: 0.25,
+    emissive: 0x2a2418,
+  });
+  const bernstein = new THREE.MeshStandardMaterial({
+    color: 0xd08a1e,
+    roughness: 0.4,
+    emissive: 0x3a2205,
+  });
+  const cz = v.bedLen / 2 + 0.9; // Mitte des Fahrerhauses
+  const front = cz + 0.76; // Vorderkante
+  const add = (
+    geo: THREE.BufferGeometry,
+    mat: THREE.Material,
+    x: number,
+    y: number,
+    z: number,
+    schatten = false
+  ): THREE.Mesh => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(x, y, z);
+    if (schatten) m.castShadow = true;
+    v.group.add(m);
+    return m;
+  };
+
+  // Stoßstange, Nummernschild, Unterfahrschutz
+  add(new THREE.BoxGeometry(2.16, 0.28, 0.18), dark, 0, 0.95, front + 0.06, true);
+  add(new THREE.BoxGeometry(0.4, 0.13, 0.03), chrom, -0.55, 0.95, front + 0.16);
+  // Kühlergrill: waagerechte Lamellen, nicht eine glatte Platte
+  for (let i = 0; i < 4; i++) {
+    add(new THREE.BoxGeometry(1.5, 0.07, 0.05), dark, 0, 1.18 + i * 0.12, front + 0.02);
+  }
+  // Scheinwerfer und Blinker
+  for (const sx of [-1, 1]) {
+    add(new THREE.BoxGeometry(0.34, 0.2, 0.05), klar, sx * 0.86, 1.18, front + 0.03);
+    add(new THREE.BoxGeometry(0.16, 0.1, 0.05), bernstein, sx * 0.86, 0.99, front + 0.05);
+  }
+  // Dachspoiler: vorn niedrig, hinten hoch — damit der Aufbau nicht anströmt
+  const spoiler = add(new THREE.BoxGeometry(1.95, 0.42, 0.7), lack, 0, 2.28, cz - 0.3, true);
+  spoiler.rotation.x = -0.18;
+  // Sonnenblende über der Frontscheibe
+  const blende = add(new THREE.BoxGeometry(2.0, 0.1, 0.3), lack, 0, 2.12, front - 0.08, true);
+  blende.rotation.x = 0.3;
+  // Außenspiegel auf Auslegern — das Erkennungszeichen jedes LKW
+  for (const sx of [-1, 1]) {
+    add(new THREE.BoxGeometry(0.24, 0.04, 0.04), dark, sx * 1.18, 1.98, front - 0.2);
+    add(new THREE.BoxGeometry(0.07, 0.46, 0.16), dark, sx * 1.3, 1.78, front - 0.2, true);
+    add(new THREE.BoxGeometry(0.07, 0.18, 0.13), dark, sx * 1.28, 1.42, front - 0.22);
+  }
+  // Türfuge und Griff — ohne sie ist die Seite eine Wand
+  for (const sx of [-1, 1]) {
+    add(new THREE.BoxGeometry(0.02, 1.1, 0.03), dark, sx * 1.06, 1.48, cz + 0.42);
+    add(new THREE.BoxGeometry(0.03, 0.06, 0.22), chrom, sx * 1.07, 1.45, cz + 0.1);
+    // Einstieg: zwei Tritte unter der Tür
+    for (let i = 0; i < 2; i++) {
+      add(new THREE.BoxGeometry(0.1, 0.04, 0.42), dark, sx * 0.98, 0.62 + i * 0.24, cz + 0.15);
+    }
+  }
+  // Auspuffrohr hinter dem Fahrerhaus, rechts — steht senkrecht hoch
+  const rohr = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.085, 1.7, 8), chrom);
+  rohr.position.set(1.02, 1.6, cz - 0.82);
+  rohr.castShadow = true;
+  v.group.add(rohr);
+  // Dachleuchten als Reihe
+  for (const sx of [-0.62, -0.21, 0.21, 0.62]) {
+    add(new THREE.BoxGeometry(0.1, 0.06, 0.08), bernstein, sx, 2.14, front - 0.05);
+  }
+  void glas;
+}
+
+/**
+ * Alles unterhalb der Ladefläche: Tank, Werkzeugkasten, Kotflügel, Rückleuchten.
+ *
+ * Der Rahmen war eine durchgehende dunkle Platte, und die Räder klebten daran
+ * wie an einem Brett. Was einen LKW von unten ausmacht, hängt seitlich am
+ * Rahmen — und ein Kotflügel über den Zwillingsrädern ist der Unterschied
+ * zwischen Fahrzeug und Kiste.
+ */
+function baueFahrgestell(
+  v: VehicleModelContext,
+  dark: THREE.MeshStandardMaterial,
+  bedMat: THREE.MeshStandardMaterial
+): void {
+  const alu = new THREE.MeshStandardMaterial({
+    color: 0xa9aeb3,
+    roughness: 0.4,
+    metalness: 0.7,
+  });
+  const rot = new THREE.MeshStandardMaterial({
+    color: 0x8e2318,
+    roughness: 0.35,
+    emissive: 0x2a0806,
+  });
+  // Kraftstofftank links, Werkzeugkasten rechts
+  const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 1.1, 10), alu);
+  tank.rotation.x = Math.PI / 2;
+  tank.position.set(-1.08, 0.72, 0.55);
+  tank.castShadow = true;
+  v.group.add(tank);
+  const kasten = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.42, 0.85), dark);
+  kasten.position.set(1.08, 0.74, 0.55);
+  kasten.castShadow = true;
+  v.group.add(kasten);
+  // Kotflügel über den beiden hinteren Achsen
+  for (const sx of [-1, 1]) {
+    const kotfluegel = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.07, 2.3), dark);
+    kotfluegel.position.set(sx * 1.02, 1.0, -v.bedLen / 2 + 1.45);
+    v.group.add(kotfluegel);
+    // Spritzlappen hinter der letzten Achse
+    const lappen = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.4, 0.03), dark);
+    lappen.position.set(sx * 1.02, 0.78, -v.bedLen / 2 + 0.35);
+    v.group.add(lappen);
+  }
+  // Unterfahrschutz und Rückleuchten am Heck
+  // Buendig ans Rahmenende: 72 cm dahinter hing er in der Luft
+  const heckZ = -v.bedLen / 2 - 0.14;
+  const schutz = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.12, 0.1), bedMat);
+  schutz.position.set(0, 0.52, heckZ);
+  v.group.add(schutz);
+  for (const sx of [-1, 1]) {
+    const leuchte = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.26, 0.06), rot);
+    leuchte.position.set(sx * 0.85, 0.78, heckZ);
+    v.group.add(leuchte);
+  }
 }
 
 /**
@@ -152,72 +370,128 @@ function buildCarAndTrailer(
     roughness: 0.45,
     metalness: 0.2,
   });
+  /*
+   * Getönt statt klar. Klarglas war hier unsichtbar: Die Scheibe liegt vor
+   * dem Blech, und durch 82 % Transmission sah man genau dieses Blech —
+   * die Kabine war ein einfarbiger Block ohne Fenster. Eine dunkle Scheibe
+   * zeichnet sich gegen jeden Lackton ab, und der Fahrer bleibt sichtbar.
+   */
   const glas = new THREE.MeshPhysicalMaterial({
-    color: 0xd6ecf4,
-    roughness: 0.06,
+    color: 0x30505e,
+    roughness: 0.12,
     metalness: 0,
-    transmission: 0.82,
+    transmission: 0.3,
     thickness: 0.05,
     transparent: true,
-    opacity: 0.32,
+    opacity: 0.72,
+  });
+  const chrom = new THREE.MeshStandardMaterial({
+    color: 0xb9bec3,
+    roughness: 0.3,
+    metalness: 0.85,
+  });
+  const klar = new THREE.MeshStandardMaterial({
+    color: 0xf2eddc,
+    roughness: 0.25,
+    emissive: 0x2a2418,
+  });
+  const rotLicht = new THREE.MeshStandardMaterial({
+    color: 0x8e2318,
+    roughness: 0.35,
+    emissive: 0x2a0806,
   });
   const kombi = Math.random() < 0.7;
-  const len = kombi ? 4.3 : 5.0;
-  const hoehe = kombi ? 0.72 : 1.35;
+  const len = kombi ? 4.3 : 4.7;
   // Kupplung: ein Stück vor der Anhängerfront, dort greift die Deichsel an
   const kupplungZ = v.bedLen + 1.05;
   // Zugfahrzeug steht davor, mit Luft zwischen Heck und Kupplung
   const zugZ = kupplungZ + 0.35 + len / 2;
+  /** z in Wagenkoordinaten: 0 = Mitte, positiv nach vorn. */
+  const w = (z: number): number => zugZ + z;
 
-  // --- Zugfahrzeug (bleibt am Fahrzeugrahmen) ---
-  const wanne = new THREE.Mesh(new THREE.BoxGeometry(1.82, hoehe, len), lack);
-  wanne.position.set(0, 0.62 + hoehe / 2, zugZ);
-  wanne.castShadow = true;
-  v.group.add(wanne);
-  if (kombi) {
-    const dach = new THREE.Mesh(new THREE.BoxGeometry(1.72, 0.62, len - 1.5), lack);
-    dach.position.set(0, 1.65, zugZ + 0.15);
-    dach.castShadow = true;
-    v.group.add(dach);
-    for (const sx of [-1, 1]) {
-      const seite = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.46, len - 1.9), glas);
-      seite.position.set(sx * 0.87, 1.68, zugZ + 0.15);
-      v.group.add(seite);
+  /*
+   * --- Zugfahrzeug ---
+   *
+   * Vorher waren das zwei Quader übereinander, und die Limousine war ein
+   * 1,35 m hoher Block ohne Dach. Ein Auto liest sich aus der Entfernung an
+   * drei Dingen: der Bordkante über den Rädern, dem abgesetzten Dachaufbau
+   * und den Lichtern vorn und hinten. Genau die gibt es jetzt.
+   */
+  const add = (
+    geo: THREE.BufferGeometry,
+    mat: THREE.Material,
+    x: number,
+    y: number,
+    z: number,
+    schatten = false
+  ): THREE.Mesh => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(x, y, z);
+    if (schatten) m.castShadow = true;
+    v.group.add(m);
+    return m;
+  };
+
+  // Wagenkasten bis Fensterunterkante
+  add(new THREE.BoxGeometry(1.82, 0.62, len), lack, 0, 0.76, w(0), true);
+  // Motorhaube vorn und — beim Stufenheck — der Kofferraum hinten
+  add(new THREE.BoxGeometry(1.74, 0.14, len * 0.3), lack, 0, 1.13, w(len * 0.33), true);
+  if (!kombi) {
+    add(new THREE.BoxGeometry(1.74, 0.14, len * 0.24), lack, 0, 1.13, w(-len * 0.36), true);
+  }
+  // Dachaufbau: beim Kombi bis ans Heck, beim Stufenheck kürzer und mittiger
+  const dachLen = kombi ? len * 0.62 : len * 0.46;
+  const dachZ = kombi ? -len * 0.12 : -len * 0.06;
+  add(new THREE.BoxGeometry(1.7, 0.56, dachLen), lack, 0, 1.42, w(dachZ), true);
+  // Scheiben: Front geneigt, Seiten längs, hinten senkrecht
+  const front = add(
+    new THREE.BoxGeometry(1.62, 0.52, 0.05),
+    glas,
+    0,
+    1.42,
+    w(dachZ + dachLen / 2 + 0.06)
+  );
+  front.rotation.x = 0.36;
+  for (const sx of [-1, 1]) {
+    add(new THREE.BoxGeometry(0.05, 0.4, dachLen - 0.5), glas, sx * 0.89, 1.44, w(dachZ));
+  }
+  add(new THREE.BoxGeometry(1.58, 0.44, 0.05), glas, 0, 1.42, w(dachZ - dachLen / 2 - 0.05));
+  // Radläufe — ohne sie kleben die Räder am Kasten
+  const bogen = new THREE.TorusGeometry(0.4, 0.05, 6, 10, Math.PI);
+  const radZ = [len / 2 - 0.95, -len / 2 + 0.95];
+  for (const sx of [-1, 1]) {
+    for (const rz of radZ) {
+      const m = new THREE.Mesh(bogen, lack);
+      m.position.set(sx * 0.84, 0.46, w(rz));
+      m.rotation.y = Math.PI / 2;
+      v.group.add(m);
     }
-    const front = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.5, 0.06), glas);
-    front.position.set(0, 1.66, zugZ + len / 2 - 0.72);
-    front.rotation.x = 0.34;
-    v.group.add(front);
-  } else {
-    const front = new THREE.Mesh(new THREE.BoxGeometry(1.66, 0.62, 0.06), glas);
-    front.position.set(0, 1.6, zugZ + len / 2 - 0.35);
-    front.rotation.x = 0.22;
-    v.group.add(front);
-    for (const sx of [-1, 1]) {
-      const seite = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.5, 1.0), glas);
-      seite.position.set(sx * 0.89, 1.56, zugZ + len / 2 - 1.15);
-      v.group.add(seite);
-    }
+  }
+  // Stoßstangen, Kennzeichen, Leuchten
+  add(new THREE.BoxGeometry(1.8, 0.2, 0.14), dark, 0, 0.56, w(len / 2 + 0.02), true);
+  add(new THREE.BoxGeometry(1.8, 0.2, 0.14), dark, 0, 0.56, w(-len / 2 - 0.02), true);
+  add(new THREE.BoxGeometry(0.4, 0.12, 0.03), chrom, 0, 0.56, w(len / 2 + 0.1));
+  add(new THREE.BoxGeometry(0.9, 0.1, 0.05), dark, 0, 0.82, w(len / 2 + 0.01));
+  for (const sx of [-1, 1]) {
+    add(new THREE.BoxGeometry(0.34, 0.16, 0.05), klar, sx * 0.66, 0.86, w(len / 2 + 0.01));
+    add(new THREE.BoxGeometry(0.3, 0.18, 0.05), rotLicht, sx * 0.7, 0.88, w(-len / 2 - 0.01));
+  }
+  // Außenspiegel und Türfuge
+  for (const sx of [-1, 1]) {
+    add(new THREE.BoxGeometry(0.14, 0.09, 0.07), dark, sx * 0.95, 1.2, w(dachZ + dachLen / 2 - 0.2));
+    add(new THREE.BoxGeometry(0.02, 0.5, 0.03), dark, sx * 0.92, 0.8, w(0.15));
   }
   const haut = new THREE.MeshStandardMaterial({ color: 0xe3b18c, roughness: 0.8 });
   const kopf = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 10), haut);
-  kopf.position.set(-0.42, kombi ? 1.6 : 1.55, zugZ + len / 2 - 1.1);
+  kopf.position.set(-0.42, 1.36, w(dachZ + dachLen / 2 - 0.45));
   v.group.add(kopf);
   // Anhängerkupplung am Heck des Wagens
   const kugel = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), dark);
   kugel.position.set(0, 0.5, kupplungZ);
   v.group.add(kugel);
 
-  const radGeo = new THREE.CylinderGeometry(0.33, 0.33, 0.22, 12);
-  radGeo.rotateZ(Math.PI / 2);
-  const gummi = new THREE.MeshStandardMaterial({ color: 0x1e2022, roughness: 0.9 });
   for (const rx of [-0.86, 0.86]) {
-    for (const rz of [zugZ + len / 2 - 0.9, zugZ - len / 2 + 0.9]) {
-      const rad = new THREE.Mesh(radGeo, gummi);
-      rad.position.set(rx, 0.33, rz);
-      rad.castShadow = true;
-      v.group.add(rad);
-    }
+    for (const rz of radZ) baueRad(v.group, rx, 0.33, w(rz), 0.33, 0.2, false);
   }
 
   // --- Anhänger (eigene Gruppe, Ursprung = Kupplung) ---
@@ -251,10 +525,23 @@ function buildCarAndTrailer(
     anhaenger.add(wand);
   }
   for (const rx of [-0.98, 0.98]) {
-    const rad = new THREE.Mesh(radGeo, gummi);
-    rad.position.set(rx, 0.33, zu(v.bedLen / 2));
-    rad.castShadow = true;
-    anhaenger.add(rad);
+    baueRad(anhaenger, rx, 0.33, zu(v.bedLen / 2), 0.33, 0.2, false);
+    // Kotflügel — ein Anhänger ohne sie ist ein Brett auf Rollen
+    const kotfluegel = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.06, 0.96), dark);
+    kotfluegel.position.set(rx, 0.72, zu(v.bedLen / 2));
+    anhaenger.add(kotfluegel);
+  }
+  // Stützrad an der Deichsel und Rückleuchten am Heck
+  const stuetze = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.42, 6), dark);
+  stuetze.position.set(0.18, 0.29, zu(v.bedLen + 0.35));
+  anhaenger.add(stuetze);
+  for (const sx of [-1, 1]) {
+    const leuchte = new THREE.Mesh(
+      new THREE.BoxGeometry(0.14, 0.14, 0.05),
+      new THREE.MeshStandardMaterial({ color: 0x8e2318, roughness: 0.35, emissive: 0x2a0806 })
+    );
+    leuchte.position.set(sx * 0.78, 0.82, zu(-0.06));
+    anhaenger.add(leuchte);
   }
 
   // Die Ladefläche gehört an den Anhänger, nicht an den Rahmen: Sie muss beim
@@ -268,7 +555,7 @@ function buildCarAndTrailer(
 }
 
 export function buildVehicleModel(v: VehicleModelContext): VehicleModelParts {
-  const paint = new THREE.MeshStandardMaterial({ color: 0x35618f, roughness: 0.55 });
+  const paint = new THREE.MeshStandardMaterial({ color: lackFuer(v.halter), roughness: 0.62 });
   const dark = new THREE.MeshStandardMaterial({ color: 0x2b2e31, roughness: 0.8 });
   const bedMat = new THREE.MeshStandardMaterial({ color: 0x5c6166, roughness: 0.7, metalness: 0.4 });
 
@@ -282,51 +569,71 @@ export function buildVehicleModel(v: VehicleModelContext): VehicleModelParts {
   const chassis = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.5, v.bedLen + 1.6), dark);
   chassis.position.set(0, 0.65, 0.8);
   v.group.add(chassis);
-  const cab = new THREE.Mesh(new THREE.BoxGeometry(2.1, 1.25, 1.5), paint);
-  cab.position.set(0, 1.5, v.bedLen / 2 + 0.9);
+  // Fahrerhaus in zwei Höhen: unten schmaler als oben, so wie ein Fernfahrer-
+  // haus über dem Rahmen auskragt. Ein einzelner Quader sieht aus wie ein
+  // Container mit Fenstern.
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.72, 1.5), paint);
+  cab.position.set(0, 1.28, v.bedLen / 2 + 0.9);
   cab.castShadow = true;
   v.group.add(cab);
+  // Das obere Haus steht hinter der Frontscheibe zurück, damit die Scheibe
+  // eine Fläche für sich ist und nicht mit dem Blech in einer Ebene liegt.
+  const cabOben = new THREE.Mesh(new THREE.BoxGeometry(2.16, 0.62, 1.4), paint);
+  cabOben.position.set(0, 1.92, v.bedLen / 2 + 0.82);
+  cabOben.castShadow = true;
+  v.group.add(cabOben);
   // Verglasung: Frontscheibe und zwei Seitenfenster
   // Klar durchsichtig, damit man den Fahrer dahinter sitzen sieht
+  // Getönt, aus demselben Grund wie beim PKW: Klarglas vor Blech ist kein Fenster.
   const windowMat = new THREE.MeshPhysicalMaterial({
-    color: 0xd6ecf4,
-    roughness: 0.06,
+    color: 0x30505e,
+    roughness: 0.12,
     metalness: 0,
-    transmission: 0.82,
+    transmission: 0.3,
     thickness: 0.05,
     transparent: true,
-    opacity: 0.32,
+    opacity: 0.72,
   });
-  const windshield = new THREE.Mesh(new THREE.BoxGeometry(1.85, 0.7, 0.06), windowMat);
-  windshield.position.set(0, 1.72, v.bedLen / 2 + 1.66);
+  /*
+   * Verglasung. Sie sass bis 12.09.2026 im Blech: Die Frontscheibe lag zwei
+   * Zentimeter hinter der Kabinenvorderkante und war schlicht nicht zu sehen.
+   * Jetzt sitzt sie auf der Flucht des oberen Hauses, und zwar dort, wo sie
+   * hingehoert — in dessen oberer Haelfte, nicht auf halber Kabinenhoehe.
+   */
+  const windshield = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.56, 0.06), windowMat);
+  windshield.position.set(0, 1.94, v.bedLen / 2 + 1.7);
   v.group.add(windshield);
   for (const sx of [-1, 1]) {
-    const sideWin = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.55, 1.0), windowMat);
-    sideWin.position.set(sx * 1.06, 1.68, v.bedLen / 2 + 0.85);
+    const sideWin = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.46, 1.1), windowMat);
+    sideWin.position.set(sx * 1.11, 1.92, v.bedLen / 2 + 0.92);
     v.group.add(sideWin);
   }
   // Fahrer hinterm Steuer
   const driverSkin = new THREE.MeshStandardMaterial({ color: 0xe3b18c, roughness: 0.8 });
   const driverShirt = new THREE.MeshStandardMaterial({ color: 0x35506b, roughness: 0.85 });
   const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.15, 0.28, 4, 10), driverShirt);
-  torso.position.set(-0.45, 1.5, v.bedLen / 2 + 0.75);
+  torso.position.set(-0.45, 1.62, v.bedLen / 2 + 0.75);
   v.group.add(torso);
   const dHead = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 10), driverSkin);
-  dHead.position.set(-0.45, 1.8, v.bedLen / 2 + 0.75);
+  dHead.position.set(-0.45, 1.92, v.bedLen / 2 + 0.75);
   v.group.add(dHead);
   const cap = new THREE.Mesh(new THREE.SphereGeometry(0.116, 12, 10), driverShirt);
   cap.scale.set(1, 0.6, 1);
-  cap.position.set(-0.45, 1.85, v.bedLen / 2 + 0.74);
+  cap.position.set(-0.45, 1.97, v.bedLen / 2 + 0.74);
   v.group.add(cap);
-  const wheelGeo = new THREE.CylinderGeometry(0.48, 0.48, 0.35, 14);
-  wheelGeo.rotateZ(Math.PI / 2);
-  for (const z of [v.bedLen / 2 + 1.1, 0.1, -v.bedLen / 2 + 0.8]) {
+  // Dreiachser: vorn Einzelrad und lenkbar, hinten Zwillinge auf beiden Achsen
+  const achsen: Array<[number, boolean]> = [
+    [v.bedLen / 2 + 1.1, false],
+    [0.1, true],
+    [-v.bedLen / 2 + 0.8, true],
+  ];
+  for (const [z, zwilling] of achsen) {
     for (const x of [-1.0, 1.0]) {
-      const w = new THREE.Mesh(wheelGeo, dark);
-      w.position.set(x, 0.48, z);
-      v.group.add(w);
+      baueRad(v.group, x, 0.48, z, 0.48, 0.3, zwilling);
     }
   }
+  baueFahrerhaus(v, paint, dark, windowMat);
+  baueFahrgestell(v, dark, bedMat);
 
   // Ladefläche: Ursprung am Heck-Kipp-Gelenk (Boden-Höhe der Fläche)
   const bedW = BED_HALF_W * 2;
