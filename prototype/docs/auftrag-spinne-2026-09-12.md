@@ -110,32 +110,54 @@ und nicht gegen etwas drücken.
 | **Größe** | Darf gern **etwas größer** werden. Maßgabe ist nicht das Datenblatt, sondern: „dass man jedes Teil auch gut packen kann, auch größere Tanks, und dass sie fast alle Objekte greifen kann". |
 | **Schalenform** | Die ovale Form darf bleiben. Gern **oben breiter als unten**. **Wichtig: Sie müssen komplett abschließen.** |
 | **Vorgehen** | Alles neu, **im Labor**. |
+| **Schalen** | **Fünf**, wie bisher. Bewährte Zahl bei Umschlaggreifern: dicht genug für einen Korb, grob genug, dass man die einzelne Schale noch sieht. |
+| **Hubkraft** | **Vom Ausladen abhängig** — nah am Bagger hebt sie schwer, weit draußen wird es leicht. Das gibt dem Ausfahren Gewicht und macht Heranfahren zu einer Entscheidung. Braucht eine Anzeige, sonst wirkt es willkürlich. |
+| **Umschmeißen** | Sie soll sich **selbst ablegen** können: Wenn der Arm drückt, kippt sie am Kardangelenk zur Seite und legt sich hin. **Kein Rammbock** — Dinge umstoßen und Haufen zusammenschieben gehört ausdrücklich nicht dazu. |
+| **Widerstand** | Ein Zahn bleibt **nur an massivem Vollmaterial** stehen: Träger, Motorblock, Schiene, Betonwand. Gemessen an der Hüllendichte — dieselbe Rechnung, die schon entscheidet, was pressbar ist (E-067: unter 260 kg/m³ pressbar, Träger liegt bei 792, Profilstahl bei 2051). Alles andere wird beiseitegeschoben oder eingedrückt. |
 
 ---
 
 ## 4. Was das für den Bau heißt
 
-1. **Bremsen raus.** Die Abwärtssperre gegen Brocken (`eindringtiefe`) fällt
-   weg oder wird an echten Widerstand gekoppelt statt an eine Massenschwelle.
-   Der Bodenanschlag gegen den Beton bleibt — durch den Boden soll sie nicht.
-2. **Blockierung umdrehen.** Feste Bauwerke halten die Zähne auf. Bewegliches
-   hält sie nur auf, wenn es wirklich massiv ist — die Schwelle ist neu zu
-   bestimmen und muss deutlich über „nicht pressbar" liegen.
-3. **Greifbereich ist ein Korb, keine Kugel.** Was zwischen den Schalen liegt,
-   wenn sie sich schließen, wird gegriffen. Sonst nichts.
-4. **Schalen schließen dicht.** Heute sind es fünf gekrümmte Finger mit
-   Lücken. Sie müssen zu einem geschlossenen Korb werden.
-5. **Beweglicher aufhängen.** Ablegen, andrücken, umkippen muss gehen.
+1. **Bremsen raus.** Die Abwärtssperre gegen Brocken (`eindringtiefe`,
+   `EINDRING_SCHWER_KG`) fällt weg. Der Bodenanschlag gegen den Beton bleibt —
+   durch den Boden soll sie nicht.
+2. **Blockierung umdrehen.** Feste Bauwerke halten die Zähne auf; heute werden
+   sie übersprungen. Bewegliches hält nur auf, wenn die Hüllendichte es als
+   Vollmaterial ausweist — die Schwelle liegt weit über „nicht pressbar".
+3. **Greifbereich ist ein Korb, keine Kugel.** Gegriffen wird, was zwischen den
+   Schalen liegt, wenn sie sich schließen. `SENSOR_RADIUS` als Kugel fällt weg.
+4. **Kapazität nach Volumen.** Was zwischen die geschlossenen Schalen passt,
+   kommt mit. `MAX_ITEMS = 5` fällt weg, das Gewicht bleibt als Hubgrenze.
+5. **Schalen schließen dicht** und dürfen oben breiter sein als unten. Heute
+   sind es fünf gekrümmte Finger mit Lücken dazwischen.
+6. **Hubkraft über dem Ausladen**, mit einer Anzeige im Instrument.
+7. **Kardangelenk weicher**, damit sie sich ablegen lässt. Heute ist der
+   Ausschlag auf 17° gedeckelt und federt immer zurück.
 
 ---
 
-## 5. Noch offen
+## 5. Reihenfolge
 
-- **Wie viele Schalen?** Heute fünf. Umschlaggreifer gibt es mit vier, fünf
-  und sechs. Mehr Schalen schließen dichter, weniger sehen grober aus.
-- **Hubgrenze.** Heute 3500 kg unabhängig vom Abstand. Soll sie nah am Bagger
-  mehr heben können als weit draußen? Das wäre das Verhalten einer echten
-  Maschine und gäbe dem Ausfahren ein Gewicht.
-- **Was heißt „umschmeißen" genau?** Soll die geschlossene Spinne beim
-  Schwenken Dinge umwerfen können wie ein Rammbock, oder geht es nur darum,
-  dass sie sich selbst ablegen lässt?
+Gebaut wird im Prüfstand (`labor.html`). Er hat keinen Platz, keine LKW und
+keine Wirtschaft — nur die Spinne, Prüfkörper und Messwerte. Genau dafür wurde
+er am 11.09.2026 angelegt: die Spinne nicht im laufenden Spiel umzubauen.
+
+1. Schalenform und Schließen — der Korb muss dicht sein.
+2. Widerstand und Blockierung — Hüllendichte statt Massenschwelle, Bauwerke
+   halten auf.
+3. Greifbereich und Volumen — was zwischen den Schalen liegt, kommt mit.
+4. Aufhängung — ablegen, andrücken.
+5. Hubkraft über dem Ausladen.
+6. Erst dann ins Spiel, und dort gegen die vorhandenen Maße prüfen: Presskammer
+   4,20 m licht, Absetzcontainer 4,08 m (`test/spinnenmass.test.ts`). Wird die
+   Spinne breiter, müssen beide mitwachsen.
+
+---
+
+## 6. Noch offen
+
+- **Anzeige der Hubkraft.** Wo und wie — Balken im Instrument, Farbe am
+  Greifer, Warnton? Entscheidet sich, wenn die Kurve steht.
+- **Wie weich die Aufhängung beim Ablegen wird.** Das lässt sich nur im
+  Prüfstand erfühlen, nicht vorher festlegen.
