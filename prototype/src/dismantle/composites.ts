@@ -167,12 +167,20 @@ export class CarComposite {
         .setLinearDamping(0.05)
     );
     this.collider = this.makeCollider(0);
-    // Rumpf zählt als Stahlschrott-Item (Haufen-Zählung, HUD, Greifen)
+    /*
+     * Der Rumpf zaehlt mit seiner Zusammensetzung, nicht nur mit einer
+     * Fraktion. Ohne sie rechnete die Presse ein Paket aus lauter Karossen
+     * als sortenrein — und genau das soll nicht passieren (E-071).
+     */
     items.register({
       materialId: def.hullMaterialId,
       massKg: def.hullMassKg,
       mesh: this.group,
       body: this.body,
+      composition: def.hullZusammensetzung?.map((a) => ({
+        materialId: a.materialId,
+        massKg: a.anteil * def.hullMassKg,
+      })),
     });
   }
 
