@@ -530,6 +530,12 @@ export class Excavator {
      * deutlich dunkleren Kantenmaterial zerfiel der Greifer in schwarze
      * Einzelteile, und die Zaehne stachen als Pfeile heraus.
      */
+    // Bolzen sind blank gedreht und heben sich vom Gussgrau ab
+    const boltMat = new THREE.MeshStandardMaterial({
+      color: 0x3c4248,
+      roughness: 0.3,
+      metalness: 0.85,
+    });
     const edgeMat = new THREE.MeshStandardMaterial({
       color: 0x6a7278,
       roughness: 0.45,
@@ -703,9 +709,39 @@ export class Excavator {
       pivot.rotation.order = "YXZ";
       pivot.rotation.y = a; // lokales +Z zeigt radial nach außen
 
-      const knuckle = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.18, 0.22), edgeMat);
-      knuckle.position.y = 0.02;
-      pivot.add(knuckle);
+      /*
+       * Die Gelenkgruppe einer Schale — mit SICHTBAREN Bolzen.
+       *
+       * Auf der Massskizze (P25VR HD-3-W, 12.09.2026) hat jede Schale zwei
+       * Bolzen dicht beieinander: unten den Drehbolzen zum Rahmen, darueber
+       * den Bolzen fuer die Lasche. Dazwischen liegt der Hebelarm, und der ist
+       * kurz — daher die enorme Griffkraft. Beides waren bei mir gedachte
+       * Punkte ohne Bauteil; der Zylinder endete sichtbar im Nichts (Befund
+       * 12.09.2026: „achte mal auf die Drehachsen und Bolzen, wo sie
+       * miteinander verbunden sind").
+       */
+      const lagerbock = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.26, 0.24), edgeMat);
+      lagerbock.position.set(0, 0.04, 0.04);
+      lagerbock.castShadow = true;
+      pivot.add(lagerbock);
+      /*
+       * Der Drehbolzen selbst: ein Zapfen quer zur Schale, also entlang der
+       * lokalen x-Achse — genau der Achse, um die das Gelenk schwenkt. Er ragt
+       * beidseits heraus, wie ein gesicherter Bolzen es tut.
+       */
+      const bolzen = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.46, 10), boltMat);
+      bolzen.rotation.z = Math.PI / 2;
+      bolzen.castShadow = true;
+      pivot.add(bolzen);
+      // Bolzen der Lasche, ein Stueck darueber und nach aussen versetzt
+      const laschenBolzen = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.055, 0.055, 0.38, 10),
+        boltMat
+      );
+      laschenBolzen.rotation.z = Math.PI / 2;
+      laschenBolzen.position.set(0, 0.13, 0.11);
+      laschenBolzen.castShadow = true;
+      pivot.add(laschenBolzen);
 
       /*
        * Eine Schale statt einer Fingerkette.
@@ -830,6 +866,16 @@ export class Excavator {
       barrel.castShadow = true;
       this.grappleGroup.add(barrel);
       this.grappleGroup.add(rod);
+      /*
+       * Lasche: das Blech zwischen Kolbenstange und Schalenbolzen. Sie sitzt
+       * am Gelenk und dreht mit ihm mit, deshalb haengt sie am pivot und nicht
+       * am Greifergehaeuse. Ohne sie fasst die Kolbenstange ins Leere.
+       */
+      const lasche = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.3, 0.16), edgeMat);
+      lasche.position.set(0, 0.19, 0.09);
+      lasche.rotation.x = -0.35;
+      lasche.castShadow = true;
+      pivot.add(lasche);
       this.grappleCylinders.push({
         pivot,
         /*
