@@ -13,7 +13,6 @@ import {
   CLAW_RING_Y,
   CLAW_SEGMENTS,
   schalenGeometrie,
-  rippenGeometrie,
   flanschGeometrie,
   CLAW_SHELL_BREITE,
   HAUT_RUECKSPRUNG,
@@ -517,7 +516,7 @@ export class Excavator {
      * Greifer helles, abgeschabtes Grau mit dunklen Laufspuren.
      */
     const shellMat = new THREE.MeshStandardMaterial({
-      color: 0x7c848b,
+      color: 0x9aa2a8,
       roughness: 0.5,
       metalness: 0.55,
       side: THREE.DoubleSide, // Innenseite ist bei geöffneter Spinne sichtbar
@@ -536,8 +535,17 @@ export class Excavator {
       roughness: 0.3,
       metalness: 0.85,
     });
+    /*
+     * Kanten nur noch minimal abgesetzt.
+     *
+     * Auf den Vorlagen ist die Schale eine grosse, ruhige Gussflaeche. Bei mir
+     * zerlegten Rippe, Schneidkante und Wangen sie in lauter dunkle Streifen —
+     * das war der Grund, warum sie zerklueftet wirkte statt massiv. Der
+     * Unterschied ist jetzt so klein, dass er die Form zeichnet, statt sie zu
+     * zerschneiden.
+     */
     const edgeMat = new THREE.MeshStandardMaterial({
-      color: 0x6a7278,
+      color: 0x89919a,
       roughness: 0.45,
       metalness: 0.7,
     });
@@ -775,12 +783,15 @@ export class Excavator {
        * untersten Stationen.
        */
       // Abgesetzte Schneidkante am unteren Drittel
-      const schneide = new THREE.Mesh(schalenGeometrie(5, CLAW_SHELL_BREITE, -HAUT_RUECKSPRUNG), edgeMat);
+      const schneide = new THREE.Mesh(schalenGeometrie(6, CLAW_SHELL_BREITE, -HAUT_RUECKSPRUNG), edgeMat);
       schneide.scale.set(1.012, 1, 1.012);
       pivot.add(schneide);
-      // Erhabener Steg ueber den Ruecken — das Erkennungszeichen eines Gussteils
-      const rippe = new THREE.Mesh(rippenGeometrie(), edgeMat);
-      pivot.add(rippe);
+      /*
+       * Keine Ruecken-Rippe mehr. Sie sollte das Gussteil kenntlich machen,
+       * lief aber als dunkler Streifen ueber die ganze Laenge und teilte jede
+       * Schale in zwei Haelften. Die Vorlagen zeigen an dieser Stelle nichts —
+       * die Form traegt sich ueber ihre Woelbung.
+       */
       /*
        * Seitenflansche an beiden Kanten der Schale.
        *
