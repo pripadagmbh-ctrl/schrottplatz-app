@@ -4,11 +4,17 @@
  * Alle Zahlen Startwerte (SW).
  */
 
+import { type Anteil, fraktionAus } from "../materials/purity";
+
 export interface PartDef {
   id: string;
   name: string;
   materialId: string;
   massKg: number;
+  /** Woraus das Teil besteht — ein Rad ist Reifen plus Felge. */
+  zusammensetzung?: Anteil[];
+  /** Faellt beim Zerquetschen auseinander (Rad: Reifen und Felge). */
+  trennbar?: boolean;
   /** Sekunden Ziehen über der Lösekraft bis zum Abriss */
   tearSeconds: number;
   /** Greifradius um den Ankerpunkt, in dem die Spinne die Part statt des Rumpfs fasst */
@@ -80,7 +86,20 @@ export const CAR_DEF: CarDef = {
       ([x, z], i): PartDef => ({
         id: `wheel_${i}`,
         name: "Rad",
-        materialId: "tires", // Reifen mit Felge gehen in die Reifenmulde
+        /*
+         * Reifen plus Felge ist ein Verbundteil und damit Mischschrott
+         * (Ansage 12.09.2026). Wer die Spinne zudrueckt, sprengt den Reifen
+         * von der Felge — danach liegt beides sortenrein da.
+         */
+        materialId: fraktionAus([
+          { materialId: "tires", anteil: 0.7 },
+          { materialId: "steel", anteil: 0.3 },
+        ]),
+        zusammensetzung: [
+          { materialId: "tires", anteil: 0.7 },
+          { materialId: "steel", anteil: 0.3 },
+        ],
+        trennbar: true,
         massKg: 25,
         tearSeconds: 1.2,
         grabRadius: 0.5,

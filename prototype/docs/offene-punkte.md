@@ -74,3 +74,13 @@ erledigt ist, bekommt den Commit dazu.
 - [ ] **Heisse Ware** — Händler mit heissem Haufen wollen schnellen Umschlag:
       direkt verladen, Autos direkt in die Presse. Volle Ladungen, sonst
       lohnt es nicht; zu durchmischt drückt den Preis.
+
+## Wirtschaft
+
+- [ ] **Mischschrott wird pauschal bepreist, nicht nach Inhalt** — gemessen
+      12.09.2026: Ein Rad (Reifen 70 %, Felge 30 %) bringt ungetrennt 4,00 €,
+      zerlegt nur 1,00 €, weil Reifen Entsorgungskosten verursachen. Damit
+      lohnt es sich, Reifen **nicht** zu trennen — das Gegenteil der Absicht.
+      Vorschlag: Der Wert eines Mischschrott-Teils ist die Summe seiner
+      Bestandteile, vermindert um einen Abschlag fürs Unsortierte. Dann ist
+      Zerlegen nie ein Verlust, nur manchmal wenig Gewinn.

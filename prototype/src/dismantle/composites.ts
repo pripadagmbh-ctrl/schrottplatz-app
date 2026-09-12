@@ -413,7 +413,29 @@ export class CarComposite {
         ? RAPIER.ColliderDesc.cuboid(d.size[1] / 2, d.size[0], d.size[0])
         : RAPIER.ColliderDesc.cuboid(d.size[0] / 2, d.size[1] / 2, d.size[2] / 2);
     this.world.createCollider(colliderDesc.setMass(d.massKg), body);
-    this.items.register({ materialId: d.materialId, massKg: d.massKg, mesh: part.mesh, body });
+    /*
+     * Auch ein abgerissenes Teil braucht seine Form: Ohne sie weiss das Spiel
+     * weder, wie es heisst, noch woraus es besteht — und ein Rad liesse sich
+     * nie in Reifen und Felge zerlegen.
+     */
+    this.items.register({
+      materialId: d.materialId,
+      massKg: d.massKg,
+      mesh: part.mesh,
+      body,
+      shape: {
+        kind: d.kind === "wheel" ? "cyl" : "box",
+        dims: d.kind === "wheel" ? [d.size[0], d.size[1]] : [...d.size],
+        color: d.color,
+        name: d.name,
+        zusammensetzung: d.zusammensetzung,
+        trennbar: d.trennbar,
+      },
+      composition: d.zusammensetzung?.map((a) => ({
+        materialId: a.materialId,
+        massKg: a.anteil * d.massKg,
+      })),
+    });
 
     // Rumpf wird leichter
     this.currentMassKg = Math.max(this.def.hullMassKg, this.currentMassKg - d.massKg);

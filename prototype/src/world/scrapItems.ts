@@ -420,7 +420,7 @@ const SPECS: PileSpec[] = [
   { materialId: "steel", massKg: 75, kind: "box", dims: [0.9, 0.75, 0.12], bau: "maschine", name: "LKW-Kuehler" },
   { materialId: "steel", massKg: 46, kind: "cyl", dims: [0.28, 0.32], name: "LKW-Felge" },
   { materialId: "alu", massKg: 16, kind: "box", dims: [0.7, 0.5, 0.15], bau: "motor", name: "Motorradmotor" },
-  { materialId: "copper", massKg: 22, kind: "box", dims: [0.45, 0.4, 0.35], bau: "elektromotor", name: "Elektromotor", zusammensetzung: [{ materialId: "steel", anteil: 0.58 }, { materialId: "copper", anteil: 0.38 }, { materialId: "alu", anteil: 0.04 }] },
+  { materialId: "copper", massKg: 22, kind: "box", dims: [0.45, 0.4, 0.35], bau: "elektromotor", name: "Elektromotor", trennbar: true, zusammensetzung: [{ materialId: "steel", anteil: 0.58 }, { materialId: "copper", anteil: 0.38 }, { materialId: "alu", anteil: 0.04 }] },
   { materialId: "tires", massKg: 11, kind: "torus", dims: [0.31, 0.11], name: "Traktorreifen" },
 
   // Erweiterung 12.09.2026 — siehe world/objektkatalog.ts
@@ -1091,6 +1091,11 @@ export class ItemManager {
    * Was hohl ist, geht zusammen; was massiv ist, bleibt (Ansage 12.09.2026:
    * "starre und massive Traeger sollten von der Presse unberuehrt bleiben").
    */
+  /** Faellt das Ding beim Zusammendruecken auseinander? */
+  istTrennbar(item: ScrapItem): boolean {
+    return !!item.shape?.trennbar && (item.composition?.length ?? 0) >= 2;
+  }
+
   isCrushable(item: ScrapItem): boolean {
     if (!item.shape || item.shape.flat) return false;
     return istPressbar(item.massKg, item.shape.dims);
@@ -1423,10 +1428,19 @@ export class ItemManager {
     const p = item.body.translation();
     const summe = item.composition.reduce((a, c) => a + c.massKg, 0);
     if (summe <= 0) return null;
-    const teile: Array<{ materialId: string; massKg: number }> = item.composition
-      .filter((c) => c.massKg / summe >= 0.05)
-      .map((c) => ({ materialId: c.materialId, massKg: (c.massKg / summe) * item.massKg }));
-    if (teile.length < 2) return null;
+    const grosse = item.composition.filter((c) => c.massKg / summe >= 0.05);
+    if (grosse.length < 2) return null;
+    /*
+     * Die Reste werden auf die verbleibenden Fraktionen verteilt, nicht
+     * weggeworfen: Sonst verschwaende beim Zerlegen stillschweigend Masse —
+     * beim Elektromotor waeren das die vier Prozent Alu. Was zu klein fuer ein
+     * eigenes Stueck ist, bleibt eben am groesseren haengen.
+     */
+    const rest = grosse.reduce((a, c) => a + c.massKg, 0);
+    const teile: Array<{ materialId: string; massKg: number }> = grosse.map((c) => ({
+      materialId: c.materialId,
+      massKg: (c.massKg / rest) * item.massKg,
+    }));
 
     this.remove(item);
     const neu: ScrapItem[] = [];

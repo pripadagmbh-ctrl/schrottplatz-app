@@ -469,7 +469,12 @@ async function main(): Promise<void> {
   // Zudrücken: was nachgibt, wird in der Spinne plattgequetscht
   grip.crusher = (body) => {
     const it = items.items.find((i) => i.body.handle === body.handle);
-    if (!it || !items.isCrushable(it)) return false;
+    /*
+     * Trennen geht vor Quetschen. Ein Rad ist nach der Dichteregel nicht
+     * quetschbar — es ist ja voll —, aber sehr wohl zu sprengen. Stuende die
+     * Pruefung zuerst, kaeme das Zerlegen nie dran.
+     */
+    if (!it || (!items.isCrushable(it) && !items.istTrennbar(it))) return false;
     const p = body.translation();
     const ort = new THREE.Vector3(p.x, p.y, p.z);
     /*
