@@ -92,6 +92,12 @@ durch Glas. Draußen umgekehrt. Der Umschalter existiert schon im Spiel.
 
 ## 5 Reihenfolge
 
+**Stand 12.09.2026: Die Klangwelt steht auf `b4760fb` (11.09. mittags), also
+vor allem, was unten steht.** Aufschläge, Rückfahrwarner und Kulissentakt
+haben stumme Einsprungstellen. Ab jetzt wird **ein Klang nach dem anderen**
+eingeschaltet und einzeln beurteilt — nicht mehr die ganze Klangwelt auf
+einmal. Das ist die eigentliche Lehre aus dem 11.09.
+
 | Schritt | Inhalt | Stand |
 |---|---|---|
 | 1 | **Diesel aus Zündungen** statt Oszillator | **gebaut und wieder zurückgenommen**, siehe unten |
