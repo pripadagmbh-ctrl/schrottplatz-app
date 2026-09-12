@@ -10,12 +10,21 @@ import * as THREE from "three";
  * und nach einer Formänderung stimmte der Bodenanschlag nicht mehr.
  */
 
-/** Gelenkkreis der Schalen = ØC/2 laut Datenblatt (1514 mm) */
-export const CLAW_RING_R = 0.82;
+/**
+ * Radius, auf dem die Drehbolzen der Schalen sitzen.
+ *
+ * Das ist KEIN Ring unter dem Kopf, sondern das untere Ende des Strunks — der
+ * massiven Saeule, die aus der Birne kommt (Beschreibung 12.09.2026: „dieser
+ * Ring, den Du da zeichnest, der existiert gar nicht … die Schalen haengen
+ * unten am Strunk"). Er ist darum klein: 0,25 m gegen vorher 0,82 m.
+ *
+ * Aus dem Datenblatt der MG4.1-800-HO5 zurueckgerechnet — siehe BEND_PROFIL.
+ */
+export const CLAW_RING_R = 0.25;
 /** Unterkante Traverse, gemessen ab Kardangelenk */
 export const CLAW_RING_Y = -0.9;
 /** Länge eines Krallensegments */
-export const CLAW_SEG_LEN = 0.2140;
+export const CLAW_SEG_LEN = 0.289;
 /** Segmente je Kralle */
 export const CLAW_SEGMENTS = 8;
 /**
@@ -27,28 +36,28 @@ export const CLAW_SEGMENTS = 8;
  * senkrecht, unten hakt sie scharf nach innen:
  *
  *   Station   1    2    3    4    5    6    7    8
- *   Winkel   0°   6°  13°  22°  33°  46°  61°  78°
+ *   Winkel   0°  16°  32°  48°  64°  81°  98°  115°
  *
- * Der Endwinkel bestimmt die Bauform, und zwar allein. Gemessen wurde er am
- * Foto des Sennebogen-Greifers, im direkten Vergleich mit dem gebauten Modell
- * nebeneinander — aus dem Gedächtnis ging es dreimal daneben. Das Maß ist die
- * Breite der offenen Schalen geteilt durch ihre Tiefe, auf der Vorlage rund 2,8:
+ * Nicht mehr geschaetzt, sondern aus dem Datenblatt der MG4.1-800-HO5
+ * zurueckgerechnet (Broschuere SENNEBOGEN, 12.09.2026). Drei Masse mussten
+ * gleichzeitig stimmen, und ein Loeser hat Kruemmung, Bolzenradius und
+ * Segmentlaenge dazu gesucht:
  *
- *   Endwinkel      55°    70°    78°    85°    95°   115°
- *   Breite/Tiefe  1,94   2,55   2,93   3,23   3,64   4,15
- *   Tiefe/Ring    1,19   0,91   0,80   0,72   0,62   0,47
+ *                       gefunden   Datenblatt
+ *   Spitzenweite offen    2,21 m     2,225 m   (d)
+ *   Schalenkreis offen    2,40 m     2,409 m   (ØD)
+ *   Tiefe geschlossen     1,46 m     ~1,45 m   (A minus Kopf)
  *
- * Zwischendurch standen hier 55°. Das war ein Fehlschluss aus dem ersten Foto
- * (Rotobec): Dessen Zinken sind lang und schlank, die Schalen des Sennebogen
- * dagegen breit, rund und gedrungen — zwei verschiedene Bauarten. Maßgeblich
- * ist die zweite.
+ * Daraus folgt alles Weitere: 115° Gesamtkruemmung, fast gleichmaessig
+ * verteilt, und ein Bolzenradius von nur 0,20 m — im Spiel auf 0,25 m
+ * vergroessert, damit der Umschlag flott bleibt. Die Schale beschreibt damit
+ * ein grosses C: vom Bolzen erst nach aussen, dann herum und wieder nach
+ * innen, bis sich die Spitzen auf der Achse treffen.
  *
- * Die Zahlen sind so skaliert, dass die Spitzen bei geschlossener Spinne genau
- * auf der Achse zusammenkommen. Wer daran dreht, muss das nachrechnen — sonst
- * laufen die Schalen übereinander oder es bleibt ein Loch.
- */
+ * Wer daran dreht, muss alle drei Masse nachrechnen.
+  */
 const BEND_PROFIL = Array.from({ length: CLAW_SEGMENTS }, (_, i) =>
-  0.32413 * (0.3 + 0.7 * (i / (CLAW_SEGMENTS - 1)))
+  0.30169 * (0.9 + 0.1 * (i / (CLAW_SEGMENTS - 1)))
 );
 /** Aufsummierte Krümmung bis Station `i`. */
 export const CLAW_BEND_KUM: number[] = BEND_PROFIL.reduce<number[]>(
@@ -60,16 +69,23 @@ export const CLAW_COUNT = 5;
 /**
  * Spreizung der ganz offenen Spinne (rad).
  *
- * Sie hängt am Krümmungsprofil: Je stärker die Schale eingerollt ist, desto
- * weiter muss sie schwenken, um dieselbe Weite zu öffnen. Mit dem 78°-Profil:
+ * Sie haengt am Kruemmungsprofil und kommt wie alles Uebrige aus dem
+ * Datenblatt: Bei 1,65 rad stehen die Spitzen 2,21 m auseinander und der
+ * groesste Durchmesser betraegt 2,40 m — beides auf zwei Zentimeter genau die
+ * Werte fuer d und ØD.
+  */
+export const CLAW_OPEN_SPLAY = 1.65;
+/**
+ * Spreizung der GESCHLOSSENEN Spinne (rad).
  *
- *   Spreizung     1,20   1,30   1,35   1,40
- *   Öffnungsweite 3,48   3,72   3,83   3,94  (m)
+ * Frueher war das schlicht 0. Mit dem kleinen Bolzenradius geht das nicht
+ * mehr: Die Schale steht bei 0 senkrecht nach unten und ihre Spitzen liegen
+ * weit auseinander. Sie muss erst um 0,85 rad ausschwenken, damit die Spitzen
+ * auf der Achse zusammenkommen — das ist der geschlossene Greifer.
  *
- * 1,30 gewählt: 3,72 m Weite. Die Behälter auf dem Platz messen 4,7 m licht,
- * das reicht mit Luft.
+ * Die Zahl steckt damit ueberall dort, wo frueher 0 stand.
  */
-export const CLAW_OPEN_SPLAY = 1.30;
+export const CLAW_CLOSED_SPLAY = 0.85;
 
 /**
  * Halbe Winkelbreite einer Schale (rad).
@@ -80,9 +96,8 @@ export const CLAW_OPEN_SPLAY = 1.30;
  * Jede hat 0,95 m Bogen zur Verfügung und füllt 0,40 m davon. Mehr als die
  * Hälfte des Umfangs war Lücke, und deshalb schloss der Korb nie.
  *
- * Eine Schale bekommt ihren Anteil am Kreis: 360°/5 = 72°, also 36° zu jeder
- * Seite, davon 2° Luft für das Gelenk. Damit stoßen die Schalen über ihre
- * ganze Länge aneinander.
+ * Halbe Breite einer Schale in METERN, nicht als Winkel. Eine Schale ist also
+ * 0,68 m breit, vom Bolzen bis zur Spitze gleich.
  *
  * Zwischendurch waren es 21°, weil die offenen Greifer auf den Vorlagen breite
  * Lücken zeigen. Am zweiten Foto (Sennebogen-Mehrschalengreifer, 12.09.2026)
@@ -99,7 +114,7 @@ export const CLAW_OPEN_SPLAY = 1.30;
  *   Radius  0,757  0,757  0,744  0,708  0,642  0,536  0,390  0,207  ~0
  *   Breite  0,79   0,79   0,78   0,74   0,67   0,56   0,41   0,22   0  (m)
  */
-export const CLAW_SHELL_HALF = (Math.PI / CLAW_COUNT) * (34 / 36);
+export const CLAW_SHELL_BREITE = 0.34;
 /** Blechstärke der Schale (m) — sie ist ein Hohlkörper, kein Vollprofil. */
 export const CLAW_SHELL_DICKE = 0.085;
 /**
@@ -143,7 +158,7 @@ const SCHALE_MIN_R = 0.055;
  * Gebaut wie die Schale selbst, nur schmal und ein Stueck weiter aussen.
  */
 export function rippenGeometrie(): THREE.BufferGeometry {
-  return schalenGeometrie(0, CLAW_SHELL_HALF * 0.26, 0.075);
+  return schalenGeometrie(0, CLAW_SHELL_BREITE * 0.26, 0.075);
 }
 
 /**
@@ -164,7 +179,7 @@ export function rippenGeometrie(): THREE.BufferGeometry {
  * Blech steht und nicht eine gewoelbte Flaeche.
  */
 export function flanschGeometrie(seite: number): THREE.BufferGeometry {
-  return schalenGeometrie(0, 0.055, 0.03, CLAW_SHELL_HALF * seite, WANGEN_TIEFE);
+  return schalenGeometrie(0, 0.05, 0.03, CLAW_SHELL_BREITE * seite, WANGEN_TIEFE);
 }
 
 /** Wie tief die Wangen nach innen reichen (m). */
@@ -174,7 +189,7 @@ export const HAUT_RUECKSPRUNG = 0.1;
 
 export function schalenGeometrie(
   vonStation = 0,
-  halbWinkel = CLAW_SHELL_HALF,
+  halbBreite = CLAW_SHELL_BREITE,
   hinaus = 0,
   mitte = 0,
   dicke = CLAW_SHELL_DICKE
@@ -194,7 +209,16 @@ export function schalenGeometrie(
   let z = 0;
   for (let k = 0; k <= CLAW_SEGMENTS; k++) {
     stationen.push({ y, r: Math.max(SCHALE_MIN_R, CLAW_RING_R + z) });
-    const th = CLAW_BEND_KUM[k] ?? 0;
+    /*
+     * Referenz ist der GESCHLOSSENE Greifer, nicht Spreizung 0.
+     *
+     * Bei 0 laeuft die Schale durch die Achse hindurch auf die Gegenseite —
+     * der Radius wird negativ (gemessen −1,285 m an der Spitze). Die Bauroutine
+     * klemmt negative Radien auf 5 cm ab und zerstoerte damit die ganze Form:
+     * Die Schalen wurden zu flachen Lappen. Geschlossen laeuft der Radius von
+     * 0,25 ueber 0,72 zurueck auf 0,015 m und bleibt durchweg positiv.
+     */
+    const th = (CLAW_BEND_KUM[k] ?? 0) - CLAW_CLOSED_SPLAY;
     y -= CLAW_SEG_LEN * Math.cos(th);
     z -= CLAW_SEG_LEN * Math.sin(th);
   }
@@ -218,8 +242,21 @@ export function schalenGeometrie(
     for (const st of teil) {
       const r = Math.max(0.012, st.r + hinaus - seite * dicke);
       const reihe: number[] = [];
+      /*
+       * Die Schale hat eine feste BREITE in Metern, keinen festen Winkel.
+       *
+       * Das war der Fehler beim Umbau auf den Strunk (12.09.2026): Mit festem
+       * Winkel waechst die Breite mit dem Radius. Am alten Ring von 0,82 m
+       * ergaben 34° eine Breite von 0,79 m — am neuen Bolzenkreis von 0,25 m
+       * laeuft dieselbe Rechnung auf 1,5 m hinaus, weil die Schale nach aussen
+       * schwingt. Die Schalen wurden dadurch zu flachen Lappen.
+       *
+       * Der Winkel folgt jetzt dem Radius, damit die Breite steht. Nur nah am
+       * Bolzen wird er gedeckelt, sonst ueberschlagen sich die Nachbarschalen.
+       */
+      const u0 = Math.min(halbBreite / Math.max(r, 0.05), Math.PI / CLAW_COUNT);
       for (let j = 0; j <= BOGEN; j++) {
-        const u = mitte - halbWinkel + (j / BOGEN) * 2 * halbWinkel;
+        const u = mitte - u0 + (j / BOGEN) * 2 * u0;
         reihe.push(punkt(r, u, st.y));
       }
       lagen.push(reihe);

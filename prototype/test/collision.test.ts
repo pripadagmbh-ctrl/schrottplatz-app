@@ -14,6 +14,7 @@ import {
   CLAW_SEGMENTS,
   clawPoint,
   clawSpan,
+  CLAW_CLOSED_SPLAY,
   clawTipDepth,
   naechsteSpreizung,
   NACHDRUECK_RESERVE,
@@ -336,7 +337,13 @@ describe("Reichweite des Baggers", () => {
   });
 
   it("schließt mittig, ohne dass die Spitzen sich überlappen", () => {
-    const p = clawPoint(0, 0, CLAW_SEGMENTS, new THREE.Vector3());
+    /*
+     * Geschlossen heißt seit dem 12.09.2026 nicht mehr Spreizung 0.
+     * Die Schalen hängen an einem Bolzenkreis von nur 0,25 m; bei 0 stehen sie
+     * senkrecht nach unten und ihre Spitzen liegen weit auseinander. Erst nach
+     * 0,85 rad Ausschwenken treffen sie sich auf der Achse.
+     */
+    const p = clawPoint(0, CLAW_CLOSED_SPLAY, CLAW_SEGMENTS, new THREE.Vector3());
     // Radius nahe null heißt: die Spitzen treffen sich in der Mitte
     expect(Math.abs(Math.hypot(p.x, p.z))).toBeLessThan(0.05);
   });
@@ -349,7 +356,13 @@ describe("Reichweite des Baggers", () => {
      * Spinne in einen Behälter passt, prüft `test/spinnenmass.test.ts` gegen
      * die echten Maße aus CONFIGS. Eine Regel, ein Besitzer.
      */
-    expect(clawSpan(CLAW_OPEN_SPLAY)).toBeGreaterThan(3);
+    /*
+     * Die echte MG4.1-800 öffnet 2,225 m (Datenblatt). Im Spiel ist sie um ein
+     * Viertel vergrößert, damit der Umschlag flott bleibt — 2,80 m. Die alte
+     * Schranke von 3 m stammt aus der Zeit, als die Öffnungsweite geschätzt
+     * statt gerechnet war.
+     */
+    expect(clawSpan(CLAW_OPEN_SPLAY)).toBeGreaterThan(2.5);
   });
 
   it("öffnet weiter, als es schließt", () => {
@@ -360,7 +373,7 @@ describe("Reichweite des Baggers", () => {
     // Offen ist die Spinne flacher als geschlossen — sie streckt sich erst
     // beim Schließen nach unten
     const offen = clawTipDepth(CLAW_OPEN_SPLAY);
-    const zu = clawTipDepth(0);
+    const zu = clawTipDepth(CLAW_CLOSED_SPLAY);
     expect(offen).toBeGreaterThan(1.5);
     expect(zu).toBeGreaterThan(offen);
     /*
@@ -379,7 +392,7 @@ describe("Reichweite des Baggers", () => {
   it("wächst monoton vom Gelenk zur Spitze", () => {
     let vorher = 0;
     for (let k = 1; k <= CLAW_SEGMENTS; k++) {
-      const tiefe = -clawPoint(0, 0, k, new THREE.Vector3()).y;
+      const tiefe = -clawPoint(0, CLAW_CLOSED_SPLAY, k, new THREE.Vector3()).y;
       expect(tiefe).toBeGreaterThan(vorher);
       vorher = tiefe;
     }

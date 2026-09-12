@@ -8,13 +8,14 @@ import { buildDriver } from "./driver";
 import {
   CLAW_COUNT,
   CLAW_OPEN_SPLAY,
+  CLAW_CLOSED_SPLAY,
   CLAW_RING_R,
   CLAW_RING_Y,
   CLAW_SEGMENTS,
   schalenGeometrie,
   rippenGeometrie,
   flanschGeometrie,
-  CLAW_SHELL_HALF,
+  CLAW_SHELL_BREITE,
   HAUT_RUECKSPRUNG,
   CLAW_BEND_KUM,
   clawPoint,
@@ -179,7 +180,7 @@ export function anlaufZeit(lastKg: number): number {
 /** Kollider-Reihen je Schale, quer zur Krallenrichtung. */
 const KOLLIDER_REIHEN = 3;
 /** Seitenversatz der aeusseren Reihen (rad Umfangswinkel). */
-const KOLLIDER_ABSTAND = CLAW_SHELL_HALF * 1.2;
+const KOLLIDER_ABSTAND = 0.30; // rad — Seitenversatz der aeusseren Kollider-Reihen
 
 const SCHNAPP_AB = 0.93;
 /** Bis hierher gilt eine Kralle als am Teil anliegend (m) */
@@ -669,15 +670,28 @@ export class Excavator {
     schulter.rotation.y = Math.PI / 6;
     schulter.castShadow = true;
     this.grappleGroup.add(schulter);
-    // Fuss des Kopfes, auf dem der Gelenkring sitzt
-    const fuss = new THREE.Mesh(new THREE.CylinderGeometry(0.50, 0.56, 0.24, 6), shellMat);
-    fuss.position.y = -0.88;
-    fuss.rotation.y = Math.PI / 6;
-    this.grappleGroup.add(fuss);
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(RING_R, 0.075, 8, 22), edgeMat);
-    ring.rotation.x = Math.PI / 2;
-    ring.position.y = ringY;
-    this.grappleGroup.add(ring);
+    /*
+     * Strunk: die massive Saeule, die unten aus der Birne kommt und an deren
+     * Ende die Schalen haengen (Beschreibung 12.09.2026). Sie laeuft nach
+     * unten in ein Prisma aus — auf den Bildern der auffaellige graue Keil in
+     * der Mitte.
+     */
+    const strunk = new THREE.Mesh(new THREE.CylinderGeometry(0.30, 0.24, 0.62, 6), shellMat);
+    strunk.position.y = CLAW_RING_Y + 0.34;
+    strunk.rotation.y = Math.PI / 6;
+    strunk.castShadow = true;
+    this.grappleGroup.add(strunk);
+    // Prisma am unteren Ende — hier sitzen die Drehbolzen
+    const prisma = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.1, 0.5, 6), edgeMat);
+    prisma.position.y = CLAW_RING_Y - 0.14;
+    prisma.rotation.y = Math.PI / 6;
+    prisma.castShadow = true;
+    this.grappleGroup.add(prisma);
+    /*
+     * Kein Ring mehr. „Dieser Ring, den Du da zeichnest, der existiert gar
+     * nicht" (12.09.2026) — an der echten Maschine sitzen die Drehbolzen
+     * einzeln am Prisma, es gibt keinen umlaufenden Kranz.
+     */
     // Kein zentraler Eindringdorn (Angleich an v2, Wunsch 10.09.2026): Echte
     // Mehrschalengreifer haben keinen, er sah aus wie ein Dolch, und er hatte
     // hier weder Kollider noch Funktion — die Krallen greifen, nicht er.
@@ -709,7 +723,7 @@ export class Excavator {
       // Die Haut liegt hinter der Aussenkante der Wangen zurueck — dadurch
       // steht das Blech vor und die Schale bekommt ihr Profil.
       const schale = new THREE.Mesh(
-        schalenGeometrie(0, CLAW_SHELL_HALF, -HAUT_RUECKSPRUNG),
+        schalenGeometrie(0, CLAW_SHELL_BREITE, -HAUT_RUECKSPRUNG),
         shellMat
       );
       schale.castShadow = true;
@@ -725,7 +739,7 @@ export class Excavator {
        * untersten Stationen.
        */
       // Abgesetzte Schneidkante am unteren Drittel
-      const schneide = new THREE.Mesh(schalenGeometrie(5, CLAW_SHELL_HALF, -HAUT_RUECKSPRUNG), edgeMat);
+      const schneide = new THREE.Mesh(schalenGeometrie(5, CLAW_SHELL_BREITE, -HAUT_RUECKSPRUNG), edgeMat);
       schneide.scale.set(1.012, 1, 1.012);
       pivot.add(schneide);
       // Erhabener Steg ueber den Ruecken — das Erkennungszeichen eines Gussteils
@@ -752,7 +766,7 @@ export class Excavator {
        * aufgespiesst wurden. Das Problem haengt aber am Zahnverhalten, nicht an
        * der Form, und auf jedem Schrottgreifer sitzt vorn ein Zahn.
        */
-      const zahnP = clawPoint(0, 0, CLAW_SEGMENTS, new THREE.Vector3());
+      const zahnP = clawPoint(0, CLAW_CLOSED_SPLAY, CLAW_SEGMENTS, new THREE.Vector3());
       /*
        * Lang und schlank, nicht der kurze Stummel von vorher. Auf den Vorlagen
        * ragt die Spitze deutlich ueber den Schalenkoerper hinaus und ist
@@ -778,7 +792,7 @@ export class Excavator {
        * Beim ersten Versuch stand hier π − th. Der Zahn zeigte damit nach
        * aussen statt in Laufrichtung und schwebte sichtbar neben der Schale.
        */
-      const zahnTh = CLAW_BEND_KUM[CLAW_SEGMENTS - 1] ?? 0;
+      const zahnTh = (CLAW_BEND_KUM[CLAW_SEGMENTS - 1] ?? 0) - CLAW_CLOSED_SPLAY;
       const zahnHalb = 0.08; // halbe Kegellaenge
       zahn.position.set(
         0,
@@ -1652,10 +1666,16 @@ export class Excavator {
   }
 
   private currentSplay(): number {
-    const minSplay = Math.min(
-      0.5,
-      this.carriedCount * 0.06 + Math.min(this.carriedMassKg / NENNLAST_KG, 1) * 0.28
-    );
+    /*
+     * Geschlossen ist nicht mehr Spreizung 0, sondern CLAW_CLOSED_SPLAY.
+     * Ladung haelt die Schalen darueber hinaus offen — das kommt oben drauf.
+     */
+    const minSplay =
+      CLAW_CLOSED_SPLAY +
+      Math.min(
+        0.5,
+        this.carriedCount * 0.06 + Math.min(this.carriedMassKg / NENNLAST_KG, 1) * 0.28
+      );
     // Der Anschlag federt kurz zurueck — siehe anschlag().
     return THREE.MathUtils.lerp(CLAW_OPEN_SPLAY, minSplay, this.closure) + this.anschlagWinkel;
   }
@@ -2134,7 +2154,9 @@ export class Excavator {
     // dichten Kalotte — es sei denn, es liegt Material darin: dann bleibt die
     // Spinne so weit offen, wie die Ladung Platz braucht.
     this.fingerPivots.forEach((pivot, i) => {
-      pivot.rotation.x = -(this.clawSplayIst[i] ?? this.currentSplay());
+      // Die Schale ist im geschlossenen Zustand gebaut; gedreht wird nur die
+      // Abweichung davon.
+      pivot.rotation.x = -((this.clawSplayIst[i] ?? this.currentSplay()) - CLAW_CLOSED_SPLAY);
     });
     this.updateClawColliders();
 
