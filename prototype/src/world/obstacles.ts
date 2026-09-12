@@ -75,10 +75,48 @@ function bayObstacles(cfg: ContainerConfig): Obstacle[] {
      */
     const wnd = cfg.haldeWaende ?? { rueck: true, aussen: true, trenn: true };
     const out: Obstacle[] = [];
-    if (wnd.rueck !== false)
-      out.push({ x: cfg.x, z: cfg.z - hd / 2 - T, hw: hw / 2 + T, hd: T, top, label: `${L} Rueck` });
-    if (wnd.aussen !== false)
-      out.push({ x: cfg.x + hw / 2 + T, z: cfg.z, hw: T, hd: hd / 2 + T, top, label: `${L} Aussen` });
+    /*
+     * Die Eintraege muessen den Steinen folgen, die man sieht — sonst steht da
+     * eine Mauer, die niemand erkennt.
+     *
+     * Befund 12.09.2026: „zwischen der Presse und dem Mischschrottplatz gibt es
+     * eine unsichtbare Barriere." Nachgemessen war der Eintrag der angedeuteten
+     * Trennwand z −28,00 bis −24,00 bei 5 m Hoehe, die Steine reichen aber nur
+     * von −28,00 bis −25,00 und sind 2,50 m hoch. Einen Meter weiter und
+     * doppelt so hoch wie das, was dasteht — und das genau in der Luecke
+     * zwischen Presse und Halde, durch die der Arm schwenkt.
+     *
+     * Dasselbe galt fuer die auslaufenden Waende: Sie sind am offenen Ende nur
+     * noch 40 % hoch (E-091), standen hier aber als ein Kasten auf voller
+     * Hoehe. Der Kollider in containers.ts macht daraus laengst zwei Stufen;
+     * diese Liste zieht jetzt nach.
+     */
+    const BL = 1.5; // Steinlaenge, wie in containers.ts
+    const halb = top * 0.55; // dieselbe Stufe wie beim Kollider
+    if (wnd.rueck !== false) {
+      // Laeuft zur Maschinenseite (−x) hin aus
+      out.push({ x: cfg.x + hw / 4, z: cfg.z - hd / 2 - T, hw: hw / 4 + T, hd: T, top, label: `${L} Rueck` });
+      out.push({
+        x: cfg.x - hw / 4,
+        z: cfg.z - hd / 2 - T,
+        hw: hw / 4 + T,
+        hd: T,
+        top: halb,
+        label: `${L} Rueck flach`,
+      });
+    }
+    if (wnd.aussen !== false) {
+      // Laeuft nach vorn (+z) hin aus
+      out.push({ x: cfg.x + hw / 2 + T, z: cfg.z - hd / 4, hw: T, hd: hd / 4 + T, top, label: `${L} Aussen` });
+      out.push({
+        x: cfg.x + hw / 2 + T,
+        z: cfg.z + hd / 4,
+        hw: T,
+        hd: hd / 4 + T,
+        top: halb,
+        label: `${L} Aussen flach`,
+      });
+    }
     if (wnd.nord === true)
       out.push({
         x: cfg.x,
@@ -92,10 +130,12 @@ function bayObstacles(cfg: ContainerConfig): Obstacle[] {
     if (wnd.trenn !== false)
       out.push({
         x: cfg.x - hw / 2 - T,
-        z: cfg.z - hd / 4,
+        // Nur die zwei Steinlaengen ab der hinteren Ecke, halbe Hoehe — genau
+        // die Andeutung, die gebaut wird.
+        z: cfg.z - hd / 2 + BL,
         hw: T,
-        hd: hd / 4,
-        top,
+        hd: BL,
+        top: top / 2,
         label: `${L} Trenn`,
       });
     return out;

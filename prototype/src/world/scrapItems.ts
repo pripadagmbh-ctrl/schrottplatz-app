@@ -240,8 +240,28 @@ interface KatalogZusatz {
 /** Fraktionen ohne metallischen Glanz — Abfall eben. */
 const NICHTMETALLE = new Set(["wood", "tires", "rubble", "plastic"]);
 
+/**
+ * Wie schnell ein Koerper werden darf, den die Maschine anstoesst (m/s).
+ *
+ * Die Untergrenze lag bei 1,4 m/s — und damit bekam alles ab rund 250 kg
+ * dasselbe Tempo. Ein 950-kg-Auto bewegte sich wie ein 250-kg-Blech, eine
+ * 1,6-t-Wanne wie beides (Befund 12.09.2026: „Koerper wie Autos folgen nicht
+ * wirklich der Traegheit, wenn sie von der Spinne erwischt werden").
+ * Traegheit, die man nicht unterscheiden kann, ist keine.
+ *
+ * Jetzt laeuft die Kurve weiter durch:
+ *
+ *       50 kg   150    250    500    950   1637   4000
+ *   alt   3,11   1,80   1,40   1,40   1,40   1,40   1,40
+ *   neu   3,11   1,80   1,39   0,98   0,71   0,54   0,35
+ *
+ * Die Kurve ist 22/sqrt(m) — die Geschwindigkeit, die eine feste Stossenergie
+ * bei dieser Masse ergibt. Unten deckelt das Werkzeugtempo (schneller als die
+ * Spinne selbst kann nichts werden), oben eine kleine Restgrenze, damit auch
+ * ein Kesselwagen noch beiseitezuschieben ist.
+ */
 export function maxSpeedFor(massKg: number): number {
-  return Math.min(WERKZEUG_MAX, Math.max(1.4, 22 / Math.sqrt(Math.max(massKg, 1))));
+  return Math.min(WERKZEUG_MAX, Math.max(0.35, 22 / Math.sqrt(Math.max(massKg, 1))));
 }
 
 /**
@@ -1636,7 +1656,16 @@ export class ItemManager {
        * dem Loeser, nicht aus dem Spiel — zusammen mit dem Querwert ergaben
        * zwei volle Grenzen die gemessenen 9,33 m/s.
        */
-      const y = Math.min(Math.max(v.y, -FALL_MAX), maxLinear * 0.55);
+      /*
+       * Die Aufwaertsgrenze haengt NICHT mehr an `maxLinear`.
+       *
+       * Seit die Massenkurve bis 0,35 m/s durchlaeuft, waere sie fuer schwere
+       * Teile auf 0,19 m/s gefallen — und genau damit kaeme ein eingesunkenes
+       * Stueck nie wieder heraus. Der Loeser drueckt es mit einem kraeftigen
+       * Stoss nach oben; das war schon einmal ein Fehler (Befund 11.09.2026:
+       * „Objekte verschwinden im Boden"). 1,2 m/s bleiben immer uebrig.
+       */
+      const y = Math.min(Math.max(v.y, -FALL_MAX), Math.max(maxLinear * 0.55, 1.2));
       if (f < 1 || y !== v.y) {
         item.body.setLinvel({ x: v.x * f, y, z: v.z * f }, true);
       }

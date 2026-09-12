@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { getMaterial } from "../materials/catalog";
+import { maxSpeedFor } from "./scrapItems";
 import { computePurity, containerValue } from "../materials/purity";
 import type { ItemManager, ScrapItem } from "./scrapItems";
 import type { EventBus } from "../core/events";
@@ -746,6 +747,41 @@ class GameContainer {
    * Vergleich, und dafür steht die Position der Zone an einer einzigen
    * Stelle statt zweimal.
    */
+  /**
+   * Trägheit eines Behälters — dieselbe Bremse, die Schrottteile längst haben.
+   *
+   * Befund 12.09.2026: „die Container bewegen sich zu leicht und zittern zu
+   * schnell." Die Ursache ist dieselbe wie damals beim Schrott: Die Spinne ist
+   * ein kinematischer Körper. Sie überträgt beim Anstoßen praktisch beliebig
+   * viel Schwung, weil der Löser eingeklemmte Körper herausdrückt, statt einen
+   * Impuls zu rechnen. `ItemManager` deckelt das seit dem 11.09.2026 — aber
+   * nur für seine eigenen Teile, und ein Behälter ist keines. Er bekam die
+   * Bremse nie und schoss deshalb davon, wo ein Blech längst nur noch rutscht.
+   *
+   * Gemessen wiegt eine leere 4,2-m-Wanne 1637 kg; daraus ergibt die
+   * Massenformel 1,4 m/s. Ein geschobener Container kriecht damit, statt zu
+   * schlittern. Die Drehung ist enger gefasst als beim Schrott: Ein Container
+   * steht auf einer Fläche und dreht sich schwerfällig, er trudelt nicht.
+   */
+  bremseTraegheit(): void {
+    const b = this.koerper;
+    if (!b || !b.isDynamic()) return;
+    const grenze = maxSpeedFor(b.mass());
+    const v = b.linvel();
+    const quer = Math.hypot(v.x, v.z);
+    if (quer > grenze) {
+      const f = grenze / quer;
+      // Nach unten nicht bremsen — das ist Schwerkraft, kein Stoß.
+      b.setLinvel({ x: v.x * f, y: Math.min(v.y, grenze * 0.5), z: v.z * f }, true);
+    }
+    const a = b.angvel();
+    const dreh = Math.abs(a.y);
+    const DREH_MAX = 0.6; // rad/s — eine Wanne trudelt nicht
+    if (dreh > DREH_MAX) {
+      b.setAngvel({ x: a.x, y: (a.y / dreh) * DREH_MAX, z: a.z }, true);
+    }
+  }
+
   syncBeweglich(): void {
     const b = this.koerper;
     if (!b) return;
@@ -955,6 +991,19 @@ export class ContainerManager {
       c.syncBeweglich();
       c.updateLabelDistance(camPos);
     }
+  }
+
+  /**
+   * Trägheitsbremse für alle beweglichen Behälter — in JEDEN Physikschritt.
+   *
+   * Sie hing zuerst in `syncBeweglich`, und das lief nur mit der Zählung, also
+   * alle paar Schritte. Gemessen half sie so gar nichts: Ein Stoß trieb die
+   * 1,6-t-Wanne weiter auf 4,3 m/s, weil die Spitze längst vorbei war, wenn
+   * die Bremse das nächste Mal hinsah. Eine Bremse, die nur jedes zehnte Bild
+   * greift, ist keine.
+   */
+  bremseAlle(): void {
+    for (const c of this.containers) c.bremseTraegheit();
   }
 
   recount(itemManager: ItemManager, grippedBodies: Set<number>): void {

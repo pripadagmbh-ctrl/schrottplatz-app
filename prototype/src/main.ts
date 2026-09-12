@@ -836,6 +836,10 @@ async function main(): Promise<void> {
       if (car.body.isValid()) excavator.obstacleBodies.add(car.body.handle);
     }
     physics.step();
+    // Behaelter sind schwere Koerper, die eine kinematische Spinne anstoesst —
+    // sie brauchen dieselbe Traegheitsbremse wie der Schrott, und zwar in
+    // jedem Schritt.
+    containers.bremseAlle();
     items.clampSpeeds(FIXED_DT);
     // Haufen zur Ruhe bringen: Ohne die Schlafhilfe bleiben rund drei Viertel
     // der Teile dauerhaft wach und kosten jeden Frame Rechenzeit (gemessen:

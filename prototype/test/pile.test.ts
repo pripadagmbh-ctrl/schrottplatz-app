@@ -152,8 +152,35 @@ function tiefsterKoerper(world: RAPIER.World): number {
 describe("Geschwindigkeitsgrenzen", () => {
   it("hält schwere Teile quer langsamer als leichte", () => {
     expect(maxSpeedFor(20)).toBeGreaterThan(maxSpeedFor(500));
-    // Auch ein Brocken muss sich noch schieben lassen, sonst klebt er fest
-    expect(maxSpeedFor(2000)).toBeGreaterThanOrEqual(1.2);
+    // Auch ein Brocken muss sich noch schieben lassen, sonst klebt er fest.
+    // 0,3 m/s heisst: in drei Sekunden Schieben knapp einen Meter — langsam,
+    // aber nie festgeklebt.
+    expect(maxSpeedFor(2000)).toBeGreaterThanOrEqual(0.3);
+  });
+
+  it("unterscheidet Massen auch am schweren Ende", () => {
+    /*
+     * Befund 12.09.2026: „Körper wie Autos folgen nicht wirklich der Trägheit,
+     * wenn sie von der Spinne erwischt werden."
+     *
+     * Die Untergrenze lag bei 1,4 m/s, und damit bekam alles ab rund 250 kg
+     * exakt dasselbe Tempo: ein 950-kg-Auto wie ein 250-kg-Blech wie eine
+     * 1,6-t-Wanne. Trägheit, die man nicht unterscheiden kann, ist keine.
+     * Jetzt läuft die Kurve 22/√m weiter durch, und jede Verdopplung der Masse
+     * ist spürbar.
+     */
+    const paare: Array<[number, number]> = [
+      [250, 500],
+      [500, 950],
+      [950, 1637],
+      [1637, 4000],
+    ];
+    for (const [leicht, schwer] of paare) {
+      expect(
+        maxSpeedFor(schwer),
+        `${schwer} kg muss träger sein als ${leicht} kg`
+      ).toBeLessThan(maxSpeedFor(leicht));
+    }
   });
 
   it("lässt nichts schneller werden als das Werkzeug, das es anstößt", () => {
