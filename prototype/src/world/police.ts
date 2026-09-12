@@ -51,7 +51,9 @@ const RUNDE: Array<[number, number]> = [
   [-24, 20],
   [-16, 16],
   [-2, 13],
-  [4, 2],
+  // Westlich an der Stahlmulde vorbei: Ihre Öffnung liegt seit 12.09.2026 bei
+  // x 4,75, und ein Streifenwagen hat in einer Muldengasse nichts zu suchen.
+  [3.0, 2],
   [2, -12],
   [-6, -16],
   [-16, -12],

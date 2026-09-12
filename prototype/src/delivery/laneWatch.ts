@@ -2,8 +2,8 @@ import * as THREE from "three";
 import type { ItemManager, ScrapItem } from "../world/scrapItems";
 import {
   ROUTE_IN_FWD,
-  ROUTE_APPROACH,
-  ROUTE_IN_REV,
+  routeApproach,
+  routeInRev,
   PICKUP_APPROACH,
   PICKUP_IN_REV,
   TIP_APPROACH,
@@ -30,16 +30,24 @@ const BLOCKING_MASS_KG = 120;
 /** Nur was am Boden liegt zählt; darüber ist es auf einer Ladefläche. */
 const MAX_Y = 1.3;
 
-/** Alle Spuren, die frei bleiben müssen. */
-const LANES: Array<[string, Array<[number, number]>]> = [
-  ["Einfahrt", ROUTE_IN_FWD],
-  ["Zufahrt", ROUTE_APPROACH],
-  ["Abladeplatz", ROUTE_IN_REV],
-  ["Abholerspur", PICKUP_APPROACH],
-  ["Verladeplatz", PICKUP_IN_REV],
-  ["Kipperspur", TIP_APPROACH],
-  ["Kipperhalt", TIP_IN_REV],
-];
+/**
+ * Alle Spuren, die frei bleiben müssen — bei jeder Prüfung frisch geholt.
+ *
+ * Zufahrt und Abladeplatz hängen seit 12.09.2026 davon ab, wo der Bagger
+ * steht. Eine einmal abgeschriebene Liste zeigte auf die Stelle, an der der
+ * letzte LKW gestanden hat, und hätte die halbe Überwachung blind gemacht.
+ */
+function lanes(): Array<[string, Array<[number, number]>]> {
+  return [
+    ["Einfahrt", ROUTE_IN_FWD],
+    ["Zufahrt", routeApproach()],
+    ["Abladeplatz", routeInRev()],
+    ["Abholerspur", PICKUP_APPROACH],
+    ["Verladeplatz", PICKUP_IN_REV],
+    ["Kipperspur", TIP_APPROACH],
+    ["Kipperhalt", TIP_IN_REV],
+  ];
+}
 
 export interface Blockage {
   item: ScrapItem;
@@ -83,19 +91,26 @@ export class LaneWatch {
 
   private scan(): void {
     this.blockages = [];
+    // Einmal je Durchgang holen, nicht je Teil: Die Spuren aendern sich
+    // zwischen zwei Schrottstuecken nicht.
+    const spuren = lanes();
     for (const it of this.items.items) {
       if (it.massKg < BLOCKING_MASS_KG) continue;
       if (!it.body.isValid() || !it.body.isDynamic()) continue;
       const p = it.body.translation();
       if (p.y > MAX_Y) continue;
-      const lane = this.laneAt(p.x, p.z);
+      const lane = LaneWatch.laneAt(spuren, p.x, p.z);
       if (lane) this.blockages.push({ item: it, lane, x: p.x, z: p.z });
     }
   }
 
   /** Auf welcher Spur liegt (x,z)? null, wenn frei. */
-  private laneAt(x: number, z: number): string | null {
-    for (const [name, pts] of LANES) {
+  private static laneAt(
+    spuren: Array<[string, Array<[number, number]>]>,
+    x: number,
+    z: number
+  ): string | null {
+    for (const [name, pts] of spuren) {
       for (let i = 0; i < pts.length - 1; i++) {
         const d = distToSegment(x, z, pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]);
         if (d < LANE_HALF_W) return name;

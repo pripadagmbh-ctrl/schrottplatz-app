@@ -1354,9 +1354,17 @@ export class StaffManager {
    * Stelle, an der seit dem Umbau nur noch Beton war. Zwei Wahrheiten ueber
    * dieselbe Sache halten nie. Stahl fehlt bewusst: der bleibt Sache des
    * Baggers, und das Ballenlager ist keine Mulde.
+   *
+   * Absetzcontainer gehen vor: Fuer Kupfer gibt es beides — den Container am
+   * Bagger und die Hortmulde ganz hinten an der Suedwand. Wer eine Handvoll
+   * Kupferrohr findet, traegt sie nicht zwanzig Meter weit, wenn drei Meter
+   * weiter der richtige Behaelter steht.
    */
   private static muldeFuer(materialId: string): ContainerConfig | undefined {
-    return CONFIGS.find((c) => c.kind === "bay" && c.fractionId === materialId);
+    const passend = CONFIGS.filter(
+      (c) => (c.kind === "bay" || c.kind === "rolloff") && c.fractionId === materialId
+    );
+    return passend.find((c) => c.kind === "rolloff") ?? passend[0];
   }
 
   /** Halteplatz vor einer Mulde: vor ihrer offenen Seite, nicht darin. */

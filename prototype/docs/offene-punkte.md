@@ -94,3 +94,21 @@ erledigt ist, bekommt den Commit dazu.
       patrol → carry.
 - [ ] **Heinz als Hilfsarbeiter** — zweiter Mann, damit zwei Arbeitsgänge
       parallel laufen. Ausbaustufe wie Radlader und Bulldozer.
+
+## Platz
+
+- [ ] **Absetzcontainer stehen außerhalb des Schwenkkranzes** — Kabel, Kupfer
+      und Messing sind 11,6 bis 17,9 m entfernt abgestellt, weil der Ring
+      zwischen 4,0 und 9,5 m mit Stahl, Alu und VA voll ist. Gedacht ist es so:
+      Lambert trägt Buntmetall hin (er bevorzugt jetzt Container vor Mulden),
+      und wer selbst hinein sortieren will, zieht sich den Behälter heran. Ob
+      das im Spiel trägt, muss sich zeigen — sonst müsste die VA-Mulde weichen.
+- [ ] **Bewegliche Container sind für Fußgänger und LKW unsichtbar** — sie
+      stehen nicht in `obstacles.ts` (die Liste ist für Feststehendes), also
+      laufen Lambert und die Fahrer dagegen und schieben sie an. Bisher steht
+      keiner in einer Fahrspur; sobald der Spieler einen dorthin zieht, fällt es
+      auf.
+- [ ] **Hortmulden für Kupfer und Messing sind 21 bzw. 25 m entfernt** — an der
+      Südwand, wie besprochen zum Horten großer Teile. Dorthin muss gefahren
+      werden; ob sich das lohnt, entscheidet sich erst, wenn es wirklich
+      sperriges Buntmetall gibt (bisher nur die Schiffsschraube mit 180 kg).

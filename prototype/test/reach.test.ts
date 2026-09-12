@@ -14,13 +14,25 @@ import { describe, it, expect } from "vitest";
 import * as THREE from "three";
 import { hoechsteKrallenspitze, tempoFaktor, anlaufZeit, CAB_MAX } from "../src/excavator/excavator";
 import { CONFIGS } from "../src/world/containers";
-import { ROUTE_IN_REV, TIP_CREEP_M } from "../src/delivery/routes";
+import {
+  neueAbladestelle,
+  routeInRev,
+  setBaggerOrt,
+  TIP_CREEP_M,
+} from "../src/delivery/routes";
 
 /** Standplatz des Baggers — siehe `position` in excavator.ts. */
 const BAGGER = { x: 0, z: -1 };
 
-/** Mulden, die der Spieler selbst befüllt (die Nichtmetalle beschickt der Radlader). */
-const SELBST_BEFUELLT = ["c_va", "c_alu", "c_copper", "c_cable", "c_bales"];
+/**
+ * Mulden, die der Spieler von seinem Standplatz aus selbst befüllt.
+ *
+ * Seit der Platzordnung vom 12.09.2026 sind das genau drei plus das
+ * Ballenlager: Stahl, Alu, VA. Abfall und Hortmulden stehen bewusst außerhalb
+ * des Schwenkkranzes — dorthin wird gefahren oder Lambert trägt es hin —, und
+ * die Absetzcontainer lassen sich ohnehin heranziehen.
+ */
+const SELBST_BEFUELLT = ["c_steel", "c_alu", "c_va", "c_bales"];
 
 function abstand(x: number, z: number): number {
   return Math.hypot(x - BAGGER.x, z - BAGGER.z);
@@ -50,12 +62,28 @@ describe("Reichweite des Arms", () => {
     // an, kippt und zieht dann gekippt an — der Rest der Fuhre rutscht auf
     // dieser Strecke heraus. Reicht sie ueber 9,5 m hinaus, liegt dort Schrott,
     // den man nicht mehr wegbekommt (Befund 10.09.2026).
-    const dock = ROUTE_IN_REV[ROUTE_IN_REV.length - 1]!;
-    const weitesterPunkt = Math.hypot(dock[0] - BAGGER.x, dock[1] + TIP_CREEP_M - BAGGER.z);
-    expect(
-      weitesterPunkt,
-      `letzter Abwurf bei ${weitesterPunkt.toFixed(1)} m — dort kommt der Arm nicht mehr auf den Boden`
-    ).toBeLessThan(9.5);
+    //
+    // Die Abladestelle wandert seit 12.09.2026 mit dem Bagger, also genügt es
+    // nicht mehr, einen Punkt zu prüfen: Gefahren wird ueber den ganzen
+    // Vorplatz, und an jeder Stelle muss der Arm noch auf den Boden kommen.
+    for (const ort of [
+      { x: 0, z: -1 },
+      { x: 0, z: 4 },
+      { x: -4, z: 0 },
+      { x: 3, z: -4 },
+      { x: -2, z: 6 },
+    ]) {
+      setBaggerOrt(() => ort);
+      neueAbladestelle();
+      const r = routeInRev();
+      const dock = r[r.length - 1]!;
+      const weitesterPunkt = Math.hypot(dock[0] - ort.x, dock[1] + TIP_CREEP_M - ort.z);
+      expect(
+        weitesterPunkt,
+        `Bagger auf (${ort.x}, ${ort.z}): letzter Abwurf bei ` +
+          `${weitesterPunkt.toFixed(1)} m — dort kommt der Arm nicht mehr auf den Boden`
+      ).toBeLessThan(9.5);
+    }
   });
 
   it("jenseits von zehn Metern reicht er gar nicht", () => {

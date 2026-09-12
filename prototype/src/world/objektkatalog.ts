@@ -161,7 +161,7 @@ export const KATALOG_SPECS: PileSpec[] = [
   { materialId: "wood", massKg: 190, kind: "box", dims: [0.9, 0.55, 2.2], bau: "stapel", name: "Bahnschwellen (Holzstapel)" },
 
   // --- Hafen ---
-  { materialId: "copper", massKg: 180, kind: "box", dims: [1.1, 0.3, 1.1], bau: "platte", name: "Schiffsschraube" },
+  { materialId: "brass", massKg: 180, kind: "box", dims: [1.1, 0.3, 1.1], bau: "platte", name: "Schiffsschraube" },
   { materialId: "steel", massKg: 175, kind: "box", dims: [1.4, 0.2, 1.1], bau: "platte", name: "Ruderblatt" },
   { materialId: "steel", massKg: 205, kind: "wire", dims: [0.7], bau: "haufen", name: "Ankerkette (Haufen)" },
   { materialId: "steel", massKg: 195, kind: "box", dims: [0.9, 1.3, 0.7], bau: "motor", name: "Stockanker" },

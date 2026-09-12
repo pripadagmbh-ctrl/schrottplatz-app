@@ -40,9 +40,10 @@ export type DeliveryKind = "kipper" | "pritsche" | "wrack" | "abholer" | "pkw";
 
 import {
   ROUTE_IN_FWD,
-  ROUTE_APPROACH,
-  ROUTE_IN_REV,
-  ROUTE_OUT,
+  neueAbladestelle,
+  routeApproach,
+  routeInRev,
+  routeOut,
   PICKUP_IN_FWD,
   PICKUP_APPROACH,
   PICKUP_IN_REV,
@@ -436,17 +437,38 @@ class DeliveryVehicle {
   private get routeIn(): Array<[number, number]> {
     return this.isPickup ? PICKUP_IN_FWD : ROUTE_IN_FWD;
   }
+  /*
+   * Die eigene Anfahrt. Sie wird einmal festgelegt, wenn der Wagen von der
+   * Waage losfährt, und ändert sich danach nicht mehr — auch wenn der Bagger
+   * inzwischen weiterfährt. Sonst rutschte dem rückwärts setzenden Fahrer das
+   * Ziel unter den Rädern weg.
+   */
+  private meineAnfahrt: Array<[number, number]> | null = null;
+  private meinRueckweg: Array<[number, number]> | null = null;
+  private meineAusfahrt: Array<[number, number]> | null = null;
+
+  /** Abladestelle nach der aktuellen Baggerstellung festlegen. */
+  private legeAbladestelleFest(): void {
+    neueAbladestelle();
+    this.meineAnfahrt = routeApproach();
+    this.meinRueckweg = routeInRev();
+    this.meineAusfahrt = routeOut();
+  }
+
   private get routeApproach(): Array<[number, number]> {
     if (this.isPickup) return PICKUP_APPROACH;
-    return this.isSelfTipping ? TIP_APPROACH : ROUTE_APPROACH;
+    if (this.isSelfTipping) return TIP_APPROACH;
+    return this.meineAnfahrt ?? routeApproach();
   }
   private get routeRev(): Array<[number, number]> {
     if (this.isPickup) return PICKUP_IN_REV;
-    return this.isSelfTipping ? TIP_IN_REV : ROUTE_IN_REV;
+    if (this.isSelfTipping) return TIP_IN_REV;
+    return this.meinRueckweg ?? routeInRev();
   }
   private get routeOut(): Array<[number, number]> {
     if (this.isPickup) return PICKUP_OUT;
-    return this.isSelfTipping ? TIP_OUT : ROUTE_OUT;
+    if (this.isSelfTipping) return TIP_OUT;
+    return this.meineAusfahrt ?? routeOut();
   }
 
   constructor(
@@ -996,6 +1018,9 @@ class DeliveryVehicle {
           this.onDealTimeout?.();
         }
         if (this.weighedIn && !this.awaitingDeal) {
+          // Jetzt, kurz vor dem Losfahren, steht fest, wo der Bagger ist —
+          // und damit, wo dieser Wagen abkippt.
+          if (!this.isSelfTipping) this.legeAbladestelleFest();
           this.phase = "approach";
           this.phaseT = 0;
           this.routeS = 0;

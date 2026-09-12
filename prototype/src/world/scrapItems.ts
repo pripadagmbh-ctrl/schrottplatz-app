@@ -373,6 +373,7 @@ const PRESSPROFIL: Record<string, Pressprofil> = {
   alu: { dichte: 1450, fransen: [3, 6], lang: 0.3, dick: 0.045, beule: 0.07, rauheit: 0.5, glanz: 0.55 },
   // Kupfer noch dichter — das schwerste Paket bei gleichem Volumen
   copper: { dichte: 1900, fransen: [3, 7], lang: 0.28, dick: 0.05, beule: 0.06, rauheit: 0.45, glanz: 0.65 },
+  brass: { dichte: 1800, fransen: [3, 6], lang: 0.26, dick: 0.055, beule: 0.05, rauheit: 0.4, glanz: 0.7 },
   // Kabel bleibt ein Knaeuel: locker, ueberall Schwaenze
   cable: { dichte: 800, fransen: [14, 22], lang: 0.75, dick: 0.035, beule: 0.16, rauheit: 0.95, glanz: 0.1 },
   // Nichtmetalle pressen sich schlecht und sehen zerfetzt aus
@@ -408,7 +409,7 @@ const SPECS: PileSpec[] = [
   { materialId: "alu", massKg: 11, kind: "cyl", dims: [0.3, 0.2] },
   { materialId: "copper", massKg: 12, kind: "cyl", dims: [0.05, 0.8], bau: "buendel", name: "Kupferrohr" },
   { materialId: "copper", massKg: 18, kind: "torus", dims: [0.14, 0.05], name: "Kupferbund" },
-  { materialId: "copper", massKg: 15, kind: "box", dims: [0.3, 0.25, 0.3], bau: "maschine", name: "Messingarmaturen" },
+  { materialId: "brass", massKg: 15, kind: "box", dims: [0.3, 0.25, 0.3], bau: "maschine", name: "Messingarmaturen" },
   { materialId: "cable", massKg: 9, kind: "torus", dims: [0.18, 0.07] },
   { materialId: "cable", massKg: 7, kind: "torus", dims: [0.15, 0.06] },
   { materialId: "cable", massKg: 12, kind: "torus", dims: [0.2, 0.08] },
@@ -566,7 +567,9 @@ export function randomCargo(
           ? "mixed"
           : r < 0.8
             ? "alu"
-            : ["va", "copper", "cable", "wood", "plastic", "rubble"][Math.floor(Math.random() * 6)]);
+            : ["va", "copper", "brass", "cable", "wood", "plastic", "rubble"][
+                Math.floor(Math.random() * 7)
+              ]);
     let matching = pool.filter((s) => s.materialId === wanted);
     // Sortenreine Ladung: notfalls in der anderen Größenklasse suchen, damit
     // die Fraktion auf jeden Fall stimmt
@@ -873,7 +876,8 @@ export class ItemManager {
     const material = new THREE.MeshStandardMaterial({
       color: shape.bau ? 0xffffff : shape.color,
       vertexColors: !!shape.bau,
-      roughness: materialId === "copper" || materialId === "alu" ? 0.35 : 0.75,
+      roughness:
+        materialId === "copper" || materialId === "brass" || materialId === "alu" ? 0.35 : 0.75,
       metalness: NICHTMETALLE.has(materialId) || materialId === "cable" ? 0 : 0.4,
     });
     let geo: THREE.BufferGeometry;

@@ -24,26 +24,90 @@ export const ROUTE_IN_FWD: Array<[number, number]> = [
   [GATE_X, 40],
   [GATE_X, 24],
 ];
+/**
+ * Die Abladestelle ist kein fester Punkt mehr (Ansage 12.09.2026).
+ *
+ * „Je nachdem, wie der Bagger positioniert ist, sollte er auch nicht immer
+ * auf derselben Stelle platziert sein, sondern so nah wie möglich an den
+ * Bagger heranfahren." Vorher hielt jeder LKW auf (0 | 7), egal wo die
+ * Maschine stand — wer nach Süden gefahren war, musste zurückfahren, um an
+ * die eigene Anlieferung zu kommen.
+ *
+ * Der Punkt liegt auf der Verbindung Bagger–Rangierpunkt, acht Meter vor der
+ * Maschine, und wird auf den Vorplatz begrenzt. Acht Meter, weil die
+ * Ladefläche dann im Greifbereich liegt (4,0–9,5 m) und die Blockadeprüfung
+ * ringsum die Maschine (5,5 m) noch nicht anspricht. Steht der Bagger an
+ * seinem gewohnten Platz, kommt genau die alte Stelle heraus.
+ */
+const ABLADE_ABSTAND = 8.0;
+/** Rangierpunkt, von dem aus rückwärts gesetzt wird. */
+const RANGIER_Z = 16.5;
+/**
+ * Der Vorplatz, über den der Punkt nicht hinauswandert. Dahinter beginnen
+ * Mulden, Presse und Fahrspuren — dort kippt kein LKW ab.
+ */
+const VORPLATZ = { xMin: -4.5, xMax: 3.5, zMin: 3.0, zMax: 13.0 };
+
+let abladeStelle: [number, number] = [0, 7.0];
+let baggerOrt: (() => { x: number; z: number }) | null = null;
+
+/** Woher die Baggerstellung kommt. Einmal beim Aufbau setzen. */
+export function setBaggerOrt(f: () => { x: number; z: number }): void {
+  baggerOrt = f;
+}
+
+/**
+ * Neue Abladestelle bestimmen — beim Losfahren von der Waage aufzurufen.
+ * Danach steht sie fest, solange der LKW unterwegs ist: Eine Strecke, die
+ * sich unter dem fahrenden Wagen verschiebt, ist keine Strecke.
+ */
+export function neueAbladestelle(): [number, number] {
+  const b = baggerOrt?.();
+  if (b) {
+    const rx = 0 - b.x;
+    const rz = RANGIER_Z - b.z;
+    const len = Math.hypot(rx, rz) || 1;
+    const x = b.x + (rx / len) * ABLADE_ABSTAND;
+    const z = b.z + (rz / len) * ABLADE_ABSTAND;
+    abladeStelle = [
+      Math.min(VORPLATZ.xMax, Math.max(VORPLATZ.xMin, x)),
+      Math.min(VORPLATZ.zMax, Math.max(VORPLATZ.zMin, z)),
+    ];
+  }
+  return abladeStelle;
+}
+
+/** Wo gerade abgeladen wird — für die Spurüberwachung. */
+export function abladestelle(): [number, number] {
+  return abladeStelle;
+}
+
 // Nach dem Wiegen weiter zum Rangierpunkt vor dem Abkippplatz
-export const ROUTE_APPROACH: Array<[number, number]> = [
-  [GATE_X, 24],
-  [-14, 16.5],
-  [0, 16.5],
-];
-export const ROUTE_IN_REV: Array<[number, number]> = [
-  [0, 16.5],
-  // 7,0 m: so nah, dass der Bagger die ganze Ladefläche bestreicht, und noch
-  // weit genug, dass die Blockadeprüfung (5,5 m um die Maschine) nicht
-  // dauernd anspricht.
-  [0, 7.0],
-];
-export const ROUTE_OUT: Array<[number, number]> = [
-  [0, 7.0],
-  [0, 16.5],
-  [-14, 16.5],
-  [GATE_X, 24],
-  [GATE_X, 40],
-];
+export function routeApproach(): Array<[number, number]> {
+  const [x] = abladeStelle;
+  return [
+    [GATE_X, 24],
+    [-14, RANGIER_Z],
+    [x, RANGIER_Z],
+  ];
+}
+export function routeInRev(): Array<[number, number]> {
+  const [x, z] = abladeStelle;
+  return [
+    [x, RANGIER_Z],
+    [x, z],
+  ];
+}
+export function routeOut(): Array<[number, number]> {
+  const [x, z] = abladeStelle;
+  return [
+    [x, z],
+    [x, RANGIER_Z],
+    [-14, RANGIER_Z],
+    [GATE_X, 24],
+    [GATE_X, 40],
+  ];
+}
 
 // ABHOLUNG: Ostspur nach Süden, dann rückwärts an den Verladeplatz neben der
 // Presse — dort lädt der Spieler den Container mit sortenreinem Material.

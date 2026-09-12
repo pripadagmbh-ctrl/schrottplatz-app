@@ -20,9 +20,9 @@ import {
 } from "../src/excavator/clawGeometry";
 import {
   ROUTE_IN_FWD,
-  ROUTE_APPROACH,
-  ROUTE_IN_REV,
-  ROUTE_OUT,
+  routeApproach,
+  routeInRev,
+  routeOut,
   PICKUP_APPROACH,
   PICKUP_IN_REV,
   PICKUP_OUT,
@@ -115,9 +115,9 @@ describe("Feste Bauten", () => {
     // dann durch die zusammengerückten Mulden.
     const routen: Array<[string, Array<[number, number]>]> = [
       ["Einfahrt", ROUTE_IN_FWD],
-      ["Anfahrt", ROUTE_APPROACH],
-      ["Rangieren", ROUTE_IN_REV],
-      ["Ausfahrt", ROUTE_OUT],
+      ["Anfahrt", routeApproach()],
+      ["Rangieren", routeInRev()],
+      ["Ausfahrt", routeOut()],
       ["Abholer-Anfahrt", PICKUP_APPROACH],
       ["Abholer-Rangieren", PICKUP_IN_REV],
       ["Abholer-Ausfahrt", PICKUP_OUT],

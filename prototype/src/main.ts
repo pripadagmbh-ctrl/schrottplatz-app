@@ -42,6 +42,7 @@ import { Account, PURCHASE_PRICE_PER_KG } from "./economy/account";
 import { getMaterial, ABFALL } from "./materials/catalog";
 import { StaffManager } from "./world/people";
 import { WEIGH_X, WEIGH_Z, KAFFEE_POS } from "./world/yard";
+import { setBaggerOrt } from "./delivery/routes";
 import { clearSave, readSave, storeSave, type SaveData } from "./core/save";
 
 const FIXED_DT = 1 / 60;
@@ -132,7 +133,7 @@ async function main(): Promise<void> {
     // Auf die Stahlflaeche, nicht auf die Grenze zur Mischschrottflaeche.
     // Der Haufen ist am Anfang unsortiert — dass er als Verunreinigung zaehlt,
     // ist gewollt: Aufraeumen ist die Aufgabe.
-    items.spawnPile(new THREE.Vector3(-9, 0, -2));
+    items.spawnPile(new THREE.Vector3(-9, 0, 1));
     // Altfahrzeuge stehen von Anfang an am Rand des Stahlschrott-Haufens
     composites.spawnCar(new THREE.Vector3(-15.8, 0.5, 3.5));
     composites.spawnCar(new THREE.Vector3(-15.8, 0.5, -2.5));
@@ -230,6 +231,12 @@ async function main(): Promise<void> {
   // Tagesablauf: Annahme → Sortieren → Annahme (Briefing Kap. 21)
   // Fahrspuren überwachen: liegt Schrott im Weg, steht der Betrieb
   const lanes = new LaneWatch(items);
+  /*
+   * Die Anlieferung richtet sich nach der Maschine (Ansage 12.09.2026): Der
+   * LKW faehrt so nah an den Bagger heran, wie der Vorplatz es zulaesst.
+   * Deshalb muessen die Routen wissen, wo er steht.
+   */
+  setBaggerOrt(() => excavator.position);
   let stoerfallGemeldet = false;
   // Geführter Einstieg — zeigt den Kreislauf einmal und hält sich dann raus
   const tutorial = new Tutorial();
