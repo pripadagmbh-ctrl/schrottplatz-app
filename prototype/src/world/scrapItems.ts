@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { getMaterial } from "../materials/catalog";
+import { baueGeometrie, type BauId } from "./objektbau";
 import {
   KATALOG_BIG,
   KATALOG_HUGE,
@@ -22,6 +23,12 @@ export interface ScrapShape {
   color: number;
   /** true = wurde in der Presse plattgedrückt (persistiert im Save) */
   flat?: boolean;
+  /**
+   * Aus welchen Bauteilen das Ding zusammengesetzt wird (world/objektbau.ts).
+   * Ohne Angabe bleibt es der nackte Grundkörper mit Fraktionsfarbe — so
+   * bleiben die alten Einträge unverändert.
+   */
+  bau?: BauId;
 }
 
 /**
@@ -232,23 +239,23 @@ const FLAT_SCALE_Y = 0.55;
 
 // Basis-Sortiment (SW) — Starthaufen und Zufalls-Ladungen speisen sich hieraus
 const SPECS: PileSpec[] = [
-  { materialId: "steel", massKg: 60, kind: "box", dims: [0.15, 0.15, 1.3] }, // Profilstahl
-  { materialId: "steel", massKg: 45, kind: "cyl", dims: [0.09, 1.1] }, // Rohr
+  { materialId: "steel", massKg: 60, kind: "box", dims: [0.15, 0.15, 1.3], bau: "buendel" }, // Profilstahl
+  { materialId: "steel", massKg: 45, kind: "cyl", dims: [0.09, 1.1], bau: "rohrFlansch" }, // Rohr
   { materialId: "steel", massKg: 35, kind: "box", dims: [0.12, 0.12, 0.9] },
-  { materialId: "steel", massKg: 55, kind: "box", dims: [0.7, 0.06, 0.9] }, // Blech
-  { materialId: "steel", massKg: 90, kind: "box", dims: [0.7, 0.5, 0.15] }, // Heizkörper (früher Guss)
-  { materialId: "steel", massKg: 110, kind: "box", dims: [0.4, 0.4, 0.4] }, // Motorblock-Rest
+  { materialId: "steel", massKg: 55, kind: "box", dims: [0.7, 0.06, 0.9], bau: "platte" }, // Blech
+  { materialId: "steel", massKg: 90, kind: "box", dims: [0.7, 0.5, 0.15], bau: "platte" }, // Heizkörper (früher Guss)
+  { materialId: "steel", massKg: 110, kind: "box", dims: [0.4, 0.4, 0.4], bau: "motor" }, // Motorblock-Rest
   { materialId: "steel", massKg: 70, kind: "box", dims: [0.18, 0.18, 1.1] },
-  { materialId: "va", massKg: 26, kind: "box", dims: [0.9, 0.18, 0.6] }, // Spülbecken
-  { materialId: "va", massKg: 34, kind: "cyl", dims: [0.34, 0.8] }, // VA-Behälter
-  { materialId: "va", massKg: 18, kind: "box", dims: [0.06, 0.06, 1.5] }, // VA-Geländerrohr
+  { materialId: "va", massKg: 26, kind: "box", dims: [0.9, 0.18, 0.6], bau: "weisseWare" }, // Spülbecken
+  { materialId: "va", massKg: 34, kind: "cyl", dims: [0.34, 0.8], bau: "tank" }, // VA-Behälter
+  { materialId: "va", massKg: 18, kind: "box", dims: [0.06, 0.06, 1.5], bau: "buendel" }, // VA-Geländerrohr
   { materialId: "alu", massKg: 12, kind: "cyl", dims: [0.32, 0.22] }, // Felge
   { materialId: "alu", massKg: 8, kind: "box", dims: [0.08, 0.08, 1.4] }, // Profil
-  { materialId: "alu", massKg: 10, kind: "box", dims: [0.6, 0.04, 0.8] }, // Tafel
+  { materialId: "alu", massKg: 10, kind: "box", dims: [0.6, 0.04, 0.8], bau: "platte" }, // Tafel
   { materialId: "alu", massKg: 11, kind: "cyl", dims: [0.3, 0.2] },
-  { materialId: "copper", massKg: 12, kind: "cyl", dims: [0.05, 0.8] }, // Kupferrohr
+  { materialId: "copper", massKg: 12, kind: "cyl", dims: [0.05, 0.8], bau: "buendel" }, // Kupferrohr
   { materialId: "copper", massKg: 18, kind: "torus", dims: [0.14, 0.05] }, // Kupferbund
-  { materialId: "copper", massKg: 15, kind: "box", dims: [0.3, 0.25, 0.3] }, // Messingarmaturen
+  { materialId: "copper", massKg: 15, kind: "box", dims: [0.3, 0.25, 0.3], bau: "maschine" }, // Messingarmaturen
   { materialId: "cable", massKg: 9, kind: "torus", dims: [0.18, 0.07] },
   { materialId: "cable", massKg: 7, kind: "torus", dims: [0.15, 0.06] },
   { materialId: "cable", massKg: 12, kind: "torus", dims: [0.2, 0.08] },
@@ -262,23 +269,23 @@ const SPECS: PileSpec[] = [
   // war das Sortiment sehr nach Baustelle: Profile, Rohre, Bleche. Ein Platz
   // lebt aber von dem, was die Leute anschleppen — Hausrat, Zweiraeder,
   // Landmaschinen, ausgeschlachtete Fahrzeugteile.
-  { materialId: "steel", massKg: 42, kind: "box", dims: [0.55, 0.85, 0.55] }, // Waschmaschine
-  { materialId: "steel", massKg: 38, kind: "box", dims: [0.6, 0.85, 0.6] }, // Spuelmaschine
-  { materialId: "steel", massKg: 30, kind: "box", dims: [0.65, 0.9, 0.6] }, // Elektroherd
-  { materialId: "steel", massKg: 52, kind: "cyl", dims: [0.28, 1.4] }, // Warmwasserspeicher
+  { materialId: "steel", massKg: 42, kind: "box", dims: [0.55, 0.85, 0.55], bau: "weisseWare" }, // Waschmaschine
+  { materialId: "steel", massKg: 38, kind: "box", dims: [0.6, 0.85, 0.6], bau: "weisseWare" }, // Spuelmaschine
+  { materialId: "steel", massKg: 30, kind: "box", dims: [0.65, 0.9, 0.6], bau: "weisseWare" }, // Elektroherd
+  { materialId: "steel", massKg: 52, kind: "cyl", dims: [0.28, 1.4], bau: "tank" }, // Warmwasserspeicher
   { materialId: "steel", massKg: 48, kind: "box", dims: [1.6, 0.55, 0.7] }, // Badewanne
-  { materialId: "steel", massKg: 26, kind: "box", dims: [0.6, 0.9, 1.9] }, // Motorradrahmen
-  { materialId: "steel", massKg: 14, kind: "box", dims: [0.5, 0.7, 1.6] }, // Mopedrahmen
-  { materialId: "steel", massKg: 120, kind: "box", dims: [1.1, 0.35, 0.9] }, // Pflugschar
-  { materialId: "steel", massKg: 85, kind: "cyl", dims: [0.34, 1.7] }, // Eggenwalze
-  { materialId: "steel", massKg: 160, kind: "box", dims: [0.5, 0.5, 1.4] }, // Traktor-Frontgewicht
-  { materialId: "steel", massKg: 95, kind: "box", dims: [2.1, 0.25, 0.35] }, // Heuwender-Ausleger
-  { materialId: "steel", massKg: 210, kind: "cyl", dims: [0.16, 2.2] }, // LKW-Achse
-  { materialId: "steel", massKg: 130, kind: "box", dims: [0.8, 0.7, 0.9] }, // LKW-Getriebe
-  { materialId: "steel", massKg: 75, kind: "box", dims: [0.9, 0.75, 0.12] }, // LKW-Kuehler
+  { materialId: "steel", massKg: 26, kind: "box", dims: [0.6, 0.9, 1.9], bau: "kleinfahrzeug" }, // Motorradrahmen
+  { materialId: "steel", massKg: 14, kind: "box", dims: [0.5, 0.7, 1.6], bau: "kleinfahrzeug" }, // Mopedrahmen
+  { materialId: "steel", massKg: 120, kind: "box", dims: [1.1, 0.35, 0.9], bau: "schaufel" }, // Pflugschar
+  { materialId: "steel", massKg: 85, kind: "cyl", dims: [0.34, 1.7], bau: "trommel" }, // Eggenwalze
+  { materialId: "steel", massKg: 160, kind: "box", dims: [0.5, 0.5, 1.4], bau: "motor" }, // Traktor-Frontgewicht
+  { materialId: "steel", massKg: 95, kind: "box", dims: [2.1, 0.25, 0.35], bau: "ausleger" }, // Heuwender-Ausleger
+  { materialId: "steel", massKg: 210, kind: "cyl", dims: [0.16, 2.2], bau: "achse" }, // LKW-Achse
+  { materialId: "steel", massKg: 130, kind: "box", dims: [0.8, 0.7, 0.9], bau: "motor" }, // LKW-Getriebe
+  { materialId: "steel", massKg: 75, kind: "box", dims: [0.9, 0.75, 0.12], bau: "maschine" }, // LKW-Kuehler
   { materialId: "steel", massKg: 46, kind: "cyl", dims: [0.28, 0.32] }, // LKW-Felge
-  { materialId: "alu", massKg: 16, kind: "box", dims: [0.7, 0.5, 0.15] }, // Motorradmotor
-  { materialId: "copper", massKg: 22, kind: "box", dims: [0.45, 0.4, 0.35] }, // Elektromotor
+  { materialId: "alu", massKg: 16, kind: "box", dims: [0.7, 0.5, 0.15], bau: "motor" }, // Motorradmotor
+  { materialId: "copper", massKg: 22, kind: "box", dims: [0.45, 0.4, 0.35], bau: "elektromotor" }, // Elektromotor
   { materialId: "tires", massKg: 11, kind: "torus", dims: [0.31, 0.11] }, // Traktorreifen
 
   // Erweiterung 12.09.2026 — siehe world/objektkatalog.ts
@@ -295,49 +302,49 @@ const SPECS: PileSpec[] = [
  * einzufädeln ist die eigentliche Aufgabe am Bagger (Wunsch 29.08.2026).
  */
 const HUGE_SPECS: PileSpec[] = [
-  { materialId: "steel", massKg: 2400, kind: "box", dims: [2.4, 1.1, 1.9] }, // Waggon-Drehgestell
-  { materialId: "steel", massKg: 2200, kind: "box", dims: [3.2, 0.9, 0.8] }, // Kettenlaufwerk
-  { materialId: "steel", massKg: 1800, kind: "cyl", dims: [1.1, 3.6] }, // Kesselwagen-Segment
-  { materialId: "steel", massKg: 1400, kind: "cyl", dims: [1.2, 3.1] }, // Lagertank
-  { materialId: "steel", massKg: 1100, kind: "cyl", dims: [0.9, 2.0] }, // Turbinengehäuse
-  { materialId: "steel", massKg: 900, kind: "box", dims: [2.2, 1.9, 1.8] }, // LKW-Fahrerhaus
-  { materialId: "steel", massKg: 1600, kind: "box", dims: [2.8, 1.2, 1.1] }, // Pressenrahmen
-  { materialId: "va", massKg: 950, kind: "cyl", dims: [1.0, 2.8] }, // VA-Prozesstank
-  { materialId: "va", massKg: 700, kind: "box", dims: [2.6, 0.9, 1.2] }, // VA-Behälter
-  { materialId: "alu", massKg: 700, kind: "box", dims: [3.5, 0.35, 1.6] }, // Tragflächenstück
-  { materialId: "alu", massKg: 800, kind: "cyl", dims: [1.3, 3.0] }, // Rumpfsegment
-  { materialId: "alu", massKg: 550, kind: "box", dims: [2.9, 1.1, 0.9] }, // Aufbau/Kofferaufbau
+  { materialId: "steel", massKg: 2400, kind: "box", dims: [2.4, 1.1, 1.9], bau: "achse" }, // Waggon-Drehgestell
+  { materialId: "steel", massKg: 2200, kind: "box", dims: [3.2, 0.9, 0.8], bau: "fahrgestell" }, // Kettenlaufwerk
+  { materialId: "steel", massKg: 1800, kind: "cyl", dims: [1.1, 3.6], bau: "tank" }, // Kesselwagen-Segment
+  { materialId: "steel", massKg: 1400, kind: "cyl", dims: [1.2, 3.1], bau: "tank" }, // Lagertank
+  { materialId: "steel", massKg: 1100, kind: "cyl", dims: [0.9, 2.0], bau: "tank" }, // Turbinengehäuse
+  { materialId: "steel", massKg: 900, kind: "box", dims: [2.2, 1.9, 1.8], bau: "karosserie" }, // LKW-Fahrerhaus
+  { materialId: "steel", massKg: 1600, kind: "box", dims: [2.8, 1.2, 1.1], bau: "motor" }, // Pressenrahmen
+  { materialId: "va", massKg: 950, kind: "cyl", dims: [1.0, 2.8], bau: "tank" }, // VA-Prozesstank
+  { materialId: "va", massKg: 700, kind: "box", dims: [2.6, 0.9, 1.2], bau: "tank" }, // VA-Behälter
+  { materialId: "alu", massKg: 700, kind: "box", dims: [3.5, 0.35, 1.6], bau: "platte" }, // Tragflächenstück
+  { materialId: "alu", massKg: 800, kind: "cyl", dims: [1.3, 3.0], bau: "rohrFlansch" }, // Rumpfsegment
+  { materialId: "alu", massKg: 550, kind: "box", dims: [2.9, 1.1, 0.9], bau: "container" }, // Aufbau/Kofferaufbau
 
   // Erweiterung 12.09.2026 — siehe world/objektkatalog.ts
   ...KATALOG_HUGE,
 ];
 
 const BIG_SPECS: PileSpec[] = [
-  { materialId: "steel", massKg: 180, kind: "box", dims: [0.28, 0.28, 2.9] }, // Doppel-T-Träger
-  { materialId: "steel", massKg: 220, kind: "box", dims: [1.9, 0.08, 1.5] }, // Blechtafel
-  { materialId: "steel", massKg: 160, kind: "cyl", dims: [0.22, 2.6] }, // dickes Rohr
-  { materialId: "steel", massKg: 140, kind: "box", dims: [1.2, 0.9, 0.75] }, // Kessel
-  { materialId: "steel", massKg: 95, kind: "box", dims: [0.75, 1.5, 0.7] }, // Waschmaschine
-  { materialId: "steel", massKg: 420, kind: "box", dims: [0.9, 0.7, 0.95] }, // Maschinenblock
-  { materialId: "steel", massKg: 300, kind: "cyl", dims: [0.6, 0.9] }, // Schwungrad
-  { materialId: "steel", massKg: 260, kind: "box", dims: [1.5, 1.1, 0.8] }, // Stahlschrank
-  { materialId: "steel", massKg: 195, kind: "box", dims: [2.4, 0.9, 0.12] }, // Stahltür/Tor
-  { materialId: "steel", massKg: 240, kind: "cyl", dims: [0.75, 1.9] }, // Öltank/Boiler
-  { materialId: "steel", massKg: 150, kind: "wire", dims: [1.15] }, // Drahtballen
-  { materialId: "va", massKg: 210, kind: "cyl", dims: [0.7, 1.8] }, // VA-Tank
-  { materialId: "va", massKg: 130, kind: "box", dims: [1.8, 0.1, 1.1] }, // VA-Tafel
-  { materialId: "va", massKg: 95, kind: "box", dims: [1.2, 0.85, 0.7] }, // Gastro-Spültisch
-  { materialId: "va", massKg: 70, kind: "box", dims: [0.14, 0.14, 2.6] }, // VA-Rohrbündel
-  { materialId: "alu", massKg: 60, kind: "box", dims: [0.3, 0.3, 2.8] }, // Profilbündel
-  { materialId: "alu", massKg: 45, kind: "box", dims: [1.6, 0.06, 1.2] }, // Alutafel
-  { materialId: "alu", massKg: 85, kind: "box", dims: [1.4, 1.2, 0.25] }, // Alu-Fensterrahmen
-  { materialId: "alu", massKg: 110, kind: "cyl", dims: [0.55, 1.4] }, // Alu-Kessel
-  { materialId: "copper", massKg: 65, kind: "cyl", dims: [0.35, 1.2] }, // Kupfer-Boiler
-  { materialId: "copper", massKg: 48, kind: "torus", dims: [0.45, 0.16] }, // Kupferrohr-Bund
+  { materialId: "steel", massKg: 180, kind: "box", dims: [0.28, 0.28, 2.9], bau: "traeger" }, // Doppel-T-Träger
+  { materialId: "steel", massKg: 220, kind: "box", dims: [1.9, 0.08, 1.5], bau: "platte" }, // Blechtafel
+  { materialId: "steel", massKg: 160, kind: "cyl", dims: [0.22, 2.6], bau: "rohrFlansch" }, // dickes Rohr
+  { materialId: "steel", massKg: 140, kind: "box", dims: [1.2, 0.9, 0.75], bau: "tank" }, // Kessel
+  { materialId: "steel", massKg: 95, kind: "box", dims: [0.75, 1.5, 0.7], bau: "weisseWare" }, // Waschmaschine
+  { materialId: "steel", massKg: 420, kind: "box", dims: [0.9, 0.7, 0.95], bau: "motor" }, // Maschinenblock
+  { materialId: "steel", massKg: 300, kind: "cyl", dims: [0.6, 0.9], bau: "trommel" }, // Schwungrad
+  { materialId: "steel", massKg: 260, kind: "box", dims: [1.5, 1.1, 0.8], bau: "moebel" }, // Stahlschrank
+  { materialId: "steel", massKg: 195, kind: "box", dims: [2.4, 0.9, 0.12], bau: "platte" }, // Stahltür/Tor
+  { materialId: "steel", massKg: 240, kind: "cyl", dims: [0.75, 1.9], bau: "tank" }, // Öltank/Boiler
+  { materialId: "steel", massKg: 150, kind: "wire", dims: [1.15], bau: "haufen" }, // Drahtballen
+  { materialId: "va", massKg: 210, kind: "cyl", dims: [0.7, 1.8], bau: "tank" }, // VA-Tank
+  { materialId: "va", massKg: 130, kind: "box", dims: [1.8, 0.1, 1.1], bau: "platte" }, // VA-Tafel
+  { materialId: "va", massKg: 95, kind: "box", dims: [1.2, 0.85, 0.7], bau: "moebel" }, // Gastro-Spültisch
+  { materialId: "va", massKg: 70, kind: "box", dims: [0.14, 0.14, 2.6], bau: "buendel" }, // VA-Rohrbündel
+  { materialId: "alu", massKg: 60, kind: "box", dims: [0.3, 0.3, 2.8], bau: "buendel" }, // Profilbündel
+  { materialId: "alu", massKg: 45, kind: "box", dims: [1.6, 0.06, 1.2], bau: "platte" }, // Alutafel
+  { materialId: "alu", massKg: 85, kind: "box", dims: [1.4, 1.2, 0.25], bau: "platte" }, // Alu-Fensterrahmen
+  { materialId: "alu", massKg: 110, kind: "cyl", dims: [0.55, 1.4], bau: "tank" }, // Alu-Kessel
+  { materialId: "copper", massKg: 65, kind: "cyl", dims: [0.35, 1.2], bau: "tank" }, // Kupfer-Boiler
+  { materialId: "copper", massKg: 48, kind: "torus", dims: [0.45, 0.16], bau: "buendel" }, // Kupferrohr-Bund
   { materialId: "cable", massKg: 55, kind: "torus", dims: [0.55, 0.22] }, // Kabelbund
-  { materialId: "cable", massKg: 120, kind: "cyl", dims: [0.85, 0.9] }, // Kabeltrommel
-  { materialId: "wood", massKg: 90, kind: "box", dims: [1.4, 0.5, 0.9] }, // Holzkiste
-  { materialId: "rubble", massKg: 130, kind: "box", dims: [1.1, 1.1, 1.1] }, // Betonblock
+  { materialId: "cable", massKg: 120, kind: "cyl", dims: [0.85, 0.9], bau: "trommel" }, // Kabeltrommel
+  { materialId: "wood", massKg: 90, kind: "box", dims: [1.4, 0.5, 0.9], bau: "moebel" }, // Holzkiste
+  { materialId: "rubble", massKg: 130, kind: "box", dims: [1.1, 1.1, 1.1], bau: "beton" }, // Betonblock
 
   // Erweiterung 12.09.2026 — siehe world/objektkatalog.ts
   ...KATALOG_BIG,
@@ -397,7 +404,7 @@ export function randomCargo(
     out.push({
       materialId: spec.materialId,
       massKg: spec.massKg,
-      shape: { kind: spec.kind, dims: spec.dims, color: colorFor(spec, i) },
+      shape: { kind: spec.kind, dims: spec.dims, color: colorFor(spec, i), bau: spec.bau },
     });
   }
   return out;
@@ -618,8 +625,14 @@ export class ItemManager {
     pos: THREE.Vector3,
     rot?: THREE.Quaternion
   ): ScrapItem {
+    /*
+     * Bei einem Bau steckt die Farbe in den Eckpunkten, nicht im Material —
+     * darum Grundfarbe weiss und `vertexColors`. Nur so bleibt ein Objekt aus
+     * zwoelf Bauteilen ein einziger Zeichenruf mit einem einzigen Material.
+     */
     const material = new THREE.MeshStandardMaterial({
-      color: shape.color,
+      color: shape.bau ? 0xffffff : shape.color,
+      vertexColors: !!shape.bau,
       roughness: materialId === "copper" || materialId === "alu" ? 0.35 : 0.75,
       metalness: NICHTMETALLE.has(materialId) || materialId === "cable" ? 0 : 0.4,
     });
@@ -669,6 +682,16 @@ export class ItemManager {
         RAPIER.ColliderDesc.convexHull(pos.array as Float32Array) ??
         RAPIER.ColliderDesc.ball(r * 0.95);
     }
+    /*
+     * Der Bau ersetzt nur das Aussehen. Der Kollider bleibt der Grundkoerper
+     * aus dem Katalog — Physik und Aussehen sind getrennt, und das Aussehen
+     * darf darum beliebig fein werden, ohne dass die Physik teurer wird.
+     */
+    if (shape.bau) {
+      geo.dispose();
+      geo = baueGeometrie(shape.bau, shape.dims, shape.kind);
+    }
+
     const isWire = shape.kind === "wire";
     const mesh = new THREE.Mesh(
       geo,

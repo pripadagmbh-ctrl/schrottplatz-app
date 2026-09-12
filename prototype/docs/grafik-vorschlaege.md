@@ -5,6 +5,29 @@ Objekte unnötig, wenn sie nicht erkennbar sind."
 
 Stimmt, und der Grund ist kein Versehen an einer Stelle, sondern die Struktur.
 
+## Umsetzungsstand (12.09.2026)
+
+**S1 und S3 sind gebaut** — `src/world/objektbau.ts`, 24 Bauten.
+**283 von 290 Katalogeinträgen** sind zugeordnet, einschließlich der 78 alten.
+
+Das Musterblatt hat dabei einen der Vorschläge widerlegt: **S2 (Formgeber
+allein) bringt fast nichts.** Verjüngung und gebrochene Kanten machen ein
+Objekt weicher, nicht erkennbarer — was in der mittleren Spalte wirkte, war
+ausschließlich die Farbe. S2 ist damit erledigt, ohne gebaut worden zu sein.
+
+| | vorher | nachher |
+|---|---|---|
+| Dreiecke je Schrottteil | 12 | 343 |
+| **Meshes je Schrottteil** | **1,48** | **1,48** |
+| Materialien je Teil | 1 | 1 |
+
+Die mittlere Zeile ist der Punkt: Ein Objekt aus zwölf Bauteilen kostet genau
+so viele Zeichenrufe wie der Quader vorher, weil alles beim Anlegen zu **einer**
+Geometrie verschmolzen wird und die Farbe in den Eckpunkten steckt.
+
+Offen bleiben S4 (Gebrauchsspuren), S5 (Texturen), S6 (Licht und
+Kontaktschatten) und S7 (Umrisse).
+
 ## Befund
 
 | | |
