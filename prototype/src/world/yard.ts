@@ -19,6 +19,30 @@ export const YARD_W = YARD_MAX_X - YARD_MIN_X;
 /** Mitte des Platzes in x — der Boden liegt nicht mehr im Ursprung. */
 export const YARD_CX = (YARD_MIN_X + YARD_MAX_X) / 2;
 export const YARD_D = 58;
+/**
+ * Wo die Suedmauer erhoeht ist — hinter den beiden Boxen und der Presse.
+ *
+ * Ansage 13.09.2026: „da war ja eine Mulde quasi, die wird abgerissen, die
+ * Wand wird erhoeht, die Aussenwand vom Platz." Die alte Stahlmulde hatte
+ * eine eigene Rueckwand auf 3 m; die faellt weg, und die Platzmauer
+ * uebernimmt ihre Aufgabe. Von `SUED_HOCH_VON` nach links steht sie auf
+ * `SUED_HOCH` statt auf den ueblichen 1,8 m, davor laeuft sie ueber
+ * `SUED_HOCH_RAMPE` Meter auf die normale Hoehe zurueck — eine Mauer, die
+ * auf voller Hoehe abbricht, sieht aus wie ein abgebrochenes Bauteil.
+ */
+export const SUED_HOCH_VON = -6.6;
+/*
+ * 4,8 m — acht Blockreihen à 0,6 m, also so hoch wie die Boxen davor.
+ *
+ * Ansage 13.09.2026: „achte auf jeden Fall darauf, dass ueberall die Waende
+ * hochgezogen sind, wo mit der Spinne gearbeitet werden kann. Also vom
+ * Mischschrottplatz bis zum Stahlschrottplatz sollte es sehr hohe Waende
+ * geben, in grossen Bereichen." Mit 3,6 m stand die Mauer einen Meter
+ * niedriger als die Boxwaende links und rechts davon — man haette ueber sie
+ * hinweggestapelt.
+ */
+export const SUED_HOCH = 4.8;
+export const SUED_HOCH_RAMPE = 4.5;
 /** Einfahrt in der linken hinteren Ecke (Nordwesten) */
 export const GATE_X = -22;
 
@@ -919,8 +943,8 @@ export class Yard {
     const block = new THREE.Object3D();
     const niete = new THREE.Object3D();
 
-    const place = (x: number, z: number, alongX: boolean): void => {
-      for (let r = 0; r < ROWS; r++) {
+    const place = (x: number, z: number, alongX: boolean, reihen = ROWS): void => {
+      for (let r = 0; r < reihen; r++) {
         const f = farben[n++ % 3]!;
         block.position.set(x, BH / 2 + r * BH, z);
         block.rotation.set(0, alongX ? 0 : Math.PI / 2, 0);
@@ -937,10 +961,20 @@ export class Yard {
       }
     };
 
+    /*
+     * Wie viele Reihen die Suedmauer an dieser Stelle hoch ist. Hinter den
+     * beiden Boxen traegt sie deren Rueckwand mit, davor laeuft sie aus.
+     */
+    const suedReihen = (x: number): number => {
+      if (x >= SUED_HOCH_VON) return Math.round(SUED_HOCH / BH);
+      const t = (x - (SUED_HOCH_VON - SUED_HOCH_RAMPE)) / SUED_HOCH_RAMPE;
+      if (t <= 0) return ROWS;
+      return Math.round(ROWS + t * (SUED_HOCH / BH - ROWS));
+    };
     // Nord- und Südwand (Einfahrtslücke im Norden bei GATE_X)
     for (let x = YARD_MIN_X + BL / 2; x < YARD_MAX_X; x += BL) {
       if (!(Math.abs(x - GATE_X) < 4.5)) place(x, hz, true);
-      place(x, -hz, true);
+      place(x, -hz, true, suedReihen(x));
     }
     // Ost- und Westwand
     for (let z = -hz + BL / 2; z < hz; z += BL) {
@@ -970,13 +1004,26 @@ export class Yard {
 
     // Kollider als durchgehende Quader (Einfahrt ausgespart)
     const wallH = ROWS * BH;
-    const addWall = (x: number, z: number, sx: number, sz: number): void => {
+    const addWall = (x: number, z: number, sx: number, sz: number, hoch = wallH): void => {
       world.createCollider(
-        RAPIER.ColliderDesc.cuboid(sx / 2, wallH / 2, sz / 2).setTranslation(x, wallH / 2, z),
+        RAPIER.ColliderDesc.cuboid(sx / 2, hoch / 2, sz / 2).setTranslation(x, hoch / 2, z),
         wallBody
       );
     };
     addWall(YARD_CX, -hz, YARD_W, BT);
+    /*
+     * Das erhoehte Stueck bekommt einen zweiten Quader obendrauf. Er muss
+     * sein, nicht nur die Steine: `hitsObstacle` laesst den Greifer ueber
+     * alles hinweg, was niedriger ist als er selbst — ohne diesen Kollider
+     * fuehre er durch die sichtbare Mauer hindurch.
+     */
+    addWall(
+      (SUED_HOCH_VON - SUED_HOCH_RAMPE + YARD_MAX_X) / 2,
+      -hz,
+      YARD_MAX_X - (SUED_HOCH_VON - SUED_HOCH_RAMPE),
+      BT,
+      SUED_HOCH
+    );
     addWall(YARD_MIN_X, 0, BT, YARD_D);
     addWall(YARD_MAX_X, 0, BT, YARD_D);
     // Nordwand in zwei Stücken links und rechts der Einfahrt

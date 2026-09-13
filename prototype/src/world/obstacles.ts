@@ -1,8 +1,12 @@
+import { PRESS_CENTER, PRESS_INNER } from "./press";
 import {
   YARD_W,
   YARD_D,
   YARD_MIN_X,
   YARD_MAX_X,
+  SUED_HOCH,
+  SUED_HOCH_VON,
+  SUED_HOCH_RAMPE,
   YARD_CX,
   GATE_X,
   KAFFEE_POS,
@@ -168,6 +172,19 @@ function bayObstacles(cfg: ContainerConfig): Obstacle[] {
 export const STATIC_OBSTACLES: Obstacle[] = [
   // --- Umrandung aus Betonlego, Einfahrt im Nordwesten ausgespart ---
   { x: YARD_CX, z: -HZ, hw: YARD_W / 2, hd: WALL_T / 2, top: WALL_H, label: "Südwand" },
+  /*
+   * Hinter den beiden Boxen steht die Suedmauer hoeher (yard.ts). Ohne diesen
+   * Eintrag liesse `hitsObstacle` den Greifer auf 2 m durch sie hindurch, weil
+   * die Mauer dort nur mit 1,8 m verzeichnet waere.
+   */
+  {
+    x: (SUED_HOCH_VON - SUED_HOCH_RAMPE + YARD_MAX_X) / 2,
+    z: -HZ,
+    hw: (YARD_MAX_X - (SUED_HOCH_VON - SUED_HOCH_RAMPE)) / 2,
+    hd: WALL_T / 2,
+    top: SUED_HOCH,
+    label: "Südwand hoch",
+  },
   { x: YARD_MIN_X, z: 0, hw: WALL_T / 2, hd: HZ, top: WALL_H, label: "Westwand" },
   { x: YARD_MAX_X, z: 0, hw: WALL_T / 2, hd: HZ, top: WALL_H, label: "Ostwand" },
   // Nordwand in zwei Stücken links und rechts der Einfahrt
@@ -191,8 +208,24 @@ export const STATIC_OBSTACLES: Obstacle[] = [
   // --- Mulden: aus CONFIGS erzeugt, damit sie nicht auseinanderlaufen ---
   ...CONFIGS.flatMap(bayObstacles),
 
-  // --- Schere und Presse, südlich hinter dem Bagger ---
-  { x: -3.0, z: -26.0, hw: 3.9, hd: 2.5, top: 2.2, label: "Schere" },
+  /*
+   * Presse — Lage und Mass kommen aus press.ts, nicht aus einer Zahl hier.
+   *
+   * Bis 13.09.2026 stand hier fest (−3,0 | −26,0) mit 7,8 x 5,0 m. Als die
+   * Presse morgens in die Ecke auf (6,6 | −26,0) gezogen ist, blieb dieser
+   * Eintrag stehen: eine unsichtbare Wand mitten auf dem Platz, genau hinter
+   * dem Bagger — und an der Presse selbst gar kein Hindernis. Gefunden hat
+   * das nicht das Auge, sondern der Anordnungstest in `test/collision.test.ts`,
+   * als der Platz umgebaut wurde.
+   */
+  {
+    x: PRESS_CENTER.x,
+    z: PRESS_CENTER.z,
+    hw: (PRESS_INNER.laenge + 0.7) / 2,
+    hd: (PRESS_INNER.tiefe + 0.7) / 2,
+    top: 2.2,
+    label: "Presse",
+  },
 
 
   // --- Betriebsgebäude: Büro und Halle, hinten rechts an der Wand ---
