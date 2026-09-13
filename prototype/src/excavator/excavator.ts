@@ -291,23 +291,6 @@ export class Excavator {
   private stickGroup = new THREE.Group();
   private stickTip = new THREE.Object3D();
   readonly grappleGroup = new THREE.Group(); // top-level, hängt lotrecht
-  /*
-   * Was am Gehaenge haengt und beim Drehen STEHEN bleibt: die beiden
-   * Kardangabeln und das Motorgehaeuse des Drehwerks.
-   *
-   * Ansage 13.09.2026: „Der Greifer dreht auch an der falschen Stelle. Du hast
-   * ja extra 'n Drehmotor unter dem Schwenkgelenk und eigentlich dreht die
-   * Spinne ueber dem Schwenkgelenk, aber der Drehmotor ist ja dafuer
-   * zustaendig." Gedreht wurde die ganze `grappleGroup`, also auch das
-   * Schwenkgelenk, das am Stiel haengt.
-   *
-   * Die Drehung bleibt trotzdem oben, denn an ihr haengt die gesamte
-   * Kollider- und Greifrechnung (`clawPoint` im Frame der grappleGroup). Statt
-   * die Kette umzubauen, werden die feststehenden Teile um denselben Winkel
-   * zurueckgedreht — das Ergebnis ist bis auf Fliesskommareste dasselbe, ohne
-   * dass eine einzige Physikrechnung angefasst werden muss.
-   */
-  private gehaengeFest: Array<{ knoten: THREE.Object3D; grund: number }> = [];
   private fingerPivots: THREE.Group[] = [];
   /**
    * Greifer-Hydraulik: Die Zylinder sind über Gelenke mit Traverse und Schale
@@ -609,14 +592,14 @@ export class Excavator {
      * BEFESTIGUNG AM AUSLEGER (Ansage 13.09.2026: „Greifer braucht Befestigung
      * am Ausleger").
      *
-     * Vorher hing die Spinne am Stiel, ohne dass am Stiel etwas zu sehen war:
-     * Beide Kardangabeln gehoerten zur `grappleGroup`, der Stiel endete stumpf.
-     * Die obere Gabel gehoert aber an den Stiel — sie ist der feste Teil des
-     * Gelenks. Dazu ein Gusskopf am Stielende, aus dem sie herauswaechst, und
-     * zwei Sicherungsscheiben auf dem Bolzen.
+     * Vorher endete der Stiel stumpf und die Spinne hing daran, ohne dass am
+     * Stiel etwas zu sehen war. Jetzt sitzt dort ein Gusskopf, aus dem zwei
+     * Laschen herauswachsen, dazu der Bolzen und zwei Sicherungsscheiben.
      *
-     * Weil die Gabel jetzt im Stielframe haengt, kippt sie mit dem Stiel mit —
-     * genau wie beim Vorbild, wo sich darunter das Pendelgelenk befindet.
+     * Der Halter haengt im Stielframe und kippt deshalb mit dem Stiel mit —
+     * genau wie beim Vorbild, wo darunter das Pendelgelenk sitzt. Er ist
+     * beim Rueckbau auf die Sichelkralle am 13.09.2026 stehen geblieben: Er
+     * gehoert zum Stiel, nicht zur Spinne, und haengt an keiner ihrer Formen.
      */
     const halter = new THREE.Group();
     halter.position.z = STICK_LEN;
@@ -645,8 +628,8 @@ export class Excavator {
       halter.add(scheibe);
     }
 
-    // Kardan-Aufhängung: die untere Gabel gehoert zur Spinne und greift in die
-    // obere am Stiel.
+    // Kardan-Aufhängung: zwei ineinandergreifende Gelenkgabeln (90° verdreht)
+    // zwischen Stielspitze und Spinne — statt eines schlichten Zylinders.
     const buildYoke = (y: number, alongX: boolean): void => {
       const yoke = new THREE.Group();
       yoke.position.y = y;
@@ -662,12 +645,12 @@ export class Excavator {
       pin.position.y = -0.16;
       yoke.add(pin);
       this.grappleGroup.add(yoke);
-      this.gehaengeFest.push({ knoten: yoke, grund: yoke.rotation.y });
     };
     const stub = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.12, 10), dark);
     stub.position.y = -0.05;
     this.grappleGroup.add(stub);
-    buildYoke(-0.3, false); // untere Gabel: 90° verdreht — greift in die obere am Stiel
+    buildYoke(-0.1, true); // obere Gabel: Bolzen quer
+    buildYoke(-0.3, false); // untere Gabel: 90° verdreht — greift in die obere
     /*
      * Die Spinne steht Bauteil fuer Bauteil in `grappleParts.ts`.
      *
@@ -679,15 +662,6 @@ export class Excavator {
      */
     const spinne = baueSpinne();
     this.grappleGroup.add(spinne.gruppe);
-    /*
-     * Der Drehmotor dreht sich NICHT mit — er treibt an.
-     *
-     * Gehaeuse und Motor sind am Gehaenge verschraubt, nur der Abtrieb
-     * darunter laeuft um. Genauso die beiden Kardangabeln: Die haengen am
-     * Stiel und bleiben stehen, wenn die Spinne sich dreht.
-     */
-    const motor = spinne.gruppe.getObjectByName("02_ROTATOR");
-    if (motor) this.gehaengeFest.push({ knoten: motor, grund: motor.rotation.y });
     this.fingerPivots.push(...spinne.gelenke);
     for (const z of spinne.zylinder) {
       this.grappleCylinders.push({
@@ -1989,8 +1963,6 @@ export class Excavator {
     this.stickTip.getWorldPosition(tip);
     this.grappleGroup.position.copy(tip);
     this.grappleGroup.rotation.set(0, this.heading + this.cabYaw + this.rotatorYaw, 0);
-    // Schwenkgelenk und Motorgehaeuse bleiben stehen (siehe `gehaengeFest`)
-    for (const t of this.gehaengeFest) t.knoten.rotation.y = t.grund - this.rotatorYaw;
 
     // Zacken: offen weit gespreizt. Geschlossen fügen sich die Schalen zur
     // dichten Kalotte — es sei denn, es liegt Material darin: dann bleibt die

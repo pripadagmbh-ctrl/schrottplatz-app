@@ -1,80 +1,74 @@
 /**
- * Zusammenbau des Fünfschalengreifers aus den Einzelteilen.
+ * Das Rig: Hierarchie, Pivots und die beiden Bewegungen.
  *
- * Gebaut wird ausschließlich aus `teile.ts` — dort stehen die Hauptmaße der
- * Explosionszeichnung und die daraus abgetastete Kinematik. Hier steht nur,
- * wo welches Teil sitzt und was sich wie bewegt.
+ * Zwei Freiheitsgrade, mehr hat ein Mehrschalengreifer nicht:
  *
- * Das Verbindungsprinzip der Zeichnung, Stück für Stück:
+ *   - `setOeffnung(0…1)` schwenkt alle fünf Schalen um ihre Gelenkbolzen und
+ *     führt die Zylinder nach.
+ *   - `setDrehung(rad)` dreht den ganzen Greifer unter der Aufhängung um die
+ *     Hochachse. Beides ist voneinander unabhängig.
  *
- *   Oberer Zylinderanschluss   an der Mitteltraverse
- *   Hydraulikzylinder          dazwischen
- *   Obere Schalenanbindung     am Zylinder
- *   Greiferschale
- *   Untere Schalenanbindung    an der zentralen Gelenkeinheit (Stempel)
- *   Greiferspitze              an der Schale
+ * Die Hierarchie weicht an einer Stelle bewusst von der Wunschliste ab: Dort
+ * standen Rotator, Mittelstück, Zylinder und Schalen nebeneinander. Mechanisch
+ * geht das nicht — dreht der Rotator, muss alles unter ihm mitdrehen. Schalen
+ * und Zylinder hängen deshalb unter `GRAPPLE_HEAD`, und der hängt unter
+ * `ROTATOR`. Die Namen sind die gewünschten geblieben.
  *
- * Jede Schale hat damit genau EINEN Drehpunkt — unten am Stempel — und wird
- * oben vom Zylinder geschoben. Ein Winkelhebel. Bis zur zweiten Fassung der
- * Zeichnung hatte ich die Schalen an der Mitteltraverse hängen; das war
- * falsch, und es ist der Grund, warum die Form nicht wie eine Birne aussah.
- *
- * Aufbau von oben nach unten, mit den Überdeckungen echter Verschraubungen:
- *
- *   Adapter           0,00 … −0,40
- *   Rotator          −0,36 … −0,66
- *   Drehwerksgehäuse −0,58 … −0,88
- *   Mitteltraverse   −0,80 … −1,20
- *   Stempel          −1,49 … −1,84   (Auge auf −1,66)
+ *   GRAPPLE_ROOT
+ *   ├── ADAPTER                     01/02, fest am Stiel
+ *   └── ROTATOR                     03, dreht um Y
+ *       └── GRAPPLE_HEAD            06/07 Mittelstück, Haube, Gelenkring
+ *           ├── CYLINDER_01…05      04, Pivot = Anlenkung, dreht um X
+ *           │   ├── CYL_BARREL_0n
+ *           │   └── CYL_ROD_0n      fährt aus und ein
+ *           ├── SHELL_01…05         08, Pivot = Gelenkbolzen, dreht um X
+ *           │   ├── SHELL_SEG_0n_1…6  Segmentkette, fest
+ *           │   │   ├── SHELL_BODY_0n_k
+ *           │   │   └── WEAR_PLATE_0n_k   09
+ *           │   ├── SHELL_TIP_0n    10
+ *           │   └── SHELL_LUG_0n
+ *           ├── PIVOT_PIN_01…05     11
+ *           └── HYDRAULIC_LINES     05
  */
 import * as THREE from "three";
 import {
-  MASS,
-  OBERE_ANBINDUNG,
+  LASCHE,
   OFFEN,
-  STEMPEL_AUGE,
-  Stoffe,
-  TRAVERSE_Y,
+  RING_Y,
+  ROHRLAENGE,
+  SCHALEN,
   ZU,
-  ZYLINDER_AUFNAHME,
-  baueAufhaengung,
-  baueDrehwerksgehaeuse,
-  baueGreiferschale,
-  baueGreiferspitze,
-  baueMitteltraverse,
-  baueRotator,
-  baueStempel,
-  baueZylinder,
-  mittellinie,
-  nahtStoff,
-  schalenEnde,
+  GELENKRING,
   schwenkFuer,
+} from "./form";
+import {
+  Stoffe,
+  baueAufhaengung,
+  baueGelenkbolzen,
+  baueMittelstueck,
+  baueRotator,
+  baueSchale,
+  baueSchlaeuche,
+  baueZylinder,
   stoffe,
-} from "./teile";
+  zylinderAmKopf,
+} from "./parts";
 
-/** Höhenlage jeder Baugruppe (Mitte, in Metern unter dem Aufhängepunkt). */
-export const LAGE = {
-  adapter: -0.2,
-  rotator: -0.51,
-  drehwerksgehaeuse: -0.73,
-  traverse: TRAVERSE_Y,
-  stempel: STEMPEL_AUGE.y,
-} as const;
-
-/** Wie weit die Kolbenstange im Rohr steckt (m). */
-const EINSTAND = 0.06;
+/** Wie weit die Kolbenstange im Rohr stecken bleibt (m). */
+const EINSTAND = 0.08;
 
 export interface Schale {
+  /** Der Knoten, dessen Ursprung auf dem Gelenkbolzen liegt. */
   gelenk: THREE.Group;
+  /** Winkel des Gelenks auf dem Gelenkring (rad). */
   winkel: number;
 }
 
 export interface Zylinder {
   gelenk: THREE.Group;
-  rohr: THREE.Group;
-  stange: THREE.Group;
-  stab: THREE.Mesh;
-  auge: THREE.Mesh;
+  rohr: THREE.Mesh;
+  stange: THREE.Mesh;
+  amKopf: THREE.Vector3;
   gehoertZu: Schale;
 }
 
@@ -82,8 +76,7 @@ export interface Greifer {
   wurzel: THREE.Group;
   adapter: THREE.Group;
   rotator: THREE.Group;
-  traverse: THREE.Group;
-  stempel: THREE.Group;
+  kopf: THREE.Group;
   schalen: Schale[];
   zylinder: Zylinder[];
   setOeffnung(t: number): void;
@@ -92,54 +85,49 @@ export interface Greifer {
 }
 
 /**
- * Wo die Kolbenstange an der Schale angreift, im Frame des Greifers.
+ * Wo die Kolbenstange angreift, im Frame des Kopfes, bei gegebenem Schwenk.
  *
- * Die obere Anbindung sitzt fest an der Schale und dreht mit ihr um den
- * Drehpunkt am Stempel. Weil Aufnahme und Anbindung auf derselben Radialebene
- * liegen, ist das eine ebene Rechnung.
+ * Die Lasche sitzt fest an der Schale; sie dreht also mit dem Gelenk um dessen
+ * x-Achse. Weil Anlenkung und Lasche auf derselben Radialebene liegen, ist das
+ * eine ebene Rechnung — der Zylinder schwenkt nur um eine Achse.
  */
-function anbindungspunkt(schwenk: number): { r: number; y: number } {
-  const c = Math.cos(-schwenk);
-  const s = Math.sin(-schwenk);
+function laschePunkt(schwenk: number): { r: number; y: number } {
+  const phi = -(schwenk - ZU);
+  const c = Math.cos(phi);
+  const s = Math.sin(phi);
   return {
-    r: STEMPEL_AUGE.r + (OBERE_ANBINDUNG.y * s + OBERE_ANBINDUNG.z * c),
-    y: STEMPEL_AUGE.y + (OBERE_ANBINDUNG.y * c - OBERE_ANBINDUNG.z * s),
+    r: GELENKRING + (LASCHE.y * s + LASCHE.z * c),
+    y: RING_Y + (LASCHE.y * c - LASCHE.z * s),
   };
 }
 
-/** Abstand zwischen oberem Zylinderanschluss und oberer Schalenanbindung (m). */
+/** Abstand zwischen Zylinderanlenkung und Lasche bei gegebenem Schwenk (m). */
 export function zylinderLaenge(schwenk: number): number {
-  const l = anbindungspunkt(schwenk);
-  return Math.hypot(l.r - ZYLINDER_AUFNAHME.r, l.y - ZYLINDER_AUFNAHME.y);
+  const l = laschePunkt(schwenk);
+  const a = zylinderAmKopf(0);
+  return Math.hypot(l.r - a.z, l.y - a.y);
 }
 
-/** Neigung des Zylinders gegen die Senkrechte (rad). */
+/** Neigung des Zylinders gegen die Senkrechte bei gegebenem Schwenk (rad). */
 export function zylinderNeigung(schwenk: number): number {
-  const l = anbindungspunkt(schwenk);
-  return Math.atan2(
-    Math.abs(l.r - ZYLINDER_AUFNAHME.r),
-    Math.abs(l.y - ZYLINDER_AUFNAHME.y)
-  );
+  const l = laschePunkt(schwenk);
+  const a = zylinderAmKopf(0);
+  return Math.atan2(Math.abs(l.r - a.z), Math.abs(l.y - a.y));
 }
 
 /**
- * Hebelarm des Zylinders am Drehpunkt der Schale (m).
+ * Hebelarm des Zylinders am Gelenkbolzen bei gegebenem Schwenk (m).
  *
- * Der senkrechte Abstand des Stempelauges von der Wirkungslinie. Das Moment an
- * der Schale ist Zylinderkraft mal diesem Arm; geht er gegen null, steht die
- * Schale fest, egal wie viel Druck anliegt.
+ * Der senkrechte Abstand des Gelenkbolzens von der Wirkungslinie Anlenkung →
+ * Lasche. Das Moment an der Schale ist Zylinderkraft mal diesem Arm.
  */
 export function hebelarm(schwenk: number): number {
-  const l = anbindungspunkt(schwenk);
-  const d = Math.max(
-    Math.hypot(l.r - ZYLINDER_AUFNAHME.r, l.y - ZYLINDER_AUFNAHME.y),
-    1e-6
-  );
-  const ux = (l.r - ZYLINDER_AUFNAHME.r) / d;
-  const uy = (l.y - ZYLINDER_AUFNAHME.y) / d;
-  return Math.abs(
-    (STEMPEL_AUGE.r - ZYLINDER_AUFNAHME.r) * uy - (STEMPEL_AUGE.y - ZYLINDER_AUFNAHME.y) * ux
-  );
+  const l = laschePunkt(schwenk);
+  const a = zylinderAmKopf(0);
+  const d = Math.max(Math.hypot(l.r - a.z, l.y - a.y), 1e-6);
+  const ux = (l.r - a.z) / d;
+  const uy = (l.y - a.y) / d;
+  return Math.abs((GELENKRING - a.z) * uy - (RING_Y - a.y) * ux);
 }
 
 /** Zwei Nachkommastellen reichen — sonst wandern Fließkommareste ins glTF. */
@@ -148,103 +136,60 @@ function rund(x: number): number {
 }
 
 export function baueGreifer(st: Stoffe = stoffe()): Greifer {
-  nahtStoff(st);
   const wurzel = new THREE.Group();
   wurzel.name = "GRAPPLE_ROOT";
 
   const adapter = baueAufhaengung(st);
-  adapter.position.y = LAGE.adapter;
   wurzel.add(adapter);
 
-  /*
-   * Alles unter dem Adapter hängt am Rotator — sonst dreht sich beim Drehen
-   * nur das Motorgehäuse und der Greifer bleibt stehen.
-   */
-  const rotator = new THREE.Group();
-  rotator.name = "ROTATOR";
+  const rotator = baueRotator(st);
   wurzel.add(rotator);
 
-  const drehwerk = baueRotator(st);
-  drehwerk.position.y = LAGE.rotator;
-  rotator.add(drehwerk);
-
-  const gehaeuse = baueDrehwerksgehaeuse(st);
-  gehaeuse.position.y = LAGE.drehwerksgehaeuse;
-  rotator.add(gehaeuse);
-
-  const traverse = baueMitteltraverse(st);
-  traverse.name = "GRAPPLE_HEAD";
-  traverse.position.y = LAGE.traverse;
-  rotator.add(traverse);
-
-  const stempel = baueStempel(st);
-  stempel.position.y = LAGE.stempel;
-  rotator.add(stempel);
+  const kopf = baueMittelstueck(st);
+  rotator.add(kopf);
 
   const schalen: Schale[] = [];
   const zylinder: Zylinder[] = [];
+  const anschluesse: THREE.Vector3[] = [];
 
-  for (let i = 0; i < MASS.schalen; i++) {
+  for (let i = 0; i < SCHALEN; i++) {
     const nr = String(i + 1).padStart(2, "0");
-    const a = (i / MASS.schalen) * Math.PI * 2;
-    const sin = Math.sin(a);
-    const cos = Math.cos(a);
+    const a = (i / SCHALEN) * Math.PI * 2;
 
-    /* --- Schale: Ursprung auf dem Stempelauge --- */
-    const gelenk = new THREE.Group();
-    gelenk.name = `SHELL_${nr}`;
-    gelenk.position.set(sin * STEMPEL_AUGE.r, STEMPEL_AUGE.y, cos * STEMPEL_AUGE.r);
-    gelenk.rotation.order = "YXZ";
-    gelenk.rotation.y = a; // lokales +z zeigt radial nach außen
-    rotator.add(gelenk);
+    const gelenk = baueSchale(st, a, nr);
+    kopf.add(gelenk);
+    const schale: Schale = { gelenk, winkel: a };
+    schalen.push(schale);
 
-    const schale = baueGreiferschale(st);
-    schale.name = `SHELL_BODY_${nr}`;
-    gelenk.add(schale);
+    const bolzen = baueGelenkbolzen(st);
+    bolzen.name = `PIVOT_PIN_${nr}`;
+    bolzen.position.copy(gelenk.position);
+    bolzen.rotation.y = a;
+    bolzen.rotation.z = Math.PI / 2;
+    kopf.add(bolzen);
 
-    /*
-     * Greiferspitze am Ende der letzten Station, in Laufrichtung der Schale.
-     * Die Spitze zeigt in ihrem Frame nach −y; eine Drehung um x um `th` bringt
-     * (0,−1,0) genau auf die Richtung (0, −cos th, −sin th), in der die Schale
-     * dort läuft.
-     */
-    const ende = schalenEnde();
-    const spitze = baueGreiferspitze(st);
-    spitze.name = `SHELL_TIP_${nr}`;
-    spitze.position.set(0, ende.y, ende.z);
-    spitze.rotation.x = ende.th;
-    gelenk.add(spitze);
-
-    const schaleRef: Schale = { gelenk, winkel: a };
-    schalen.push(schaleRef);
-
-    /* --- Zylinder: Ursprung am oberen Anschluss an der Mitteltraverse --- */
+    const amKopf = zylinderAmKopf(a);
     const zylGelenk = new THREE.Group();
     zylGelenk.name = `CYLINDER_${nr}`;
-    zylGelenk.position.set(
-      sin * ZYLINDER_AUFNAHME.r,
-      ZYLINDER_AUFNAHME.y,
-      cos * ZYLINDER_AUFNAHME.r
-    );
+    zylGelenk.position.copy(amKopf);
     zylGelenk.rotation.order = "YXZ";
     zylGelenk.rotation.y = a;
-    rotator.add(zylGelenk);
+    kopf.add(zylGelenk);
 
-    const { gehaeuse: rohrTeil, stange, stab, auge } = baueZylinder(st);
-    rohrTeil.name = `CYL_BARREL_${nr}`;
+    const { rohr, stange } = baueZylinder(st);
+    rohr.name = `CYL_BARREL_${nr}`;
     stange.name = `CYL_ROD_${nr}`;
-    /*
-     * Stab und Auge bewegen sich einzeln, seit nicht mehr die ganze Gruppe
-     * skaliert wird. Sie brauchen darum eigene Namen — der Export legt seine
-     * Animationsspuren auf Namen, und was keinen hat, bewegt sich im GLB nicht.
-     */
-    stab.name = `CYL_ROD_SHAFT_${nr}`;
-    auge.name = `CYL_ROD_EYE_${nr}`;
-    zylGelenk.add(rohrTeil);
+    rohr.position.y = -ROHRLAENGE / 2;
+    rohr.scale.y = ROHRLAENGE;
+    stange.position.y = -0.5;
+    zylGelenk.add(rohr);
     zylGelenk.add(stange);
 
-    zylinder.push({ gelenk: zylGelenk, rohr: rohrTeil, stange, stab, auge, gehoertZu: schaleRef });
+    zylinder.push({ gelenk: zylGelenk, rohr, stange, amKopf, gehoertZu: schale });
+    anschluesse.push(amKopf.clone().setY(amKopf.y + 0.06));
   }
+
+  kopf.add(baueSchlaeuche(st, anschluesse));
 
   let stand = 0;
 
@@ -252,33 +197,23 @@ export function baueGreifer(st: Stoffe = stoffe()): Greifer {
     stand = Math.min(1, Math.max(0, t));
     const schwenk = schwenkFuer(stand);
     for (const s of schalen) {
-      s.gelenk.rotation.x = rund(-schwenk);
+      s.gelenk.rotation.x = rund(-(schwenk - ZU));
     }
-    const l = anbindungspunkt(schwenk);
-    const dr = l.r - ZYLINDER_AUFNAHME.r;
-    const dy = l.y - ZYLINDER_AUFNAHME.y;
-    const dist = Math.max(Math.hypot(dr, dy), 0.2);
-    /*
-     * Das Rohr zeigt in seinem Frame nach −y. Eine Drehung um x um ψ bringt
-     * (0,−1,0) auf (0, −cos ψ, −sin ψ). Damit das auf (0, dy, dr) zeigt:
-     *   ψ = atan2(−dr, −dy)
-     */
-    const psi = rund(Math.atan2(-dr, -dy));
-    const rohrLaenge = MASS.zylinder.laenge * 0.6;
-    const auszug = MASS.zylinder.laenge - rohrLaenge - 0.12;
-    /*
-     * Das Auge der Kolbenstange sitzt GENAU auf dem Anlenkpunkt, also `dist`
-     * unter dem oberen Gelenk. Vorher wurde die ganze Stangengruppe skaliert,
-     * das Auge also mitgedehnt und mitverschoben — es stand 14 cm hinter
-     * seinem Bolzen. Jetzt wird nur der Stab gedehnt; das Auge wird gesetzt.
-     */
-    const frei = Math.max(dist - rohrLaenge, 0.04);
+    const l = laschePunkt(schwenk);
+    const a = zylinderAmKopf(0);
     for (const z of zylinder) {
-      z.gelenk.rotation.x = psi;
-      z.stange.position.y = rund(-rohrLaenge);
-      z.stab.scale.y = rund((frei + EINSTAND) / auszug);
-      z.stab.position.y = rund(EINSTAND - (frei + EINSTAND) / 2);
-      z.auge.position.y = rund(-frei);
+      const dr = l.r - a.z;
+      const dy = l.y - a.y;
+      const dist = Math.max(Math.hypot(dr, dy), 0.2);
+      /*
+       * Das Rohr zeigt in seinem Frame nach −y. Eine Drehung um x um ψ bringt
+       * (0,−1,0) auf (0, −cos ψ, −sin ψ). Damit das auf (0, dy, dr) zeigt:
+       *   ψ = atan2(−dr, −dy)
+       */
+      z.gelenk.rotation.x = rund(Math.atan2(-dr, -dy));
+      const stangenLaenge = Math.max(dist - ROHRLAENGE + EINSTAND, 0.08);
+      z.stange.scale.y = rund(stangenLaenge);
+      z.stange.position.y = rund(-(dist - stangenLaenge));
     }
   };
 
@@ -293,8 +228,7 @@ export function baueGreifer(st: Stoffe = stoffe()): Greifer {
     wurzel,
     adapter,
     rotator,
-    traverse,
-    stempel,
+    kopf,
     schalen,
     zylinder,
     setOeffnung,
@@ -303,13 +237,5 @@ export function baueGreifer(st: Stoffe = stoffe()): Greifer {
   };
 }
 
-/** Hüllmaße des Greifers bei gegebenem Öffnungsgrad (Durchmesser, Tiefe). */
-export function huelle(oeffnung: number): { breite: number; hoehe: number } {
-  const bahn = mittellinie(schwenkFuer(oeffnung));
-  return {
-    breite: 2 * Math.max(...bahn.map((p) => p.r)),
-    hoehe: -Math.min(...bahn.map((p) => p.y)),
-  };
-}
-
+/** Alle Schwenkwinkel, die im Rig vorkommen — für Prüfungen und Animationen. */
 export const SCHWENK_BEREICH = { zu: ZU, offen: OFFEN };

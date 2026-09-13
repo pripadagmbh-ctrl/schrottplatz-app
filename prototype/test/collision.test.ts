@@ -379,22 +379,21 @@ describe("Reichweite des Baggers", () => {
     expect(hitsObstacle(-3.0, -26.0, 0), "alte Pressenstelle sperrt noch").toBeNull();
   });
 
-  it("schließt mittig, mit dem kleinen Loch der halboffenen Bauform", () => {
+  it("schließt mittig, ohne dass die Spitzen sich überlappen", () => {
     /*
-     * Geschlossen ist seit dem 13.09.2026 wieder Spreizung 0 — aber die
-     * Spitzen treffen sich nicht exakt auf der Achse, sondern lassen ein Loch
-     * von Ø 0,12 m. Das ist gewollt und keine Ungenauigkeit: Fünf Spitzen
-     * endlicher Breite können sich auf einem Punkt gar nicht treffen, ohne
-     * einander zu durchdringen. Die halboffene Bauform der Zeichnung macht
-     * genau das.
+     * Geschlossen heisst bei der Sichelkralle nicht Spreizung 0: Die Schalen
+     * haengen an einem Bolzenkreis von 0,25 m; bei 0 stehen sie senkrecht nach
+     * unten und ihre Spitzen liegen weit auseinander. Erst nach 0,85 rad
+     * Ausschwenken treffen sie sich auf der Achse.
      *
-     * Die Schranke prüft beides: klein genug, dass nichts durchrieselt, und
-     * größer als null, damit die Spitzen einander nicht überlappen.
+     * Der Fuenfschalengreifer vom 13.09.2026 liess dort ein Loch von 0,12 m,
+     * weil fuenf Spitzen endlicher Breite sich nicht auf einem Punkt treffen
+     * koennen. Diese Form hat drei Segmente und schliesst auf der Achse; die
+     * Schranke ist deshalb wieder „nahe null" (Rueckbau 13.09.2026).
      */
     const p = clawPoint(0, CLAW_CLOSED_SPLAY, CLAW_SEGMENTS, new THREE.Vector3());
-    const r = Math.hypot(p.x, p.z);
-    expect(r, "die Spitzen überfahren die Drehachse").toBeGreaterThan(0.02);
-    expect(2 * r, "unnötig viel Loch in der Mitte").toBeLessThan(0.2);
+    // Radius nahe null heisst: die Spitzen treffen sich in der Mitte
+    expect(Math.abs(Math.hypot(p.x, p.z))).toBeLessThan(0.05);
   });
 
   it("öffnet weit genug, um etwas zu fassen", () => {
