@@ -815,7 +815,7 @@ export function schalenHalbbreite(k: number): number {
     }
     halb = Math.min(
       halb,
-      HALB * (1 - 0.72 * (i / SCHALEN_ABSCHNITTE) ** 1.6),
+      HALB * (1 - 0.8 * (i / SCHALEN_ABSCHNITTE) ** 2.6),
       Math.max(innen, 0) * Math.sin(sektorHalb * 0.9)
     );
   }
