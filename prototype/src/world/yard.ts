@@ -935,29 +935,38 @@ export class Yard {
   }
 
   /**
-   * Betonlego zwischen den Absetzcontainern.
+   * Betonlego zwischen den Sortierboxen — und zwar als deren Waende.
    *
-   * Ansage 13.09.2026: „zwischen jedem Container stehen Legosteine zum
-   * Abgrenzen." Auf dem Platz steht das Zeug nicht frei nebeneinander — wer
-   * vorbeifaehrt, soll sehen, wo der eine Behaelter aufhoert und der naechste
-   * anfaengt, und ein Stueck, das danebenfaellt, landet nicht im falschen.
+   * Ansage 13.09.2026, zuerst: „zwischen jedem Container stehen Legosteine zum
+   * Abgrenzen", dann: „wir lassen die Container weg und nutzen die
+   * Trennwaende als Mulden." Aus der Abgrenzung ist damit das Bauteil
+   * geworden: Die vier Absetzcontainer sind weg, was bleibt, ist ein Kreuz aus
+   * Steinreihen und vier Flaechen darin.
    *
-   * Die Reihen kommen nicht aus einer Liste, sondern aus den Behaelterplaetzen
+   * Jede Box hat dadurch ZWEI Waende, ueber Eck — nicht vier. Das ist Absicht
+   * und nicht gespart: Lambert raeumt sie mit dem Radlader aus und muss mit
+   * der Schaufel hineinkommen. Eine geschlossene Box koennte nur der Greifer
+   * leeren.
+   *
+   * Die Reihen kommen nicht aus einer Liste, sondern aus den Boxplaetzen
    * selbst: Je zwei Nachbarn, zwischen die eine Steinreihe passt, bekommen
-   * eine. Verschiebt sich ein Behaelter, verschiebt sich die Reihe mit.
+   * eine. Verschiebt sich eine Box, verschiebt sich die Reihe mit.
    *
-   * Halbe Hoehe, 1,2 m. Die Behaelter sind 2,1 m hoch; eine Reihe auf voller
-   * Hoehe waere eine Wand und keine Abgrenzung, und der Greifer muss darueber.
+   * 1,8 m hoch, drei Lagen — ungefaehr die Hoehe der Absetzcontainer, die
+   * vorher hier standen (2,1 m). Und einen Meter laenger als die Box breit
+   * ist, damit die Ecke wirklich haelt statt nur angedeutet zu sein.
    */
   private buildTrennsteine(scene: THREE.Scene, world: RAPIER.World): void {
     const BL = 1.5;
     const BH = 0.6;
     const BT = 0.55;
-    const REIHEN = 2;
+    const REIHEN = 3;
+    /** Wie weit die Reihe ueber die Box hinaussteht (m, beidseits zusammen). */
+    const UEBERSTAND = 1.5;
     /* Schmaler als das hier passt keine Steinreihe mehr dazwischen. */
     const MIN_LUECKE = BT + 0.1;
 
-    const behaelter = CONFIGS.filter((c) => c.kind === "rolloff");
+    const behaelter = CONFIGS.filter((c) => c.sortierbox === true);
     type Reihe = { x: number; z: number; laenge: number; laengsX: boolean };
     const reihen: Reihe[] = [];
     for (let i = 0; i < behaelter.length; i++) {
@@ -974,7 +983,7 @@ export class Yard {
           reihen.push({
             x: (a.x + b.x) / 2,
             z: (a.z + b.z) / 2,
-            laenge: Math.min(a.size[1], b.size[1]),
+            laenge: Math.min(a.size[1], b.size[1]) + UEBERSTAND,
             laengsX: false,
           });
         }
@@ -984,7 +993,7 @@ export class Yard {
           reihen.push({
             x: (a.x + b.x) / 2,
             z: (a.z + b.z) / 2,
-            laenge: Math.min(a.size[0], b.size[0]),
+            laenge: Math.min(a.size[0], b.size[0]) + UEBERSTAND,
             laengsX: true,
           });
         }

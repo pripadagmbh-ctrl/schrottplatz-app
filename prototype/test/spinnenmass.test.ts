@@ -29,13 +29,6 @@ const LUFT = 0.3;
  * lichte Weite. Ohne diesen Abzug hätte der Test 4,00 m durchgewunken, obwohl
  * innen nur 3,88 m frei sind — 25 cm Luft statt der geforderten 30.
  */
-/*
- * Zwei Wandstaerken, seit die Behaelter massiver sind (13.09.2026): 2 x 90 mm
- * statt 2 x 55. Ohne diesen Abzug rechnet man mit dem Aussenmass und winkt eine
- * Groesse durch, die innen gar nicht passt.
- */
-const WANDSTAERKE = 0.18;
-
 const SPANNE = clawSpan(CLAW_OPEN_SPLAY);
 
 describe("Mindestmaß der Behälter", () => {
@@ -46,13 +39,22 @@ describe("Mindestmaß der Behälter", () => {
     expect(PRESS_INNER.laenge).toBeGreaterThan(SPANNE + 2 * LUFT);
   });
 
-  it("jeder Absetzcontainer nimmt die offene Spinne auf", () => {
-    for (const c of CONFIGS) {
-      if (c.kind !== "rolloff") continue;
+  it("jede Sortierbox nimmt die offene Spinne auf", () => {
+    /*
+     * Seit dem 13.09.2026 stehen hier keine Absetzcontainer mehr, sondern
+     * offene Flaechen zwischen Steinreihen (Ansage: „wir lassen die Container
+     * weg und nutzen die Trennwaende als Mulden"). Die Schranke bleibt
+     * dieselbe: Wer eine Box schmaler macht als die offene Spinne, kann sie
+     * nicht mehr ausraeumen, ohne die Nachbarbox mitzunehmen.
+     *
+     * Ohne Wandabzug, weil die Steinreihe NEBEN der Flaeche steht und nicht
+     * um sie herum — sie nimmt der Box keine lichte Weite weg.
+     */
+    const boxen = CONFIGS.filter((c) => c.sortierbox === true);
+    expect(boxen.length, "keine Sortierboxen mehr im Platz").toBeGreaterThan(0);
+    for (const c of boxen) {
       const [w, d] = c.size;
-      expect(Math.min(w, d) - WANDSTAERKE, `${c.label}: lichte Weite`).toBeGreaterThan(
-        SPANNE + 2 * LUFT
-      );
+      expect(Math.min(w, d), `${c.label}: lichte Weite`).toBeGreaterThan(SPANNE + 2 * LUFT);
     }
   });
 

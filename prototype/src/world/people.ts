@@ -256,6 +256,38 @@ const FUSS_BREITE = 0.9;
 // Wieder in Betrieb (Ansage 12.09.2026): Er bedient die weit aussen
 // liegenden Silos und faehrt das Zwischenlager ab.
 const RADLADER_IN_BETRIEB = true;
+/**
+ * Raeumt Lambert von sich aus auf dem Platz auf?
+ *
+ * Ansage 13.09.2026: „er kommt dann nicht mehr bei uns aufraeumen." Bis dahin
+ * suchte er selbsttaetig nach Arbeit — blockierte Fahrspuren, Raeder mit
+ * Alufelge, weit abgelegte Brocken, Buntmetall im Stahlhaufen — und war damit
+ * staendig im Arbeitsbereich des Baggers unterwegs.
+ *
+ * Jetzt wartet er auf der Ostseite, bis er gerufen wird, und leert dann die
+ * Sortierboxen in die Mulden an der Ostwand. Die alte Rangfolge ist nicht
+ * geloescht, nur abgeschaltet: `true`, und sie ist unveraendert wieder da.
+ */
+const RAEUMT_AUF = false;
+/**
+ * Wo er wartet: auf der Ostseite, zwischen Muldenreihe und Sortierboxen.
+ *
+ * Ansage: „Lambert faehrt von der Ostseite ran auf Befehl." Der Platz ist
+ * gesucht, nicht gegriffen — er liegt ausserhalb der LKW-Gasse zu den Mulden
+ * (x −26), ausserhalb der Grossteileflaeche (x −19,9 .. −13,4) und ausserhalb
+ * der Sortierboxen (ab x −14,8).
+ */
+const OSTPOSTEN = new THREE.Vector3(-22.0, 0, -12.0);
+/**
+ * Bis zu welcher Hoehe ein Stueck in einer Sortierbox noch als abholbar gilt.
+ *
+ * Die alte Schranke war 1,4 m — sie stammt von den flachen Absetzcontainern
+ * und aus der Frage, ob ein Stueck auf einer Ladeflaeche liegt. In einer Box
+ * mit 1,8 m Wand liegt der Haufen hoeher, und mit 1,4 m galt eine volle Box
+ * als leer: Gemessen hat Lambert den Ruf sofort wieder abgesagt, weil die
+ * gerade abgekippte Ladung noch uebereinander lag.
+ */
+const BOX_MAX_Y = 3.5;
 /** Abstellplatz: vorne in der ersten Halle, Schaufel zum Tor. */
 const RADLADER_PARKPLATZ = new THREE.Vector3(OFFICE_X + 1.5, 0, HALL1_Z);
 /** Blickrichtung dort — aus der Halle heraus (+X). */
@@ -323,6 +355,61 @@ export class StaffManager {
    */
   getWeighTruck: (() => THREE.Vector3 | null) | null = null;
   private lambertState: LambertState = "patrol";
+  /** Ist er gerufen? Ohne Ruf bleibt er auf dem Ostposten stehen. */
+  private gerufen = false;
+
+  /**
+   * Lambert rufen (Taste Y / Knopf LAMBERT).
+   *
+   * Ansage 13.09.2026: „ich rufe Lambert, wenn voll, er kippt hinten in
+   * Silos." Er kommt, raeumt die Sortierboxen leer und faehrt das Material zu
+   * der Mulde seiner Fraktion an der Ostwand. Ist nichts mehr zu holen, stellt
+   * er sich wieder auf seinen Posten.
+   */
+  rufeLambert(): "kommt" | "schon unterwegs" | "nichts zu holen" {
+    if (this.gerufen) return "schon unterwegs";
+    /*
+     * Nur pruefen, OB etwas in den Boxen liegt — nicht, ob er es von seinem
+     * jetzigen Standplatz aus erreicht. Der Weg haengt daran, wo er gerade
+     * steht und was sonst herumliegt; danach zu fragen hiesse, den Ruf
+     * abzulehnen, weil er noch nicht losgefahren ist.
+     */
+    if (!this.gibtEsBoxArbeit()) return "nichts zu holen";
+    this.gerufen = true;
+    this.naechstePruefung = 0;
+    this.pruefUhr = 999;
+    return "kommt";
+  }
+
+  /** Fuer HUD und Tests: arbeitet er gerade? */
+  get lambertArbeitet(): boolean {
+    return this.gerufen;
+  }
+
+  /** Wo Lambert steht — fuer Tests und das Debug-Overlay. */
+  get lambertOrt(): THREE.Vector3 {
+    return this.lambert.group.position;
+  }
+
+  /** Liegt ueberhaupt etwas in den Sortierboxen, das in eine Ostmulde gehoert? */
+  private gibtEsBoxArbeit(): boolean {
+    const boxen = CONFIGS.filter((c) => c.sortierbox === true);
+    for (const it of this.items.items) {
+      if (!it.body.isValid() || !it.body.isDynamic()) continue;
+      const ziel = StaffManager.muldeFuer(it.materialId);
+      if (!ziel || ziel.kind !== "bay") continue;
+      const p = it.body.translation();
+      if (p.y > BOX_MAX_Y) continue;
+      if (
+        boxen.some(
+          (c) => Math.abs(p.x - c.x) <= c.size[0] / 2 && Math.abs(p.z - c.z) <= c.size[1] / 2
+        )
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
   private lambertTarget = new THREE.Vector3();
   private walkPhase = 0;
   private waveT = 0;
@@ -546,7 +633,14 @@ export class StaffManager {
     // Lambert Prison — Platzwart in Warnweste
     this.lambert = buildPerson({ shirt: 0xf2c018, trousers: 0x2f3a45, hair: 0x5a4632 });
     this.loader = new WheelLoader(scene);
-    this.lambert.group.position.copy(this.patrol[0]);
+    /*
+     * Er faengt auf dem Ostposten an, nicht auf dem alten Patrouillenposten
+     * mitten auf dem Platz. Von dort aus faehrt er los, wenn man ihn ruft —
+     * und die Strecke zu den Sortierboxen ist frei, waehrend der Weg quer
+     * ueber die Annahmeflaeche regelmaessig durch abgekippten Schrott
+     * versperrt ist (gemessen: er kam nicht los).
+     */
+    this.lambert.group.position.copy(RAEUMT_AUF ? this.patrol[0] : OSTPOSTEN);
     scene.add(this.lambert.group);
     const vest = new THREE.Mesh(
       new THREE.BoxGeometry(0.38, 0.36, 0.3),
@@ -554,7 +648,7 @@ export class StaffManager {
     );
     vest.position.set(0, 1.08, 0);
     this.lambert.group.add(vest);
-    this.lambertTarget.copy(this.patrol[1]);
+    this.lambertTarget.copy(RAEUMT_AUF ? this.patrol[1] : OSTPOSTEN);
   }
 
   /*
@@ -642,7 +736,15 @@ export class StaffManager {
     // Einweisen hat Vorrang: sobald ein LKW auf dem Platz rangiert. Was er
     // gerade in der Schaufel hat oder vor sich herschiebt, laesst er dafuer
     // aber nicht mitten auf dem Platz stehen.
-    const gebunden = this.lambertState === "carry" || this.lambertState === "shoving";
+    /*
+     * Einweisen gehoert zum Aufraeumen „bei uns" und faellt mit ihm weg
+     * (Ansage 13.09.2026). Es stand hier an der schaerfsten Stelle: Der Block
+     * ueberschreibt JEDES Ziel, sobald ein LKW auf dem Platz ist. Gemessen
+     * blieb Lambert dadurch auf seinem Posten stehen, obwohl er gerufen war
+     * und ein Ziel hatte — jedes Bild setzte ihn zurueck auf „guide".
+     */
+    const gebunden =
+      !RAEUMT_AUF || this.lambertState === "carry" || this.lambertState === "shoving";
     if (truck && !gebunden) {
       if (this.lambertState !== "guide") {
         this.lambertState = "guide";
@@ -1071,6 +1173,31 @@ export class StaffManager {
       this.lambertTarget.set(p.x, 0, p.z);
       this.lambertState = "fetch";
     };
+    /*
+     * Auf Befehl, nicht von sich aus. Die alte Rangfolge steht unveraendert
+     * darunter und laeuft wieder, sobald `RAEUMT_AUF` auf true steht.
+     */
+    if (!RAEUMT_AUF) {
+      if (!this.gerufen) {
+        // Warten. Nicht patrouillieren, nicht Kaffee holen — bereitstehen.
+        this.lambertTarget.copy(OSTPOSTEN);
+        return;
+      }
+      const ausDerBox = this.findBoxTeil();
+      if (ausDerBox) {
+        hol(ausDerBox);
+        return;
+      }
+      /*
+       * Nichts erreichbar. Liegt trotzdem noch etwas in den Boxen, bleibt er
+       * gerufen und sieht gleich wieder nach — der Weg kann durch die Spinne
+       * oder durch herumliegenden Schrott versperrt sein, und beides geht
+       * vorbei. Erst wenn die Boxen wirklich leer sind, ist Feierabend.
+       */
+      if (!this.gibtEsBoxArbeit()) this.gerufen = false;
+      this.lambertTarget.copy(OSTPOSTEN);
+      return;
+    }
     // Eine blockierte Fahrspur legt den Betrieb lahm und hat Vorrang. Danach
     // kommt, was der Bagger nicht erreicht — daran kommt sonst niemand heran,
     // waehrend Sortierteile nur liegenbleiben. Stuende das Sortieren davor,
@@ -1541,6 +1668,78 @@ export class StaffManager {
       bestD = d;
     }
     return best;
+  }
+
+  /**
+   * Ein Stueck, das in einer Sortierbox liegt und in eine Ostmulde gehoert.
+   *
+   * Das ist seit dem 13.09.2026 Lamberts ganze Arbeit: „Lambert faehrt von der
+   * Ostseite ran auf Befehl und macht die Mulden leer und faehrt sie zu der
+   * Ostseite mit dem Radlader."
+   *
+   * Anders als `findStray` sucht das hier NICHT auf dem ganzen Platz, sondern
+   * nur in den Boxen — was daneben liegt, ist nicht mehr seine Sache. Und das
+   * Ziel ist immer eine `bay`: Die Sortierboxen selbst sind offene Flaechen,
+   * `muldeFuer` liefert deshalb die Mulde an der Ostwand.
+   */
+  private findBoxTeil(): (typeof this.items.items)[number] | null {
+    const boxen = CONFIGS.filter((c) => c.sortierbox === true);
+    if (boxen.length === 0) return null;
+    const gr = this.getGrapplePos?.();
+    const von = this.lambert.group.position;
+    let best: (typeof this.items.items)[number] | null = null;
+    let bestD = Infinity;
+    for (const it of this.items.items) {
+      if (it.massKg > this.tragkraft) continue;
+      if (!it.body.isValid() || !it.body.isDynamic()) continue;
+      const ziel = StaffManager.muldeFuer(it.materialId);
+      if (!ziel || ziel.kind !== "bay") continue;
+      const p = it.body.translation();
+      if (p.y > BOX_MAX_Y) continue;
+      const box = boxen.find(
+        (c) => Math.abs(p.x - c.x) <= c.size[0] / 2 && Math.abs(p.z - c.z) <= c.size[1] / 2
+      );
+      if (!box) continue;
+      // Nicht dort zugreifen, wo die Spinne gerade arbeitet
+      if (gr && Math.hypot(p.x - gr.x, p.z - gr.z) < StaffManager.GRAPPLE_KEEPOUT) continue;
+      /*
+       * Der Weg wird nur bis an den RAND der Box geprueft, nicht bis zum
+       * Stueck.
+       *
+       * Sonst versperrt die Ladung sich selbst den Weg: Gemessen lag das
+       * naechste Kupferstueck 0,7 m neben der Linie und galt als Hindernis —
+       * Lambert blieb auf dem Posten stehen, obwohl die Box voll war. Was in
+       * der Box liegt, ist sein Ziel und nicht sein Hindernis.
+       */
+      if (!this.wegIstFrei(...StaffManager.boxAnfahrt(box, von), it)) continue;
+      const d = Math.hypot(p.x - von.x, p.z - von.z);
+      if (d < bestD) {
+        bestD = d;
+        best = it;
+      }
+    }
+    return best;
+  }
+
+  /**
+   * Punkt knapp vor der Box, auf der Seite, von der Lambert kommt.
+   *
+   * Bis dorthin muss der Weg frei sein; das Stueck selbst holt er dann mit der
+   * Schaufel, ohne durch die uebrige Ladung zu fahren.
+   */
+  private static boxAnfahrt(
+    box: ContainerConfig,
+    von: { x: number; z: number }
+  ): [number, number] {
+    const hw = box.size[0] / 2;
+    const hd = box.size[1] / 2;
+    const dx = Math.max(-hw, Math.min(hw, von.x - box.x));
+    const dz = Math.max(-hd, Math.min(hd, von.z - box.z));
+    // Auf die naeher liegende Kante hinausschieben, plus einen Meter Luft
+    if (hw - Math.abs(dx) < hd - Math.abs(dz)) {
+      return [box.x + Math.sign(dx || 1) * (hw + 1.0), box.z + dz];
+    }
+    return [box.x + dx, box.z + Math.sign(dz || 1) * (hd + 1.0)];
   }
 
   private findStray(): (typeof this.items.items)[number] | null {

@@ -980,6 +980,22 @@ async function main(): Promise<void> {
         showPickup(true);
       }
     }
+    /*
+     * Lambert rufen (Ansage 13.09.2026: „ich rufe Lambert, wenn voll, er
+     * kippt hinten in Silos"). Er kommt von der Ostseite, raeumt die
+     * Sortierboxen leer und faehrt das Material zu der Mulde seiner Fraktion
+     * an der Ostwand. Von sich aus kommt er nicht mehr.
+     */
+    if (input.wasPressed("KeyY") || touch.consumePress("KeyY")) {
+      const antwort = staff.rufeLambert();
+      hud.toast(
+        antwort === "kommt"
+          ? "Lambert kommt und räumt die Boxen leer."
+          : antwort === "schon unterwegs"
+            ? "Lambert ist schon dabei."
+            : "Lambert winkt ab — in den Boxen liegt nichts für ihn."
+      );
+    }
     // Zur Waage schicken: Reste auf der Flaeche zaehlen dort als Tara
     if (input.wasPressed("KeyJ") || touch.consumePress("KeyJ")) {
       const r = vehicles.zurWaage();

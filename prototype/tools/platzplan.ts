@@ -171,7 +171,7 @@ for (const c of CONFIGS) {
 
 /* ------------------------------------------- Trennsteine zwischen Behaeltern */
 /* Dieselbe Regel wie in yard.ts: je zwei Nachbarn mit genug Luecke. */
-const rolloffs = CONFIGS.filter((c) => c.kind === "rolloff");
+const rolloffs = CONFIGS.filter((c) => c.sortierbox === true);
 for (let i = 0; i < rolloffs.length; i++) {
   for (let j = i + 1; j < rolloffs.length; j++) {
     const a = rolloffs[i]!;
