@@ -549,7 +549,7 @@ function je(v: ProStation, k: number): number {
 export function strang(
   stationen: Array<{ y: number; z: number; th: number }>,
   x: ProStation,
-  breite: number,
+  breite: ProStation,
   dicke: ProStation,
   versatz: ProStation = 0
 ): THREE.BufferGeometry {
@@ -568,20 +568,33 @@ export function strang(
   const ecken: number[][] = [];
   for (let k = 0; k < stationen.length; k++) {
     const s0 = stationen[k]!;
-    const ny = Math.sin(s0.th);
+    /*
+     * Die Aussennormale des Bogens ist (-sin th, cos th), NICHT (sin th, cos th).
+     *
+     * Die Stationen liegen auf einem Kreis um (Cy, Cz) mit
+     * y = Cy - R sin th und z = Cz + R cos th; der Fahrstrahl vom Mittelpunkt
+     * zur Station ist damit (-R sin th, +R cos th). Mit dem falschen Vorzeichen
+     * stimmt die Richtung nur bei th = 0 und kippt danach um 2 th weg: bei
+     * Station 3 (th = 43,8°) stand sie fast parallel zur Bahn, bei der Spitze
+     * (th = 80,2°) lief sie rueckwaerts. Die Strebe lag dadurch nicht AUF dem
+     * Blech, sondern laengs daneben — in der Seitenansicht die Einschnuerung
+     * in der Mitte („die Mitte ist zu duenn", 13.09.2026).
+     */
+    const ny = -Math.sin(s0.th);
     const nz = Math.cos(s0.th);
     const xk = je(x, k);
     const vk = je(versatz, k);
     const dk = je(dicke, k);
+    const bk = je(breite, k);
     const reihe: number[] = [];
     for (const [dx, dn] of [
-      [-breite / 2, vk],
-      [breite / 2, vk],
-      [breite / 2, vk + dk],
-      [-breite / 2, vk + dk],
+      [-bk / 2, vk],
+      [bk / 2, vk],
+      [bk / 2, vk + dk],
+      [-bk / 2, vk + dk],
     ] as Array<[number, number]>) {
       reihe.push(
-        p(xk + dx, s0.y + dn * ny, s0.z + dn * nz, (dx + breite / 2) / breite, k / stationen.length)
+        p(xk + dx, s0.y + dn * ny, s0.z + dn * nz, (dx + bk / 2) / bk, k / stationen.length)
       );
     }
     ecken.push(reihe);
@@ -973,8 +986,20 @@ const HALB = MASS.schale.breite / 2;
  * keine tiefe Rinne; die Tiefe der Positionsliste steckt im Holm.
  */
 function querRadius(k: number): number {
+  /*
+   * Zwischen den Stuetzstellen LINEAR, nicht gerundet.
+   *
+   * Mit `Math.round` sprang der Radius bei jeder halben Station auf den der
+   * naechsten — und weil die Woelbung mit 1/r geht, sprang sie dort nach oben:
+   * 17,6 / 17,5 / 16,0 / 14,3 / 15,2 / 13,4 / 11,5 / 13,4 mm. Ein Saegezahn
+   * ueber die ganze Laenge, den man der Haut als Wellen ansieht.
+   */
   const bahn = mittellinie(ZU);
-  const r = bahn[Math.max(0, Math.min(SCHALEN_ABSCHNITTE, Math.round(k)))]?.r ?? 0.1;
+  const kk = Math.max(0, Math.min(SCHALEN_ABSCHNITTE, k));
+  const a = Math.floor(kk);
+  const b = Math.min(SCHALEN_ABSCHNITTE, a + 1);
+  const t = kk - a;
+  const r = (bahn[a]?.r ?? 0.1) * (1 - t) + (bahn[b]?.r ?? 0.1) * t;
   return Math.max(r, 0.12);
 }
 /** Wölbung der Haut bei halber Breite `halb` an Station k. */
@@ -1071,7 +1096,8 @@ export function baueGreiferschale(st: Stoffe): THREE.Group {
         const x = -halb + t * 2 * halb;
         const w = (halb * halb - x * x) / (2 * querRadius(s0.k)) + seite * HAUT;
         reihe.push(
-          p(x, s0.y + w * Math.sin(s0.th), s0.z + w * Math.cos(s0.th), t, k / ENDE)
+          // Aussennormale (-sin th, cos th) — siehe `strang`
+          p(x, s0.y - w * Math.sin(s0.th), s0.z + w * Math.cos(s0.th), t, k / ENDE)
         );
       }
       reihen.push(reihe);
@@ -1147,7 +1173,7 @@ export function baueGreiferschale(st: Stoffe): THREE.Group {
       strang(
         fein.slice(k, k + 2),
         0,
-        (strebeBreiten[k]! + strebeBreiten[k + 1]!) / 2,
+        strebeBreiten.slice(k, k + 2),
         strebeHoehen.slice(k, k + 2),
         fein.slice(k, k + 2).map((f) => woelbungBei(halbbreiteBei(f.k), f.k) + BLECH)
       ),
@@ -1332,14 +1358,18 @@ export function baueGreiferspitze(st: Stoffe): THREE.Group {
       const w = x / R;
       const r = R + py;
       /*
-       * Die Hoehe laeuft nach −z, nicht nach +z.
+       * Die Hoehe laeuft nach +z, die Laenge nach −y.
        *
        * Eine Drehung um x um `th` bildet lokales (0,0,1) auf (0, −sin th,
-       * cos th) ab; die Aussennormale der Schale ist aber (+sin th, cos th).
-       * Mit +z stand der Zahn auf der falschen Seite und lag 113 mm neben der
-       * Verstaerkung — gemessen als kleinster Abstand der beiden Netze.
+       * cos th) ab — und genau das IST die Aussennormale des Bogens. Lokales
+       * (0,−1,0) wird zu (0, −cos th, −sin th), der Tangente. Der Zahn steht
+       * damit auf dem Blech und setzt die Sichel fort.
+       *
+       * Vorher war die Hoehe negiert, um zu einer Schale zu passen, deren
+       * Normale selbst falsch herum gerechnet war. Beide Fehler zusammen sahen
+       * am oberen Ende richtig aus und liefen nach unten auseinander.
        */
-      return p(pz, -(r * Math.sin(w)), -(z0 + (-R + r * Math.cos(w))), j / 5, si / 5);
+      return p(pz, -(r * Math.sin(w)), z0 + (-R + r * Math.cos(w)), j / 5, si / 5);
     });
   });
   for (let i = 0; i < ringe.length - 1; i++) {
