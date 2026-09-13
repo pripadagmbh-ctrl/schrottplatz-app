@@ -24,6 +24,13 @@ const BREITE = 1320;
 const HOEHE = 560;
 const HINTERGRUND = [0xee, 0xf0, 0xf3];
 
+/*
+ * Tiefenpuffer. Ohne ihn bleibt nur das Malerverfahren, und bei einer
+ * gekruemmten Schale, die sich in der Projektion selbst ueberlappt,
+ * uebermalen sich die Dreiecke gegenseitig — im Bild entstand dadurch eine
+ * Einschnuerung, die in der Geometrie nicht da war.
+ */
+const tiefe = new Float32Array(BREITE * HOEHE).fill(-1e30);
 const bild = new Uint8Array(BREITE * HOEHE * 3);
 for (let i = 0; i < BREITE * HOEHE; i++) {
   bild[i * 3] = HINTERGRUND[0]!;
@@ -52,7 +59,11 @@ function rechteck(x0: number, y0: number, w: number, h: number, farbe: number[])
  * hinten nach vorn sortiert, also reicht Uebermalen — dasselbe Verfahren wie
  * beim SVG-Blatt.
  */
-function dreieck(p: Array<[number, number]>, farbe: number[]): void {
+function dreieck(
+  p: Array<[number, number]>,
+  farbe: number[],
+  z?: [number, number, number]
+): void {
   const [a, b, c] = p as [[number, number], [number, number], [number, number]];
   const minX = Math.max(0, Math.floor(Math.min(a[0], b[0], c[0])));
   const maxX = Math.min(BREITE - 1, Math.ceil(Math.max(a[0], b[0], c[0])));
@@ -67,8 +78,13 @@ function dreieck(p: Array<[number, number]>, farbe: number[]): void {
       const w0 = ((b[0] - a[0]) * (py - a[1]) - (px - a[0]) * (b[1] - a[1])) / flaeche;
       const w1 = ((c[0] - b[0]) * (py - b[1]) - (px - b[0]) * (c[1] - b[1])) / flaeche;
       const w2 = ((a[0] - c[0]) * (py - c[1]) - (px - c[0]) * (a[1] - c[1])) / flaeche;
-      if (w0 >= -0.0001 && w1 >= -0.0001 && w2 >= -0.0001) {
-        setze(x, y, farbe[0]!, farbe[1]!, farbe[2]!);
+      if (w0 >= -1e-4 && w1 >= -1e-4 && w2 >= -1e-4) {
+        const i = y * BREITE + x;
+        const zz = z ? z[1]! * w0 + z[2]! * w1 + z[0]! * w2 : 0;
+        if (!z || zz >= tiefe[i]!) {
+          if (z) tiefe[i] = zz;
+          setze(x, y, farbe[0]!, farbe[1]!, farbe[2]!);
+        }
       }
     }
   }
@@ -83,6 +99,9 @@ function farbeZuRgb(hex: string): number[] {
 
 function male(oeffnung: number, x0: number, y0: number, w: number, h: number): void {
   rechteck(x0, y0, w, h, [255, 255, 255]);
+  // Tiefenpuffer je Bildfeld zuruecksetzen — sonst blenden sich die Felder aus
+  for (let yy = y0; yy < y0 + h; yy++)
+    for (let xx = x0; xx < x0 + w; xx++) tiefe[yy * BREITE + xx] = -1e30;
   const g = baueGreifer(stoffe());
   g.setOeffnung(oeffnung);
   /*
@@ -111,7 +130,8 @@ function male(oeffnung: number, x0: number, y0: number, w: number, h: number): v
   for (const t of tr) {
     dreieck(
       t.p.map((q) => [cx + q[0] * s, cy - q[1] * s] as [number, number]),
-      farbeZuRgb(t.farbe)
+      farbeZuRgb(t.farbe),
+      t.ecken
     );
   }
 }
