@@ -256,6 +256,23 @@ const FUSS_BREITE = 0.9;
 // Wieder in Betrieb (Ansage 12.09.2026): Er bedient die weit aussen
 // liegenden Silos und faehrt das Zwischenlager ab.
 const RADLADER_IN_BETRIEB = true;
+/**
+ * Ist Lambert im Dienst?
+ *
+ * Ansage 13.09.2026: „den Radlader und Lambert pausieren."
+ *
+ * Auf false steht er bei Janine an der Theke und ruehrt nichts an — kein
+ * Einweisen, kein Wegraeumen, kein Trennen, kein Schieben. Der Radlader
+ * steht dann zwangslaeufig auch: Er ist Lamberts Maschine, und ohne Fahrer
+ * faehrt sie nicht. `setLoader` beachtet das mit.
+ *
+ * Weggenommen ist nichts. Beide Schalter auf true, und die Logik ist
+ * unveraendert wieder da. Mario und Janine laufen weiter — pausiert ist
+ * Lambert, nicht der Betrieb.
+ */
+const LAMBERT_IM_DIENST = false;
+/** Wo er in der Pause steht: neben Janines Theke, nicht im Weg. */
+const LAMBERT_PAUSENPLATZ = new THREE.Vector3(KAFFEE_THEKE.x + 1.3, 0, KAFFEE_THEKE.z + 0.6);
 /** Abstellplatz: vorne in der ersten Halle, Schaufel zum Tor. */
 const RADLADER_PARKPLATZ = new THREE.Vector3(OFFICE_X + 1.5, 0, HALL1_Z);
 /** Blickrichtung dort — aus der Halle heraus (+X). */
@@ -448,7 +465,7 @@ export class StaffManager {
    * gezeigt — nur eben abgestellt in der Halle, und Lambert bleibt zu Fuß.
    */
   setLoader(on: boolean): void {
-    if (on && !RADLADER_IN_BETRIEB) {
+    if (on && !(RADLADER_IN_BETRIEB && LAMBERT_IM_DIENST)) {
       /*
        * Ausser Betrieb (Ansage 12.09.2026: "koennen wir den Radlader ausser
        * Funktion setzen fuer den Moment und in der Halle parken?").
@@ -571,6 +588,15 @@ export class StaffManager {
    * @param truck Position des aktiven Fahrzeugs, wenn es gerade rangiert/ablädt
    */
   update(dt: number, truck: THREE.Vector3 | null): void {
+    if (!LAMBERT_IM_DIENST) {
+      /*
+       * Lambert pausiert. Mario laeuft trotzdem weiter — er haengt nur am
+       * Ende derselben Methode, und ohne diesen Aufruf bliebe auch er stehen.
+       */
+      this.pausiereLambert();
+      this.updateMario(dt);
+      return;
+    }
     this.stateT += dt;
     this.seitPauseS += dt;
     this.pruefUhr += dt;
@@ -751,6 +777,29 @@ export class StaffManager {
     this.fuehreLast(g);
     this.updateMario(dt);
   }
+
+  /**
+   * Lambert in die Pause stellen — einmal hinstellen, dann nichts mehr.
+   *
+   * Er bleibt sichtbar: Ein Platzwart, der verschwunden ist, sieht aus wie
+   * ein Fehler. Er steht neben der Theke und schaut zu Janine.
+   */
+  private pausiereLambert(): void {
+    if (this.pausePlatzGesetzt) return;
+    this.pausePlatzGesetzt = true;
+    this.zuFuss = true;
+    this._hasLoader = false;
+    this.loader?.setVisible(true);
+    this.loader?.update(1, RADLADER_PARKPLATZ, RADLADER_PARKYAW, false);
+    this.lambert.group.visible = true;
+    this.lambert.group.position.copy(LAMBERT_PAUSENPLATZ);
+    this.lambert.group.rotation.y = Math.atan2(
+      KAFFEE_THEKE.x - LAMBERT_PAUSENPLATZ.x,
+      KAFFEE_THEKE.z - LAMBERT_PAUSENPLATZ.z
+    );
+    this.lambert.armRight.rotation.x = -1.3; // Becher in der Hand
+  }
+  private pausePlatzGesetzt = false;
 
   /**
    * Mario zwischen Büro und Waage.
