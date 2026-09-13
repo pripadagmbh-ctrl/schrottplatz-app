@@ -10,18 +10,24 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 /*
- * Der Pfad ist BASIS-RELATIV, und die Datei liegt in `public/`.
+ * Die Datei wird IMPORTIERT, nicht als Pfad zusammengebaut.
  *
- * Vorher stand hier "/docs/greifer-mehrschalen.glb". Das lief in der
- * Entwicklung, weil Vite dort das Projektverzeichnis ausliefert — und war auf
- * GitHub Pages doppelt falsch: Die Seite liegt unter /schrottplatz-app/, also
- * ging der Ruf an den falschen Ort, und `docs/` wird ueberhaupt nicht
- * mitgebaut. Die Vorschau zeigte live nur die Fehlermeldung.
+ * Vite haengt dabei einen Inhalts-Hash an den Dateinamen. Das loest zwei
+ * Probleme, die beide erst live aufgefallen sind:
  *
- * `BASE_URL` ist das, was in `vite.config.ts` als `base` steht ("./"), und
- * `public/` ist das Verzeichnis, dessen Inhalt unveraendert im Build landet.
+ *   Der Pfad stimmt von allein — vorher stand hier "/docs/...", was auf
+ *   GitHub Pages an der Projektbasis /schrottplatz-app/ vorbeilief, und
+ *   `docs/` wurde ohnehin nicht mitgebaut.
+ *
+ *   Und ein neues Modell bekommt einen neuen Namen. GitHub Pages liefert mit
+ *   `Cache-Control: max-age=600` aus; unter gleichem Namen haette der Browser
+ *   bis zu zehn Minuten lang das ALTE Modell unter der neuen Seite gezeigt —
+ *   ohne dass man es merkt. Genau die Sorte Fehler, bei der man glaubt, den
+ *   aktuellen Stand zu sehen.
  */
-const DATEI = new URL("greifer-mehrschalen.glb", document.baseURI).href;
+import modellUrl from "./greifer-mehrschalen.glb?url";
+
+const DATEI = modellUrl;
 
 const kopf = document.getElementById("kopf") as HTMLDivElement;
 const leiste = document.getElementById("leiste") as HTMLDivElement;

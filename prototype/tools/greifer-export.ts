@@ -2,7 +2,7 @@
  * GLB-Export des Mehrschalengreifers, mit Animationen.
  *
  * Aufruf:  npx vite-node tools/greifer-export.ts
- * Ergebnis: public/greifer-mehrschalen.glb
+ * Ergebnis: src/greifer/greifer-mehrschalen.glb
  *
  * Die Animationen werden nicht von Hand gekeyt, sondern aus dem Rig
  * abgetastet: Für jeden Zeitpunkt wird `setOeffnung`/`setDrehung` gerufen und
@@ -335,7 +335,7 @@ exporter.parse(
   greifer.wurzel,
   (ergebnis) => {
     const puffer = Buffer.from(ergebnis as ArrayBuffer);
-    writeFileSync("public/greifer-mehrschalen.glb", puffer);
+    writeFileSync("src/greifer/greifer-mehrschalen.glb", puffer);
     let dreiecke = 0;
     let meshes = 0;
     greifer.wurzel.traverse((o) => {
@@ -346,7 +346,7 @@ exporter.parse(
       dreiecke += (idx ? idx.count : m.geometry.getAttribute("position").count) / 3;
     });
     console.log(
-      `public/greifer-mehrschalen.glb  ${(puffer.length / 1024).toFixed(0)} kB · ` +
+      `src/greifer/greifer-mehrschalen.glb  ${(puffer.length / 1024).toFixed(0)} kB · ` +
         `${meshes} Meshes · ${dreiecke} Dreiecke · ${clips.length} Clips: ` +
         clips.map((c) => c.name).join(", ")
     );
