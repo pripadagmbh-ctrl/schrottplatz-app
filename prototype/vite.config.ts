@@ -28,4 +28,14 @@ export default defineConfig({
     port,
     strictPort: true,
   },
+  /*
+   * Nur `test/` laeuft als Testlauf. Unter `docs/archiv/` liegen die Quellen
+   * abgelegter Bauformen samt ihrer Waechter — die gehoeren zum Archiv und
+   * sollen nicht gegen den aktuellen Stand gemessen werden. Ohne diese Zeile
+   * schlug der Waechter der Fuenfschalenschale fehl, sobald die Sichelkralle
+   * wieder eingebaut war.
+   */
+  test: {
+    include: ["test/**/*.test.ts"],
+  },
 });

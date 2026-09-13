@@ -348,10 +348,15 @@ describe("Reichweite des Baggers", () => {
     const presse = STATIC_OBSTACLES.find((o) => o.label === "Presse")!;
     expect(presse.x, "Presse nicht links aussen in der Ecke").toBeGreaterThan(stahl.x);
     expect(halde.x, "Mischschrott nicht links von der Stahlbox").toBeGreaterThan(stahl.x);
-    expect(
-      [stahl.size[0], stahl.size[1], stahl.size[2]],
-      "die beiden Boxen sind nicht gleich gross"
-    ).toEqual([halde.size[0], halde.size[1], halde.size[2]]);
+    /*
+     * Gleich gross waren sie nur einen halben Tag. Am 13.09.2026 kam die Ansage
+     * „Wand entfernen lassen, Lego-Mulden fuer Alu, VA, Kabel und Kupfer dort
+     * hinsetzen" — die Reihe steht jetzt dort, wo die Stahlbox breit war, und
+     * die Stahlbox ist auf 4 m zurueckgegangen. Gleich geblieben ist, was
+     * beide haelt: die erhoehte Suedmauer im Ruecken, auf ganzer Tiefe.
+     */
+    expect(stahl.size[1], "die Boxen sind nicht mehr gleich tief").toBe(halde.size[1]);
+    expect(stahl.size[2], "die Boxen sind nicht mehr gleich hoch").toBe(halde.size[2]);
     for (const [name, z] of [
       ["Mischschrott", halde.z],
       ["Stahlbox", stahl.z],
@@ -379,22 +384,21 @@ describe("Reichweite des Baggers", () => {
     expect(hitsObstacle(-3.0, -26.0, 0), "alte Pressenstelle sperrt noch").toBeNull();
   });
 
-  it("schließt mittig, mit dem kleinen Loch der halboffenen Bauform", () => {
+  it("schließt mittig, ohne dass die Spitzen sich überlappen", () => {
     /*
-     * Geschlossen ist seit dem 13.09.2026 wieder Spreizung 0 — aber die
-     * Spitzen treffen sich nicht exakt auf der Achse, sondern lassen ein Loch
-     * von Ø 0,12 m. Das ist gewollt und keine Ungenauigkeit: Fünf Spitzen
-     * endlicher Breite können sich auf einem Punkt gar nicht treffen, ohne
-     * einander zu durchdringen. Die halboffene Bauform der Zeichnung macht
-     * genau das.
+     * Geschlossen heisst bei der Sichelkralle nicht Spreizung 0: Die Schalen
+     * haengen an einem Bolzenkreis von 0,25 m; bei 0 stehen sie senkrecht nach
+     * unten und ihre Spitzen liegen weit auseinander. Erst nach 0,85 rad
+     * Ausschwenken treffen sie sich auf der Achse.
      *
-     * Die Schranke prüft beides: klein genug, dass nichts durchrieselt, und
-     * größer als null, damit die Spitzen einander nicht überlappen.
+     * Der Fuenfschalengreifer vom 13.09.2026 liess dort ein Loch von 0,12 m,
+     * weil fuenf Spitzen endlicher Breite sich nicht auf einem Punkt treffen
+     * koennen. Diese Form hat drei Segmente und schliesst auf der Achse; die
+     * Schranke ist deshalb wieder „nahe null" (Rueckbau 13.09.2026).
      */
     const p = clawPoint(0, CLAW_CLOSED_SPLAY, CLAW_SEGMENTS, new THREE.Vector3());
-    const r = Math.hypot(p.x, p.z);
-    expect(r, "die Spitzen überfahren die Drehachse").toBeGreaterThan(0.02);
-    expect(2 * r, "unnötig viel Loch in der Mitte").toBeLessThan(0.2);
+    // Radius nahe null heisst: die Spitzen treffen sich in der Mitte
+    expect(Math.abs(Math.hypot(p.x, p.z))).toBeLessThan(0.05);
   });
 
   it("öffnet weit genug, um etwas zu fassen", () => {
@@ -532,8 +536,15 @@ describe("Krallen schließen einzeln", () => {
     expect(reserve).toBe(0);
     // Nachgedrueckt hat sie genau ihre Reserve, nicht mehr
     expect(1.0 - winkel).toBeCloseTo(R, 6);
-    // ... und ist damit weit vom kommandierten Winkel entfernt geblieben
-    expect(winkel).toBeGreaterThan(0.8);
+    /*
+     * ... und ist damit weit vom kommandierten Winkel entfernt geblieben.
+     *
+     * Geprueft wird der Abstand zum Kommando, nicht mehr die feste Schranke
+     * 0,8. Die stand fuer eine Reserve von 0,12 rad; seit sie am 13.09.2026 auf
+     * 0,38 steht („die Spinne greift nicht richtig"), waere sie nur noch die
+     * alte Zahl und nicht die Eigenschaft.
+     */
+    expect(winkel - 0.4, "der Zahn ist bis zum Kommando durchgelaufen").toBeGreaterThan(0.1);
   });
 
   it("wer loslaesst, bekommt seine Reserve zurueck", () => {

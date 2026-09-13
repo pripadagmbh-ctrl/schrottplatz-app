@@ -10,23 +10,15 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 /*
- * Die Datei wird IMPORTIERT, nicht als Pfad zusammengebaut.
+ * Ueber `?url` aus dem Quellbaum, nicht ueber einen absoluten Pfad.
  *
- * Vite haengt dabei einen Inhalts-Hash an den Dateinamen. Das loest zwei
- * Probleme, die beide erst live aufgefallen sind:
- *
- *   Der Pfad stimmt von allein — vorher stand hier "/docs/...", was auf
- *   GitHub Pages an der Projektbasis /schrottplatz-app/ vorbeilief, und
- *   `docs/` wurde ohnehin nicht mitgebaut.
- *
- *   Und ein neues Modell bekommt einen neuen Namen. GitHub Pages liefert mit
- *   `Cache-Control: max-age=600` aus; unter gleichem Namen haette der Browser
- *   bis zu zehn Minuten lang das ALTE Modell unter der neuen Seite gezeigt —
- *   ohne dass man es merkt. Genau die Sorte Fehler, bei der man glaubt, den
- *   aktuellen Stand zu sehen.
+ * `/docs/greifer-mehrschalen.glb` funktionierte nur beim Entwickeln: `docs/`
+ * wird gar nicht mitgebaut, und die Seite liegt live unter einem
+ * Unterverzeichnis — die Vorschau blieb dort leer. Mit dem Import kommt die
+ * Datei in den Build und bekommt eine Pruefsumme im Namen, sodass nach einem
+ * Export nicht die alte aus dem Zwischenspeicher gezeigt wird.
  */
 import modellUrl from "./greifer-mehrschalen.glb?url";
-
 const DATEI = modellUrl;
 
 const kopf = document.getElementById("kopf") as HTMLDivElement;

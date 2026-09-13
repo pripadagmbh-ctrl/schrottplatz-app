@@ -163,15 +163,14 @@ export const CONFIGS: ContainerConfig[] = [
    * neue Wand auf der rechten Seite. Zum Bagger hin (+z) und zum Mischschrott
    * hin (+x) bleibt sie offen.
    *
-   * Beide Boxen sind am 13.09.2026 von 8 x 8 auf 8 x 6 m geschrumpft, als die
-   * Presse von der Mauer abrueckte: Sie reicht jetzt bis z −22,07 nach Norden
-   * und haette sonst in der Zone des Mischschrotts gestanden. Die Stahlbox
-   * liegt weiter mit der Rueckseite an der Suedmauer (z −28,7), der
-   * Mischschrott bleibt hinter der Arbeitslinie des Baggers.
+   * Die Stahlbox hat am 13.09.2026 ihre eigene Wand verloren (Ansage: „Wand
+   * entfernen lassen") und ist dabei von 8 auf 4 m Breite zurueckgegangen:
+   * Dort, wo sie stand, liegt jetzt die Reihe der vier Lego-Mulden. Was sie
+   * haelt, ist die erhoehte Suedmauer im Ruecken.
    */
-  { id: "c_steel", fractionId: "steel", label: "STAHLSCHROTT", kind: "halde", x: -7.8,
-    z: -25.7, size: [8.0, 6.0, 5.0],
-    haldeWaende: { rueck: false, aussen: false, nord: false, trenn: "voll" } },
+  { id: "c_steel", fractionId: "steel", label: "STAHLSCHROTT", kind: "halde", x: -5.5,
+    z: -25.7, size: [4.0, 6.0, 5.0],
+    haldeWaende: { rueck: false, aussen: false, nord: false, trenn: false } },
 
   /*
    * SCHUTT — Absetzcontainer neben der Presse, zum Vorsammeln.
@@ -187,7 +186,7 @@ export const CONFIGS: ContainerConfig[] = [
    * −7,8 gewandert; es bleiben 50 cm Luft auf jeder Seite.
    */
   { id: "r_rubble", fractionId: "rubble", label: "SCHUTT", kind: "bay", x: -1.3,
-    z: -26.0, size: [4.0, 4.0, 2.0] },
+    z: -26.0, size: [4.0, 4.0, 2.0], shareNorth: true },
 
   /*
    * GROSSTEILE — offene Fläche rechts neben der Stahlmulde.
@@ -198,8 +197,16 @@ export const CONFIGS: ContainerConfig[] = [
    * die Silos bringen." Keine Wände: Was hier liegt, soll der Lader von der
    * Seite aufnehmen können.
    */
-  { id: "c_alu_gross", fractionId: "alu", label: "GROSSTEILE ALU", kind: "pile", x: -16.6,
-    z: -22.0, size: [6.5, 5.0, 0] },
+  /*
+   * Am 13.09.2026 von (−16,6 | −22,0) nach (−20,0 | −14,0) gerueckt: Sie lag
+   * genau vor den offenen Seiten der neuen Sortiermulden. Lambert haette quer
+   * durch sie hindurchfahren muessen, um sie zu erreichen — und durch eine
+   * Zone, in der Material liegt, faehrt er nicht. Zwischen ihr und der
+   * Muldenreihe bleibt jetzt eine Gasse von 4,5 m; dort steht auch sein
+   * Posten.
+   */
+  { id: "c_alu_gross", fractionId: "alu", label: "GROSSTEILE ALU", kind: "pile", x: -20.0,
+    z: -14.0, size: [6.5, 5.0, 0] },
   /*
    * REIFENDEPOT — rechts hinten, offene Fläche ohne Wände.
    *
@@ -293,14 +300,24 @@ export const CONFIGS: ContainerConfig[] = [
    * Die Abstaende sind gesucht, nicht gegriffen: Bei x −12,2 lagen VA und
    * Kupfer mit 9,8 und 9,7 m ausserhalb des Rings von 9,5 m.
    */
-  { id: "r_alu", fractionId: "alu", label: "ALU", kind: "pile", x: -7.0,
-    z: -12.8, size: [4.0, 4.0, 0], sortierbox: true },
-  { id: "r_va", fractionId: "va", label: "EDELSTAHL VA", kind: "pile", x: -11.8,
-    z: -12.8, size: [4.0, 4.0, 0], sortierbox: true },
-  { id: "r_cable", fractionId: "cable", label: "KABEL", kind: "pile", x: -7.0,
-    z: -17.5, size: [4.0, 4.0, 0], sortierbox: true },
-  { id: "r_copper", fractionId: "copper", label: "KUPFER", kind: "pile", x: -11.8,
-    z: -17.5, size: [4.0, 4.0, 0], sortierbox: true },
+  /*
+   * Die vier Sortiermulden sind offen zu LAMBERT hin, nicht zum Bagger.
+   *
+   * Ansage 13.09.2026: „Lego-Mulden fuer Alu, VA, Kabel und Kupfer dort
+   * hinsetzen" — und davor: „Lambert faehrt von der Ostseite ran … und macht
+   * die Mulden leer." Der Bagger fuellt von oben, ueber die Wand; der Radlader
+   * braucht die offene Seite, sonst kommt er mit der Schaufel nicht hinein.
+   * Mit Oeffnung zum Bagger stand er hinter der Rueckwand und die Box wurde
+   * nie leer (gemessen: 4 von 4 blieben liegen).
+   */
+  { id: "r_alu", fractionId: "alu", label: "ALU", kind: "bay", x: -10.0,
+    z: -10.0, size: [4.5, 4.6, 2.0], sortierbox: true },
+  { id: "r_va", fractionId: "va", label: "EDELSTAHL VA", kind: "bay", x: -10.0,
+    z: -14.6, size: [4.5, 4.6, 2.0], sortierbox: true, shareSouth: true },
+  { id: "r_cable", fractionId: "cable", label: "KABEL", kind: "bay", x: -10.0,
+    z: -19.2, size: [4.5, 4.6, 2.0], sortierbox: true, shareSouth: true },
+  { id: "r_copper", fractionId: "copper", label: "KUPFER", kind: "bay", x: -10.0,
+    z: -23.8, size: [4.5, 4.6, 2.0], sortierbox: true, shareSouth: true },
 
   /*
    * MULDENREIHE an der Ostwand — acht statt vier.
@@ -357,7 +374,21 @@ export const CONFIGS: ContainerConfig[] = [
  */
 export function lagerMuldeFuer(fractionId: string | null): ContainerConfig | null {
   if (!fractionId) return null;
-  return CONFIGS.find((c) => c.kind === "bay" && c.fractionId === fractionId) ?? null;
+  /*
+   * Sortierboxen zaehlen NICHT als Lager.
+   *
+   * Seit dem 13.09.2026 sind die vier Sortierplaetze am Bagger ebenfalls
+   * Betonlego-Mulden (`kind: "bay"`) — und stehen in CONFIGS vor der Reihe an
+   * der Ostwand. Ohne diese Zeile schickte die Suche jeden sortenreinen
+   * Kipper und jede Fuhre Lamberts dorthin, wo das Material schon liegt:
+   * gemessen 0 von 11 Stueck im Ostlager, und Lambert trug aus der Alu-Box in
+   * die Alu-Box.
+   */
+  return (
+    CONFIGS.find(
+      (c) => c.kind === "bay" && !c.sortierbox && c.fractionId === fractionId
+    ) ?? null
+  );
 }
 
 /** Fangbereich über einer Haufen-Zone (Zonen-Zählung + Ampel) */

@@ -110,7 +110,17 @@ describe("Lambert", () => {
       `er ist ungerufen von (${a.x.toFixed(1)}|${a.z.toFixed(1)}) nach ` +
         `(${b.x.toFixed(1)}|${b.z.toFixed(1)}) gefahren`
     ).toBeLessThan(0.5);
-    expect(b.x, "steht nicht auf der Ostseite").toBeLessThan(-18);
+    /*
+     * Sein Posten liegt in der Gasse VOR den offenen Seiten der Sortiermulden
+     * — westlich davon, damit er mit der Schaufel hineinkommt. Geprueft wird
+     * diese Eigenschaft, nicht die Zahl: Die Reihe ist am 13.09.2026 einmal
+     * gewandert, und mit einer festen Schranke waere der Test danach falsch
+     * gewesen, obwohl er richtig stand.
+     */
+    const mulde = CONFIGS.find((c) => c.sortierbox === true)!;
+    expect(b.x, "steht nicht vor den offenen Seiten der Mulden").toBeLessThan(
+      mulde.x - mulde.size[0] / 2
+    );
   }, 30000);
 
   it("nimmt den Ruf an, auch wenn der Weg gerade versperrt ist", () => {
@@ -151,6 +161,10 @@ describe("Lambert", () => {
     p.staff.rufeLambert();
     p.schritt(150);
     expect(p.staff.lambertArbeitet, "bleibt gerufen, obwohl die Box leer ist").toBe(false);
-    expect(p.staff.lambertOrt.x, "steht nicht wieder auf der Ostseite").toBeLessThan(-18);
+    const mulde = CONFIGS.find((c) => c.sortierbox === true)!;
+    expect(
+      p.staff.lambertOrt.x,
+      "steht nicht wieder vor den offenen Seiten der Mulden"
+    ).toBeLessThan(mulde.x - mulde.size[0] / 2);
   }, 60000);
 });

@@ -1,6 +1,5 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
-import { CONFIGS } from "./containers";
 
 /** Position der Brückenwaage in der Nordspur (SW) */
 /** Brückenwaage direkt hinter der Einfahrt */
@@ -84,7 +83,6 @@ export class Yard {
   constructor(scene: THREE.Scene, world: RAPIER.World) {
     this.buildGround(scene, world);
     this.buildWalls(scene, world);
-    this.buildTrennsteine(scene, world);
     this.buildGraffiti(scene);
     this.buildReceivingArea(scene);
     this.buildScrapMounds(scene, world);
@@ -934,131 +932,15 @@ export class Yard {
     requestAnimationFrame(tick);
   }
 
-  /**
-   * Betonlego zwischen den Sortierboxen — und zwar als deren Waende.
+  /*
+   * Das Trennsteinkreuz zwischen den Sortierboxen ist weg (Ansage 13.09.2026:
+   * „Mauer entfernen").
    *
-   * Ansage 13.09.2026, zuerst: „zwischen jedem Container stehen Legosteine zum
-   * Abgrenzen", dann: „wir lassen die Container weg und nutzen die
-   * Trennwaende als Mulden." Aus der Abgrenzung ist damit das Bauteil
-   * geworden: Die vier Absetzcontainer sind weg, was bleibt, ist ein Kreuz aus
-   * Steinreihen und vier Flaechen darin.
-   *
-   * Jede Box hat dadurch ZWEI Waende, ueber Eck — nicht vier. Das ist Absicht
-   * und nicht gespart: Lambert raeumt sie mit dem Radlader aus und muss mit
-   * der Schaufel hineinkommen. Eine geschlossene Box koennte nur der Greifer
-   * leeren.
-   *
-   * Die Reihen kommen nicht aus einer Liste, sondern aus den Boxplaetzen
-   * selbst: Je zwei Nachbarn, zwischen die eine Steinreihe passt, bekommen
-   * eine. Verschiebt sich eine Box, verschiebt sich die Reihe mit.
-   *
-   * 1,8 m hoch, drei Lagen — ungefaehr die Hoehe der Absetzcontainer, die
-   * vorher hier standen (2,1 m). Und einen Meter laenger als die Box breit
-   * ist, damit die Ecke wirklich haelt statt nur angedeutet zu sein.
+   * Es war der Versuch, aus zwei Waenden ueber Eck eine Mulde zu machen. Jetzt
+   * sind die vier Sortierplaetze richtige Betonlego-Mulden mit drei Waenden
+   * (`kind: "bay"` in containers.ts) und bringen ihre Waende selbst mit — das
+   * Kreuz haette nur noch daneben gestanden.
    */
-  private buildTrennsteine(scene: THREE.Scene, world: RAPIER.World): void {
-    const BL = 1.5;
-    const BH = 0.6;
-    const BT = 0.55;
-    const REIHEN = 3;
-    /** Wie weit die Reihe ueber die Box hinaussteht (m, beidseits zusammen). */
-    const UEBERSTAND = 1.5;
-    /* Schmaler als das hier passt keine Steinreihe mehr dazwischen. */
-    const MIN_LUECKE = BT + 0.1;
-
-    const behaelter = CONFIGS.filter((c) => c.sortierbox === true);
-    type Reihe = { x: number; z: number; laenge: number; laengsX: boolean };
-    const reihen: Reihe[] = [];
-    for (let i = 0; i < behaelter.length; i++) {
-      for (let j = i + 1; j < behaelter.length; j++) {
-        const a = behaelter[i]!;
-        const b = behaelter[j]!;
-        const dx = Math.abs(a.x - b.x);
-        const dz = Math.abs(a.z - b.z);
-        const breiteA = a.size[0] / 2 + b.size[0] / 2;
-        const tiefeA = a.size[1] / 2 + b.size[1] / 2;
-        // Nachbarn in x: gleiche Reihe, Luecke dazwischen
-        if (dz < 0.6 && dx > breiteA && dx - breiteA < 2.0) {
-          if (dx - breiteA < MIN_LUECKE) continue;
-          reihen.push({
-            x: (a.x + b.x) / 2,
-            z: (a.z + b.z) / 2,
-            laenge: Math.min(a.size[1], b.size[1]) + UEBERSTAND,
-            laengsX: false,
-          });
-        }
-        // Nachbarn in z: gleiche Spalte
-        if (dx < 0.6 && dz > tiefeA && dz - tiefeA < 2.0) {
-          if (dz - tiefeA < MIN_LUECKE) continue;
-          reihen.push({
-            x: (a.x + b.x) / 2,
-            z: (a.z + b.z) / 2,
-            laenge: Math.min(a.size[0], b.size[0]) + UEBERSTAND,
-            laengsX: true,
-          });
-        }
-      }
-    }
-    if (reihen.length === 0) return;
-
-    const farben = [0x9b9b94, 0x92928b, 0xa4a49c].map((c) => new THREE.Color(c));
-    const bloecke: Array<{ m: THREE.Matrix4; f: THREE.Color }> = [];
-    const nieten: Array<{ m: THREE.Matrix4; f: THREE.Color }> = [];
-    const block = new THREE.Object3D();
-    const niete = new THREE.Object3D();
-    let n = 0;
-    const koerper = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
-    for (const r of reihen) {
-      const anzahl = Math.max(1, Math.round(r.laenge / BL));
-      const spanne = anzahl * BL;
-      for (let k = 0; k < anzahl; k++) {
-        const mitte = -spanne / 2 + BL / 2 + k * BL;
-        for (let lage = 0; lage < REIHEN; lage++) {
-          // Versatz je Lage, damit die Fugen nicht uebereinanderstehen
-          const off = (lage % 2) * (BL / 2);
-          const bx = r.laengsX ? r.x + mitte - off : r.x;
-          const bz = r.laengsX ? r.z : r.z + mitte - off;
-          const f = farben[n++ % 3]!;
-          block.position.set(bx, BH / 2 + lage * BH, bz);
-          block.rotation.set(0, r.laengsX ? 0 : Math.PI / 2, 0);
-          block.updateMatrix();
-          bloecke.push({ m: block.matrix.clone(), f });
-          for (const sv of [-0.45, 0.45]) {
-            niete.position.set(r.laengsX ? sv : 0, BH / 2 + 0.045, r.laengsX ? 0 : sv);
-            niete.updateMatrix();
-            nieten.push({ m: block.matrix.clone().multiply(niete.matrix), f });
-          }
-        }
-      }
-      const hoch = REIHEN * BH;
-      world.createCollider(
-        RAPIER.ColliderDesc.cuboid(
-          (r.laengsX ? spanne : BT) / 2,
-          hoch / 2,
-          (r.laengsX ? BT : spanne) / 2
-        ).setTranslation(r.x, hoch / 2, r.z),
-        koerper
-      );
-    }
-    const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95 });
-    const bauen = (
-      geo: THREE.BufferGeometry,
-      liste: Array<{ m: THREE.Matrix4; f: THREE.Color }>
-    ): void => {
-      const im = new THREE.InstancedMesh(geo, mat, liste.length);
-      liste.forEach((e, i) => {
-        im.setMatrixAt(i, e.m);
-        im.setColorAt(i, e.f);
-      });
-      im.instanceMatrix.needsUpdate = true;
-      if (im.instanceColor) im.instanceColor.needsUpdate = true;
-      im.castShadow = true;
-      im.receiveShadow = true;
-      scene.add(im);
-    };
-    bauen(new THREE.BoxGeometry(BL, BH, BT), bloecke);
-    bauen(new THREE.CylinderGeometry(0.13, 0.13, 0.09, 8), nieten);
-  }
 
   private buildWalls(scene: THREE.Scene, world: RAPIER.World): void {
     const BL = 1.6; // Blocklänge

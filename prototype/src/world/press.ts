@@ -104,7 +104,20 @@ const INNER_W = 5.95; // x — Länge, Pressweg (rechts → links)
  * Mindestmass fuer jeden Behaelter auf dem Platz: Was man befuellen soll,
  * muss man auch ausraeumen koennen.
  */
-const INNER_D = 3.76;
+/*
+ * Nachtrag 13.09.2026, Rueckbau auf die Sichelkralle: 3,76 geht nicht mehr.
+ *
+ * Die 3,76 m waren die geforderten −20 % und gingen nur, solange der
+ * Fuenfschalengreifer eingebaut war — der misst offen 3,02 m. Die Sichelkralle
+ * von gestern misst 3,38 m; mit 30 cm Luft je Seite braucht die Kammer 3,98 m.
+ * Bei 3,76 setzte der Greifer wieder auf den Laengswaenden auf, und ein
+ * Behaelter, den man nicht ausraeumen kann, ist eine Sackgasse
+ * (`spinnenmass`).
+ *
+ * 4,05 statt der urspruenglichen 4,70 sind damit −14 % statt −20. Die Laenge
+ * bleibt bei den geforderten −15 %.
+ */
+const INNER_D = 4.05;
 /** Lichte Masse der Kammer — fuer Tests und Platzplanung. */
 export const PRESS_INNER = { laenge: INNER_W, tiefe: INNER_D };
 const WALL_H = 1.9;

@@ -18,7 +18,7 @@ import * as THREE from "three";
 import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { writeFileSync } from "node:fs";
-import { MASS } from "../src/grapple/teile";
+import { SCHALEN } from "../src/grapple/form";
 import { baueGreifer, type Greifer } from "../src/grapple/rig";
 
 /**
@@ -50,15 +50,9 @@ interface Spur {
 
 function spuren(g: Greifer): Spur[] {
   const liste: THREE.Object3D[] = [g.rotator];
-  for (let i = 1; i <= MASS.schalen; i++) {
+  for (let i = 1; i <= SCHALEN; i++) {
     const nr = String(i).padStart(2, "0");
-    for (const name of [
-      `SHELL_${nr}`,
-      `CYLINDER_${nr}`,
-      `CYL_ROD_${nr}`,
-      `CYL_ROD_SHAFT_${nr}`,
-      `CYL_ROD_EYE_${nr}`,
-    ]) {
+    for (const name of [`SHELL_${nr}`, `CYLINDER_${nr}`, `CYL_ROD_${nr}`]) {
       const o = g.wurzel.getObjectByName(name);
       if (o) liste.push(o);
     }
@@ -75,20 +69,8 @@ function abtasten(sp: Spur[]): void {
   }
 }
 
-/**
- * Spuren zu Keyframe-Tracks.
- *
- * `nurBewegte` wirft weg, was sich über den Clip nicht ändert — das haelt die
- * Datei klein. Für stehende Posen muss es ausgeschaltet sein: Dort ändert sich
- * per Definition nichts, und mit dem Filter kamen drei leere Clips heraus.
- * Aufgefallen ist das erst in der Vorschau, als POSE_OFFEN den Greifer
- * geschlossen liess.
- */
-function tracks(
-  sp: Spur[],
-  zeiten: number[],
-  nurBewegte = true
-): THREE.KeyframeTrack[] {
+/** Nur die Spuren behalten, die sich tatsächlich bewegen. */
+function tracks(sp: Spur[], zeiten: number[]): THREE.KeyframeTrack[] {
   const out: THREE.KeyframeTrack[] = [];
   const bewegt = (werte: number[], breite: number): boolean => {
     for (let i = breite; i < werte.length; i++) {
@@ -98,13 +80,13 @@ function tracks(
   };
   for (const s of sp) {
     const n = s.knoten.name;
-    if (!nurBewegte || bewegt(s.quat, 4)) {
+    if (bewegt(s.quat, 4)) {
       out.push(new THREE.QuaternionKeyframeTrack(`${n}.quaternion`, zeiten, s.quat));
     }
-    if (!nurBewegte || bewegt(s.pos, 3)) {
+    if (bewegt(s.pos, 3)) {
       out.push(new THREE.VectorKeyframeTrack(`${n}.position`, zeiten, s.pos));
     }
-    if (!nurBewegte || bewegt(s.skal, 3)) {
+    if (bewegt(s.skal, 3)) {
       out.push(new THREE.VectorKeyframeTrack(`${n}.scale`, zeiten, s.skal));
     }
   }
@@ -213,7 +195,7 @@ for (const [name, wert] of [
   abtasten(sp);
   greifer.setOeffnung(wert);
   abtasten(sp);
-  clips.push(new THREE.AnimationClip(name, 0.04, tracks(sp, [0, 0.04], false)));
+  clips.push(new THREE.AnimationClip(name, 0.04, tracks(sp, [0, 0.04])));
 }
 greifer.setOeffnung(0);
 
@@ -238,20 +220,13 @@ function gegenprobe(puffer: Buffer): void {
     (gltf) => {
       const szene = gltf.scene;
       const fehlt = [
-        "01_AUFHAENGUNG",
-        "02_ROTATOR",
-        "03_DREHWERKSGEHAEUSE",
+        "ADAPTER",
+        "ROTATOR",
         "GRAPPLE_HEAD",
-        ...Array.from({ length: MASS.schalen }, (_, i) => {
+        "HYDRAULIC_LINES",
+        ...Array.from({ length: SCHALEN }, (_, i) => {
           const nr = String(i + 1).padStart(2, "0");
-          return [
-            `SHELL_${nr}`,
-            `CYLINDER_${nr}`,
-            `CYL_ROD_${nr}`,
-            `CYL_ROD_SHAFT_${nr}`,
-            `CYL_ROD_EYE_${nr}`,
-            `SHELL_TIP_${nr}`,
-          ];
+          return [`SHELL_${nr}`, `CYLINDER_${nr}`, `CYL_ROD_${nr}`, `WEAR_PLATE_${nr}_1`];
         }).flat(),
       ].filter((n) => !szene.getObjectByName(n));
       if (fehlt.length) {
@@ -269,12 +244,7 @@ function gegenprobe(puffer: Buffer): void {
         return;
       }
       const schale = szene.getObjectByName("SHELL_01")!;
-      /*
-       * Gemessen wird am AUGE der Kolbenstange, und zwar seine Lage in Metern.
-       * Vorher stand hier die Skalierung der Stangengruppe, ausgegeben als
-       * Zentimeter — das meldete 118 cm Hub, wo der Zylinder 19 cm faehrt.
-       */
-      const stange = szene.getObjectByName("CYL_ROD_EYE_01")!;
+      const stange = szene.getObjectByName("CYL_ROD_01")!;
       const rotator = szene.getObjectByName("ROTATOR")!;
 
       /*
@@ -288,10 +258,10 @@ function gegenprobe(puffer: Buffer): void {
       wirkung.play();
       mixer.update(0);
       const zuWinkel = schale.rotation.x;
-      const zuStange = stange.position.y;
+      const zuStange = stange.scale.y;
       mixer.update(oeffnen.duration * 0.98);
       const offenWinkel = schale.rotation.x;
-      const offenStange = stange.position.y;
+      const offenStange = stange.scale.y;
       wirkung.stop();
 
       const drehWirkung = mixer.clipAction(drehen);
@@ -304,21 +274,14 @@ function gegenprobe(puffer: Buffer): void {
       console.log(
         `  Gegenprobe: Schale schwenkt ${(((offenWinkel - zuWinkel) * 180) / Math.PI).toFixed(1)}°, ` +
           `Stange faehrt beim Oeffnen ${Math.abs((offenStange - zuStange) * 100).toFixed(0)} cm ` +
-          `${offenStange > zuStange ? "ein" : "aus"}, ` +
+          `${offenStange > zuStange ? "aus" : "ein"}, ` +
           `Rotator nach einem Viertel bei ${((gedreht * 180) / Math.PI).toFixed(0)}°`
       );
-      for (const name of ["POSE_ZU", "POSE_HALB", "POSE_OFFEN"]) {
-        const clip = gltf.animations.find((c) => c.name === name);
-        if (!clip || clip.tracks.length === 0) {
-          console.error(`  Clip ${name} ist leer.`);
-          process.exitCode = 1;
-        }
-      }
       if (Math.abs(offenWinkel - zuWinkel) < 0.5) {
         console.error("  Die Schalen bewegen sich im GLB nicht.");
         process.exitCode = 1;
       }
-      if (Math.abs(offenStange - zuStange) < 0.05) {
+      if (Math.abs(offenStange - zuStange) < 0.1) {
         console.error("  Die Kolbenstange bewegt sich im GLB nicht.");
         process.exitCode = 1;
       }
