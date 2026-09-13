@@ -29,10 +29,34 @@ const SCHALE_MIN_B = 0.2;
  * irgendwann abgebrannt und neu aufgeschweisst. Das Schalenblech selbst soll
  * nie angefasst werden muessen."
  */
-const VERST_L = 0.3;
-const VERST_B = 0.11;
-const VERST_HINTEN = 0.025;
-const VERST_VORN = 0.075;
+/**
+ * Die Strebe — der zweite Koerper des Gussteils.
+ *
+ * Ansage 13.09.2026: „nur musst du dir zwei Koerper vorstellen, die als eins
+ * gegossen wurden sind. Die Schalen, welche mit ihrer Form und Kruemmung fein
+ * sind und die Innenflaeche der Spinne darstellen, und eine zentrierte Strebe,
+ * die mittig auf der Schale liegt und die Aussenkanten der Schale nicht
+ * erreicht. Nur ist diese gegossene Strebe oben von Form/Dicke gut, nur sie
+ * flacht zu schnell ab, was diese duenne Form in der Mitte ergibt. Sie wird in
+ * der Tat schmaeler, aber von oben nach unten durchgaengig und wird auch unten
+ * nie ganz duenn, dennoch unten schmaler als oben und gleichmaessig schmaler
+ * werdend."
+ *
+ * Mein Fehler war die LAENGE: Die Verstaerkung lief nur ueber die letzten
+ * 300 mm, also knapp ein Fuenftel der Schale. Dazwischen blieb nur das
+ * 15-mm-Blech — genau die duenne Mitte, die im Bild zu sehen war.
+ *
+ * Jetzt laeuft sie durch, von Station 0 bis zur Spitze, und verjuengt sich
+ * gleichmaessig. Ihr unteres Ende hat den Querschnitt der Zahnbasis
+ * (110 x 75 mm), damit der Zahn buendig darauf sitzt — das ist die
+ * „Verstaerkung" der Zeichnung, nur als Ende eines durchgehenden Koerpers
+ * statt als eigenes Stueck.
+ */
+const STREBE_B_OBEN = 0.22;
+const STREBE_B_UNTEN = 0.11;
+const STREBE_H_OBEN = 0.13;
+const STREBE_H_UNTEN = 0.075;
+const VERST_VORN = STREBE_H_UNTEN;
 
 /**
  * Einzelteile nach der Explosionszeichnung „5-Schalen-Mehrschalengreifer,
@@ -148,9 +172,9 @@ export const SCHALEN_BOGEN = (17.5 * Math.PI) / 180;
  *
  *   Drehpunkt   an Station 0 — dem OBEREN Ende —, 0,30 m nach innen versetzt
  *   Stempelauge r 0,59 m, y −1,5335 m
- *   Anschläge   0° geschlossen, 65° offen
+ *   Anschläge   0° geschlossen, 96,25° offen — Spitzen senkrecht
  *   geschlossen 1,78 m breit, Loch Ø 0,12 m, 2,40 m hoch  (Liste: 2,40 m)
- *   offen       2,30 m Spitzenweite, 2,52 m Hüllkreis     (Liste: 2,30 m)
+ *   offen       3,02 m Spitzenweite
  *
  * Die 2,30 m der Liste sind die SPITZENWEITE, nicht der Hüllkreis. Zuerst hatte
  * ich sie als Hüllmaß gelesen und kam auf 51° Öffnung; die Spitzen standen dann
@@ -160,8 +184,8 @@ export const SCHALEN_BOGEN = (17.5 * Math.PI) / 180;
  * Spitze; so hat es auch das Vorgängermodell gelesen. Mit 65° trifft sie auf den
  * Zentimeter, und die Gesamthöhe bleibt bei 2,40 m, weil die vom geschlossenen
  * Zustand kommt.
- *   Zylinder    0,75 m geschlossen, 0,48 m offen — fährt zum SCHLIESSEN aus
- *   Moment      Schließen 1,7-mal Öffnen
+ *   Zylinder    0,98 m geschlossen, 0,54 m offen — fährt zum SCHLIESSEN aus
+ *   Moment      Schließen 2,7-mal Öffnen
  *
  * Der Drehpunkt saß vorher an Station 1, also 0,30 m UNTER dem oberen Ende.
  * Das war der Fehler hinter drei Beanstandungen auf einmal: Die Schale ragte
@@ -187,11 +211,29 @@ export const STEMPEL_AUGE = { r: 0.59, y: -1.5335 };
  * Abschnitte nach außen, bevor die Schale einzog.
  */
 export const ZU = 0;
-export const OFFEN = (65 * Math.PI) / 180;
+/**
+ * Offen stehen die SPITZEN SENKRECHT.
+ *
+ * Ansage 13.09.2026: „wenn die Spinne offen ist, sollten die Schalen weiter
+ * offen gehen, sodass die Spitzen senkrecht stehen."
+ *
+ * Das ist keine gewaehlte Zahl: Die Tangente am Schalenende liegt bei
+ * `SCHALEN_ABSCHNITTE · BOGEN − BOGEN/2` = 96,25° (eine Sehne zeigt in
+ * Richtung der Tangente in ihrer Mitte, das Ende liegt also eine halbe Sehne
+ * hinter 105°). Schwenkt die Schale um genau diesen Betrag, steht ihr Ende
+ * senkrecht.
+ *
+ * Der Preis steht in den Huellmassen: Die Spitzenweite waechst von 2,30 auf
+ * 3,02 m, die Positionsliste nennt 2,30. Die Ansage dazu lautete „die
+ * Masstaebe muessen nicht richtig sein, es sollte nur das Grundprinzip
+ * darstellen" — das Grundprinzip ist hier, dass die Schalen senkrecht in den
+ * Schrott einstechen koennen.
+ */
+export const OFFEN = SCHALEN_ABSCHNITTE * SCHALEN_BOGEN - SCHALEN_BOGEN / 2;
 /** Obere Schalenanbindung — wo der Zylinder angreift, im Frame des Drehpunkts. */
-export const OBERE_ANBINDUNG = { y: 0.1, z: 0.24 };
+export const OBERE_ANBINDUNG = { y: 0, z: 0.31 };
 /** Oberer Zylinderanschluss an der Mitteltraverse, im Frame des Greifers. */
-export const ZYLINDER_AUFNAHME = { r: 0.35, y: -0.86 };
+export const ZYLINDER_AUFNAHME = { r: 0.34, y: -0.73 };
 /**
  * Höhe der Mitteltraverse im Frame des Greifers (m).
  *
@@ -1058,41 +1100,44 @@ export function baueGreiferschale(st: Stoffe): THREE.Group {
    * tiefe Randwangen, Holm, Vierkantrohr, Mittelrippe.
    */
   /*
-   * Nur was beschriftet ist: Schalenblech 15 und Verstaerkung 25.
+   * Zwei Koerper, als einer gegossen.
    *
-   * Ansage 13.09.2026: „ohne die Bleche, nur das, was beschriftet war." Im
-   * Querschnitt C-C tragen genau zwei Teile eine Bemassung — das Blech und die
-   * Verstaerkung darauf. Die beiden Schenkel, die dort nach unten laufen, sind
-   * das gebogene Blech selbst im Schnitt, keine angesetzten Waende.
+   * Erstens das Blech — Form und Kruemmung stellen die Innenflaeche der Spinne
+   * dar. Zweitens eine zentrierte Strebe, die mittig darauf liegt und die
+   * Aussenkanten der Schale nicht erreicht.
    *
-   * Ich hatte sie zweimal als eigene Bauteile gebaut, einmal nach aussen und
-   * einmal nach innen. Beide Male war es eine Zutat, die die Zeichnung nicht
-   * hergibt.
+   * Angesetzte Seitenwaende gibt es nicht: Im Querschnitt C-C tragen nur diese
+   * beiden Teile eine Bemassung, und die Schenkel, die dort nach unten laufen,
+   * sind das gebogene Blech selbst im Schnitt.
    */
-  const verstAb = fein.findIndex(
-    (f) => f.k >= SCHALEN_ABSCHNITTE - VERST_L / ABSCHNITT
-  );
-  const verstTeil = fein.slice(Math.max(0, verstAb));
-  const verstDicken = verstTeil.map((_f, i) => {
-    const t = verstTeil.length > 1 ? i / (verstTeil.length - 1) : 1;
-    return VERST_HINTEN + (VERST_VORN - VERST_HINTEN) * t;
-  });
   /*
-   * Die Verstärkung liegt AUSSEN auf dem Blech, auf der konvexen Seite — so
-   * zeigt es die Seitenansicht, und dort setzt auch der Zahn an.
+   * Die Strebe liegt AUSSEN auf dem Blech, mittig, und laeuft durch — von
+   * Station 0 bis zur Spitze. Ihre Breite endet deutlich vor den Aussenkanten
+   * der Schale, ihre Hoehe faellt gleichmaessig von 130 auf 75 mm. Unten ist
+   * sie damit schmaler als oben, aber nie duenn.
    */
-  const verstaerkung = new THREE.Mesh(
-    strang(
-      verstTeil,
-      0,
-      VERST_B,
-      verstDicken,
-      verstTeil.map((f) => woelbungBei(halbbreiteBei(f.k), f.k) + BLECH)
-    ),
-    st.guss
-  );
-  verstaerkung.name = "06_VERSTAERKUNG";
-  g.add(verstaerkung);
+  const strebeBreiten = fein.map((f) => {
+    const t = f.k / SCHALEN_ABSCHNITTE;
+    return STREBE_B_OBEN + (STREBE_B_UNTEN - STREBE_B_OBEN) * t;
+  });
+  const strebeHoehen = fein.map((f) => {
+    const t = f.k / SCHALEN_ABSCHNITTE;
+    return STREBE_H_OBEN + (STREBE_H_UNTEN - STREBE_H_OBEN) * t;
+  });
+  for (let k = 0; k < fein.length - 1; k++) {
+    const abschnitt = new THREE.Mesh(
+      strang(
+        fein.slice(k, k + 2),
+        0,
+        (strebeBreiten[k]! + strebeBreiten[k + 1]!) / 2,
+        strebeHoehen.slice(k, k + 2),
+        fein.slice(k, k + 2).map((f) => woelbungBei(halbbreiteBei(f.k), f.k) + BLECH)
+      ),
+      st.guss
+    );
+    abschnitt.name = `06_STREBE_${String(k + 1).padStart(2, "0")}`;
+    g.add(abschnitt);
+  }
 
   // Lagerkasten mit den beiden Augen — das Hülsengelenk zur Mitteltraverse
   /*
@@ -1207,13 +1252,19 @@ export function baueGreiferspitze(st: Stoffe): THREE.Group {
    * Meine letzte Fassung hatte ihn mit konstantem Querschnitt gebaut. Die
    * Zeichnung zeigt das Gegenteil: Er verjuengt sich auf ein Fuenftel.
    */
+  /*
+   * Vier Stationen statt sechs, und das Ende bleibt stumpf.
+   *
+   * Ansage 13.09.2026: „Kantenschutz braucht nicht so viel Detailtiefe und
+   * sind eher stumpfe Elemente." Die Zeichnung laeuft auf 22 x 14 mm aus; hier
+   * endet der Zahn bei 45 x 28 mm. Das ist Kantenschutz, keine Schneide, und
+   * spart Dreiecke, die in der Spielkamera niemand sieht.
+   */
   const STATIONEN: Array<[number, number, number]> = [
     [0, 0.11, 0.075],
-    [0.04, 0.105, 0.07],
-    [0.1, 0.095, 0.062],
-    [0.18, 0.072, 0.046],
-    [0.26, 0.045, 0.028],
-    [0.32, 0.022, 0.014],
+    [0.12, 0.092, 0.06],
+    [0.24, 0.062, 0.04],
+    [0.32, 0.045, 0.028],
   ];
   const R = 0.7; // Biegeradius der Zeichnung
   /* Die flache Seite liegt auf der Verstaerkung, also aussen auf dem Blech. */
