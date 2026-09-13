@@ -1343,7 +1343,16 @@ export function baueGreiferspitze(st: Stoffe): THREE.Group {
   geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
   geo.setIndex(idx);
   geo.computeVertexNormals();
-  const zahn = new THREE.Mesh(geo, st.bolzen);
+  /*
+   * Dasselbe Gusseisen wie die Schale, nicht das helle Bolzenmaterial.
+   *
+   * Ansage 13.09.2026: „wie kann es sein, dass das Ende dicker ist als die
+   * Mitte?" Gemessen war es das nicht — die Spitze laeuft von 72 auf 25 mm zu
+   * und schliesst buendig an das Schalenende an. Es war die FARBE: In Hellgrau
+   * las sie sich als aufgesetzter Schuh. Die Skizze zeigt ein Stueck aus
+   * dickem gegossenem Eisen.
+   */
+  const zahn = new THREE.Mesh(geo, st.guss);
   zahn.name = "07_ZAHN";
   g.add(zahn);
   /*
