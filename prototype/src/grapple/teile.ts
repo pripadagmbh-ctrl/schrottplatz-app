@@ -49,14 +49,13 @@ import * as THREE from "three";
 export const MASS = {
   aufhaengung: { breite: 0.45, tiefe: 0.35, hoehe: 0.4 },
   rotator: { breite: 0.4, tiefe: 0.4, hoehe: 0.3 },
-  drehwerksgehaeuse: { breite: 0.45, tiefe: 0.35, hoehe: 0.25 },
-  traverse: { durchmesser: 0.7, hoehe: 0.45 },
+  drehwerksgehaeuse: { breite: 0.5, tiefe: 0.45, hoehe: 0.3 },
+  traverse: { breite: 0.75, tiefe: 0.55, hoehe: 0.4 },
   zylinder: { laenge: 0.7, breite: 0.2, durchmesser: 0.12 },
   schale: { laenge: 1.2, breite: 0.4, tiefe: 0.3 },
   spitze: { laenge: 0.25, breite: 0.12, dicke: 0.08 },
-  schutzblech: { laenge: 0.5, breite: 0.18, hoehe: 0.1 },
-  verstaerkung: { laenge: 0.4, breite: 0.15, hoehe: 0.08 },
-  gesamt: { hoehe: 1.85, breite: 1.6, volumen: 1.2 },
+  stempel: { breite: 0.6, tiefe: 0.5, hoehe: 0.35 },
+  gesamt: { hoehe: 2.4, breite: 2.3, volumen: 1.2 },
   schalen: 5,
 } as const;
 
@@ -83,51 +82,45 @@ export const SCHALEN_BOGEN = (17.5 * Math.PI) / 180;
 /* ------------------------------------------------------------- Kinematik */
 
 /**
- * Die Kinematik des Zusammenbaus — abgetastet, nicht gegriffen.
+ * Die Kinematik — und der Befund, der sie umgeworfen hat.
  *
- * Gesucht wurde über Bolzenkreis, beide Anschläge, Laschenlage und
- * Zylinderaufnahme gleichzeitig, unter sechs Bedingungen:
+ * Die zweite Fassung der Zeichnung hat zwei Positionen, die vorher fehlten:
  *
- *   1. Die Spitzen lassen geschlossen ein Loch von 16 cm — halboffene Bauform.
- *   2. Die Lasche sitzt auf dem RÜCKEN der Schale, nicht im Trog. Dort läge
- *      sie da, wo das Material hinsoll.
- *   3. Der Zylinder steht steil (hier bis 26°), nicht quer über dem Kopf.
- *   4. Kein Totpunkt: Der Hebelarm bleibt überall über 8 cm; hier sind es 29.
- *   5. Der Zylinder bleibt zwischen 0,42 und 0,80 m — die Tabelle nennt 0,70 m.
- *   6. Zum Schließen fährt er AUS, also mit voller Kolbenfläche.
+ *   9  Zentrale untere Gelenk-/Führungseinheit (Stempel)   1x, 600×500×350
+ *   10 Untere Schalenanbindung                             5x, Gelenkpunkt am Stempel
  *
- * Dazu kam am Ende die wichtigste Bedingung, und die kam nicht aus der
- * Zeichnung, sondern aus einem Satz: „Stell dir die Spinne von der Form wie
- * eine Glocke vor, wo unten eine halbe Abrissbirne rausguckt. Sollte die Form
- * oben also breiter sein als unten, ist was falsch."
+ * Damit hängen die Schalen NICHT an der Mitteltraverse, wie ich es gebaut
+ * hatte. Das Verbindungsprinzip der Zeichnung sagt es Punkt für Punkt: oberer
+ * Zylinderanschluss an der Mitteltraverse, obere Schalenanbindung am Zylinder,
+ * untere Schalenanbindung an der zentralen Gelenkeinheit. Jede Schale hat also
+ * genau einen Drehpunkt — unten in der Mitte, am Stempel — und wird oben vom
+ * Zylinder geschoben. Ein Winkelhebel, keine hängende Schale.
  *
- * Genau das war der Fall. Die Zylinder saßen auf Auslegern bei Radius 0,58 und
- * machten den Kopf 1,5 m breit — breiter als die geschlossenen Schalen mit
- * 1,02 m. Der Greifer war oben am breitesten, also eine Glocke auf dem Kopf.
+ * Genau das ist auch der Grund, warum der Greifer geschlossen wie eine Birne
+ * aussieht: Der Drehpunkt sitzt tief und mittig, die Schale wickelt sich um
+ * ihn herum, und unten schaut der Stempel heraus.
  *
- * Jetzt bleibt die ganze Anlenkung zwischen Radius 0,16 und 0,29, also im
- * Schatten der Mitteltraverse (Ø 0,70). Der Kopf ist damit schmaler als die
- * Schalen darunter, und die Silhouette läuft nach unten auf.
+ * Abgetastet ergibt sich:
  *
- * Nachgerechnet: Bolzenkreis Ø 0,68 gegen Ø 0,70 Traverse — die Lageraugen
- * sitzen an ihrem Rand. Zylinder 0,54 m geschlossen bis 0,69 m offen (Tabelle
- * 0,70 m über alles), Hub 15 cm, Neigung höchstens 9°, kein Totpunkt,
- * Schließmoment 1,66-mal Öffnungsmoment. Spitzenweite 0,16 m geschlossen bis
- * 2,47 m offen.
+ *   Drehpunkt   an Station 1 der Schale, 0,24 m nach innen versetzt
+ *   Stempelauge r 0,48 m, y −1,66 m
+ *   Anschläge   20° geschlossen, 85° offen
+ *   geschlossen 1,36 m breit, 2,40 m hoch  (Zeichnung: 2,40 m)
+ *   offen       rund 2,0 m Spitzenweite    (Zeichnung: 2,30 m Greiferbreite)
+ *   Zylinder    0,90 m geschlossen, 0,62 m offen — fährt zum SCHLIESSEN aus
+ *   Moment      Schließen 3,0-mal Öffnen
  */
-/** Bolzenkreis der Schalen (m) — Ø 0,68, also der Rand der Mitteltraverse. */
-export const BOLZENKREIS = 0.34;
-/** Höhe der Schalenbolzen unter der Oberkante des Adapters (m). */
-export const BOLZEN_Y = -1.155;
-/** Anschläge der Schalen (rad): 31° geschlossen, 92° offen — 2,47 m Spitzenweite. */
-export const ZU = (31 * Math.PI) / 180;
-export const OFFEN = (92 * Math.PI) / 180;
-/** Angriffspunkt der Kolbenstange auf dem Schalenrücken, im Frame des Lagerauges. */
-export const ANLENKPUNKT = { y: 0.0927, z: -0.1543 };
-/** Aufnahme des Zylinders an der Mitteltraverse, im Frame des Greifers. */
-export const ZYLINDER_AUFNAHME = { r: 0.24, y: -0.62 };
-/** Hoehenlage der Mitteltraverse — hier gebraucht, um ihre Aufnahmen zu setzen. */
-export const LAGE_TRAVERSE = -1.005;
+/** Station der Schale, an der ihr Drehpunkt sitzt, und dessen Versatz nach innen. */
+export const DREHPUNKT = { station: 1, versatz: 0.24 };
+/** Lage des Stempelauges im Frame des Greifers (m). */
+export const STEMPEL_AUGE = { r: 0.48, y: -1.66 };
+/** Anschläge der Schalen (rad): 20° geschlossen, 85° offen. */
+export const ZU = (20 * Math.PI) / 180;
+export const OFFEN = (85 * Math.PI) / 180;
+/** Obere Schalenanbindung — wo der Zylinder angreift, im Frame des Drehpunkts. */
+export const OBERE_ANBINDUNG = { y: 0.06, z: 0.3 };
+/** Oberer Zylinderanschluss an der Mitteltraverse, im Frame des Greifers. */
+export const ZYLINDER_AUFNAHME = { r: 0.18, y: -0.8 };
 
 /** Schwenkwinkel zu einem Öffnungsgrad 0 (zu) … 1 (offen). */
 export function schwenkFuer(oeffnung: number): number {
@@ -135,18 +128,35 @@ export function schwenkFuer(oeffnung: number): number {
   return ZU + (OFFEN - ZU) * t;
 }
 
+/**
+ * Stützstellen der Schale im Frame ihres Drehpunkts.
+ *
+ * Station 0 ist das obere Ende, `SCHALEN_ABSCHNITTE` die Spitze. Der Ursprung
+ * liegt am unteren Gelenk — dort, wo die Schale am Stempel hängt.
+ */
+export function schalenStationen(): Array<{ y: number; z: number; th: number }> {
+  const roh: Array<{ y: number; z: number; th: number }> = [];
+  let y = 0;
+  let z = 0;
+  for (let i = 0; i <= SCHALEN_ABSCHNITTE; i++) {
+    roh.push({ y, z, th: i * SCHALEN_BOGEN });
+    y -= ABSCHNITT * Math.cos(i * SCHALEN_BOGEN);
+    z -= ABSCHNITT * Math.sin(i * SCHALEN_BOGEN);
+  }
+  const st = roh[DREHPUNKT.station]!;
+  const px = st.y - DREHPUNKT.versatz * Math.sin(st.th);
+  const pz = st.z - DREHPUNKT.versatz * Math.cos(st.th);
+  return roh.map((r) => ({ y: r.y - px, z: r.z - pz, th: r.th }));
+}
+
 /** Mittellinie einer Schale im Frame des Greifers, bei gegebenem Schwenk. */
 export function mittellinie(schwenk: number): Array<{ r: number; y: number }> {
-  const out = [{ r: BOLZENKREIS, y: BOLZEN_Y }];
-  let r = BOLZENKREIS;
-  let y = BOLZEN_Y;
-  for (let i = 0; i < SCHALEN_ABSCHNITTE; i++) {
-    const th = i * SCHALEN_BOGEN - schwenk;
-    y -= ABSCHNITT * Math.cos(th);
-    r -= ABSCHNITT * Math.sin(th);
-    out.push({ r, y });
-  }
-  return out;
+  const c = Math.cos(-schwenk);
+  const sn = Math.sin(-schwenk);
+  return schalenStationen().map((p) => ({
+    r: STEMPEL_AUGE.r + (p.y * sn + p.z * c),
+    y: STEMPEL_AUGE.y + (p.y * c - p.z * sn),
+  }));
 }
 
 /* ------------------------------------------------------------------ Stoffe */
@@ -292,24 +302,11 @@ export function gabel(
   return g;
 }
 
-/** Stützstellen der Schalenkrümmung, im Frame des Lagerauges. */
-export function schalenStationen(): Array<{ y: number; z: number; th: number }> {
-  const out: Array<{ y: number; z: number; th: number }> = [];
-  let y = 0;
-  let z = 0;
-  for (let i = 0; i <= SCHALEN_ABSCHNITTE; i++) {
-    out.push({ y, z, th: i * SCHALEN_BOGEN });
-    y -= ABSCHNITT * Math.cos(i * SCHALEN_BOGEN);
-    z -= ABSCHNITT * Math.sin(i * SCHALEN_BOGEN);
-  }
-  return out;
-}
-
 /**
  * Strang mit Rechteckquerschnitt entlang einer Stationsfolge.
  *
- * Für alles, was der Schalenkrümmung folgt: Seitenwangen, Verstärkungen,
- * Schutzbleche. `versatz` misst von der Mittellinie nach außen.
+ * Fuer alles, was der Schalenkruemmung folgt: Seitenwangen, Verstaerkungen.
+ * `versatz` misst von der Mittellinie nach aussen.
  */
 export function strang(
   stationen: Array<{ y: number; z: number; th: number }>,
@@ -497,72 +494,91 @@ export function baueDrehwerksgehaeuse(st: Stoffe): THREE.Group {
 /* ------------------------------------------------------ 04 Mitteltraverse */
 
 /**
- * Mitteltraverse — Ø 0,70 × 0,45 m, die zentrale Baugruppe.
+ * Mitteltraverse — 0,75 × 0,55 × 0,40 m, die zentrale Baugruppe.
  *
- * Das Teil, an dem alles andere hängt: oben der Flansch zum Drehwerk, am
- * oberen Rand fünf Gabeln für die Zylinder, am unteren Rand fünf Gabeln für
- * die Schalen, unten mittig der Gusskegel, um den sich die Schalen schließen.
- *
- * Ø 700 mm ist der wichtigste Einzelwert der ganzen Tabelle. Das bisherige
- * Modell hatte hier 1514 mm — mehr als das Doppelte —, weil die Zahl aus einem
- * Datenblatt einer anderen Baugröße stammte. Der Bolzenkreis der Schalen hängt
- * unmittelbar daran, und damit die ganze Kinematik.
- *
- * Einen freischwebenden Gelenkring gibt es nicht: Der Kreis ist das, was die
- * fünf Gabeln beschreiben.
+ * Oben der Flansch zum Drehwerk, rundum fünf Gabeln für die oberen
+ * Zylinderanschlüsse. Die Schalen hängen NICHT hier — das war mein Fehler bis
+ * zur zweiten Fassung der Zeichnung. Sie hängen am Stempel (Position 9); die
+ * Traverse trägt nur die Zylinder und den Stempel selbst.
  */
 export function baueMitteltraverse(st: Stoffe): THREE.Group {
   const g = new THREE.Group();
   g.name = "04_MITTELTRAVERSE";
   const M = MASS.traverse;
-  const R = M.durchmesser / 2;
+  const R = M.breite / 2;
   const koerper = new THREE.Mesh(
-    new THREE.CylinderGeometry(R, R * 0.82, M.hoehe * 0.72, 10),
+    new THREE.CylinderGeometry(R, R * 0.86, M.hoehe * 0.75, 10),
     st.guss
   );
   koerper.name = "04_GRUNDKOERPER";
   koerper.rotation.y = Math.PI / 10;
   g.add(koerper);
-  const flansch = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.6, R * 0.6, 0.05, 16), st.guss);
+  const flansch = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.62, R * 0.62, 0.05, 16), st.guss);
   flansch.name = "04_OBERFLANSCH";
-  flansch.position.y = M.hoehe * 0.36 + 0.02;
+  flansch.position.y = M.hoehe * 0.38;
   g.add(flansch);
   for (let i = 0; i < 10; i++) {
     const a = (i / 10) * Math.PI * 2;
     const sitz = new THREE.Mesh(rohr(0.024, 0.013, 0.06), st.blech);
     sitz.rotation.z = Math.PI / 2;
-    sitz.position.set(Math.sin(a) * R * 0.48, M.hoehe * 0.36 + 0.02, Math.cos(a) * R * 0.48);
+    sitz.position.set(Math.sin(a) * R * 0.5, M.hoehe * 0.38, Math.cos(a) * R * 0.5);
     g.add(sitz);
   }
-  // Gusskegel unten — der Kern, um den sich die Schalen schliessen
-  const kegel = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.5, R * 0.2, 0.16, 10), st.guss);
-  kegel.name = "04_KEGEL";
-  kegel.position.y = -M.hoehe * 0.36 - 0.06;
-  g.add(kegel);
-
+  // Fuenf Gabeln fuer die oberen Zylinderanschluesse
   for (let i = 0; i < MASS.schalen; i++) {
     const a = (i / MASS.schalen) * Math.PI * 2;
     const nr = String(i + 1).padStart(2, "0");
-    /*
-     * Zylinderaufnahme: Ausleger von der Schulter der Traverse nach oben und
-     * aussen, oben die Gabel. Ihre Lage ist gerechnet (`ZYLINDER_AUFNAHME`) —
-     * der Zylinder braucht dort oben Platz, sonst steht er quer.
-     */
-    const oben = gabel(st, 0.1, 0.07, 0.036, 0.14, 0.04);
-    oben.name = `04_ZYLINDERAUFNAHME_${nr}`;
-    oben.position.set(
+    const gabelTeil = gabel(st, 0.1, 0.07, 0.036, 0.16, 0.04);
+    gabelTeil.name = `04_ZYLINDERAUFNAHME_${nr}`;
+    gabelTeil.position.set(
       Math.sin(a) * ZYLINDER_AUFNAHME.r,
-      ZYLINDER_AUFNAHME.y - LAGE_TRAVERSE,
+      -M.hoehe * 0.34,
       Math.cos(a) * ZYLINDER_AUFNAHME.r
     );
-    oben.rotation.y = a;
-    g.add(oben);
-    // Schalengabel am unteren Rand — ihre Augen bilden den Bolzenkreis
-    const unten = gabel(st, 0.17, 0.085, 0.042, 0.18, 0.05);
-    unten.name = `04_SCHALENAUFNAHME_${nr}`;
-    unten.position.set(Math.sin(a) * R * 0.9, -M.hoehe * 0.3, Math.cos(a) * R * 0.9);
-    unten.rotation.y = a;
-    g.add(unten);
+    gabelTeil.rotation.y = a;
+    g.add(gabelTeil);
+  }
+  return g;
+}
+
+/* ------------------------------------- 09 Zentrale untere Gelenkeinheit */
+
+/**
+ * Stempel — die zentrale untere Gelenk- und Führungseinheit, 0,60 × 0,50 × 0,35 m.
+ *
+ * Position 9 der Zeichnung, und das Bauteil, das mir gefehlt hat. An ihm hängen
+ * alle fünf Schalen: Jede hat unten ihre eigene Gabel („untere Schalenanbindung",
+ * Position 10). Nach unten läuft er in einen Kegel aus — das ist die halbe
+ * Abrissbirne, die geschlossen zwischen den Schalen herausschaut.
+ *
+ * Der Stempel hängt über eine Säule an der Mitteltraverse; die Säule ist das,
+ * was auf der Zeichnung zwischen Traverse und Gelenkeinheit zu sehen ist.
+ */
+export function baueStempel(st: Stoffe): THREE.Group {
+  const g = new THREE.Group();
+  g.name = "09_STEMPEL";
+  const M = MASS.stempel;
+  const R = M.breite / 2;
+  const saeule = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 0.34, 8), st.guss);
+  saeule.name = "09_SAEULE";
+  saeule.position.y = M.hoehe * 0.5 + 0.17;
+  g.add(saeule);
+  const koerper = new THREE.Mesh(new THREE.CylinderGeometry(R, R * 0.9, M.hoehe, 10), st.guss);
+  koerper.name = "09_KOERPER";
+  koerper.rotation.y = Math.PI / 10;
+  g.add(koerper);
+  const kegel = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.85, R * 0.18, 0.26, 10), st.guss);
+  kegel.name = "09_KEGEL";
+  kegel.position.y = -M.hoehe * 0.5 - 0.13;
+  g.add(kegel);
+  for (let i = 0; i < MASS.schalen; i++) {
+    const a = (i / MASS.schalen) * Math.PI * 2;
+    const nr = String(i + 1).padStart(2, "0");
+    const anbindung = gabel(st, 0.3, 0.095, 0.045, 0.18, 0.045);
+    anbindung.name = `10_SCHALENANBINDUNG_${nr}`;
+    anbindung.position.set(Math.sin(a) * R * 0.95, 0, Math.cos(a) * R * 0.95);
+    anbindung.rotation.y = a;
+    g.add(anbindung);
   }
   return g;
 }
@@ -777,18 +793,21 @@ export function baueGreiferschale(st: Stoffe): THREE.Group {
    * breit — und griff damit in den Sektor der Nachbarin. Die Pruefung hat es
    * bei drei Vierteln geoeffnet gefangen, mit 43° von 36°.
    */
-  const kasten = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.13, 0.2), st.guss);
-  kasten.name = "06_LAGERKASTEN";
-  kasten.position.set(0, 0.01, 0.05);
+  /*
+   * Untere Schalenanbindung — der Drehpunkt am Stempel (Position 10). Er liegt
+   * im Ursprung der Schale, denn genau darum dreht sie sich.
+   */
+  const kasten = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.16, 0.18), st.guss);
+  kasten.name = "06_UNTERE_ANBINDUNG";
+  kasten.position.set(0, 0.02, -0.02);
   g.add(kasten);
+  const unteresAuge = new THREE.Mesh(rohr(0.085, 0.042, 0.26), st.guss);
+  unteresAuge.name = "06_UNTERES_AUGE";
+  g.add(unteresAuge);
   for (const seite of [-1, 1]) {
-    const auge = new THREE.Mesh(rohr(0.075, 0.038, 0.07), st.guss);
-    auge.name = `06_LAGERAUGE_${seite < 0 ? "L" : "R"}`;
-    auge.position.set(seite * 0.14, 0, 0);
-    g.add(auge);
-    const n = naht(0.14);
+    const n = naht(0.13);
     n.rotation.z = Math.PI / 2;
-    n.position.set(seite * 0.1, 0, 0.02);
+    n.position.set(seite * 0.09, 0.04, -0.04);
     g.add(n);
   }
 
@@ -798,17 +817,21 @@ export function baueGreiferschale(st: Stoffe): THREE.Group {
    * Ihre Lage ist gerechnet, nicht gegriffen: `ANLENKPUNKT` kommt aus der
    * Abtastung der ganzen Kinematik.
    */
-  const konsole = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.1, 0.22), st.guss);
-  konsole.name = "06_KONSOLE";
-  konsole.position.set(0, ANLENKPUNKT.y + 0.01, ANLENKPUNKT.z * 0.5);
+  /*
+   * Obere Schalenanbindung — hier greift die Kolbenstange an (Position 6 der
+   * Zeichnung, orange markiert). Sie sitzt aussen am oberen Ende der Schale.
+   */
+  const konsole = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.18, 0.14), st.guss);
+  konsole.name = "06_OBERE_ANBINDUNG";
+  konsole.position.set(0, OBERE_ANBINDUNG.y + 0.02, OBERE_ANBINDUNG.z * 0.75);
   g.add(konsole);
-  const anlenkauge = new THREE.Mesh(rohr(0.055, 0.03, 0.11), st.guss);
-  anlenkauge.name = "06_ANLENKAUGE";
-  anlenkauge.position.set(0, ANLENKPUNKT.y, ANLENKPUNKT.z);
-  g.add(anlenkauge);
-  const nk = naht(0.14);
+  const oberesAuge = new THREE.Mesh(rohr(0.055, 0.03, 0.11), st.guss);
+  oberesAuge.name = "06_OBERES_AUGE";
+  oberesAuge.position.set(0, OBERE_ANBINDUNG.y, OBERE_ANBINDUNG.z);
+  g.add(oberesAuge);
+  const nk = naht(0.12);
   nk.rotation.z = Math.PI / 2;
-  nk.position.set(0, 0.02, 0.12);
+  nk.position.set(0, OBERE_ANBINDUNG.y - 0.08, OBERE_ANBINDUNG.z * 0.6);
   g.add(nk);
 
   return g;
@@ -859,106 +882,16 @@ export function baueGreiferspitze(st: Stoffe): THREE.Group {
   return g;
 }
 
-/* ------------------------------------------------ 08 Zylinderschutzblech */
-
-/**
- * Zylinderschutzblech — 0,50 × 0,18 × 0,10 m, fünfmal.
+/*
+ * Weggelassen, auf Ansage vom 13.09.2026:
  *
- * Die gekantete Haube über jedem Zylinder. Auf der Zeichnung liegen die fünf
- * als eigene Position daneben; sie halten Schrott von Rohr und Kolbenstange
- * fern. Dieses Teil fehlte im ersten Anlauf vollständig.
+ *   - Hydraulikleitungen und Verbindungsschläuche („kannst weglassen").
+ *   - Zylinderschutzbleche. Sie liegen ZWISCHEN den Zylindern, nicht davor —
+ *     und weil ich sie zweimal falsch herum gebaut habe, bleiben sie erst mal
+ *     draußen („im Zweifel weglassen").
+ *   - Schalenverstärkung. Sie steht in der zweiten Fassung der Zeichnung nicht
+ *     mehr in der Positionsliste.
  */
-export function baueZylinderschutzblech(st: Stoffe): THREE.Group {
-  const g = new THREE.Group();
-  g.name = "08_ZYLINDERSCHUTZBLECH";
-  const M = MASS.schutzblech;
-  const ruecken = new THREE.Mesh(new THREE.BoxGeometry(M.breite, M.laenge, 0.02), st.blech);
-  ruecken.position.z = M.hoehe / 2;
-  g.add(ruecken);
-  for (const seite of [-1, 1]) {
-    const flanke = new THREE.Mesh(new THREE.BoxGeometry(0.02, M.laenge, M.hoehe), st.blech);
-    flanke.position.set((seite * M.breite) / 2, 0, 0);
-    g.add(flanke);
-    const n = naht(M.laenge);
-    n.position.set((seite * M.breite) / 2, 0, M.hoehe / 2 - 0.012);
-    g.add(n);
-  }
-  // Anschraublaschen oben und unten
-  for (const y of [-M.laenge / 2 + 0.03, M.laenge / 2 - 0.03]) {
-    const lasche = new THREE.Mesh(new THREE.BoxGeometry(M.breite * 0.7, 0.035, 0.07), st.blech);
-    lasche.position.set(0, y, -M.hoehe * 0.2);
-    g.add(lasche);
-  }
-  return g;
-}
-
-/* ------------------------------------------------- 09 Hydraulikleitungen */
-
-/**
- * Hydraulikleitung — Schlauch mit Verschraubungen an beiden Enden.
- *
- * Auf der Zeichnung ein Satz gebogener Schläuche mit Sechskant-Verschraubung
- * und Winkelstück. Genau das macht sie als Schlauch erkennbar und nicht als
- * Rohr.
- */
-export function baueHydraulikleitung(st: Stoffe, laenge = 0.8): THREE.Group {
-  const g = new THREE.Group();
-  g.name = "09_HYDRAULIKLEITUNG";
-  const kurve = new THREE.CubicBezierCurve3(
-    new THREE.Vector3(0, 0, 0),
-    new THREE.Vector3(laenge * 0.3, -laenge * 0.24, 0),
-    new THREE.Vector3(laenge * 0.7, -laenge * 0.3, 0),
-    new THREE.Vector3(laenge, -laenge * 0.05, 0)
-  );
-  const schlauch = new THREE.Mesh(new THREE.TubeGeometry(kurve, 14, 0.019, 8, false), st.gummi);
-  g.add(schlauch);
-  for (const t of [0, 1]) {
-    const punkt = kurve.getPoint(t);
-    const richtung = kurve.getTangent(t);
-    const mutter = new THREE.Mesh(new THREE.CylinderGeometry(0.031, 0.031, 0.06, 6), st.bolzen);
-    mutter.position.copy(punkt).addScaledVector(richtung, t === 0 ? 0.04 : -0.04);
-    mutter.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), richtung);
-    g.add(mutter);
-  }
-  return g;
-}
-
-/* ------------------------------------------------- 10 Schalenverstärkung */
-
-/**
- * Schalenverstärkung — 0,40 × 0,15 × 0,08 m, fünfmal.
- *
- * Das Verstärkungsblech auf dem Rücken der Schale, dort wo sie sich in den
- * Haufen wühlt. Es folgt der Krümmung und ist geschraubt, damit man es
- * wechseln kann. Zweite Position, die im ersten Anlauf fehlte.
- */
-export function baueSchalenverstaerkung(st: Stoffe): THREE.Group {
-  const g = new THREE.Group();
-  g.name = "10_SCHALENVERSTAERKUNG";
-  const M = MASS.verstaerkung;
-  const stationen = schalenStationen();
-  const abschnitte = Math.max(2, Math.round((M.laenge / MASS.schale.laenge) * SCHALEN_ABSCHNITTE) + 1);
-  const teil = stationen.slice(1, 1 + abschnitte);
-  const blech = new THREE.Mesh(
-    strang(teil, 0, M.breite, M.hoehe * 0.45, MASS.schale.tiefe * 0.4),
-    st.guss
-  );
-  blech.name = "10_BLECH";
-  g.add(blech);
-  for (const k of [0, teil.length - 1]) {
-    const s0 = teil[k]!;
-    const versatz = MASS.schale.tiefe * 0.4 + M.hoehe * 0.45;
-    const schraube = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.05, 6), st.bolzen);
-    schraube.position.set(
-      0,
-      s0.y + versatz * Math.sin(s0.th),
-      s0.z + versatz * Math.cos(s0.th)
-    );
-    schraube.rotation.x = -s0.th + Math.PI / 2;
-    g.add(schraube);
-  }
-  return g;
-}
 
 /* ------------------------------------------------------------- Übersicht */
 
@@ -971,14 +904,12 @@ export function einzelteile(st: Stoffe = stoffe()): Array<{
   nahtStoff(st);
   return [
     { name: "01  Aufhaengung / Adapter", anzahl: 1, teil: baueAufhaengung(st) },
-    { name: "02  Rotator (Drehwerk)", anzahl: 1, teil: baueRotator(st) },
+    { name: "02  Rotator / Drehwerk", anzahl: 1, teil: baueRotator(st) },
     { name: "03  Drehwerksgehaeuse", anzahl: 1, teil: baueDrehwerksgehaeuse(st) },
     { name: "04  Mitteltraverse", anzahl: 1, teil: baueMitteltraverse(st) },
     { name: "05  Hydraulikzylinder", anzahl: 5, teil: baueZylinder(st).gruppe },
     { name: "06  Greiferschale (HO)", anzahl: 5, teil: baueGreiferschale(st) },
     { name: "07  Greiferspitze", anzahl: 5, teil: baueGreiferspitze(st) },
-    { name: "08  Zylinderschutzblech", anzahl: 5, teil: baueZylinderschutzblech(st) },
-    { name: "09  Hydraulikleitung", anzahl: 1, teil: baueHydraulikleitung(st) },
-    { name: "10  Schalenverstaerkung", anzahl: 5, teil: baueSchalenverstaerkung(st) },
+    { name: "09  Zentrale untere Einheit", anzahl: 1, teil: baueStempel(st) },
   ];
 }

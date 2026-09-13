@@ -22,7 +22,7 @@ function greiferIn(oeffnung: number): THREE.Object3D {
 
 const VORN = new THREE.Vector3(0, 0, 1);
 const felder: Feld[] = [
-  { name: "geschlossen", obj: greiferIn(0), blick: VORN, notiz: "Kopf 0,70 m · Bauch 1,38 m" },
+  { name: "geschlossen", obj: greiferIn(0), blick: VORN },
   { name: "halb", obj: greiferIn(0.5), blick: VORN },
   { name: "offen", obj: greiferIn(1), blick: VORN },
 ];
@@ -50,7 +50,7 @@ writeFileSync(
     breite,
     hoehe,
     "5-Schalen-Mehrschalengreifer — Silhouette von vorn",
-    `Glockenform: oben Mitteltraverse Ø ${komma(MASS.traverse.durchmesser)} m, ` +
+    `Birnenform: Drehpunkte am Stempel, unten schaut er heraus · ` +
       `unten Schalenbauch Ø ${komma(zu.breite)} m · ` +
       `offen Ø ${komma(auf.breite)} m · ` +
       "die ganze Anlenkung bleibt im Schatten der Traverse",

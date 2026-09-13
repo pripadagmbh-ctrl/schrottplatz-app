@@ -14,6 +14,7 @@ import {
   MASS,
   baueGreiferschale,
   baueMitteltraverse,
+  baueStempel,
   einzelteile,
   stoffe,
 } from "../src/grapple/teile";
@@ -48,8 +49,8 @@ const st = stoffe();
 const details: Feld[] = [
   { name: "Detail 06 — von innen", obj: baueGreiferschale(st), blick: new THREE.Vector3(0, 0.05, -1) },
   { name: "Detail 06 — von der Seite", obj: baueGreiferschale(st), blick: new THREE.Vector3(1, 0.12, 0.1) },
-  { name: "Detail 04 — von vorn", obj: baueMitteltraverse(st), blick: BLICK_VORN },
-  { name: "Detail 04 — von unten", obj: baueMitteltraverse(st), blick: new THREE.Vector3(0.25, -1, 0.25) },
+  { name: "Detail 09 — Stempel", obj: baueStempel(st), blick: BLICK_VORN },
+  { name: "Detail 09 — von unten", obj: baueStempel(st), blick: new THREE.Vector3(0.25, -1, 0.25) },
 ];
 
 let inhalt2 = "";
@@ -77,7 +78,7 @@ writeFileSync(
     hoehe,
     "5-Schalen-Mehrschalengreifer, 1.200 Liter — Einzelteile",
     `${teile.length} Positionen nach der Explosionszeichnung · ` +
-      `Mitteltraverse Ø ${komma(MASS.traverse.durchmesser)} m · ` +
+      `Mitteltraverse ${komma(MASS.traverse.breite)} m · Stempel ${komma(MASS.stempel.breite)} m · ` +
       `Schale ${komma(MASS.schale.laenge)} × ${komma(MASS.schale.breite)} × ` +
       `${komma(MASS.schale.tiefe)} m · ` +
       `Gesamt geschlossen ${komma(MASS.gesamt.hoehe)} × ${komma(MASS.gesamt.breite)} m · ` +

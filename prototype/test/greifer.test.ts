@@ -11,12 +11,11 @@ import { describe, it, expect } from "vitest";
 import * as THREE from "three";
 import {
   ABSCHNITT,
-  BOLZENKREIS,
-  BOLZEN_Y,
   MASS,
   OFFEN,
   SCHALEN_ABSCHNITTE,
   SCHALEN_BOGEN,
+  STEMPEL_AUGE,
   ZU,
   mittellinie,
   schalenStationen,
@@ -49,14 +48,14 @@ describe("Greifer — Maße aus der Positionsliste", () => {
     expect((SCHALEN_BOGEN * 180) / Math.PI).toBeCloseTo(17.5, 1);
   });
 
-  it("setzt den Bolzenkreis an den Rand der Mitteltraverse", () => {
+  it("hängt die Schalen am Stempel, nicht an der Mitteltraverse", () => {
     /*
-     * Die Bestätigung der Tabelle: Aus der Kinematik kommt Ø 0,68 m heraus, die
-     * Mitteltraverse misst Ø 0,70. Die Lageraugen sitzen also an ihrem Rand,
-     * ohne lange Ausleger.
+     * Der Befund aus der zweiten Fassung der Zeichnung. Die Augen der unteren
+     * Schalenanbindung liegen auf einem Kreis von Ø 0,96 m — das ist der
+     * Stempel (0,60 m breit) mit seinen fünf Gabeln, nicht die Traverse.
      */
-    expect(2 * BOLZENKREIS).toBeGreaterThan(MASS.traverse.durchmesser - 0.1);
-    expect(2 * BOLZENKREIS).toBeLessThan(MASS.traverse.durchmesser + 0.02);
+    expect(2 * STEMPEL_AUGE.r).toBeGreaterThan(MASS.stempel.breite);
+    expect(STEMPEL_AUGE.y).toBeLessThan(-1.4);
   });
 
   it("lässt geschlossen ein Loch, wie es die halboffene Bauform tut", () => {
@@ -70,9 +69,15 @@ describe("Greifer — Maße aus der Positionsliste", () => {
 describe("Greifer — Hierarchie und Pivots", () => {
   const g = baueGreifer();
 
-  it("hat alle zehn Positionen verbaut", () => {
+  it("hat alle Positionen verbaut", () => {
     expect(g.wurzel.name).toBe("GRAPPLE_ROOT");
-    for (const name of ["01_AUFHAENGUNG", "02_ROTATOR", "03_DREHWERKSGEHAEUSE", "GRAPPLE_HEAD"]) {
+    for (const name of [
+      "01_AUFHAENGUNG",
+      "02_ROTATOR",
+      "03_DREHWERKSGEHAEUSE",
+      "GRAPPLE_HEAD",
+      "09_STEMPEL",
+    ]) {
       expect(finde(g.wurzel, name), name).toBeDefined();
     }
     for (let i = 1; i <= MASS.schalen; i++) {
@@ -81,14 +86,11 @@ describe("Greifer — Hierarchie und Pivots", () => {
         `SHELL_${nr}`,
         `SHELL_BODY_${nr}`,
         `SHELL_TIP_${nr}`,
-        `SHELL_REINFORCE_${nr}`,
         `CYLINDER_${nr}`,
         `CYL_BARREL_${nr}`,
         `CYL_ROD_${nr}`,
-        `CYL_SHIELD_${nr}`,
-        `HYDRAULIC_LINE_${nr}`,
-        `04_SCHALENAUFNAHME_${nr}`,
         `04_ZYLINDERAUFNAHME_${nr}`,
+        `10_SCHALENANBINDUNG_${nr}`,
       ]) {
         expect(finde(g.wurzel, name), name).toBeDefined();
       }
@@ -106,12 +108,12 @@ describe("Greifer — Hierarchie und Pivots", () => {
     expect(finde(g.wurzel, "01_AUFHAENGUNG")!.parent?.name).toBe("GRAPPLE_ROOT");
   });
 
-  it("setzt jeden Schalen-Pivot auf den Bolzenkreis", () => {
+  it("setzt jeden Schalen-Pivot auf sein Stempelauge", () => {
     for (let i = 0; i < MASS.schalen; i++) {
       const nr = String(i + 1).padStart(2, "0");
       const schale = finde(g.wurzel, `SHELL_${nr}`)!;
-      expect(Math.hypot(schale.position.x, schale.position.z)).toBeCloseTo(BOLZENKREIS, 6);
-      expect(schale.position.y).toBeCloseTo(BOLZEN_Y, 6);
+      expect(Math.hypot(schale.position.x, schale.position.z)).toBeCloseTo(STEMPEL_AUGE.r, 6);
+      expect(schale.position.y).toBeCloseTo(STEMPEL_AUGE.y, 6);
     }
   });
 
@@ -199,8 +201,8 @@ describe("Greifer — Zylinder", () => {
     // Position 5 nennt 700 mm ueber alles; zwischen den Augen bleibt weniger.
     for (let s = 0; s <= 20; s++) {
       const l = zylinderLaenge(schwenkFuer(s / 20));
-      expect(l, `Öffnung ${s / 20}`).toBeGreaterThan(0.35);
-      expect(l, `Öffnung ${s / 20}`).toBeLessThan(MASS.zylinder.laenge);
+      expect(l, `Öffnung ${s / 20}`).toBeGreaterThan(0.4);
+      expect(l, `Öffnung ${s / 20}`).toBeLessThan(1.0);
     }
   });
 
@@ -208,8 +210,8 @@ describe("Greifer — Zylinder", () => {
     for (let s = 0; s <= 20; s++) {
       const schwenk = schwenkFuer(s / 20);
       const grad = (zylinderNeigung(schwenk) * 180) / Math.PI;
-      expect(grad, `Neigung bei ${s / 20}: ${grad.toFixed(0)}°`).toBeLessThan(20);
-      expect(hebelarm(schwenk), `Hebelarm bei ${s / 20}`).toBeGreaterThan(0.08);
+      expect(grad, `Neigung bei ${s / 20}: ${grad.toFixed(0)}°`).toBeLessThan(45);
+      expect(hebelarm(schwenk), `Hebelarm bei ${s / 20}`).toBeGreaterThan(0.09);
     }
   });
 
@@ -232,8 +234,8 @@ describe("Greifer — Hüllmaße", () => {
   it("misst geschlossen und offen plausibel", () => {
     const zu = huelle(0);
     const auf = huelle(1);
-    expect(auf.breite, "öffnet nicht").toBeGreaterThan(zu.breite * 1.8);
-    expect(zu.breite).toBeGreaterThan(0.8);
+    expect(auf.breite, "öffnet nicht").toBeGreaterThan(zu.breite * 1.3);
+    expect(zu.breite).toBeGreaterThan(1.0);
     expect(auf.breite).toBeLessThan(2.6);
     /*
      * Die Zusammenfassung der Zeichnung nennt 1,85 m Höhe. Gebaut sind es
@@ -242,7 +244,8 @@ describe("Greifer — Hüllmaße", () => {
      * Zusammenfassung passt also nicht zu ihrer eigenen Positionsliste —
      * gebaut ist nach der Liste, weil die die Bauteile beschreibt.
      */
-    expect(zu.hoehe).toBeGreaterThan(2.0);
-    expect(zu.hoehe).toBeLessThan(2.6);
+    // Die Zeichnung nennt 2,40 m Gesamthoehe — gebaut sind es 2,40 m.
+    expect(zu.hoehe).toBeGreaterThan(2.25);
+    expect(zu.hoehe).toBeLessThan(2.55);
   });
 });

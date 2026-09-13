@@ -56,9 +56,9 @@ writeFileSync(
     breite,
     hoehe,
     "5-Schalen-Mehrschalengreifer, 1.200 Liter — Zusammenbau",
-    `Bolzenkreis Ø 0,68 m am Rand der Mitteltraverse (Ø ${komma(MASS.traverse.durchmesser)} m) · ` +
+    `Schalen drehen am Stempel (Position 9), Zylinder von der Mitteltraverse · ` +
       `geschlossen Ø ${komma(zu.breite)} m · offen Ø ${komma(auf.breite)} m · ` +
-      `Schalen 31° bis 58° · alle Maße aus der Positionsliste`,
+      `Schalen 20° bis 85° · alle Maße aus der Positionsliste`,
     inhalt2
   )
 );
