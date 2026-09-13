@@ -247,6 +247,64 @@ export const TIP_OUT: Array<[number, number]> = [
   [GATE_X, 40],
 ];
 
+/* --------------------------------------------------- Sortenrein: Ostmulden */
+
+/**
+ * Wer sortenrein anliefert, kippt in die Mulde seiner Fraktion an der Ostwand.
+ *
+ * Ansage 13.09.2026: „sortenreine Kipper sollen direkt in den Mulden auf der
+ * Ostseite rechts kippen, nicht bei mir." Vorher ging jede Fuhre auf den
+ * Mischschrott vor dem Bagger — auch die sauber getrennte, die dort nur wieder
+ * auseinandersortiert werden musste.
+ *
+ * Die Gasse liegt auf x −26: oestlich der Mulden (deren Oeffnung bei −32,3
+ * steht), westlich vom Betriebsgebaeude (ab −30,4) und noerdlich des
+ * Reifendepots (x −28 .. −20, z −28,5 .. −21,5). Alle vier LKW-Mulden liegen
+ * bei z ≥ −12,8, also nordlich davon.
+ */
+/** Gassenmitte, auf der die Anlieferer an der Muldenreihe entlangfahren. */
+export const MULDEN_GASSE_X = -26;
+/**
+ * Wie weit der Wagen in die Mulde zurueckstoesst (Wagenmitte, x).
+ *
+ * Gesucht, nicht gegriffen. Nach hinten begrenzt ihn die Stirnwand: Sie steht
+ * bei x −38,0 ± 0,35, das Heck liegt 3,0 m hinter der Wagenmitte, also ist bei
+ * −34,45 Schluss. Nach vorn begrenzt ihn die Ladung: Steht er weiter draussen,
+ * faellt beim Kippen ein Teil der Fuhre neben die Mulde.
+ *
+ * −34,3 legt die Ladeflaeche von −37,3 bis −31,3, und die Mulde reicht von
+ * −38,0 bis −31,0 — die Flaeche steht also ganz darueber. Das gekippte
+ * Anziehen verteilt die Fuhre danach von der Stirnwand zur Oeffnung hin.
+ *
+ * Die Blockadepruefung laesst das zu: Sie tastet mit 1,40 m Radius, die
+ * Seitenwaende stehen 1,75 m von der Mittellinie entfernt, und bis zur
+ * Stirnwand bleiben 3,35 m.
+ */
+const MULDE_TIEFE_X = -34.3;
+
+export function bayApproach(z: number): Array<[number, number]> {
+  return [
+    [GATE_X, 24],
+    [MULDEN_GASSE_X, 16],
+    [MULDEN_GASSE_X, z],
+  ];
+}
+export function bayInRev(z: number): Array<[number, number]> {
+  return [
+    [MULDEN_GASSE_X, z],
+    [MULDE_TIEFE_X, z],
+  ];
+}
+export function bayOut(z: number): Array<[number, number]> {
+  return [
+    [MULDE_TIEFE_X, z],
+    [MULDEN_GASSE_X, z],
+    [MULDEN_GASSE_X, 16],
+    [GATE_X, 24],
+    [GATE_X, 40],
+  ];
+}
+
 /**
  * Warteplatz an der Innenseite der Nordwand, oestlich der Einfahrt: Nach dem
  * Abladen stellen sich vor allem die Händler dort ab und quatschen, bevor
@@ -292,6 +350,12 @@ export const WORK_ZONES: Array<[number, number, number]> = [
   [5, -12, 8],
   // Kippkante des Mischschrottplatzes — dorthin kippen die Kipper selbst ab
   [6, -18, 9],
+  /*
+   * Die Muldenreihe an der Ostwand samt Gasse. Dorthin kippt der sortenreine
+   * Kipper; was dort liegt, ist Ziel und nicht Hindernis. Ein Radius deckt
+   * die ganze Reihe ab: Sie laeuft von z +7,7 bis −28,7 auf x −34,5.
+   */
+  [-30, -10, 22],
 ];
 /** Nach so langer Blockade fährt der Fahrer vorsichtig weiter (kein Deadlock) */
 export const BLOCK_GIVEUP_S = 35;

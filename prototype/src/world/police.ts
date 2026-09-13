@@ -61,7 +61,12 @@ const RUNDE: Array<[number, number]> = [
   [-9, -4],
   [-16, -4],
   [-24, -6],
-  [-30, 2],
+  /*
+   * 13.09.2026 von x −30 auf −28,5 gerueckt: Die Muldenreihe an der Ostwand
+   * ist von 4,4 auf 7,0 m Tiefe gewachsen und reicht jetzt bis x −31,0. Mit
+   * 1,4 m Sicherheitsabstand fuhr der Streifenwagen 40 cm in die Mulde hinein.
+   */
+  [-28.5, 2],
   [-28, 12],
 ];
 
