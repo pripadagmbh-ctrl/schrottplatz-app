@@ -17,7 +17,7 @@ import {
   baueGreiferschale,
   baueGreiferspitze,
   schalenHalbbreite,
-  schalenStationen,
+  schalenEnde,
   stoffe,
 } from "../src/grapple/teile";
 import { dreiecke } from "./riss";
@@ -65,8 +65,7 @@ function schale(): THREE.Group {
   const st = stoffe();
   const g = new THREE.Group();
   g.add(baueGreiferschale(st));
-  const stationen = schalenStationen();
-  const ende = stationen[stationen.length - 1]!;
+  const ende = schalenEnde();
   const sp = baueGreiferspitze(st);
   sp.position.set(0, ende.y, ende.z);
   sp.rotation.x = ende.th;

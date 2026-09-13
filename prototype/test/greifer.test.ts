@@ -18,8 +18,10 @@ import {
   STEMPEL_AUGE,
   ZU,
   baueGreiferschale,
+  feineStationen,
   baueGreiferspitze,
   mittellinie,
+  schalenEnde,
   schalenHalbbreite,
   schalenStationen,
   schwenkFuer,
@@ -87,6 +89,55 @@ describe("Greifer — Form der Schale", () => {
       ).toBeLessThanOrEqual(schalenHalbbreite(k) + 1e-9);
     }
     expect(schalenHalbbreite(SCHALEN_ABSCHNITTE)).toBeLessThan(schalenHalbbreite(0) * 0.4);
+  });
+
+  it("ist nicht in sich verwunden", () => {
+    /*
+     * Ansage 13.09.2026: „stell dir 'n Blatt vor und das obere Ende würdest Du
+     * mit dem Uhrzeigersinn und das untere gegen den Uhrzeigersinn drehen.
+     * Dann wär das ja in sich verdreht. Und so sehen auch deine Zähne aus."
+     *
+     * Der Grund war die Glättung: Erst holte `getSpacedPoints` Punkte mit
+     * gleichem Bogenabstand — die liegen gerade nicht auf den Stützstellen —,
+     * und die Anstellung der Querschnitte kam aus dem Stationsindex statt aus
+     * der Tangente. Lage und Anstellung passten nirgends zusammen, und weil
+     * der Fehler die Schale entlangwanderte, sah sie verdreht aus. Gemessen
+     * drehte sich die Anstellung zwischen 2,84° und 8,75° je Teilschritt.
+     *
+     * Zwei Eigenschaften halten das fest: Die feinen Punkte müssen die
+     * Stationen exakt treffen, und der Knick je Teilschritt muss überall
+     * gleich sein. Ein gleichmäßiger Knick ist genau das Gegenteil einer
+     * Verwindung.
+     */
+    const je = 3;
+    const fein = feineStationen(je);
+    const grob = schalenStationen();
+    for (let j = 0; j <= SCHALEN_ABSCHNITTE; j++) {
+      const f = fein[j * je]!;
+      const g = grob[j]!;
+      expect(Math.hypot(f.y - g.y, f.z - g.z), `Station ${j} verfehlt`).toBeLessThan(1e-9);
+    }
+    const schritte = fein.slice(1).map((f, i) => f.th - fein[i]!.th);
+    const min = Math.min(...schritte);
+    const max = Math.max(...schritte);
+    expect(max - min, "die Anstellung dreht ungleichmäßig — das ist eine Verwindung")
+      .toBeLessThan(1e-9);
+    expect(min).toBeCloseTo(SCHALEN_BOGEN / je, 9);
+  });
+
+  it("setzt den Meißel bündig auf das Schalenende", () => {
+    /*
+     * `schalenStationen()[6].th` ist die Richtung der ABGEHENDEN Sehne, die
+     * wirkliche Tangente der Schale liegt eine halbe Sehne dahinter. Mit dem
+     * Stationswinkel sass der Meissel um 8,75° verkantet am Ende.
+     */
+    const fein = feineStationen();
+    const ende = fein[fein.length - 1]!;
+    expect(schalenEnde().th).toBeCloseTo(ende.th, 9);
+    expect(Math.abs(ende.th - schalenStationen()[SCHALEN_ABSCHNITTE]!.th)).toBeCloseTo(
+      SCHALEN_BOGEN / 2,
+      9
+    );
   });
 
   it("lässt die Greiferspitze nirgends über die Schale hinausstehen", () => {

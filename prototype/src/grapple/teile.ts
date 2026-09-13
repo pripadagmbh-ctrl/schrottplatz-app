@@ -216,19 +216,53 @@ export function schalenStationen(): Array<{ y: number; z: number; th: number }> 
 export function feineStationen(
   je = 3
 ): Array<{ y: number; z: number; th: number; k: number }> {
-  const grob = schalenStationen();
-  const kurve = new THREE.CatmullRomCurve3(
-    grob.map((p) => new THREE.Vector3(0, p.y, p.z)),
-    false,
-    "catmullrom",
-    0.5
-  );
+  /*
+   * Die sieben Stationen liegen auf einem EXAKTEN KREIS — gleiche Sehnen,
+   * gleicher Knick. Also braucht es keine Spline, sondern nur diesen Kreis.
+   *
+   * Der erste Versuch nahm eine Catmull-Rom-Kurve. Die traf die Stuetzstellen
+   * zwar, lief zwischen ihnen aber ungleichmaessig: gemessen 2,84° bis 8,75°
+   * Anstellungsaenderung je Teilschritt, wo 5,83° gleichmaessig sein muessten.
+   * Dieser wandernde Fehler ist genau die Verwindung, die im Bild zu sehen war
+   * — „stell dir 'n Blatt vor und das obere Ende wuerdest du mit dem
+   * Uhrzeigersinn und das untere gegen den Uhrzeigersinn drehen".
+   *
+   * Auf dem Kreis ist der Knick je Teilschritt konstant, und die Stuetzstellen
+   * werden exakt getroffen. Der Radius folgt aus Sehne und Knick:
+   * R = Sehne / (2 · sin(Knick/2)).
+   *
+   * `th` ist die WIRKLICHE Tangente. Sie liegt an Station j bei (j − ½)·Knick,
+   * denn eine Sehne zeigt in Richtung der Tangente in ihrer Mitte.
+   */
+  const R = ABSCHNITT / (2 * Math.sin(SCHALEN_BOGEN / 2));
+  const phi0 = -SCHALEN_BOGEN / 2;
+  // Nullpunkt der Schale im Frame ihres Drehpunkts — den bringt `schalenStationen` mit
+  const start = schalenStationen()[0]!;
   const n = SCHALEN_ABSCHNITTE * je;
-  const punkte = kurve.getSpacedPoints(n);
-  return punkte.map((v, i) => {
+  const aus: Array<{ y: number; z: number; th: number; k: number }> = [];
+  for (let i = 0; i <= n; i++) {
     const k = (i / n) * SCHALEN_ABSCHNITTE;
-    return { y: v.y, z: v.z, th: k * SCHALEN_BOGEN, k };
-  });
+    const phi = phi0 + k * SCHALEN_BOGEN;
+    aus.push({
+      y: start.y - R * (Math.sin(phi) - Math.sin(phi0)),
+      z: start.z + R * (Math.cos(phi) - Math.cos(phi0)),
+      th: phi,
+      k,
+    });
+  }
+  return aus;
+}
+
+/**
+ * Das Schalenende, wie es die gebaute Schale wirklich hat.
+ *
+ * Nicht dasselbe wie `schalenStationen()[6]`: Deren `th` ist die Richtung der
+ * ABGEHENDEN Sehne, die wirkliche Tangente der Schale liegt eine halbe Sehne
+ * dahinter. Der Meissel sass damit um 8,75° verkantet am Ende.
+ */
+export function schalenEnde(): { y: number; z: number; th: number } {
+  const f = feineStationen();
+  return f[f.length - 1]!;
 }
 
 /** Halbe Schalenbreite an einer Zwischenstation; zwischen den Stützstellen linear. */
