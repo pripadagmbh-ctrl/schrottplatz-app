@@ -8,6 +8,7 @@ import {
   slideAround,
 } from "../src/world/obstacles";
 import { OFFICE_X, OFFICE_Z, officeFootprints } from "../src/world/office";
+import { PRESS_CENTER } from "../src/world/press";
 import { WEIGH_X, WEIGH_Z } from "../src/world/yard";
 import {
   CLAW_OPEN_SPLAY,
@@ -75,7 +76,7 @@ describe("Feste Bauten", () => {
 
   it("führt die erwarteten Bauwerke", () => {
     const labels = STATIC_OBSTACLES.map((o) => o.label).join(" ");
-    for (const pflicht of ["Südwand", "Westwand", "Ostwand", "Schere"]) {
+    for (const pflicht of ["Südwand", "Westwand", "Ostwand", "Presse"]) {
       expect(labels, `${pflicht} fehlt in der Hindernisliste`).toContain(pflicht);
     }
   });
@@ -185,26 +186,42 @@ describe("Feste Bauten", () => {
     }
   });
 
-  it("der Mischschrottplatz ist nach Norden offen und sonst zu", () => {
-    // Dort setzt der Kipper zurueck. Die drei anderen Seiten muessen stehen,
-    // sonst rutscht der Berg heraus (Ansage 12.09.2026: Waende doppelt und hoch).
+  it("der Mischschrottplatz hat nur die Aussenmauer, sonst nichts", () => {
+    /*
+     * Ansage 13.09.2026: „die Abgrenzung, die du da neu gezogen hast, die
+     * gehoeren da eigentlich gar nicht hin bzw. koennen weg … die Presse
+     * kommt da hin und der Mischschrott liegt einfach nur daneben, ohne dass
+     * das irgendwie abgegrenzt wird."
+     *
+     * Damit faellt auch die Rueckwand zur Presse. Uebrig bleibt genau das,
+     * was am 12.09. schon die Regel war: „die natuerlichen Abgrenzungen vom
+     * Mischschrott soll eigentlich nur die Aussenwand sein und daneben der
+     * Bagger, anders braucht's eigentlich keine Abgrenzung."
+     */
     const h = CONFIGS.find((c) => c.id === "c_mixed")!;
     const [w, d] = h.size;
     expect(hitsObstacle(h.x, h.z, 0), "Innenraum frei").toBeNull();
     expect(hitsObstacle(h.x, h.z + d / 2 + 1.2, 0), "Vorderseite offen").toBeNull();
-    expect(hitsObstacle(h.x, h.z - d / 2 - 0.4, 0), "Rückwand sperrt").not.toBeNull();
     expect(hitsObstacle(h.x + w / 2 + 0.4, h.z, 0), "Aussenwand sperrt").not.toBeNull();
-    // Zur Maschine hin steht KEINE Wand (Ansage 12.09.2026): dort ist der
-    // Bagger selbst die Abgrenzung, und eine Wand waere nur im Weg.
-    // Vorn offen, hinten die halbe Trennwand (12.09.2026)
+    /*
+     * Die Probe liegt NEBEN der Presse, nicht in ihr: Die Presse steht selbst
+     * dort hinten und ist zu Recht ein Hindernis. Gesucht ist die Wand, die
+     * frueher ueber die ganze Breite lief — bei x 2,7 stand sie, die Presse
+     * beginnt erst bei 3,3.
+     */
     expect(
-      hitsObstacle(h.x - w / 2 - 0.4, h.z + d / 2 - 1, 0),
-      "Vordere Haelfte zum Bagger muss offen sein"
+      hitsObstacle(h.x - w / 2 + 0.5, h.z - d / 2 - 0.4, 0),
+      "zur Presse hin darf keine Wand mehr stehen"
     ).toBeNull();
-    expect(
-      hitsObstacle(h.x - w / 2 - 0.4, h.z - d / 4, 0),
-      "hintere Haelfte braucht die Trennwand"
-    ).not.toBeNull();
+    for (const [name, z] of [
+      ["vorn", h.z + d / 2 - 1],
+      ["hinten", h.z - d / 4],
+    ] as Array<[string, number]>) {
+      expect(
+        hitsObstacle(h.x - w / 2 - 0.4, z, 0),
+        `zur Stahlbox hin muss es ${name} offen sein`
+      ).toBeNull();
+    }
   });
 
   it("alles steht innerhalb der Platzgrenzen", () => {
@@ -284,12 +301,13 @@ describe("Reichweite des Baggers", () => {
     }
   });
 
-  it("erreicht die offene Seite der Schere", () => {
-    // Naechster Punkt der Kammer, nicht deren Mitte. Sie liegt seit dem
-    // Platzumbau direkt hinter dem Bagger an der Suedgrenze.
-    const presse = STATIC_OBSTACLES.find((o) => o.label === "Schere")!;
+  it("erreicht die offene Seite der Presse", () => {
+    // Naechster Punkt der Kammer, nicht deren Mitte. Sie steht seit dem
+    // Umbau vom 13.09.2026 in der Ecke, nicht mehr in der Sitzachse.
+    const presse = STATIC_OBSTACLES.find((o) => o.label === "Presse")!;
     const dz = Math.abs(presse.z + presse.hd - BAGGER_Z);
-    expect(Math.hypot(presse.x - BAGGER_X, dz)).toBeLessThan(REICHWEITE_M);
+    const dx = Math.max(0, Math.abs(presse.x - BAGGER_X) - presse.hw);
+    expect(Math.hypot(dx, dz)).toBeLessThan(REICHWEITE_M);
   });
 
   it("die Silos stehen in einer Flucht an der Ostwand", () => {
@@ -310,31 +328,52 @@ describe("Reichweite des Baggers", () => {
     expect(wand.top).toBeGreaterThan(flanke.top);
   });
 
-  it("die Presse steht mittig hinter dem Bagger, Halde links und Stahl rechts", () => {
+  it("die Presse steht in der Ecke, davor zwei gleich grosse Boxen", () => {
     /*
-     * Ansage 12.09.2026: „die Presse kommt wieder hinter den Bagger."
-     * Vorher stand sie zur Seite gerueckt, damit der Bagger naeher an den
-     * Mischschrott kam; jetzt ist sie wieder die Wand im Ruecken, und die
-     * Stahlmulde ist dafuer nach rechts gewandert.
+     * Ansage 13.09.2026: „da, wo der Mischschrott ist, da kommt einfach die
+     * Presse hin … und dann wird quasi rechts eine neue Grenze gezogen, damit
+     * du quasi zwei gleiche Boxen hast. Also einmal Mischschrott und dann
+     * einmal Stahlschrott."
      *
      * Geprueft wird die Anordnung aus der Sitzperspektive, nicht die
-     * Koordinate — links vom Sitz ist +x (E-086). Die Presse liegt zwischen
-     * Halde und Stahlmulde und fluchtet mit der Maschine.
+     * Koordinate — links vom Sitz ist +x (E-086). Die Presse liegt links
+     * aussen in der Ecke, die Mischschrottbox daneben, die Stahlbox rechts
+     * davon, und beide Boxen sind gleich gross.
      */
     const halde = CONFIGS.find((c) => c.id === "c_mixed")!;
     const stahl = CONFIGS.find((c) => c.id === "c_steel")!;
-    const presse = STATIC_OBSTACLES.find((o) => o.label === "Schere")!;
-    expect(halde.x, "Halde nicht links aussen").toBeGreaterThan(presse.x);
-    expect(presse.x, "Presse nicht zwischen Halde und Stahlmulde").toBeGreaterThan(stahl.x);
-    // Mittig heisst: in der Sitzachse, nicht zur Seite gerueckt
-    expect(Math.abs(presse.x - BAGGER_X), "Presse nicht in der Sitzachse").toBeLessThan(1.0);
+    const presse = STATIC_OBSTACLES.find((o) => o.label === "Presse")!;
+    expect(presse.x, "Presse nicht links aussen in der Ecke").toBeGreaterThan(stahl.x);
+    expect(halde.x, "Mischschrott nicht links von der Stahlbox").toBeGreaterThan(stahl.x);
+    expect(
+      [stahl.size[0], stahl.size[1], stahl.size[2]],
+      "die beiden Boxen sind nicht gleich gross"
+    ).toEqual([halde.size[0], halde.size[1], halde.size[2]]);
     for (const [name, z] of [
-      ["Halde", halde.z],
-      ["Stahlmulde", stahl.z],
+      ["Mischschrott", halde.z],
+      ["Stahlbox", stahl.z],
       ["Presse", presse.z],
     ] as Array<[string, number]>) {
       expect(z, `${name} liegt nicht hinter dem Bagger`).toBeLessThan(BAGGER_Z);
     }
+  });
+
+  it("kein Hindernis steht dort, wo gar nichts gebaut ist", () => {
+    /*
+     * Die Presse ist am 13.09.2026 von (−3,0 | −26,0) in die Ecke auf
+     * (6,6 | −26,0) gezogen — ihr Eintrag in STATIC_OBSTACLES blieb stehen.
+     * Einen halben Tag lang stand damit eine unsichtbare Wand von 7,8 x 5,0 m
+     * hinter dem Bagger, und an der Presse selbst gar keine. Seitdem kommen
+     * Lage und Mass aus press.ts; dieser Test haelt fest, dass sie
+     * zusammenbleiben.
+     */
+    const presse = STATIC_OBSTACLES.find((o) => o.label === "Presse")!;
+    expect(presse.x).toBeCloseTo(PRESS_CENTER.x, 6);
+    expect(presse.z).toBeCloseTo(PRESS_CENTER.z, 6);
+    expect(hitsObstacle(PRESS_CENTER.x, PRESS_CENTER.z, 0), "Presse ist kein Hindernis")
+      .not.toBeNull();
+    // Die alte Stelle muss frei sein — dort liegt jetzt die Stahlbox.
+    expect(hitsObstacle(-3.0, -26.0, 0), "alte Pressenstelle sperrt noch").toBeNull();
   });
 
   it("schließt mittig, mit dem kleinen Loch der halboffenen Bauform", () => {

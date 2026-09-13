@@ -27,10 +27,10 @@ import { haggle, leavesOnRefusal, hint, OFFER_FACTOR, OFFER_LABEL, type Offer } 
 import { LaneWatch } from "./delivery/laneWatch";
 import { Daylight, Floodlights } from "./world/daylight";
 import { hitsObstacle, setBuildingObstacles } from "./world/obstacles";
+import { START_HAUFEN, START_AUTOS, START_STREU } from "./world/startplatz";
 import { findeBox } from "./world/boxen";
 import { OfficeBuilding, BUERO_TUER } from "./world/office";
 import { Police } from "./world/police";
-import { Signage } from "./world/signage";
 import {
   type AxisId,
   type ControlFunction,
@@ -107,7 +107,15 @@ async function main(): Promise<void> {
   // Der Platz baut sich selbst; ein Handle brauchen wir nicht mehr, seit die
   // Schrottberge nur noch Kulisse ausserhalb der Mauer sind.
   new Yard(scene, physics.world);
-  const signage = new Signage(scene); // Orientierungstexte, mit M umschaltbar
+  /*
+   * Keine Wegweiser mehr (Ansage 13.09.2026: „wir koennen auch alle Schilder
+   * zur Benennung wegmachen. Die einzigen Schilder sind diese kleinen
+   * Containerschilder, dass man sieht, die dann auch aufleuchten, wenn ich
+   * ueber dem richtigen Container bin.").
+   *
+   * Uebrig bleibt genau das: die Behaelterschilder aus containers.ts, die
+   * beim richtigen Behaelter aufleuchten. Taste M schaltet sie weiter um.
+   */
   const items = new ItemManager(scene, physics.world);
   const containers = new ContainerManager(scene, physics.world, bus);
   const composites = new CompositeManager(scene, physics.world, items, bus);
@@ -135,29 +143,41 @@ async function main(): Promise<void> {
     }
   } else {
     fence = new FenceManager(scene, physics.world, items, bus);
-    // Großer Berg auf der Stahlschrottfläche. Die Annahmefläche bleibt frei,
-    // dort laden die Pritschen ab.
-    // Auf die Stahlflaeche, nicht auf die Grenze zur Mischschrottflaeche.
-    // Der Haufen ist am Anfang unsortiert — dass er als Verunreinigung zaehlt,
-    // ist gewollt: Aufraeumen ist die Aufgabe.
-    items.spawnPile(new THREE.Vector3(6.0, 0, -24.0), 85, 2.9);
-    // Altfahrzeuge stehen von Anfang an am Rand des Stahlschrott-Haufens
-    // Zu den uebrigen Teilen in den Mischschrott (Ansage 12.09.2026): Sie
-    // standen noch am Platz von vor dem Umbau.
-    composites.spawnCar(new THREE.Vector3(4.2, 0.5, -21.5));
-    composites.spawnCar(new THREE.Vector3(8.0, 0.5, -26.0));
+    /*
+     * Grosser Berg in der Mischschrottbox. Die Annahmeflaeche bleibt frei,
+     * dort laden die Pritschen ab. Der Haufen ist am Anfang unsortiert — dass
+     * er als Verunreinigung zaehlt, ist gewollt: Aufraeumen ist die Aufgabe.
+     *
+     * NICHT in die Presskammer. Er lag bei (6,0 | −24,0) mit 2,9 m Streuung,
+     * also von z −26,9 bis −21,1 — und die Kammer geht von −28,2 bis −23,8.
+     * Gut die Haelfte des Haufens lag damit in der Presse, und eines der
+     * beiden Altfahrzeuge stand mit (8,0 | −26,0) genau darin (Ansage
+     * 13.09.2026: „achtet darauf, dass kein Schrott am Anfang in der Presse
+     * liegt"). `test/startplatz.test.ts` haelt den Abstand fest.
+     */
+    items.spawnPile(
+      new THREE.Vector3(START_HAUFEN.x, 0, START_HAUFEN.z),
+      START_HAUFEN.teile,
+      START_HAUFEN.streuung
+    );
+    // Altfahrzeuge am Rand des Haufens, beide in der Mischschrottbox
+    for (const a of START_AUTOS) composites.spawnCar(new THREE.Vector3(a.x, 0.5, a.z));
     // Etwas Streuschrott neben dem Stahlhaufen — er lag frueher an den
     // Schrottbergen, und die stehen jetzt ausserhalb der Mauer. Auf dem Platz
     // soll alles, was nach Material aussieht, auch aufzunehmen sein.
-    randomCargo(10).forEach((sp, i) => {
-      const a = (i / 10) * Math.PI * 2;
+    randomCargo(START_STREU.teile).forEach((sp, i) => {
+      const a = (i / START_STREU.teile) * Math.PI * 2;
       items.spawnScrap(
         sp.materialId,
         sp.massKg,
         sp.shape,
         // An den Mischschrott statt an den alten Platz (Ansage 12.09.2026:
         // „es fallen immer noch am alten Platz Schrottteile runter").
-        new THREE.Vector3(6 + Math.cos(a) * 3.0, 0.8 + (i % 3) * 0.7, -24 + Math.sin(a) * 3.0)
+        new THREE.Vector3(
+          START_STREU.x + Math.cos(a) * START_STREU.radius,
+          0.8 + (i % 3) * 0.7,
+          START_STREU.z + Math.sin(a) * START_STREU.radius
+        )
       );
     });
     // Erst jetzt setzen lassen, wenn alles Anfaengliche steht — Haufen, Autos
@@ -940,7 +960,6 @@ async function main(): Promise<void> {
     if (input.wasPressed("KeyM") || touch.consumePress("KeyM")) {
       labelsOn = !labelsOn;
       containers.setLabelsVisible(labelsOn);
-      signage.setVisible(labelsOn);
       hud.toast(labelsOn ? "Markierungen an" : "Markierungen aus");
     }
     if (input.wasPressed("F3") || touch.consumePress("F3")) debug.toggle();

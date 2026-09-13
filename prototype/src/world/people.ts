@@ -520,7 +520,6 @@ export class StaffManager {
     this.mario.group.position.copy(bueroTuer);
     this.mario.group.visible = false;
     scene.add(this.mario.group);
-    this.addNameTagToObject(this.mario.group, "MARIO", 0, 2.1, 0);
     const brett = new THREE.Mesh(
       new THREE.BoxGeometry(0.3, 0.02, 0.22),
       new THREE.MeshStandardMaterial({ color: 0xb98a4a, roughness: 0.9 })
@@ -543,7 +542,6 @@ export class StaffManager {
     janine.legLeft.visible = false; // steht hinter der Theke
     janine.legRight.visible = false;
     wagen.add(janine.group);
-    this.addNameTagToObject(janine.group, "JANINE", 0, 1.35, 0);
 
     // Lambert Prison — Platzwart in Warnweste
     this.lambert = buildPerson({ shirt: 0xf2c018, trousers: 0x2f3a45, hair: 0x5a4632 });
@@ -556,37 +554,18 @@ export class StaffManager {
     );
     vest.position.set(0, 1.08, 0);
     this.lambert.group.add(vest);
-    this.addNameTagToObject(this.lambert.group, "LAMBERT", 0, 2.1, 0);
     this.lambertTarget.copy(this.patrol[1]);
   }
 
-  private addNameTagToObject(
-    parent: THREE.Object3D,
-    text: string,
-    x: number,
-    y: number,
-    z: number
-  ): void {
-    const canvas = document.createElement("canvas");
-    canvas.width = 512;
-    canvas.height = 96;
-    const ctx = canvas.getContext("2d")!;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "rgba(20,24,26,0.8)";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#f2c018";
-    ctx.font = "bold 44px 'Arial Black', Impact, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(text, canvas.width / 2, canvas.height / 2 + 2);
-    const sprite = new THREE.Sprite(
-      new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), depthTest: false })
-    );
-    sprite.scale.set(1.6, 0.3, 1);
-    sprite.position.set(x, y, z);
-    sprite.renderOrder = 11;
-    parent.add(sprite);
-  }
+  /*
+   * Keine Namensschilder mehr ueber den Leuten.
+   *
+   * Ansage 13.09.2026: „wir koennen auch alle Schilder zur Benennung
+   * wegmachen. Die einzigen Schilder, so wie's jetzt ist, sind diese kleinen
+   * Containerschilder." MARIO, JANINE und LAMBERT schwebten als gelbe Tafeln
+   * ueber den Koepfen — auch das ist Benennung. Wer wer ist, liest man an der
+   * Weste, am Radlader und am Standort.
+   */
 
   /**
    * @param truck Position des aktiven Fahrzeugs, wenn es gerade rangiert/ablädt

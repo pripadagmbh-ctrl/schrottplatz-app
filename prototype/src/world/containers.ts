@@ -48,7 +48,22 @@ export interface ContainerConfig {
    * Zwei Halden nebeneinander teilen sich eine Trennwand — die zweite
    * daneben zu stellen sähe aus wie ein Baufehler.
    */
-  haldeWaende?: { rueck?: boolean; aussen?: boolean; trenn?: boolean; nord?: boolean };
+  haldeWaende?: {
+    rueck?: boolean;
+    aussen?: boolean;
+    /**
+     * Wand auf der rechten Seite (−x).
+     *
+     * `true` ist der zwei Steine lange Stummel auf halber Hoehe, mit dem eine
+     * Kante nur angedeutet wird. `"voll"` ist eine richtige Wand ueber die
+     * ganze Tiefe und auf voller Hoehe — die neue Grenze, die aus der offenen
+     * Flaeche hinter dem Bagger eine Box macht (Ansage 13.09.2026: „dann wird
+     * quasi rechts eine neue Grenze gezogen, damit du quasi zwei gleiche
+     * Boxen hast").
+     */
+    trenn?: boolean | "voll";
+    nord?: boolean;
+  };
   /**
    * Um wie viele Meter die Aussenwand ueber die Halde hinaus auf voller Hoehe
    * weiterlaeuft (Ansage 13.09.2026: „bei der Mischschrottseite noch 10 Meter
@@ -101,44 +116,50 @@ export const CONFIGS: ContainerConfig[] = [
    */
 
   /*
-   * MISCHSCHROTT — links hinten, die große Fläche des Platzes.
+   * MISCHSCHROTT — links hinten, eine von zwei gleich grossen Boxen.
    *
    * Hier kippt jeder ab, der gemischt anliefert, und von hier holt der Bagger
    * alles Weitere. Die Wände sind doppelt gesetzt und fünf Meter hoch (Ansage
    * 12.09.2026: „da müssten natürlich die Wände doppelt sein und sehr hoch,
    * damit wir den Mischschrott auch ohne Probleme stapeln können").
    *
-   * Aber nur ZWEI Wände, und zwar die, die ohnehin die Platzgrenze sind
-   * (Ansage 12.09.2026: „die natürlichen Abgrenzungen vom Mischschrott soll
-   * eigentlich nur die Außenwand sein und daneben der Bagger, anders braucht's
-   * eigentlich keine Abgrenzung"). Zur Maschine hin ist offen — dort stand
-   * eine Wand, die nur im Weg war. Und die Fläche ist von 156 auf 90 m²
-   * geschrumpft: „die erscheint mir auch viel zu groß".
+   * Aber nur EINE Wand, und zwar die, die ohnehin Platzgrenze ist (Ansage
+   * 12.09.2026: „die natürlichen Abgrenzungen vom Mischschrott soll eigentlich
+   * nur die Außenwand sein und daneben der Bagger, anders braucht's eigentlich
+   * keine Abgrenzung"). Hinten übernimmt die erhöhte Südmauer.
+   *
+   * Auch die Rückwand zur Presse ist weg (Ansage 13.09.2026: „da, wo der
+   * Mischschrott ist, da kommt einfach die Presse hin … und der Mischschrott
+   * liegt einfach nur daneben, ohne dass das irgendwie abgegrenzt wird").
+   * Die Presse steht damit in der Ecke und der Haufen reicht bis an sie heran.
    */
   { id: "c_mixed", fractionId: "mixed", label: "MISCHSCHROTT", kind: "halde", x: 6.2,
-    z: -20.0, size: [8.0, 8.0, 5.0], wandPlus: 10.0 },
+    z: -20.0, size: [8.0, 8.0, 5.0], wandPlus: 10.0,
+    haldeWaende: { rueck: false, aussen: true, trenn: false } },
 
   /*
-   * STAHLSCHROTT — rechts neben der Presse, im Winkel ihrer Fassung.
+   * STAHLSCHROTT — die zweite Box, rechts neben dem Mischschrott.
    *
-   * Ansage 12.09.2026: „die Muldenabgrenzung wird versetzt, sodass die Presse
-   * genau reinpasst. Die rechte Abgrenzung wird verlaengert und nach rechts im
-   * 90-Grad-Winkel erweitert, und schliesst mit Container-Positionen ab."
+   * Ansage 13.09.2026: „hinter mir bzw. im Suedosten, da war ja eine Mulde
+   * quasi, die wird abgerissen, die Wand wird erhoeht, die Aussenwand vom
+   * Platz. Und dann wird quasi rechts eine neue Grenze gezogen, damit du
+   * quasi zwei gleiche Boxen hast. Also einmal Mischschrott und dann einmal
+   * Stahlschrott."
    *
-   * Die Mulde bringt genau dieses Winkeleisen mit: Ihre Aussenwand steht dicht
-   * an der rechten Flanke der Presse, ihre Nordwand knickt davon ab und laeuft
-   * nach rechts bis zu den Absetzcontainern. Zusammen mit der Suedwand des
-   * Platzes und der angedeuteten Trennwand des Mischschrotts bildet das die
-   * Fassung, in der die Presse steht — und zugleich die Mulde, in der sortiert
-   * wird. Zum Bagger hin (−x, offene Seite) bleibt sie offen.
+   * Die alte Mulde hatte eine eigene Aussenwand und einen abgewinkelten
+   * Schenkel nach rechts, 6,5 x 5,0 m und 3 m hoch. Beides faellt weg. Was
+   * bleibt, ist spiegelbildlich zum Mischschrott: gleiche Groesse, gleiche
+   * Wandhoehe, hinten die erhoehte Platzmauer, und statt der Ostmauer eine
+   * neue Wand auf der rechten Seite. Zum Bagger hin (+z) und zum Mischschrott
+   * hin (+x) bleibt sie offen.
    *
-   * Der Preis dafuer steht in den Messungen: Die Mulde liegt jetzt weiter weg
-   * als der Arm vom Standplatz aus reicht. Sie wird von einem Schritt nach
-   * rechts befuellt, nicht vom Sitzplatz aus (E-090, Arbeitslinie).
+   * Die Box liegt mit der Rueckseite an der Suedmauer (z −28,7) und endet
+   * 1,2 m vor der Arbeitslinie des Baggers. Gemessen sind es 5,2 m vom
+   * Sitzplatz zur Boxmitte — der Ring geht von 4,0 bis 9,5 m.
    */
-  { id: "c_steel", fractionId: "steel", label: "STAHLSCHROTT", kind: "halde", x: -5.0,
-    z: -25.0, size: [6.5, 5.0, 3.0],
-    haldeWaende: { rueck: false, aussen: true, nord: true, trenn: false } },
+  { id: "c_steel", fractionId: "steel", label: "STAHLSCHROTT", kind: "halde", x: -1.8,
+    z: -24.7, size: [8.0, 8.0, 5.0],
+    haldeWaende: { rueck: false, aussen: false, nord: false, trenn: "voll" } },
 
   /*
    * GROSSTEILE — offene Fläche rechts neben der Stahlmulde.
@@ -220,16 +241,38 @@ export const CONFIGS: ContainerConfig[] = [
    * Zink faellt weg. Die Fraktion bleibt im Katalog, sie hat nur keinen
    * eigenen Behaelter mehr.
    */
-  { id: "r_alu", fractionId: "alu", label: "ALU", kind: "rolloff", x: -4.7,
-    z: -10.0, size: [4.0, 4.0, 2.1] },
-  { id: "r_va", fractionId: "va", label: "EDELSTAHL VA", kind: "rolloff", x: -8.0,
-    z: -19.5, size: [4.0, 4.0, 2.1] },
-  { id: "r_cable", fractionId: "cable", label: "KABEL", kind: "rolloff", x: -8.0,
-    z: -14.5, size: [4.0, 4.0, 2.1] },
-  { id: "r_copper", fractionId: "copper", label: "KUPFER", kind: "rolloff", x: -9.6,
-    z: -9.8, size: [4.0, 4.0, 2.1] },
-  { id: "r_brass", fractionId: "brass", label: "MESSING", kind: "rolloff", x: -10.8,
-    z: -23.6, size: [4.0, 4.0, 2.1] },
+  /*
+   * Nachtrag 13.09.2026: zurueck zu ZWEI NEBENEINANDER, aber getrennt.
+   *
+   * „Ansonsten die Container so wie die angeordnet waren vorher, zwei
+   * nebeneinander. Das war okay. Die sollen nur nicht zusammenhaengen. Und
+   * der erste Container soll Alu sein, rechts daneben VA. Dann kommt Kabel,
+   * dann Kupfer. Und ich denke, das reicht erst mal."
+   *
+   * Also wieder das Raster von vorher (Spalten bei x −7,3 und −11,8), nur mit
+   * Luft: Die alten Behaelter waren 4,7 m breit bei 4,3 m Abstand — sie
+   * beruehrten einander. Mit 4,0 m bleiben 0,5 m zwischen den Spalten und
+   * 0,7 m zwischen den Reihen.
+   *
+   * Vier statt fuenf. Messing faellt damit weg wie vorher schon Zink; beide
+   * Fraktionen bleiben im Katalog, sie haben nur keinen eigenen Behaelter.
+   *
+   * Reihenfolge nach der Ansage, rechts ist −x:
+   *
+   *   ALU    (−7,3 | −12,8)   5,1 m    VA     (−11,8 | −12,8)   9,5 m
+   *   KABEL  (−7,3 | −17,5)   4,8 m    KUPFER (−11,8 | −17,5)   9,3 m
+   *
+   * Die Abstaende sind gesucht, nicht gegriffen: Bei x −12,2 lagen VA und
+   * Kupfer mit 9,8 und 9,7 m ausserhalb des Rings von 9,5 m.
+   */
+  { id: "r_alu", fractionId: "alu", label: "ALU", kind: "rolloff", x: -7.3,
+    z: -12.8, size: [4.0, 4.0, 2.1] },
+  { id: "r_va", fractionId: "va", label: "EDELSTAHL VA", kind: "rolloff", x: -11.8,
+    z: -12.8, size: [4.0, 4.0, 2.1] },
+  { id: "r_cable", fractionId: "cable", label: "KABEL", kind: "rolloff", x: -7.3,
+    z: -17.5, size: [4.0, 4.0, 2.1] },
+  { id: "r_copper", fractionId: "copper", label: "KUPFER", kind: "rolloff", x: -11.8,
+    z: -17.5, size: [4.0, 4.0, 2.1] },
 
   /*
    * SILOS an der Ostwand — dorthin fährt der Abholer entlang, ohne den
@@ -422,11 +465,27 @@ class GameContainer {
           }
         }
         const andeutung = Math.max(2, Math.round(REIHEN / 2));
-        if (wnd.trenn !== false)
-        for (let bz = -hd / 2 + BL / 2; bz < -hd / 2 + 2 * BL; bz += BL) {
-          for (let r = 0; r < andeutung; r++) {
-            const off = (r % 2) * (BL / 2);
-            setze(-(hw / 2 + tt), BH / 2 + r * BH, bz - off, false);
+        /*
+         * `"voll"` ist eine richtige Wand: ganze Tiefe, volle Hoehe, und sie
+         * laeuft zum offenen Ende hin aus wie die Aussenwand gegenueber. So
+         * werden die beiden Boxen gleich — die eine haelt die Platzmauer, die
+         * andere diese Wand, hinten beide die erhoehte Aussenmauer.
+         */
+        if (wnd.trenn === "voll") {
+          for (let bz = -hd / 2 + BL / 2; bz < hd / 2 + 0.4; bz += BL) {
+            const rest = hd / 2 - bz;
+            const n = rest > 3 ? REIHEN : reihenBei(Math.max(0, rest) / 3);
+            for (let r = 0; r < n; r++) {
+              const off = (r % 2) * (BL / 2);
+              setze(-(hw / 2 + tt), BH / 2 + r * BH, bz - off, false);
+            }
+          }
+        } else if (wnd.trenn !== false) {
+          for (let bz = -hd / 2 + BL / 2; bz < -hd / 2 + 2 * BL; bz += BL) {
+            for (let r = 0; r < andeutung; r++) {
+              const off = (r % 2) * (BL / 2);
+              setze(-(hw / 2 + tt), BH / 2 + r * BH, bz - off, false);
+            }
           }
         }
       }
@@ -461,7 +520,29 @@ class GameContainer {
       const halb = hh * 0.55;
       // Die angedeutete Trennwand bekommt ihren eigenen Kollider — halbe Höhe,
       // zwei Steinlängen ab der hinteren Ecke.
-      if (wnd.trenn !== false) {
+      if (wnd.trenn === "voll") {
+        /*
+         * Zwei Quader wie bei den anderen Waenden, damit der Kollider dem
+         * Auslaufen folgt — ein einziger auf voller Hoehe waere eine
+         * unsichtbare Wand dort, wo man die Steine schon aufhoeren sieht.
+         */
+        world.createCollider(
+          RAPIER.ColliderDesc.cuboid(BT, hh / 2, hd / 4).setTranslation(
+            -(hw / 2 + BT),
+            hh / 2,
+            -hd / 4
+          ),
+          body
+        );
+        world.createCollider(
+          RAPIER.ColliderDesc.cuboid(BT, halb / 2, hd / 4).setTranslation(
+            -(hw / 2 + BT),
+            halb / 2,
+            hd / 4
+          ),
+          body
+        );
+      } else if (wnd.trenn !== false) {
         const andeutungH = hh / 2;
         world.createCollider(
           RAPIER.ColliderDesc.cuboid(BT, andeutungH / 2, BL).setTranslation(
