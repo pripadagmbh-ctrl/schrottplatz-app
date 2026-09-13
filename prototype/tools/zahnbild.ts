@@ -13,11 +13,7 @@ import * as THREE from "three";
 import { deflateSync } from "node:zlib";
 import { writeFileSync } from "node:fs";
 import {
-  SCHALEN_ABSCHNITTE,
-  baueGreiferschale,
   baueGreiferspitze,
-  schalenHalbbreite,
-  schalenEnde,
   stoffe,
 } from "../src/grapple/teile";
 import { dreiecke } from "./riss";
@@ -80,15 +76,8 @@ function rgb(hex: string): number[] {
 
 /** Schale mit aufgesetzter Spitze, wie sie im Zusammenbau sitzt. */
 function schale(): THREE.Group {
-  const st = stoffe();
-  const g = new THREE.Group();
-  g.add(baueGreiferschale(st));
-  const ende = schalenEnde();
-  const sp = baueGreiferspitze(st);
-  sp.position.set(0, ende.y, ende.z);
-  sp.rotation.x = ende.th;
-  g.add(sp);
-  return g;
+  /* Nur der Zahn, unrotiert — damit man seine eigene Form sieht. */
+  return baueGreiferspitze(stoffe());
 }
 
 function male(
@@ -134,7 +123,7 @@ function male(
 /* Seitenansicht gross links, die beiden anderen klein rechts daneben */
 const GROSS = Math.floor(BREITE * 0.56);
 const KLEIN = BREITE - GROSS - 30;
-male(new THREE.Vector3(1, 0, 0), 10, 10, GROSS, HOEHE - 20, true); // genau von der Seite, als Umriss
+male(new THREE.Vector3(1, 0, 0), 10, 10, GROSS, HOEHE - 20); // genau von der Seite
 male(new THREE.Vector3(0, 0, 1), GROSS + 20, 10, KLEIN, Math.floor((HOEHE - 30) / 2));
 male(
   new THREE.Vector3(0.75, 0.3, 1),
@@ -143,20 +132,6 @@ male(
   KLEIN,
   Math.floor((HOEHE - 30) / 2)
 );
-
-/* Breitenbalken unten in die vordere Ansicht: gemessen, nicht behauptet */
-const balkenX = GROSS + 20;
-for (let k = 0; k <= SCHALEN_ABSCHNITTE; k++) {
-  const b = 2 * schalenHalbbreite(k);
-  const y = HOEHE - 46 + 0;
-  rechteck(
-    Math.round(balkenX + (KLEIN - 40) / 2 - (b / 0.4) * ((KLEIN - 60) / 2)),
-    y - k * 5,
-    Math.round((b / 0.4) * (KLEIN - 60)),
-    4,
-    [0x2e, 0x7d, 0x32]
-  );
-}
 
 const CRC = (() => {
   const t = new Uint32Array(256);
@@ -189,7 +164,7 @@ const roh = Buffer.alloc(HOEHE * (BREITE * 3 + 1));
 for (let y = 0; y < HOEHE; y++)
   Buffer.from(bild.buffer, y * BREITE * 3, BREITE * 3).copy(roh, y * (BREITE * 3 + 1) + 1);
 writeFileSync(
-  "docs/greiferschale.png",
+  "docs/zahn.png",
   Buffer.concat([
     Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
     chunk("IHDR", ihdr),
@@ -197,6 +172,13 @@ writeFileSync(
     chunk("IEND", Buffer.alloc(0)),
   ])
 );
-console.log("docs/greiferschale.png geschrieben");
-for (let k = 0; k <= SCHALEN_ABSCHNITTE; k++)
-  console.log(`  Station ${k}: ${(2 * schalenHalbbreite(k)).toFixed(3)} m breit`);
+console.log("docs/zahn.png geschrieben");
+/* Masse des Zahns, damit das Bild nicht allein steht */
+import { MASS } from "../src/grapple/teile";
+const bb = new THREE.Box3().setFromObject(schale());
+console.log(
+  `Zahn: ${( (bb.max.x - bb.min.x) * 1000).toFixed(0)} mm breit, ` +
+    `${((bb.max.y - bb.min.y) * 1000).toFixed(0)} mm lang, ` +
+    `${((bb.max.z - bb.min.z) * 1000).toFixed(0)} mm tief ` +
+    `(Positionsliste ${MASS.spitze.breite * 1000} x ${MASS.spitze.laenge * 1000} x ${MASS.spitze.dicke * 1000})`
+);
