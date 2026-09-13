@@ -129,17 +129,37 @@ export function clawTipDepth(splay: number): number {
  * Hydraulik drückt weiter, bis der Druck steht. Sichtbar wird das als kurzes
  * Nachsetzen, nicht als abrupter Stopp.
  */
-export const NACHDRUECK_RESERVE = 0.12;
+/*
+ * 0,55 statt 0,12 (Ansage 13.09.2026: „die Spinne greift nicht richtig").
+ *
+ * Gemessen war der Grund nicht die Form — die ist unveraendert die von
+ * letzter Woche —, sondern diese Zahl. Mit 0,12 rad verengte sich die Spinne
+ * nach der ersten Beruehrung noch um 28 cm und stand: von 3,38 m auf 3,11 m.
+ * Sie war damit praktisch noch ganz offen und hielt nichts. Der Zahn hatte
+ * Starre, aber der Greifer hatte keinen Griff.
+ *
+ * 0,38 rad sind knapp 1,0 m Verengung statt 0,28 — dreimal so viel. Weiter
+ * ging es nicht, ohne die Starre selbst aufzugeben: `test/zaehne.test.ts`
+ * verlangt, dass Weiches mehr als das 2,5-fache nachgibt und dass auch
+ * Weiches den Zahn zum Stehen bringt. Das deckelt Weich auf unter 1,0 und
+ * damit Massiv auf unter 0,4.
+ *
+ * Die Starre von der Ansage 12.09.2026 („eine gewisse Starre bzw. Kraft muss
+ * jeder Zahn haben") bleibt also — sie steht nur nicht mehr so weit vor dem
+ * Zufassen.
+ */
+export const NACHDRUECK_RESERVE = 0.38;
 /**
  * Dasselbe fuer Nachgiebiges: Blech, Faesser, Weisse Ware, Kabinen.
  *
- * Der Zahn drueckt sich hier deutlich weiter hinein als in massiven Stahl —
- * gut das Dreifache, am Zahnende rund 45 cm — und steht dann. Vorher gab es
+ * Der Zahn drueckt sich hier weiter hinein als in massiven Stahl und steht
+ * dann. Mit 0,38 fuer massiv (13.09.2026) sind es 0,96 statt 0,4, damit der
+ * Abstand zwischen hart und weich bleibt. Vorher gab es
  * fuer solches Material gar keine Grenze: Es galt nicht als Hindernis, der
  * Zahn lief bis zum Anschlag durch das Teil hindurch (Ansage 12.09.2026:
  * „eine gewisse Starre bzw. Kraft muss jeder Zahn haben").
  */
-export const WEICH_RESERVE = 0.4;
+export const WEICH_RESERVE = 0.96;
 /** Wie langsam das Nachdrücken gegenüber freier Bewegung läuft. */
 const NACHDRUECK_TEMPO = 0.25;
 

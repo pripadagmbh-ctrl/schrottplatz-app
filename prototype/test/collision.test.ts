@@ -531,8 +531,15 @@ describe("Krallen schließen einzeln", () => {
     expect(reserve).toBe(0);
     // Nachgedrueckt hat sie genau ihre Reserve, nicht mehr
     expect(1.0 - winkel).toBeCloseTo(R, 6);
-    // ... und ist damit weit vom kommandierten Winkel entfernt geblieben
-    expect(winkel).toBeGreaterThan(0.8);
+    /*
+     * ... und ist damit weit vom kommandierten Winkel entfernt geblieben.
+     *
+     * Geprueft wird der Abstand zum Kommando, nicht mehr die feste Schranke
+     * 0,8. Die stand fuer eine Reserve von 0,12 rad; seit sie am 13.09.2026 auf
+     * 0,38 steht („die Spinne greift nicht richtig"), waere sie nur noch die
+     * alte Zahl und nicht die Eigenschaft.
+     */
+    expect(winkel - 0.4, "der Zahn ist bis zum Kommando durchgelaufen").toBeGreaterThan(0.1);
   });
 
   it("wer loslaesst, bekommt seine Reserve zurueck", () => {
