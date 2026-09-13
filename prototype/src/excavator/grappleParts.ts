@@ -1,48 +1,43 @@
 import * as THREE from "three";
 import {
-  clawPoint,
-  flanschGeometrie,
-  schalenGeometrie,
-  CLAW_BEND_KUM,
-  CLAW_CLOSED_SPLAY,
   CLAW_COUNT,
   CLAW_RING_R,
   CLAW_RING_Y,
   CLAW_SEGMENTS,
-  CLAW_SHELL_BREITE,
-  HAUT_RUECKSPRUNG,
-  SPIEL_MASSSTAB,
+  CLAW_SEG_BEND,
+  CLAW_SEG_LEN,
 } from "./clawGeometry";
 
 /**
  * Die Spinne, Bauteil für Bauteil.
  *
- * Vorher stand der ganze Greifer als ein Block von 270 Zeilen mitten im
- * Baggermodell. Das war der eigentliche Grund, warum die Formarbeit am
- * 12.09.2026 fünfmal hintereinander danebenging: Ich habe immer das Ganze auf
- * einmal geändert und konnte nie zuordnen, welche Änderung was bewirkt hat.
+ * Stand: zurück auf die Form vom 12.09.2026 mittags (Ansage 13.09.2026:
+ * „kannst du einfach wieder die Spinne von gestern Mittag nehmen?"). Also
+ * wieder Rotator, Gusstraverse, Gelenkring und fünf Sichelkrallen aus je sechs
+ * Segmenten — nicht die Trogschalen und nicht der Gussblock mit Frästaschen,
+ * die am 12. abends und am 13. morgens daraus geworden waren.
  *
- * Jedes Teil hat jetzt seine eigene Funktion, sein eigenes Maß und seine
- * eigene Begründung. Der Prüfstand kann sie einzeln nebeneinanderstellen, und
- * wer eines ändert, sieht genau dieses eine Teil vorher und nachher.
+ * Was bleibt, ist die Zerlegung selbst. Vorher stand der ganze Greifer als
+ * Block von 270 Zeilen mitten im Baggermodell, und genau das war der Grund,
+ * warum die Formarbeit am 12.09. fünfmal hintereinander danebenging: Es ließ
+ * sich nie ein Teil allein ändern und nie zuordnen, welche Änderung was
+ * bewirkt hat. Jedes Teil hat darum weiterhin seine eigene Funktion, sein
+ * eigenes Maß und seine eigene Begründung — nur eben mit den alten Maßen.
  *
- * Reihenfolge von oben nach unten:
+ * Von oben nach unten:
  *
- * Die Nummern folgen dem Baugruppenblatt vom 13.09.2026:
- *
- *   1 Aufhaengung · 2 Drehwerk · 3 Greiferkopf · 4 Zylinder ·
- *   5 Schale · 6 Gelenk · 7 Hydraulik · 8 Verschleissteile
+ *   Rotator · Traverse · Gelenkring · Kralle · Zylinder
  */
 
 /** Die Werkstoffe der Spinne — einmal gebaut, von allen Teilen geteilt. */
 export interface SpinnenStoffe {
-  /** Gusseisen, hell und matt: die großen Flächen */
+  /** Hardox-Schalen: die großen Flächen */
   guss: THREE.MeshStandardMaterial;
-  /** Eine Spur dunkler: Kanten, Absätze, Lagerböcke */
+  /** Fast schwarz: Kanten, Stege, Lagerböcke, Ring */
   kante: THREE.MeshStandardMaterial;
   /** Blank gedreht: Bolzen */
   bolzen: THREE.MeshStandardMaterial;
-  /** Ocker: Zylinderrohre */
+  /** Maschinengrün: Zylinderrohre */
   lack: THREE.MeshStandardMaterial;
   /** Verchromt: Kolbenstangen */
   chrom: THREE.MeshStandardMaterial;
@@ -51,349 +46,164 @@ export interface SpinnenStoffe {
 export function spinnenStoffe(): SpinnenStoffe {
   return {
     /*
-     * Heller, matter Guss.
-     *
-     * 0x40474b war so dunkel, dass die Schalen zu einer einzigen Masse
-     * verschmolzen; ohne erkennbare Kanten liest sich das Ding als glatter
-     * Körper statt als Maschine. Auf den Vorlagen ist der Greifer helles,
-     * abgeschabtes Grau.
+     * Dunkle Hardox-Schalen, fast schwarze Kanten — die Farbgebung vom
+     * 12.09. mittags. Am Abend war sie auf helles Grau gezogen worden, weil
+     * die Schalen zu einer einzigen Masse verschmolzen; das war aber ein
+     * Problem der Trogform, nicht der Farbe. Die Segmentkralle bringt ihre
+     * Kanten selbst mit — jedes Segment hat seinen eigenen dunklen Steg.
      */
-    guss: new THREE.MeshStandardMaterial({ color: 0x9aa2a8, roughness: 0.62, metalness: 0.45 }),
-    /*
-     * Nur eine Spur dunkler. Mit einem deutlich dunkleren Kantenmaterial
-     * zerfiel der Greifer in schwarze Einzelteile, und die Zähne stachen als
-     * Pfeile heraus (Befund 12.09.2026).
-     */
-    kante: new THREE.MeshStandardMaterial({ color: 0x89919a, roughness: 0.5, metalness: 0.6 }),
-    bolzen: new THREE.MeshStandardMaterial({ color: 0x3c4248, roughness: 0.3, metalness: 0.85 }),
-    /*
-     * Ocker, nicht Maschinengruen.
-     *
-     * Auf dem Baugruppenblatt (13.09.2026) sind die Zylinder das einzige
-     * farbige Teil am ganzen Greifer — daran liest man die Maschine ab.
-     * In Gruen verschwanden sie zwischen den grauen Gussteilen.
-     */
-    lack: new THREE.MeshStandardMaterial({ color: 0xd9a227, roughness: 0.45, metalness: 0.3 }),
-    chrom: new THREE.MeshStandardMaterial({ color: 0xd0d6dc, roughness: 0.14, metalness: 0.92 }),
+    guss: new THREE.MeshStandardMaterial({ color: 0x40474b, roughness: 0.5, metalness: 0.55 }),
+    kante: new THREE.MeshStandardMaterial({ color: 0x23282b, roughness: 0.45, metalness: 0.7 }),
+    bolzen: new THREE.MeshStandardMaterial({ color: 0x2b2e31, roughness: 0.8, metalness: 0.5 }),
+    lack: new THREE.MeshStandardMaterial({ color: 0x62c94b, roughness: 0.4, metalness: 0.35 }),
+    chrom: new THREE.MeshStandardMaterial({ color: 0xb8bec4, roughness: 0.22, metalness: 0.85 }),
   };
 }
 
-/** Kurz fuer den Spielmassstab — die Handmasse der unteren Teile haengen daran. */
-const M = SPIEL_MASSSTAB;
+/** Breite der Krallensegmente, von der Wurzel zur Spitze (m). */
+const SEG_BREITE = [0.4, 0.37, 0.33, 0.28, 0.22, 0.15];
+/** Dicke der Krallensegmente, von der Wurzel zur Spitze (m). */
+const SEG_DICKE = [0.16, 0.15, 0.135, 0.12, 0.105, 0.085];
 /**
- * Die beiden Masse, an denen der ganze Kopf haengt.
+ * Anlenkung der Zylinder — abgetastet, nicht gegriffen (13.09.2026).
  *
- * Nicht in Metern gebaut, sondern in Anteilen von Bolzenkreis und Kopfhoehe.
- * Beim ersten Anlauf am 13.09.2026 standen hier Meterwerte, die ich schon in
- * Spielgroesse gerechnet und dann nochmal mit dem Massstab multipliziert
- * hatte — der Grundkoerper wurde dadurch unten breiter als der Bolzenkreis,
- * die Schalen sassen also INNERHALB des Kopfes. In Anteilen kann das nicht
- * passieren.
+ * Am 12.09. mittags sass der Anlenkbock bei Radius 0,42 und die Lasche 0,30 m
+ * unter dem Drehbolzen. Nachgerechnet war das mechanisch unbrauchbar: Der
+ * Hebelarm lief bei 20 % Oeffnung durch einen Totpunkt (7 mm), das
+ * Schliessmoment betrug nur ein Fuenftel des Oeffnungsmoments, und die
+ * Zylinder liefen durch den Gussblock hindurch. Im Spiel fiel nichts davon
+ * auf, weil die Kralle kinematisch gefuehrt wird und der Zylinder nur
+ * mitlaeuft — er ist Dekoration.
+ *
+ * Fuer den exportierten Prototyp muss es stimmen, und weil beide dieselbe
+ * Geometrie benutzen, stimmt es jetzt auch hier. Ueber alle Lagen abgetastet
+ * unter vier Bedingungen — Zylinder frei am Gussblock vorbei, steil, kein
+ * Totpunkt, groesster Hebelarm im geschlossenen Zustand — bleibt diese
+ * Familie uebrig:
+ *
+ *   geschlossen 0,57 m   offen 0,34 m   Hub 0,23 m   Neigung bis 14°
+ *   Hebelarm 0,19 m geschlossen, 0,11 m offen
+ *
+ * Damit faehrt der Zylinder zum SCHLIESSEN AUS — die starke Richtung, volle
+ * Kolbenflaeche. Schliessmoment zu Oeffnungsmoment: 1,70.
  */
-const RK = CLAW_RING_R;
-const KH = -CLAW_RING_Y;
+const ZYLINDERKREIS = 0.84;
 
 /**
- * (1) Aufhaengung — Adapterplatte und Gabel, mit der die Spinne am Stiel haengt.
+ * Rotator — das Modul ganz oben, mit dem sich die Spinne dreht.
  *
- * Auf dem Baugruppenblatt (13.09.2026) ist das die oberste Gruppe: Adapter-
- * platte, Bolzen, darueber die Pendelaufhaengung. Im Modell gab es das bisher
- * gar nicht — die Spinne begann beim Drehmotor und hing sichtbar im Nichts.
- *
- * Die Gabel ist das Erkennungsmerkmal: zwei Ohren mit einer Bohrung, dazwischen
- * der Bolzen. Genau daran sieht man, dass das Ding abnehmbar ist.
+ * Ein eigenes Gerät, kein Teil des Greifers: Es wird angeflanscht und ist auf
+ * jedem Bild als abgesetzter Kasten zu erkennen.
  */
-export function baueAufhaengung(st: SpinnenStoffe): THREE.Group {
+export function baueRotator(st: SpinnenStoffe): THREE.Group {
   const g = new THREE.Group();
-  for (const seite of [-1, 1]) {
-    const ohr = new THREE.Mesh(
-      new THREE.BoxGeometry(0.11 * RK, 0.25 * KH, 0.32 * RK),
-      st.kante
-    );
-    ohr.position.set(seite * 0.19 * RK, -0.07 * KH, 0);
-    ohr.castShadow = true;
-    g.add(ohr);
-  }
-  const bolzen = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.088 * RK, 0.088 * RK, 0.57 * RK, 12),
-    st.bolzen
-  );
-  bolzen.rotation.z = Math.PI / 2;
-  bolzen.position.y = -0.03 * KH;
-  bolzen.castShadow = true;
-  g.add(bolzen);
-  const platte = new THREE.Mesh(
-    new THREE.BoxGeometry(0.68 * RK, 0.065 * KH, 0.68 * RK),
-    st.guss
-  );
-  platte.position.y = -0.155 * KH;
-  platte.castShadow = true;
-  g.add(platte);
-  return g;
-}
-
-/**
- * (2) Drehwerk — Hydraulikmotor, Getriebe, Lager, Drehdurchfuehrung.
- *
- * Ein abgesetzter runder Turm zwischen Adapter und Kopf, unten mit dem
- * Drehkranz. Vorher war das ein Kasten; auf allen Vorlagen ist es ein Zylinder
- * mit deutlichem Flanschring, und der Ring ist das, woran man die Gruppe
- * ueberhaupt erkennt.
- */
-export function baueDrehwerk(st: SpinnenStoffe): THREE.Group {
-  const g = new THREE.Group();
-  const gehaeuse = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.285 * RK, 0.32 * RK, 0.16 * KH, 12),
-    st.kante
-  );
-  gehaeuse.position.y = -0.225 * KH;
+  const gehaeuse = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.36, 0.5), st.kante);
+  gehaeuse.position.y = -0.48;
   gehaeuse.castShadow = true;
   g.add(gehaeuse);
-  // Drehkranz: der breite Flansch, auf dem der Kopf sitzt
-  const kranz = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.38 * RK, 0.38 * RK, 0.065 * KH, 16),
-    st.guss
-  );
-  kranz.position.y = -0.3 * KH;
-  kranz.castShadow = true;
-  g.add(kranz);
-  // Drehdurchfuehrung: der Stutzen an der Seite, an dem die Schlaeuche sitzen
-  const stutzen = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.065 * RK, 0.065 * RK, 0.22 * RK, 8),
-    st.bolzen
-  );
-  stutzen.rotation.z = Math.PI / 2;
-  stutzen.position.set(0.33 * RK, -0.21 * KH, 0);
-  g.add(stutzen);
+  const kappe = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.24, 0.14, 12), st.guss);
+  kappe.position.y = -0.3;
+  g.add(kappe);
   return g;
 }
 
 /**
- * (3) Greiferkopf / Mittelteil — Grundkoerper, Zylinderaufnahmen, Lageraufnahmen.
+ * Traverse — der Stahlgussblock unter dem Rotator, nach unten verjüngt.
  *
- * Der Kern der Maschine, und der Teil, den ich bis zum 13.09.2026 falsch hatte.
- * Er bestand aus einer „Birne" und einem duennen „Strunk" mit Prisma darunter,
- * an dem die Schalen haengen sollten. Auf dem Baugruppenblatt ist das ein
- * einziges Gussteil: ein nach unten breiter werdender Koerper, oben die Ohren
- * fuer die Zylinder, unten am Rand die Lageraufnahmen fuer die Schalenbolzen.
- *
- * Der Unterschied ist nicht kosmetisch. Der Strunk endete bei einem knappen
- * Drittel des Bolzenkreises — dazwischen war schlicht Luft, und die Schalen
- * hingen an nichts. Jetzt reicht der Koerper bis auf vier Fuenftel heran, und
- * die Lageraufnahmen ueberbruecken den Rest.
+ * Fünfeckig, weil fünf Krallen daran hängen: So sitzt jede Anlenkung auf einer
+ * Fläche und nicht auf einer Kante.
  */
-export function baueGreiferkopf(st: SpinnenStoffe): THREE.Group {
-  const g = new THREE.Group();
-  const OBEN = -0.28 * KH;
-  const koerper = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.72 * RK, 0.66 * RK, OBEN - CLAW_RING_Y + 0.04 * KH, 10),
-    st.guss
-  );
-  koerper.position.y = (OBEN + CLAW_RING_Y) / 2;
-  koerper.rotation.y = Math.PI / 10;
-  koerper.castShadow = true;
-  g.add(koerper);
-  // Unterer Rand: der kraeftige Flansch, auf dem die Lageraufnahmen sitzen
-  const rand = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.72 * RK, 0.66 * RK, 0.09 * KH, 10),
-    st.kante
-  );
-  rand.position.y = CLAW_RING_Y + 0.04 * KH;
-  rand.rotation.y = Math.PI / 10;
-  rand.castShadow = true;
-  g.add(rand);
+export function baueTraverse(st: SpinnenStoffe): THREE.Mesh {
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.5, 0.4, 5), st.guss);
+  m.position.y = -0.75;
+  m.rotation.y = Math.PI / 5;
+  m.castShadow = true;
+  return m;
+}
 
-  for (let i = 0; i < CLAW_COUNT; i++) {
-    const a = (i / CLAW_COUNT) * Math.PI * 2;
-    const sin = Math.sin(a);
-    const cos = Math.cos(a);
-    // Zylinderaufnahme: das Ohr, das neben dem Drehwerk nach oben steht
-    const ohr = new THREE.Mesh(
-      new THREE.BoxGeometry(0.2 * RK, 0.15 * KH, 0.32 * RK),
+/**
+ * Gelenkring — der Kreis, auf dem die fünf Krallen hängen.
+ *
+ * Er war am 12.09. abends ersatzlos gestrichen worden („dieser Ring, den Du da
+ * zeichnest, der existiert gar nicht"), und die Krallen hingen stattdessen an
+ * einem Strunk mit 0,25 m Radius. Mit der Rückkehr zur Mittagsform ist er
+ * wieder da — er ist es, der die Kralle so weit außen aufhängt, dass sie ein
+ * großes C beschreibt.
+ */
+export function baueGelenkring(st: SpinnenStoffe): THREE.Mesh {
+  const m = new THREE.Mesh(new THREE.TorusGeometry(CLAW_RING_R, 0.075, 8, 22), st.kante);
+  m.rotation.x = Math.PI / 2;
+  m.position.y = CLAW_RING_Y;
+  return m;
+}
+
+/**
+ * Eine Sichelkralle: Lagerbock, sechs gebogene Segmente, stumpfe Spitze.
+ *
+ * Gebaut als Kette ineinandersteckender Gruppen — jedes Segment sitzt eine
+ * Segmentlänge tiefer als sein Vorgänger und ist um `CLAW_SEG_BEND` weiter
+ * gekippt. Das ist genau die Rechnung aus `clawPoint`, nur als Szenengraph:
+ * Modell und Kollider können dadurch nicht auseinanderlaufen.
+ *
+ * Der zurückgegebene Knoten ist der Drehpunkt am Gelenkring. Ihn dreht der
+ * Bagger um seine lokale x-Achse, um die Spinne zu öffnen.
+ */
+export function baueKralle(st: SpinnenStoffe, winkel: number): THREE.Group {
+  const pivot = new THREE.Group();
+  pivot.position.set(Math.sin(winkel) * CLAW_RING_R, CLAW_RING_Y, Math.cos(winkel) * CLAW_RING_R);
+  pivot.rotation.order = "YXZ";
+  pivot.rotation.y = winkel; // lokales +z zeigt radial nach außen
+
+  const lagerbock = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.18, 0.22), st.kante);
+  lagerbock.position.y = 0.02;
+  pivot.add(lagerbock);
+
+  let eltern: THREE.Object3D = pivot;
+  for (let i = 0; i < CLAW_SEGMENTS; i++) {
+    const breite = SEG_BREITE[i] ?? 0.15;
+    const dicke = SEG_DICKE[i] ?? 0.085;
+    const seg = new THREE.Group();
+    if (i > 0) {
+      seg.position.y = -CLAW_SEG_LEN;
+      seg.rotation.x = CLAW_SEG_BEND;
+    }
+    const schale = new THREE.Mesh(
+      new THREE.BoxGeometry(breite, CLAW_SEG_LEN + 0.04, dicke),
+      st.guss
+    );
+    schale.position.y = -CLAW_SEG_LEN / 2;
+    schale.castShadow = true;
+    seg.add(schale);
+    // dunkler Steg auf der Außenseite gibt der Schale Profil
+    const steg = new THREE.Mesh(
+      new THREE.BoxGeometry(breite + 0.03, CLAW_SEG_LEN + 0.05, 0.045),
       st.kante
     );
-    ohr.position.set(sin * 0.79 * RK, -0.451 * KH, cos * 0.79 * RK);
-    ohr.rotation.y = a;
-    ohr.castShadow = true;
-    g.add(ohr);
-    // Lageraufnahme: der Arm vom Rand hinaus zum Schalenbolzen
-    const arm = new THREE.Mesh(
-      new THREE.BoxGeometry(0.26 * RK, 0.17 * KH, 0.4 * RK),
-      st.kante
-    );
-    arm.position.set(sin * 0.82 * RK, CLAW_RING_Y + 0.05 * KH, cos * 0.82 * RK);
-    arm.rotation.y = a;
-    arm.castShadow = true;
-    g.add(arm);
+    steg.position.set(0, -CLAW_SEG_LEN / 2, dicke / 2);
+    seg.add(steg);
+    eltern.add(seg);
+    eltern = seg;
   }
-  return g;
-}
 
-/**
- * Gelenk einer Schale — Lagerbock, Drehbolzen, Laschenbolzen, Lasche.
- *
- * Auf der Maßskizze (P25VR HD-3-W, 12.09.2026) hat jede Schale zwei Bolzen
- * dicht beieinander: unten den Drehbolzen zum Rahmen, darüber den Bolzen für
- * die Lasche. Dazwischen liegt der Hebelarm, und dass er kurz ist, ist der
- * Grund für die Griffkraft.
- *
- * Beides waren vorher gedachte Punkte ohne Bauteil — die Kolbenstange endete
- * sichtbar im Nichts.
- */
-export function baueGelenk(st: SpinnenStoffe): THREE.Group {
-  const g = new THREE.Group();
-  const lagerbock = new THREE.Mesh(new THREE.BoxGeometry(0.34 * M, 0.28 * M, 0.26 * M), st.kante);
-  lagerbock.position.set(0, 0.04 * M, 0.03 * M);
-  lagerbock.castShadow = true;
-  g.add(lagerbock);
   /*
-   * Der Drehbolzen liegt quer zur Schale, also entlang der lokalen x-Achse —
-   * genau der Achse, um die das Gelenk schwenkt. Er ragt beidseits heraus, wie
-   * ein gesicherter Bolzen es tut.
+   * Stumpfes Schalenende statt Vierkantkegel: Sortiergreifer laufen wie ein
+   * Löffelrand aus, nicht wie ein Spieß. Das erklärt nebenbei, warum Bleche
+   * früher aufgespießt wurden.
    */
-  const dreh = new THREE.Mesh(new THREE.CylinderGeometry(0.075 * M, 0.075 * M, 0.5 * M, 10), st.bolzen);
-  dreh.rotation.z = Math.PI / 2;
-  dreh.castShadow = true;
-  g.add(dreh);
-  const laschenBolzen = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.055 * M, 0.055 * M, 0.34 * M, 10),
-    st.bolzen
-  );
-  laschenBolzen.rotation.z = Math.PI / 2;
-  laschenBolzen.position.copy(LASCHE_AM_GELENK);
-  laschenBolzen.castShadow = true;
-  g.add(laschenBolzen);
-  const lasche = new THREE.Mesh(
-    new THREE.BoxGeometry(0.1 * M, LASCHE_AM_GELENK.y * 1.1, 0.14 * M),
-    st.kante
-  );
-  lasche.position.set(0, LASCHE_AM_GELENK.y * 0.55, LASCHE_AM_GELENK.z * 0.55);
-  lasche.rotation.x = Math.atan2(LASCHE_AM_GELENK.z, LASCHE_AM_GELENK.y);
-  lasche.castShadow = true;
-  g.add(lasche);
-  return g;
+  const spitze = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.075, 0.14, 8), st.kante);
+  spitze.position.y = -CLAW_SEG_LEN - 0.03;
+  spitze.castShadow = true;
+  spitze.name = "tineTip";
+  eltern.add(spitze);
+
+  return pivot;
 }
 
-/**
- * Wo die Kolbenstange am Gelenk angreift — Bolzenmitte im Gelenkframe.
- *
- * Ueber dem Drehbolzen und deutlich nach aussen: Auf dem Baugruppenblatt sitzt
- * an jeder Schale hinten ein Ausleger, und daran greift die Stange an. Die
- * Lage ist nicht gegriffen, sondern abgetastet (13.09.2026) unter drei
- * Bedingungen:
- *
- *   - Der Zylinder muss frei NEBEN dem Grundkoerper stehen. Beim ersten Anlauf
- *     lag die Lasche innen; die Zylinder verschwanden dadurch komplett im Kopf
- *     und waren im Bild nicht zu sehen.
- *   - Der Hub soll rund ein Viertel der Laenge betragen: 0,61 m geschlossen,
- *     0,85 m offen.
- *   - Der Zylinder soll steil stehen (hier 12 bis 14 Grad), nicht quer
- *     ueber dem Kopf liegen wie beim ersten Anlauf mit 31 Grad.
- *   - Nichts davon darf ueber die geschlossene Schalenkontur hinausragen.
- *     Ein Zwischenstand hatte die Lasche 32 cm nach aussen gelegt; die
- *     Spinne mass geschlossen dadurch 2,61 m statt der 1,89 m aus dem
- *     Datenblatt — die Laschen standen wie Hoerner ab.
- *
- * Die Lasche liegt damit oberhalb und INNERHALB des Drehbolzens, und der
- * Zylinder zieht die Schale zu: Beim Schliessen faehrt er ein. So ist es
- * auch im Bewegungsablauf auf dem Baugruppenblatt — offen stehen die
- * Kolbenstangen weit heraus, geschlossen sind sie eingezogen.
- */
-export const LASCHE_AM_GELENK = new THREE.Vector3(0, 0.18, -0.18);
-
-/**
- * Schale — Haut, Seitenwangen, Schneidkante und Zahn.
- *
- * Sie ist ein geschweißter Trog, kein Ausschnitt aus einem Rotationskörper:
- * zwei tiefe Wangen mit einer zurückliegenden Haut dazwischen. Als Spaltstück
- * hatte sie keine eigene Form und keine Kanten, und geschlossen ergab sie
- * zwangsläufig ein Ei — ein Rotationskörper ist ein Ei (Befund 12.09.2026:
- * „ich glaub dein Ansatz ist falsch").
- *
- * Gebaut wird im GESCHLOSSENEN Zustand. Bei Spreizung 0 läuft die Schale durch
- * die Achse hindurch auf die Gegenseite, der Radius wird negativ, und die
- * Bauroutine klemmt ihn ab — das zerstört die Form vollständig.
- */
-export function baueSchale(st: SpinnenStoffe): THREE.Group {
-  const g = new THREE.Group();
-  // Die Haut liegt hinter der Außenkante der Wangen zurück — daher das Profil
-  const haut = new THREE.Mesh(
-    schalenGeometrie(0, CLAW_SHELL_BREITE, -HAUT_RUECKSPRUNG),
-    st.guss
-  );
-  haut.castShadow = true;
-  haut.receiveShadow = true;
-  g.add(haut);
-  // Schneidkante: nur die unterste Station, sonst zerschneidet sie die Fläche
-  const schneide = new THREE.Mesh(
-    schalenGeometrie(6, CLAW_SHELL_BREITE, -HAUT_RUECKSPRUNG),
-    st.kante
-  );
-  schneide.scale.set(1.012, 1, 1.012);
-  g.add(schneide);
-  for (const seite of [-1, 1]) {
-    const wange = new THREE.Mesh(flanschGeometrie(seite), st.kante);
-    wange.castShadow = true;
-    g.add(wange);
-  }
-  g.add(baueZahn(st));
-  return g;
-}
-
-/**
- * Zahn an der Schalenspitze.
- *
- * Er sitzt auf der Spitze und zeigt in Laufrichtung der Schale — beides
- * gerechnet, nicht geschätzt. Die Schale endet mit dem Winkel `th` gegen die
- * Senkrechte, läuft dort also in Richtung (0, −cos th, −sin th). Ein Kegel
- * zeigt von Haus aus nach +y; eine Drehung um x um φ bringt +y auf
- * (0, cos φ, sin φ). Aus cos φ = −cos th und sin φ = −sin th folgt φ = π + th.
- *
- * Beim ersten Versuch stand dort π − th: Der Zahn zeigte nach außen statt in
- * Laufrichtung und schwebte sichtbar neben der Schale.
- */
-export function baueZahn(st: SpinnenStoffe): THREE.Mesh {
-  const spitze = clawPoint(0, CLAW_CLOSED_SPLAY, CLAW_SEGMENTS, new THREE.Vector3());
-  const th = (CLAW_BEND_KUM[CLAW_SEGMENTS - 1] ?? 0) - CLAW_CLOSED_SPLAY;
-  const halb = 0.1 * M;
-  /*
-   * Ein Keil, kein Kegel.
-   *
-   * Vorher war es ein vierseitiger Kegel, und auf dem Bauteilblatt vom
-   * 13.09.2026 war das sofort zu sehen: von vorn eine flache Raute, von der
-   * Seite ein Dreieck — ein Blech, kein Zahn. Auf dem Baugruppenblatt ist die
-   * Spitze ein Verschleissteil mit Ruecken, Flanken und einer Schneide: breit
-   * quer zur Schale, schmal in Blickrichtung, und sie laeuft nicht auf einen
-   * Punkt, sondern auf eine Kante zu.
-   */
-  const zahn = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.035 * M, 0.1 * M, 0.26 * M, 4),
-    st.kante
-  );
-  zahn.scale.set(1.45, 1, 0.6);
-  zahn.position.set(
-    0,
-    spitze.y - CLAW_RING_Y - halb * Math.cos(th),
-    spitze.z - CLAW_RING_R - halb * Math.sin(th)
-  );
-  zahn.rotation.x = Math.PI + th;
-  zahn.name = "tineTip";
-  zahn.castShadow = true;
-  return zahn;
-}
-
-/**
- * Zylinder — Rohr und Kolbenstange.
- *
- * Auf der Vorlage sind sie das Auffälligste an der ganzen Maschine: dick,
- * fast senkrecht, in Maschinengrün, mit blanker Stange. Vorher waren es
- * 6,6-cm-Schrägstreben, die im Bild untergingen — ein Zylinder, der fünf
- * Tonnen zudrückt, ist kein Bleistift.
- */
+/** Zylinder — Rohr und Kolbenstange, je ein eigenes Objekt. */
 export function baueZylinder(st: SpinnenStoffe): { rohr: THREE.Mesh; stange: THREE.Mesh } {
-  const rohr = new THREE.Mesh(new THREE.CylinderGeometry(0.115 * M, 0.12 * M, 1, 14), st.lack);
+  const rohr = new THREE.Mesh(new THREE.CylinderGeometry(0.066, 0.066, 1, 10), st.lack);
   rohr.castShadow = true;
-  const stange = new THREE.Mesh(new THREE.CylinderGeometry(0.065 * M, 0.065 * M, 1, 12), st.chrom);
+  const stange = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.042, 1, 8), st.chrom);
   return { rohr, stange };
 }
 
@@ -409,7 +219,7 @@ export interface ZylinderAnlenkung {
 
 export interface Spinne {
   gruppe: THREE.Group;
-  /** Die fünf Schalengelenke — sie werden zum Öffnen gedreht. */
+  /** Die fünf Krallengelenke — sie werden zum Öffnen gedreht. */
   gelenke: THREE.Group[];
   zylinder: ZylinderAnlenkung[];
 }
@@ -422,20 +232,15 @@ export interface Spinne {
  */
 export function baueSpinne(st: SpinnenStoffe = spinnenStoffe()): Spinne {
   const gruppe = new THREE.Group();
-  gruppe.add(baueAufhaengung(st));
-  gruppe.add(baueDrehwerk(st));
-  gruppe.add(baueGreiferkopf(st));
+  gruppe.add(baueRotator(st));
+  gruppe.add(baueTraverse(st));
+  gruppe.add(baueGelenkring(st));
 
   const gelenke: THREE.Group[] = [];
   const zylinder: ZylinderAnlenkung[] = [];
   for (let i = 0; i < CLAW_COUNT; i++) {
     const a = (i / CLAW_COUNT) * Math.PI * 2;
-    const gelenk = new THREE.Group();
-    gelenk.position.set(Math.sin(a) * CLAW_RING_R, CLAW_RING_Y, Math.cos(a) * CLAW_RING_R);
-    gelenk.rotation.order = "YXZ";
-    gelenk.rotation.y = a; // lokales +z zeigt radial nach außen
-    gelenk.add(baueGelenk(st));
-    gelenk.add(baueSchale(st));
+    const gelenk = baueKralle(st, a);
     gruppe.add(gelenk);
     gelenke.push(gelenk);
 
@@ -444,25 +249,15 @@ export function baueSpinne(st: SpinnenStoffe = spinnenStoffe()): Spinne {
     gruppe.add(stange);
     zylinder.push({
       gelenk,
-      /*
-       * Der Zylinder steht fast senkrecht: oben am äußeren Rand der Birne,
-       * unten am Laschenbolzen über dem Drehpunkt. Weil der Bolzen oberhalb
-       * des Drehpunkts sitzt, schwenkt er beim Öffnen nach außen — die Stange
-       * fährt dabei aus, genau wie bei der echten Maschine.
-       *
-       * Ein erster Anlauf setzte ihn oben nah an die Achse und unten weit
-       * außen an die Schale. Der Zylinder lag dann quer über der Birne wie ein
-       * hingelegter Baumstamm.
-       */
       obenLokal: new THREE.Vector3(
-        Math.sin(a) * 0.919 * CLAW_RING_R,
-        0.451 * CLAW_RING_Y,
-        Math.cos(a) * 0.919 * CLAW_RING_R
+        Math.sin(a) * ZYLINDERKREIS,
+        -0.38,
+        Math.cos(a) * ZYLINDERKREIS
       ),
-      untenAmGelenk: LASCHE_AM_GELENK.clone(),
+      untenAmGelenk: new THREE.Vector3(0, -0.04, 0.2),
       rohr,
       stange,
-      rohrLaenge: 0.55,
+      rohrLaenge: 0.28,
     });
   }
   return { gruppe, gelenke, zylinder };
@@ -474,18 +269,16 @@ export function einzelteile(st: SpinnenStoffe = spinnenStoffe()): Array<{
   teil: THREE.Object3D;
 }> {
   const { rohr, stange } = baueZylinder(st);
-  rohr.scale.y = 0.55;
-  stange.scale.y = 0.45;
-  stange.position.y = -0.5;
+  rohr.scale.y = 0.28;
+  stange.scale.y = 0.3;
+  stange.position.y = -0.28;
   const zyl = new THREE.Group();
   zyl.add(rohr, stange);
   return [
-    { name: "1 Aufhaengung", teil: baueAufhaengung(st) },
-    { name: "2 Drehwerk", teil: baueDrehwerk(st) },
-    { name: "3 Greiferkopf", teil: baueGreiferkopf(st) },
-    { name: "4 Zylinder", teil: zyl },
-    { name: "5 Schale", teil: baueSchale(st) },
-    { name: "6 Gelenk", teil: baueGelenk(st) },
-    { name: "8 Zahn", teil: baueZahn(st) },
+    { name: "Rotator", teil: baueRotator(st) },
+    { name: "Traverse", teil: baueTraverse(st) },
+    { name: "Gelenkring", teil: baueGelenkring(st) },
+    { name: "Zylinder", teil: zyl },
+    { name: "Kralle", teil: baueKralle(st, 0) },
   ];
 }

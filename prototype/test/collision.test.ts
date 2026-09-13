@@ -16,6 +16,7 @@ import {
   clawSpan,
   CLAW_CLOSED_SPLAY,
   clawTipDepth,
+  CLAW_MAX_DEPTH,
   naechsteSpreizung,
   NACHDRUECK_RESERVE,
 } from "../src/excavator/clawGeometry";
@@ -371,32 +372,30 @@ describe("Reichweite des Baggers", () => {
 
   it("liefert eine Spitzentiefe, die zum Bodenanschlag passt", () => {
     /*
-     * Offen ist die Spinne LÄNGER als geschlossen — nicht umgekehrt.
-     *
-     * Das Datenblatt sagt es (A = 2363 mm offen, B = 1966 mm zu), und die
-     * Geometrie erzwingt es: Geschlossen müssen die Spitzen den Bolzenkreis
-     * von 0,73 m nach innen überbrücken, und dieser Weg fehlt ihnen nach
-     * unten. Eine Faust ist kürzer als eine ausgestreckte Hand.
-     *
-     * Bis zum 13.09.2026 stand hier die umgekehrte Forderung. Sie stammte aus
-     * der Zeit, als die Schale ein 170°-Haken war — da traf sie sogar zu, weil
-     * die Spitze beim Öffnen wieder hochkam. Die Form war aber falsch.
+     * Hier stand zweimal eine Behauptung darueber, welche Stellung die tiefere
+     * ist — erst „zu ist tiefer", dann „offen ist tiefer". Beide waren fuer
+     * ihre jeweilige Form richtig und wurden beim naechsten Formwechsel
+     * falsch. Die Frage ist ohnehin die falsche: Fuer den Bodenanschlag zaehlt
+     * nicht, welche Stellung tiefer ist, sondern dass mit der tiefsten
+     * gerechnet wird.
      */
     const offen = clawTipDepth(CLAW_OPEN_SPLAY);
     const zu = clawTipDepth(CLAW_CLOSED_SPLAY);
+    expect(offen).toBeGreaterThan(1.5);
     expect(zu).toBeGreaterThan(1.5);
-    expect(offen).toBeGreaterThan(zu);
+    expect(CLAW_MAX_DEPTH, "Maximum liegt unter einer Einzelstellung").toBeGreaterThanOrEqual(
+      Math.max(offen, zu) - 1e-9
+    );
+    for (let i = 0; i <= 20; i++) {
+      expect(clawTipDepth((CLAW_OPEN_SPLAY * i) / 20)).toBeLessThanOrEqual(CLAW_MAX_DEPTH + 1e-9);
+    }
     /*
-     * Obergrenze der Spitzentiefe. Sie hütet, dass der Greifer nicht so lang
-     * wird, dass der Arm ihn nicht mehr über eine Wand hebt: Die 5-m-Wand des
-     * Mischschrottplatzes plus Greiferlänge muss der Arm noch schaffen.
-     *
-     * Von 2,6 auf 3,0 angehoben, als die Schale nach der Vorlage länger wurde
-     * (E-121). Dass es weiterhin reicht, prüft nicht diese Zahl, sondern
-     * `test/reach.test.ts`: dort wird für jede Mulde nachgerechnet, ob der Arm
-     * von der Arbeitslinie aus über ihre Wand kommt.
+     * Obergrenze der Spitzentiefe. Sie huetet, dass der Greifer nicht so lang
+     * wird, dass der Arm ihn nicht mehr ueber eine Wand hebt. Dass es reicht,
+     * prueft nicht diese Zahl, sondern `test/reach.test.ts`: dort wird fuer
+     * jede Mulde nachgerechnet, ob der Arm ueber ihre Wand kommt.
      */
-    expect(zu).toBeLessThan(3.0);
+    expect(CLAW_MAX_DEPTH).toBeLessThan(3.0);
   });
 
   it("läuft vom Gelenk bis zur Spitze durchgehend abwärts", () => {

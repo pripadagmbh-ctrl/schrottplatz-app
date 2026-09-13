@@ -226,7 +226,7 @@ function gegenprobe(puffer: Buffer): void {
         "HYDRAULIC_LINES",
         ...Array.from({ length: SCHALEN }, (_, i) => {
           const nr = String(i + 1).padStart(2, "0");
-          return [`SHELL_${nr}`, `CYLINDER_${nr}`, `CYL_ROD_${nr}`, `WEAR_PLATE_${nr}`];
+          return [`SHELL_${nr}`, `CYLINDER_${nr}`, `CYL_ROD_${nr}`, `WEAR_PLATE_${nr}_1`];
         }).flat(),
       ].filter((n) => !szene.getObjectByName(n));
       if (fehlt.length) {
@@ -273,7 +273,8 @@ function gegenprobe(puffer: Buffer): void {
 
       console.log(
         `  Gegenprobe: Schale schwenkt ${(((offenWinkel - zuWinkel) * 180) / Math.PI).toFixed(1)}°, ` +
-          `Stange faehrt ${((offenStange - zuStange) * 100).toFixed(0)} cm aus, ` +
+          `Stange faehrt beim Oeffnen ${Math.abs((offenStange - zuStange) * 100).toFixed(0)} cm ` +
+          `${offenStange > zuStange ? "aus" : "ein"}, ` +
           `Rotator nach einem Viertel bei ${((gedreht * 180) / Math.PI).toFixed(0)}°`
       );
       if (Math.abs(offenWinkel - zuWinkel) < 0.5) {

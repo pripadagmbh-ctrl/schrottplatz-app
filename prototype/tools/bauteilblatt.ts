@@ -17,7 +17,15 @@ import {
   spinnenStoffe,
   type ZylinderAnlenkung,
 } from "../src/excavator/grappleParts";
-import { CLAW_CLOSED_SPLAY, CLAW_OPEN_SPLAY } from "../src/excavator/clawGeometry";
+import {
+  CLAW_CLOSED_SPLAY,
+  CLAW_OPEN_SPLAY,
+  CLAW_RING_R,
+  CLAW_SEG_BEND,
+  CLAW_SEGMENTS,
+  CLAW_MAX_DEPTH,
+  clawSpan,
+} from "../src/excavator/clawGeometry";
 
 interface Dreieck {
   p: Array<[number, number]>;
@@ -191,8 +199,13 @@ let svg =
   "Spinne — Bauteile, Stand 13.09.2026</text>" +
   '<text x="' + RAND + '" y="' + (RAND + 48) +
   '" font-family="Segoe UI,Arial" font-size="13" fill="#5b626b">' +
-  "Sennebogen MG4.1-800-HO5, im Spiel um ein Viertel vergroessert · " +
-  "Bogen 86° · Bolzenkreis 1,83 m · offen 2,73 m Spitzenweite</text>";
+  "Sichelkralle vom 12.09. mittags · " +
+  (CLAW_SEGMENTS + " Segmente, Bogen " +
+    Math.round((CLAW_SEG_BEND * (CLAW_SEGMENTS - 1) * 180) / Math.PI) + "°") +
+  " · Gelenkring " + (2 * CLAW_RING_R).toFixed(2).replace(".", ",") + " m" +
+  " · offen " + clawSpan(CLAW_OPEN_SPLAY).toFixed(2).replace(".", ",") +
+  " m Spitzenweite · tiefste Spitze " +
+  CLAW_MAX_DEPTH.toFixed(2).replace(".", ",") + " m</text>";
 
 felder.forEach((f, i) => {
   const sp = i % SPALTEN;

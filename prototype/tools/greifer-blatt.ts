@@ -1,5 +1,5 @@
 /**
- * Bauteil- und Stellungsblatt des Mehrschalengreifers.
+ * Bauteil- und Stellungsblatt des Fünfzinken-Mehrschalengreifers.
  *
  * Aufruf:  npx vite-node tools/greifer-blatt.ts
  * Ergebnis: docs/greifer-mehrschalen.svg
@@ -7,64 +7,49 @@
 import * as THREE from "three";
 import { writeFileSync } from "node:fs";
 import {
-  baueAdapter,
+  baueAufhaengung,
   baueGelenkbolzen,
-  baueKopf,
-  baueLasche,
+  baueMittelstueck,
   baueRotator,
-  baueSchalenkoerper,
-  baueSpitze,
-  baueVerschleissmesser,
-  baueWange,
+  baueSchale,
   baueZylinder,
   stoffe,
 } from "../src/grapple/parts";
-import { SCHALEN } from "../src/grapple/form";
+import { GELENKRING, GROESSTE_TIEFE, SCHALEN, SEGMENTE, clawSpan, OFFEN } from "../src/grapple/form";
 import { baueGreifer } from "../src/grapple/rig";
 import { BLICK_SCHRAEG, BLICK_VORN, blatt, feld, type Feld } from "./riss";
 
 const st = stoffe();
 
-function schaleKomplett(): THREE.Group {
-  const g = new THREE.Group();
-  g.add(baueSchalenkoerper(st));
-  g.add(baueWange(st, -1));
-  g.add(baueWange(st, 1));
-  g.add(baueVerschleissmesser(st));
-  g.add(baueSpitze(st));
-  g.add(baueLasche(st));
-  return g;
-}
-
 function zylinderKomplett(): THREE.Group {
   const g = new THREE.Group();
   const { rohr, stange } = baueZylinder(st);
-  stange.scale.y = 0.42;
-  stange.position.y = -0.34;
+  rohr.scale.y = 0.28;
+  rohr.position.y = -0.14;
+  stange.scale.y = 0.3;
+  stange.position.y = -0.29;
   g.add(rohr, stange);
   return g;
 }
 
-function greiferIn(oeffnung: number, drehung = 0): THREE.Object3D {
+function greiferIn(oeffnung: number): THREE.Object3D {
   const g = baueGreifer(stoffe());
   g.setOeffnung(oeffnung);
-  g.setDrehung(drehung);
   return g.wurzel;
 }
 
 const teile: Feld[] = [
-  { name: "1  ADAPTER", obj: baueAdapter(st), blick: BLICK_SCHRAEG },
-  { name: "2  ROTATOR", obj: baueRotator(st), blick: BLICK_SCHRAEG },
-  { name: "3  GRAPPLE_HEAD", obj: baueKopf(st), blick: BLICK_SCHRAEG },
-  { name: "4  CYLINDER", obj: zylinderKomplett(), blick: BLICK_SCHRAEG, notiz: `x${SCHALEN}` },
-  { name: "5  SHELL", obj: schaleKomplett(), blick: BLICK_SCHRAEG, notiz: `x${SCHALEN}` },
-  { name: "6  PIVOT_PIN", obj: baueGelenkbolzen(st), blick: BLICK_SCHRAEG, notiz: `x${SCHALEN}` },
-  { name: "8  WEAR_PLATE + TIP", obj: (() => {
-      const g = new THREE.Group();
-      g.add(baueVerschleissmesser(st));
-      g.add(baueSpitze(st));
-      return g;
-    })(), blick: BLICK_SCHRAEG, notiz: `x${SCHALEN}` },
+  { name: "01/02  ADAPTER", obj: baueAufhaengung(st), blick: BLICK_SCHRAEG },
+  { name: "03  ROTATOR", obj: baueRotator(st), blick: BLICK_SCHRAEG },
+  { name: "06/07  MITTELSTUECK", obj: baueMittelstueck(st), blick: BLICK_SCHRAEG },
+  { name: "04  ZYLINDER", obj: zylinderKomplett(), blick: BLICK_SCHRAEG, notiz: `x${SCHALEN}` },
+  {
+    name: "08/09/10  GREIFERSCHALE",
+    obj: baueSchale(st, 0, "01"),
+    blick: BLICK_SCHRAEG,
+    notiz: `x${SCHALEN}`,
+  },
+  { name: "11  GELENKBOLZEN", obj: baueGelenkbolzen(st), blick: BLICK_SCHRAEG, notiz: `x${SCHALEN}` },
 ];
 
 const stellungen: Feld[] = [
@@ -102,14 +87,18 @@ stellungen.forEach((f, i) => {
   inhalt += feld(f, RAND + i * (grossB + LUFT), yGross, grossB, GROSS_H);
 });
 
+const komma = (x: number): string => x.toFixed(2).replace(".", ",");
+
 writeFileSync(
   "docs/greifer-mehrschalen.svg",
   blatt(
     breite,
     hoehe,
-    "Mehrschalengreifer — Bauteile und Stellungen",
-    `${SCHALEN} Schalen, halboffene Bauform (HO) nach SENNEBOGEN MG4.1 · Bogen 86° · ` +
-      "Bolzenkreis 1,83 m · offen 2,73 m Spitzenweite · im Spiel x1,25",
+    `${SCHALEN}-Zinken-Mehrschalengreifer — Bauteile und Stellungen`,
+    `Sichelkralle aus ${SEGMENTE} Segmenten · Gelenkring ${komma(2 * GELENKRING)} m · ` +
+      `offen ${komma(clawSpan(OFFEN))} m Spitzenweite · ` +
+      `tiefste Spitze ${komma(GROESSTE_TIEFE)} m · ` +
+      `dieselbe Geometrie wie die Spinne im Spiel`,
     inhalt
   )
 );

@@ -18,6 +18,7 @@ import {
   NACHDRUECK_RESERVE,
   WEICH_RESERVE,
   clawTipDepth,
+  CLAW_MAX_DEPTH,
 } from "./clawGeometry";
 
 /**
@@ -41,7 +42,13 @@ import {
  * Reine Geometrie, kein Zustand — absichtlich ohne die Klasse benutzbar.
  */
 export function hoechsteKrallenspitze(abstandM: number): number {
-  const tief = clawTipDepth(CLAW_OPEN_SPLAY);
+  /*
+   * Die groesste Tiefe ueber alle Stellungen, nicht die der offenen Spinne.
+   * Mit der Sichelkralle vom 12.09. mittags haengt die geschlossene Spinne
+   * 13 cm tiefer als die offene — wer nur die offene rechnet, haelt den Arm
+   * fuer hoeher, als er ist, und der Greifer streift die Wand.
+   */
+  const tief = CLAW_MAX_DEPTH;
   let best = -Infinity;
   for (let b = BOOM_MIN; b <= BOOM_MAX; b += 0.004) {
     for (let st = STICK_MIN; st <= STICK_MAX; st += 0.004) {
@@ -172,8 +179,18 @@ export function anlaufZeit(lastKg: number): number {
 }
 
 /** Ab diesem Schliessgrad treffen sich die Krallenspitzen. */
-/** Kollider-Reihen je Schale, quer zur Krallenrichtung. */
-const KOLLIDER_REIHEN = 3;
+/**
+ * Kollider-Reihen je Kralle, quer zur Krallenrichtung.
+ *
+ * Eine. Am 12.09. abends waren es drei (E-117), weil die 0,90 m breite
+ * Trogschale mit einer einzigen Kapselkette physisch ein 18 cm dicker Draht
+ * war und Material links und rechts daran vorbeifiel. Mit der Rueckkehr zur
+ * Sichelkralle vom Mittag ist das hinfaellig: Die ist an der Wurzel 0,40 m
+ * breit und laeuft auf 0,15 m aus. Drei Reihen mit 0,30 rad Seitenversatz
+ * laegen bei 0,7 m Radius rund 0,21 m neben der Mitte — also ausserhalb der
+ * Kralle, die man sieht.
+ */
+const KOLLIDER_REIHEN = 1;
 /** Seitenversatz der aeusseren Reihen (rad Umfangswinkel). */
 const KOLLIDER_ABSTAND = 0.30; // rad — Seitenversatz der aeusseren Kollider-Reihen
 

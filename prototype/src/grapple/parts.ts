@@ -1,58 +1,70 @@
 /**
- * Die Bauteile des Mehrschalengreifers.
+ * Die Bauteile des Fünfzinken-Mehrschalengreifers.
  *
- * Jede Funktion liefert genau ein Bauteil, gebaut um seinen eigenen Ursprung.
- * Das ist keine Ordnungsliebe, sondern die Bedingung für alles Weitere: Der
- * Ursprung eines Teils ist im glTF sein Pivot. Eine Schale, die um ihren
- * Drehbolzen gebaut ist, dreht sich in jeder Engine um genau diesen Bolzen —
- * ohne Korrekturwerte, ohne Nachrechnen.
+ * Nummerierung nach der Positionsliste der Explosionszeichnung (13.09.2026):
  *
- * Maße kommen ausnahmslos aus `form.ts`.
+ *   01 Aufhängung / Anschraubplatte   Verbindung zum Stiel
+ *   02 Aufnahmebolzen                 Befestigung der Aufhängung
+ *   03 Rotator                        Drehwerk
+ *   04 Hydraulikzylinder (5x)         Greifbewegung der Schalen
+ *   05 Hydraulikschläuche (5x)        Zylinderverbindung
+ *   06 Schutzabdeckung                Schutz vor Schmutz
+ *   07 Mittelstück                    zentrale Greiferanbindung
+ *   08 Greiferschale (5x)             Schalenkörper
+ *   09 Verschleißblech                seitlicher Schutz
+ *   10 Greiferspitze (5x)             austauschbar
+ *   11 Gelenkbolzen                   Verbindung Schale / Zylinder
+ *
+ * Nicht als eigene Netze gebaut sind 12 Buchse, 13 Sicherungsring und 14
+ * Verschraubung: In einer Spielkamera ist davon nichts zu sehen, und der
+ * Auftrag sagt ausdrücklich, unnötig winzige Details wegzulassen. Sie sind an
+ * den Gelenkbolzen mitgedacht — dort sitzt der Absatz, auf dem sie liefen.
+ *
+ * Jedes Teil ist um seinen eigenen Ursprung gebaut. Das ist keine Ordnungsliebe,
+ * sondern die Bedingung für alles Weitere: Der Ursprung eines Teils ist im glTF
+ * sein Pivot.
  */
 import * as THREE from "three";
 import {
-  ABSCHNITT,
-  BOLZENKREIS,
-  KOPF_OBERKANTE,
-  TASCHE_HALBWINKEL,
-  kopfKontur,
-  HAUT,
-  KOPFHOEHE,
+  GELENKRING,
   LASCHE,
-  MASSSTAB,
+  MITTELSTUECK,
+  RING_ROHR,
+  RING_Y,
+  ROHR_R,
   ROHRLAENGE,
-  ZYLINDER_RADIUS,
+  ROTATOR,
   SCHALEN,
-  SCHALE_HALBWINKEL,
-  STATIONEN,
-  WANGE,
-  ZU,
-  ZYLINDER_AUFNAHME,
-  halbbreite,
-  mittellinie,
+  SEGMENTBOGEN,
+  SEGMENTE,
+  SEGMENTLAENGE,
+  SEG_BREITE,
+  SEG_DICKE,
+  STANGE_R,
+  VERSCHLEISSBLECH,
+  ZYLINDERKREIS,
+  ZYLINDER_OBEN_Y,
 } from "./form";
 
 /* ------------------------------------------------------------------ Stoffe */
 
-/**
- * Die Werkstoffe, als PBR-Materialien.
- *
- * Die Farben sind vom Prospektfoto abgenommen: dunkelgrauer Lack am
- * Grundkörper, fast schwarzer Stahl an den hochbelasteten Stellen, das
- * Maschinengrün ausschließlich an den Zylinderrohren. Genau diese Sparsamkeit
- * macht das Gerät industriell — drei Farben, nicht zehn.
- */
 export interface Stoffe {
-  lack: THREE.MeshStandardMaterial;
+  guss: THREE.MeshStandardMaterial;
   stahl: THREE.MeshStandardMaterial;
   bolzen: THREE.MeshStandardMaterial;
   gruen: THREE.MeshStandardMaterial;
   chrom: THREE.MeshStandardMaterial;
   gummi: THREE.MeshStandardMaterial;
-  verschleiss: THREE.MeshStandardMaterial;
-  ventil: THREE.MeshStandardMaterial;
 }
 
+/**
+ * Die Werkstoffe, als PBR-Materialien.
+ *
+ * Dieselben Farben wie im Spiel: dunkler Hardox-Guss, fast schwarze Kanten,
+ * Maschinengrün ausschließlich an den Zylinderrohren. Auf der Vorlage ist das
+ * Grün das einzige Farbige am ganzen Gerät, und genau diese Sparsamkeit macht
+ * es industriell statt bunt.
+ */
 export function stoffe(): Stoffe {
   const m = (
     name: string,
@@ -65,628 +77,267 @@ export function stoffe(): Stoffe {
     return mat;
   };
   return {
-    lack: m("Stahl_lackiert", 0x3c4246, 0.55, 0.35),
-    stahl: m("Stahl_dunkel", 0x23282b, 0.48, 0.72),
-    bolzen: m("Stahl_blank", 0xc2c8ce, 0.22, 0.94),
-    gruen: m("Lack_gruen", 0x6db33f, 0.42, 0.3),
-    chrom: m("Kolbenstange_chrom", 0xd7dce1, 0.11, 0.95),
+    guss: m("Hardox_Guss", 0x40474b, 0.5, 0.55),
+    stahl: m("Stahl_dunkel", 0x23282b, 0.45, 0.7),
+    bolzen: m("Stahl_blank", 0xb9c0c6, 0.25, 0.9),
+    gruen: m("Lack_gruen", 0x62c94b, 0.4, 0.35),
+    chrom: m("Kolbenstange_chrom", 0xb8bec4, 0.22, 0.85),
     gummi: m("Hydraulikschlauch", 0x15181a, 0.85, 0.05),
-    verschleiss: m("Verschleissflaeche", 0x8b9299, 0.35, 0.85),
-    /* Der Ventilblock unter dem Zapfen ist auf dem Foto gelb — das einzige
-     * Gelb am Geraet, und genau deshalb faellt er auf. */
-    ventil: m("Ventilblock_gelb", 0xc9a81f, 0.5, 0.4),
   };
 }
 
-/* ------------------------------------------------------- Hilfe für Flächen */
-
-interface Netz {
-  pos: number[];
-  uv: number[];
-  idx: number[];
-}
-
-function netz(): Netz {
-  return { pos: [], uv: [], idx: [] };
-}
-
-function punkt(n: Netz, x: number, y: number, z: number, u: number, v: number): number {
-  const i = n.pos.length / 3;
-  n.pos.push(x, y, z);
-  n.uv.push(u, v);
-  return i;
-}
-
-function viereck(n: Netz, a: number, b: number, c: number, d: number): void {
-  n.idx.push(a, b, c, a, c, d);
-}
-
-function fertig(n: Netz, name: string): THREE.BufferGeometry {
-  const g = new THREE.BufferGeometry();
-  g.setAttribute("position", new THREE.Float32BufferAttribute(n.pos, 3));
-  g.setAttribute("uv", new THREE.Float32BufferAttribute(n.uv, 2));
-  g.setIndex(n.idx);
-  g.computeVertexNormals();
-  g.name = name;
-  return g;
-}
+/* ------------------------------------------------- (01/02) Aufhängung */
 
 /**
- * Ein Punkt der Schale im Frame ihres Gelenks.
+ * Aufhängung mit Anschraubplatte und Aufnahmebolzen.
  *
- * Die Umrechnung ist einfacher, als sie aussieht: Ein Punkt, der im Frame des
- * Greifers bei Radius `r`, Umfangswinkel `u` und Höhe `y` liegt, hat im Frame
- * des Gelenks — das auf dem Bolzenkreis sitzt und um seinen eigenen Winkel
- * gedreht ist — immer die Koordinaten
- *
- *     (r·sin u, y + Kopfhöhe, r·cos u − Bolzenkreis)
- *
- * unabhängig davon, um welche der Schalen es geht. Deshalb wird die Schale
- * einmal gebaut und für jede Position wiederverwendet.
+ * Zwei hochstehende Bleche mit einer Bohrung, dazwischen der Bolzen — daran
+ * erkennt man, dass das Gerät abnehmbar ist. Auf der Explosionszeichnung ist es
+ * die oberste Gruppe.
  */
-function amGelenk(r: number, u: number, y: number): [number, number, number] {
-  return [r * Math.sin(u), y + KOPFHOEHE, r * Math.cos(u) - BOLZENKREIS];
-}
-
-/** Querschnitt: die Winkel-Stützstellen über die Breite. */
-const QUER = 4;
-
-interface Rippe {
-  y: number;
-  r: number;
-  u: number;
-}
-
-/**
- * Die Stützstellen der Schale, gebaut im GESCHLOSSENEN Zustand.
- *
- * Warum geschlossen und nicht bei Schwenk 0: Bei 0 stünde die Schale senkrecht
- * unter ihrem Bolzen und liefe durch die Drehachse hindurch auf die Gegenseite
- * — die Radien würden negativ. Geschlossen bleiben sie durchweg positiv, und
- * gedreht wird später nur die Abweichung vom geschlossenen Zustand.
- */
-function schalenRippen(): Rippe[] {
-  return mittellinie(ZU).map((st, k) => ({
-    y: st.y,
-    r: st.r,
-    u: Math.asin(Math.min(0.999, halbbreite(k, st.r) / Math.max(st.r, 0.05))),
-  }));
-}
-
-/* ------------------------------------------------------------ (1) ADAPTER */
-
-/**
- * Aufhängung: Adapterplatte und Gabel mit Bolzen.
- *
- * Das oberste Bauteil, mit dem der Greifer am Stiel hängt. Auf dem Prospektfoto
- * sind es zwei hochstehende Bleche mit einer Bohrung, dazwischen der Bolzen —
- * daran erkennt man, dass das Gerät abnehmbar ist.
- */
-export function baueAdapter(st: Stoffe): THREE.Group {
+export function baueAufhaengung(st: Stoffe): THREE.Group {
   const g = new THREE.Group();
   g.name = "ADAPTER";
-  const R = BOLZENKREIS;
   for (const seite of [-1, 1]) {
-    const ohr = new THREE.Mesh(new THREE.BoxGeometry(0.1 * R, 0.3 * R, 0.42 * R), st.stahl);
+    const ohr = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.3, 0.34), st.stahl);
     ohr.name = `ADAPTER_OHR_${seite < 0 ? "L" : "R"}`;
-    ohr.position.set(seite * 0.17 * R, -0.13 * R, 0);
+    ohr.position.set(seite * 0.13, -0.13, 0);
     g.add(ohr);
   }
-  const bolzen = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.075 * R, 0.075 * R, 0.52 * R, 12),
-    st.bolzen
-  );
+  const bolzen = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.42, 12), st.bolzen);
   bolzen.name = "ADAPTER_BOLZEN";
   bolzen.rotation.z = Math.PI / 2;
-  bolzen.position.y = -0.06 * R;
+  bolzen.position.y = -0.06;
   g.add(bolzen);
-  const platte = new THREE.Mesh(new THREE.BoxGeometry(0.66 * R, 0.1 * R, 0.66 * R), st.lack);
+  const platte = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.07, 0.5), st.guss);
   platte.name = "ADAPTER_PLATTE";
-  platte.position.y = -0.33 * R;
+  platte.position.y = -0.31;
   g.add(platte);
   return g;
 }
 
-/* ------------------------------------------------------------ (2) ROTATOR */
+/* ------------------------------------------------------------ (03) Rotator */
 
 /**
- * Drehwerk: Motorgehäuse, Drehkranz, Drehdurchführung.
+ * Rotator — Drehwerk mit Gehäuse, Drehkranz und Drehdurchführung.
  *
- * Der Drehkranz ist das Erkennungsmerkmal — der breite Flansch, auf dem der
- * ganze Greiferkopf sitzt. Ohne ihn liest sich das Teil als Kiste.
- *
- * Der Ursprung liegt auf der Drehachse: Das Bauteil ist zugleich der Pivot für
- * die Rotationsanimation.
+ * Ein eigenes Gerät, kein Teil des Greifers: Es wird angeflanscht und ist auf
+ * jedem Bild als abgesetzter Kasten mit Flanschring zu erkennen. Sein Ursprung
+ * liegt auf der Drehachse — das Bauteil ist zugleich der Pivot der
+ * Rotationsanimation.
  */
 export function baueRotator(st: Stoffe): THREE.Group {
   const g = new THREE.Group();
   g.name = "ROTATOR";
-  const R = BOLZENKREIS;
   const gehaeuse = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.3 * R, 0.34 * R, 0.24 * R, 12),
+    new THREE.BoxGeometry(ROTATOR.breite, ROTATOR.hoehe, ROTATOR.breite),
     st.stahl
   );
   gehaeuse.name = "ROTATOR_GEHAEUSE";
-  gehaeuse.position.y = -0.15 * R;
+  gehaeuse.position.y = ROTATOR.y;
   g.add(gehaeuse);
-  const kranz = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.4 * R, 0.4 * R, 0.09 * R, 16),
-    st.lack
-  );
+  const kranz = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.24, 0.14, 12), st.guss);
   kranz.name = "ROTATOR_DREHKRANZ";
-  kranz.position.y = -0.31 * R;
+  kranz.position.y = -0.3;
   g.add(kranz);
-  const stutzen = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.06 * R, 0.06 * R, 0.24 * R, 8),
-    st.stahl
-  );
-  stutzen.name = "ROTATOR_DURCHFUEHRUNG";
-  stutzen.rotation.z = Math.PI / 2;
-  stutzen.position.set(0.33 * R, -0.13 * R, 0);
-  g.add(stutzen);
+  const durchfuehrung = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.18, 8), st.bolzen);
+  durchfuehrung.name = "ROTATOR_DURCHFUEHRUNG";
+  durchfuehrung.rotation.z = Math.PI / 2;
+  durchfuehrung.position.set(0.28, ROTATOR.y, 0);
+  g.add(durchfuehrung);
   return g;
 }
 
-/* ------------------------------------------------------- (3) GRAPPLE_HEAD */
+/* -------------------------------------------- (06/07) Mittelstück + Deckel */
 
 /**
- * Greiferkopf (Mitteltraverse): Gussblock mit gefrästen Taschen, Unterflansch,
- * Lagerböcke und Gusszapfen.
+ * Mittelstück — der Stahlgussblock, an dem alles hängt, mit Gelenkring.
  *
- * „Mitteltraverse aus hochfestem Stahlguss" (Prospekt) — ein Teil, nicht
- * mehrere.
+ * Fünfeckig, weil fünf Krallen daran hängen: So sitzt jede Anlenkung auf einer
+ * Fläche und nicht auf einer Kante. Der Gelenkring darunter ist der Kreis, auf
+ * dem die Krallen sitzen — er ist es, der die Kralle so weit außen aufhängt,
+ * dass sie ein großes C beschreibt.
  *
- * Der Kopf war bis zum 13.09.2026 ein glatter Kegelstumpf, an dem die Zylinder
- * außen an Ohren hingen. Befund dazu, im Klartext: „Der Greiferkopf ist kein
- * Vollklotz, wo die Hülsen angeschweißt bzw. die Hydraulikzylinder außen
- * angebracht sind. Die Zylinder laufen nach innen, weil es entsprechende
- * Fräsungen für die Zylinder gibt."
- *
- * Genau so ist es jetzt gebaut: In den Block ist je Schale eine senkrechte
- * Tasche gefräst, in der der Zylinder liegt; zwischen den Taschen stehen die
- * Rippen. Deshalb ist der Kopf von oben gezahnt und nicht rund, und deshalb
- * sieht man von außen die Zylinder in ihren Nischen statt davor.
- *
- * Das hat die Anlenkung mitgezogen: Versenkt rückt die Zylinderachse von 0,92
- * auf 0,72 Bolzenkreisradien nach innen, und der Zylinder steht dadurch fast
- * senkrecht (5° statt 12°) — wie auf dem Foto.
- *
- * Unter dem Block hängt der Gusszapfen. Er war zwischendurch ganz entfallen,
- * weil ich ihn für den Träger der Schalen gehalten hatte — das ist er nicht,
- * die Schalen hängen an den Lagerböcken am Blockrand. Er ist trotzdem da: der
- * mittige Gusskegel, um den sich die Schalen schließen.
+ * Obenauf die Schutzabdeckung (06): die flache Haube, die auf der
+ * Explosionszeichnung als eigenes Teil neben dem Block liegt. Sie deckt die
+ * Zylinderanlenkungen ab.
  */
-export function baueKopf(st: Stoffe): THREE.Group {
+export function baueMittelstueck(st: Stoffe): THREE.Group {
   const g = new THREE.Group();
   g.name = "GRAPPLE_HEAD";
-  const R = BOLZENKREIS;
-  const OBEN = KOPF_OBERKANTE * KOPFHOEHE;
-  const UNTEN = -KOPFHOEHE;
-  /*
-   * Ungleiche Hoehenstufen, dichter dort, wo sich die Kontur aendert: am Bauch
-   * des Zapfens und im Auslauf der Fraesung. Gleichmaessige Stufen haetten
-   * genau diese beiden Knicke verschmiert.
-   */
-  const STUFEN = [KOPF_OBERKANTE, -0.4, -0.55, -0.7, -0.8, -0.86, -0.93, -1.0];
-  /*
-   * Wenige Stützstellen, aber die Kanten zwischen Rippe und Tasche doppelt:
-   * Dort stehen zwei Ecken auf demselben Punkt, jede nur mit ihrer eigenen
-   * Fläche verbunden. `computeVertexNormals` mittelt dann nicht über die Kante
-   * hinweg, und die Fräsung bekommt einen scharfen Rand statt eines weichen
-   * Übergangs — ohne dass das Netz insgesamt feiner werden muss.
-   */
-  const RIPPE_N = 3;
-  const TASCHE_N = 4;
-  const winkel: number[] = [];
-  const sektor = (Math.PI * 2) / SCHALEN;
-  for (let i = 0; i < SCHALEN; i++) {
-    const a = (i / SCHALEN) * Math.PI * 2;
-    const rippeVon = a + TASCHE_HALBWINKEL;
-    const rippeBis = a + sektor - TASCHE_HALBWINKEL;
-    for (let k = 0; k <= RIPPE_N; k++) {
-      winkel.push(rippeVon + ((rippeBis - rippeVon) * k) / RIPPE_N);
-    }
-    for (let k = 0; k <= TASCHE_N; k++) {
-      winkel.push(rippeBis + ((2 * TASCHE_HALBWINKEL) * k) / TASCHE_N);
-    }
-  }
-
-  const n = netz();
-  const lagen: number[][] = [];
-  for (let h = 0; h < STUFEN.length; h++) {
-    const y = STUFEN[h]! * KOPFHOEHE;
-    const reihe: number[] = [];
-    for (const th of winkel) {
-      const r = kopfKontur(th, y);
-      reihe.push(
-        punkt(n, r * Math.sin(th), y, r * Math.cos(th), th / (Math.PI * 2), h / (STUFEN.length - 1))
-      );
-    }
-    lagen.push(reihe);
-  }
-  for (let h = 0; h < STUFEN.length - 1; h++) {
-    for (let j = 0; j < winkel.length; j++) {
-      const j2 = (j + 1) % winkel.length;
-      viereck(n, lagen[h]![j]!, lagen[h]![j2]!, lagen[h + 1]![j2]!, lagen[h + 1]![j]!);
-    }
-  }
-  // Deckel oben und unten, als Fächer auf die Achse
-  const mitteOben = punkt(n, 0, OBEN, 0, 0.5, 0);
-  const mitteUnten = punkt(n, 0, UNTEN, 0, 0.5, 1);
-  for (let j = 0; j < winkel.length; j++) {
-    const j2 = (j + 1) % winkel.length;
-    n.idx.push(mitteOben, lagen[0]![j2]!, lagen[0]![j]!);
-    const letzte = lagen[STUFEN.length - 1]!;
-    n.idx.push(mitteUnten, letzte[j]!, letzte[j2]!);
-  }
-  const block = new THREE.Mesh(fertig(n, "GreiferkopfGeo"), st.lack);
-  block.name = "HEAD_GRUNDKOERPER";
+  const block = new THREE.Mesh(
+    new THREE.CylinderGeometry(MITTELSTUECK.oben, MITTELSTUECK.unten, MITTELSTUECK.hoehe, 5),
+    st.guss
+  );
+  block.name = "HEAD_MITTELSTUECK";
+  block.position.y = MITTELSTUECK.y;
+  block.rotation.y = Math.PI / 5;
   g.add(block);
 
-  /*
-   * Ventilblock unter dem Zapfen.
-   *
-   * Auf dem Foto von unten (13.09.2026) sitzt mittig unter dem Guss ein gelber
-   * Block mit den Schlauchanschluessen — der Oelverteiler, von dem die vier
-   * bzw. fuenf Zylinder gespeist werden. Er ist klein, aber er ist das
-   * einzige, was unten aus der Mitte herausschaut, und ohne ihn wirkt die
-   * Unterseite wie abgesaegt.
-   */
-  const ventil = new THREE.Mesh(
-    new THREE.BoxGeometry(0.3 * R, 0.14 * KOPFHOEHE, 0.3 * R),
-    st.ventil
-  );
-  ventil.name = "HEAD_VENTILBLOCK";
-  ventil.position.y = UNTEN - 0.05 * KOPFHOEHE;
-  g.add(ventil);
-  const deckel = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.2 * R, 0.14 * R, 0.07 * KOPFHOEHE, SCHALEN * 2),
+  const haube = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.62, 0.14, 10), st.stahl);
+  haube.name = "HEAD_SCHUTZABDECKUNG";
+  haube.position.y = MITTELSTUECK.y + MITTELSTUECK.hoehe / 2 + 0.05;
+  g.add(haube);
+
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(GELENKRING, RING_ROHR, 8, 22),
     st.stahl
   );
-  deckel.name = "HEAD_ZAPFEN_DECKEL";
-  deckel.position.y = UNTEN + 0.01 * KOPFHOEHE;
-  g.add(deckel);
-
-  for (let i = 0; i < SCHALEN; i++) {
-    const a = (i / SCHALEN) * Math.PI * 2;
-    const sin = Math.sin(a);
-    const cos = Math.cos(a);
-    const nr = String(i + 1).padStart(2, "0");
-
-    // Lagerbock: die Gabel am Blockrand, die den Schalenbolzen hält
-    const lagerbock = new THREE.Mesh(
-      new THREE.BoxGeometry(0.32 * R, 0.2 * KOPFHOEHE, 0.4 * R),
-      st.stahl
-    );
-    lagerbock.name = `HEAD_LAGERBOCK_${nr}`;
-    lagerbock.position.set(sin * 0.9 * R, UNTEN + 0.06 * KOPFHOEHE, cos * 0.9 * R);
-    lagerbock.rotation.y = a;
-    g.add(lagerbock);
-
-    // Bolzen, auf dem das Zylinderrohr in seiner Tasche schwenkt
-    const bolzen = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.06 * R, 0.06 * R, 0.42 * R, 10),
-      st.bolzen
-    );
-    bolzen.name = `HEAD_ZYLINDERBOLZEN_${nr}`;
-    bolzen.position.set(
-      sin * ZYLINDER_AUFNAHME.r * R,
-      ZYLINDER_AUFNAHME.y * KOPFHOEHE,
-      cos * ZYLINDER_AUFNAHME.r * R
-    );
-    bolzen.rotation.y = a;
-    bolzen.rotation.z = Math.PI / 2;
-    g.add(bolzen);
-  }
+  ring.name = "HEAD_GELENKRING";
+  ring.rotation.x = Math.PI / 2;
+  ring.position.y = RING_Y;
+  g.add(ring);
   return g;
 }
 
-/* ------------------------------------------------------- (6) GELENKBOLZEN */
+/* ------------------------------------------------------ (11) Gelenkbolzen */
 
 /**
  * Gelenkbolzen einer Schale, quer zur Drehachse.
  *
- * „Lagerstellen groß dimensioniert mit hochfesten Bolzen und Buchsen"
- * (Prospekt). Der Bolzen liegt auf genau der Achse, um die die Schale schwenkt
- * — er ist damit die sichtbare Begründung für den Pivot.
+ * Er liegt auf genau der Achse, um die die Schale schwenkt, und ist damit die
+ * sichtbare Begründung für den Pivot. Der Absatz an beiden Enden steht für
+ * Buchse und Sicherungsring (12/13), die nicht einzeln gebaut sind.
  */
 export function baueGelenkbolzen(st: Stoffe): THREE.Mesh {
-  const R = BOLZENKREIS;
-  const m = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.085 * R, 0.085 * R, 0.62 * R, 12),
-    st.bolzen
-  );
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.42, 12), st.bolzen);
   m.rotation.z = Math.PI / 2;
   return m;
 }
 
-/* ----------------------------------------------------------- (5) SHELL_0n */
+/* ------------------------------------------- (08/09/10) Greiferschale */
 
 /**
- * Schalenkörper: Außenhaut, Innenhaut, zwei Seitenwangen, Rand und Spitze.
+ * Eine Sichelkralle: Lagerbock, sechs gebogene Segmente, Verschleißbleche,
+ * austauschbare Spitze.
  *
- * Die Schale ist ein geschweißter Trog („Greifer-Schalen in Hardox
- * Schweißkonstruktion"), kein Ausschnitt aus einem Rotationskörper. Als
- * Spaltstück hätte sie keine eigene Form und keine Kanten, und geschlossen
- * ergäbe sie zwangsläufig ein Ei.
+ * Gebaut als Kette ineinandersteckender Gruppen — jedes Segment sitzt eine
+ * Segmentlänge tiefer als sein Vorgänger und ist um `SEGMENTBOGEN` weiter
+ * gekippt. Das ist genau die Rechnung aus `clawPoint`, nur als Szenengraph:
+ * Modell und Physik können dadurch nicht auseinanderlaufen.
  *
- * UV: u läuft über die Breite, v vom Bolzen zur Spitze. Damit liegt eine
- * Verschleiß- oder Rostmaske später in Laufrichtung der Schale, nicht quer.
+ * Der zurückgegebene Knoten ist der Drehpunkt am Gelenkring. Nur er wird
+ * animiert; die Segmente stehen fest zu ihrem Vorgänger. Eine Schale braucht
+ * deshalb genau EINE Rotationsspur, egal wie viele Segmente sie hat.
  */
-export function baueSchalenkoerper(st: Stoffe): THREE.Mesh {
-  const rippen = schalenRippen();
-  const n = netz();
-  const aussen: number[][] = [];
-  const innen: number[][] = [];
+export function baueSchale(st: Stoffe, winkel: number, nr: string): THREE.Group {
+  const pivot = new THREE.Group();
+  pivot.name = `SHELL_${nr}`;
+  pivot.position.set(Math.sin(winkel) * GELENKRING, RING_Y, Math.cos(winkel) * GELENKRING);
+  pivot.rotation.order = "YXZ";
+  pivot.rotation.y = winkel; // lokales +z zeigt radial nach außen
 
-  for (const lage of [0, 1]) {
-    const ziel = lage === 0 ? aussen : innen;
-    for (let k = 0; k <= STATIONEN; k++) {
-      const rp = rippen[k]!;
-      const r = Math.max(0.03, rp.r - lage * HAUT);
-      const reihe: number[] = [];
-      for (let j = 0; j <= QUER; j++) {
-        const t = j / QUER;
-        const u = -rp.u + t * 2 * rp.u;
-        const [x, y, z] = amGelenk(r, u, rp.y);
-        reihe.push(punkt(n, x, y, z, t, k / STATIONEN));
-      }
-      ziel.push(reihe);
+  const lagerbock = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.18, 0.22), st.stahl);
+  lagerbock.name = `SHELL_LAGERBOCK_${nr}`;
+  lagerbock.position.y = 0.02;
+  pivot.add(lagerbock);
+
+  let eltern: THREE.Object3D = pivot;
+  for (let i = 0; i < SEGMENTE; i++) {
+    const breite = SEG_BREITE[i] ?? 0.15;
+    const dicke = SEG_DICKE[i] ?? 0.085;
+    const seg = new THREE.Group();
+    seg.name = `SHELL_SEG_${nr}_${i + 1}`;
+    if (i > 0) {
+      seg.position.y = -SEGMENTLAENGE;
+      seg.rotation.x = SEGMENTBOGEN;
     }
+    const koerper = new THREE.Mesh(
+      new THREE.BoxGeometry(breite, SEGMENTLAENGE + 0.04, dicke),
+      st.guss
+    );
+    koerper.name = `SHELL_BODY_${nr}_${i + 1}`;
+    koerper.position.y = -SEGMENTLAENGE / 2;
+    seg.add(koerper);
+    // Verschleissblech auf dem Ruecken — gibt der Schale Profil und Schutz
+    const blech = new THREE.Mesh(
+      new THREE.BoxGeometry(breite + 0.03, SEGMENTLAENGE + 0.05, VERSCHLEISSBLECH),
+      st.stahl
+    );
+    blech.name = `WEAR_PLATE_${nr}_${i + 1}`;
+    blech.position.set(0, -SEGMENTLAENGE / 2, dicke / 2);
+    seg.add(blech);
+    eltern.add(seg);
+    eltern = seg;
   }
 
-  for (let k = 0; k < STATIONEN; k++) {
-    for (let j = 0; j < QUER; j++) {
-      viereck(n, aussen[k]![j]!, aussen[k]![j + 1]!, aussen[k + 1]![j + 1]!, aussen[k + 1]![j]!);
-      viereck(n, innen[k]![j + 1]!, innen[k]![j]!, innen[k + 1]![j]!, innen[k + 1]![j + 1]!);
-    }
-    viereck(n, aussen[k]![0]!, innen[k]![0]!, innen[k + 1]![0]!, aussen[k + 1]![0]!);
-    viereck(n, innen[k]![QUER]!, aussen[k]![QUER]!, aussen[k + 1]![QUER]!, innen[k + 1]![QUER]!);
-  }
-  for (let j = 0; j < QUER; j++) {
-    viereck(n, innen[0]![j]!, innen[0]![j + 1]!, aussen[0]![j + 1]!, aussen[0]![j]!);
-    const e = STATIONEN;
-    viereck(n, aussen[e]![j]!, aussen[e]![j + 1]!, innen[e]![j + 1]!, innen[e]![j]!);
-  }
+  /*
+   * Stumpfe Greiferspitze statt Vierkantkegel: Sortiergreifer laufen wie ein
+   * Löffelrand aus, nicht wie ein Spieß. Das erklärt nebenbei, warum Bleche
+   * früher aufgespießt wurden. Auf der Vorlage ist sie als austauschbares Teil
+   * geführt (10) — im Modell ist sie darum ein eigenes Netz.
+   */
+  const spitze = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.075, 0.14, 8), st.stahl);
+  spitze.name = `SHELL_TIP_${nr}`;
+  spitze.position.y = -SEGMENTLAENGE - 0.03;
+  eltern.add(spitze);
 
-  const m = new THREE.Mesh(fertig(n, "SchalenkoerperGeo"), st.lack);
-  return m;
+  /*
+   * Lasche, an der die Kolbenstange angreift. Sie sitzt am Lagerbock, nicht an
+   * der Segmentkette — der Zylinder greift oben an der Schale an, nicht in
+   * ihrer Mitte.
+   */
+  const lasche = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.2, 0.14), st.stahl);
+  lasche.name = `SHELL_LUG_${nr}`;
+  lasche.position.set(0, LASCHE.y * 0.6, LASCHE.z * 0.6);
+  lasche.rotation.x = Math.atan2(LASCHE.z, LASCHE.y);
+  pivot.add(lasche);
+
+  return pivot;
 }
 
-/**
- * Seitenwange einer Schale — das tragende Blech an der Kante.
- *
- * Sie steht ein Stück über die Haut hinaus und reicht nach innen. Daran sieht
- * man von der Seite, dass da Blech steht und nicht eine gewölbte Fläche; und
- * sie ist es, die beim Schließen an die Nachbarschale stößt.
- */
-export function baueWange(st: Stoffe, seite: number): THREE.Mesh {
-  const rippen = schalenRippen();
-  const n = netz();
-  const reihen: number[][] = [];
-  for (let k = 0; k <= STATIONEN; k++) {
-    const rp = rippen[k]!;
-    const u = seite * rp.u;
-    /*
-     * Wie weit die Wange nach innen reicht, als Winkel.
-     *
-     * Gedeckelt auf die halbe Schalenbreite. Ohne den Deckel wuchs der Winkel
-     * zur Spitze hin ins Unermessliche — bei 6 cm Radius ergaben 10 cm Wange
-     * 96°, und die Wange schwenkte quer durch den Sektor der Nachbarschale.
-     * Die Bewegungspruefung hat genau das gefangen.
-     */
-    const du =
-      -seite *
-      Math.min(WANGE / Math.max(rp.r, 0.05), Math.max(rp.u * 0.9, 0.02));
-    const reihe: number[] = [];
-    // vier Ecken des Wangenprofils: aussen/innen × Kante/eingerückt
-    for (const [r, uu] of [
-      [rp.r + WANGE * 0.35, u],
-      [rp.r + WANGE * 0.35, u + du],
-      [rp.r - HAUT * 1.6, u + du],
-      [rp.r - HAUT * 1.6, u],
-    ] as Array<[number, number]>) {
-      const [x, y, z] = amGelenk(Math.max(0.03, r), uu, rp.y);
-      reihe.push(punkt(n, x, y, z, (uu - u) / Math.max(du, 1e-6), k / STATIONEN));
-    }
-    reihen.push(reihe);
-  }
-  for (let k = 0; k < STATIONEN; k++) {
-    for (let e = 0; e < 4; e++) {
-      const f = (e + 1) % 4;
-      viereck(n, reihen[k]![e]!, reihen[k]![f]!, reihen[k + 1]![f]!, reihen[k + 1]![e]!);
-    }
-  }
-  viereck(n, reihen[0]![3]!, reihen[0]![2]!, reihen[0]![1]!, reihen[0]![0]!);
-  const e = STATIONEN;
-  viereck(n, reihen[e]![0]!, reihen[e]![1]!, reihen[e]![2]!, reihen[e]![3]!);
-  return new THREE.Mesh(fertig(n, "WangeGeo"), st.stahl);
-}
-
-/* ------------------------------------------------------ (8) WEAR_PLATE_0n */
+/* ------------------------------------------------------ (04) Hydraulikzylinder */
 
 /**
- * Verschleißmesser an der Schneide.
- *
- * „Lange Lebensdauer der Spitzen durch hochfesten Schmiedestahl" (Prospekt).
- * Das Messer liegt auf den letzten beiden Stationen, ein paar Millimeter über
- * der Haut, in blankem Material — im Spiel ist das der helle Streifen, der die
- * Schale unten abschließt und ihr eine Richtung gibt.
- */
-export function baueVerschleissmesser(st: Stoffe): THREE.Mesh {
-  const rippen = schalenRippen();
-  const n = netz();
-  const VON = STATIONEN - 3;
-  const aussen: number[][] = [];
-  const innen: number[][] = [];
-  for (const lage of [0, 1]) {
-    const ziel = lage === 0 ? aussen : innen;
-    for (let k = VON; k <= STATIONEN; k++) {
-      const rp = rippen[k]!;
-      const r = Math.max(0.025, rp.r + (lage === 0 ? 0.02 * MASSSTAB : -HAUT * 0.8));
-      const reihe: number[] = [];
-      for (let j = 0; j <= QUER; j++) {
-        const t = j / QUER;
-        const u = (-rp.u + t * 2 * rp.u) * 0.94;
-        const [x, y, z] = amGelenk(r, u, rp.y);
-        reihe.push(punkt(n, x, y, z, t, (k - VON) / (STATIONEN - VON)));
-      }
-      ziel.push(reihe);
-    }
-  }
-  const lagen = STATIONEN - VON;
-  for (let k = 0; k < lagen; k++) {
-    for (let j = 0; j < QUER; j++) {
-      viereck(n, aussen[k]![j]!, aussen[k]![j + 1]!, aussen[k + 1]![j + 1]!, aussen[k + 1]![j]!);
-      viereck(n, innen[k]![j + 1]!, innen[k]![j]!, innen[k + 1]![j]!, innen[k + 1]![j + 1]!);
-    }
-    viereck(n, aussen[k]![0]!, innen[k]![0]!, innen[k + 1]![0]!, aussen[k + 1]![0]!);
-    viereck(n, innen[k]![QUER]!, aussen[k]![QUER]!, aussen[k + 1]![QUER]!, innen[k + 1]![QUER]!);
-  }
-  for (let j = 0; j < QUER; j++) {
-    viereck(n, innen[0]![j]!, innen[0]![j + 1]!, aussen[0]![j + 1]!, aussen[0]![j]!);
-    viereck(n, aussen[lagen]![j]!, aussen[lagen]![j + 1]!, innen[lagen]![j + 1]!, innen[lagen]![j]!);
-  }
-  return new THREE.Mesh(fertig(n, "VerschleissmesserGeo"), st.verschleiss);
-}
-
-/**
- * Schalenspitze: der geschmiedete Zahn am Ende.
- *
- * Er ist kein aufgesetzter Dorn, sondern der letzte Abschnitt der Schale
- * selbst — gebaut aus denselben Stationen und derselben Breitenfunktion, nur
- * ein Stück proud und aus blankem Material. Genau so sieht es auf dem
- * Prospektfoto aus: Die Schale läuft in ihre Spitze aus, sie trägt keine.
- *
- * Der erste Anlauf war ein Keil, der über die letzte Station hinausragte. Die
- * Bewegungsprüfung hat ihn sofort gefangen: Er schoss über die Drehachse
- * hinaus, landete im Sektor der gegenüberliegenden Schale und steckte dort
- * drin. Gebaut aus der Breitenfunktion kann das nicht passieren — sie deckelt
- * die Breite auf `r · sin(Halbwinkel)`, und damit schrumpft die Spitze
- * zwangsläufig mit dem Radius.
- */
-export function baueSpitze(st: Stoffe): THREE.Mesh {
-  const rippen = schalenRippen();
-  const VON = STATIONEN - 1;
-  const n = netz();
-  const aussen: number[][] = [];
-  const innen: number[][] = [];
-  for (const lage of [0, 1]) {
-    const ziel = lage === 0 ? aussen : innen;
-    for (let k = VON; k <= STATIONEN; k++) {
-      const rp = rippen[k]!;
-      // Am Ende laeuft die Spitze auf eine Schneide zu, nicht auf eine Flaeche
-      const schmaler = k === STATIONEN ? 0.55 : 0.95;
-      const r = Math.max(0.02, rp.r + (lage === 0 ? 0.03 * MASSSTAB : -HAUT * 0.7));
-      const reihe: number[] = [];
-      for (let j = 0; j <= QUER; j++) {
-        const t = j / QUER;
-        const u = (-rp.u + t * 2 * rp.u) * schmaler;
-        const [x, y, z] = amGelenk(r, u, rp.y);
-        reihe.push(punkt(n, x, y, z, t, k - VON));
-      }
-      ziel.push(reihe);
-    }
-  }
-  for (let j = 0; j < QUER; j++) {
-    viereck(n, aussen[0]![j]!, aussen[0]![j + 1]!, aussen[1]![j + 1]!, aussen[1]![j]!);
-    viereck(n, innen[0]![j + 1]!, innen[0]![j]!, innen[1]![j]!, innen[1]![j + 1]!);
-    viereck(n, innen[0]![j]!, innen[0]![j + 1]!, aussen[0]![j + 1]!, aussen[0]![j]!);
-    viereck(n, aussen[1]![j]!, aussen[1]![j + 1]!, innen[1]![j + 1]!, innen[1]![j]!);
-  }
-  viereck(n, aussen[0]![0]!, innen[0]![0]!, innen[1]![0]!, aussen[1]![0]!);
-  viereck(n, innen[0]![QUER]!, aussen[0]![QUER]!, aussen[1]![QUER]!, innen[1]![QUER]!);
-  return new THREE.Mesh(fertig(n, "SpitzeGeo"), st.verschleiss);
-}
-
-/* --------------------------------------------------------- (4) CYLINDER_0n */
-
-/**
- * Hydraulikzylinder: Rohr und Kolbenstange, je ein eigenes Objekt.
+ * Hydraulikzylinder: Zylindergehäuse und Kolbenstange, je ein eigenes Objekt.
  *
  * Beide sind um ihren eigenen Ursprung gebaut und zeigen nach −y, damit sie
- * sich im Rig einfach aufhängen lassen: Das Rohr hängt am Kopfgelenk, die
- * Stange fährt aus ihm heraus.
+ * sich im Rig einfach aufhängen lassen: Das Rohr hängt am Mittelstück, die
+ * Stange fährt aus ihm heraus. Kolben und Dichtungen (16/17) stecken darin und
+ * sind nicht einzeln gebaut — in einer Spielkamera sieht man sie nie.
  */
 export function baueZylinder(st: Stoffe): { rohr: THREE.Mesh; stange: THREE.Mesh } {
-  const rohr = new THREE.Mesh(
-    new THREE.CylinderGeometry(ZYLINDER_RADIUS * 0.96, ZYLINDER_RADIUS, ROHRLAENGE, 14),
-    st.gruen
-  );
-  rohr.position.y = -ROHRLAENGE / 2;
-  const stange = new THREE.Mesh(
-    new THREE.CylinderGeometry(ZYLINDER_RADIUS * 0.5, ZYLINDER_RADIUS * 0.5, 1, 10),
-    st.chrom
-  );
-  stange.position.y = -0.5;
+  const rohr = new THREE.Mesh(new THREE.CylinderGeometry(ROHR_R, ROHR_R, 1, 10), st.gruen);
+  const stange = new THREE.Mesh(new THREE.CylinderGeometry(STANGE_R, STANGE_R, 1, 8), st.chrom);
   return { rohr, stange };
 }
 
-/**
- * Lasche an der Schale, an der die Kolbenstange angreift.
- *
- * Sitzt oberhalb und innerhalb des Drehbolzens. Der kurze Hebelarm zwischen
- * den beiden Bolzen ist der Grund für die Schließkraft — deshalb ist er kurz
- * und deshalb steht der Zylinder steil.
- */
-export function baueLasche(st: Stoffe): THREE.Group {
-  const g = new THREE.Group();
-  const R = BOLZENKREIS;
-  const laenge = Math.hypot(LASCHE.y, LASCHE.z);
-  const arm = new THREE.Mesh(
-    new THREE.BoxGeometry(0.14 * R, laenge * 1.15, 0.16 * R),
-    st.stahl
-  );
-  arm.name = "LASCHE_ARM";
-  arm.position.set(0, LASCHE.y * 0.5, LASCHE.z * 0.5);
-  arm.rotation.x = Math.atan2(LASCHE.z, LASCHE.y);
-  g.add(arm);
-  const bolzen = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.055 * R, 0.055 * R, 0.4 * R, 10),
-    st.bolzen
-  );
-  bolzen.name = "LASCHE_BOLZEN";
-  bolzen.rotation.z = Math.PI / 2;
-  bolzen.position.set(0, LASCHE.y, LASCHE.z);
-  g.add(bolzen);
-  return g;
-}
-
-/* --------------------------------------------------- (7) HYDRAULIC_LINES */
+/* ---------------------------------------------- (05) Hydraulikschläuche */
 
 /**
- * Hydraulikleitungen — ein Bogen je Zylinder, vom Kopf zum Rohranschluss.
+ * Hydraulikschläuche — einer je Zylinder, von der Drehdurchführung zum Rohr.
  *
- * Bewusst grob: vier Schläuche mit sechs Ecken Querschnitt. Sie sind das, was
+ * Bewusst grob: fünf Schläuche mit sechs Ecken Querschnitt. Sie sind das, was
  * den Kopf als Hydraulikgerät lesbar macht; einzeln sichtbar sind sie in einer
- * Spielkamera nie. Verlegt werden sie als Bézierbogen, damit sie hängen und
- * nicht wie Rohre stehen.
+ * Spielkamera nie. Verlegt als Bézierbogen, damit sie hängen statt zu stehen.
  */
-export function baueLeitungen(st: Stoffe, anschluesse: THREE.Vector3[]): THREE.Group {
+export function baueSchlaeuche(st: Stoffe, ziele: THREE.Vector3[]): THREE.Group {
   const g = new THREE.Group();
   g.name = "HYDRAULIC_LINES";
-  const R = BOLZENKREIS;
-  anschluesse.forEach((ziel, i) => {
-    const start = new THREE.Vector3(
-      ziel.x * 0.32,
-      -0.2 * KOPFHOEHE,
-      ziel.z * 0.32
-    );
+  ziele.forEach((ziel, i) => {
+    const start = new THREE.Vector3(ziel.x * 0.25, ROTATOR.y - 0.08, ziel.z * 0.25);
     const bauch = new THREE.Vector3(
-      (start.x + ziel.x) * 0.5 * 1.18,
-      (start.y + ziel.y) * 0.5 - 0.1 * KOPFHOEHE,
-      (start.z + ziel.z) * 0.5 * 1.18
+      (start.x + ziel.x) * 0.62,
+      (start.y + ziel.y) * 0.5 - 0.12,
+      (start.z + ziel.z) * 0.62
     );
     const kurve = new THREE.QuadraticBezierCurve3(start, bauch, ziel);
-    const rohr = new THREE.Mesh(
-      new THREE.TubeGeometry(kurve, 6, 0.035 * R, 6, false),
-      st.gummi
-    );
-    rohr.name = `HYDRAULIC_LINE_${String(i + 1).padStart(2, "0")}`;
-    g.add(rohr);
+    const schlauch = new THREE.Mesh(new THREE.TubeGeometry(kurve, 6, 0.028, 6, false), st.gummi);
+    schlauch.name = `HYDRAULIC_LINE_${String(i + 1).padStart(2, "0")}`;
+    g.add(schlauch);
   });
   return g;
 }
 
-/** Die Winkel-Halbbreite einer Schale, für Prüfungen von außen sichtbar. */
-export { SCHALE_HALBWINKEL, ABSCHNITT };
+/** Aufnahmepunkt eines Zylinders am Mittelstück, im Frame des Kopfes. */
+export function zylinderAmKopf(winkel: number): THREE.Vector3 {
+  return new THREE.Vector3(
+    Math.sin(winkel) * ZYLINDERKREIS,
+    ZYLINDER_OBEN_Y,
+    Math.cos(winkel) * ZYLINDERKREIS
+  );
+}
+
+/** Wie viele Schalen der Greifer hat — für Prüfungen von außen sichtbar. */
+export const ZINKEN = SCHALEN;
+export { ROHRLAENGE };

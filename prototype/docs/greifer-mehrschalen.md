@@ -1,15 +1,21 @@
-# Mehrschalengreifer — modulares, animierbares Modell
+# Fünfzinken-Mehrschalengreifer — modulares, animierbares Modell
 
-Hydraulischer Fünfschalengreifer, halboffene Bauform (HO), nach SENNEBOGEN
-MG4.1. Game-ready, mit Hierarchie, Pivots, PBR-Materialien, UVs und
-Animationen.
+Hydraulischer Greifer mit fünf Sichelkrallen am Gelenkring. Game-ready, mit
+Hierarchie, Pivots, PBR-Materialien, UVs und Animationen.
+
+**Es ist dieselbe Spinne wie im Spiel.** Die Form kommt aus
+`src/excavator/clawGeometry.ts` — dieselbe Datei, aus der der Bagger seinen
+Greifer baut. Zwischen dem 12. und 13.09.2026 gab es zeitweise zwei Greifer
+nebeneinander, und sie liefen auseinander, sobald an einem von beiden etwas
+geändert wurde. `test/greifer.test.ts` prüft jetzt, dass Schalenzahl,
+Gelenkring, Segmentzahl und Öffnungsweite übereinstimmen.
 
 | | |
 |---|---|
 | **Datei** | `docs/greifer-mehrschalen.glb` (glTF 2.0, binär) |
-| **Größe** | 277 kB · 75 Meshes · 4720 Dreiecke |
+| **Größe** | 278 kB · 105 Meshes · 2548 Dreiecke |
 | **Einheit** | Meter, Y oben, rechtshändig (glTF-Standard) |
-| **Abmessungen** | geschlossen 2,06 × 2,65 m · offen 3,02 × 3,11 m |
+| **Abmessungen** | geschlossen 1,87 × 2,02 m · offen 3,40 × 2,23 m |
 | **Ursprung** | Kardangelenk oben, also der Punkt, an dem der Greifer am Stiel hängt |
 | **Quelle** | `src/grapple/` — `form.ts` (Maße) · `parts.ts` (Bauteile) · `rig.ts` (Rig) |
 | **Neu erzeugen** | `npx vite-node tools/greifer-export.ts` |
@@ -19,46 +25,49 @@ Animationen.
 
 ## 1. Hierarchie
 
+Die Nummern sind die der Positionsliste aus der Explosionszeichnung.
+
 ```
 GRAPPLE_ROOT                       Ursprung = Aufhängepunkt am Stiel
-├── ADAPTER                        Adapterplatte + Gabel, dreht NICHT mit
+├── ADAPTER                     01 Aufhängung / Anschraubplatte, dreht NICHT mit
 │   ├── ADAPTER_OHR_L / _R
-│   ├── ADAPTER_BOLZEN
+│   ├── ADAPTER_BOLZEN          02 Aufnahmebolzen
 │   └── ADAPTER_PLATTE
-└── ROTATOR                     ◀── Drehachse Y
+└── ROTATOR                     03 Drehwerk           ◀── Drehachse Y
     ├── ROTATOR_GEHAEUSE
     ├── ROTATOR_DREHKRANZ
     ├── ROTATOR_DURCHFUEHRUNG
-    └── GRAPPLE_HEAD               Mitteltraverse, ein Gussteil
-        ├── HEAD_GRUNDKOERPER       Gussblock mit Frästaschen + Zapfen, ein Netz
-        ├── HEAD_ZAPFEN_DECKEL
-        ├── HEAD_VENTILBLOCK        Ölverteiler unter dem Zapfen
-        ├── HEAD_ZYLINDERBOLZEN_01…05
-        ├── HEAD_LAGERBOCK_01…05    am untersten Ende des Zapfens
-        ├── PIVOT_PIN_01…05         Gelenkbolzen (sichtbar, nicht beweglich)
-        ├── HYDRAULIC_LINES
+    └── GRAPPLE_HEAD            07 Mittelstück
+        ├── HEAD_MITTELSTUECK
+        ├── HEAD_SCHUTZABDECKUNG   06
+        ├── HEAD_GELENKRING
+        ├── PIVOT_PIN_01…05        11 Gelenkbolzen
+        ├── HYDRAULIC_LINES        05 Hydraulikschläuche
         │   └── HYDRAULIC_LINE_01…05
-        ├── CYLINDER_01…05       ◀── Drehachse X (Zylinderaufnahme)
-        │   ├── CYL_BARREL_0n       Rohr, fest am Gelenk
-        │   └── CYL_ROD_0n       ◀── fährt aus: position.y + scale.y
-        └── SHELL_01…05          ◀── Drehachse X (Gelenkbolzen)
-            ├── SHELL_BODY_0n       Haut innen und außen
-            ├── SHELL_FLANGE_0n_L / _R
-            ├── WEAR_PLATE_0n       Verschleißmesser
-            ├── SHELL_TIP_0n        Schmiedespitze
-            └── SHELL_LUG_0n        Lasche + Laschenbolzen
+        ├── CYLINDER_01…05         04                 ◀── Drehachse X
+        │   ├── CYL_BARREL_0n      15 Zylindergehäuse
+        │   └── CYL_ROD_0n         18 Kolbenstange, fährt aus
+        └── SHELL_01…05            08 Greiferschale   ◀── Drehachse X
+            ├── SHELL_LAGERBOCK_0n
+            ├── SHELL_LUG_0n
+            ├── SHELL_SEG_0n_1…6      Segmentkette, fest verbaut
+            │   ├── SHELL_BODY_0n_k
+            │   └── WEAR_PLATE_0n_k   09 Verschleißblech
+            └── SHELL_TIP_0n          10 Greiferspitze
 ```
+
+**Nicht als eigene Netze gebaut:** 12 Buchse, 13 Sicherungsring, 14
+Verschraubung, 16 Kolben, 17 Dichtungen. In einer Spielkamera ist davon nichts
+zu sehen, und der Auftrag sagt ausdrücklich, unnötig winzige Details
+wegzulassen. Sie sind an den Bolzen mitgedacht — dort sitzt der Absatz, auf dem
+sie liefen.
 
 **Abweichung von der Wunschliste, mit Absicht.** Dort standen `ROTATOR`,
 `GRAPPLE_HEAD`, `CYLINDER_*` und `SHELL_*` nebeneinander unter der Wurzel.
 Mechanisch geht das nicht: Dreht der Rotator, muss alles unter ihm mitdrehen,
-sonst steht der Greifer still, während sich nur sein Motorgehäuse dreht. Die
-Namen sind unverändert geblieben, nur die Verschachtelung ist mechanisch
-richtig.
-
-Der `ADAPTER` hängt bewusst **neben** dem Rotator, nicht darunter: Er ist mit
-dem Stiel verschraubt und dreht nicht mit. Genau das ist der Sinn eines
-Rotators.
+sonst steht der Greifer still, während sich nur sein Motorgehäuse dreht. Der
+`ADAPTER` hängt dagegen bewusst **neben** dem Rotator — er ist mit dem Stiel
+verschraubt und dreht nicht mit. Genau das ist der Sinn eines Rotators.
 
 ---
 
@@ -66,22 +75,24 @@ Rotators.
 
 | Bewegung | Knoten | Kanal | Bereich |
 |---|---|---|---|
-| Schalen öffnen/schließen | `SHELL_01…05` | `rotation.x` (im glTF: `quaternion`) | 0 rad (zu) … −0,913 rad (offen), alle fünf synchron |
+| Schalen öffnen/schließen | `SHELL_01…05` | `rotation.x` (im glTF: `quaternion`) | 0 rad (zu) … −1,25 rad (offen), alle fünf synchron |
 | Zylinder folgt | `CYLINDER_01…05` | `rotation.x` | wird aus der Schalenstellung gerechnet |
-| Kolbenstange fährt | `CYL_ROD_01…05` | `position.y` + `scale.y` | 0,80 m zu … 1,09 m offen |
+| Kolbenstange fährt | `CYL_ROD_01…05` | `position.y` + `scale.y` | 0,57 m zu … 0,34 m offen |
 | Greifer drehen | `ROTATOR` | `rotation.y` | frei, unabhängig von den Schalen |
 | Heben | `GRAPPLE_ROOT` | `position` | nur als Vorlage; am Bagger übernimmt das der Arm |
 
+**Je Schale genau eine Rotationsspur.** Die Sichelkralle ist eine Kette aus
+sechs Segmenten, aber die Segmente stehen fest zueinander — nur der Drehpunkt
+am Gelenkring wird animiert. Ein Test hält das fest, sonst bräuchte eine Schale
+sechs Spuren statt einer.
+
 **Bones gibt es keine** und es braucht auch keine: Ein Greifer ist eine
 Starrkörperkette, kein verformbares Netz. Jedes bewegliche Teil ist ein eigener
-Knoten mit eigenem Pivot, und Engines animieren solche Knoten direkt. Das ist
-billiger als Skinning und lässt sich in der Engine auch per Code ansteuern,
-ohne die Clips zu benutzen.
+Knoten mit eigenem Pivot, und Engines animieren solche Knoten direkt.
 
-**Die Pivots liegen auf den Bolzen.** `SHELL_0n` sitzt exakt auf
-`PIVOT_PIN_0n`; `test/greifer.test.ts` rechnet das nach. Wer die Schale in der
-Engine anfasst und um ihre lokale X-Achse dreht, dreht sie um den echten
-Gelenkbolzen — ohne Korrekturwerte.
+**Die Pivots liegen auf den Bolzen.** `SHELL_0n` sitzt exakt auf `PIVOT_PIN_0n`.
+Wer die Schale in der Engine anfasst und um ihre lokale X-Achse dreht, dreht sie
+um den echten Gelenkbolzen — ohne Korrekturwerte.
 
 ---
 
@@ -102,161 +113,83 @@ wer den Greifer an einen Arm hängt, lässt diesen Clip weg.
 
 Die Clips sind nicht von Hand gekeyt, sondern aus dem Rig abgetastet: Für jeden
 Zeitpunkt wird `setOeffnung()` gerufen und danach abgelesen, wo die Knoten
-stehen. Zylinder und Schalen können dadurch gar nicht auseinanderlaufen, auch
-wenn später jemand an der Anlenkung dreht.
-
-**In der Engine ohne Clips:** Wer lieber selbst steuert, braucht nur
-`SHELL_0n.rotation.x = −0,913 · t` zu setzen und den Zylinder nachzuführen. Die
-Rechnung dafür steht in `src/grapple/rig.ts` (`setOeffnung`) und ist zwanzig
-Zeilen lang.
+stehen. Zylinder und Schalen können dadurch gar nicht auseinanderlaufen.
 
 ---
 
-## 4. Materialien
+## 4. Die Zylinderanlenkung wurde korrigiert
 
-Sieben PBR-Materialien, metallic/roughness, ohne Texturen — die Farbe steckt im
-`baseColorFactor`. Alle Meshes haben UVs (u über die Breite, v vom Bolzen zur
-Spitze), eine Verschleiß- oder Rostmaske liegt damit später in Laufrichtung der
-Schale.
+Die Form ist die vom 12.09.2026 mittags, unverändert. Die **Anlenkung** nicht —
+sie war mechanisch unbrauchbar, was im Spiel nie aufgefallen ist, weil die
+Kralle dort kinematisch geführt wird und der Zylinder nur mitläuft.
 
-| Material | Farbe | Rauheit / Metall | Wo |
-|---|---|---|---|
-| `Stahl_lackiert` | `#3c4246` | 0,55 / 0,35 | Grundkörper, Drehkranz, Adapterplatte |
-| `Stahl_dunkel` | `#23282b` | 0,48 / 0,72 | Lagerböcke, Zylinderaufnahmen, Wangen |
-| `Stahl_blank` | `#c2c8ce` | 0,22 / 0,94 | alle Bolzen |
-| `Lack_gruen` | `#6db33f` | 0,42 / 0,30 | Zylinderrohre |
-| `Kolbenstange_chrom` | `#d7dce1` | 0,11 / 0,95 | Kolbenstangen |
-| `Hydraulikschlauch` | `#15181a` | 0,85 / 0,05 | Leitungen |
-| `Verschleissflaeche` | `#8b9299` | 0,35 / 0,85 | Messer und Spitzen |
+Nachgerechnet, alter Stand:
 
-Drei Farben, nicht zehn. Das Grün sitzt ausschließlich auf den Zylindern —
-genau diese Sparsamkeit macht das Gerät industriell statt bunt.
+| Öffnung | 0,0 | 0,2 | 0,5 | 1,0 |
+|---|---|---|---|---|
+| Hebelarm | 0,044 m | **0,007 m** | 0,083 m | 0,201 m |
 
----
+Bei 20 % Öffnung lief der Hebelarm durch einen **Totpunkt**: Dort hätte kein
+Öldruck der Welt die Schale bewegt. Das Schließmoment betrug ein Fünftel des
+Öffnungsmoments, und die Zylinder liefen durch den Gussblock hindurch.
 
-## 4a. Der Kopf ist ein Gussblock mit Frästaschen
+Über alle Lagen abgetastet unter vier Bedingungen — frei am Gussblock vorbei,
+steil, kein Totpunkt, größter Hebelarm im geschlossenen Zustand — bleibt diese
+Anlenkung übrig:
 
-Er war zwei Anläufe lang ein glatter Kegelstumpf, an dem die Zylinder außen an
-Ohren hingen. Befund dazu im Klartext: *„Der Greiferkopf ist kein Vollklotz, wo
-die Hülsen angeschweißt bzw. die Hydraulikzylinder außen angebracht sind. Die
-Zylinder laufen nach innen, weil es entsprechende Fräsungen für die Zylinder
-gibt."*
+| | alt | neu |
+|---|---|---|
+| Anlenkbock | r 0,42 m, y −0,56 m | r 0,84 m, y −0,38 m |
+| Lasche am Gelenk | y −0,30, z +0,19 | y −0,04, z +0,20 |
+| Länge zu / offen | 0,83 / 0,73 m | 0,57 / 0,34 m |
+| Hub | 0,10 m | 0,23 m |
+| kleinster Hebelarm | 0,007 m | 0,110 m |
+| Schließmoment / Öffnungsmoment | 0,22 | **1,70** |
 
-Jetzt ist je Schale eine senkrechte Tasche in den Block gefräst, in der der
-Zylinder liegt; dazwischen stehen die Rippen. Deshalb ist der Kopf von oben
-gezahnt und nicht rund, und deshalb sieht man von außen die Zylinder in ihren
-Nischen statt davor.
-
-Das hat drei Dinge nach sich gezogen, die alle nachgerechnet sind:
-
-1. **Die Zylinderachse rückt nach innen**, von 0,92 auf 0,66 Bolzenkreisradien.
-   Die ganze Anlenkung wurde deshalb neu abgetastet.
-2. **Das Rohr wird dünner**, von 30 auf 24 cm. Am 12.09. war es absichtlich dick
-   gemacht worden, weil dünne Zylinder außen am Kopf im Bild untergingen.
-   Versenkt dreht sich das um: Ein dickes Rohr zwingt die Fräsung nach außen und
-   den Kopf auf 1,81 m Durchmesser — fast so breit wie der geschlossene Greifer.
-3. **Unter dem Block sitzt der Gusszapfen**, der nach unten aufweitet und an
-   seinem untersten Ende die Lagerböcke der Schalen trägt — *„man sieht da auch
-   gut, wo die Zähne befestigt sind, am untersten Ende vom Zapfen."* Darunter
-   der gelbe Ölverteiler, das einzige Gelb am Gerät.
+Der Zylinder fährt zum **Schließen aus** — die starke Richtung, volle
+Kolbenfläche. Das ist die Richtung, für die ein Greifer Kraft braucht.
 
 ---
 
-## 4b. Die Kraft liegt beim Schließen
+## 5. Geprüft wird, nicht geschätzt
 
-*„Die Kraft wird für das Schließen benötigt, nicht das Öffnen."* Nachgerechnet
-war es vorher genau verkehrt herum — das Schließmoment betrug **57 %** des
-Öffnungsmoments, aus zwei Gründen gleichzeitig:
+`test/greifer.test.ts`, 14 Prüfungen. Die wichtigen:
 
-- Geschlossen wird durch **Einfahren**, und einfahrend drückt der Zylinder nur
-  auf die Ringfläche: 84 % der Kolbenfläche bei dieser Stange.
-- Der **Hebelarm** am Drehbolzen war geschlossen am kleinsten (0,26 m gegen
-  0,35 m offen). Die Kraft fehlte dort, wo sie gebraucht wird.
-
-**Am Einfahren lässt sich nichts ändern.** Bei versenkten Zylindern ist es
-geometrisch zwingend: Damit Ausfahren schließt, müsste die Lasche nach außen
-über die geschlossene Schalenkontur hinausstehen — abgetastet bis 1,4
-Bolzenkreisradien, also Hörner, die es an der Maschine nicht gibt. Auf den
-Fotos ist es auch genau so: offen stehen die Kolbenstangen weit heraus.
-
-**Am Hebelarm dagegen sehr wohl.** Die Lasche zeigt jetzt als Ausleger nach
-innen statt nach oben. Damit steht der Zylinder im geschlossenen Zustand fast
-senkrecht auf ihr, und der Hebelarm ist dort am größten:
-
-| Öffnung | 0,0 | 0,25 | 0,5 | 0,75 | 1,0 |
-|---|---|---|---|---|---|
-| Hebelarm | 0,38 m | 0,34 m | 0,30 m | 0,27 m | 0,24 m |
-
-Schließmoment zu Öffnungsmoment: **1,30**. `test/greifer.test.ts` rechnet es
-nach und verlangt zusätzlich, dass der Hebelarm über den ganzen Weg monoton
-fällt — wer an der Lasche dreht, erfährt es dort.
-
----
-
-## 5. Woher die Maße kommen
-
-Aus dem Datenblatt der MG4.1-800-HO5, und zwar aus **allen sechs Maßen
-gleichzeitig**:
-
-```
-ØC = 1514 mm   Durchmesser geschlossen
-ØD = 2409 mm   größter Durchmesser offen
-d  = 2225 mm   Spitzenweite offen
-A  = 2363 mm   Gesamthöhe offen
-B  = 1966 mm   Gesamthöhe geschlossen
-```
-
-Mit nur zwei Maßen ist die Aufgabe unterbestimmt; ein früherer Versuch lieferte
-einen Haken von 170°, der sich beim Öffnen fast waagerecht aufklappte. Gegen
-alle sechs bleibt genau ein Bogen übrig, und der ist gleichmäßig: **86° auf
-acht Abschnitten**, Bolzenkreis 0,731 m, Abschnitt 0,172 m.
-
-Wichtig war dabei, A und B richtig herum zuzuordnen: **A gehört zur offenen
-Stellung.** Andersherum geht es geometrisch nicht — geschlossen müssen die
-Spitzen den Bolzenkreis nach innen überbrücken, und dieser Weg fehlt ihnen nach
-unten. Eine Faust ist kürzer als eine ausgestreckte Hand.
-
-Im Spiel ist alles mit **1,25** multipliziert (`MASSSTAB` in `form.ts`), weil
-hier Autos und Tanks dichter beieinanderliegen als auf einem echten Platz. Das
-Datenblatt bleibt dadurch im Quelltext nachprüfbar.
-
-### Bewusste Abweichung
-
-Der geschlossene Anschlag liegt bei 8°, nicht bei den 4,6°, die aus dem
-Datenblatt folgen würden. Grund: Die Spitzen dürfen die Drehachse nicht
-überfahren, sonst laufen sie in den Sektor ihres Gegenübers. Es bleibt ein Loch
-von 8 cm in der Mitte — das hat ein echter HO-Greifer auch, und deshalb steht
-im Prospekt: „Je kleinteiliger das Material, desto geschlossener wird die
-Schalenform gewählt."
-
----
-
-## 6. Geprüft wird, nicht geschätzt
-
-`test/greifer.test.ts`, 16 Prüfungen. Die wichtigen:
-
+- **Dieselbe Spinne wie im Spiel.** Schalenzahl, Gelenkring, Segmentzahl und
+  Öffnungsweite werden gegen `src/excavator/clawGeometry.ts` gehalten.
 - **Bewegungsfreiheit.** Über 21 Stellungen werden alle Eckpunkte aller
-  Schalenteile in Weltkoordinaten gerechnet und geprüft, ob jede Schale in
-  ihrem 72°-Sektor bleibt. Bleibt sie das, können die Schalen sich nicht
-  durchdringen — die Sektoren sind disjunkt. Das hat zwei echte Fehler
-  gefangen: eine Spitze, die über die Achse hinausschoss, und eine Seitenwange,
-  deren Winkel zur Spitze hin ins Unermessliche wuchs (bei 6 cm Radius ergaben
-  10 cm Wange 96°).
-- **Zylinder.** Länger als sein Rohr in jeder Stellung, Hub über 15 cm, Neigung
-  unter 25°, die Achse überall innerhalb ihrer Frästasche, die Tasche selbst
-  ohne Anschnitt am Kern des Kopfes, und die Rippen an jeder Höhe weiter außen
-  als die Rohraußenkante — sonst sieht man den Zylinder nicht in der Nische,
-  sondern davor.
-- **Kraftrichtung.** Hebelarm geschlossen größer als offen, über den ganzen Weg
-  monoton fallend, Schließmoment mindestens 1,2-mal Öffnungsmoment.
+  Schalenteile in Weltkoordinaten gerechnet und geprüft, ob jede Schale in ihrem
+  72°-Sektor bleibt. Ausgenommen sind die innersten 30 cm: Dort laufen die fünf
+  Spitzen im geschlossenen Zustand zusammen und überlappen sich — bei fünf
+  Zinken endlicher Breite geht es nicht anders, und am Gerät schieben sie sich
+  dort aneinander vorbei.
+- **Zylinder.** Fährt zum Schließen aus, Hub über 15 cm, immer länger als sein
+  Rohr, Neigung unter 20°, nirgends weniger als 11 cm Hebelarm.
 - **Pivots.** Jeder Schalenknoten sitzt exakt auf seinem Gelenkbolzen.
-- **Maße** gegen das Datenblatt, mit 14 cm Toleranz.
+- **Eine Spur je Schale.** Die Segmentkette bleibt beim Öffnen unverändert.
 
 Der Export prüft sich zusätzlich selbst: Nach dem Schreiben wird das GLB wieder
 geladen, die Hierarchie gegengelesen und die Animation abgespielt. Gemeldet
-wird, um wie viel Grad die Schale schwenkt und wie weit die Stange ausfährt.
-Ein GLB, das sich schreiben lässt, muss sich nämlich nicht laden lassen — und
-Spuren auf Knoten, die der Exporter nicht kennt, fallen stillschweigend weg.
+wird, um wie viel Grad die Schale schwenkt und wie weit die Stange fährt.
+
+---
+
+## 6. Materialien
+
+Sechs PBR-Materialien, metallic/roughness, ohne Texturen — die Farbe steckt im
+`baseColorFactor`. Dieselbe Farbgebung wie im Spiel.
+
+| Material | Farbe | Rauheit / Metall | Wo |
+|---|---|---|---|
+| `Hardox_Guss` | `#40474b` | 0,50 / 0,55 | Schalensegmente, Mittelstück, Drehkranz |
+| `Stahl_dunkel` | `#23282b` | 0,45 / 0,70 | Verschleißbleche, Lagerböcke, Gelenkring, Spitzen |
+| `Stahl_blank` | `#b9c0c6` | 0,25 / 0,90 | alle Bolzen |
+| `Lack_gruen` | `#62c94b` | 0,40 / 0,35 | Zylinderrohre |
+| `Kolbenstange_chrom` | `#b8bec4` | 0,22 / 0,85 | Kolbenstangen |
+| `Hydraulikschlauch` | `#15181a` | 0,85 / 0,05 | Leitungen |
+
+Das Grün sitzt ausschließlich auf den Zylindern — genau diese Sparsamkeit macht
+das Gerät industriell statt bunt.
 
 ---
 
@@ -271,9 +204,9 @@ const mixer = new THREE.AnimationMixer(gltf.scene);
 mixer.clipAction(THREE.AnimationClip.findByName(gltf.animations, "OEFFNEN")).play();
 ```
 
-**Unity** — glTF über UnityGLTF oder glTFast. Achtung: Unity ist linkshändig
-und importiert glTF mit gespiegelter Z-Achse; die Drehrichtung der Schalen
-kehrt sich dabei um. Das betrifft nur das Vorzeichen, nicht die Mechanik.
+**Unity** — glTF über UnityGLTF oder glTFast. Achtung: Unity ist linkshändig und
+importiert glTF mit gespiegelter Z-Achse; die Drehrichtung der Schalen kehrt
+sich dabei um. Das betrifft nur das Vorzeichen, nicht die Mechanik.
 
 **Godot** — `.glb` direkt in den Projektordner legen. Die Clips landen in einem
 `AnimationPlayer` unter der Wurzel.
