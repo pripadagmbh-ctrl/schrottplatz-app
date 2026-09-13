@@ -15,10 +15,6 @@
  * genau einen Zahn von 110 mm.
  */
 const BLECH = 0.015;
-const WANGE_D = 0.02;
-const WANGE_H = 0.25;
-const RIPPE_D = 0.016;
-const RIPPE_H = 0.15;
 /** Schmalste Schalenbreite: ein Zahn von 110 mm plus zwei Wangen. */
 const SCHALE_MIN_B = 0.2;
 
@@ -976,7 +972,7 @@ export function schalenHalbbreite(k: number): number {
 export function baueGreiferschale(st: Stoffe): THREE.Group {
   const g = new THREE.Group();
   g.name = "06_GREIFERSCHALE";
-  const HAUT = 0.03;
+  const HAUT = BLECH;
 
   const pos: number[] = [];
   const uv: number[] = [];
@@ -1046,49 +1042,20 @@ export function baueGreiferschale(st: Stoffe): THREE.Group {
    * sich als flaches Blech — genau so sah sie im ersten Anlauf aus.
    */
   /*
-   * Alles Weitere steht AUSSEN auf dem Blech, auf der konvexen Seite. Innen
-   * bleibt die Schale glatt — dort laeuft das Material.
-   */
-  const aussenFlaeche = fein.map((f) => woelbungBei(halbbreiteBei(f.k), f.k) + BLECH);
-
-  // Seitenwangen, 20 x 250 mm, ueber die ganze Laenge
-  for (const seite of [-1, 1]) {
-    const wange = new THREE.Mesh(
-      strang(
-        fein,
-        fein.map((f) => seite * (halbbreiteBei(f.k) - WANGE_D / 2)),
-        WANGE_D,
-        WANGE_H,
-        aussenFlaeche
-      ),
-      st.guss
-    );
-    wange.name = `06_WANGE_${seite < 0 ? "L" : "R"}`;
-    g.add(wange);
-  }
-
-  /*
-   * Mittelrippe, 16 x 150 mm, von 15 % bis 85 % der Laenge. Die Zeichnung
-   * fuehrt sie nur bei der breiten Schale — unsere ist mit 400 mm breit.
-   */
-  const rippeVon = Math.round(fein.length * 0.15);
-  const rippeBis = Math.round(fein.length * 0.85);
-  const rippe = new THREE.Mesh(
-    strang(
-      fein.slice(rippeVon, rippeBis),
-      0,
-      RIPPE_D,
-      RIPPE_H,
-      aussenFlaeche.slice(rippeVon, rippeBis)
-    ),
-    st.guss
-  );
-  rippe.name = "06_MITTELRIPPE";
-  g.add(rippe);
-
-  /*
-   * Verstaerkung: der Streifen unter dem Zahn, INNEN auf dem Blech, nach vorn
-   * dicker werdend — 25 mm hinten, 75 mm vorn, auf 300 mm Laenge.
+   * EIN GUSS — nichts steht ab.
+   *
+   * Ansage 13.09.2026: „eben, das ist alles falsch … ein Guss, keine nach oben
+   * stehenden Bleche", und davor: „es gibt keine Bleche nach oben, nur
+   * Stahlbleche, die das innere Material zusammenhalten sollen."
+   *
+   * Die Seitenansicht der Zeichnung zeigt genau drei Dinge und sonst nichts:
+   * das Blech (15 mm), die Verstärkung darauf (25 mm, nach vorn dicker) und
+   * den Zahn, der sie fortsetzt. Keine Seitenwangen, keine Mittelrippe. Das
+   * Blech selbst ist das Stahlblech, das die Ladung hält — seine Wölbung tut
+   * das, nicht angesetzte Wände.
+   *
+   * Damit fallen alle Aufbauten weg, die ich nacheinander gebaut hatte:
+   * tiefe Randwangen, Holm, Vierkantrohr, Mittelrippe.
    */
   const verstAb = fein.findIndex(
     (f) => f.k >= SCHALEN_ABSCHNITTE - VERST_L / ABSCHNITT
@@ -1098,13 +1065,17 @@ export function baueGreiferschale(st: Stoffe): THREE.Group {
     const t = verstTeil.length > 1 ? i / (verstTeil.length - 1) : 1;
     return VERST_HINTEN + (VERST_VORN - VERST_HINTEN) * t;
   });
+  /*
+   * Die Verstärkung liegt AUSSEN auf dem Blech, auf der konvexen Seite — so
+   * zeigt es die Seitenansicht, und dort setzt auch der Zahn an.
+   */
   const verstaerkung = new THREE.Mesh(
     strang(
       verstTeil,
       0,
       VERST_B,
       verstDicken,
-      verstTeil.map((f, i) => woelbungBei(halbbreiteBei(f.k), f.k) - verstDicken[i]!)
+      verstTeil.map((f) => woelbungBei(halbbreiteBei(f.k), f.k) + BLECH)
     ),
     st.guss
   );
@@ -1233,8 +1204,8 @@ export function baueGreiferspitze(st: Stoffe): THREE.Group {
     [0.32, 0.022, 0.014],
   ];
   const R = 0.7; // Biegeradius der Zeichnung
-  /* Die flache Seite liegt auf der Verstaerkung, also innen auf dem Blech. */
-  const z0 = woelbungBei(schalenHalbbreite(SCHALEN_ABSCHNITTE), SCHALEN_ABSCHNITTE) - VERST_VORN;
+  /* Die flache Seite liegt auf der Verstaerkung, also aussen auf dem Blech. */
+  const z0 = woelbungBei(schalenHalbbreite(SCHALEN_ABSCHNITTE), SCHALEN_ABSCHNITTE) + BLECH;
 
   const pos: number[] = [];
   const uv: number[] = [];
@@ -1261,7 +1232,15 @@ export function baueGreiferspitze(st: Stoffe): THREE.Group {
     return profil.map(([pz, py], j) => {
       const w = x / R;
       const r = R + py;
-      return p(pz, -(r * Math.sin(w)), z0 + (-R + r * Math.cos(w)), j / 5, si / 5);
+      /*
+       * Die Hoehe laeuft nach −z, nicht nach +z.
+       *
+       * Eine Drehung um x um `th` bildet lokales (0,0,1) auf (0, −sin th,
+       * cos th) ab; die Aussennormale der Schale ist aber (+sin th, cos th).
+       * Mit +z stand der Zahn auf der falschen Seite und lag 113 mm neben der
+       * Verstaerkung — gemessen als kleinster Abstand der beiden Netze.
+       */
+      return p(pz, -(r * Math.sin(w)), -(z0 + (-R + r * Math.cos(w))), j / 5, si / 5);
     });
   });
   for (let i = 0; i < ringe.length - 1; i++) {
@@ -1292,7 +1271,7 @@ export function baueGreiferspitze(st: Stoffe): THREE.Group {
   for (const x of [0.055, 0.145]) {
     const loch = new THREE.Mesh(rohr(0.017, 0.013, 0.09), st.blech);
     loch.rotation.x = Math.PI / 2;
-    loch.position.set(0, -x, z0 + 0.03);
+    loch.position.set(0, -x, -(z0 + 0.03));
     g.add(loch);
   }
   return g;
