@@ -7,7 +7,7 @@ gesetzt.
 
 | | |
 |---|---|
-| **Datei** | `docs/greifer-mehrschalen.glb` (glTF 2.0, binär) |
+| **Datei** | `prototype/public/greifer-mehrschalen.glb` (glTF 2.0, binär) |
 | **Größe** | 1.230 kB · 263 Meshes · 12.864 Dreiecke |
 | **Einheit** | Meter, Y oben, rechtshändig (glTF-Standard) |
 | **Abmessungen** | geschlossen 1,78 × 2,40 m · offen 2,30 × 2,49 m |

@@ -9,7 +9,19 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
-const DATEI = "/docs/greifer-mehrschalen.glb";
+/*
+ * Der Pfad ist BASIS-RELATIV, und die Datei liegt in `public/`.
+ *
+ * Vorher stand hier "/docs/greifer-mehrschalen.glb". Das lief in der
+ * Entwicklung, weil Vite dort das Projektverzeichnis ausliefert — und war auf
+ * GitHub Pages doppelt falsch: Die Seite liegt unter /schrottplatz-app/, also
+ * ging der Ruf an den falschen Ort, und `docs/` wird ueberhaupt nicht
+ * mitgebaut. Die Vorschau zeigte live nur die Fehlermeldung.
+ *
+ * `BASE_URL` ist das, was in `vite.config.ts` als `base` steht ("./"), und
+ * `public/` ist das Verzeichnis, dessen Inhalt unveraendert im Build landet.
+ */
+const DATEI = new URL("greifer-mehrschalen.glb", document.baseURI).href;
 
 const kopf = document.getElementById("kopf") as HTMLDivElement;
 const leiste = document.getElementById("leiste") as HTMLDivElement;
