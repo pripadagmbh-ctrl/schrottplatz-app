@@ -49,6 +49,12 @@ export interface ContainerConfig {
    * daneben zu stellen sähe aus wie ein Baufehler.
    */
   haldeWaende?: { rueck?: boolean; aussen?: boolean; trenn?: boolean; nord?: boolean };
+  /**
+   * Um wie viele Meter die Aussenwand ueber die Halde hinaus auf voller Hoehe
+   * weiterlaeuft (Ansage 13.09.2026: „bei der Mischschrottseite noch 10 Meter
+   * laenger hoch sein"). Erst danach laeuft sie aus.
+   */
+  wandPlus?: number;
   /** Rückwand weglassen — die Nachbarmulde dahinter bringt sie mit */
   shareEast?: boolean;
   shareWest?: boolean;
@@ -109,8 +115,8 @@ export const CONFIGS: ContainerConfig[] = [
    * eine Wand, die nur im Weg war. Und die Fläche ist von 156 auf 90 m²
    * geschrumpft: „die erscheint mir auch viel zu groß".
    */
-  { id: "c_mixed", fractionId: "mixed", label: "MISCHSCHROTT", kind: "halde", x: 6.0,
-    z: -24.0, size: [8.0, 8.0, 5.0] },
+  { id: "c_mixed", fractionId: "mixed", label: "MISCHSCHROTT", kind: "halde", x: 6.2,
+    z: -20.0, size: [8.0, 8.0, 5.0], wandPlus: 10.0 },
 
   /*
    * STAHLSCHROTT — rechts neben der Presse, im Winkel ihrer Fassung.
@@ -130,8 +136,8 @@ export const CONFIGS: ContainerConfig[] = [
    * als der Arm vom Standplatz aus reicht. Sie wird von einem Schritt nach
    * rechts befuellt, nicht vom Sitzplatz aus (E-090, Arbeitslinie).
    */
-  { id: "c_steel", fractionId: "steel", label: "STAHLSCHROTT", kind: "halde", x: -11.4,
-    z: -25.9, size: [6.5, 5.0, 3.0],
+  { id: "c_steel", fractionId: "steel", label: "STAHLSCHROTT", kind: "halde", x: -5.0,
+    z: -25.0, size: [6.5, 5.0, 3.0],
     haldeWaende: { rueck: false, aussen: true, nord: true, trenn: false } },
 
   /*
@@ -143,16 +149,16 @@ export const CONFIGS: ContainerConfig[] = [
    * die Silos bringen." Keine Wände: Was hier liegt, soll der Lader von der
    * Seite aufnehmen können.
    */
-  { id: "c_alu_gross", fractionId: "alu", label: "GROSSTEILE ALU", kind: "pile", x: -18.5,
-    z: -25.5, size: [6.5, 5.0, 0] },
+  { id: "c_alu_gross", fractionId: "alu", label: "GROSSTEILE ALU", kind: "pile", x: -16.6,
+    z: -22.0, size: [6.5, 5.0, 0] },
   /*
    * REIFENDEPOT — rechts hinten, offene Fläche ohne Wände.
    *
    * Reifen fallen ständig an und werden selten abgeholt; sie brauchen Fläche,
    * keine Mulde. Heinz kümmert sich darum (Ansage 12.09.2026).
    */
-  { id: "c_tires", fractionId: "tires", label: "REIFEN", kind: "pile", x: -19.0,
-    z: -22.0, size: [8.0, 7.0, 0] },
+  { id: "c_tires", fractionId: "tires", label: "REIFEN", kind: "pile", x: -24.0,
+    z: -25.0, size: [8.0, 7.0, 0] },
 
   /*
    * ABSETZCONTAINER — sechs Stück rechts vorne, in Reichweite.
@@ -183,18 +189,47 @@ export const CONFIGS: ContainerConfig[] = [
    * ausserhalb des Greifrings. Sie ist beweglich (E-081) — man zieht sich den
    * Behaelter heran, mit dem man gerade arbeitet.
    */
-  { id: "r_cable", fractionId: "cable", label: "KABEL", kind: "rolloff", x: -7.5,
-    z: -11.5, size: [4.7, 4.7, 1.8] },
-  { id: "r_va", fractionId: "va", label: "EDELSTAHL VA", kind: "rolloff", x: -11.8,
-    z: -11.5, size: [4.7, 4.7, 1.8] },
-  { id: "r_copper", fractionId: "copper", label: "KUPFER", kind: "rolloff", x: -7.5,
-    z: -15.8, size: [4.7, 4.7, 1.8] },
-  { id: "r_alu", fractionId: "alu", label: "ALU", kind: "rolloff", x: -11.8,
-    z: -15.8, size: [4.7, 4.7, 1.8] },
-  { id: "r_zinc", fractionId: "zinc", label: "ZINK", kind: "rolloff", x: -7.5,
-    z: -20.1, size: [4.7, 4.7, 1.8] },
-  { id: "r_brass", fractionId: "brass", label: "MESSING", kind: "rolloff", x: -11.8,
-    z: -20.1, size: [4.7, 4.7, 1.8] },
+  /*
+   * ABSETZCONTAINER — fuenf Stueck, einzeln, in einer Reihe vom Bagger weg.
+   *
+   * Ansage 13.09.2026: „Container sollen massiver werden und sind nie
+   * zusammenhaengend sondern einzeln. Neue Anordnung: Aluminium und VA am
+   * naechsten zum Bagger, dann Kabel, dann Kupfer, dann Messing; Zink erstmal
+   * weglassen."
+   *
+   * Vorher standen sie als Block 2x3 dicht beieinander bei x −7,5/−11,8 — mit
+   * 4,3 m Abstand bei 4,7 m Breite beruehrten sie sich sogar. Jetzt hat jeder
+   * 1,1 m Luft zum naechsten, und die Reihenfolge folgt dem Abstand zum
+   * Bagger (der auf x −5 arbeitet):
+   *
+   *   ALU      5,0 m
+   *   VA       5,5 m   — das Paar direkt neben der Maschine
+   *   KABEL    5,5 m
+   *   KUPFER   8,5 m
+   *   MESSING  9,3 m
+   *
+   * Die Plaetze sind nicht gegriffen, sondern gesucht: Fuenf Behaelter von
+   * 4,7 m passen ueberhaupt nicht alle in den Reichweitenring von 9,8 m um
+   * die 5 m kurze Arbeitslinie — nachgerechnet blieben nur drei uebrig. Mit
+   * 4,0 m gehen alle fuenf, und der Greifer passt weiterhin hinein: Er misst
+   * offen 3,02 m ueber die Spitzen, lichte Weite sind 3,88 m. Dass die
+   * Behaelter kleiner werden duerfen, ist die Folge davon, dass die Spinne
+   * nach der Zeichnung gebaut ist statt vergroessert — vorher waren es
+   * 3,38 m Spitzenweite.
+   *
+   * Zink faellt weg. Die Fraktion bleibt im Katalog, sie hat nur keinen
+   * eigenen Behaelter mehr.
+   */
+  { id: "r_alu", fractionId: "alu", label: "ALU", kind: "rolloff", x: -4.7,
+    z: -10.0, size: [4.0, 4.0, 2.1] },
+  { id: "r_va", fractionId: "va", label: "EDELSTAHL VA", kind: "rolloff", x: -8.0,
+    z: -19.5, size: [4.0, 4.0, 2.1] },
+  { id: "r_cable", fractionId: "cable", label: "KABEL", kind: "rolloff", x: -8.0,
+    z: -14.5, size: [4.0, 4.0, 2.1] },
+  { id: "r_copper", fractionId: "copper", label: "KUPFER", kind: "rolloff", x: -9.6,
+    z: -9.8, size: [4.0, 4.0, 2.1] },
+  { id: "r_brass", fractionId: "brass", label: "MESSING", kind: "rolloff", x: -10.8,
+    z: -23.6, size: [4.0, 4.0, 2.1] },
 
   /*
    * SILOS an der Ostwand — dorthin fährt der Abholer entlang, ohne den
@@ -333,12 +368,27 @@ class GameContainer {
           }
         }
         // Aussenwand: läuft nach vorn (+z) hin aus
-        if (wnd.aussen !== false)
-        for (let bz = -hd / 2 + BL / 2; bz < hd / 2 + 0.4; bz += BL) {
-          const n = reihenBei((hd / 2 - bz) / hd);
-          for (let r = 0; r < n; r++) {
-            const off = (r % 2) * (BL / 2);
-            setze(hw / 2 + tt, BH / 2 + r * BH, bz - off, false);
+        /*
+         * `wandPlus` haengt vorn ein Stueck auf VOLLER Hoehe an, bevor die
+         * Wand auslaeuft — beim Mischschrott zehn Meter. Ohne das endet die
+         * hohe Wand dort, wo die Halde endet, und der Haufen kann nicht mehr
+         * gestapelt werden, sobald er ueber sie hinauswaechst.
+         */
+        if (wnd.aussen !== false) {
+          const plus = cfg.wandPlus ?? 0;
+          for (let bz = -hd / 2 + BL / 2; bz < hd / 2 + plus + 0.4; bz += BL) {
+            /*
+             * Voll hoch bis drei Meter vor dem Ende, dann auslaufen — eine
+             * Wand, die mit voller Hoehe abbricht, sieht aus wie ein
+             * abgebrochenes Bauteil (dieselbe Regel wie ohne Verlaengerung).
+             */
+            const ende = hd / 2 + plus;
+            const rest = ende - bz;
+            const n = rest > 3 ? REIHEN : reihenBei(rest / 3);
+            for (let r = 0; r < n; r++) {
+              const off = (r % 2) * (BL / 2);
+              setze(hw / 2 + tt, BH / 2 + r * BH, bz - off, false);
+            }
           }
         }
         /*
@@ -593,8 +643,20 @@ class GameContainer {
        * Aufräumstrafe. Geschleift statt gehoben ist ohnehin das Richtige —
        * eine volle Mulde hebt kein Umschlagbagger am Greifer an.
        */
-      const T = 0.055;
-      const KUFE = 0.16;
+      /*
+       * MASSIVER (Ansage 13.09.2026: „Container sollen massiver werden").
+       *
+       * Wandstaerke von 55 auf 90 mm, Kufen von 160 auf 220 mm, Rungen von
+       * 120 x 70 auf 180 x 110 mm und fuenf statt drei je Laengsseite, dazu
+       * ein schwererer Oberriegel. Der Behaelter liest sich damit als Stahlbau
+       * und nicht als Blechkiste.
+       *
+       * Die lichte Weite sinkt dadurch von 3,89 auf 3,82 m — der Greifer misst
+       * offen 3,02 m ueber die Spitzen, es bleiben also 40 cm auf jeder Seite.
+       * `test/spinnenmass.test.ts` rechnet das mit.
+       */
+      const T = 0.09;
+      const KUFE = 0.22;
       const stahl = new THREE.MeshStandardMaterial({
         color: fraction.color,
         roughness: 0.62,
@@ -611,7 +673,7 @@ class GameContainer {
       boden.receiveShadow = true;
       group.add(boden);
       for (const sx of [-1, 1]) {
-        const kufe = new THREE.Mesh(new THREE.BoxGeometry(0.16, KUFE, d), rahmen);
+        const kufe = new THREE.Mesh(new THREE.BoxGeometry(0.22, KUFE, d), rahmen);
         kufe.position.set((sx * (w - 0.3)) / 2, KUFE / 2, 0);
         kufe.castShadow = true;
         group.add(kufe);
@@ -632,15 +694,15 @@ class GameContainer {
       }
       // Rungen: senkrechte Profile außen auf den Längsseiten
       for (const sz of [-1, 1]) {
-        for (const rx of [-w / 2 + 0.35, 0, w / 2 - 0.35]) {
-          const runge = new THREE.Mesh(new THREE.BoxGeometry(0.12, h, 0.07), rahmen);
-          runge.position.set(rx, wandY, sz * (d / 2 + 0.03));
+        for (const rx of [-w / 2 + 0.3, -w / 4, 0, w / 4, w / 2 - 0.3]) {
+          const runge = new THREE.Mesh(new THREE.BoxGeometry(0.18, h, 0.11), rahmen);
+          runge.position.set(rx, wandY, sz * (d / 2 + 0.05));
           group.add(runge);
         }
       }
       // Obere Kante als durchlaufender Riegel — daran erkennt man die Mulde
       for (const sz of [-1, 1]) {
-        const kante = new THREE.Mesh(new THREE.BoxGeometry(w + 0.1, 0.09, 0.12), rahmen);
+        const kante = new THREE.Mesh(new THREE.BoxGeometry(w + 0.14, 0.13, 0.18), rahmen);
         kante.position.set(0, KUFE + T + h, sz * (d / 2));
         group.add(kante);
       }
