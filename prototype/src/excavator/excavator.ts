@@ -605,8 +605,48 @@ export class Excavator {
     this.stickTip.position.z = STICK_LEN;
     this.stickGroup.add(this.stickTip);
 
-    // Kardan-Aufhängung: zwei ineinandergreifende Gelenkgabeln (90° verdreht)
-    // zwischen Stielspitze und Spinne — statt eines schlichten Zylinders.
+    /*
+     * BEFESTIGUNG AM AUSLEGER (Ansage 13.09.2026: „Greifer braucht Befestigung
+     * am Ausleger").
+     *
+     * Vorher hing die Spinne am Stiel, ohne dass am Stiel etwas zu sehen war:
+     * Beide Kardangabeln gehoerten zur `grappleGroup`, der Stiel endete stumpf.
+     * Die obere Gabel gehoert aber an den Stiel — sie ist der feste Teil des
+     * Gelenks. Dazu ein Gusskopf am Stielende, aus dem sie herauswaechst, und
+     * zwei Sicherungsscheiben auf dem Bolzen.
+     *
+     * Weil die Gabel jetzt im Stielframe haengt, kippt sie mit dem Stiel mit —
+     * genau wie beim Vorbild, wo sich darunter das Pendelgelenk befindet.
+     */
+    const halter = new THREE.Group();
+    halter.position.z = STICK_LEN;
+    this.stickGroup.add(halter);
+    const kopf = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.52, 0.36), dark);
+    kopf.position.z = -0.1;
+    kopf.castShadow = true;
+    halter.add(kopf);
+    for (const sx of [-1, 1]) {
+      const lasche = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.3, 0.2), dark);
+      lasche.position.set(sx * 0.16, -0.22, 0);
+      lasche.castShadow = true;
+      halter.add(lasche);
+    }
+    const halterBolzen = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.05, 0.05, 0.44, 10),
+      dark
+    );
+    halterBolzen.rotation.z = Math.PI / 2;
+    halterBolzen.position.y = -0.32;
+    halter.add(halterBolzen);
+    for (const sx of [-0.21, 0.21]) {
+      const scheibe = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.03, 10), dark);
+      scheibe.rotation.z = Math.PI / 2;
+      scheibe.position.set(sx, -0.32, 0);
+      halter.add(scheibe);
+    }
+
+    // Kardan-Aufhängung: die untere Gabel gehoert zur Spinne und greift in die
+    // obere am Stiel.
     const buildYoke = (y: number, alongX: boolean): void => {
       const yoke = new THREE.Group();
       yoke.position.y = y;
@@ -627,8 +667,7 @@ export class Excavator {
     const stub = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.12, 10), dark);
     stub.position.y = -0.05;
     this.grappleGroup.add(stub);
-    buildYoke(-0.1, true); // obere Gabel: Bolzen quer
-    buildYoke(-0.3, false); // untere Gabel: 90° verdreht — greift in die obere
+    buildYoke(-0.3, false); // untere Gabel: 90° verdreht — greift in die obere am Stiel
     /*
      * Die Spinne steht Bauteil fuer Bauteil in `grappleParts.ts`.
      *
