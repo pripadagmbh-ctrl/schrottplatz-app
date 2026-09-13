@@ -27,6 +27,7 @@ const FAHRER_TEMPO = 1.5;
 /** Rechenhilfe fuer boxen() — kein neuer Vektor je Bild. */
 const BOX_TMP = new THREE.Vector3();
 import { hitsObstacle } from "../world/obstacles";
+import { lagerMuldeFuer, type ContainerConfig } from "../world/containers";
 import { rollCustomer, vehicleForCustomer, type CustomerProfile } from "./customers";
 import { buildVehicleModel, wandHoehe } from "./vehicleModel";
 
@@ -55,6 +56,9 @@ import {
   TIP_APPROACH,
   TIP_IN_REV,
   TIP_OUT,
+  bayApproach,
+  bayInRev,
+  bayOut,
   PARK_SLOTS,
   PARK_ANFAHRT_M,
   PARK_TIME_S,
@@ -438,6 +442,18 @@ class DeliveryVehicle {
   get sortedMaterial(): string | null {
     return this.customer?.sortedMaterial ?? null;
   }
+
+  /**
+   * Die Mulde an der Ostwand, in die diese Fuhre gehoert — oder null.
+   *
+   * Nur fuer Kipper: Wer nicht selbst kippen kann, wird vom Bagger entladen
+   * und muss dafuer vor der Maschine stehen. Und nur, wenn es die Fraktion
+   * dort ueberhaupt gibt; sonst bleibt es beim Mischschrott.
+   */
+  private get zielMulde(): ContainerConfig | null {
+    if (!this.isSelfTipping) return null;
+    return lagerMuldeFuer(this.sortedMaterial);
+  }
   private get routeIn(): Array<[number, number]> {
     return this.isPickup ? PICKUP_IN_FWD : ROUTE_IN_FWD;
   }
@@ -474,16 +490,22 @@ class DeliveryVehicle {
 
   private get routeApproach(): Array<[number, number]> {
     if (this.isPickup) return this.meineAnfahrt ?? pickupApproach();
+    const mulde = this.zielMulde;
+    if (mulde) return bayApproach(mulde.z);
     if (this.isSelfTipping) return TIP_APPROACH;
     return this.meineAnfahrt ?? routeApproach();
   }
   private get routeRev(): Array<[number, number]> {
     if (this.isPickup) return this.meinRueckweg ?? pickupInRev();
+    const mulde = this.zielMulde;
+    if (mulde) return bayInRev(mulde.z);
     if (this.isSelfTipping) return TIP_IN_REV;
     return this.meinRueckweg ?? routeInRev();
   }
   private get routeOut(): Array<[number, number]> {
     if (this.isPickup) return this.meineAusfahrt ?? pickupOut();
+    const mulde = this.zielMulde;
+    if (mulde) return bayOut(mulde.z);
     if (this.isSelfTipping) return TIP_OUT;
     return this.meineAusfahrt ?? routeOut();
   }

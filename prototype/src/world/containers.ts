@@ -275,19 +275,62 @@ export const CONFIGS: ContainerConfig[] = [
     z: -17.5, size: [4.0, 4.0, 2.1] },
 
   /*
-   * SILOS an der Ostwand — dorthin fährt der Abholer entlang, ohne den
-   * Arbeitsbereich zu kreuzen (Ansage 12.09.2026). Was liegenbleiben darf,
-   * bis genug für eine Fuhre zusammen ist; gefüllt vom Radlader.
+   * MULDENREIHE an der Ostwand — acht statt vier.
+   *
+   * Bisher lagen hier vier Lagermulden, die der Radlader fuellt: Holz,
+   * Baumisch, Kunststoff, VA. Dazu kommen jetzt vier fuer die Fraktionen, die
+   * sortenrein angeliefert werden (Ansage 13.09.2026: „sortenreine Kipper
+   * sollen direkt in den Mulden auf der Ostseite rechts kippen, nicht bei
+   * mir"). Der Fahrer setzt selbst zurueck und kippt dort ab; der
+   * Arbeitsbereich vor dem Bagger bleibt frei.
+   *
+   * Die Reihe konnte dafuer nicht laenger werden, sie war schon voll: Zwischen
+   * der Suedmauer (z −28,7) und der ersten Halle (z +8,0) liegen 36,7 m, und
+   * vier weitere mit dem alten Abstand von 7,0 m haetten 56 m gebraucht. Die
+   * Mulden ruecken deshalb zusammen: 4,2 m Front statt 6,0 bei 4,6 m
+   * Achsabstand, acht davon brauchen 36,4 m.
+   *
+   * Was die Front verliert, holt die TIEFE zurueck — sie kostet nichts, weil
+   * die Reihe an der Wand steht und nach hinten Platz ist: 7,0 m statt 4,4.
+   * Das ist kein Schoenheitsmass, sondern noetig: Die Ladeflaeche eines
+   * Kippers ist 6,0 m lang, und bei 4,4 m Tiefe landete gemessen nur ein
+   * Drittel der Fuhre in der Mulde, der Rest davor.
+   *
+   * Die Front bleibt ueber 3,02 m: Daran haengt die Spinne, die zwischen die
+   * Flanken passen muss (`spinnenmass`).
+   *
+   * Reihenfolge von der Einfahrt her: erst die vier, die der LKW anfaehrt,
+   * dann die vier, die der Radlader bedient. So kreuzt kein Anlieferer die
+   * halbe Reihe, und keiner faehrt an den Reifen (x −28 .. −20) vorbei.
    */
-  { id: "c_wood", fractionId: "wood", label: "HOLZ", kind: "bay", x: -34.5,
-    z: -2.0, size: [4.4, 6.0, 3.0], facing: "east" },
-  { id: "c_rubble", fractionId: "rubble", label: "BAUMISCH", kind: "bay", x: -34.5,
-    z: -9.0, size: [4.4, 6.0, 3.0], facing: "east" },
-  { id: "c_plastic", fractionId: "plastic", label: "KUNSTSTOFF", kind: "bay", x: -34.5,
-    z: -16.0, size: [4.4, 6.0, 3.0], facing: "east" },
+  { id: "c_steel_lager", fractionId: "steel", label: "STAHL-LAGER", kind: "bay", x: -34.5,
+    z: 5.6, size: [7.0, 4.2, 3.5], facing: "east" },
+  { id: "c_alu_lager", fractionId: "alu", label: "ALU-LAGER", kind: "bay", x: -34.5,
+    z: 1.0, size: [7.0, 4.2, 3.0], facing: "east" },
+  { id: "c_cable_lager", fractionId: "cable", label: "KABEL-LAGER", kind: "bay", x: -34.5,
+    z: -3.6, size: [7.0, 4.2, 3.0], facing: "east" },
+  { id: "c_copper_lager", fractionId: "copper", label: "KUPFER-LAGER", kind: "bay", x: -34.5,
+    z: -8.2, size: [7.0, 4.2, 3.0], facing: "east" },
   { id: "c_va_lager", fractionId: "va", label: "VA-LAGER", kind: "bay", x: -34.5,
-    z: -23.0, size: [4.4, 6.0, 3.5], facing: "east" },
+    z: -12.8, size: [7.0, 4.2, 3.5], facing: "east" },
+  { id: "c_wood", fractionId: "wood", label: "HOLZ", kind: "bay", x: -34.5,
+    z: -17.4, size: [7.0, 4.2, 3.0], facing: "east" },
+  { id: "c_rubble", fractionId: "rubble", label: "BAUMISCH", kind: "bay", x: -34.5,
+    z: -22.0, size: [7.0, 4.2, 3.0], facing: "east" },
+  { id: "c_plastic", fractionId: "plastic", label: "KUNSTSTOFF", kind: "bay", x: -34.5,
+    z: -26.6, size: [7.0, 4.2, 3.0], facing: "east" },
 ];
+
+/**
+ * Die Mulde, in die eine sortenreine Fuhre dieser Fraktion gehoert.
+ *
+ * `null` heisst: fuer diese Fraktion gibt es keine — dann kippt der Wagen wie
+ * bisher in den Mischschrott vor dem Bagger.
+ */
+export function lagerMuldeFuer(fractionId: string | null): ContainerConfig | null {
+  if (!fractionId) return null;
+  return CONFIGS.find((c) => c.kind === "bay" && c.fractionId === fractionId) ?? null;
+}
 
 /** Fangbereich über einer Haufen-Zone (Zonen-Zählung + Ampel) */
 const PILE_CATCH_HEIGHT = 2.4;
