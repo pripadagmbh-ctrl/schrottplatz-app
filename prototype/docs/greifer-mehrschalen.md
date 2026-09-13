@@ -10,7 +10,7 @@ gesetzt.
 | **Datei** | `prototype/src/greifer/greifer-mehrschalen.glb` (glTF 2.0, binär)<br>ausgeliefert als `assets/greifer-mehrschalen-<hash>.glb` |
 | **Größe** | 1.230 kB · 263 Meshes · 12.864 Dreiecke |
 | **Einheit** | Meter, Y oben, rechtshändig (glTF-Standard) |
-| **Abmessungen** | geschlossen 1,78 × 2,40 m · offen 2,30 × 2,49 m |
+| **Abmessungen** | geschlossen 1,78 × 2,40 m · offen 2,30 m Spitzenweite (2,52 m Hüllkreis) |
 | **Ursprung** | Aufhängepunkt am Stiel |
 | **Quelle** | `src/grapple/teile.ts` (Positionen + Kinematik) · `src/grapple/rig.ts` (Zusammenbau) |
 | **Neu erzeugen** | `npx vite-node tools/greifer-export.ts` |
@@ -44,7 +44,7 @@ herausgekommen:
 | | gerechnet | Positionsliste |
 |---|---|---|
 | Gesamthöhe | 2,400 m | 2.400 mm |
-| Breite offen | 2,296 m | 2.300 mm |
+| Spitzenweite offen | 2,30 m | 2.300 mm |
 | Schalenbreite oben | 0,400 m | 400 mm |
 | Inhalt geschlossen | 1.195 l | 1.200 l |
 
@@ -104,7 +104,7 @@ GRAPPLE_ROOT                        Ursprung = Aufhängepunkt am Stiel
 | Objekt | Kanal | Bewegung |
 |---|---|---|
 | `ROTATOR` | `rotation.y` | Endlosdrehung des ganzen Greifers |
-| `SHELL_01..05` | `rotation.x` | Öffnen und Schließen, 0° … 51° |
+| `SHELL_01..05` | `rotation.x` | Öffnen und Schließen, 0° … 65° |
 | `CYLINDER_01..05` | `rotation.x` | Neigung des Zylinders, folgt der Schale |
 | `CYL_ROD_SHAFT_nn` | `scale.y`, `position.y` | Auszug der Kolbenstange |
 | `CYL_ROD_EYE_nn` | `position.y` | Stangenauge, bleibt auf dem Bolzen |
@@ -121,9 +121,9 @@ Standbilder `POSE_ZU`, `POSE_HALB`, `POSE_OFFEN`.
 Das Verbindungsprinzip der Zeichnung, Stück für Stück:
 
 ```
-Oberer Zylinderanschluss   an der Mitteltraverse      r 0,35 m, y −0,88 m
-Hydraulikzylinder          dazwischen                 0,50 … 0,69 m
-Obere Schalenanbindung     am Zylinder                Drehpunktframe y +0,12, z +0,20
+Oberer Zylinderanschluss   an der Mitteltraverse      r 0,35 m, y −0,86 m
+Hydraulikzylinder          dazwischen                 0,48 … 0,75 m
+Obere Schalenanbindung     am Zylinder                Drehpunktframe y +0,10, z +0,24
 Greiferschale
 Untere Schalenanbindung    am Stempel                 r 0,59 m, y −1,5335 m
 Greiferspitze              an der Schale
@@ -134,11 +134,11 @@ und wird vom Zylinder geschoben. Ein Winkelhebel.
 
 | | |
 |---|---|
-| Hub | 189 mm |
-| Kleinster Hebelarm | 153 mm — kein Totpunkt über den ganzen Weg |
-| Neigung | höchstens 40° gegen die Senkrechte |
+| Hub | 264 mm |
+| Kleinster Hebelarm | 144 mm — kein Totpunkt über den ganzen Weg |
+| Neigung | höchstens 41° gegen die Senkrechte |
 | Kraftrichtung | fährt zum **Schließen aus**, also mit voller Kolbenfläche |
-| Schließmoment | 1,5-mal das Öffnungsmoment |
+| Schließmoment | 1,7-mal das Öffnungsmoment |
 
 ## 6. Was geprüft wird
 
@@ -157,7 +157,26 @@ und wird vom Zylinder geschoben. Ein Winkelhebel.
   abgespielt und nachgemessen. Ein Clip, dessen Spuren sich nicht bewegen,
   lässt den Lauf fehlschlagen.
 
-## 7. Bilder
+## 7. Im Spiel
+
+Seit dem 13.09.2026 trägt der Bagger diesen Greifer. `src/excavator/clawGeometry.ts`
+leitet Mittellinie, Anschläge und Bolzenkreis aus `src/grapple/teile.ts` ab, statt
+eigene Zahlen zu führen; `src/excavator/grappleParts.ts` setzt die Bauteile für das
+Spiel zusammen. Die frühere Sichelkralle liegt unter `docs/archiv/spinne-sichel/`.
+
+Was sich damit im Spiel ändert:
+
+| | Sichel (alt) | Fünfschalen (neu) |
+|---|---|---|
+| Spitzenweite offen | 3,38 m | 2,30 m |
+| Breite geschlossen | 1,51 m | 1,78 m |
+| Bauhöhe | 2,14 m | 2,49 m |
+
+Der Greifer nimmt einen kleineren Biss. Nachgemessen an den 44 Schrottsorten
+passt jede noch zwischen die Spitzen: die sperrigste hat 1,90 m in der mittleren
+Kante (Waggon-Drehgestell, LKW-Fahrerhaus).
+
+## 8. Bilder
 
 | Datei | Inhalt |
 |---|---|

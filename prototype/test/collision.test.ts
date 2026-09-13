@@ -337,16 +337,22 @@ describe("Reichweite des Baggers", () => {
     }
   });
 
-  it("schließt mittig, ohne dass die Spitzen sich überlappen", () => {
+  it("schließt mittig, mit dem kleinen Loch der halboffenen Bauform", () => {
     /*
-     * Geschlossen heißt seit dem 12.09.2026 nicht mehr Spreizung 0.
-     * Die Schalen hängen an einem Bolzenkreis von nur 0,25 m; bei 0 stehen sie
-     * senkrecht nach unten und ihre Spitzen liegen weit auseinander. Erst nach
-     * 0,85 rad Ausschwenken treffen sie sich auf der Achse.
+     * Geschlossen ist seit dem 13.09.2026 wieder Spreizung 0 — aber die
+     * Spitzen treffen sich nicht exakt auf der Achse, sondern lassen ein Loch
+     * von Ø 0,12 m. Das ist gewollt und keine Ungenauigkeit: Fünf Spitzen
+     * endlicher Breite können sich auf einem Punkt gar nicht treffen, ohne
+     * einander zu durchdringen. Die halboffene Bauform der Zeichnung macht
+     * genau das.
+     *
+     * Die Schranke prüft beides: klein genug, dass nichts durchrieselt, und
+     * größer als null, damit die Spitzen einander nicht überlappen.
      */
     const p = clawPoint(0, CLAW_CLOSED_SPLAY, CLAW_SEGMENTS, new THREE.Vector3());
-    // Radius nahe null heißt: die Spitzen treffen sich in der Mitte
-    expect(Math.abs(Math.hypot(p.x, p.z))).toBeLessThan(0.05);
+    const r = Math.hypot(p.x, p.z);
+    expect(r, "die Spitzen überfahren die Drehachse").toBeGreaterThan(0.02);
+    expect(2 * r, "unnötig viel Loch in der Mitte").toBeLessThan(0.2);
   });
 
   it("öffnet weit genug, um etwas zu fassen", () => {
@@ -358,12 +364,17 @@ describe("Reichweite des Baggers", () => {
      * die echten Maße aus CONFIGS. Eine Regel, ein Besitzer.
      */
     /*
-     * Die echte MG4.1-800 öffnet 2,225 m (Datenblatt). Im Spiel ist sie um ein
-     * Viertel vergrößert, damit der Umschlag flott bleibt — 2,80 m. Die alte
-     * Schranke von 3 m stammt aus der Zeit, als die Öffnungsweite geschätzt
-     * statt gerechnet war.
+     * 2,30 m Spitzenweite — die Zahl der Positionsliste, jetzt im Maßstab 1:1
+     * statt vergrößert. Die alte Sichelkralle öffnete 3,38 m, weil sie eine um
+     * ein Viertel aufgeblasene MG4.1-800 war.
+     *
+     * Die Schranke steht bei 2,0 m, und der Grund ist nachgemessen: Von den 44
+     * Schrottsorten hat die sperrigste eine mittlere Kante von 1,90 m (Waggon-
+     * Drehgestell, LKW-Fahrerhaus). Was darunter fällt, passt nicht mehr
+     * zwischen die Spitzen — dann ist im Spiel etwas nicht mehr aufnehmbar,
+     * und das soll auffallen, bevor es jemand beim Spielen merkt.
      */
-    expect(clawSpan(CLAW_OPEN_SPLAY)).toBeGreaterThan(2.5);
+    expect(clawSpan(CLAW_OPEN_SPLAY)).toBeGreaterThan(2.0);
   });
 
   it("öffnet weiter, als es schließt", () => {
