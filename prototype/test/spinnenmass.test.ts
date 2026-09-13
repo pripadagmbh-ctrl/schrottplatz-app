@@ -29,7 +29,12 @@ const LUFT = 0.3;
  * lichte Weite. Ohne diesen Abzug hätte der Test 4,00 m durchgewunken, obwohl
  * innen nur 3,88 m frei sind — 25 cm Luft statt der geforderten 30.
  */
-const WANDSTAERKE = 0.14;
+/*
+ * Zwei Wandstaerken, seit die Behaelter massiver sind (13.09.2026): 2 x 90 mm
+ * statt 2 x 55. Ohne diesen Abzug rechnet man mit dem Aussenmass und winkt eine
+ * Groesse durch, die innen gar nicht passt.
+ */
+const WANDSTAERKE = 0.18;
 
 const SPANNE = clawSpan(CLAW_OPEN_SPLAY);
 

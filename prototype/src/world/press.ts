@@ -29,7 +29,12 @@ import type { CompositeManager } from "../dismantle/composites";
 // naeher an den Mischschrottplatz rueckt. Und quergestellt: Sie lag vom Sitz
 // aus waagerecht im Bild und nahm die ganze Breite ein; hochkant steht sie in
 // einer Reihe mit Stahlmulde und Halde.
-const CENTER = new THREE.Vector3(-3.0, 0, -26.0);
+/*
+ * Die Presse steht ganz links in der Ecke (Ansage 13.09.2026: „Presse steht
+ * ganz links in der Ecke, davor liegt Mischschrott"). Links vom Fahrersitz ist
+ * +x, hinten ist −z; die Platzgrenze liegt bei x 10,5 und z −29.
+ */
+const CENTER = new THREE.Vector3(6.6, 0, -26.0);
 /** Mitte der Presskammer — auch fuer Hindernisliste und Tests. */
 export const PRESS_CENTER = CENTER;
 // Die Schwelle gilt fuer Objekte wie fuer Pakete — sie steht in materials/purity.ts.
@@ -66,7 +71,12 @@ const ROT = 0;
 // Breite wie der Stahlschrottplatz (11 m), direkt daneben: So bildet die
 // Schere mit dem Haufen eine Flucht. Die geringe Tiefe hält die Deckelklappen
 // kurz — die Spinne reicht bequem darüber (Wunsch 02.09.2026).
-const INNER_W = 7.0; // x — Länge, Pressweg (rechts → links)
+/*
+ * 15 % kuerzer und 20 % schmaler als vorher (Ansage 13.09.2026). Aus 7,00 x
+ * 4,70 m werden 5,95 x 3,76 m. Der Greifer passt weiterhin hinein: offen misst
+ * er 3,02 m ueber die Spitzen, es bleiben also 37 cm auf jeder Seite.
+ */
+const INNER_W = 5.95; // x — Länge, Pressweg (rechts → links)
 // Schmaler (Ansage 12.09.2026: „die Presse erscheint immer noch zu tief,
 // die kann ruhig noch ein bisschen schmaler werden").
 /*
@@ -79,7 +89,7 @@ const INNER_W = 7.0; // x — Länge, Pressweg (rechts → links)
  * Mindestmass fuer jeden Behaelter auf dem Platz: Was man befuellen soll,
  * muss man auch ausraeumen koennen.
  */
-const INNER_D = 4.7;
+const INNER_D = 3.76;
 /** Lichte Masse der Kammer — fuer Tests und Platzplanung. */
 export const PRESS_INNER = { laenge: INNER_W, tiefe: INNER_D };
 const WALL_H = 1.9;
