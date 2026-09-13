@@ -370,12 +370,22 @@ describe("Reichweite des Baggers", () => {
   });
 
   it("liefert eine Spitzentiefe, die zum Bodenanschlag passt", () => {
-    // Offen ist die Spinne flacher als geschlossen — sie streckt sich erst
-    // beim Schließen nach unten
+    /*
+     * Offen ist die Spinne LÄNGER als geschlossen — nicht umgekehrt.
+     *
+     * Das Datenblatt sagt es (A = 2363 mm offen, B = 1966 mm zu), und die
+     * Geometrie erzwingt es: Geschlossen müssen die Spitzen den Bolzenkreis
+     * von 0,73 m nach innen überbrücken, und dieser Weg fehlt ihnen nach
+     * unten. Eine Faust ist kürzer als eine ausgestreckte Hand.
+     *
+     * Bis zum 13.09.2026 stand hier die umgekehrte Forderung. Sie stammte aus
+     * der Zeit, als die Schale ein 170°-Haken war — da traf sie sogar zu, weil
+     * die Spitze beim Öffnen wieder hochkam. Die Form war aber falsch.
+     */
     const offen = clawTipDepth(CLAW_OPEN_SPLAY);
     const zu = clawTipDepth(CLAW_CLOSED_SPLAY);
-    expect(offen).toBeGreaterThan(1.5);
-    expect(zu).toBeGreaterThan(offen);
+    expect(zu).toBeGreaterThan(1.5);
+    expect(offen).toBeGreaterThan(zu);
     /*
      * Obergrenze der Spitzentiefe. Sie hütet, dass der Greifer nicht so lang
      * wird, dass der Arm ihn nicht mehr über eine Wand hebt: Die 5-m-Wand des
@@ -389,12 +399,38 @@ describe("Reichweite des Baggers", () => {
     expect(zu).toBeLessThan(3.0);
   });
 
-  it("wächst monoton vom Gelenk zur Spitze", () => {
+  it("läuft vom Gelenk bis zur Spitze durchgehend abwärts", () => {
+    /*
+     * Die Schale ist ein gleichmäßiger Bogen von 86°, kein Haken: Sie krümmt
+     * sich zur Achse hin, läuft dabei aber bis zur Spitze weiter nach unten.
+     *
+     * Am 13.09.2026 stand hier kurz das Gegenteil — ein Rücklauf nach oben.
+     * Der kam aus einer 170°-Form, die aus nur zwei Datenblattmaßen
+     * zurückgerechnet war. Gegen alle sechs Maße gerechnet bleibt der flache
+     * Bogen übrig, und der hakt nicht.
+     */
     let vorher = 0;
     for (let k = 1; k <= CLAW_SEGMENTS; k++) {
       const tiefe = -clawPoint(0, CLAW_CLOSED_SPLAY, k, new THREE.Vector3()).y;
-      expect(tiefe).toBeGreaterThan(vorher);
+      expect(tiefe, `Station ${k} läuft nicht weiter abwärts`).toBeGreaterThan(vorher);
       vorher = tiefe;
+    }
+  });
+
+  it("nimmt für den Bodenanschlag den tiefsten Punkt der Schale", () => {
+    /*
+     * Heute ist das die Spitze. Die Rechnung geht trotzdem über alle Stationen,
+     * und das ist Absicht: Sobald jemand am Krümmungsprofil dreht und die
+     * Schale am Ende nach innen hakt, wandert der tiefste Punkt nach oben.
+     * Wer dann noch nach der Spitze absetzt, fährt mit dem Bauch der Schale in
+     * den Beton, ohne dass ein Test anschlägt.
+     */
+    for (const splay of [CLAW_CLOSED_SPLAY, CLAW_OPEN_SPLAY]) {
+      let tiefste = 0;
+      for (let k = 1; k <= CLAW_SEGMENTS; k++) {
+        tiefste = Math.max(tiefste, -clawPoint(0, splay, k, new THREE.Vector3()).y);
+      }
+      expect(clawTipDepth(splay)).toBeCloseTo(tiefste, 6);
     }
   });
 });

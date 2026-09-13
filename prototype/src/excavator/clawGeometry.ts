@@ -11,81 +11,104 @@ import * as THREE from "three";
  */
 
 /**
- * Radius, auf dem die Drehbolzen der Schalen sitzen.
+ * Massstab der Spielspinne gegenueber dem Datenblatt.
  *
- * Das ist KEIN Ring unter dem Kopf, sondern das untere Ende des Strunks — der
- * massiven Saeule, die aus der Birne kommt (Beschreibung 12.09.2026: „dieser
- * Ring, den Du da zeichnest, der existiert gar nicht … die Schalen haengen
- * unten am Strunk"). Er ist darum klein: 0,25 m gegen vorher 0,82 m.
+ * Alle Maße unten stehen so, wie sie am echten Geraet gemessen sind — das
+ * Datenblatt bleibt damit nachpruefbar. Groesser wird sie an genau einer
+ * Stelle, hier.
  *
- * Aus dem Datenblatt der MG4.1-800-HO5 zurueckgerechnet — siehe BEND_PROFIL.
+ * Ein Viertel darueber. Die MG4.1-800-HO5 oeffnet 2,225 m; im Spiel sind es
+ * damit 2,78 m. Das war die Ansage vom 13.09.2026 — „wie im Bild, gerne
+ * groesser" — und es hat einen Grund im Spiel: Autos, Tanks und Motorbloecke
+ * liegen hier dichter beieinander als auf einem echten Platz, und mit der
+ * Datenblattgroesse muesste man jedes Teil einzeln herausfummeln.
+ *
+ * Der Kopf — Drehmotor, Birne, Strunk — waechst vorerst nicht mit. Er ist in
+ * `grappleParts.ts` von Hand gebaut; ob er zu klein wirkt, entscheidet sich am
+ * Bild, nicht an der Zahl.
  */
-export const CLAW_RING_R = 0.25;
-/** Unterkante Traverse, gemessen ab Kardangelenk */
-export const CLAW_RING_Y = -0.9;
+export const SPIEL_MASSSTAB = 1.25;
+
+/**
+ * Radius, auf dem die Drehbolzen der Schalen sitzen (m).
+ *
+ * An der CAD-Zeichnung des MG4.1 nachgemessen (13.09.2026): Die offene Spinne
+ * misst dort 560 px bei ØD = 2409 mm, der Bolzenkreis 340 px — macht 1,463 m
+ * Durchmesser, also 0,731 m Radius.
+ *
+ * Das Datenblatt nennt ØC = 1514 mm. Das ist NICHT der Bolzenkreis, sondern
+ * der Durchmesser der geschlossenen Zwiebel — und der liegt naturgemaess ein
+ * paar Zentimeter ueber dem Bolzenkreis, weil die Schalen dort aussen am
+ * Lagerbock vorbeilaufen. Beides zusammen passt: 1,463 m Bolzenkreis,
+ * 1,514 m Zwiebel.
+ */
+export const CLAW_RING_R = 0.731 * SPIEL_MASSSTAB;
+/**
+ * Hoehe des Kopfes ueber dem Bolzenkreis (m, negativ = nach unten).
+ *
+ * Adapter, Drehwerk und Greiferkopf zusammen. Mitgerechnet aus dem
+ * Datenblatt: Die Gesamthoehen A = 2363 mm (offen) und B = 1966 mm
+ * (geschlossen) minus der Tiefe, die die Schalen in der jeweiligen Stellung
+ * selbst erreichen, ergeben beide Male rund 1,10 m.
+ */
+export const CLAW_RING_Y = -1.1 * SPIEL_MASSSTAB;
 /** Länge eines Krallensegments */
-export const CLAW_SEG_LEN = 0.289;
+export const CLAW_SEG_LEN = 0.1719 * SPIEL_MASSSTAB;
 /** Segmente je Kralle */
 export const CLAW_SEGMENTS = 8;
 /**
- * Krümmung der Sichel, Station für Station (rad).
+ * Krümmung der Schale (rad je Segment) — ein gleichmäßiger Bogen.
  *
- * Nicht gleichmäßig, sondern nach hinten zunehmend — das ist der Unterschied
- * zwischen einem Kreisbogen und der Sichel eines echten Schrottgreifers
- * (Vorlage 12.09.2026, Rotobec-Mehrschalengreifer). Oben läuft die Schale fast
- * senkrecht, unten hakt sie scharf nach innen:
+ * Acht Stationen, jedes Mal dieselben 12,3°, zusammen 86° vom Drehbolzen bis
+ * zur Spitze. Das ist ein Kreisbogen, kein Haken.
  *
- *   Station   1    2    3    4    5    6    7    8
- *   Winkel   0°  16°  32°  48°  64°  81°  98°  115°
+ * Hier stand bis zum 13.09.2026 ein nach unten zunehmendes Profil mit 170°
+ * Gesamtkrümmung. Das war aus zwei Datenblattmaßen rückgerechnet — und mit nur
+ * zwei Maßen ist die Aufgabe unterbestimmt. Gegen alle sechs gerechnet
+ * (Spitzenweite und größter Durchmesser, je offen und zu, dazu beide
+ * Gesamthöhen) bleibt genau ein Bogen übrig, und der ist gleichmäßig. Die
+ * 170°-Form öffnete sich wie ein Seestern: Die Schalen klappten fast waagerecht
+ * auf und die Spinne maß offen 3,7 m statt 2,4 m.
  *
- * Nicht mehr geschaetzt, sondern aus dem Datenblatt der MG4.1-800-HO5
- * zurueckgerechnet (Broschuere SENNEBOGEN, 12.09.2026). Drei Masse mussten
- * gleichzeitig stimmen, und ein Loeser hat Kruemmung, Bolzenradius und
- * Segmentlaenge dazu gesucht:
+ * Wichtig war dabei, die Höhen richtig herum zuzuordnen. A = 2363 mm ist die
+ * Höhe OFFEN, B = 1966 mm die Höhe ZU. Andersherum geht es gar nicht: Wenn die
+ * Spitzen geschlossen auf der Achse zusammenkommen, müssen sie den Bolzenkreis
+ * von 0,73 m überbrücken — und dieser Weg nach innen fehlt ihnen nach unten.
+ * Eine geschlossene Spinne ist immer kürzer als eine offene, so wie eine Faust
+ * kürzer ist als eine ausgestreckte Hand.
  *
- *                       gefunden   Datenblatt
- *   Spitzenweite offen    2,21 m     2,225 m   (d)
- *   Schalenkreis offen    2,40 m     2,409 m   (ØD)
- *   Tiefe geschlossen     1,46 m     ~1,45 m   (A minus Kopf)
- *
- * Daraus folgt alles Weitere: 115° Gesamtkruemmung, fast gleichmaessig
- * verteilt, und ein Bolzenradius von nur 0,20 m — im Spiel auf 0,25 m
- * vergroessert, damit der Umschlag flott bleibt. Die Schale beschreibt damit
- * ein grosses C: vom Bolzen erst nach aussen, dann herum und wieder nach
- * innen, bis sich die Spitzen auf der Achse treffen.
- *
- * Wer daran dreht, muss alle drei Masse nachrechnen.
-  */
-const BEND_PROFIL = Array.from({ length: CLAW_SEGMENTS }, (_, i) =>
-  0.30169 * (0.9 + 0.1 * (i / (CLAW_SEGMENTS - 1)))
-);
+ *   Station   0      1      2      3      4      5      6      7
+ *   Winkel    0°   12°    25°    37°    49°    62°    74°    86°
+ */
+const SEG_BEND = 1.5041 / (CLAW_SEGMENTS - 1);
 /** Aufsummierte Krümmung bis Station `i`. */
-export const CLAW_BEND_KUM: number[] = BEND_PROFIL.reduce<number[]>(
-  (acc, b2) => [...acc, (acc[acc.length - 1] ?? 0) + b2],
-  [0]
+export const CLAW_BEND_KUM: number[] = Array.from(
+  { length: CLAW_SEGMENTS + 1 },
+  (_, i) => i * SEG_BEND
 );
 /** Zahl der Krallen */
 export const CLAW_COUNT = 5;
 /**
- * Spreizung der ganz offenen Spinne (rad).
+ * Spreizung der ganz offenen Spinne (rad) = 60°.
  *
- * Sie haengt am Kruemmungsprofil und kommt wie alles Uebrige aus dem
- * Datenblatt: Bei 1,65 rad stehen die Spitzen 2,21 m auseinander und der
- * groesste Durchmesser betraegt 2,40 m — beides auf zwei Zentimeter genau die
- * Werte fuer d und ØD.
-  */
-export const CLAW_OPEN_SPLAY = 1.65;
-/**
- * Spreizung der GESCHLOSSENEN Spinne (rad).
+ * Aus demselben Ausgleich wie der Bogen. Bei 1,053 rad stehen die Spitzen
+ * 2,18 m auseinander (Soll d = 2,225 m) und der größte Durchmesser beträgt
+ * 2,42 m (Soll ØD = 2,409 m).
  *
- * Frueher war das schlicht 0. Mit dem kleinen Bolzenradius geht das nicht
- * mehr: Die Schale steht bei 0 senkrecht nach unten und ihre Spitzen liegen
- * weit auseinander. Sie muss erst um 0,85 rad ausschwenken, damit die Spitzen
- * auf der Achse zusammenkommen — das ist der geschlossene Greifer.
- *
- * Die Zahl steckt damit ueberall dort, wo frueher 0 stand.
+ * Vorher standen hier 1,55 rad — knapp 89°, also fast waagerecht. Daran
+ * erkennt man den alten Fehler am schnellsten: So weit klappt keine Schale
+ * auf, das wäre ein Regenschirm im Sturm.
  */
-export const CLAW_CLOSED_SPLAY = 0.85;
+export const CLAW_OPEN_SPLAY = 1.0532;
+/**
+ * Spreizung der GESCHLOSSENEN Spinne (rad) = 4,6°.
+ *
+ * Fast null, und das ist richtig: Geschlossen hängt die Schale nahezu
+ * senkrecht unter ihrem Bolzen und krümmt sich von dort zur Achse. Die paar
+ * Grad Ausschwenken sorgen dafür, dass die Spitzen sich genau auf der Achse
+ * treffen statt sich zu durchdringen.
+ */
+export const CLAW_CLOSED_SPLAY = 0.0806;
 
 /**
  * Halbe Winkelbreite einer Schale (rad).
@@ -120,9 +143,9 @@ export const CLAW_CLOSED_SPLAY = 0.85;
  *   Radius  0,757  0,757  0,744  0,708  0,642  0,536  0,390  0,207  ~0
  *   Breite  0,79   0,79   0,78   0,74   0,67   0,56   0,41   0,22   0  (m)
  */
-export const CLAW_SHELL_BREITE = 0.45;
+export const CLAW_SHELL_BREITE = 0.45 * SPIEL_MASSSTAB;
 /** Blechstärke der Schale (m) — sie ist ein Hohlkörper, kein Vollprofil. */
-export const CLAW_SHELL_DICKE = 0.085;
+export const CLAW_SHELL_DICKE = 0.085 * SPIEL_MASSSTAB;
 /**
  * Kleinster Radius, bis zu dem die Schale läuft.
  *
@@ -130,7 +153,7 @@ export const CLAW_SHELL_DICKE = 0.085;
  * durchdringen sie sich und flackern. Sie hören darum kurz davor auf. Das
  * verbleibende Loch von gut zehn Zentimetern hat ein echter Greifer auch.
  */
-const SCHALE_MIN_R = 0.055;
+const SCHALE_MIN_R = 0.055 * SPIEL_MASSSTAB;
 
 /**
  * Geometrie einer Schale, im Frame ihres Gelenks.
@@ -189,9 +212,9 @@ export function flanschGeometrie(seite: number): THREE.BufferGeometry {
 }
 
 /** Wie tief die Wangen nach innen reichen (m). */
-export const WANGEN_TIEFE = 0.34;
+export const WANGEN_TIEFE = 0.34 * SPIEL_MASSSTAB;
 /** Wie weit die Haut hinter der Aussenkante der Wangen zurueckliegt (m). */
-export const HAUT_RUECKSPRUNG = 0.1;
+export const HAUT_RUECKSPRUNG = 0.1 * SPIEL_MASSSTAB;
 
 export function schalenGeometrie(
   vonStation = 0,
@@ -340,11 +363,44 @@ export function clawSpan(splay: number): number {
 }
 
 /**
- * Tiefe der Krallenspitze unter dem Ursprung der Spinne. Daraus ergibt sich
- * der Bodenanschlag — der Greifer darf nie in den Beton sinken.
+ * Tiefe des tiefsten Krallenpunktes unter dem Ursprung der Spinne. Daraus
+ * ergibt sich der Bodenanschlag — der Greifer darf nie in den Beton sinken.
+ *
+ * Frueher war das schlicht die Spitze. Das stimmte, solange die Schale ein
+ * flacher Bogen war. Mit den 170 Grad Kruemmung aus dem Datenblatt
+ * (13.09.2026) hakt die Spitze am Ende wieder nach oben: geschlossen liegt der
+ * tiefste Punkt an Station 6, und die Spitze steht 24 cm darueber. Wer weiter
+ * nach der Spitze rechnet, setzt den Bagger genau um diese 24 cm zu tief ab —
+ * der Haken der Schale faehrt in den Beton.
+ *
+ * Darum laeuft die Rechnung ueber alle Stationen und nimmt die tiefste.
  */
 export function clawTipDepth(splay: number): number {
-  return -clawPoint(0, splay, CLAW_SEGMENTS, new THREE.Vector3()).y;
+  const p = new THREE.Vector3();
+  let tief = 0;
+  for (let k = 1; k <= CLAW_SEGMENTS; k++) {
+    tief = Math.max(tief, -clawPoint(0, splay, k, p).y);
+  }
+  return tief;
+}
+
+/**
+ * Groesster Durchmesser der Spinne bei gegebener Spreizung, in Metern.
+ *
+ * Nicht dasselbe wie `clawSpan`: Geschlossen treffen sich die Spitzen auf der
+ * Achse, aber die Schalen bauchen davor nach aussen — beim Datenblatt der
+ * MG4.1 ist das der Unterschied zwischen d = 2225 mm (Spitzenweite offen) und
+ * ØD = 2409 mm (Zwiebel geschlossen). Fuer die Frage „passt sie in den
+ * Behaelter" zaehlt diese Zahl, nicht die Spitzenweite: Man faehrt offen
+ * hinein, schliesst dort unten — und genau dann ist sie am breitesten.
+ */
+export function clawWidth(splay: number): number {
+  const p = new THREE.Vector3();
+  let weit = 0;
+  for (let k = 0; k <= CLAW_SEGMENTS; k++) {
+    weit = Math.max(weit, Math.hypot(clawPoint(0, splay, k, p).x, p.z));
+  }
+  return weit * 2;
 }
 
 /**
