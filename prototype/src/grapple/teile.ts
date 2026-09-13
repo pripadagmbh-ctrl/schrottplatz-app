@@ -14,7 +14,19 @@
  * Wange 20 mm, Verstaerkung 110 x 25. Ein Schalenende von 200 mm traegt also
  * genau einen Zahn von 110 mm.
  */
-const BLECH = 0.015;
+/**
+ * Blechstaerke — 45 mm, nicht 15.
+ *
+ * Die Herstellerzeichnung nennt 15 mm, aber fuer eine Schale von 500 mm
+ * Bogenlaenge. Unsere misst 1380 mm; auf sie umgelegt waere das ein Blatt.
+ * Ansage dazu: „die Masstaebe muessen nicht richtig sein, es sollte nur das
+ * Grundprinzip darstellen" und, zur Skizze, „dick gegossenes Eisen".
+ *
+ * Vorher kam die ganze Tiefe des Zinkens aus der Strebe. Wo man die von der
+ * Seite sieht, blieb nur das duenne Blech uebrig — der Zinken las sich dort
+ * als Blatt statt als Guss.
+ */
+const BLECH = 0.045;
 /**
  * Verjuengung — EIN Faktor fuer alles.
  *
@@ -1275,7 +1287,15 @@ export function baueGreiferspitze(st: Stoffe): THREE.Group {
    * laeuft sie auf eine stumpfe, gerundete Spitze aus.
    */
   const basisB = 2 * schalenHalbbreite(SCHALEN_ABSCHNITTE);
-  const basisH = STREBE_H_OBEN * verjuengung(SCHALEN_ABSCHNITTE) + BLECH;
+  /*
+   * Die Basis ist genau die Strebenhoehe am Schalenende — NICHT plus Blech.
+   *
+   * Die flache Seite des Zahns liegt schon auf der Aussenflaeche des Blechs
+   * (`z0`); das Blech noch einmal zur Hoehe zu addieren zaehlt es doppelt.
+   * Gemessen sprang die Dicke dadurch am Uebergang von 88 auf 120 mm — genau
+   * die Stelle, an der das Ende dicker aussah als die Mitte.
+   */
+  const basisH = STREBE_H_OBEN * verjuengung(SCHALEN_ABSCHNITTE);
   const STATIONEN: Array<[number, number, number]> = [
     [0, basisB, basisH],
     [0.09, basisB * 0.82, basisH * 0.84],
