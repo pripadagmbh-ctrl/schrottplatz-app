@@ -18,7 +18,7 @@ import * as THREE from "three";
 import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { writeFileSync } from "node:fs";
-import { SCHALEN } from "../src/grapple/form";
+import { MASS } from "../src/grapple/teile";
 import { baueGreifer, type Greifer } from "../src/grapple/rig";
 
 /**
@@ -50,7 +50,7 @@ interface Spur {
 
 function spuren(g: Greifer): Spur[] {
   const liste: THREE.Object3D[] = [g.rotator];
-  for (let i = 1; i <= SCHALEN; i++) {
+  for (let i = 1; i <= MASS.schalen; i++) {
     const nr = String(i).padStart(2, "0");
     for (const name of [`SHELL_${nr}`, `CYLINDER_${nr}`, `CYL_ROD_${nr}`]) {
       const o = g.wurzel.getObjectByName(name);
@@ -232,13 +232,13 @@ function gegenprobe(puffer: Buffer): void {
     (gltf) => {
       const szene = gltf.scene;
       const fehlt = [
-        "ADAPTER",
-        "ROTATOR",
+        "01_AUFHAENGUNG",
+        "02_ROTATOR",
+        "03_DREHWERKSGEHAEUSE",
         "GRAPPLE_HEAD",
-        "HYDRAULIC_LINES",
-        ...Array.from({ length: SCHALEN }, (_, i) => {
+        ...Array.from({ length: MASS.schalen }, (_, i) => {
           const nr = String(i + 1).padStart(2, "0");
-          return [`SHELL_${nr}`, `CYLINDER_${nr}`, `CYL_ROD_${nr}`, `WEAR_PLATE_${nr}_1`];
+          return [`SHELL_${nr}`, `CYLINDER_${nr}`, `CYL_ROD_${nr}`, `SHELL_TIP_${nr}`];
         }).flat(),
       ].filter((n) => !szene.getObjectByName(n));
       if (fehlt.length) {

@@ -1,36 +1,14 @@
 /**
- * Bauteil- und Stellungsblatt des Fünfzinken-Mehrschalengreifers.
+ * Blatt des zusammengebauten Greifers.
  *
  * Aufruf:  npx vite-node tools/greifer-blatt.ts
  * Ergebnis: docs/greifer-mehrschalen.svg
  */
-import * as THREE from "three";
 import { writeFileSync } from "node:fs";
-import {
-  baueAufhaengung,
-  baueGelenkbolzen,
-  baueMittelstueck,
-  baueRotator,
-  baueSchale,
-  baueZylinder,
-  stoffe,
-} from "../src/grapple/parts";
-import { GELENKRING, GROESSTE_TIEFE, SCHALEN, SEGMENTE, clawSpan, OFFEN } from "../src/grapple/form";
-import { baueGreifer } from "../src/grapple/rig";
+import * as THREE from "three";
+import { MASS, stoffe } from "../src/grapple/teile";
+import { baueGreifer, huelle } from "../src/grapple/rig";
 import { BLICK_SCHRAEG, BLICK_VORN, blatt, feld, type Feld } from "./riss";
-
-const st = stoffe();
-
-function zylinderKomplett(): THREE.Group {
-  const g = new THREE.Group();
-  const { rohr, stange } = baueZylinder(st);
-  rohr.scale.y = 0.28;
-  rohr.position.y = -0.14;
-  stange.scale.y = 0.3;
-  stange.position.y = -0.29;
-  g.add(rohr, stange);
-  return g;
-}
 
 function greiferIn(oeffnung: number): THREE.Object3D {
   const g = baueGreifer(stoffe());
@@ -38,42 +16,28 @@ function greiferIn(oeffnung: number): THREE.Object3D {
   return g.wurzel;
 }
 
-const teile: Feld[] = [
-  { name: "01/02  ADAPTER", obj: baueAufhaengung(st), blick: BLICK_SCHRAEG },
-  { name: "03  ROTATOR", obj: baueRotator(st), blick: BLICK_SCHRAEG },
-  { name: "06/07  MITTELSTUECK", obj: baueMittelstueck(st), blick: BLICK_SCHRAEG },
-  { name: "04  ZYLINDER", obj: zylinderKomplett(), blick: BLICK_SCHRAEG, notiz: `x${SCHALEN}` },
-  {
-    name: "08/09/10  GREIFERSCHALE",
-    obj: baueSchale(st, 0, "01"),
-    blick: BLICK_SCHRAEG,
-    notiz: `x${SCHALEN}`,
-  },
-  { name: "11  GELENKBOLZEN", obj: baueGelenkbolzen(st), blick: BLICK_SCHRAEG, notiz: `x${SCHALEN}` },
-];
-
-const stellungen: Feld[] = [
+const felder: Feld[] = [
   { name: "geschlossen", obj: greiferIn(0), blick: BLICK_SCHRAEG },
   { name: "halb", obj: greiferIn(0.5), blick: BLICK_SCHRAEG },
   { name: "offen", obj: greiferIn(1), blick: BLICK_SCHRAEG },
+  { name: "geschlossen, von vorn", obj: greiferIn(0), blick: BLICK_VORN },
   { name: "offen, von vorn", obj: greiferIn(1), blick: BLICK_VORN },
+  { name: "offen, von unten", obj: greiferIn(1), blick: new THREE.Vector3(0.2, -1, 0.25) },
 ];
 
-const SPALTEN = 4;
-const ZELLE_B = 300;
-const ZELLE_H = 240;
+const SPALTEN = 3;
+const ZELLE_B = 404;
+const ZELLE_H = 430;
 const LUFT = 12;
 const RAND = 24;
 const KOPFZEILE = 64;
-const GROSS_H = 430;
-const reihen = Math.ceil(teile.length / SPALTEN);
-const bauB = SPALTEN * ZELLE_B + (SPALTEN - 1) * LUFT;
-const breite = RAND * 2 + bauB;
-const hoehe = RAND * 2 + KOPFZEILE + reihen * (ZELLE_H + LUFT) + GROSS_H + LUFT;
+const reihen = Math.ceil(felder.length / SPALTEN);
+const breite = RAND * 2 + SPALTEN * ZELLE_B + (SPALTEN - 1) * LUFT;
+const hoehe = RAND * 2 + KOPFZEILE + reihen * (ZELLE_H + LUFT);
 
-let inhalt = "";
-teile.forEach((f, i) => {
-  inhalt += feld(
+let inhalt2 = "";
+felder.forEach((f, i) => {
+  inhalt2 += feld(
     f,
     RAND + (i % SPALTEN) * (ZELLE_B + LUFT),
     RAND + KOPFZEILE + Math.floor(i / SPALTEN) * (ZELLE_H + LUFT),
@@ -81,12 +45,9 @@ teile.forEach((f, i) => {
     ZELLE_H
   );
 });
-const yGross = RAND + KOPFZEILE + reihen * (ZELLE_H + LUFT);
-const grossB = (bauB - 3 * LUFT) / 4;
-stellungen.forEach((f, i) => {
-  inhalt += feld(f, RAND + i * (grossB + LUFT), yGross, grossB, GROSS_H);
-});
 
+const zu = huelle(0);
+const auf = huelle(1);
 const komma = (x: number): string => x.toFixed(2).replace(".", ",");
 
 writeFileSync(
@@ -94,12 +55,14 @@ writeFileSync(
   blatt(
     breite,
     hoehe,
-    `${SCHALEN}-Zinken-Mehrschalengreifer — Bauteile und Stellungen`,
-    `Sichelkralle aus ${SEGMENTE} Segmenten · Gelenkring ${komma(2 * GELENKRING)} m · ` +
-      `offen ${komma(clawSpan(OFFEN))} m Spitzenweite · ` +
-      `tiefste Spitze ${komma(GROESSTE_TIEFE)} m · ` +
-      `dieselbe Geometrie wie die Spinne im Spiel`,
-    inhalt
+    "5-Schalen-Mehrschalengreifer, 1.200 Liter — Zusammenbau",
+    `Bolzenkreis Ø 0,68 m am Rand der Mitteltraverse (Ø ${komma(MASS.traverse.durchmesser)} m) · ` +
+      `geschlossen Ø ${komma(zu.breite)} m · offen Ø ${komma(auf.breite)} m · ` +
+      `Schalen 31° bis 58° · alle Maße aus der Positionsliste`,
+    inhalt2
   )
 );
-console.log("docs/greifer-mehrschalen.svg " + breite + "x" + hoehe);
+console.log(
+  `docs/greifer-mehrschalen.svg ${breite}x${hoehe}  ` +
+    `zu ${zu.breite.toFixed(2)}x${zu.hoehe.toFixed(2)}  offen ${auf.breite.toFixed(2)}x${auf.hoehe.toFixed(2)}`
+);
