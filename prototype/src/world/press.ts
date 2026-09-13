@@ -34,7 +34,22 @@ import type { CompositeManager } from "../dismantle/composites";
  * ganz links in der Ecke, davor liegt Mischschrott"). Links vom Fahrersitz ist
  * +x, hinten ist −z; die Platzgrenze liegt bei x 10,5 und z −29.
  */
-const CENTER = new THREE.Vector3(6.6, 0, -26.0);
+/*
+ * Abstand zur Mauer, wegen der Klappe.
+ *
+ * Ansage 13.09.2026: „die Presse braucht ein wenig Abstand zur Mauer wegen
+ * der Klappe." Gemessen an der offenen Maschine: Die Deckelplatte reichte bis
+ * z −29,85, die Innenseite der Suedmauer liegt bei −28,7 — sie schwang also
+ * 1,15 m in die Mauer hinein. Die Klappe haengt an der Suedseite (`makeLid(-1,
+ * true)`), deshalb geht es nach Norden.
+ *
+ * In x stand sie ebenfalls in der Wand: Der Rahmen reichte bis 10,87, die
+ * Ostmauer beginnt innen bei 10,20.
+ *
+ * Jetzt (5,5 | −24,3): Klappe bis −28,15, also 55 cm vor der Suedmauer,
+ * Rahmen bis 9,77, also 43 cm vor der Ostmauer.
+ */
+const CENTER = new THREE.Vector3(5.5, 0, -24.3);
 /** Mitte der Presskammer — auch fuer Hindernisliste und Tests. */
 export const PRESS_CENTER = CENTER;
 // Die Schwelle gilt fuer Objekte wie fuer Pakete — sie steht in materials/purity.ts.

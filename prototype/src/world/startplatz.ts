@@ -18,7 +18,7 @@ export const START_HAUFEN = { x: 6.2, z: -19.0, streuung: 2.9, teile: 85 };
 /** Die beiden Altfahrzeuge am Rand des Haufens. */
 export const START_AUTOS: Array<{ x: number; z: number }> = [
   { x: 3.6, z: -18.0 },
-  { x: 8.8, z: -20.5 },
+  { x: 8.8, z: -19.0 },
 ];
 
 /** Streuschrott ringsum: zehn Teile auf einem Kreis um den Haufen. */

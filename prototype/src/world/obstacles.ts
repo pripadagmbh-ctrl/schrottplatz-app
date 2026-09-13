@@ -7,6 +7,7 @@ import {
   SUED_HOCH,
   SUED_HOCH_VON,
   SUED_HOCH_RAMPE,
+  OST_HOCH_BIS,
   YARD_CX,
   GATE_X,
   KAFFEE_POS,
@@ -184,6 +185,15 @@ export const STATIC_OBSTACLES: Obstacle[] = [
     hd: WALL_T / 2,
     top: SUED_HOCH,
     label: "Südwand hoch",
+  },
+  /* Dasselbe an der Ostmauer, hinter der Presse (yard.ts). */
+  {
+    x: YARD_MAX_X,
+    z: (-HZ + OST_HOCH_BIS) / 2,
+    hw: WALL_T / 2,
+    hd: (OST_HOCH_BIS + HZ) / 2,
+    top: SUED_HOCH,
+    label: "Ostwand hoch",
   },
   { x: YARD_MIN_X, z: 0, hw: WALL_T / 2, hd: HZ, top: WALL_H, label: "Westwand" },
   { x: YARD_MAX_X, z: 0, hw: WALL_T / 2, hd: HZ, top: WALL_H, label: "Ostwand" },
