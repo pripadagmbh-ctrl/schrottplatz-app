@@ -194,6 +194,51 @@ export function schalenStationen(): Array<{ y: number; z: number; th: number }> 
   return roh.map((r) => ({ y: r.y - px, z: r.z - pz, th: r.th }));
 }
 
+/**
+ * Dieselbe Schalenbahn, nur feiner aufgelöst — ausschließlich fürs Netz.
+ *
+ * Die sieben Stationen sind der Vertrag: An ihnen hängen Hüllmaß, Kinematik,
+ * Drehpunkt und Volumen, und nur mit ihrer groben Teilung trifft der Bogen die
+ * Positionsliste auf den Millimeter (1,199 × 0,296 gegen 1,200 × 0,300; mit
+ * zwölf Abschnitten wären es 1,227 × 0,271).
+ *
+ * Fürs Auge sind sechs Abschnitte über 87,5° aber zu wenig: Jeder Knick misst
+ * 17,5°, und in der Seitenansicht liest sich die Schale dadurch als gerader
+ * Schaft mit einem Knie darin statt als Sichel (Ansage 13.09.2026: „schau dir
+ * doch einfach mal die Formgebung an … bei der Spinnenansicht, also montiert,
+ * da siehst du es doch von der Seite").
+ *
+ * Deshalb wird hier eine Catmull-Rom-Kurve DURCH die sieben Stationen gelegt.
+ * Sie geht exakt durch sie hindurch — an den Stützstellen ändert sich nichts,
+ * dazwischen wird sie rund. Der Vertrag bleibt unangetastet, nur die Facetten
+ * verschwinden.
+ */
+export function feineStationen(
+  je = 3
+): Array<{ y: number; z: number; th: number; k: number }> {
+  const grob = schalenStationen();
+  const kurve = new THREE.CatmullRomCurve3(
+    grob.map((p) => new THREE.Vector3(0, p.y, p.z)),
+    false,
+    "catmullrom",
+    0.5
+  );
+  const n = SCHALEN_ABSCHNITTE * je;
+  const punkte = kurve.getSpacedPoints(n);
+  return punkte.map((v, i) => {
+    const k = (i / n) * SCHALEN_ABSCHNITTE;
+    return { y: v.y, z: v.z, th: k * SCHALEN_BOGEN, k };
+  });
+}
+
+/** Halbe Schalenbreite an einer Zwischenstation; zwischen den Stützstellen linear. */
+export function halbbreiteBei(k: number): number {
+  const a = Math.floor(k);
+  const b = Math.min(SCHALEN_ABSCHNITTE, a + 1);
+  const t = k - a;
+  return schalenHalbbreite(a) * (1 - t) + schalenHalbbreite(b) * t;
+}
+
 /** Mittellinie einer Schale im Frame des Greifers, bei gegebenem Schwenk. */
 export function mittellinie(schwenk: number): Array<{ r: number; y: number }> {
   const c = Math.cos(-schwenk);
@@ -831,7 +876,6 @@ export function schalenHalbbreite(k: number): number {
 export function baueGreiferschale(st: Stoffe): THREE.Group {
   const g = new THREE.Group();
   g.name = "06_GREIFERSCHALE";
-  const stationen = schalenStationen();
   const HAUT = 0.03;
 
   const pos: number[] = [];
@@ -848,19 +892,25 @@ export function baueGreiferschale(st: Stoffe): THREE.Group {
   };
   const QUER = 4;
 
+  /*
+   * Gebaut wird auf den FEINEN Stuetzstellen — dieselbe Bahn, nur rund statt
+   * facettiert. Die groben sieben bleiben der Vertrag fuer Mass und Kinematik.
+   */
+  const fein = feineStationen(3);
+  const ENDE = fein.length - 1;
   const lagen: number[][][] = [];
   for (const seite of [0, 1]) {
     const reihen: number[][] = [];
-    for (let k = 0; k <= SCHALEN_ABSCHNITTE; k++) {
-      const s0 = stationen[k]!;
-      const halb = schalenHalbbreite(k);
+    for (let k = 0; k <= ENDE; k++) {
+      const s0 = fein[k]!;
+      const halb = halbbreiteBei(s0.k);
       const reihe: number[] = [];
       for (let j = 0; j <= QUER; j++) {
         const t = j / QUER;
         const x = -halb + t * 2 * halb;
         const w = WOELBUNG * (1 - (x / Math.max(halb, 1e-3)) ** 2) + seite * HAUT;
         reihe.push(
-          p(x, s0.y + w * Math.sin(s0.th), s0.z + w * Math.cos(s0.th), t, k / SCHALEN_ABSCHNITTE)
+          p(x, s0.y + w * Math.sin(s0.th), s0.z + w * Math.cos(s0.th), t, k / ENDE)
         );
       }
       reihen.push(reihe);
@@ -868,7 +918,7 @@ export function baueGreiferschale(st: Stoffe): THREE.Group {
     lagen.push(reihen);
   }
   const [aussen, innen] = lagen as [number[][], number[][]];
-  for (let k = 0; k < SCHALEN_ABSCHNITTE; k++) {
+  for (let k = 0; k < ENDE; k++) {
     for (let j = 0; j < QUER; j++) {
       quad(aussen[k]![j]!, aussen[k]![j + 1]!, aussen[k + 1]![j + 1]!, aussen[k + 1]![j]!);
       quad(innen[k]![j + 1]!, innen[k]![j]!, innen[k + 1]![j]!, innen[k + 1]![j + 1]!);
@@ -876,7 +926,7 @@ export function baueGreiferschale(st: Stoffe): THREE.Group {
     quad(aussen[k]![0]!, innen[k]![0]!, innen[k + 1]![0]!, aussen[k + 1]![0]!);
     quad(innen[k]![QUER]!, aussen[k]![QUER]!, aussen[k + 1]![QUER]!, innen[k + 1]![QUER]!);
   }
-  const e = SCHALEN_ABSCHNITTE;
+  const e = ENDE;
   for (let j = 0; j < QUER; j++) {
     quad(innen[0]![j]!, innen[0]![j + 1]!, aussen[0]![j + 1]!, aussen[0]![j]!);
     quad(aussen[e]![j]!, aussen[e]![j + 1]!, innen[e]![j + 1]!, innen[e]![j]!);
@@ -895,7 +945,7 @@ export function baueGreiferschale(st: Stoffe): THREE.Group {
    * hinein. Andersherum verschwindet sie hinter der Haut, und die Schale liest
    * sich als flaches Blech — genau so sah sie im ersten Anlauf aus.
    */
-  const randTiefen = stationen.map((_, k) => wangenTiefe(k));
+  const randTiefen = fein.map((f) => wangenTiefe(f.k));
   for (const seite of [-1, 1]) {
     /*
      * Randleiste statt Wange: Sie fasst die Platte ein, trägt aber nicht mehr
@@ -903,8 +953,8 @@ export function baueGreiferschale(st: Stoffe): THREE.Group {
      */
     const leiste = new THREE.Mesh(
       strang(
-        stationen,
-        stationen.map((_, k) => seite * (schalenHalbbreite(k) - WANGE_DICK / 2)),
+        fein,
+        fein.map((f) => seite * (halbbreiteBei(f.k) - WANGE_DICK / 2)),
         WANGE_DICK,
         randTiefen,
         randTiefen.map((t) => -t)
@@ -919,9 +969,9 @@ export function baueGreiferschale(st: Stoffe): THREE.Group {
    * Der Holm — ein Rücken in der Mitte, über die ganze Länge, mitgegossen.
    * Er ist schmal und tief; links und rechts von ihm liegen die Platten.
    */
-  const holmTiefen = stationen.map((_, k) => holmTiefe(k));
+  const holmTiefen = fein.map((f) => holmTiefe(f.k));
   const holm = new THREE.Mesh(
-    strang(stationen, 0, HOLM_B, holmTiefen, holmTiefen.map((t) => -t)),
+    strang(fein, 0, HOLM_B, holmTiefen, holmTiefen.map((t) => -t)),
     st.guss
   );
   holm.name = "06_HOLM";
@@ -1020,31 +1070,30 @@ export function baueGreiferspitze(st: Stoffe): THREE.Group {
   g.name = "07_GREIFERSPITZE";
   const M = MASS.spitze;
   /*
-   * EIN Gussteil, nicht drei.
+   * Ein MEISSEL, ein Gussteil.
    *
-   * Ansage 13.09.2026: „ein Zahn ist ein gegossenes Bauteil und ist mehr oder
-   * weniger durchgängig gleich breit. Hier aber nicht und scheint aus
-   * verschiedenen Bauteilen zu bestehen." Vorher war es ein Schuh, zwei
-   * angesetzte Kegel und zwei Schrauben — im Bild fünf Teile, und die Kegel
-   * liefen auf 5 mm Spitze zu.
+   * Aus den Herstellerzeichnungen vom 13.09.2026 (anbauwerkzeuge.com und
+   * Kinshofer): Bei allen vier Schalenbauarten — schmale Greifarme, breite
+   * Greifarme, Halbschalen, Vollschalen — sitzt am Ende derselbe Zahn, und er
+   * ist ein Keil mit EINER geraden, schräg angeschnittenen Schneidfläche.
    *
-   * Jetzt ist es ein einziges Netz: Die BREITE bleibt über die ganze Länge
-   * gleich, nur die Dicke nimmt ab, wie es ein Gussteil mit Formschräge tut.
-   * Die Breite kommt aus `schalenHalbbreite` am Schalenende — damit steht die
-   * Spitze nirgends über die Schale hinaus.
+   * Was hier vorher stand, war dreimal falsch: erst ein Schuh mit zwei
+   * angesetzten Kegeln („scheint aus verschiedenen Bauteilen zu bestehen"),
+   * dann ein Block mit drei Wellen. Beides gibt es an keiner der vier
+   * Bauarten.
+   *
+   * Die Breite ist über die ganze Länge gleich — 120 mm aus der
+   * Positionsliste, gedeckelt auf die Schalenbreite am Ende, damit der Zahn
+   * nirgends über die Schale hinaussteht. Er ist damit schmaler als die
+   * Platte, die ihn trägt: die schmale Zacke, links und rechts flankiert.
+   *
+   * Die Schneide bleibt stumpf (12 mm), sie schützt die Kante, sie schneidet
+   * nicht.
    */
   const halb = Math.min(M.breite / 2, schalenHalbbreite(SCHALEN_ABSCHNITTE));
-  const DICK_OBEN = M.dicke * 0.62;
-  const DICK_UNTEN = M.dicke * 0.34;
-  const LAENGS = 4;
-  const QUER = 6;
-  /*
-   * Die Zacken unten sind KANTENSCHUTZ, keine Schneide: drei flache Wellen
-   * von 10 mm Tiefe, stumpf auslaufend. Vorher standen dort zwei spitze Kegel
-   * („viel zu scharf und zu spitz, diese dienen eher als Kantenschutz").
-   */
-  const WELLE = 0.01;
-  const saum = (u: number): number => WELLE * (0.5 - 0.5 * Math.cos(2 * Math.PI * 3 * u));
+  const RUECKEN = M.dicke * 0.75; // Materialstaerke am Ruecken, aussen
+  const SCHNEIDE = 0.012; // stumpfe Kante
+  const ANSCHNITT = 0.55; // ab wo die Schraege beginnt, als Anteil der Laenge
 
   const pos: number[] = [];
   const uv: number[] = [];
@@ -1058,37 +1107,32 @@ export function baueGreiferspitze(st: Stoffe): THREE.Group {
   const quad = (q0: number, q1: number, q2: number, q3: number): void => {
     idx.push(q0, q1, q2, q0, q2, q3);
   };
-
-  const lagen: number[][][] = [];
-  for (const seite of [1, -1]) {
-    const reihen: number[][] = [];
-    for (let k = 0; k <= LAENGS; k++) {
-      const t = k / LAENGS;
-      const dick = DICK_OBEN + (DICK_UNTEN - DICK_OBEN) * t;
-      const reihe: number[] = [];
-      for (let j = 0; j <= QUER; j++) {
-        const u = j / QUER;
-        const tief = k === LAENGS ? M.laenge - saum(u) : M.laenge * t;
-        reihe.push(p(-halb + u * 2 * halb, -tief, seite * dick, u, t));
-      }
-      reihen.push(reihe);
-    }
-    lagen.push(reihen);
+  /*
+   * Vier Stationen laengs. Der RUECKEN (aussen, +z) laeuft gerade durch — er
+   * setzt die Aussenhaut der Schale fort. Die INNENSEITE zieht ab `ANSCHNITT`
+   * schraeg nach aussen und trifft den Ruecken an der stumpfen Schneide. Das
+   * ist der Anschnitt, den die Zeichnungen zeigen.
+   */
+  const laengs = [0, ANSCHNITT, 0.82, 1];
+  const aussen: number[][] = [];
+  const innen: number[][] = [];
+  for (let k = 0; k < laengs.length; k++) {
+    const t = laengs[k]!;
+    const y = -M.laenge * t;
+    const rest = t <= ANSCHNITT ? 1 : 1 - (t - ANSCHNITT) / (1 - ANSCHNITT);
+    const dick = SCHNEIDE + (RUECKEN - SCHNEIDE) * rest;
+    aussen.push([p(-halb, y, RUECKEN / 2, 0, t), p(halb, y, RUECKEN / 2, 1, t)]);
+    innen.push([p(-halb, y, RUECKEN / 2 - dick, 0, t), p(halb, y, RUECKEN / 2 - dick, 1, t)]);
   }
-  const [aussen, innen] = lagen as [number[][], number[][]];
-  for (let k = 0; k < LAENGS; k++) {
-    for (let j = 0; j < QUER; j++) {
-      quad(aussen[k]![j]!, aussen[k]![j + 1]!, aussen[k + 1]![j + 1]!, aussen[k + 1]![j]!);
-      quad(innen[k]![j + 1]!, innen[k]![j]!, innen[k + 1]![j]!, innen[k + 1]![j + 1]!);
-    }
-    quad(aussen[k]![0]!, innen[k]![0]!, innen[k + 1]![0]!, aussen[k + 1]![0]!);
-    quad(innen[k]![QUER]!, aussen[k]![QUER]!, aussen[k + 1]![QUER]!, innen[k + 1]![QUER]!);
+  for (let k = 0; k < laengs.length - 1; k++) {
+    quad(aussen[k]![0]!, aussen[k]![1]!, aussen[k + 1]![1]!, aussen[k + 1]![0]!);
+    quad(innen[k]![1]!, innen[k]![0]!, innen[k + 1]![0]!, innen[k + 1]![1]!);
+    quad(aussen[k]![1]!, innen[k]![1]!, innen[k + 1]![1]!, aussen[k + 1]![1]!);
+    quad(innen[k]![0]!, aussen[k]![0]!, aussen[k + 1]![0]!, innen[k + 1]![0]!);
   }
-  // Deckel oben (zum Schalenende) und die stumpfe Kante unten
-  for (let j = 0; j < QUER; j++) {
-    quad(innen[0]![j]!, innen[0]![j + 1]!, aussen[0]![j + 1]!, aussen[0]![j]!);
-    quad(aussen[LAENGS]![j]!, aussen[LAENGS]![j + 1]!, innen[LAENGS]![j + 1]!, innen[LAENGS]![j]!);
-  }
+  const e = laengs.length - 1;
+  quad(innen[0]![0]!, innen[0]![1]!, aussen[0]![1]!, aussen[0]![0]!); // Aufnahme oben
+  quad(aussen[e]![0]!, aussen[e]![1]!, innen[e]![1]!, innen[e]![0]!); // stumpfe Schneide
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
   geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
