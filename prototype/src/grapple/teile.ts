@@ -933,8 +933,14 @@ export function wangenTiefe(_k: number): number {
  * Platte behält jetzt über die ganze Länge dieselbe Tiefe, und der Lagerkasten
  * überbrückt von ihrer Innenkante bis zum Bolzen.
  */
-export function holmTiefe(_k: number): number {
-  return HOLM_T;
+export function holmTiefe(k: number): number {
+  /*
+   * „eine dicke Stange, die oben 'n bisschen breiter ist und unten am
+   * schmalsten ist, nicht in der Mitte" — also eine leichte, durchgehende
+   * Verjuengung von oben nach unten, keine Einschnuerung dazwischen.
+   */
+  const t = Math.max(0, Math.min(1, k / SCHALEN_ABSCHNITTE));
+  return HOLM_T * (1.15 - 0.25 * t);
 }
 
 export function schalenHalbbreite(k: number): number {
@@ -1063,13 +1069,14 @@ export function baueGreiferschale(st: Stoffe): THREE.Group {
    * seine Dicke vor — und genau dieses Stueck laeuft unten als Zahn weiter.
    */
   const aussenFlaeche = fein.map((f) => woelbungBei(halbbreiteBei(f.k), f.k));
+  const rohrTiefen = fein.map((f) => holmTiefe(f.k));
   const holm = new THREE.Mesh(
     strang(
       fein,
       0,
       HOLM_B,
-      HOLM_T,
-      aussenFlaeche.map((a) => a - HOLM_T)
+      rohrTiefen,
+      aussenFlaeche.map((a, i) => a - rohrTiefen[i]!)
     ),
     st.guss
   );
@@ -1191,7 +1198,7 @@ export function baueGreiferspitze(st: Stoffe): THREE.Group {
    * Kantenschutz, keine Schneide.
    */
   const halb = HOLM_B / 2;
-  const tief = HOLM_T;
+  const tief = holmTiefe(SCHALEN_ABSCHNITTE);
   const FASE = 0.05; // nur die letzten 50 mm laufen an
   const REST = 0.35; // worauf die Fase zulaeuft, als Anteil des Querschnitts
 
