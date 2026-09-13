@@ -603,8 +603,9 @@ export function baueMitteltraverse(st: Stoffe): THREE.Group {
  *
  * Position 9 der Zeichnung, und das Bauteil, das mir gefehlt hat. An ihm hängen
  * alle fünf Schalen: Jede hat unten ihre eigene Gabel („untere Schalenanbindung",
- * Position 10). Nach unten läuft er in einen Kegel aus — das ist die halbe
- * Abrissbirne, die geschlossen zwischen den Schalen herausschaut.
+ * Position 10). Nach unten endet er FLACH, mit einem kurzen Fuß — nicht in einer
+ * Spitze. Die halbe Abrissbirne, die geschlossen unten herausschaut, bilden die
+ * Schalen selbst, nicht der Stempel.
  *
  * Der Stempel hängt über eine Säule an der Mitteltraverse; die Säule ist das,
  * was auf der Zeichnung zwischen Traverse und Gelenkeinheit zu sehen ist.
@@ -622,10 +623,20 @@ export function baueStempel(st: Stoffe): THREE.Group {
   koerper.name = "09_KOERPER";
   koerper.rotation.y = Math.PI / 10;
   g.add(koerper);
-  const kegel = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.85, R * 0.18, 0.26, 10), st.guss);
-  kegel.name = "09_KEGEL";
-  kegel.position.y = -M.hoehe * 0.5 - 0.13;
-  g.add(kegel);
+  /*
+   * Unten FLACH, kein Dorn.
+   *
+   * Ansage 13.09.2026: „Es gibt auch keinen Dorn unten an dem Stempel, der ist
+   * flach." Vorher lief hier ein Kegel von 0,26 m Länge auf 54 mm Durchmesser
+   * zu — eine Spitze, die es am Vorbild nicht gibt. Der Stempel endet in einem
+   * kurzen Fuß mit ebener Unterseite; die Verjüngung ist nur die Formschräge
+   * eines Gussteils.
+   */
+  const fuss = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.88, R * 0.74, 0.18, 10), st.guss);
+  fuss.name = "09_FUSS";
+  fuss.rotation.y = Math.PI / 10;
+  fuss.position.y = -M.hoehe * 0.5 - 0.09;
+  g.add(fuss);
   for (let i = 0; i < MASS.schalen; i++) {
     const a = (i / MASS.schalen) * Math.PI * 2;
     const nr = String(i + 1).padStart(2, "0");
@@ -994,40 +1005,83 @@ export function baueGreiferspitze(st: Stoffe): THREE.Group {
   g.name = "07_GREIFERSPITZE";
   const M = MASS.spitze;
   /*
-   * Der Schuh wird über das Schalenende geschoben. Er ist auf die Breite des
-   * Schalenendes gedeckelt — das ist die Zusage, dass die Kontur von oben nach
-   * unten nur schmaler wird.
+   * EIN Gussteil, nicht drei.
+   *
+   * Ansage 13.09.2026: „ein Zahn ist ein gegossenes Bauteil und ist mehr oder
+   * weniger durchgängig gleich breit. Hier aber nicht und scheint aus
+   * verschiedenen Bauteilen zu bestehen." Vorher war es ein Schuh, zwei
+   * angesetzte Kegel und zwei Schrauben — im Bild fünf Teile, und die Kegel
+   * liefen auf 5 mm Spitze zu.
+   *
+   * Jetzt ist es ein einziges Netz: Die BREITE bleibt über die ganze Länge
+   * gleich, nur die Dicke nimmt ab, wie es ein Gussteil mit Formschräge tut.
+   * Die Breite kommt aus `schalenHalbbreite` am Schalenende — damit steht die
+   * Spitze nirgends über die Schale hinaus.
    */
   const halb = Math.min(M.breite / 2, schalenHalbbreite(SCHALEN_ABSCHNITTE));
-  const schuh = new THREE.Mesh(
-    new THREE.BoxGeometry(2 * halb, M.laenge * 0.34, M.dicke * 1.2),
-    st.bolzen
-  );
-  schuh.name = "07_SCHUH";
-  g.add(schuh);
+  const DICK_OBEN = M.dicke * 0.62;
+  const DICK_UNTEN = M.dicke * 0.34;
+  const LAENGS = 4;
+  const QUER = 6;
   /*
-   * Zwei Zacken statt einer breiten Schneide. Beide gleich groß und zusammen
-   * schmaler als der Schuh — sie stehen nach unten heraus, nicht zur Seite.
+   * Die Zacken unten sind KANTENSCHUTZ, keine Schneide: drei flache Wellen
+   * von 10 mm Tiefe, stumpf auslaufend. Vorher standen dort zwei spitze Kegel
+   * („viel zu scharf und zu spitz, diese dienen eher als Kantenschutz").
    */
-  for (const seite of [-1, 1]) {
-    const zacke = new THREE.Mesh(
-      new THREE.CylinderGeometry(halb * 0.42, 0.005, M.laenge * 0.72, 4),
-      st.bolzen
-    );
-    zacke.name = `07_ZACKE_${seite < 0 ? "L" : "R"}`;
-    zacke.scale.set(1, 1, (M.dicke * 0.9) / (halb * 0.84));
-    zacke.rotation.y = Math.PI / 4;
-    zacke.position.set(seite * halb * 0.46, -M.laenge * 0.52, 0);
-    g.add(zacke);
+  const WELLE = 0.01;
+  const saum = (u: number): number => WELLE * (0.5 - 0.5 * Math.cos(2 * Math.PI * 3 * u));
+
+  const pos: number[] = [];
+  const uv: number[] = [];
+  const idx: number[] = [];
+  const p = (x: number, y: number, z: number, tu: number, tv: number): number => {
+    const i = pos.length / 3;
+    pos.push(x, y, z);
+    uv.push(tu, tv);
+    return i;
+  };
+  const quad = (q0: number, q1: number, q2: number, q3: number): void => {
+    idx.push(q0, q1, q2, q0, q2, q3);
+  };
+
+  const lagen: number[][][] = [];
+  for (const seite of [1, -1]) {
+    const reihen: number[][] = [];
+    for (let k = 0; k <= LAENGS; k++) {
+      const t = k / LAENGS;
+      const dick = DICK_OBEN + (DICK_UNTEN - DICK_OBEN) * t;
+      const reihe: number[] = [];
+      for (let j = 0; j <= QUER; j++) {
+        const u = j / QUER;
+        const tief = k === LAENGS ? M.laenge - saum(u) : M.laenge * t;
+        reihe.push(p(-halb + u * 2 * halb, -tief, seite * dick, u, t));
+      }
+      reihen.push(reihe);
+    }
+    lagen.push(reihen);
   }
-  // Zwei Schrauben halten den Schuh am Schalenende
-  for (const x of [-halb * 0.55, halb * 0.55]) {
-    const loch = new THREE.Mesh(rohr(0.014, 0.008, M.dicke * 1.3), st.blech);
-    loch.rotation.x = Math.PI / 2;
-    loch.rotation.z = Math.PI / 2;
-    loch.position.set(x, 0, 0);
-    g.add(loch);
+  const [aussen, innen] = lagen as [number[][], number[][]];
+  for (let k = 0; k < LAENGS; k++) {
+    for (let j = 0; j < QUER; j++) {
+      quad(aussen[k]![j]!, aussen[k]![j + 1]!, aussen[k + 1]![j + 1]!, aussen[k + 1]![j]!);
+      quad(innen[k]![j + 1]!, innen[k]![j]!, innen[k + 1]![j]!, innen[k + 1]![j + 1]!);
+    }
+    quad(aussen[k]![0]!, innen[k]![0]!, innen[k + 1]![0]!, aussen[k + 1]![0]!);
+    quad(innen[k]![QUER]!, aussen[k]![QUER]!, aussen[k + 1]![QUER]!, innen[k + 1]![QUER]!);
   }
+  // Deckel oben (zum Schalenende) und die stumpfe Kante unten
+  for (let j = 0; j < QUER; j++) {
+    quad(innen[0]![j]!, innen[0]![j + 1]!, aussen[0]![j + 1]!, aussen[0]![j]!);
+    quad(aussen[LAENGS]![j]!, aussen[LAENGS]![j + 1]!, innen[LAENGS]![j + 1]!, innen[LAENGS]![j]!);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  const zahn = new THREE.Mesh(geo, st.bolzen);
+  zahn.name = "07_ZAHN";
+  g.add(zahn);
   return g;
 }
 

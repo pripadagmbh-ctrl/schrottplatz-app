@@ -73,8 +73,10 @@ Zwei Regeln, beide geprüft:
    k. Das ist die Zusage, dass die Kontur nur schmaler wird.
 
    Die Greiferspitze leitet ihre Breite aus derselben Funktion ab und kann
-   deshalb nicht über die Schale hinausstehen. Was unten heraussteht, sind nur
-   die beiden Zacken.
+   deshalb nicht über die Schale hinausstehen. Sie ist EIN Gussteil mit
+   durchgehend 112 mm Breite — nur die Dicke fällt von 99 auf 54 mm, die
+   Formschräge eines Gussteils. Unten läuft sie stumpf aus: drei flache Wellen
+   von 10 mm als Kantenschutz, keine Schneide.
 
 ## 3. Hierarchie
 
@@ -91,7 +93,7 @@ GRAPPLE_ROOT                        Ursprung = Aufhängepunkt am Stiel
     │                               trägt 10_AUSLEGER_nn + 10_SCHALENANBINDUNG_nn
     ├── SHELL_01 … SHELL_05         ◀── Pivot = Stempelauge, Achse X
     │   ├── SHELL_BODY_nn       06  Greiferschale (Haut, Wangen, Naben)
-    │   └── SHELL_TIP_nn        07  Greiferspitze (Schuh + zwei Zacken)
+    │   └── SHELL_TIP_nn        07  Greiferspitze (ein Gussteil, 07_ZAHN)
     └── CYLINDER_01 … _05           ◀── Pivot = oberer Zylinderanschluss, Achse X
         ├── CYL_BARREL_nn       05  Gehäuse
         └── CYL_ROD_nn              Kolbenstange
