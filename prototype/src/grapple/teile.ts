@@ -15,6 +15,9 @@
  * genau einen Zahn von 110 mm.
  */
 const BLECH = 0.015;
+/** Seitenwaende: 20 mm dick, nach INNEN gerichtet. */
+const WANGE_D = 0.02;
+const WANGE_H = 0.25;
 /** Schmalste Schalenbreite: ein Zahn von 110 mm plus zwei Wangen. */
 const SCHALE_MIN_B = 0.2;
 
@@ -1057,6 +1060,35 @@ export function baueGreiferschale(st: Stoffe): THREE.Group {
    * Damit fallen alle Aufbauten weg, die ich nacheinander gebaut hatte:
    * tiefe Randwangen, Holm, Vierkantrohr, Mittelrippe.
    */
+  /*
+   * Querschnitt C-C, endgueltig gelesen (13.09.2026):
+   *
+   *          ┌──────┐          Verstaerkung 25, oben auf dem Blech
+   *     ┌────┴──────┴────┐     Schalenblech 15
+   *     │                │     Seitenwaende, nach INNEN
+   *
+   * Nach aussen steht nur die Verstaerkung. Die Seitenwaende gehen nach innen
+   * — das sind die „Stahlbleche, die das innere Material zusammenhalten
+   * sollen". Genau dieser Unterschied hat mich dreimal in die Irre gefuehrt:
+   * erst standen sie aussen (aus dem parametrischen Modul uebernommen), dann
+   * habe ich sie ganz entfernt.
+   */
+  const innenFlaeche = fein.map((f) => woelbungBei(halbbreiteBei(f.k), f.k));
+  for (const seite of [-1, 1]) {
+    const wange = new THREE.Mesh(
+      strang(
+        fein,
+        fein.map((f) => seite * (halbbreiteBei(f.k) - WANGE_D / 2)),
+        WANGE_D,
+        WANGE_H,
+        innenFlaeche.map((a2) => a2 - WANGE_H)
+      ),
+      st.guss
+    );
+    wange.name = `06_WANGE_${seite < 0 ? "L" : "R"}`;
+    g.add(wange);
+  }
+
   const verstAb = fein.findIndex(
     (f) => f.k >= SCHALEN_ABSCHNITTE - VERST_L / ABSCHNITT
   );
