@@ -47,7 +47,7 @@ import {
   baueZylinder,
   mittellinie,
   nahtStoff,
-  schalenStationen,
+  schalenEnde,
   schwenkFuer,
   stoffe,
 } from "./teile";
@@ -183,7 +183,6 @@ export function baueGreifer(st: Stoffe = stoffe()): Greifer {
 
   const schalen: Schale[] = [];
   const zylinder: Zylinder[] = [];
-  const stationen = schalenStationen();
 
   for (let i = 0; i < MASS.schalen; i++) {
     const nr = String(i + 1).padStart(2, "0");
@@ -209,7 +208,7 @@ export function baueGreifer(st: Stoffe = stoffe()): Greifer {
      * (0,−1,0) genau auf die Richtung (0, −cos th, −sin th), in der die Schale
      * dort läuft.
      */
-    const ende = stationen[stationen.length - 1]!;
+    const ende = schalenEnde();
     const spitze = baueGreiferspitze(st);
     spitze.name = `SHELL_TIP_${nr}`;
     spitze.position.set(0, ende.y, ende.z);

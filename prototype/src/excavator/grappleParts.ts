@@ -28,7 +28,7 @@ import {
   baueRotator,
   baueStempel,
   nahtStoff,
-  schalenStationen,
+  schalenEnde,
   stoffe,
   type Stoffe,
 } from "../grapple/teile";
@@ -100,8 +100,7 @@ export function baueSpinne(st: SpinnenStoffe = spinnenStoffe()): Spinne {
   stempel.position.y = LAGE.stempel;
   gruppe.add(stempel);
 
-  const stationen = schalenStationen();
-  const ende = stationen[stationen.length - 1]!;
+  const ende = schalenEnde();
   const gelenke: THREE.Group[] = [];
   const zylinder: ZylinderAnlenkung[] = [];
 
@@ -164,8 +163,7 @@ export function einzelteile(st: SpinnenStoffe = spinnenStoffe()): Array<{
   const schale = new THREE.Group();
   schale.add(baueGreiferschale(st));
   const spitze = baueGreiferspitze(st);
-  const st2 = schalenStationen();
-  const ende = st2[st2.length - 1]!;
+  const ende = schalenEnde();
   spitze.position.set(0, ende.y, ende.z);
   spitze.rotation.x = ende.th;
   schale.add(spitze);

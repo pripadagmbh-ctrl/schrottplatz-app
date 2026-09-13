@@ -64,7 +64,7 @@ Zwei Regeln, beide geprüft:
 
    | Station | 0 | 1 | 2 | 3 | 4 | 5 | 6 |
    |---|---|---|---|---|---|---|---|
-   | Breite (m) | 0,400 | 0,384 | 0,350 | 0,305 | 0,249 | 0,185 | 0,112 |
+   | Breite (m) | 0,400 | 0,397 | 0,382 | 0,347 | 0,288 | 0,201 | 0,130 |
 
    Zwei Grenzen wirken zusammen: die Form und der Platz (fünf Schalen teilen
    sich den Kreis, jede hat 72°). Der Platzdeckel ist für sich genommen NICHT
@@ -92,7 +92,7 @@ GRAPPLE_ROOT                        Ursprung = Aufhängepunkt am Stiel
     ├── 09_STEMPEL              09  zentrale untere Gelenkeinheit
     │                               trägt 10_AUSLEGER_nn + 10_SCHALENANBINDUNG_nn
     ├── SHELL_01 … SHELL_05         ◀── Pivot = Stempelauge, Achse X
-    │   ├── SHELL_BODY_nn       06  Greiferschale (Haut, Wangen, Naben)
+    │   ├── SHELL_BODY_nn       06  Greiferschale (Haut, Holm, Randleisten, Naben)
     │   └── SHELL_TIP_nn        07  Greiferspitze (ein Gussteil, 07_ZAHN)
     └── CYLINDER_01 … _05           ◀── Pivot = oberer Zylinderanschluss, Achse X
         ├── CYL_BARREL_nn       05  Gehäuse

@@ -194,6 +194,85 @@ export function schalenStationen(): Array<{ y: number; z: number; th: number }> 
   return roh.map((r) => ({ y: r.y - px, z: r.z - pz, th: r.th }));
 }
 
+/**
+ * Dieselbe Schalenbahn, nur feiner aufgelöst — ausschließlich fürs Netz.
+ *
+ * Die sieben Stationen sind der Vertrag: An ihnen hängen Hüllmaß, Kinematik,
+ * Drehpunkt und Volumen, und nur mit ihrer groben Teilung trifft der Bogen die
+ * Positionsliste auf den Millimeter (1,199 × 0,296 gegen 1,200 × 0,300; mit
+ * zwölf Abschnitten wären es 1,227 × 0,271).
+ *
+ * Fürs Auge sind sechs Abschnitte über 87,5° aber zu wenig: Jeder Knick misst
+ * 17,5°, und in der Seitenansicht liest sich die Schale dadurch als gerader
+ * Schaft mit einem Knie darin statt als Sichel (Ansage 13.09.2026: „schau dir
+ * doch einfach mal die Formgebung an … bei der Spinnenansicht, also montiert,
+ * da siehst du es doch von der Seite").
+ *
+ * Deshalb wird hier eine Catmull-Rom-Kurve DURCH die sieben Stationen gelegt.
+ * Sie geht exakt durch sie hindurch — an den Stützstellen ändert sich nichts,
+ * dazwischen wird sie rund. Der Vertrag bleibt unangetastet, nur die Facetten
+ * verschwinden.
+ */
+export function feineStationen(
+  je = 3
+): Array<{ y: number; z: number; th: number; k: number }> {
+  /*
+   * Die sieben Stationen liegen auf einem EXAKTEN KREIS — gleiche Sehnen,
+   * gleicher Knick. Also braucht es keine Spline, sondern nur diesen Kreis.
+   *
+   * Der erste Versuch nahm eine Catmull-Rom-Kurve. Die traf die Stuetzstellen
+   * zwar, lief zwischen ihnen aber ungleichmaessig: gemessen 2,84° bis 8,75°
+   * Anstellungsaenderung je Teilschritt, wo 5,83° gleichmaessig sein muessten.
+   * Dieser wandernde Fehler ist genau die Verwindung, die im Bild zu sehen war
+   * — „stell dir 'n Blatt vor und das obere Ende wuerdest du mit dem
+   * Uhrzeigersinn und das untere gegen den Uhrzeigersinn drehen".
+   *
+   * Auf dem Kreis ist der Knick je Teilschritt konstant, und die Stuetzstellen
+   * werden exakt getroffen. Der Radius folgt aus Sehne und Knick:
+   * R = Sehne / (2 · sin(Knick/2)).
+   *
+   * `th` ist die WIRKLICHE Tangente. Sie liegt an Station j bei (j − ½)·Knick,
+   * denn eine Sehne zeigt in Richtung der Tangente in ihrer Mitte.
+   */
+  const R = ABSCHNITT / (2 * Math.sin(SCHALEN_BOGEN / 2));
+  const phi0 = -SCHALEN_BOGEN / 2;
+  // Nullpunkt der Schale im Frame ihres Drehpunkts — den bringt `schalenStationen` mit
+  const start = schalenStationen()[0]!;
+  const n = SCHALEN_ABSCHNITTE * je;
+  const aus: Array<{ y: number; z: number; th: number; k: number }> = [];
+  for (let i = 0; i <= n; i++) {
+    const k = (i / n) * SCHALEN_ABSCHNITTE;
+    const phi = phi0 + k * SCHALEN_BOGEN;
+    aus.push({
+      y: start.y - R * (Math.sin(phi) - Math.sin(phi0)),
+      z: start.z + R * (Math.cos(phi) - Math.cos(phi0)),
+      th: phi,
+      k,
+    });
+  }
+  return aus;
+}
+
+/**
+ * Das Schalenende, wie es die gebaute Schale wirklich hat.
+ *
+ * Nicht dasselbe wie `schalenStationen()[6]`: Deren `th` ist die Richtung der
+ * ABGEHENDEN Sehne, die wirkliche Tangente der Schale liegt eine halbe Sehne
+ * dahinter. Der Meissel sass damit um 8,75° verkantet am Ende.
+ */
+export function schalenEnde(): { y: number; z: number; th: number } {
+  const f = feineStationen();
+  return f[f.length - 1]!;
+}
+
+/** Halbe Schalenbreite an einer Zwischenstation; zwischen den Stützstellen linear. */
+export function halbbreiteBei(k: number): number {
+  const a = Math.floor(k);
+  const b = Math.min(SCHALEN_ABSCHNITTE, a + 1);
+  const t = k - a;
+  return schalenHalbbreite(a) * (1 - t) + schalenHalbbreite(b) * t;
+}
+
 /** Mittellinie einer Schale im Frame des Greifers, bei gegebenem Schwenk. */
 export function mittellinie(schwenk: number): Array<{ r: number; y: number }> {
   const c = Math.cos(-schwenk);
@@ -758,11 +837,71 @@ export function baueZylinder(st: Stoffe): {
  * 300 mm, verteilt auf 120 mm Wölbung der Haut und 180 mm hohe Wangen.
  */
 const HALB = MASS.schale.breite / 2;
-const WOELBUNG = MASS.schale.tiefe * 0.4;
-const WANGE = MASS.schale.tiefe * 0.6;
+/**
+ * Querradius der Schalenhaut (m).
+ *
+ * Die Woelbung darf NICHT konstant sein. Sie war es: 120 mm ueber die ganze
+ * Laenge, waehrend die Breite von 400 auf 130 mm faellt. Oben ergibt das einen
+ * flachen Bogen, unten ein spitzes V, und der Trogrand wandert dabei diagonal
+ * ueber die Schale — im Bild nicht von einer Verwindung zu unterscheiden.
+ *
+ * Ein gewalztes oder gegossenes Blech hat stattdessen einen festen Querradius.
+ * Der folgt aus dem Hauptmass: Pfeilhoehe 120 mm bei 400 mm Breite ergibt
+ * R = (b/2)^2 / (2 * Pfeilhoehe) = 0,167 m. Damit faellt die Woelbung mit dem
+ * Quadrat der Breite — an der Spitze bleiben von 120 mm noch 13 mm.
+ */
+/**
+ * Querkrümmung der Haut — die der geschlossenen Kugel, nicht eine eigene.
+ *
+ * Ansage 13.09.2026: „die Wölbung ist immer noch nicht richtig." Sie war es
+ * zweimal nicht. Erst stand sie fest auf 120 mm über die ganze Länge, während
+ * die Breite von 400 auf 130 mm fiel — oben ein flacher Bogen, unten ein
+ * spitzes V, und der Trogrand wanderte diagonal über die Schale. Dann lief sie
+ * über einen festen Querradius von 0,167 m, was an der Spitze fast flach wurde.
+ *
+ * Beides ging am Wesentlichen vorbei: Fünf Schalen schließen zu einer KUGEL.
+ * Damit ist jede Schale ein Stück dieser Kugeloberfläche, und ihre
+ * Querkrümmung ist die der Kugel an dieser Station — der Radius, den die
+ * geschlossene Mittellinie dort hat. Gerechnet sind das rund 22 mm Wölbung auf
+ * 400 mm Breite, nicht 120. Die Schale ist also eine SANFT gewölbte Platte,
+ * keine tiefe Rinne; die Tiefe der Positionsliste steckt im Holm.
+ */
+function querRadius(k: number): number {
+  const bahn = mittellinie(ZU);
+  const r = bahn[Math.max(0, Math.min(SCHALEN_ABSCHNITTE, Math.round(k)))]?.r ?? 0.1;
+  return Math.max(r, 0.12);
+}
+/** Wölbung der Haut bei halber Breite `halb` an Station k. */
+function woelbungBei(halb: number, k: number): number {
+  return (halb * halb) / (2 * querRadius(k));
+}
+
 const sektorHalb = Math.PI / MASS.schalen;
 /** Blechdicke der Seitenwangen (m). */
 const WANGE_DICK = 0.035;
+/** Tiefe der Randleiste (m) — nur noch eine Kante, keine Wange mehr. */
+const RAND_TIEF = 0.05;
+/**
+ * Der Holm ist ein VIERKANTROHR, laengs gebogen — und er ist der Zahn.
+ *
+ * Ansage 13.09.2026, woertlich: „Stell dir 'n Zahn genauso vor: 'n Vierkantrohr.
+ * 'N einfaches, breites Vierkantrohr, laengs nach innen gebogen. Das ist im
+ * Grunde genommen der Zahn … Und quasi aussen auf einer Seite des
+ * Vierkantrohres sind die Schalen gegossen, eben mit der einen Bodenflaeche,
+ * also der breiteren Flaeche des Vierkants … Der Holmen, der das Vierkantrohr
+ * ist, ist in der Dicke ueberall gleich, ueberall. Und darum ist auch der Zahn
+ * ueberall gleich."
+ *
+ * Damit faellt mein Grundmodell: Ich hatte die Schale als gebogenes Blech mit
+ * einer Rinne gebaut und den Zahn als Keil daran. Richtig ist das Umgekehrte —
+ * ein durchgehendes Profil traegt alles, und die Platten sind nur aussen
+ * daraufgesetzt.
+ *
+ * Der Querschnitt steht in der Positionsliste: Die Greiferspitze misst
+ * 120 x 80 mm, also breiter als tief. Genau das ist das Rohr.
+ */
+const HOLM_B = MASS.spitze.breite;
+const HOLM_T = MASS.spitze.dicke;
 
 /**
  * Wie tief die Seitenwange an Station k in den Trog hineinragt (m).
@@ -773,36 +912,37 @@ const WANGE_DICK = 0.035;
  * Lager. Beim Vorbild sind das die großen Backen am oberen Ende, die den Bolzen
  * tragen; nach unten laufen sie auf das Normalmaß zu.
  */
-export function wangenTiefe(k: number): number {
-  const tief = DREHPUNKT.versatz + 0.06;
-  return WANGE + (tief - WANGE) * Math.max(0, 1 - k / 2) ** 1.2;
+export function wangenTiefe(_k: number): number {
+  return RAND_TIEF;
 }
 
-/*
- * Das Breitenprofil — die Stelle, an der die Seitenansicht entschieden wird.
+/**
+ * Tiefe des Holms (m) — konstant über die ganze Länge.
  *
- * Regel, und zwar ohne Ausnahme: Am oberen Ende ist die Schale am breitesten,
- * nach unten wird sie nur schmaler oder bleibt gleich. Nie wieder breiter.
- * Genau das war vorher verletzt — 0,20 m oben, 0,38 m eine Station tiefer,
- * dann fallend, und ganz unten noch einmal ein Sprung nach außen durch den
- * Zahn. In der Seitenansicht las sich das als Bauch mit Fuß statt als Birne.
+ * Ansage 13.09.2026: „wenn links das Bild von der Seite ist, dann siehst Du
+ * ja, dass das immer noch superstark verwunden ist."
  *
- * Zwei Grenzen wirken zusammen:
+ * Der Umriss der Seitenansicht war schuld, nicht eine echte Verwindung. Das
+ * Band war oben 480 mm dick (360 mm Wange plus 120 mm Wölbung) und unten
+ * 190 mm — es lief wie eine Sensenklinge zu. Auf den Herstellerzeichnungen
+ * laufen die beiden Konturen des Arms dagegen fast parallel.
  *
- *   Form    Am Äquator die vollen 400 mm der Positionsliste, zur Spitze hin
- *           auf gut die Hälfte auslaufend.
- *   Platz   Fünf Schalen teilen sich den Kreis, jede hat 72°. Die Breite
- *           bleibt unter `r · sin(0,9 · Halbsektor)`, gemessen am kleinsten
- *           Radius, den die INNENKANTE der Seitenwange über den ganzen
- *           Schwenkweg erreicht. Damit können sich die Schalen in keiner
- *           Stellung durchdringen.
- *
- * Beides wird als LAUFENDES MINIMUM über alle Stationen bis k genommen. Das
- * ist der Teil, der die Regel garantiert: Was einmal schmal war, wird weiter
- * unten nicht wieder breit, auch wenn der Sektor dort wieder Platz ließe.
- * Ohne das Minimum hing die Form davon ab, welche der beiden Grenzen gerade
- * greift — und die Platzgrenze ist nicht monoton.
+ * Der Grund für den dicken Kopf war, dass die Wangen bis an den Drehbolzen
+ * reichen mussten, der `DREHPUNKT.versatz` = 300 mm hinter der Haut sitzt. Das
+ * ist aber die Aufgabe des GUSSKOPFES am oberen Ende, nicht der Platte. Die
+ * Platte behält jetzt über die ganze Länge dieselbe Tiefe, und der Lagerkasten
+ * überbrückt von ihrer Innenkante bis zum Bolzen.
  */
+export function holmTiefe(k: number): number {
+  /*
+   * „eine dicke Stange, die oben 'n bisschen breiter ist und unten am
+   * schmalsten ist, nicht in der Mitte" — also eine leichte, durchgehende
+   * Verjuengung von oben nach unten, keine Einschnuerung dazwischen.
+   */
+  const t = Math.max(0, Math.min(1, k / SCHALEN_ABSCHNITTE));
+  return HOLM_T * (1.15 - 0.25 * t);
+}
+
 export function schalenHalbbreite(k: number): number {
   let halb = Infinity;
   for (let i = 0; i <= k; i++) {
@@ -811,21 +951,25 @@ export function schalenHalbbreite(k: number): number {
       const schwenk = ZU + ((OFFEN - ZU) * j) / 12;
       const bahn = mittellinie(schwenk);
       const th = i * SCHALEN_BOGEN - schwenk;
-      innen = Math.min(innen, (bahn[i]?.r ?? 0) - wangenTiefe(i) * Math.cos(th));
+      innen = Math.min(innen, (bahn[i]?.r ?? 0) - holmTiefe(i) * Math.cos(th));
     }
     halb = Math.min(
       halb,
-      HALB * (1 - 0.72 * (i / SCHALEN_ABSCHNITTE) ** 1.6),
+      HALB * (1 - 0.8 * (i / SCHALEN_ABSCHNITTE) ** 2.6),
       Math.max(innen, 0) * Math.sin(sektorHalb * 0.9)
     );
   }
-return halb;
+  /*
+   * Unter die Holmbreite geht es nicht: Dort hoert die Platte auf und der Holm
+   * steht allein — die schmale, tiefe Zacke. Ein Maximum mit einer Konstanten
+   * bleibt monoton fallend, die Zusage von oben gilt weiter.
+   */
+  return Math.max(halb, HOLM_B / 2);
 }
 
 export function baueGreiferschale(st: Stoffe): THREE.Group {
   const g = new THREE.Group();
   g.name = "06_GREIFERSCHALE";
-  const stationen = schalenStationen();
   const HAUT = 0.03;
 
   const pos: number[] = [];
@@ -842,19 +986,25 @@ export function baueGreiferschale(st: Stoffe): THREE.Group {
   };
   const QUER = 4;
 
+  /*
+   * Gebaut wird auf den FEINEN Stuetzstellen — dieselbe Bahn, nur rund statt
+   * facettiert. Die groben sieben bleiben der Vertrag fuer Mass und Kinematik.
+   */
+  const fein = feineStationen(3);
+  const ENDE = fein.length - 1;
   const lagen: number[][][] = [];
   for (const seite of [0, 1]) {
     const reihen: number[][] = [];
-    for (let k = 0; k <= SCHALEN_ABSCHNITTE; k++) {
-      const s0 = stationen[k]!;
-      const halb = schalenHalbbreite(k);
+    for (let k = 0; k <= ENDE; k++) {
+      const s0 = fein[k]!;
+      const halb = halbbreiteBei(s0.k);
       const reihe: number[] = [];
       for (let j = 0; j <= QUER; j++) {
         const t = j / QUER;
         const x = -halb + t * 2 * halb;
-        const w = WOELBUNG * (1 - (x / Math.max(halb, 1e-3)) ** 2) + seite * HAUT;
+        const w = (halb * halb - x * x) / (2 * querRadius(s0.k)) + seite * HAUT;
         reihe.push(
-          p(x, s0.y + w * Math.sin(s0.th), s0.z + w * Math.cos(s0.th), t, k / SCHALEN_ABSCHNITTE)
+          p(x, s0.y + w * Math.sin(s0.th), s0.z + w * Math.cos(s0.th), t, k / ENDE)
         );
       }
       reihen.push(reihe);
@@ -862,7 +1012,7 @@ export function baueGreiferschale(st: Stoffe): THREE.Group {
     lagen.push(reihen);
   }
   const [aussen, innen] = lagen as [number[][], number[][]];
-  for (let k = 0; k < SCHALEN_ABSCHNITTE; k++) {
+  for (let k = 0; k < ENDE; k++) {
     for (let j = 0; j < QUER; j++) {
       quad(aussen[k]![j]!, aussen[k]![j + 1]!, aussen[k + 1]![j + 1]!, aussen[k + 1]![j]!);
       quad(innen[k]![j + 1]!, innen[k]![j]!, innen[k + 1]![j]!, innen[k + 1]![j + 1]!);
@@ -870,7 +1020,7 @@ export function baueGreiferschale(st: Stoffe): THREE.Group {
     quad(aussen[k]![0]!, innen[k]![0]!, innen[k + 1]![0]!, aussen[k + 1]![0]!);
     quad(innen[k]![QUER]!, aussen[k]![QUER]!, aussen[k + 1]![QUER]!, innen[k + 1]![QUER]!);
   }
-  const e = SCHALEN_ABSCHNITTE;
+  const e = ENDE;
   for (let j = 0; j < QUER; j++) {
     quad(innen[0]![j]!, innen[0]![j + 1]!, aussen[0]![j + 1]!, aussen[0]![j]!);
     quad(aussen[e]![j]!, aussen[e]![j + 1]!, innen[e]![j + 1]!, innen[e]![j]!);
@@ -889,28 +1039,49 @@ export function baueGreiferschale(st: Stoffe): THREE.Group {
    * hinein. Andersherum verschwindet sie hinter der Haut, und die Schale liest
    * sich als flaches Blech — genau so sah sie im ersten Anlauf aus.
    */
-  const tiefen = stationen.map((_, k) => wangenTiefe(k));
+  const randTiefen = fein.map((f) => wangenTiefe(f.k));
   for (const seite of [-1, 1]) {
     /*
-     * EIN durchgehender Strang statt sechs Stücken, und er folgt der Breite
-     * Station für Station. Vorher bekam jedes Stück die MITTLERE Breite seiner
-     * beiden Enden — am letzten Abschnitt stand die Wange damit 38 mm über die
-     * Haut hinaus, und die Schale endete in zwei Beinen mit einer Kerbe
-     * dazwischen statt in einer Spitze.
+     * Randleiste statt Wange: Sie fasst die Platte ein, trägt aber nicht mehr
+     * die Tiefe der Schale — das tut jetzt der Holm in der Mitte.
      */
-    const wange = new THREE.Mesh(
+    const leiste = new THREE.Mesh(
       strang(
-        stationen,
-        stationen.map((_, k) => seite * (schalenHalbbreite(k) - WANGE_DICK / 2)),
+        fein,
+        fein.map((f) => seite * (halbbreiteBei(f.k) - WANGE_DICK / 2)),
         WANGE_DICK,
-        tiefen,
-        tiefen.map((t) => -t)
+        randTiefen,
+        randTiefen.map((t) => -t)
       ),
       st.guss
     );
-    wange.name = `06_WANGE_${seite < 0 ? "L" : "R"}`;
-    g.add(wange);
+    leiste.name = `06_RANDLEISTE_${seite < 0 ? "L" : "R"}`;
+    g.add(leiste);
   }
+
+  /*
+   * Der Holm — ein Rücken in der Mitte, über die ganze Länge, mitgegossen.
+   * Er ist schmal und tief; links und rechts von ihm liegen die Platten.
+   */
+  /*
+   * Das Rohr liegt BUENDIG unter der Aussenhaut: Seine breite Aussenflaeche
+   * ist dieselbe Flaeche, auf der die Platten sitzen. Nach innen steht es um
+   * seine Dicke vor — und genau dieses Stueck laeuft unten als Zahn weiter.
+   */
+  const aussenFlaeche = fein.map((f) => woelbungBei(halbbreiteBei(f.k), f.k));
+  const rohrTiefen = fein.map((f) => holmTiefe(f.k));
+  const holm = new THREE.Mesh(
+    strang(
+      fein,
+      0,
+      HOLM_B,
+      rohrTiefen,
+      aussenFlaeche.map((a, i) => a - rohrTiefen[i]!)
+    ),
+    st.guss
+  );
+  holm.name = "06_HOLM";
+  g.add(holm);
 
   // Lagerkasten mit den beiden Augen — das Hülsengelenk zur Mitteltraverse
   /*
@@ -934,9 +1105,18 @@ export function baueGreiferschale(st: Stoffe): THREE.Group {
    * Länge und Kastenbreite kommen deshalb aus der Schalenbreite an Station 0.
    */
   const backen = 2 * (schalenHalbbreite(0) - WANGE_DICK);
-  const kasten = new THREE.Mesh(new THREE.BoxGeometry(backen, 0.16, 0.2), st.guss);
+  /*
+   * Der Gusskopf überbrückt von der Innenkante des Holms bis hinter den
+   * Bolzen. Vorher tat das die Wange, indem sie sich auf 360 mm vertiefte —
+   * und genau davon lief das Band der Seitenansicht keilförmig zu.
+   */
+  const brueckeVon = DREHPUNKT.versatz - HOLM_T; // Innenkante des Holms
+  const kasten = new THREE.Mesh(
+    new THREE.BoxGeometry(backen, 0.2, brueckeVon + 0.13),
+    st.guss
+  );
   kasten.name = "06_UNTERE_ANBINDUNG";
-  kasten.position.set(0, 0.02, -0.02);
+  kasten.position.set(0, 0.02, (brueckeVon - 0.13) / 2);
   g.add(kasten);
   const unteresAuge = new THREE.Mesh(rohr(0.085, 0.042, backen + 2 * WANGE_DICK), st.guss);
   unteresAuge.name = "06_UNTERES_AUGE";
@@ -1005,31 +1185,22 @@ export function baueGreiferspitze(st: Stoffe): THREE.Group {
   g.name = "07_GREIFERSPITZE";
   const M = MASS.spitze;
   /*
-   * EIN Gussteil, nicht drei.
+   * Der Zahn ist das ENDE des Vierkantrohrs, nicht ein Keil daran.
    *
-   * Ansage 13.09.2026: „ein Zahn ist ein gegossenes Bauteil und ist mehr oder
-   * weniger durchgängig gleich breit. Hier aber nicht und scheint aus
-   * verschiedenen Bauteilen zu bestehen." Vorher war es ein Schuh, zwei
-   * angesetzte Kegel und zwei Schrauben — im Bild fünf Teile, und die Kegel
-   * liefen auf 5 mm Spitze zu.
+   * „Es ist nicht so, dass der Zahn unten wieder breiter wird. Der Holmen, der
+   * das Vierkantrohr ist, ist in der Dicke überall gleich, überall. Und darum
+   * ist auch der Zahn überall gleich. Vielleicht oben 'n bisschen breiter,
+   * aber ansonsten ist der konstant."
    *
-   * Jetzt ist es ein einziges Netz: Die BREITE bleibt über die ganze Länge
-   * gleich, nur die Dicke nimmt ab, wie es ein Gussteil mit Formschräge tut.
-   * Die Breite kommt aus `schalenHalbbreite` am Schalenende — damit steht die
-   * Spitze nirgends über die Schale hinaus.
+   * Also: derselbe Querschnitt wie der Holm — 120 × 80 mm aus der
+   * Positionsliste —, über die ganze Länge gleich. Nur die letzten
+   * Zentimeter sind angefast, wie es ein Gussteil hat; das ist der
+   * Kantenschutz, keine Schneide.
    */
-  const halb = Math.min(M.breite / 2, schalenHalbbreite(SCHALEN_ABSCHNITTE));
-  const DICK_OBEN = M.dicke * 0.62;
-  const DICK_UNTEN = M.dicke * 0.34;
-  const LAENGS = 4;
-  const QUER = 6;
-  /*
-   * Die Zacken unten sind KANTENSCHUTZ, keine Schneide: drei flache Wellen
-   * von 10 mm Tiefe, stumpf auslaufend. Vorher standen dort zwei spitze Kegel
-   * („viel zu scharf und zu spitz, diese dienen eher als Kantenschutz").
-   */
-  const WELLE = 0.01;
-  const saum = (u: number): number => WELLE * (0.5 - 0.5 * Math.cos(2 * Math.PI * 3 * u));
+  const halb = HOLM_B / 2;
+  const tief = holmTiefe(SCHALEN_ABSCHNITTE);
+  const FASE = 0.05; // nur die letzten 50 mm laufen an
+  const REST = 0.35; // worauf die Fase zulaeuft, als Anteil des Querschnitts
 
   const pos: number[] = [];
   const uv: number[] = [];
@@ -1043,37 +1214,33 @@ export function baueGreiferspitze(st: Stoffe): THREE.Group {
   const quad = (q0: number, q1: number, q2: number, q3: number): void => {
     idx.push(q0, q1, q2, q0, q2, q3);
   };
-
-  const lagen: number[][][] = [];
-  for (const seite of [1, -1]) {
-    const reihen: number[][] = [];
-    for (let k = 0; k <= LAENGS; k++) {
-      const t = k / LAENGS;
-      const dick = DICK_OBEN + (DICK_UNTEN - DICK_OBEN) * t;
-      const reihe: number[] = [];
-      for (let j = 0; j <= QUER; j++) {
-        const u = j / QUER;
-        const tief = k === LAENGS ? M.laenge - saum(u) : M.laenge * t;
-        reihe.push(p(-halb + u * 2 * halb, -tief, seite * dick, u, t));
-      }
-      reihen.push(reihe);
-    }
-    lagen.push(reihen);
+  /*
+   * Konstant über die ganze Länge, nur am Ende die Fase. „Vielleicht oben 'n
+   * bisschen breiter" wäre erlaubt — es bleibt aber bei exakt gleich, sonst
+   * stünde der Zahn über die Schale hinaus, und das ist die härtere Zusage.
+   */
+  const stationen: Array<[number, number, number]> = [
+    [0, 1, 1],
+    [0.12, 1, 1],
+    [1 - FASE / M.laenge, 1, 1],
+    [1, REST, REST],
+  ];
+  const aussen: number[][] = [];
+  const innen: number[][] = [];
+  for (const [t, fb, ft] of stationen) {
+    const y = -M.laenge * t;
+    aussen.push([p(-halb * fb, y, 0, 0, t), p(halb * fb, y, 0, 1, t)]);
+    innen.push([p(-halb * fb, y, -tief * ft, 0, t), p(halb * fb, y, -tief * ft, 1, t)]);
   }
-  const [aussen, innen] = lagen as [number[][], number[][]];
-  for (let k = 0; k < LAENGS; k++) {
-    for (let j = 0; j < QUER; j++) {
-      quad(aussen[k]![j]!, aussen[k]![j + 1]!, aussen[k + 1]![j + 1]!, aussen[k + 1]![j]!);
-      quad(innen[k]![j + 1]!, innen[k]![j]!, innen[k + 1]![j]!, innen[k + 1]![j + 1]!);
-    }
-    quad(aussen[k]![0]!, innen[k]![0]!, innen[k + 1]![0]!, aussen[k + 1]![0]!);
-    quad(innen[k]![QUER]!, aussen[k]![QUER]!, aussen[k + 1]![QUER]!, innen[k + 1]![QUER]!);
+  for (let k = 0; k < stationen.length - 1; k++) {
+    quad(aussen[k]![0]!, aussen[k]![1]!, aussen[k + 1]![1]!, aussen[k + 1]![0]!);
+    quad(innen[k]![1]!, innen[k]![0]!, innen[k + 1]![0]!, innen[k + 1]![1]!);
+    quad(aussen[k]![1]!, innen[k]![1]!, innen[k + 1]![1]!, aussen[k + 1]![1]!);
+    quad(innen[k]![0]!, aussen[k]![0]!, aussen[k + 1]![0]!, innen[k + 1]![0]!);
   }
-  // Deckel oben (zum Schalenende) und die stumpfe Kante unten
-  for (let j = 0; j < QUER; j++) {
-    quad(innen[0]![j]!, innen[0]![j + 1]!, aussen[0]![j + 1]!, aussen[0]![j]!);
-    quad(aussen[LAENGS]![j]!, aussen[LAENGS]![j + 1]!, innen[LAENGS]![j + 1]!, innen[LAENGS]![j]!);
-  }
+  const e = stationen.length - 1;
+  quad(innen[0]![0]!, innen[0]![1]!, aussen[0]![1]!, aussen[0]![0]!);
+  quad(aussen[e]![0]!, aussen[e]![1]!, innen[e]![1]!, innen[e]![0]!);
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
   geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));

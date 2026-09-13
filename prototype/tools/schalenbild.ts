@@ -17,13 +17,13 @@ import {
   baueGreiferschale,
   baueGreiferspitze,
   schalenHalbbreite,
-  schalenStationen,
+  schalenEnde,
   stoffe,
 } from "../src/grapple/teile";
 import { dreiecke } from "./riss";
 
 const BREITE = 1180;
-const HOEHE = 620;
+const HOEHE = 760;
 const bild = new Uint8Array(BREITE * HOEHE * 3).fill(0xf2);
 
 function setze(x: number, y: number, f: number[]): void {
@@ -65,8 +65,7 @@ function schale(): THREE.Group {
   const st = stoffe();
   const g = new THREE.Group();
   g.add(baueGreiferschale(st));
-  const stationen = schalenStationen();
-  const ende = stationen[stationen.length - 1]!;
+  const ende = schalenEnde();
   const sp = baueGreiferspitze(st);
   sp.position.set(0, ende.y, ende.z);
   sp.rotation.x = ende.th;
@@ -74,7 +73,14 @@ function schale(): THREE.Group {
   return g;
 }
 
-function male(blick: THREE.Vector3, x0: number, y0: number, w: number, h: number): void {
+function male(
+  blick: THREE.Vector3,
+  x0: number,
+  y0: number,
+  w: number,
+  h: number,
+  umriss = false
+): void {
   rechteck(x0, y0, w, h, [255, 255, 255]);
   const tr = dreiecke(schale(), blick);
   let ax = Infinity;
@@ -91,27 +97,40 @@ function male(blick: THREE.Vector3, x0: number, y0: number, w: number, h: number
   const s = Math.min((w - 40) / (bx - ax), (h - 40) / (by - ay));
   const cx = x0 + w / 2 - ((ax + bx) / 2) * s;
   const cy = y0 + h / 2 + ((ay + by) / 2) * s;
+  /*
+   * `umriss`: alles in einer Farbe. Dann bleibt nur die Silhouette uebrig —
+   * dieselbe Darstellung wie eine technische Zeichnung, und Schattierung kann
+   * keine Form vortaeuschen, die gar nicht da ist.
+   */
   for (const t of tr)
     dreieck(
       t.p.map((q) => [cx + q[0] * s, cy - q[1] * s] as [number, number]),
-      rgb(t.farbe)
+      umriss ? [0x33, 0x37, 0x3b] : rgb(t.farbe)
     );
 }
 
-const P = Math.floor((BREITE - 4 * 10) / 3);
-male(new THREE.Vector3(1, 0, 0), 10, 10, P, HOEHE - 20); // Seite
-male(new THREE.Vector3(0, 0, 1), 20 + P, 10, P, HOEHE - 20); // von vorn
-male(new THREE.Vector3(0.75, 0.3, 1), 30 + 2 * P, 10, P, HOEHE - 20); // schraeg
+/* Seitenansicht gross links, die beiden anderen klein rechts daneben */
+const GROSS = Math.floor(BREITE * 0.56);
+const KLEIN = BREITE - GROSS - 30;
+male(new THREE.Vector3(1, 0, 0), 10, 10, GROSS, HOEHE - 20, true); // genau von der Seite, als Umriss
+male(new THREE.Vector3(0, 0, 1), GROSS + 20, 10, KLEIN, Math.floor((HOEHE - 30) / 2));
+male(
+  new THREE.Vector3(0.75, 0.3, 1),
+  GROSS + 20,
+  20 + Math.floor((HOEHE - 30) / 2),
+  KLEIN,
+  Math.floor((HOEHE - 30) / 2)
+);
 
 /* Breitenbalken unten in die vordere Ansicht: gemessen, nicht behauptet */
-const balkenX = 30 + P;
+const balkenX = GROSS + 20;
 for (let k = 0; k <= SCHALEN_ABSCHNITTE; k++) {
   const b = 2 * schalenHalbbreite(k);
   const y = HOEHE - 46 + 0;
   rechteck(
-    Math.round(balkenX + (P - 40) / 2 - (b / 0.4) * ((P - 60) / 2)),
+    Math.round(balkenX + (KLEIN - 40) / 2 - (b / 0.4) * ((KLEIN - 60) / 2)),
     y - k * 5,
-    Math.round((b / 0.4) * (P - 60)),
+    Math.round((b / 0.4) * (KLEIN - 60)),
     4,
     [0x2e, 0x7d, 0x32]
   );
