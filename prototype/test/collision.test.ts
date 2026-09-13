@@ -206,11 +206,14 @@ describe("Feste Bauten", () => {
     /*
      * Die Probe liegt NEBEN der Presse, nicht in ihr: Die Presse steht selbst
      * dort hinten und ist zu Recht ein Hindernis. Gesucht ist die Wand, die
-     * frueher ueber die ganze Breite lief — bei x 2,7 stand sie, die Presse
-     * beginnt erst bei 3,3.
+     * frueher ueber die ganze Breite lief.
+     *
+     * Seit die Presse am 13.09.2026 von der Mauer abgerueckt ist, reicht sie
+     * bis x 8,83 — die freie Stelle liegt jetzt oestlich davon, nicht
+     * westlich.
      */
     expect(
-      hitsObstacle(h.x - w / 2 + 0.5, h.z - d / 2 - 0.4, 0),
+      hitsObstacle(h.x + w / 2 - 0.7, h.z - d / 2 - 0.4, 0),
       "zur Presse hin darf keine Wand mehr stehen"
     ).toBeNull();
     for (const [name, z] of [

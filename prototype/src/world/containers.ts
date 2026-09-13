@@ -73,6 +73,16 @@ export interface ContainerConfig {
   /** Rückwand weglassen — die Nachbarmulde dahinter bringt sie mit */
   shareEast?: boolean;
   shareWest?: boolean;
+  /**
+   * Sortierbox: eine offene Zone, die ihre Waende von den Trennsteinen
+   * zwischen den Nachbarn bekommt (`Yard.buildTrennsteine`).
+   *
+   * Ansage 13.09.2026: „wir lassen die Container weg und nutzen die
+   * Trennwaende als Mulden." Vorher standen hier Absetzcontainer; jetzt ist
+   * die Flaeche selbst die Mulde, und was sie begrenzt, sind die Steinreihen,
+   * die ohnehin zwischen den Behaeltern standen.
+   */
+  sortierbox?: boolean;
 }
 
 /**
@@ -134,7 +144,7 @@ export const CONFIGS: ContainerConfig[] = [
    * Die Presse steht damit in der Ecke und der Haufen reicht bis an sie heran.
    */
   { id: "c_mixed", fractionId: "mixed", label: "MISCHSCHROTT", kind: "halde", x: 6.2,
-    z: -20.0, size: [8.0, 8.0, 5.0], wandPlus: 10.0,
+    z: -19.7, size: [8.0, 6.0, 5.0], wandPlus: 10.0,
     haldeWaende: { rueck: false, aussen: true, trenn: false } },
 
   /*
@@ -153,13 +163,31 @@ export const CONFIGS: ContainerConfig[] = [
    * neue Wand auf der rechten Seite. Zum Bagger hin (+z) und zum Mischschrott
    * hin (+x) bleibt sie offen.
    *
-   * Die Box liegt mit der Rueckseite an der Suedmauer (z −28,7) und endet
-   * 1,2 m vor der Arbeitslinie des Baggers. Gemessen sind es 5,2 m vom
-   * Sitzplatz zur Boxmitte — der Ring geht von 4,0 bis 9,5 m.
+   * Beide Boxen sind am 13.09.2026 von 8 x 8 auf 8 x 6 m geschrumpft, als die
+   * Presse von der Mauer abrueckte: Sie reicht jetzt bis z −22,07 nach Norden
+   * und haette sonst in der Zone des Mischschrotts gestanden. Die Stahlbox
+   * liegt weiter mit der Rueckseite an der Suedmauer (z −28,7), der
+   * Mischschrott bleibt hinter der Arbeitslinie des Baggers.
    */
-  { id: "c_steel", fractionId: "steel", label: "STAHLSCHROTT", kind: "halde", x: -1.8,
-    z: -24.7, size: [8.0, 8.0, 5.0],
+  { id: "c_steel", fractionId: "steel", label: "STAHLSCHROTT", kind: "halde", x: -7.8,
+    z: -25.7, size: [8.0, 6.0, 5.0],
     haldeWaende: { rueck: false, aussen: false, nord: false, trenn: "voll" } },
+
+  /*
+   * SCHUTT — Absetzcontainer neben der Presse, zum Vorsammeln.
+   *
+   * Ansage 13.09.2026: „neben der Presse kommt ein Schuttcontainer zum
+   * Vorsammeln." Was beim Sortieren an Bauschutt anfaellt, soll nicht quer
+   * ueber den Platz zu den Silos, sondern gleich neben der Maschine liegen —
+   * von dort holt es der Abholer ab.
+   *
+   * Der Platz ist die Luecke zwischen Presse und Stahlbox an der Suedmauer.
+   * Vier Meter Behaelter brauchen dort Raum: Die Presse beginnt bei x 1,23,
+   * also muss die Stahlbox bis −3,8 zurueck. Sie ist deshalb von x −1,8 auf
+   * −7,8 gewandert; es bleiben 50 cm Luft auf jeder Seite.
+   */
+  { id: "r_rubble", fractionId: "rubble", label: "SCHUTT", kind: "bay", x: -1.3,
+    z: -26.0, size: [4.0, 4.0, 2.0] },
 
   /*
    * GROSSTEILE — offene Fläche rechts neben der Stahlmulde.
@@ -265,14 +293,14 @@ export const CONFIGS: ContainerConfig[] = [
    * Die Abstaende sind gesucht, nicht gegriffen: Bei x −12,2 lagen VA und
    * Kupfer mit 9,8 und 9,7 m ausserhalb des Rings von 9,5 m.
    */
-  { id: "r_alu", fractionId: "alu", label: "ALU", kind: "rolloff", x: -7.3,
-    z: -12.8, size: [4.0, 4.0, 2.1] },
-  { id: "r_va", fractionId: "va", label: "EDELSTAHL VA", kind: "rolloff", x: -11.8,
-    z: -12.8, size: [4.0, 4.0, 2.1] },
-  { id: "r_cable", fractionId: "cable", label: "KABEL", kind: "rolloff", x: -7.3,
-    z: -17.5, size: [4.0, 4.0, 2.1] },
-  { id: "r_copper", fractionId: "copper", label: "KUPFER", kind: "rolloff", x: -11.8,
-    z: -17.5, size: [4.0, 4.0, 2.1] },
+  { id: "r_alu", fractionId: "alu", label: "ALU", kind: "pile", x: -7.0,
+    z: -12.8, size: [4.0, 4.0, 0], sortierbox: true },
+  { id: "r_va", fractionId: "va", label: "EDELSTAHL VA", kind: "pile", x: -11.8,
+    z: -12.8, size: [4.0, 4.0, 0], sortierbox: true },
+  { id: "r_cable", fractionId: "cable", label: "KABEL", kind: "pile", x: -7.0,
+    z: -17.5, size: [4.0, 4.0, 0], sortierbox: true },
+  { id: "r_copper", fractionId: "copper", label: "KUPFER", kind: "pile", x: -11.8,
+    z: -17.5, size: [4.0, 4.0, 0], sortierbox: true },
 
   /*
    * MULDENREIHE an der Ostwand — acht statt vier.
