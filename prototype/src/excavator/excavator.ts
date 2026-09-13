@@ -5,6 +5,7 @@ import type { Input } from "../core/input";
 import { ExcavatorCollision, type ArmShape } from "./collision";
 import { InstrumentPanel, type InstrumentReadout } from "./instruments";
 import { buildDriver } from "./driver";
+import { baueSpinne } from "./grappleParts";
 import {
   CLAW_COUNT,
   CLAW_OPEN_SPLAY,
@@ -12,11 +13,6 @@ import {
   CLAW_RING_R,
   CLAW_RING_Y,
   CLAW_SEGMENTS,
-  schalenGeometrie,
-  flanschGeometrie,
-  CLAW_SHELL_BREITE,
-  HAUT_RUECKSPRUNG,
-  CLAW_BEND_KUM,
   clawPoint,
   naechsteSpreizung,
   NACHDRUECK_RESERVE,
@@ -507,48 +503,6 @@ export class Excavator {
     const machineBlue = new THREE.MeshStandardMaterial({ color: 0x5bbf46, roughness: 0.55 });
     const dark = new THREE.MeshStandardMaterial({ color: 0x2b2e31, roughness: 0.8 });
     // Greifer-Farbgebung nach Vorbild: dunkle Hardox-Schalen, fast schwarze Kanten
-    /*
-     * Verwitterter Stahl, nicht fast schwarz.
-     *
-     * 0x40474b war so dunkel, dass die Schalen zu einer einzigen Masse
-     * verschmolzen — man sah keine Kanten mehr, und ohne Kanten liest sich das
-     * Ding als glatter Koerper statt als Maschine. Auf den Vorlagen ist der
-     * Greifer helles, abgeschabtes Grau mit dunklen Laufspuren.
-     */
-    const shellMat = new THREE.MeshStandardMaterial({
-      color: 0x9aa2a8,
-      roughness: 0.5,
-      metalness: 0.55,
-      side: THREE.DoubleSide, // Innenseite ist bei geöffneter Spinne sichtbar
-    });
-    /*
-     * Nur eine Spur dunkler als die Schale.
-     *
-     * Im direkten Vergleich mit der Vorlage (12.09.2026) faellt auf: Dort ist
-     * die ganze Maschine ein Grau — Kopf, Schalen, Kanten, Zaehne. Mit einem
-     * deutlich dunkleren Kantenmaterial zerfiel der Greifer in schwarze
-     * Einzelteile, und die Zaehne stachen als Pfeile heraus.
-     */
-    // Bolzen sind blank gedreht und heben sich vom Gussgrau ab
-    const boltMat = new THREE.MeshStandardMaterial({
-      color: 0x3c4248,
-      roughness: 0.3,
-      metalness: 0.85,
-    });
-    /*
-     * Kanten nur noch minimal abgesetzt.
-     *
-     * Auf den Vorlagen ist die Schale eine grosse, ruhige Gussflaeche. Bei mir
-     * zerlegten Rippe, Schneidkante und Wangen sie in lauter dunkle Streifen —
-     * das war der Grund, warum sie zerklueftet wirkte statt massiv. Der
-     * Unterschied ist jetzt so klein, dass er die Form zeichnet, statt sie zu
-     * zerschneiden.
-     */
-    const edgeMat = new THREE.MeshStandardMaterial({
-      color: 0x89919a,
-      roughness: 0.45,
-      metalness: 0.7,
-    });
     const glass = new THREE.MeshStandardMaterial({ color: 0x9fc4d8, roughness: 0.2 });
 
     // Chassis + 4 Räder
@@ -640,281 +594,27 @@ export class Excavator {
     this.grappleGroup.add(stub);
     buildYoke(-0.1, true); // obere Gabel: Bolzen quer
     buildYoke(-0.3, false); // untere Gabel: 90° verdreht — greift in die obere
-    // --- Greifspinne nach Fotoreferenz (Umschlagbagger-Bauart) ---
-    // Von oben nach unten: Rotatorgehäuse, Guss-Traverse, Gelenkring und fünf
-    // gebogene Sichelkrallen mit stumpfem Schalenende.
-    // Maße nach Datenblatt MG4.1-800-HO5 (800 l): Öffnungsweite d = 2225 mm,
-    // Schalenkreis ØD = 2409 mm, Zylinderkreis ØC = 1514 mm, Gesamthöhe
-    // A = 2363 mm. Alle Werte hier in Metern.
-    // Gelenkkreis = ØC/2 aus dem Datenblatt (1514 mm). Segmentlänge und
-    // Krümmung sind so gewählt, dass die Spitzen bei geschlossener Spinne
-    // exakt in der Mitte zusammenkommen — vorher liefen sie übereinander.
-    const RING_R = CLAW_RING_R;
-    const ringY = CLAW_RING_Y;
-
-    const rotator = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.36, 0.5), edgeMat);
-    rotator.position.y = -0.48;
-    rotator.castShadow = true;
-    this.grappleGroup.add(rotator);
-    const rotatorCap = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.24, 0.14, 12), shellMat);
-    rotatorCap.position.y = -0.3;
-    this.grappleGroup.add(rotatorCap);
-
     /*
-     * Kopf: ein hoher, sich nach unten verjuengender Gussblock.
+     * Die Spinne steht Bauteil fuer Bauteil in `grappleParts.ts`.
      *
-     * Vorher war das eine Scheibe — 0,72 m Radius bei 0,40 m Hoehe, also fast
-     * so breit wie der Gelenkring mit 0,757 m. Darauf standen die Zylinder wie
-     * Stummel, und geschlossen sah die ganze Spinne aus wie eine fliegende
-     * Untertasse (Befund 12.09.2026: „Ist das ein UFO?").
-     *
-     * Am Foto nachgemessen (Sennebogen-Mehrschalengreifer): Der Zinkenkreis
-     * ist dort rund 330 px breit, der Kopf an seiner breitesten Stelle 200 px
-     * — also gut die Haelfte. Und er ist hoch, nicht flach. Genau daran
-     * erkennt man die Maschine: schlanker Turm ueber einem weiten Zinkenkreis.
+     * Hier stand sie als ein Block von 270 Zeilen mitten im Baggermodell. Das
+     * war der eigentliche Grund, warum die Formarbeit am 12.09.2026 fuenfmal
+     * hintereinander danebenging: Es liess sich nie ein Teil allein aendern
+     * und nie zuordnen, welche Aenderung was bewirkt hat (Ansage: „baue
+     * erstmal die einzelnen Bauteile").
      */
-    const kopf = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.50, 0.86, 6), shellMat);
-    kopf.position.y = -0.50;
-    kopf.rotation.y = Math.PI / 6;
-    kopf.castShadow = true;
-    this.grappleGroup.add(kopf);
-    // Schulter, an der die Zylinder haengen — sie kragt ueber den Kopf hinaus
-    const schulter = new THREE.Mesh(new THREE.CylinderGeometry(0.70, 0.62, 0.20, 6), shellMat);
-    schulter.position.y = -0.26;
-    schulter.rotation.y = Math.PI / 6;
-    schulter.castShadow = true;
-    this.grappleGroup.add(schulter);
-    /*
-     * Strunk: die massive Saeule, die unten aus der Birne kommt und an deren
-     * Ende die Schalen haengen (Beschreibung 12.09.2026). Sie laeuft nach
-     * unten in ein Prisma aus — auf den Bildern der auffaellige graue Keil in
-     * der Mitte.
-     */
-    const strunk = new THREE.Mesh(new THREE.CylinderGeometry(0.30, 0.24, 0.62, 6), shellMat);
-    strunk.position.y = CLAW_RING_Y + 0.34;
-    strunk.rotation.y = Math.PI / 6;
-    strunk.castShadow = true;
-    this.grappleGroup.add(strunk);
-    // Prisma am unteren Ende — hier sitzen die Drehbolzen
-    const prisma = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.1, 0.5, 6), edgeMat);
-    prisma.position.y = CLAW_RING_Y - 0.14;
-    prisma.rotation.y = Math.PI / 6;
-    prisma.castShadow = true;
-    this.grappleGroup.add(prisma);
-    /*
-     * Kein Ring mehr. „Dieser Ring, den Du da zeichnest, der existiert gar
-     * nicht" (12.09.2026) — an der echten Maschine sitzen die Drehbolzen
-     * einzeln am Prisma, es gibt keinen umlaufenden Kranz.
-     */
-    // Kein zentraler Eindringdorn (Angleich an v2, Wunsch 10.09.2026): Echte
-    // Mehrschalengreifer haben keinen, er sah aus wie ein Dolch, und er hatte
-    // hier weder Kollider noch Funktion — die Krallen greifen, nicht er.
-
-    for (let i = 0; i < 5; i++) {
-      const a = (i / 5) * Math.PI * 2;
-      const pivot = new THREE.Group();
-      pivot.position.set(Math.sin(a) * RING_R, ringY, Math.cos(a) * RING_R);
-      pivot.rotation.order = "YXZ";
-      pivot.rotation.y = a; // lokales +Z zeigt radial nach außen
-
-      /*
-       * Die Gelenkgruppe einer Schale — mit SICHTBAREN Bolzen.
-       *
-       * Auf der Massskizze (P25VR HD-3-W, 12.09.2026) hat jede Schale zwei
-       * Bolzen dicht beieinander: unten den Drehbolzen zum Rahmen, darueber
-       * den Bolzen fuer die Lasche. Dazwischen liegt der Hebelarm, und der ist
-       * kurz — daher die enorme Griffkraft. Beides waren bei mir gedachte
-       * Punkte ohne Bauteil; der Zylinder endete sichtbar im Nichts (Befund
-       * 12.09.2026: „achte mal auf die Drehachsen und Bolzen, wo sie
-       * miteinander verbunden sind").
-       */
-      const lagerbock = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.26, 0.24), edgeMat);
-      lagerbock.position.set(0, 0.04, 0.04);
-      lagerbock.castShadow = true;
-      pivot.add(lagerbock);
-      /*
-       * Der Drehbolzen selbst: ein Zapfen quer zur Schale, also entlang der
-       * lokalen x-Achse — genau der Achse, um die das Gelenk schwenkt. Er ragt
-       * beidseits heraus, wie ein gesicherter Bolzen es tut.
-       */
-      const bolzen = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.46, 10), boltMat);
-      bolzen.rotation.z = Math.PI / 2;
-      bolzen.castShadow = true;
-      pivot.add(bolzen);
-      // Bolzen der Lasche, ein Stueck darueber und nach aussen versetzt
-      const laschenBolzen = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.055, 0.055, 0.38, 10),
-        boltMat
-      );
-      laschenBolzen.rotation.z = Math.PI / 2;
-      laschenBolzen.position.set(0, 0.13, 0.11);
-      laschenBolzen.castShadow = true;
-      pivot.add(laschenBolzen);
-
-      /*
-       * Eine Schale statt einer Fingerkette.
-       *
-       * Vorher war jede Kralle ein Stapel aus sechs Kaesten, 0,40 m breit oben
-       * und 0,15 m an der Spitze. Fuenf davon auf einem Kreis von 0,757 m
-       * Radius liessen mehr als die Haelfte des Umfangs offen — der Korb
-       * schloss nie (Befund 12.09.2026: „wichtig ist, dass sie komplett
-       * abschliessen").
-       *
-       * Jetzt bekommt jede Schale ihren Anteil am Kreis. Die Form ist starr,
-       * wie bei einem echten Mehrschalengreifer: Sie sitzt fest am Gelenk, und
-       * bewegt wird nur das Gelenk selbst.
-       */
-      // Die Haut liegt hinter der Aussenkante der Wangen zurueck — dadurch
-      // steht das Blech vor und die Schale bekommt ihr Profil.
-      const schale = new THREE.Mesh(
-        schalenGeometrie(0, CLAW_SHELL_BREITE, -HAUT_RUECKSPRUNG),
-        shellMat
-      );
-      schale.castShadow = true;
-      schale.receiveShadow = true;
-      pivot.add(schale);
-      /*
-       * Dunkler Schneidenrand am unteren Drittel — er zeigt, wo die Schale
-       * beisst, und gibt ihr Profil.
-       *
-       * Der erste Anlauf legte eine dunkle Kopie der GANZEN Schale mit 1,004
-       * darueber. Das war keine Kante, das war ein zweites Blech: Die Spinne
-       * sah geschlossen aus wie eine schwarze Kugel. Jetzt nur noch die
-       * untersten Stationen.
-       */
-      // Abgesetzte Schneidkante am unteren Drittel
-      const schneide = new THREE.Mesh(schalenGeometrie(6, CLAW_SHELL_BREITE, -HAUT_RUECKSPRUNG), edgeMat);
-      schneide.scale.set(1.012, 1, 1.012);
-      pivot.add(schneide);
-      /*
-       * Keine Ruecken-Rippe mehr. Sie sollte das Gussteil kenntlich machen,
-       * lief aber als dunkler Streifen ueber die ganze Laenge und teilte jede
-       * Schale in zwei Haelften. Die Vorlagen zeigen an dieser Stelle nichts —
-       * die Form traegt sich ueber ihre Woelbung.
-       */
-      /*
-       * Seitenflansche an beiden Kanten der Schale.
-       *
-       * Auf der Vorlage steht jede Schale nicht als glattes Blech da, sondern
-       * als Profil: Die Raender sind dicke, erhabene Wangen, die Mitte liegt
-       * dazwischen zurueck. Das ist der Unterschied zwischen einem Blech und
-       * einem Gussteil — und der Grund, warum die echte Schale Kanten hat, an
-       * denen sich Licht faengt.
-       */
-      for (const seite of [-1, 1]) {
-        const flansch = new THREE.Mesh(flanschGeometrie(seite), edgeMat);
-        pivot.add(flansch);
-      }
-      /*
-       * Spitzer Verschleisszahn an der Schalenspitze (Vorlage 12.09.2026).
-       *
-       * Die alte Fassung lief bewusst stumpf aus — "Sortiergreifer laufen wie
-       * ein Loeffelrand aus, nicht wie ein Spiess" —, weil damals Bleche
-       * aufgespiesst wurden. Das Problem haengt aber am Zahnverhalten, nicht an
-       * der Form, und auf jedem Schrottgreifer sitzt vorn ein Zahn.
-       */
-      const zahnP = clawPoint(0, CLAW_CLOSED_SPLAY, CLAW_SEGMENTS, new THREE.Vector3());
-      /*
-       * Lang und schlank, nicht der kurze Stummel von vorher. Auf den Vorlagen
-       * ragt die Spitze deutlich ueber den Schalenkoerper hinaus und ist
-       * sichtbar schmaler als er — sie sitzt vorn wie ein aufgeschweisster
-       * Zahn.
-       */
-      const zahn = new THREE.Mesh(new THREE.ConeGeometry(0.115, 0.16, 4), shellMat);
-      /*
-       * `clawPoint` liefert Weltkoordinaten der Spinne, das Gelenk hat seine
-       * eigenen. Umrechnung: y minus Ringhoehe, z minus Ringradius. Beim
-       * ersten Versuch stand hier ein Plus vor dem Radius — dann sassen alle
-       * fuenf Zaehne in der Mitte der Spinne statt an ihren Spitzen.
-       */
-      /*
-       * Der Zahn sitzt auf der Spitze und zeigt in Laufrichtung der Schale —
-       * beides gerechnet, nicht geschaetzt.
-       *
-       * Die Schale endet mit dem Winkel `th` gegen die Senkrechte, laeuft dort
-       * also in Richtung (0, −cos th, −sin th). Ein Kegel zeigt von Haus aus
-       * nach +y; eine Drehung um x um φ bringt +y auf (0, cos φ, sin φ). Aus
-       * cos φ = −cos th und sin φ = −sin th folgt φ = π + th.
-       *
-       * Beim ersten Versuch stand hier π − th. Der Zahn zeigte damit nach
-       * aussen statt in Laufrichtung und schwebte sichtbar neben der Schale.
-       */
-      const zahnTh = (CLAW_BEND_KUM[CLAW_SEGMENTS - 1] ?? 0) - CLAW_CLOSED_SPLAY;
-      const zahnHalb = 0.08; // halbe Kegellaenge
-      zahn.position.set(
-        0,
-        zahnP.y - CLAW_RING_Y - zahnHalb * Math.cos(zahnTh),
-        zahnP.z - CLAW_RING_R - zahnHalb * Math.sin(zahnTh)
-      );
-      zahn.rotation.x = Math.PI + zahnTh;
-      zahn.name = "tineTip";
-      zahn.castShadow = true;
-      pivot.add(zahn);
-      /*
-       * Hydraulikzylinder: Traverse → Krallen-Lagerbock.
-       *
-       * Auf der Vorlage (12.09.2026) sind sie das Auffaelligste an der ganzen
-       * Maschine: fuenf dicke, fast senkrecht stehende Zylinder in einem Ring,
-       * blanke Kolbenstangen, dazwischen die Schlaeuche. Vorher waren es hier
-       * dünne Schraegstreben von 6,6 cm Durchmesser, die im Bild untergingen.
-       * Jetzt 11 cm Rohr und 7 cm Stange — ein Zylinder, der fuenf Tonnen
-       * zudrueckt, ist kein Bleistift.
-       */
-      /*
-       * Zylinder in Maschinengruen, wie auf der Vorlage. Sie sind dort kurz und
-       * dick und sitzen hoch am Kopf — der auffaellige Farbtupfer an einer
-       * sonst grauen Maschine. Dunkelgrau gingen sie vor dem grauen Kopf
-       * vollstaendig unter.
-       */
-      const barrel = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.125, 0.13, 1, 14),
-        new THREE.MeshStandardMaterial({ color: 0x5fbe3f, roughness: 0.45, metalness: 0.3 })
-      );
-      const rod = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.07, 0.07, 1, 12),
-        new THREE.MeshStandardMaterial({ color: 0xd0d6dc, roughness: 0.14, metalness: 0.92 })
-      );
-      barrel.castShadow = true;
-      this.grappleGroup.add(barrel);
-      this.grappleGroup.add(rod);
-      /*
-       * Lasche: das Blech zwischen Kolbenstange und Schalenbolzen. Sie sitzt
-       * am Gelenk und dreht mit ihm mit, deshalb haengt sie am pivot und nicht
-       * am Greifergehaeuse. Ohne sie fasst die Kolbenstange ins Leere.
-       */
-      const lasche = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.3, 0.16), edgeMat);
-      lasche.position.set(0, 0.19, 0.09);
-      lasche.rotation.x = -0.35;
-      lasche.castShadow = true;
-      pivot.add(lasche);
+    const spinne = baueSpinne();
+    this.grappleGroup.add(spinne.gruppe);
+    this.fingerPivots.push(...spinne.gelenke);
+    for (const z of spinne.zylinder) {
       this.grappleCylinders.push({
-        pivot,
-        /*
-         * Oben dicht an der Achse, unten aussen an der Schale — dadurch steht
-         * der Zylinder steil statt schraeg, wie auf der Vorlage. Vorher lag der
-         * obere Anlenkpunkt auf 0,42 m Radius und der untere fast senkrecht
-         * darunter; die Zylinder lagen dann flach ueber den Schalen.
-         */
-        /*
-         * Der Zylinder steht fast senkrecht, wie auf der Vorlage: oben am
-         * aeusseren Rand des Kopfes, unten an einem Lagerbock, der ueber dem
-         * Gelenk aus der Schale ragt. Weil der Bock oberhalb des Drehpunkts
-         * sitzt, schwenkt er beim Oeffnen nach aussen — die Kolbenstange faehrt
-         * dabei aus, genau wie bei der echten Maschine.
-         *
-         * Der erste Anlauf setzte ihn oben nah an die Achse und unten weit
-         * aussen an die Schale. Der Zylinder lag dann quer ueber dem Kopf wie
-         * ein hingelegter Baumstamm.
-         */
-        fromLocal: new THREE.Vector3(Math.sin(a) * 0.78, -0.06, Math.cos(a) * 0.78),
-        toLocalOnShell: new THREE.Vector3(0, 0.13, 0.11),
-        barrel,
-        rod,
-        barrelLen: 0.46,
+        pivot: z.gelenk,
+        fromLocal: z.obenLokal,
+        toLocalOnShell: z.untenAmGelenk,
+        barrel: z.rohr,
+        rod: z.stange,
+        barrelLen: z.rohrLaenge,
       });
-
-      this.grappleGroup.add(pivot);
-      this.fingerPivots.push(pivot);
     }
   }
 
