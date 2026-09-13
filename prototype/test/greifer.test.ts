@@ -17,9 +17,13 @@ import {
   SCHALEN_BOGEN,
   STEMPEL_AUGE,
   ZU,
+  baueGreiferschale,
+  baueGreiferspitze,
   mittellinie,
+  schalenHalbbreite,
   schalenStationen,
   schwenkFuer,
+  stoffe,
 } from "../src/grapple/teile";
 import { baueGreifer, hebelarm, huelle, zylinderLaenge, zylinderNeigung } from "../src/grapple/rig";
 
@@ -63,6 +67,108 @@ describe("Greifer — Maße aus der Positionsliste", () => {
     const spitze = bahn[bahn.length - 1]!;
     expect(spitze.r, "die Spitzen überfahren die Drehachse").toBeGreaterThan(0.03);
     expect(2 * spitze.r, "unnötig viel Loch in der Mitte").toBeLessThan(0.3);
+  });
+});
+
+describe("Greifer — Form der Schale", () => {
+  it("ist oben am breitesten und wird nach unten nur schmaler", () => {
+    /*
+     * Die Ansage vom 13.09.2026, wörtlich: „die Breite ist oben in der Schale
+     * am größten und wird immer kleiner." Vorher war sie das nicht — 0,20 m
+     * oben, 0,38 m eine Station tiefer —, weil der Sektordeckel nahe der
+     * Drehachse zubiss und weiter unten wieder aufging. Der Deckel ist nicht
+     * monoton; das laufende Minimum in `schalenHalbbreite` macht ihn dazu.
+     */
+    expect(2 * schalenHalbbreite(0)).toBeCloseTo(MASS.schale.breite, 3);
+    for (let k = 0; k < SCHALEN_ABSCHNITTE; k++) {
+      expect(
+        schalenHalbbreite(k + 1),
+        `Station ${k + 1} ist breiter als ${k}`
+      ).toBeLessThanOrEqual(schalenHalbbreite(k) + 1e-9);
+    }
+    expect(schalenHalbbreite(SCHALEN_ABSCHNITTE)).toBeLessThan(schalenHalbbreite(0) * 0.4);
+  });
+
+  it("lässt die Greiferspitze nirgends über die Schale hinausstehen", () => {
+    /*
+     * „hat auch nichts mit Anbauteilen zu tun, das sind nur unten die Zacken."
+     * Der Kragen der Spitze war mit 138 mm breiter als das Schalenende mit
+     * 110 mm — in der Seitenansicht ein Fuß statt einer Spitze.
+     */
+    const grenze = schalenHalbbreite(SCHALEN_ABSCHNITTE);
+    const spitze = baueGreiferspitze(stoffe());
+    spitze.updateMatrixWorld(true);
+    const v = new THREE.Vector3();
+    let breiteste = 0;
+    spitze.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      const pos = m.geometry.getAttribute("position") as THREE.BufferAttribute;
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
+        breiteste = Math.max(breiteste, Math.abs(v.x));
+      }
+    });
+    expect(breiteste, `Spitze steht ${((breiteste - grenze) * 1000).toFixed(0)} mm über`)
+      .toBeLessThanOrEqual(grenze + 1e-6);
+  });
+
+  it("hält die Seitenwangen innerhalb der Schalenbreite", () => {
+    /*
+     * Die Wangen sitzen mittig auf der Kante, ihre Aussenflaeche also bündig
+     * mit der Sollbreite. Und die Nabe geht durch BEIDE Backen — vorher war
+     * die Hülse 0,26 m lang bei 0,40 m Backenabstand und hing in der Luft.
+     */
+    const schale = baueGreiferschale(stoffe());
+    schale.updateMatrixWorld(true);
+    const v = new THREE.Vector3();
+    let breiteste = 0;
+    schale.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      const pos = m.geometry.getAttribute("position") as THREE.BufferAttribute;
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
+        breiteste = Math.max(breiteste, Math.abs(v.x));
+      }
+    });
+    expect(breiteste).toBeCloseTo(schalenHalbbreite(0), 3);
+    const auge = schale.getObjectByName("06_UNTERES_AUGE")!;
+    const bb = new THREE.Box3().setFromObject(auge);
+    expect(bb.max.x - bb.min.x, "Bolzen erreicht die Backen nicht")
+      .toBeGreaterThan(2 * schalenHalbbreite(0) - 0.01);
+  });
+
+  it("schließt zur Birne: der Radius wächst nach unten nirgends", () => {
+    /*
+     * „stell dir die Spinne von der Form wie eine Glocke vor, wo unten eine
+     * halbe Abrissbirne rausguckt. Sollte die Form oben also breiter sein als
+     * unten, ist was falsch."
+     *
+     * Der Radius der Mittellinie fällt von Station zu Station um
+     * `ABSCHNITT · sin(θ − Schwenk)`. Nicht-positiv ist das genau dann, wenn
+     * der geschlossene Anschlag den Anstellwinkel der obersten Station nicht
+     * übersteigt — deshalb ist ZU = 0 und nicht mehr 20°.
+     */
+    const bahn = mittellinie(ZU);
+    for (let k = 0; k < bahn.length - 1; k++) {
+      expect(bahn[k + 1]!.r, `Station ${k + 1} steht weiter aussen als ${k}`)
+        .toBeLessThanOrEqual(bahn[k]!.r + 1e-9);
+    }
+  });
+
+  it("umschließt geschlossen die 1.200 Liter der Positionsliste", () => {
+    /*
+     * Die Probe, die die ganze Form bestätigt: Der Bogen aus dem Hüllmaß
+     * 1,20 × 0,30 m hebt über seine sechs Abschnitte 0,8295 m nach aussen.
+     * Sitzt der Drehpunkt am oberen Ende, liegt geschlossen genau dieser Bogen
+     * zwischen Äquator und Spitze — eine Halbkugel, deren Inhalt die Liste als
+     * 1.200 Liter führt.
+     */
+    const bahn = mittellinie(ZU);
+    const r = bahn[0]!.r - bahn[bahn.length - 1]!.r;
+    const liter = ((2 / 3) * Math.PI * r ** 3 * 1000);
+    expect(liter / 1000).toBeCloseTo(MASS.gesamt.volumen, 1);
   });
 });
 
@@ -215,6 +321,26 @@ describe("Greifer — Zylinder", () => {
     }
   });
 
+  it("setzt das Stangenauge auf den Bolzen der Schale", () => {
+    /*
+     * Vorher wurde die ganze Stangengruppe skaliert — das Auge wurde mit
+     * gedehnt und stand 14 cm hinter seinem Anlenkpunkt. Jetzt wird nur der
+     * Stab gedehnt, das Auge wird gesetzt. Über den ganzen Weg, nicht nur an
+     * den Anschlägen.
+     */
+    const g = baueGreifer();
+    const a = new THREE.Vector3();
+    const b = new THREE.Vector3();
+    for (let i = 0; i <= 8; i++) {
+      g.setOeffnung(i / 8);
+      g.wurzel.updateMatrixWorld(true);
+      const lug = g.schalen[0]!.gelenk.getObjectByName("06_OBERES_AUGE")!;
+      g.zylinder[0]!.auge.getWorldPosition(a);
+      lug.getWorldPosition(b);
+      expect(a.distanceTo(b), `Öffnung ${i / 8}`).toBeLessThan(0.005);
+    }
+  });
+
   it("hat sein größtes Moment beim Zugreifen", () => {
     /*
      * Der Punkt, auf den es bei einem Greifer ankommt. Geschlossen wird hier
@@ -234,7 +360,16 @@ describe("Greifer — Hüllmaße", () => {
   it("misst geschlossen und offen plausibel", () => {
     const zu = huelle(0);
     const auf = huelle(1);
-    expect(auf.breite, "öffnet nicht").toBeGreaterThan(zu.breite * 1.3);
+    /*
+     * Faktor 1,25, nicht mehr 1,3. Nicht weil der Greifer schlechter öffnet,
+     * sondern weil er geschlossen größer geworden ist: Seit der Drehpunkt am
+     * Äquator sitzt, schließen die Schalen zu einer echten Halbkugel von
+     * 1,78 m statt zu einem Fass von 1,36 m. Beide Hüllmaße treffen jetzt die
+     * Positionsliste — 2,30 m offen, 2,40 m hoch —, und aus genau diesen
+     * beiden Zahlen folgt das Verhältnis 1,29. Die Prüfung soll „öffnet gar
+     * nicht" fangen, und das tut sie damit weiterhin.
+     */
+    expect(auf.breite, "öffnet nicht").toBeGreaterThan(zu.breite * 1.25);
     expect(zu.breite).toBeGreaterThan(1.0);
     expect(auf.breite).toBeLessThan(2.6);
     /*

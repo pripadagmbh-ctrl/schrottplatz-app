@@ -34,6 +34,7 @@ import {
   OFFEN,
   STEMPEL_AUGE,
   Stoffe,
+  TRAVERSE_Y,
   ZU,
   ZYLINDER_AUFNAHME,
   baueAufhaengung,
@@ -56,7 +57,7 @@ export const LAGE = {
   adapter: -0.2,
   rotator: -0.51,
   drehwerksgehaeuse: -0.73,
-  traverse: -1.0,
+  traverse: TRAVERSE_Y,
   stempel: STEMPEL_AUGE.y,
 } as const;
 
@@ -72,6 +73,8 @@ export interface Zylinder {
   gelenk: THREE.Group;
   rohr: THREE.Group;
   stange: THREE.Group;
+  stab: THREE.Mesh;
+  auge: THREE.Mesh;
   gehoertZu: Schale;
 }
 
@@ -228,13 +231,20 @@ export function baueGreifer(st: Stoffe = stoffe()): Greifer {
     zylGelenk.rotation.y = a;
     rotator.add(zylGelenk);
 
-    const { gehaeuse: rohrTeil, stange } = baueZylinder(st);
+    const { gehaeuse: rohrTeil, stange, stab, auge } = baueZylinder(st);
     rohrTeil.name = `CYL_BARREL_${nr}`;
     stange.name = `CYL_ROD_${nr}`;
+    /*
+     * Stab und Auge bewegen sich einzeln, seit nicht mehr die ganze Gruppe
+     * skaliert wird. Sie brauchen darum eigene Namen — der Export legt seine
+     * Animationsspuren auf Namen, und was keinen hat, bewegt sich im GLB nicht.
+     */
+    stab.name = `CYL_ROD_SHAFT_${nr}`;
+    auge.name = `CYL_ROD_EYE_${nr}`;
     zylGelenk.add(rohrTeil);
     zylGelenk.add(stange);
 
-    zylinder.push({ gelenk: zylGelenk, rohr: rohrTeil, stange, gehoertZu: schaleRef });
+    zylinder.push({ gelenk: zylGelenk, rohr: rohrTeil, stange, stab, auge, gehoertZu: schaleRef });
   }
 
   let stand = 0;
@@ -256,12 +266,20 @@ export function baueGreifer(st: Stoffe = stoffe()): Greifer {
      */
     const psi = rund(Math.atan2(-dr, -dy));
     const rohrLaenge = MASS.zylinder.laenge * 0.6;
-    const grundStange = MASS.zylinder.laenge - rohrLaenge - 0.12;
+    const auszug = MASS.zylinder.laenge - rohrLaenge - 0.12;
+    /*
+     * Das Auge der Kolbenstange sitzt GENAU auf dem Anlenkpunkt, also `dist`
+     * unter dem oberen Gelenk. Vorher wurde die ganze Stangengruppe skaliert,
+     * das Auge also mitgedehnt und mitverschoben — es stand 14 cm hinter
+     * seinem Bolzen. Jetzt wird nur der Stab gedehnt; das Auge wird gesetzt.
+     */
+    const frei = Math.max(dist - rohrLaenge, 0.04);
     for (const z of zylinder) {
       z.gelenk.rotation.x = psi;
-      const stangenLaenge = Math.max(dist - rohrLaenge + EINSTAND, 0.06);
-      z.stange.scale.y = rund(stangenLaenge / grundStange);
       z.stange.position.y = rund(-rohrLaenge);
+      z.stab.scale.y = rund((frei + EINSTAND) / auszug);
+      z.stab.position.y = rund(EINSTAND - (frei + EINSTAND) / 2);
+      z.auge.position.y = rund(-frei);
     }
   };
 

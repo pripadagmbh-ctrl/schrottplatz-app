@@ -100,27 +100,63 @@ export const SCHALEN_BOGEN = (17.5 * Math.PI) / 180;
  * aussieht: Der Drehpunkt sitzt tief und mittig, die Schale wickelt sich um
  * ihn herum, und unten schaut der Stempel heraus.
  *
- * Abgetastet ergibt sich:
+ * Abgetastet ergibt sich — und diesmal mit einer Probe, die aufgeht:
  *
- *   Drehpunkt   an Station 1 der Schale, 0,24 m nach innen versetzt
- *   Stempelauge r 0,48 m, y −1,66 m
- *   Anschläge   20° geschlossen, 85° offen
- *   geschlossen 1,36 m breit, 2,40 m hoch  (Zeichnung: 2,40 m)
- *   offen       rund 2,0 m Spitzenweite    (Zeichnung: 2,30 m Greiferbreite)
- *   Zylinder    0,90 m geschlossen, 0,62 m offen — fährt zum SCHLIESSEN aus
- *   Moment      Schließen 3,0-mal Öffnen
+ * Der Bogen aus dem Hüllmaß 1,20 × 0,30 m hebt über seine sechs Abschnitte
+ * 0,8295 m nach außen und 0,8665 m nach unten. Legt man den Drehpunkt an das
+ * OBERE Ende der Schale, liegt geschlossen genau dieser Bogen zwischen dem
+ * Äquator und der Spitze auf der Achse — die Schalen bilden eine Halbkugel von
+ * 0,83 m Radius. Deren Inhalt: 1.195 Liter. Die Positionsliste nennt 1.200.
+ *
+ * Damit ist die Form nicht mehr geraten, sondern erzwungen:
+ *
+ *   Drehpunkt   an Station 0 — dem OBEREN Ende —, 0,30 m nach innen versetzt
+ *   Stempelauge r 0,59 m, y −1,5335 m
+ *   Anschläge   0° geschlossen, 51° offen
+ *   geschlossen 1,78 m breit, Loch Ø 0,12 m, 2,40 m hoch  (Liste: 2,40 m)
+ *   offen       2,30 m Spitzenweite                       (Liste: 2,30 m)
+ *   Zylinder    0,69 m geschlossen, 0,50 m offen — fährt zum SCHLIESSEN aus
+ *   Moment      Schließen 1,5-mal Öffnen
+ *
+ * Der Drehpunkt saß vorher an Station 1, also 0,30 m UNTER dem oberen Ende.
+ * Das war der Fehler hinter drei Beanstandungen auf einmal: Die Schale ragte
+ * über ihren Drehpunkt hinaus, schwenkte offen bis auf 0,20 m an die Achse
+ * heran und musste dort schmal gedeckelt werden — die Breite war oben klein,
+ * wuchs nach unten an und fiel erst danach. Und geschlossen wuchs auch der
+ * Radius der Mittellinie die ersten beiden Abschnitte nach unten noch an: ein
+ * Fass, keine Birne. Beides verschwindet, sobald der Bolzen dort sitzt, wo er
+ * beim Vorbild sitzt — am Äquator, am breitesten Punkt.
  */
 /** Station der Schale, an der ihr Drehpunkt sitzt, und dessen Versatz nach innen. */
-export const DREHPUNKT = { station: 1, versatz: 0.24 };
+export const DREHPUNKT = { station: 0, versatz: 0.3 };
 /** Lage des Stempelauges im Frame des Greifers (m). */
-export const STEMPEL_AUGE = { r: 0.48, y: -1.66 };
-/** Anschläge der Schalen (rad): 20° geschlossen, 85° offen. */
-export const ZU = (20 * Math.PI) / 180;
-export const OFFEN = (85 * Math.PI) / 180;
+export const STEMPEL_AUGE = { r: 0.59, y: -1.5335 };
+/**
+ * Anschläge der Schalen (rad): 0° geschlossen, 51° offen.
+ *
+ * Geschlossen steht der oberste Abschnitt senkrecht. Das ist kein gerundeter
+ * Wert, sondern die Bedingung für die Birnenform: Der Radius der Mittellinie
+ * fällt von Station zu Station um `Abschnitt · sin(θ − Schwenk)`, und das ist
+ * genau dann nirgends positiv, wenn der Schwenk den Anstellwinkel der obersten
+ * Station nicht übersteigt. Bei den vorherigen 20° liefen die ersten beiden
+ * Abschnitte nach außen, bevor die Schale einzog.
+ */
+export const ZU = 0;
+export const OFFEN = (51 * Math.PI) / 180;
 /** Obere Schalenanbindung — wo der Zylinder angreift, im Frame des Drehpunkts. */
-export const OBERE_ANBINDUNG = { y: 0.06, z: 0.3 };
+export const OBERE_ANBINDUNG = { y: 0.12, z: 0.2 };
 /** Oberer Zylinderanschluss an der Mitteltraverse, im Frame des Greifers. */
-export const ZYLINDER_AUFNAHME = { r: 0.18, y: -0.8 };
+export const ZYLINDER_AUFNAHME = { r: 0.35, y: -0.88 };
+/**
+ * Höhe der Mitteltraverse im Frame des Greifers (m).
+ *
+ * Steht hier und nicht im Zusammenbau, weil die Zylinderaufnahme an der
+ * Traverse sitzt: Ihre Gabel muss genau auf `ZYLINDER_AUFNAHME.y` liegen, und
+ * das kann das Bauteil nur wissen, wenn es seine eigene Einbauhöhe kennt.
+ * Vorher war der Anschluss mit −0,80 m gerechnet und die Gabel bei −1,14 m
+ * gezeichnet — der Zylinder hing 34 cm neben seinem Auge.
+ */
+export const TRAVERSE_Y = -1.0;
 
 /** Schwenkwinkel zu einem Öffnungsgrad 0 (zu) … 1 (offen). */
 export function schwenkFuer(oeffnung: number): number {
@@ -308,12 +344,19 @@ export function gabel(
  * Fuer alles, was der Schalenkruemmung folgt: Seitenwangen, Verstaerkungen.
  * `versatz` misst von der Mittellinie nach aussen.
  */
+export type ProStation = number | number[];
+
+/** Wert einer `ProStation`-Angabe an Station k. */
+function je(v: ProStation, k: number): number {
+  return typeof v === "number" ? v : (v[k] ?? v[v.length - 1] ?? 0);
+}
+
 export function strang(
   stationen: Array<{ y: number; z: number; th: number }>,
-  x: number,
+  x: ProStation,
   breite: number,
-  dicke: number,
-  versatz = 0
+  dicke: ProStation,
+  versatz: ProStation = 0
 ): THREE.BufferGeometry {
   const pos: number[] = [];
   const uv: number[] = [];
@@ -332,15 +375,18 @@ export function strang(
     const s0 = stationen[k]!;
     const ny = Math.sin(s0.th);
     const nz = Math.cos(s0.th);
+    const xk = je(x, k);
+    const vk = je(versatz, k);
+    const dk = je(dicke, k);
     const reihe: number[] = [];
     for (const [dx, dn] of [
-      [-breite / 2, versatz],
-      [breite / 2, versatz],
-      [breite / 2, versatz + dicke],
-      [-breite / 2, versatz + dicke],
+      [-breite / 2, vk],
+      [breite / 2, vk],
+      [breite / 2, vk + dk],
+      [-breite / 2, vk + dk],
     ] as Array<[number, number]>) {
       reihe.push(
-        p(x + dx, s0.y + dn * ny, s0.z + dn * nz, (dx + breite / 2) / breite, k / stationen.length)
+        p(xk + dx, s0.y + dn * ny, s0.z + dn * nz, (dx + breite / 2) / breite, k / stationen.length)
       );
     }
     ecken.push(reihe);
@@ -532,7 +578,7 @@ export function baueMitteltraverse(st: Stoffe): THREE.Group {
     gabelTeil.name = `04_ZYLINDERAUFNAHME_${nr}`;
     gabelTeil.position.set(
       Math.sin(a) * ZYLINDER_AUFNAHME.r,
-      -M.hoehe * 0.34,
+      ZYLINDER_AUFNAHME.y - TRAVERSE_Y,
       Math.cos(a) * ZYLINDER_AUFNAHME.r
     );
     gabelTeil.rotation.y = a;
@@ -574,9 +620,32 @@ export function baueStempel(st: Stoffe): THREE.Group {
   for (let i = 0; i < MASS.schalen; i++) {
     const a = (i / MASS.schalen) * Math.PI * 2;
     const nr = String(i + 1).padStart(2, "0");
+    /*
+     * Die Gabel sitzt auf `STEMPEL_AUGE.r` — dort, wo die Schale dreht, nicht
+     * am Rand des Blocks. Der Ausleger dazwischen ist das, was Position 10 von
+     * einem blossen Auge unterscheidet: ein angeschweisster Arm, der den
+     * Bolzen nach aussen an den Äquator der Kugel traegt.
+     */
+    const arm = new THREE.Mesh(
+      new THREE.BoxGeometry(0.12, 0.14, Math.max(STEMPEL_AUGE.r - R * 0.7, 0.05)),
+      st.guss
+    );
+    arm.name = `10_AUSLEGER_${nr}`;
+    arm.position.set(
+      Math.sin(a) * (R * 0.7 + STEMPEL_AUGE.r) * 0.5,
+      0,
+      Math.cos(a) * (R * 0.7 + STEMPEL_AUGE.r) * 0.5
+    );
+    arm.rotation.y = a;
+    g.add(arm);
+    const wurzelNaht = naht(0.12);
+    wurzelNaht.rotation.z = Math.PI / 2;
+    wurzelNaht.position.set(Math.sin(a) * R * 0.78, -0.07, Math.cos(a) * R * 0.78);
+    wurzelNaht.rotation.y = a;
+    g.add(wurzelNaht);
     const anbindung = gabel(st, 0.3, 0.095, 0.045, 0.18, 0.045);
     anbindung.name = `10_SCHALENANBINDUNG_${nr}`;
-    anbindung.position.set(Math.sin(a) * R * 0.95, 0, Math.cos(a) * R * 0.95);
+    anbindung.position.set(Math.sin(a) * STEMPEL_AUGE.r, 0, Math.cos(a) * STEMPEL_AUGE.r);
     anbindung.rotation.y = a;
     g.add(anbindung);
   }
@@ -596,6 +665,10 @@ export function baueZylinder(st: Stoffe): {
   gruppe: THREE.Group;
   gehaeuse: THREE.Group;
   stange: THREE.Group;
+  stab: THREE.Mesh;
+  auge: THREE.Mesh;
+  rohrLaenge: number;
+  auszug: number;
 } {
   const gruppe = new THREE.Group();
   gruppe.name = "05_HYDRAULIKZYLINDER";
@@ -616,8 +689,13 @@ export function baueZylinder(st: Stoffe): {
   const kopf = new THREE.Mesh(new THREE.CylinderGeometry(rR * 1.08, rR * 1.08, 0.055, 14), st.blech);
   kopf.position.y = -rohrLaenge;
   gehaeuse.add(kopf);
+  /*
+   * Das obere Auge liegt IM Gelenkpunkt, nicht 7 cm darüber. Sonst stimmt der
+   * Abstand zwischen den beiden Augen nicht mit der gerechneten Zylinderlänge
+   * überein, und der Zylinder steht neben seiner Gabel.
+   */
   const augeOben = new THREE.Mesh(rohr(rR * 0.95, rR * 0.42, M.breite * 0.45), st.guss);
-  augeOben.position.y = 0.07;
+  augeOben.position.y = 0;
   gehaeuse.add(augeOben);
   const n = naht(M.breite * 0.5);
   n.rotation.z = Math.PI / 2;
@@ -643,7 +721,7 @@ export function baueZylinder(st: Stoffe): {
   stange.position.y = -rohrLaenge;
   gruppe.add(stange);
 
-  return { gruppe, gehaeuse, stange };
+  return { gruppe, gehaeuse, stange, stab, auge: augeUnten, rohrLaenge, auszug };
 }
 
 /* ------------------------------------------------ 06 Greiferschale (HO) */
@@ -659,16 +737,76 @@ export function baueZylinder(st: Stoffe): {
  * einem Zinken unterscheidet, ist damit nicht die Breite, sondern die Tiefe:
  * 300 mm, verteilt auf 120 mm Wölbung der Haut und 180 mm hohe Wangen.
  */
+const HALB = MASS.schale.breite / 2;
+const WOELBUNG = MASS.schale.tiefe * 0.4;
+const WANGE = MASS.schale.tiefe * 0.6;
+const sektorHalb = Math.PI / MASS.schalen;
+/** Blechdicke der Seitenwangen (m). */
+const WANGE_DICK = 0.035;
+
+/**
+ * Wie tief die Seitenwange an Station k in den Trog hineinragt (m).
+ *
+ * Oben so tief, dass sie den Drehbolzen erreicht. Der sitzt `DREHPUNKT.versatz`
+ * hinter der Haut — mit den durchgehenden 180 mm der Positionsliste hörte die
+ * Wange 120 mm vor ihm auf, und die Schale hing sichtbar neben ihrem eigenen
+ * Lager. Beim Vorbild sind das die großen Backen am oberen Ende, die den Bolzen
+ * tragen; nach unten laufen sie auf das Normalmaß zu.
+ */
+export function wangenTiefe(k: number): number {
+  const tief = DREHPUNKT.versatz + 0.06;
+  return WANGE + (tief - WANGE) * Math.max(0, 1 - k / 2) ** 1.2;
+}
+
+/*
+ * Das Breitenprofil — die Stelle, an der die Seitenansicht entschieden wird.
+ *
+ * Regel, und zwar ohne Ausnahme: Am oberen Ende ist die Schale am breitesten,
+ * nach unten wird sie nur schmaler oder bleibt gleich. Nie wieder breiter.
+ * Genau das war vorher verletzt — 0,20 m oben, 0,38 m eine Station tiefer,
+ * dann fallend, und ganz unten noch einmal ein Sprung nach außen durch den
+ * Zahn. In der Seitenansicht las sich das als Bauch mit Fuß statt als Birne.
+ *
+ * Zwei Grenzen wirken zusammen:
+ *
+ *   Form    Am Äquator die vollen 400 mm der Positionsliste, zur Spitze hin
+ *           auf gut die Hälfte auslaufend.
+ *   Platz   Fünf Schalen teilen sich den Kreis, jede hat 72°. Die Breite
+ *           bleibt unter `r · sin(0,9 · Halbsektor)`, gemessen am kleinsten
+ *           Radius, den die INNENKANTE der Seitenwange über den ganzen
+ *           Schwenkweg erreicht. Damit können sich die Schalen in keiner
+ *           Stellung durchdringen.
+ *
+ * Beides wird als LAUFENDES MINIMUM über alle Stationen bis k genommen. Das
+ * ist der Teil, der die Regel garantiert: Was einmal schmal war, wird weiter
+ * unten nicht wieder breit, auch wenn der Sektor dort wieder Platz ließe.
+ * Ohne das Minimum hing die Form davon ab, welche der beiden Grenzen gerade
+ * greift — und die Platzgrenze ist nicht monoton.
+ */
+export function schalenHalbbreite(k: number): number {
+  let halb = Infinity;
+  for (let i = 0; i <= k; i++) {
+    let innen = Infinity;
+    for (let j = 0; j <= 12; j++) {
+      const schwenk = ZU + ((OFFEN - ZU) * j) / 12;
+      const bahn = mittellinie(schwenk);
+      const th = i * SCHALEN_BOGEN - schwenk;
+      innen = Math.min(innen, (bahn[i]?.r ?? 0) - wangenTiefe(i) * Math.cos(th));
+    }
+    halb = Math.min(
+      halb,
+      HALB * (1 - 0.72 * (i / SCHALEN_ABSCHNITTE) ** 1.6),
+      Math.max(innen, 0) * Math.sin(sektorHalb * 0.9)
+    );
+  }
+return halb;
+}
+
 export function baueGreiferschale(st: Stoffe): THREE.Group {
   const g = new THREE.Group();
   g.name = "06_GREIFERSCHALE";
-  const M = MASS.schale;
   const stationen = schalenStationen();
-  const HALB = M.breite / 2;
-  const WOELBUNG = M.tiefe * 0.4;
-  const WANGE = M.tiefe * 0.6;
   const HAUT = 0.03;
-  const sektorHalb = Math.PI / MASS.schalen;
 
   const pos: number[] = [];
   const uv: number[] = [];
@@ -683,54 +821,13 @@ export function baueGreiferschale(st: Stoffe): THREE.Group {
     idx.push(a, b, c, a, c, d);
   };
   const QUER = 4;
-  /*
-   * Zur Spitze hin laeuft die Schale schmaler zu — und zwar aus zwei Gruenden
-   * gleichzeitig, von denen der zweite zwingend ist.
-   *
-   * Der erste ist die Form: Eine Greiferschale ist oben breit und laeuft unten
-   * aus, das zeigt jede Vorlage.
-   *
-   * Der zweite ist Platz. Fuenf Schalen teilen sich den Kreis, jede hat 72°.
-   * Nahe der Drehachse wird dieser Sektor eng: Bei 20 cm Radius sind 72° nur
-   * noch 23 cm Bogen. Eine Schale von 40 cm Breite passt dort nicht mehr —
-   * sie griffe in den Sektor der Nachbarin. Die Breite wird deshalb auf
-   * `r · sin(0,9 · Halbsektor)` gedeckelt, mit dem Radius, den die Station im
-   * GESCHLOSSENEN Zustand hat. Damit kann es gar nicht mehr passieren.
-   *
-   * Ungedeckelt nutzte die Schale geschlossen 49° von 36° — die Pruefung hat
-   * es gefangen, im Bild war davon nichts zu sehen.
-   */
-  const breiteBei = (k: number): number => {
-    /*
-     * Gedeckelt wird am kleinsten Radius, den das Teil an dieser Station
-     * ueberhaupt erreicht — ueber die GANZE Schwenkbewegung, und gemessen an
-     * der INNENKANTE der Seitenwange, die 18 cm in den Trog hineinragt.
-     *
-     * Beide Verschaerfungen kamen aus der Pruefung, eine nach der anderen: Mit
-     * dem Radius der Mittellinie im geschlossenen Zustand nutzte die Schale
-     * noch 47° von 36°, mit der Wangenkante im geschlossenen Zustand immer
-     * noch 43° — dann aber bei drei Vierteln geoeffnet, weil die Wange dort
-     * am weitesten nach innen zeigt.
-     */
-    let innen = Infinity;
-    for (let i = 0; i <= 8; i++) {
-      const schwenk = ZU + ((OFFEN - ZU) * i) / 8;
-      const bahn = mittellinie(schwenk);
-      const th = k * SCHALEN_BOGEN - schwenk;
-      innen = Math.min(innen, (bahn[k]?.r ?? 0.05) - WANGE * Math.cos(th));
-    }
-    return Math.min(
-      HALB * (1 - 0.45 * (k / SCHALEN_ABSCHNITTE) ** 1.6),
-      Math.max(innen, 0.04) * Math.sin(sektorHalb * 0.9)
-    );
-  };
 
   const lagen: number[][][] = [];
   for (const seite of [0, 1]) {
     const reihen: number[][] = [];
     for (let k = 0; k <= SCHALEN_ABSCHNITTE; k++) {
       const s0 = stationen[k]!;
-      const halb = breiteBei(k);
+      const halb = schalenHalbbreite(k);
       const reihe: number[] = [];
       for (let j = 0; j <= QUER; j++) {
         const t = j / QUER;
@@ -772,16 +869,27 @@ export function baueGreiferschale(st: Stoffe): THREE.Group {
    * hinein. Andersherum verschwindet sie hinter der Haut, und die Schale liest
    * sich als flaches Blech — genau so sah sie im ersten Anlauf aus.
    */
+  const tiefen = stationen.map((_, k) => wangenTiefe(k));
   for (const seite of [-1, 1]) {
-    for (let k = 0; k < SCHALEN_ABSCHNITTE; k++) {
-      const halb = (breiteBei(k) + breiteBei(k + 1)) / 2;
-      const wange = new THREE.Mesh(
-        strang(stationen.slice(k, k + 2), seite * halb, 0.035, WANGE, -WANGE),
-        st.guss
-      );
-      wange.name = `06_WANGE_${seite < 0 ? "L" : "R"}_${k + 1}`;
-      g.add(wange);
-    }
+    /*
+     * EIN durchgehender Strang statt sechs Stücken, und er folgt der Breite
+     * Station für Station. Vorher bekam jedes Stück die MITTLERE Breite seiner
+     * beiden Enden — am letzten Abschnitt stand die Wange damit 38 mm über die
+     * Haut hinaus, und die Schale endete in zwei Beinen mit einer Kerbe
+     * dazwischen statt in einer Spitze.
+     */
+    const wange = new THREE.Mesh(
+      strang(
+        stationen,
+        stationen.map((_, k) => seite * (schalenHalbbreite(k) - WANGE_DICK / 2)),
+        WANGE_DICK,
+        tiefen,
+        tiefen.map((t) => -t)
+      ),
+      st.guss
+    );
+    wange.name = `06_WANGE_${seite < 0 ? "L" : "R"}`;
+    g.add(wange);
   }
 
   // Lagerkasten mit den beiden Augen — das Hülsengelenk zur Mitteltraverse
@@ -797,17 +905,31 @@ export function baueGreiferschale(st: Stoffe): THREE.Group {
    * Untere Schalenanbindung — der Drehpunkt am Stempel (Position 10). Er liegt
    * im Ursprung der Schale, denn genau darum dreht sie sich.
    */
-  const kasten = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.16, 0.18), st.guss);
+  /*
+   * Der Bolzen geht durch BEIDE Backen, nicht zwischen ihnen hindurch.
+   *
+   * Vorher war die Hülse 0,26 m lang und die Wangen standen 0,40 m auseinander
+   * — das Auge schwebte mit 7 cm Luft auf jeder Seite zwischen den Backen, und
+   * in der Seitenansicht sah die Schale aus, als hinge sie neben ihrem Lager.
+   * Länge und Kastenbreite kommen deshalb aus der Schalenbreite an Station 0.
+   */
+  const backen = 2 * (schalenHalbbreite(0) - WANGE_DICK);
+  const kasten = new THREE.Mesh(new THREE.BoxGeometry(backen, 0.16, 0.2), st.guss);
   kasten.name = "06_UNTERE_ANBINDUNG";
   kasten.position.set(0, 0.02, -0.02);
   g.add(kasten);
-  const unteresAuge = new THREE.Mesh(rohr(0.085, 0.042, 0.26), st.guss);
+  const unteresAuge = new THREE.Mesh(rohr(0.085, 0.042, backen + 2 * WANGE_DICK), st.guss);
   unteresAuge.name = "06_UNTERES_AUGE";
   g.add(unteresAuge);
+  /*
+   * Die Kehlnaht laeuft LAENGS der Fuge zwischen Nabe und Backe, nicht quer
+   * darueber. Quer gelegt stand sie 35 mm ueber die Schalenkante hinaus — und
+   * genau das soll die Kontur nirgends tun.
+   */
   for (const seite of [-1, 1]) {
-    const n = naht(0.13);
-    n.rotation.z = Math.PI / 2;
-    n.position.set(seite * 0.09, 0.04, -0.04);
+    const n = naht(0.16);
+    n.rotation.y = Math.PI / 2;
+    n.position.set(seite * (backen / 2 - 0.012), 0.05, -0.02);
     g.add(n);
   }
 
@@ -821,7 +943,12 @@ export function baueGreiferschale(st: Stoffe): THREE.Group {
    * Obere Schalenanbindung — hier greift die Kolbenstange an (Position 6 der
    * Zeichnung, orange markiert). Sie sitzt aussen am oberen Ende der Schale.
    */
-  const konsole = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.18, 0.14), st.guss);
+  /*
+   * Die Konsole steht ebenfalls von Backe zu Backe. Sie überträgt die
+   * Zylinderkraft in beide Wangen; als schmaler Klotz in der Mitte hätte sie
+   * nichts, woran sie sich abstützt.
+   */
+  const konsole = new THREE.Mesh(new THREE.BoxGeometry(backen, 0.18, 0.16), st.guss);
   konsole.name = "06_OBERE_ANBINDUNG";
   konsole.position.set(0, OBERE_ANBINDUNG.y + 0.02, OBERE_ANBINDUNG.z * 0.75);
   g.add(konsole);
@@ -840,40 +967,53 @@ export function baueGreiferschale(st: Stoffe): THREE.Group {
 /* ------------------------------------------------------ 07 Greiferspitze */
 
 /**
- * Greiferspitze — 0,25 × 0,12 × 0,08 m, austauschbar, fünfmal.
+ * Greiferspitze — geschmiedet, austauschbar, fünfmal.
  *
- * Ein Schmiedeteil, das über das Schalenende geschoben und verschraubt wird.
- * Es läuft auf eine Schneide zu, nicht auf einen Punkt.
+ * Sie darf die Seitenansicht der Schale nicht verändern. Vorher tat sie das:
+ * Der Kragen war mit 138 mm breiter als die Schale an ihrem Ende (110 mm), und
+ * der Kegel setzte mit 120 mm ebenfalls darüber auf. In der Seitenansicht sah
+ * die Schale damit aus, als würde sie ganz unten noch einmal ausstellen — ein
+ * Fuß, wo eine Spitze hingehört.
+ *
+ * Deshalb kommt die Breite jetzt nicht mehr aus der Positionsliste, sondern
+ * aus `schalenHalbbreite` an der letzten Station: Der Schuh ist genau so breit
+ * wie das Schalenende, keinen Millimeter mehr. Was darunter heraussteht, sind
+ * nur noch die beiden Zacken — gleich groß, schmal, auf einen Punkt zulaufend.
  */
 export function baueGreiferspitze(st: Stoffe): THREE.Group {
   const g = new THREE.Group();
   g.name = "07_GREIFERSPITZE";
   const M = MASS.spitze;
   /*
-   * Die Spitze zeigt nach −y, der Kragen sitzt am breiten Ende bei +y.
-   *
-   * Erst war es umgekehrt: Die Kegelspitze lag bei +y und der Kragen darauf.
-   * Im Zusammenbau zeigte damit der Kragen nach vorn und die Spitze nach
-   * hinten in die Schale — und weil er weiter aussteht als der Zahn, schob er
-   * sich über die Drehachse in den Sektor der gegenüberliegenden Schale.
+   * Der Schuh wird über das Schalenende geschoben. Er ist auf die Breite des
+   * Schalenendes gedeckelt — das ist die Zusage, dass die Kontur von oben nach
+   * unten nur schmaler wird.
    */
-  const zahn = new THREE.Mesh(
-    new THREE.CylinderGeometry(M.breite * 0.5, M.dicke * 0.2, M.laenge * 0.66, 4),
+  const halb = Math.min(M.breite / 2, schalenHalbbreite(SCHALEN_ABSCHNITTE));
+  const schuh = new THREE.Mesh(
+    new THREE.BoxGeometry(2 * halb, M.laenge * 0.34, M.dicke * 1.2),
     st.bolzen
   );
-  zahn.scale.set(1, 1, M.dicke / M.breite);
-  zahn.rotation.y = Math.PI / 4;
-  zahn.position.y = -M.laenge * 0.18;
-  g.add(zahn);
-  const kragen = new THREE.Mesh(
-    new THREE.BoxGeometry(M.breite * 1.15, M.laenge * 0.3, M.dicke * 1.3),
-    st.bolzen
-  );
-  kragen.name = "07_KRAGEN";
-  kragen.position.y = 0;
-  g.add(kragen);
-  for (const x of [-M.breite * 0.32, M.breite * 0.32]) {
-    const loch = new THREE.Mesh(rohr(0.016, 0.009, M.dicke * 1.4), st.blech);
+  schuh.name = "07_SCHUH";
+  g.add(schuh);
+  /*
+   * Zwei Zacken statt einer breiten Schneide. Beide gleich groß und zusammen
+   * schmaler als der Schuh — sie stehen nach unten heraus, nicht zur Seite.
+   */
+  for (const seite of [-1, 1]) {
+    const zacke = new THREE.Mesh(
+      new THREE.CylinderGeometry(halb * 0.42, 0.005, M.laenge * 0.72, 4),
+      st.bolzen
+    );
+    zacke.name = `07_ZACKE_${seite < 0 ? "L" : "R"}`;
+    zacke.scale.set(1, 1, (M.dicke * 0.9) / (halb * 0.84));
+    zacke.rotation.y = Math.PI / 4;
+    zacke.position.set(seite * halb * 0.46, -M.laenge * 0.52, 0);
+    g.add(zacke);
+  }
+  // Zwei Schrauben halten den Schuh am Schalenende
+  for (const x of [-halb * 0.55, halb * 0.55]) {
+    const loch = new THREE.Mesh(rohr(0.014, 0.008, M.dicke * 1.3), st.blech);
     loch.rotation.x = Math.PI / 2;
     loch.rotation.z = Math.PI / 2;
     loch.position.set(x, 0, 0);

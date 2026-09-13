@@ -52,7 +52,13 @@ function spuren(g: Greifer): Spur[] {
   const liste: THREE.Object3D[] = [g.rotator];
   for (let i = 1; i <= MASS.schalen; i++) {
     const nr = String(i).padStart(2, "0");
-    for (const name of [`SHELL_${nr}`, `CYLINDER_${nr}`, `CYL_ROD_${nr}`]) {
+    for (const name of [
+      `SHELL_${nr}`,
+      `CYLINDER_${nr}`,
+      `CYL_ROD_${nr}`,
+      `CYL_ROD_SHAFT_${nr}`,
+      `CYL_ROD_EYE_${nr}`,
+    ]) {
       const o = g.wurzel.getObjectByName(name);
       if (o) liste.push(o);
     }
@@ -238,7 +244,14 @@ function gegenprobe(puffer: Buffer): void {
         "GRAPPLE_HEAD",
         ...Array.from({ length: MASS.schalen }, (_, i) => {
           const nr = String(i + 1).padStart(2, "0");
-          return [`SHELL_${nr}`, `CYLINDER_${nr}`, `CYL_ROD_${nr}`, `SHELL_TIP_${nr}`];
+          return [
+            `SHELL_${nr}`,
+            `CYLINDER_${nr}`,
+            `CYL_ROD_${nr}`,
+            `CYL_ROD_SHAFT_${nr}`,
+            `CYL_ROD_EYE_${nr}`,
+            `SHELL_TIP_${nr}`,
+          ];
         }).flat(),
       ].filter((n) => !szene.getObjectByName(n));
       if (fehlt.length) {
@@ -256,7 +269,12 @@ function gegenprobe(puffer: Buffer): void {
         return;
       }
       const schale = szene.getObjectByName("SHELL_01")!;
-      const stange = szene.getObjectByName("CYL_ROD_01")!;
+      /*
+       * Gemessen wird am AUGE der Kolbenstange, und zwar seine Lage in Metern.
+       * Vorher stand hier die Skalierung der Stangengruppe, ausgegeben als
+       * Zentimeter — das meldete 118 cm Hub, wo der Zylinder 19 cm faehrt.
+       */
+      const stange = szene.getObjectByName("CYL_ROD_EYE_01")!;
       const rotator = szene.getObjectByName("ROTATOR")!;
 
       /*
@@ -270,10 +288,10 @@ function gegenprobe(puffer: Buffer): void {
       wirkung.play();
       mixer.update(0);
       const zuWinkel = schale.rotation.x;
-      const zuStange = stange.scale.y;
+      const zuStange = stange.position.y;
       mixer.update(oeffnen.duration * 0.98);
       const offenWinkel = schale.rotation.x;
-      const offenStange = stange.scale.y;
+      const offenStange = stange.position.y;
       wirkung.stop();
 
       const drehWirkung = mixer.clipAction(drehen);
@@ -286,7 +304,7 @@ function gegenprobe(puffer: Buffer): void {
       console.log(
         `  Gegenprobe: Schale schwenkt ${(((offenWinkel - zuWinkel) * 180) / Math.PI).toFixed(1)}°, ` +
           `Stange faehrt beim Oeffnen ${Math.abs((offenStange - zuStange) * 100).toFixed(0)} cm ` +
-          `${offenStange > zuStange ? "aus" : "ein"}, ` +
+          `${offenStange > zuStange ? "ein" : "aus"}, ` +
           `Rotator nach einem Viertel bei ${((gedreht * 180) / Math.PI).toFixed(0)}°`
       );
       for (const name of ["POSE_ZU", "POSE_HALB", "POSE_OFFEN"]) {
@@ -300,7 +318,7 @@ function gegenprobe(puffer: Buffer): void {
         console.error("  Die Schalen bewegen sich im GLB nicht.");
         process.exitCode = 1;
       }
-      if (Math.abs(offenStange - zuStange) < 0.1) {
+      if (Math.abs(offenStange - zuStange) < 0.05) {
         console.error("  Die Kolbenstange bewegt sich im GLB nicht.");
         process.exitCode = 1;
       }
