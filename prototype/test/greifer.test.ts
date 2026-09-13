@@ -88,7 +88,16 @@ describe("Greifer — Form der Schale", () => {
         `Station ${k + 1} ist breiter als ${k}`
       ).toBeLessThanOrEqual(schalenHalbbreite(k) + 1e-9);
     }
-    expect(schalenHalbbreite(SCHALEN_ABSCHNITTE)).toBeLessThan(schalenHalbbreite(0) * 0.4);
+    /*
+     * Das Ende misst 200 mm gegen 400 mm oben, also die Haelfte. Diese Zahl
+     * ist nicht gewaehlt, sondern gefordert: Querschnitt C-C der Zeichnung
+     * `zahngreifer` zeigt ein Schalenende von 200 mm, auf dem ein Zahn von
+     * 110 mm und zwei Wangen von je 20 mm sitzen. Schmaler geht es nicht,
+     * ohne den Zahn zu verlieren.
+     */
+    expect(schalenHalbbreite(SCHALEN_ABSCHNITTE)).toBeLessThanOrEqual(
+      schalenHalbbreite(0) * 0.55
+    );
   });
 
   it("ist nicht in sich verwunden", () => {
