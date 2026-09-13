@@ -113,12 +113,40 @@ export function baueRotator(st: SpinnenStoffe): THREE.Group {
  * Fünfeckig, weil fünf Krallen daran hängen: So sitzt jede Anlenkung auf einer
  * Fläche und nicht auf einer Kante.
  */
-export function baueTraverse(st: SpinnenStoffe): THREE.Mesh {
-  const m = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.5, 0.4, 5), st.guss);
-  m.position.y = -0.75;
-  m.rotation.y = Math.PI / 5;
-  m.castShadow = true;
-  return m;
+export function baueTraverse(st: SpinnenStoffe): THREE.Group {
+  const g = new THREE.Group();
+  const block = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.5, 0.4, 5), st.guss);
+  block.position.y = -0.75;
+  block.rotation.y = Math.PI / 5;
+  block.castShadow = true;
+  g.add(block);
+  /*
+   * Anlenkboecke fuer die Zylinder — die radialen Ohren oben am Mittelstueck.
+   *
+   * Sie fehlten, und das war kein Schoenheitsfehler: Nach dem Verlegen der
+   * Anlenkung von Radius 0,42 auf 0,84 hingen die Zylinder mit ihrem oberen
+   * Ende sichtbar im Nichts. Auf der Explosionszeichnung (Position 07) sind
+   * genau diese Ohren das, woran die Zylinder haengen.
+   */
+  for (let i = 0; i < CLAW_COUNT; i++) {
+    const a = (i / CLAW_COUNT) * Math.PI * 2;
+    // Schmal und knapp vor dem Bolzen endend, sonst verdeckt der Bock den
+    // Zylinder, den er halten soll.
+    const ohr = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.28, 0.2), st.kante);
+    ohr.position.set(Math.sin(a) * 0.74, -0.46, Math.cos(a) * 0.74);
+    ohr.rotation.y = a;
+    ohr.castShadow = true;
+    g.add(ohr);
+    const bolzen = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.05, 0.05, 0.3, 10),
+      st.bolzen
+    );
+    bolzen.position.set(Math.sin(a) * ZYLINDERKREIS, -0.38, Math.cos(a) * ZYLINDERKREIS);
+    bolzen.rotation.y = a;
+    bolzen.rotation.z = Math.PI / 2;
+    g.add(bolzen);
+  }
+  return g;
 }
 
 /**

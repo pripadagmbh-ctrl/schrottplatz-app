@@ -187,6 +187,32 @@ export function baueMittelstueck(st: Stoffe): THREE.Group {
   ring.rotation.x = Math.PI / 2;
   ring.position.y = RING_Y;
   g.add(ring);
+
+  /*
+   * Anlenkböcke für die Zylinder — die radialen Ohren oben am Mittelstück.
+   *
+   * Sie fehlten, und das war kein Schönheitsfehler: Nach dem Verlegen der
+   * Anlenkung von Radius 0,42 auf 0,84 hingen die Zylinder mit ihrem oberen
+   * Ende sichtbar im Nichts. Auf der Explosionszeichnung (Position 07) sind
+   * genau diese Ohren das, woran die Zylinder hängen.
+   */
+  for (let i = 0; i < SCHALEN; i++) {
+    const a = (i / SCHALEN) * Math.PI * 2;
+    const nr = String(i + 1).padStart(2, "0");
+    // Schmal und knapp vor dem Bolzen endend, sonst verdeckt der Bock den
+    // Zylinder, den er halten soll.
+    const ohr = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.28, 0.2), st.stahl);
+    ohr.name = `HEAD_ZYLINDERBOCK_${nr}`;
+    ohr.position.set(Math.sin(a) * 0.74, ZYLINDER_OBEN_Y - 0.08, Math.cos(a) * 0.74);
+    ohr.rotation.y = a;
+    g.add(ohr);
+    const bolzen = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.3, 10), st.bolzen);
+    bolzen.name = `HEAD_ZYLINDERBOLZEN_${nr}`;
+    bolzen.position.copy(zylinderAmKopf(a));
+    bolzen.rotation.y = a;
+    bolzen.rotation.z = Math.PI / 2;
+    g.add(bolzen);
+  }
   return g;
 }
 

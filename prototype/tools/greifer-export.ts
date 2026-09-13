@@ -69,8 +69,20 @@ function abtasten(sp: Spur[]): void {
   }
 }
 
-/** Nur die Spuren behalten, die sich tatsächlich bewegen. */
-function tracks(sp: Spur[], zeiten: number[]): THREE.KeyframeTrack[] {
+/**
+ * Spuren zu Keyframe-Tracks.
+ *
+ * `nurBewegte` wirft weg, was sich über den Clip nicht ändert — das haelt die
+ * Datei klein. Für stehende Posen muss es ausgeschaltet sein: Dort ändert sich
+ * per Definition nichts, und mit dem Filter kamen drei leere Clips heraus.
+ * Aufgefallen ist das erst in der Vorschau, als POSE_OFFEN den Greifer
+ * geschlossen liess.
+ */
+function tracks(
+  sp: Spur[],
+  zeiten: number[],
+  nurBewegte = true
+): THREE.KeyframeTrack[] {
   const out: THREE.KeyframeTrack[] = [];
   const bewegt = (werte: number[], breite: number): boolean => {
     for (let i = breite; i < werte.length; i++) {
@@ -80,13 +92,13 @@ function tracks(sp: Spur[], zeiten: number[]): THREE.KeyframeTrack[] {
   };
   for (const s of sp) {
     const n = s.knoten.name;
-    if (bewegt(s.quat, 4)) {
+    if (!nurBewegte || bewegt(s.quat, 4)) {
       out.push(new THREE.QuaternionKeyframeTrack(`${n}.quaternion`, zeiten, s.quat));
     }
-    if (bewegt(s.pos, 3)) {
+    if (!nurBewegte || bewegt(s.pos, 3)) {
       out.push(new THREE.VectorKeyframeTrack(`${n}.position`, zeiten, s.pos));
     }
-    if (bewegt(s.skal, 3)) {
+    if (!nurBewegte || bewegt(s.skal, 3)) {
       out.push(new THREE.VectorKeyframeTrack(`${n}.scale`, zeiten, s.skal));
     }
   }
@@ -195,7 +207,7 @@ for (const [name, wert] of [
   abtasten(sp);
   greifer.setOeffnung(wert);
   abtasten(sp);
-  clips.push(new THREE.AnimationClip(name, 0.04, tracks(sp, [0, 0.04])));
+  clips.push(new THREE.AnimationClip(name, 0.04, tracks(sp, [0, 0.04], false)));
 }
 greifer.setOeffnung(0);
 
@@ -277,6 +289,13 @@ function gegenprobe(puffer: Buffer): void {
           `${offenStange > zuStange ? "aus" : "ein"}, ` +
           `Rotator nach einem Viertel bei ${((gedreht * 180) / Math.PI).toFixed(0)}°`
       );
+      for (const name of ["POSE_ZU", "POSE_HALB", "POSE_OFFEN"]) {
+        const clip = gltf.animations.find((c) => c.name === name);
+        if (!clip || clip.tracks.length === 0) {
+          console.error(`  Clip ${name} ist leer.`);
+          process.exitCode = 1;
+        }
+      }
       if (Math.abs(offenWinkel - zuWinkel) < 0.5) {
         console.error("  Die Schalen bewegen sich im GLB nicht.");
         process.exitCode = 1;
