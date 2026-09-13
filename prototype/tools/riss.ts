@@ -9,6 +9,8 @@
 import * as THREE from "three";
 
 export interface Dreieck {
+  /** Tiefe der drei Ecken in Blickrichtung — fuer den Tiefenpuffer. */
+  ecken?: [number, number, number];
   p: Array<[number, number]>;
   tiefe: number;
   farbe: string;
@@ -55,6 +57,18 @@ export function dreiecke(wurzel: THREE.Object3D, blick: THREE.Vector3): Dreieck[
       out.push({
         p: [a, b, c].map((v) => [v.dot(rechts), v.dot(hoch)] as [number, number]),
         tiefe: (a.dot(d) + b.dot(d) + c.dot(d)) / 3,
+        /*
+         * Tiefe JE ECKE, nicht nur im Mittel.
+         *
+         * Ohne sie bleibt nur das Malerverfahren: hinten zuerst, vorn zuletzt.
+         * Bei einer gekruemmten Schale, die sich in der Projektion selbst
+         * ueberlappt, uebermalen sich Dreiecke dabei gegenseitig — im Bild
+         * entstand dadurch am 13.09.2026 eine Einschnuerung, die in der
+         * Geometrie nachweislich nicht da war (im echten Renderer mit
+         * Tiefenpuffer ist der Zinken durchgehend glatt). Mit diesen drei
+         * Werten kann der Rasterer je Pixel pruefen, was wirklich vorn liegt.
+         */
+        ecken: [a.dot(d), b.dot(d), c.dot(d)],
         farbe: "#" + f.getHexString(),
       });
     }

@@ -24,6 +24,13 @@ import { dreiecke } from "./riss";
 
 const BREITE = 1180;
 const HOEHE = 760;
+/*
+ * Tiefenpuffer. Ohne ihn bleibt nur das Malerverfahren, und bei einer
+ * gekruemmten Schale, die sich in der Projektion selbst ueberlappt,
+ * uebermalen sich die Dreiecke gegenseitig — im Bild entstand dadurch eine
+ * Einschnuerung, die in der Geometrie nicht da war.
+ */
+const tiefe = new Float32Array(BREITE * HOEHE).fill(-1e30);
 const bild = new Uint8Array(BREITE * HOEHE * 3).fill(0xf2);
 
 function setze(x: number, y: number, f: number[]): void {
@@ -51,7 +58,14 @@ function dreieck(p: Array<[number, number]>, f: number[]): void {
       const w0 = ((b[0] - a[0]) * (py - a[1]) - (px - a[0]) * (b[1] - a[1])) / fl;
       const w1 = ((c[0] - b[0]) * (py - b[1]) - (px - b[0]) * (c[1] - b[1])) / fl;
       const w2 = ((a[0] - c[0]) * (py - c[1]) - (px - c[0]) * (a[1] - c[1])) / fl;
-      if (w0 >= -1e-4 && w1 >= -1e-4 && w2 >= -1e-4) setze(x, y, f);
+      if (w0 >= -1e-4 && w1 >= -1e-4 && w2 >= -1e-4) {
+        const i = y * BREITE + x;
+        const zz = z ? z[1]! * w0 + z[2]! * w1 + z[0]! * w2 : 0;
+        if (!z || zz >= tiefe[i]!) {
+          if (z) tiefe[i] = zz;
+          setze(x, y, f);
+        }
+      }
     }
   }
 }
@@ -82,6 +96,9 @@ function male(
   umriss = false
 ): void {
   rechteck(x0, y0, w, h, [255, 255, 255]);
+  // Tiefenpuffer je Bildfeld zuruecksetzen — sonst blenden sich die Felder aus
+  for (let yy = y0; yy < y0 + h; yy++)
+    for (let xx = x0; xx < x0 + w; xx++) tiefe[yy * BREITE + xx] = -1e30;
   const tr = dreiecke(schale(), blick);
   let ax = Infinity;
   let bx = -Infinity;
@@ -105,7 +122,8 @@ function male(
   for (const t of tr)
     dreieck(
       t.p.map((q) => [cx + q[0] * s, cy - q[1] * s] as [number, number]),
-      umriss ? [0x33, 0x37, 0x3b] : rgb(t.farbe)
+      umriss ? [0x33, 0x37, 0x3b] : rgb(t.farbe),
+      t.ecken
     );
 }
 
