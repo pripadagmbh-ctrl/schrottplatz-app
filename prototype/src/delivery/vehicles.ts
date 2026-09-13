@@ -552,8 +552,29 @@ class DeliveryVehicle {
         this.chassisBody
       );
     } else {
+      /*
+       * Der Rahmen liegt UNTER der Mulde und ist schmaler als sie.
+       *
+       * Vorher war er ein Kasten von 2,2 m Breite und reichte bis y 0,92 — der
+       * Muldenboden beginnt aber schon bei y 0,49. Beide Koerper sind
+       * kinematisch und ueberschnitten sich damit um 43 cm. Beim Kippen wurde
+       * die Ladung zwischen ihnen eingeklemmt: Zwei kinematische Koerper haben
+       * fuer den Loeser unendliche Masse, er drueckt das Teil mit Gewalt
+       * heraus. Gemessen 258 km/h, und danach lag es auf dem Rahmendeck,
+       * waehrend die Mulde darueber wegkippte — genau die Beanstandung
+       * „das Material bleibt auf dem Chassis und taucht unter der Ladeflaeche".
+       *
+       * Jetzt endet der Rahmen 4 cm unter dem Muldenboden und ist mit 1,1 m
+       * schmaler als die Mulde (2,7 m). Was ueber die Muldenkante rutscht,
+       * faellt daran vorbei zu Boden, statt auf einem Deck liegenzubleiben.
+       * Solide bleibt der LKW trotzdem: Darueber deckt der Muldenkoerper ab.
+       */
       world.createCollider(
-        RAPIER.ColliderDesc.cuboid(1.1, 0.42, (this.bedLen + 1.6) / 2).setTranslation(0, 0.5, 0.8),
+        RAPIER.ColliderDesc.cuboid(0.55, 0.185, (this.bedLen + 1.6) / 2).setTranslation(
+          0,
+          0.265,
+          0.8
+        ),
         this.chassisBody
       );
     }
