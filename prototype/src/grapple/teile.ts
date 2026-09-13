@@ -759,10 +759,14 @@ export function baueZylinder(st: Stoffe): {
  */
 const HALB = MASS.schale.breite / 2;
 const WOELBUNG = MASS.schale.tiefe * 0.4;
-const WANGE = MASS.schale.tiefe * 0.6;
 const sektorHalb = Math.PI / MASS.schalen;
 /** Blechdicke der Seitenwangen (m). */
 const WANGE_DICK = 0.035;
+/** Tiefe der Randleiste (m) — nur noch eine Kante, keine Wange mehr. */
+const RAND_TIEF = 0.05;
+/** Breite und Tiefe des Holms in der Mitte (m). */
+const HOLM_B = 0.13;
+const HOLM_T = MASS.schale.tiefe * 0.6;
 
 /**
  * Wie tief die Seitenwange an Station k in den Trog hineinragt (m).
@@ -774,35 +778,32 @@ const WANGE_DICK = 0.035;
  * tragen; nach unten laufen sie auf das Normalmaß zu.
  */
 export function wangenTiefe(k: number): number {
-  const tief = DREHPUNKT.versatz + 0.06;
-  return WANGE + (tief - WANGE) * Math.max(0, 1 - k / 2) ** 1.2;
+  const kopf = DREHPUNKT.versatz + 0.06;
+  return RAND_TIEF + (kopf - RAND_TIEF) * Math.max(0, 1 - k / 2) ** 1.4;
 }
 
-/*
- * Das Breitenprofil — die Stelle, an der die Seitenansicht entschieden wird.
+/**
+ * Tiefe des Holms an Station k (m) — der Rücken, der über der Schale liegt.
  *
- * Regel, und zwar ohne Ausnahme: Am oberen Ende ist die Schale am breitesten,
- * nach unten wird sie nur schmaler oder bleibt gleich. Nie wieder breiter.
- * Genau das war vorher verletzt — 0,20 m oben, 0,38 m eine Station tiefer,
- * dann fallend, und ganz unten noch einmal ein Sprung nach außen durch den
- * Zahn. In der Seitenansicht las sich das als Bauch mit Fuß statt als Birne.
+ * Ansage 13.09.2026: „im Grunde genommen sind das ja einfach nur fünf schmale,
+ * aber tiefe Zacken. Und links und rechts neben den Zacken sind ja eigentlich
+ * nur dicke Stahlplatten als Schalen noch mit gegossen. Das heißt, Du hast 'n
+ * Holmen, der über den Schalen liegt, aber es ist ein Gussteil."
  *
- * Zwei Grenzen wirken zusammen:
+ * Vorher stand das Material genau andersherum: Die Haut wölbte sich in der
+ * MITTE um 120 mm nach aussen und lief an den Rändern auf null, und die tiefen
+ * Wangen von 180 bis 360 mm sassen AM RAND. Damit war die Schale in der Mitte
+ * ein dünnes Blech mit zwei tiefen Kanten — eine Rinne statt einer Zacke.
  *
- *   Form    Am Äquator die vollen 400 mm der Positionsliste, zur Spitze hin
- *           auf gut die Hälfte auslaufend.
- *   Platz   Fünf Schalen teilen sich den Kreis, jede hat 72°. Die Breite
- *           bleibt unter `r · sin(0,9 · Halbsektor)`, gemessen am kleinsten
- *           Radius, den die INNENKANTE der Seitenwange über den ganzen
- *           Schwenkweg erreicht. Damit können sich die Schalen in keiner
- *           Stellung durchdringen.
- *
- * Beides wird als LAUFENDES MINIMUM über alle Stationen bis k genommen. Das
- * ist der Teil, der die Regel garantiert: Was einmal schmal war, wird weiter
- * unten nicht wieder breit, auch wenn der Sektor dort wieder Platz ließe.
- * Ohne das Minimum hing die Form davon ab, welche der beiden Grenzen gerade
- * greift — und die Platzgrenze ist nicht monoton.
+ * Jetzt trägt der Holm in der Mitte die Tiefe, und die Ränder sind nur noch
+ * Leisten. Die Summe bleibt das Hauptmass der Positionsliste: 120 mm Wölbung
+ * plus 180 mm Holm sind die 300 mm Schalentiefe.
  */
+export function holmTiefe(k: number): number {
+  const kopf = DREHPUNKT.versatz + 0.06;
+  return HOLM_T + (kopf - HOLM_T) * Math.max(0, 1 - k / 2) ** 1.4;
+}
+
 export function schalenHalbbreite(k: number): number {
   let halb = Infinity;
   for (let i = 0; i <= k; i++) {
@@ -811,7 +812,7 @@ export function schalenHalbbreite(k: number): number {
       const schwenk = ZU + ((OFFEN - ZU) * j) / 12;
       const bahn = mittellinie(schwenk);
       const th = i * SCHALEN_BOGEN - schwenk;
-      innen = Math.min(innen, (bahn[i]?.r ?? 0) - wangenTiefe(i) * Math.cos(th));
+      innen = Math.min(innen, (bahn[i]?.r ?? 0) - holmTiefe(i) * Math.cos(th));
     }
     halb = Math.min(
       halb,
@@ -819,7 +820,12 @@ export function schalenHalbbreite(k: number): number {
       Math.max(innen, 0) * Math.sin(sektorHalb * 0.9)
     );
   }
-return halb;
+  /*
+   * Unter die Holmbreite geht es nicht: Dort hoert die Platte auf und der Holm
+   * steht allein — die schmale, tiefe Zacke. Ein Maximum mit einer Konstanten
+   * bleibt monoton fallend, die Zusage von oben gilt weiter.
+   */
+  return Math.max(halb, HOLM_B / 2);
 }
 
 export function baueGreiferschale(st: Stoffe): THREE.Group {
@@ -889,28 +895,37 @@ export function baueGreiferschale(st: Stoffe): THREE.Group {
    * hinein. Andersherum verschwindet sie hinter der Haut, und die Schale liest
    * sich als flaches Blech — genau so sah sie im ersten Anlauf aus.
    */
-  const tiefen = stationen.map((_, k) => wangenTiefe(k));
+  const randTiefen = stationen.map((_, k) => wangenTiefe(k));
   for (const seite of [-1, 1]) {
     /*
-     * EIN durchgehender Strang statt sechs Stücken, und er folgt der Breite
-     * Station für Station. Vorher bekam jedes Stück die MITTLERE Breite seiner
-     * beiden Enden — am letzten Abschnitt stand die Wange damit 38 mm über die
-     * Haut hinaus, und die Schale endete in zwei Beinen mit einer Kerbe
-     * dazwischen statt in einer Spitze.
+     * Randleiste statt Wange: Sie fasst die Platte ein, trägt aber nicht mehr
+     * die Tiefe der Schale — das tut jetzt der Holm in der Mitte.
      */
-    const wange = new THREE.Mesh(
+    const leiste = new THREE.Mesh(
       strang(
         stationen,
         stationen.map((_, k) => seite * (schalenHalbbreite(k) - WANGE_DICK / 2)),
         WANGE_DICK,
-        tiefen,
-        tiefen.map((t) => -t)
+        randTiefen,
+        randTiefen.map((t) => -t)
       ),
       st.guss
     );
-    wange.name = `06_WANGE_${seite < 0 ? "L" : "R"}`;
-    g.add(wange);
+    leiste.name = `06_RANDLEISTE_${seite < 0 ? "L" : "R"}`;
+    g.add(leiste);
   }
+
+  /*
+   * Der Holm — ein Rücken in der Mitte, über die ganze Länge, mitgegossen.
+   * Er ist schmal und tief; links und rechts von ihm liegen die Platten.
+   */
+  const holmTiefen = stationen.map((_, k) => holmTiefe(k));
+  const holm = new THREE.Mesh(
+    strang(stationen, 0, HOLM_B, holmTiefen, holmTiefen.map((t) => -t)),
+    st.guss
+  );
+  holm.name = "06_HOLM";
+  g.add(holm);
 
   // Lagerkasten mit den beiden Augen — das Hülsengelenk zur Mitteltraverse
   /*
