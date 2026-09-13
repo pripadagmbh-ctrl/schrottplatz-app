@@ -79,7 +79,7 @@ const INNER_W = 7.0; // x — Länge, Pressweg (rechts → links)
  * Mindestmass fuer jeden Behaelter auf dem Platz: Was man befuellen soll,
  * muss man auch ausraeumen koennen.
  */
-const INNER_D = 4.2;
+const INNER_D = 4.7;
 /** Lichte Masse der Kammer — fuer Tests und Platzplanung. */
 export const PRESS_INNER = { laenge: INNER_W, tiefe: INNER_D };
 const WALL_H = 1.9;

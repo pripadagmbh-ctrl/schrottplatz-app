@@ -14,7 +14,9 @@ import {
   CLAW_SEGMENTS,
   clawPoint,
   clawSpan,
+  CLAW_CLOSED_SPLAY,
   clawTipDepth,
+  CLAW_MAX_DEPTH,
   naechsteSpreizung,
   NACHDRUECK_RESERVE,
 } from "../src/excavator/clawGeometry";
@@ -336,15 +338,32 @@ describe("Reichweite des Baggers", () => {
   });
 
   it("schließt mittig, ohne dass die Spitzen sich überlappen", () => {
-    const p = clawPoint(0, 0, CLAW_SEGMENTS, new THREE.Vector3());
+    /*
+     * Geschlossen heißt seit dem 12.09.2026 nicht mehr Spreizung 0.
+     * Die Schalen hängen an einem Bolzenkreis von nur 0,25 m; bei 0 stehen sie
+     * senkrecht nach unten und ihre Spitzen liegen weit auseinander. Erst nach
+     * 0,85 rad Ausschwenken treffen sie sich auf der Achse.
+     */
+    const p = clawPoint(0, CLAW_CLOSED_SPLAY, CLAW_SEGMENTS, new THREE.Vector3());
     // Radius nahe null heißt: die Spitzen treffen sich in der Mitte
     expect(Math.abs(Math.hypot(p.x, p.z))).toBeLessThan(0.05);
   });
 
-  it("passt geöffnet zwischen die Muldenwände", () => {
-    const span = clawSpan(CLAW_OPEN_SPLAY);
-    expect(span).toBeGreaterThan(3); // muss ordentlich fassen
-    expect(span, "Innenbreite der Mulde ist 3,8 m").toBeLessThan(3.8);
+  it("öffnet weit genug, um etwas zu fassen", () => {
+    /*
+     * Hier stand auch eine Obergrenze: „Innenbreite der Mulde ist 3,8 m".
+     * Eine abgeschriebene Zahl, die nach jedem Umbau der Behälter falsch war —
+     * zuletzt schlug sie an, obwohl die Behälter längst 4,7 m messen. Ob die
+     * Spinne in einen Behälter passt, prüft `test/spinnenmass.test.ts` gegen
+     * die echten Maße aus CONFIGS. Eine Regel, ein Besitzer.
+     */
+    /*
+     * Die echte MG4.1-800 öffnet 2,225 m (Datenblatt). Im Spiel ist sie um ein
+     * Viertel vergrößert, damit der Umschlag flott bleibt — 2,80 m. Die alte
+     * Schranke von 3 m stammt aus der Zeit, als die Öffnungsweite geschätzt
+     * statt gerechnet war.
+     */
+    expect(clawSpan(CLAW_OPEN_SPLAY)).toBeGreaterThan(2.5);
   });
 
   it("öffnet weiter, als es schließt", () => {
@@ -352,21 +371,65 @@ describe("Reichweite des Baggers", () => {
   });
 
   it("liefert eine Spitzentiefe, die zum Bodenanschlag passt", () => {
-    // Offen ist die Spinne flacher als geschlossen — sie streckt sich erst
-    // beim Schließen nach unten
+    /*
+     * Hier stand zweimal eine Behauptung darueber, welche Stellung die tiefere
+     * ist — erst „zu ist tiefer", dann „offen ist tiefer". Beide waren fuer
+     * ihre jeweilige Form richtig und wurden beim naechsten Formwechsel
+     * falsch. Die Frage ist ohnehin die falsche: Fuer den Bodenanschlag zaehlt
+     * nicht, welche Stellung tiefer ist, sondern dass mit der tiefsten
+     * gerechnet wird.
+     */
     const offen = clawTipDepth(CLAW_OPEN_SPLAY);
-    const zu = clawTipDepth(0);
+    const zu = clawTipDepth(CLAW_CLOSED_SPLAY);
     expect(offen).toBeGreaterThan(1.5);
-    expect(zu).toBeGreaterThan(offen);
-    expect(zu).toBeLessThan(2.6);
+    expect(zu).toBeGreaterThan(1.5);
+    expect(CLAW_MAX_DEPTH, "Maximum liegt unter einer Einzelstellung").toBeGreaterThanOrEqual(
+      Math.max(offen, zu) - 1e-9
+    );
+    for (let i = 0; i <= 20; i++) {
+      expect(clawTipDepth((CLAW_OPEN_SPLAY * i) / 20)).toBeLessThanOrEqual(CLAW_MAX_DEPTH + 1e-9);
+    }
+    /*
+     * Obergrenze der Spitzentiefe. Sie huetet, dass der Greifer nicht so lang
+     * wird, dass der Arm ihn nicht mehr ueber eine Wand hebt. Dass es reicht,
+     * prueft nicht diese Zahl, sondern `test/reach.test.ts`: dort wird fuer
+     * jede Mulde nachgerechnet, ob der Arm ueber ihre Wand kommt.
+     */
+    expect(CLAW_MAX_DEPTH).toBeLessThan(3.0);
   });
 
-  it("wächst monoton vom Gelenk zur Spitze", () => {
+  it("läuft vom Gelenk bis zur Spitze durchgehend abwärts", () => {
+    /*
+     * Die Schale ist ein gleichmäßiger Bogen von 86°, kein Haken: Sie krümmt
+     * sich zur Achse hin, läuft dabei aber bis zur Spitze weiter nach unten.
+     *
+     * Am 13.09.2026 stand hier kurz das Gegenteil — ein Rücklauf nach oben.
+     * Der kam aus einer 170°-Form, die aus nur zwei Datenblattmaßen
+     * zurückgerechnet war. Gegen alle sechs Maße gerechnet bleibt der flache
+     * Bogen übrig, und der hakt nicht.
+     */
     let vorher = 0;
     for (let k = 1; k <= CLAW_SEGMENTS; k++) {
-      const tiefe = -clawPoint(0, 0, k, new THREE.Vector3()).y;
-      expect(tiefe).toBeGreaterThan(vorher);
+      const tiefe = -clawPoint(0, CLAW_CLOSED_SPLAY, k, new THREE.Vector3()).y;
+      expect(tiefe, `Station ${k} läuft nicht weiter abwärts`).toBeGreaterThan(vorher);
       vorher = tiefe;
+    }
+  });
+
+  it("nimmt für den Bodenanschlag den tiefsten Punkt der Schale", () => {
+    /*
+     * Heute ist das die Spitze. Die Rechnung geht trotzdem über alle Stationen,
+     * und das ist Absicht: Sobald jemand am Krümmungsprofil dreht und die
+     * Schale am Ende nach innen hakt, wandert der tiefste Punkt nach oben.
+     * Wer dann noch nach der Spitze absetzt, fährt mit dem Bauch der Schale in
+     * den Beton, ohne dass ein Test anschlägt.
+     */
+    for (const splay of [CLAW_CLOSED_SPLAY, CLAW_OPEN_SPLAY]) {
+      let tiefste = 0;
+      for (let k = 1; k <= CLAW_SEGMENTS; k++) {
+        tiefste = Math.max(tiefste, -clawPoint(0, splay, k, new THREE.Vector3()).y);
+      }
+      expect(clawTipDepth(splay)).toBeCloseTo(tiefste, 6);
     }
   });
 });

@@ -165,9 +165,13 @@ export const CONFIGS: ContainerConfig[] = [
    * Das Mass kommt nicht aus dem Gefuehl, sondern aus dem Greifer (Ansage
    * 12.09.2026: „Container und Presse muessen mindestens so gross sein, dass
    * ich mit der Spinne reinfassen kann"). Offen ist die Spinne 3,38 m breit;
-   * mit 30 cm Luft beidseits ergibt das 3,98 m lichte Weite. Das Aussenmass
-   * liegt darueber, weil die Waende Dicke haben: Bei 4,20 m aussen sind es
-   * nachgemessen 4,08 x 4,15 m innen. `test/spinnenmass.test.ts` haelt das
+   * mit 30 cm Luft beidseits ergibt das die lichte Weite. Das Aussenmass liegt
+   * darueber, weil die Waende Dicke haben.
+   *
+   * Seit die Schale die Sichelform der Vorlage hat (12.09.2026), oeffnet die
+   * Spinne 3,50 statt 3,38 m — und prompt war der Container 4 cm zu klein.
+   * Gefunden hat das `test/spinnenmass.test.ts`, nicht das Auge. Genau dafuer
+   * steht er da: Wer an der Spinne dreht, merkt es hier. `test/spinnenmass.test.ts` haelt das
    * fest, damit kein spaeterer Umbau sie wieder zu eng macht.
    *
    * Vorher waren es 2,8 x 1,8 und zuletzt 3,6 x 2,3 m. In beiden Faellen kam
@@ -180,17 +184,17 @@ export const CONFIGS: ContainerConfig[] = [
    * Behaelter heran, mit dem man gerade arbeitet.
    */
   { id: "r_cable", fractionId: "cable", label: "KABEL", kind: "rolloff", x: -7.5,
-    z: -11.5, size: [4.2, 4.2, 1.8] },
+    z: -11.5, size: [4.7, 4.7, 1.8] },
   { id: "r_va", fractionId: "va", label: "EDELSTAHL VA", kind: "rolloff", x: -11.8,
-    z: -11.5, size: [4.2, 4.2, 1.8] },
+    z: -11.5, size: [4.7, 4.7, 1.8] },
   { id: "r_copper", fractionId: "copper", label: "KUPFER", kind: "rolloff", x: -7.5,
-    z: -15.8, size: [4.2, 4.2, 1.8] },
+    z: -15.8, size: [4.7, 4.7, 1.8] },
   { id: "r_alu", fractionId: "alu", label: "ALU", kind: "rolloff", x: -11.8,
-    z: -15.8, size: [4.2, 4.2, 1.8] },
+    z: -15.8, size: [4.7, 4.7, 1.8] },
   { id: "r_zinc", fractionId: "zinc", label: "ZINK", kind: "rolloff", x: -7.5,
-    z: -20.1, size: [4.2, 4.2, 1.8] },
+    z: -20.1, size: [4.7, 4.7, 1.8] },
   { id: "r_brass", fractionId: "brass", label: "MESSING", kind: "rolloff", x: -11.8,
-    z: -20.1, size: [4.2, 4.2, 1.8] },
+    z: -20.1, size: [4.7, 4.7, 1.8] },
 
   /*
    * SILOS an der Ostwand — dorthin fährt der Abholer entlang, ohne den
@@ -198,13 +202,13 @@ export const CONFIGS: ContainerConfig[] = [
    * bis genug für eine Fuhre zusammen ist; gefüllt vom Radlader.
    */
   { id: "c_wood", fractionId: "wood", label: "HOLZ", kind: "bay", x: -34.5,
-    z: -2.0, size: [3.6, 6.0, 3.0], facing: "east" },
+    z: -2.0, size: [4.4, 6.0, 3.0], facing: "east" },
   { id: "c_rubble", fractionId: "rubble", label: "BAUMISCH", kind: "bay", x: -34.5,
-    z: -9.0, size: [3.6, 6.0, 3.0], facing: "east" },
+    z: -9.0, size: [4.4, 6.0, 3.0], facing: "east" },
   { id: "c_plastic", fractionId: "plastic", label: "KUNSTSTOFF", kind: "bay", x: -34.5,
-    z: -16.0, size: [3.6, 6.0, 3.0], facing: "east" },
+    z: -16.0, size: [4.4, 6.0, 3.0], facing: "east" },
   { id: "c_va_lager", fractionId: "va", label: "VA-LAGER", kind: "bay", x: -34.5,
-    z: -23.0, size: [3.6, 6.0, 3.5], facing: "east" },
+    z: -23.0, size: [4.4, 6.0, 3.5], facing: "east" },
 ];
 
 /** Fangbereich über einer Haufen-Zone (Zonen-Zählung + Ampel) */

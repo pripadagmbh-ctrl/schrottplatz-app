@@ -8,15 +8,19 @@ const port = Number(process.env.PORT) || 5173;
 export default defineConfig({
   base: "./",
   /*
-   * Zwei Seiten: das Spiel und das Spinnen-Labor (Auftrag 11.09.2026,
-   * Phase 1.1). Das Labor laeuft getrennt vom Spiel — die Lehre aus dem
-   * letzten Umbau war, die Spinne nicht im laufenden Spiel umzubauen.
+   * Drei Seiten: das Spiel, das Spinnen-Labor (Auftrag 11.09.2026, Phase 1.1)
+   * und die Greifer-Vorschau. Labor und Vorschau laufen getrennt vom Spiel —
+   * die Lehre aus dem letzten Umbau war, die Spinne nicht im laufenden Spiel
+   * umzubauen. Die Vorschau laedt zusaetzlich die exportierte GLB-Datei statt
+   * des Modells aus dem Quelltext: Nur so sieht man, was in einer Engine
+   * ankommt.
    */
   build: {
     rollupOptions: {
       input: {
         index: resolve(__dirname, "index.html"),
         labor: resolve(__dirname, "labor.html"),
+        greifer: resolve(__dirname, "greifer.html"),
       },
     },
   },

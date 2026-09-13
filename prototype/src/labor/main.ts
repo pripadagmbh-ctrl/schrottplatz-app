@@ -406,6 +406,10 @@ async function main(): Promise<void> {
 
   // Messhandle wie im Spiel: von aussen Schritte ausloesen, Schleife anhalten
   (window as unknown as { __labor: unknown }).__labor = {
+    // three mitgeben: Ohne sie laesst sich von aussen kein zweiter Renderer
+    // aufmachen, und genau das braucht jede Messaufnahme der Spinne.
+    THREE,
+    scene,
     excavator,
     grip,
     items,

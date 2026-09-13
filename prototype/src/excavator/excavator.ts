@@ -5,19 +5,20 @@ import type { Input } from "../core/input";
 import { ExcavatorCollision, type ArmShape } from "./collision";
 import { InstrumentPanel, type InstrumentReadout } from "./instruments";
 import { buildDriver } from "./driver";
+import { baueSpinne } from "./grappleParts";
 import {
   CLAW_COUNT,
   CLAW_OPEN_SPLAY,
+  CLAW_CLOSED_SPLAY,
   CLAW_RING_R,
   CLAW_RING_Y,
   CLAW_SEGMENTS,
-  CLAW_SEG_BEND,
-  CLAW_SEG_LEN,
   clawPoint,
   naechsteSpreizung,
   NACHDRUECK_RESERVE,
   WEICH_RESERVE,
   clawTipDepth,
+  CLAW_MAX_DEPTH,
 } from "./clawGeometry";
 
 /**
@@ -41,7 +42,13 @@ import {
  * Reine Geometrie, kein Zustand — absichtlich ohne die Klasse benutzbar.
  */
 export function hoechsteKrallenspitze(abstandM: number): number {
-  const tief = clawTipDepth(CLAW_OPEN_SPLAY);
+  /*
+   * Die groesste Tiefe ueber alle Stellungen, nicht die der offenen Spinne.
+   * Mit der Sichelkralle vom 12.09. mittags haengt die geschlossene Spinne
+   * 13 cm tiefer als die offene — wer nur die offene rechnet, haelt den Arm
+   * fuer hoeher, als er ist, und der Greifer streift die Wand.
+   */
+  const tief = CLAW_MAX_DEPTH;
   let best = -Infinity;
   for (let b = BOOM_MIN; b <= BOOM_MAX; b += 0.004) {
     for (let st = STICK_MIN; st <= STICK_MAX; st += 0.004) {
@@ -172,6 +179,21 @@ export function anlaufZeit(lastKg: number): number {
 }
 
 /** Ab diesem Schliessgrad treffen sich die Krallenspitzen. */
+/**
+ * Kollider-Reihen je Kralle, quer zur Krallenrichtung.
+ *
+ * Eine. Am 12.09. abends waren es drei (E-117), weil die 0,90 m breite
+ * Trogschale mit einer einzigen Kapselkette physisch ein 18 cm dicker Draht
+ * war und Material links und rechts daran vorbeifiel. Mit der Rueckkehr zur
+ * Sichelkralle vom Mittag ist das hinfaellig: Die ist an der Wurzel 0,40 m
+ * breit und laeuft auf 0,15 m aus. Drei Reihen mit 0,30 rad Seitenversatz
+ * laegen bei 0,7 m Radius rund 0,21 m neben der Mitte — also ausserhalb der
+ * Kralle, die man sieht.
+ */
+const KOLLIDER_REIHEN = 1;
+/** Seitenversatz der aeusseren Reihen (rad Umfangswinkel). */
+const KOLLIDER_ABSTAND = 0.30; // rad — Seitenversatz der aeusseren Kollider-Reihen
+
 const SCHNAPP_AB = 0.93;
 /** Bis hierher gilt eine Kralle als am Teil anliegend (m) */
 const KONTAKT_NAH = 0.14;
@@ -498,17 +520,6 @@ export class Excavator {
     const machineBlue = new THREE.MeshStandardMaterial({ color: 0x5bbf46, roughness: 0.55 });
     const dark = new THREE.MeshStandardMaterial({ color: 0x2b2e31, roughness: 0.8 });
     // Greifer-Farbgebung nach Vorbild: dunkle Hardox-Schalen, fast schwarze Kanten
-    const shellMat = new THREE.MeshStandardMaterial({
-      color: 0x40474b,
-      roughness: 0.5,
-      metalness: 0.55,
-      side: THREE.DoubleSide, // Innenseite ist bei geöffneter Spinne sichtbar
-    });
-    const edgeMat = new THREE.MeshStandardMaterial({
-      color: 0x23282b,
-      roughness: 0.45,
-      metalness: 0.7,
-    });
     const glass = new THREE.MeshStandardMaterial({ color: 0x9fc4d8, roughness: 0.2 });
 
     // Chassis + 4 Räder
@@ -600,114 +611,27 @@ export class Excavator {
     this.grappleGroup.add(stub);
     buildYoke(-0.1, true); // obere Gabel: Bolzen quer
     buildYoke(-0.3, false); // untere Gabel: 90° verdreht — greift in die obere
-    // --- Greifspinne nach Fotoreferenz (Umschlagbagger-Bauart) ---
-    // Von oben nach unten: Rotatorgehäuse, Guss-Traverse, Gelenkring und fünf
-    // gebogene Sichelkrallen mit stumpfem Schalenende.
-    // Maße nach Datenblatt MG4.1-800-HO5 (800 l): Öffnungsweite d = 2225 mm,
-    // Schalenkreis ØD = 2409 mm, Zylinderkreis ØC = 1514 mm, Gesamthöhe
-    // A = 2363 mm. Alle Werte hier in Metern.
-    // Gelenkkreis = ØC/2 aus dem Datenblatt (1514 mm). Segmentlänge und
-    // Krümmung sind so gewählt, dass die Spitzen bei geschlossener Spinne
-    // exakt in der Mitte zusammenkommen — vorher liefen sie übereinander.
-    const RING_R = CLAW_RING_R;
-    const CYL_R = 0.42; // Anlenkkreis der Zylinder am Gehäuse
-    const ringY = CLAW_RING_Y;
-    const SEG_LEN = CLAW_SEG_LEN;
-    const SEG_BEND = CLAW_SEG_BEND;
-    const SEGMENTS = 6;
-    const segWidth = [0.4, 0.37, 0.33, 0.28, 0.22, 0.15];
-    const segThick = [0.16, 0.15, 0.135, 0.12, 0.105, 0.085];
-
-    const rotator = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.36, 0.5), edgeMat);
-    rotator.position.y = -0.48;
-    rotator.castShadow = true;
-    this.grappleGroup.add(rotator);
-    const rotatorCap = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.24, 0.14, 12), shellMat);
-    rotatorCap.position.y = -0.3;
-    this.grappleGroup.add(rotatorCap);
-
-    // Traverse: Stahlgussblock, nach unten verjüngt
-    const traverse = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.5, 0.4, 5), shellMat);
-    traverse.position.y = -0.75;
-    traverse.rotation.y = Math.PI / 5;
-    traverse.castShadow = true;
-    this.grappleGroup.add(traverse);
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(RING_R, 0.075, 8, 22), edgeMat);
-    ring.rotation.x = Math.PI / 2;
-    ring.position.y = ringY;
-    this.grappleGroup.add(ring);
-    // Kein zentraler Eindringdorn (Angleich an v2, Wunsch 10.09.2026): Echte
-    // Mehrschalengreifer haben keinen, er sah aus wie ein Dolch, und er hatte
-    // hier weder Kollider noch Funktion — die Krallen greifen, nicht er.
-
-    for (let i = 0; i < 5; i++) {
-      const a = (i / 5) * Math.PI * 2;
-      const pivot = new THREE.Group();
-      pivot.position.set(Math.sin(a) * RING_R, ringY, Math.cos(a) * RING_R);
-      pivot.rotation.order = "YXZ";
-      pivot.rotation.y = a; // lokales +Z zeigt radial nach außen
-
-      const knuckle = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.18, 0.22), edgeMat);
-      knuckle.position.y = 0.02;
-      pivot.add(knuckle);
-
-      // Sichelkralle: Kette gebogener Schalensegmente, zur Spitze verjüngt
-      let parent: THREE.Object3D = pivot;
-      for (let sIdx = 0; sIdx < SEGMENTS; sIdx++) {
-        const seg = new THREE.Group();
-        if (sIdx > 0) {
-          seg.position.y = -SEG_LEN;
-          seg.rotation.x = SEG_BEND;
-        }
-        const mesh = new THREE.Mesh(
-          new THREE.BoxGeometry(segWidth[sIdx], SEG_LEN + 0.04, segThick[sIdx]),
-          shellMat
-        );
-        mesh.position.y = -SEG_LEN / 2;
-        mesh.castShadow = true;
-        seg.add(mesh);
-        // dunkler Steg auf der Außenseite gibt der Schale Profil
-        const edge = new THREE.Mesh(
-          new THREE.BoxGeometry(segWidth[sIdx] + 0.03, SEG_LEN + 0.05, 0.045),
-          edgeMat
-        );
-        edge.position.set(0, -SEG_LEN / 2, segThick[sIdx] / 2);
-        seg.add(edge);
-        parent.add(seg);
-        parent = seg;
-      }
-      // Stumpfes Schalenende statt 24-cm-Vierkantkegel (Angleich an v2):
-      // Sortiergreifer laufen wie ein Loeffelrand aus, nicht wie ein Spiess.
-      // Das erklaert nebenbei, warum Bleche aufgespiesst wurden.
-      const tip = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.075, 0.14, 8), edgeMat);
-      tip.position.y = -SEG_LEN - 0.03;
-      tip.castShadow = true;
-      tip.name = "tineTip";
-      parent.add(tip);
-
-      // Hydraulikzylinder: Traverse → Krallen-Lagerbock
-      const barrel = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.066, 0.066, 1, 10),
-        new THREE.MeshStandardMaterial({ color: 0x62c94b, roughness: 0.4, metalness: 0.35 })
-      );
-      const rod = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.042, 0.042, 1, 8),
-        new THREE.MeshStandardMaterial({ color: 0xb8bec4, roughness: 0.22, metalness: 0.85 })
-      );
-      barrel.castShadow = true;
-      this.grappleGroup.add(barrel);
-      this.grappleGroup.add(rod);
+    /*
+     * Die Spinne steht Bauteil fuer Bauteil in `grappleParts.ts`.
+     *
+     * Hier stand sie als ein Block von 270 Zeilen mitten im Baggermodell. Das
+     * war der eigentliche Grund, warum die Formarbeit am 12.09.2026 fuenfmal
+     * hintereinander danebenging: Es liess sich nie ein Teil allein aendern
+     * und nie zuordnen, welche Aenderung was bewirkt hat (Ansage: „baue
+     * erstmal die einzelnen Bauteile").
+     */
+    const spinne = baueSpinne();
+    this.grappleGroup.add(spinne.gruppe);
+    this.fingerPivots.push(...spinne.gelenke);
+    for (const z of spinne.zylinder) {
       this.grappleCylinders.push({
-        pivot,
-        fromLocal: new THREE.Vector3(Math.sin(a) * CYL_R, -0.56, Math.cos(a) * CYL_R),
-        toLocalOnShell: new THREE.Vector3(0, -0.3, 0.19),
-        barrel,
-        rod,
-        barrelLen: 0.3,
+        pivot: z.gelenk,
+        fromLocal: z.obenLokal,
+        toLocalOnShell: z.untenAmGelenk,
+        barrel: z.rohr,
+        rod: z.stange,
+        barrelLen: z.rohrLaenge,
       });
-
-      this.grappleGroup.add(pivot);
-      this.fingerPivots.push(pivot);
     }
   }
 
@@ -1167,9 +1091,19 @@ export class Excavator {
     this.selfHandles.add(this.grappleBody.handle);
     // Die Krallen bekommen eigene Kollider — je zwei Kapseln bilden die Sichel
     // grob nach. Ohne sie fuhr die Spinne sichtbar durch Schrottteile hindurch.
-    for (let i = 0; i < CLAW_COUNT * 2; i++) {
+    /*
+     * Drei Kollider-Reihen je Schale statt einer.
+     *
+     * Eine Schale ist oben 0,90 m breit. Mit einer einzigen Kapselkette auf
+     * der Mittellinie war sie physisch ein 20 cm dicker Draht — Material fiel
+     * links und rechts daran vorbei, obwohl man die Schale davor sah. Die
+     * Reihen liegen auf der Mitte und auf 60 % der halben Breite zu jeder
+     * Seite; an der Spitze laufen sie ohnehin zusammen, weil die Schale dort
+     * schmal wird.
+     */
+    for (let i = 0; i < CLAW_COUNT * KOLLIDER_REIHEN * 2; i++) {
       this.clawColliders.push(
-        world.createCollider(RAPIER.ColliderDesc.capsule(0.16, 0.1), this.grappleBody)
+        world.createCollider(RAPIER.ColliderDesc.capsule(0.16, 0.09), this.grappleBody)
       );
     }
   }
@@ -1185,12 +1119,20 @@ export class Excavator {
       // Jede Kralle mit ihrem eigenen Winkel — sonst stuenden die Kollider
       // woanders als die Zacken, die man sieht
       const splay = this.clawSplayIst[c] ?? this.currentSplay();
+      for (let reihe = 0; reihe < KOLLIDER_REIHEN; reihe++) {
+      /*
+       * Die Reihe sitzt um `u` neben der Mittellinie. `clawPoint` nimmt den
+       * Umfangswinkel als ersten Parameter — ein Punkt der Schale bei
+       * Seitenversatz u ist deshalb schlicht `clawPoint(a + u, …)`. Der Radius
+       * haengt nicht vom Winkel ab, also stimmt das ohne Umrechnung.
+       */
+      const u = (reihe - (KOLLIDER_REIHEN - 1) / 2) * KOLLIDER_ABSTAND;
       for (let h = 0; h < 2; h++) {
-        const col = this.clawColliders[c * 2 + h];
+        const col = this.clawColliders[(c * KOLLIDER_REIHEN + reihe) * 2 + h];
         col.setEnabled(!carrying);
         if (carrying) continue;
-        clawPoint(a, splay, h * (CLAW_SEGMENTS / 2), this.clawA);
-        clawPoint(a, splay, (h + 1) * (CLAW_SEGMENTS / 2), this.clawB);
+        clawPoint(a + u, splay, h * (CLAW_SEGMENTS / 2), this.clawA);
+        clawPoint(a + u, splay, (h + 1) * (CLAW_SEGMENTS / 2), this.clawB);
         this.clawMid.addVectors(this.clawA, this.clawB).multiplyScalar(0.5);
         this.clawDir.subVectors(this.clawB, this.clawA);
         const len = this.clawDir.length();
@@ -1200,6 +1142,7 @@ export class Excavator {
         col.setHalfHeight(Math.max(len / 2 - 0.1, 0.03));
         col.setTranslationWrtParent(this.clawMid);
         col.setRotationWrtParent(this.clawQuat);
+      }
       }
     }
   }
@@ -1497,10 +1440,16 @@ export class Excavator {
   }
 
   private currentSplay(): number {
-    const minSplay = Math.min(
-      0.5,
-      this.carriedCount * 0.06 + Math.min(this.carriedMassKg / NENNLAST_KG, 1) * 0.28
-    );
+    /*
+     * Geschlossen ist nicht mehr Spreizung 0, sondern CLAW_CLOSED_SPLAY.
+     * Ladung haelt die Schalen darueber hinaus offen — das kommt oben drauf.
+     */
+    const minSplay =
+      CLAW_CLOSED_SPLAY +
+      Math.min(
+        0.5,
+        this.carriedCount * 0.06 + Math.min(this.carriedMassKg / NENNLAST_KG, 1) * 0.28
+      );
     // Der Anschlag federt kurz zurueck — siehe anschlag().
     return THREE.MathUtils.lerp(CLAW_OPEN_SPLAY, minSplay, this.closure) + this.anschlagWinkel;
   }
@@ -1979,7 +1928,9 @@ export class Excavator {
     // dichten Kalotte — es sei denn, es liegt Material darin: dann bleibt die
     // Spinne so weit offen, wie die Ladung Platz braucht.
     this.fingerPivots.forEach((pivot, i) => {
-      pivot.rotation.x = -(this.clawSplayIst[i] ?? this.currentSplay());
+      // Die Schale ist im geschlossenen Zustand gebaut; gedreht wird nur die
+      // Abweichung davon.
+      pivot.rotation.x = -((this.clawSplayIst[i] ?? this.currentSplay()) - CLAW_CLOSED_SPLAY);
     });
     this.updateClawColliders();
 
