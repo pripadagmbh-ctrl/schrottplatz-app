@@ -273,11 +273,12 @@ const RAEUMT_AUF = false;
  * Wo er wartet: auf der Ostseite, zwischen Muldenreihe und Sortierboxen.
  *
  * Ansage: „Lambert faehrt von der Ostseite ran auf Befehl." Der Platz ist
- * gesucht, nicht gegriffen — er liegt ausserhalb der LKW-Gasse zu den Mulden
- * (x −26), ausserhalb der Grossteileflaeche (x −19,9 .. −13,4) und ausserhalb
- * der Sortierboxen (ab x −14,8).
+ * gesucht, nicht gegriffen: Er liegt in der Gasse zwischen Grossteileflaeche
+ * (bis x −16,75) und der Muldenreihe (ab x −12,25), also genau vor deren
+ * offenen Seiten — von dort kommt er mit der Schaufel hinein, ohne quer durch
+ * eine Zone zu fahren.
  */
-const OSTPOSTEN = new THREE.Vector3(-22.0, 0, -12.0);
+const OSTPOSTEN = new THREE.Vector3(-15.0, 0, -18.0);
 /**
  * Bis zu welcher Hoehe ein Stueck in einer Sortierbox noch als abholbar gilt.
  *
@@ -357,6 +358,19 @@ export class StaffManager {
   private lambertState: LambertState = "patrol";
   /** Ist er gerufen? Ohne Ruf bleibt er auf dem Ostposten stehen. */
   private gerufen = false;
+  /** Faehrt er gerade nur bis vor die offene Seite einer Mulde? */
+  private zwischenhalt = false;
+
+  /**
+   * Wohin er geht, wenn eine Aufgabe zu Ende ist.
+   *
+   * Ohne Aufraeumdienst ist das sein Posten, nicht der alte Patrouillenweg:
+   * Sonst faehrt er nach jedem abgelieferten Stueck erst nach Norden und dann
+   * wieder zurueck.
+   */
+  private get ruhepunkt(): THREE.Vector3 {
+    return RAEUMT_AUF ? this.patrol[this.patrolIdx]! : OSTPOSTEN;
+  }
 
   /**
    * Lambert rufen (Taste Y / Knopf LAMBERT).
@@ -1006,6 +1020,7 @@ export class StaffManager {
    */
   private giveUpTarget(): void {
     this.resetStuck();
+    this.zwischenhalt = false;
     this.carriedItemId = null;
     this.lastAufgenommen = false;
     this.lambertState = "patrol";
@@ -1046,7 +1061,7 @@ export class StaffManager {
       this.lambertState = "patrol";
       // Ein Stueck zuruecksetzen, sonst steht er dem Bagger im Schwenkbereich
       this.patrolIdx = (this.patrolIdx + 1) % this.patrol.length;
-      this.lambertTarget.copy(this.patrol[this.patrolIdx]);
+      this.lambertTarget.copy(this.ruhepunkt);
       return;
     }
     if (this.lambertState === "werkzeug") {
@@ -1061,6 +1076,25 @@ export class StaffManager {
       return;
     }
     if (this.lambertState === "fetch") {
+      /*
+       * Erst vor die Mulde, dann hinein.
+       *
+       * Eine Sortiermulde hat drei Waende, und die Gerade vom Posten zu einem
+       * Stueck darin fuehrt quer durch die Flanke der Nachbarmulde. Gemessen
+       * blieb Lambert dort haengen und gab nach fuenf Sekunden auf — sechsmal
+       * hintereinander, die Box blieb voll. Deshalb ist die offene Seite ein
+       * Zwischenhalt: Von dort geht es geradeaus hinein.
+       */
+      if (this.zwischenhalt) {
+        this.zwischenhalt = false;
+        const ziel = this.items.items.find((i) => i.id === this.carriedItemId);
+        if (ziel && ziel.body.isValid()) {
+          const p = ziel.body.translation();
+          this.lambertTarget.set(p.x, 0, p.z);
+          this.resetStuck();
+          return;
+        }
+      }
       // Aufgenommen — jetzt zur Box, in die das Material gehört
       const it = this.items.items.find((i) => i.id === this.carriedItemId);
       if (it) {
@@ -1119,7 +1153,7 @@ export class StaffManager {
       this.carriedItemId = null;
       this.lastAufgenommen = false;
       this.lambertState = "patrol";
-      this.lambertTarget.copy(this.patrol[this.patrolIdx]);
+      this.lambertTarget.copy(this.ruhepunkt);
       return;
     }
 
@@ -1186,6 +1220,15 @@ export class StaffManager {
       const ausDerBox = this.findBoxTeil();
       if (ausDerBox) {
         hol(ausDerBox);
+        const p = ausDerBox.body.translation();
+        const box = CONFIGS.filter((c) => c.sortierbox === true).find(
+          (c) => Math.abs(p.x - c.x) <= c.size[0] / 2 && Math.abs(p.z - c.z) <= c.size[1] / 2
+        );
+        if (box && box.kind === "bay") {
+          const [ax, az] = StaffManager.anlieferPunkt(box);
+          this.lambertTarget.set(ax, 0, az);
+          this.zwischenhalt = true;
+        }
         return;
       }
       /*
@@ -1493,8 +1536,17 @@ export class StaffManager {
    * weiter der richtige Behaelter steht.
    */
   private static muldeFuer(materialId: string): ContainerConfig | undefined {
+    /*
+     * Die Sortierboxen am Bagger sind seit dem 13.09.2026 selbst Mulden. Sie
+     * sind Lamberts QUELLE, nicht sein Ziel — sonst traegt er aus der Alu-Box
+     * in die Alu-Box und die Box wird nie leer (gemessen: 4 von 4 blieben
+     * liegen, und er meldete sich nie ab).
+     */
     const passend = CONFIGS.filter(
-      (c) => (c.kind === "bay" || c.kind === "rolloff") && c.fractionId === materialId
+      (c) =>
+        (c.kind === "bay" || c.kind === "rolloff") &&
+        !c.sortierbox &&
+        c.fractionId === materialId
     );
     return passend.find((c) => c.kind === "rolloff") ?? passend[0];
   }
@@ -1711,7 +1763,15 @@ export class StaffManager {
        * Lambert blieb auf dem Posten stehen, obwohl die Box voll war. Was in
        * der Box liegt, ist sein Ziel und nicht sein Hindernis.
        */
-      if (!this.wegIstFrei(...StaffManager.boxAnfahrt(box, von), it)) continue;
+      /*
+       * Bei einer Mulde zaehlt die OFFENE Seite, nicht die naechste Kante:
+       * Hinter der Rueckwand kommt er mit der Schaufel nicht hinein.
+       */
+      const anfahrt: [number, number] =
+        box.kind === "bay"
+          ? StaffManager.anlieferPunkt(box)
+          : StaffManager.boxAnfahrt(box, von);
+      if (!this.wegIstFrei(anfahrt[0], anfahrt[1], it)) continue;
       const d = Math.hypot(p.x - von.x, p.z - von.z);
       if (d < bestD) {
         bestD = d;

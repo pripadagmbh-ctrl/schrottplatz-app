@@ -169,26 +169,6 @@ for (const c of CONFIGS) {
   beschriftung(c.x, c.z, c.label, "#2f343a", c.kind === "rolloff" ? 9 : 10);
 }
 
-/* ------------------------------------------- Trennsteine zwischen Behaeltern */
-/* Dieselbe Regel wie in yard.ts: je zwei Nachbarn mit genug Luecke. */
-const rolloffs = CONFIGS.filter((c) => c.sortierbox === true);
-for (let i = 0; i < rolloffs.length; i++) {
-  for (let j = i + 1; j < rolloffs.length; j++) {
-    const a = rolloffs[i]!;
-    const b = rolloffs[j]!;
-    const dx = Math.abs(a.x - b.x);
-    const dz = Math.abs(a.z - b.z);
-    const bA = a.size[0] / 2 + b.size[0] / 2;
-    const tA = a.size[1] / 2 + b.size[1] / 2;
-    if (dz < 0.6 && dx > bA && dx - bA >= BT + 0.1 && dx - bA < 2.0)
-      kasten((a.x + b.x) / 2, (a.z + b.z) / 2, BT, Math.min(a.size[1], b.size[1]) + 0.5,
-        "#8f8b84", "#5d5a55", 'stroke-width="0.6"');
-    if (dx < 0.6 && dz > tA && dz - tA >= BT + 0.1 && dz - tA < 2.0)
-      kasten((a.x + b.x) / 2, (a.z + b.z) / 2, Math.min(a.size[0], b.size[0]) + 0.5, BT,
-        "#8f8b84", "#5d5a55", 'stroke-width="0.6"');
-  }
-}
-
 /* ---------------------------------------------------------------- Presse */
 kasten(
   PRESS_CENTER.x,

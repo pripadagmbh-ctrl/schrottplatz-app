@@ -235,12 +235,24 @@ export const TIP_APPROACH: Array<[number, number]> = [
   [-14, 12],
   [6.0, 2],
 ];
+/*
+ * Nur bis an den RAND des Mischschrotts, nicht hinein.
+ *
+ * Ansage 13.09.2026: „LKW nur bis zum Rand des Mischschrotts fahren." Vorher
+ * endete der Rueckweg auf z −17,5 und damit mitten in der Halde (sie reicht
+ * von −22,7 bis −16,7) — der Wagen stand bis zur Achse im Schrott.
+ *
+ * −15,0 ist gesucht, nicht gegriffen: Die Ladeflaeche ist 6,0 m lang und
+ * liegt hinter der Wagenmitte, reicht also von −18,0 bis −12,0. Das Heck
+ * steht damit 1,3 m ueber der Haldenkante, die Fuhre faellt hinein, und der
+ * Wagen selbst bleibt davor.
+ */
 export const TIP_IN_REV: Array<[number, number]> = [
   [6.0, 2],
-  [6.0, -17.5],
+  [6.0, -15.0],
 ];
 export const TIP_OUT: Array<[number, number]> = [
-  [6.0, -17.5],
+  [6.0, -15.0],
   [6.0, 2],
   [-14, 12],
   [GATE_X, 24],

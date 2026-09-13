@@ -348,10 +348,15 @@ describe("Reichweite des Baggers", () => {
     const presse = STATIC_OBSTACLES.find((o) => o.label === "Presse")!;
     expect(presse.x, "Presse nicht links aussen in der Ecke").toBeGreaterThan(stahl.x);
     expect(halde.x, "Mischschrott nicht links von der Stahlbox").toBeGreaterThan(stahl.x);
-    expect(
-      [stahl.size[0], stahl.size[1], stahl.size[2]],
-      "die beiden Boxen sind nicht gleich gross"
-    ).toEqual([halde.size[0], halde.size[1], halde.size[2]]);
+    /*
+     * Gleich gross waren sie nur einen halben Tag. Am 13.09.2026 kam die Ansage
+     * „Wand entfernen lassen, Lego-Mulden fuer Alu, VA, Kabel und Kupfer dort
+     * hinsetzen" — die Reihe steht jetzt dort, wo die Stahlbox breit war, und
+     * die Stahlbox ist auf 4 m zurueckgegangen. Gleich geblieben ist, was
+     * beide haelt: die erhoehte Suedmauer im Ruecken, auf ganzer Tiefe.
+     */
+    expect(stahl.size[1], "die Boxen sind nicht mehr gleich tief").toBe(halde.size[1]);
+    expect(stahl.size[2], "die Boxen sind nicht mehr gleich hoch").toBe(halde.size[2]);
     for (const [name, z] of [
       ["Mischschrott", halde.z],
       ["Stahlbox", stahl.z],
