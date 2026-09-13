@@ -14,9 +14,39 @@
  * Wange 20 mm, Verstaerkung 110 x 25. Ein Schalenende von 200 mm traegt also
  * genau einen Zahn von 110 mm.
  */
-const BLECH = 0.015;
-/** Schmalste Schalenbreite: ein Zahn von 110 mm plus zwei Wangen. */
-const SCHALE_MIN_B = 0.2;
+/**
+ * Blechstaerke — 45 mm, nicht 15.
+ *
+ * Die Herstellerzeichnung nennt 15 mm, aber fuer eine Schale von 500 mm
+ * Bogenlaenge. Unsere misst 1380 mm; auf sie umgelegt waere das ein Blatt.
+ * Ansage dazu: „die Masstaebe muessen nicht richtig sein, es sollte nur das
+ * Grundprinzip darstellen" und, zur Skizze, „dick gegossenes Eisen".
+ *
+ * Vorher kam die ganze Tiefe des Zinkens aus der Strebe. Wo man die von der
+ * Seite sieht, blieb nur das duenne Blech uebrig — der Zinken las sich dort
+ * als Blatt statt als Guss.
+ */
+const BLECH = 0.045;
+/**
+ * Verjuengung — EIN Faktor fuer alles.
+ *
+ * Handskizze vom 13.09.2026 („Zinken / Zahn"), abgewickelt gezeichnet: Der
+ * ganze Zinken ist ein Stueck, laeuft vom Kopf mit der Bohrung durchgehend
+ * schmaler zu und endet in einer schmalen, runden Spitze. Blech und
+ * Verstaerkung verjuengen sich dabei MIT — „Kruemmung dazu und dann sollte die
+ * Sichelform durchgaengig proportional sein".
+ *
+ * Deshalb hat alles denselben Faktor: Blechbreite, Strebenbreite,
+ * Strebenhoehe. Vorher lief die Breite auf 200 mm aus und darauf sass ein
+ * eigener, breiter Zahn — das war ein Ende, keine Spitze.
+ *
+ * Der Endwert ist nicht gewaehlt: Die Sektorgrenze laesst an der Spitze 86 mm
+ * zu (fuenf Schalen teilen sich 72°, und dort liegt die Bahn nur 6 cm von der
+ * Drehachse). 0,21 mal 400 mm sind genau diese 86 mm.
+ */
+function verjuengung(k: number): number {
+  return 1 - 0.79 * (Math.max(0, Math.min(SCHALEN_ABSCHNITTE, k)) / SCHALEN_ABSCHNITTE) ** 1.3;
+}
 
 /**
  * Die Verstaerkung — der Streifen unter dem Zahn.
@@ -53,10 +83,9 @@ const SCHALE_MIN_B = 0.2;
  * statt als eigenes Stueck.
  */
 const STREBE_B_OBEN = 0.22;
-const STREBE_B_UNTEN = 0.11;
 const STREBE_H_OBEN = 0.13;
-const STREBE_H_UNTEN = 0.075;
-const VERST_VORN = STREBE_H_UNTEN;
+/** Hoehe der Strebe an der Spitze — nur noch fuer den Sektordeckel gebraucht. */
+const VERST_VORN = STREBE_H_OBEN * 0.21;
 
 /**
  * Einzelteile nach der Explosionszeichnung „5-Schalen-Mehrschalengreifer,
@@ -998,17 +1027,11 @@ export function schalenHalbbreite(k: number): number {
     }
     halb = Math.min(
       halb,
-      HALB * (1 - 0.8 * (i / SCHALEN_ABSCHNITTE) ** 2.6),
+      HALB * verjuengung(i),
       Math.max(innen, 0) * Math.sin(sektorHalb * 0.9)
     );
   }
-  /*
-   * Schmaler als 200 mm wird die Schale nicht: So breit muss ihr Ende sein,
-   * damit ein Zahn von 110 mm und zwei Wangen von je 20 mm darauf Platz haben
-   * (Querschnitt C-C der Zeichnung). Ein Maximum mit einer Konstanten bleibt
-   * monoton fallend, die Zusage von oben gilt weiter.
-   */
-  return Math.max(halb, SCHALE_MIN_B / 2);
+  return halb;
 }
 
 export function baueGreiferschale(st: Stoffe): THREE.Group {
@@ -1116,14 +1139,9 @@ export function baueGreiferschale(st: Stoffe): THREE.Group {
    * der Schale, ihre Hoehe faellt gleichmaessig von 130 auf 75 mm. Unten ist
    * sie damit schmaler als oben, aber nie duenn.
    */
-  const strebeBreiten = fein.map((f) => {
-    const t = f.k / SCHALEN_ABSCHNITTE;
-    return STREBE_B_OBEN + (STREBE_B_UNTEN - STREBE_B_OBEN) * t;
-  });
-  const strebeHoehen = fein.map((f) => {
-    const t = f.k / SCHALEN_ABSCHNITTE;
-    return STREBE_H_OBEN + (STREBE_H_UNTEN - STREBE_H_OBEN) * t;
-  });
+  /* Alles mit demselben Faktor — das ist die „durchgaengig proportionale" Form. */
+  const strebeBreiten = fein.map((f) => STREBE_B_OBEN * verjuengung(f.k));
+  const strebeHoehen = fein.map((f) => STREBE_H_OBEN * verjuengung(f.k));
   for (let k = 0; k < fein.length - 1; k++) {
     const abschnitt = new THREE.Mesh(
       strang(
@@ -1260,11 +1278,29 @@ export function baueGreiferspitze(st: Stoffe): THREE.Group {
    * endet der Zahn bei 45 x 28 mm. Das ist Kantenschutz, keine Schneide, und
    * spart Dreiecke, die in der Spielkamera niemand sieht.
    */
+  /*
+   * Die Spitze setzt den Zinken fort — in seinen Proportionen.
+   *
+   * Handskizze 13.09.2026: Der Zinken laeuft durchgehend schmaler zu und endet
+   * rund, nicht in einem angesetzten breiten Zahn. Die Basis hier ist deshalb
+   * genau der Querschnitt, den Blech und Strebe am Schalenende haben; von dort
+   * laeuft sie auf eine stumpfe, gerundete Spitze aus.
+   */
+  const basisB = 2 * schalenHalbbreite(SCHALEN_ABSCHNITTE);
+  /*
+   * Die Basis ist genau die Strebenhoehe am Schalenende — NICHT plus Blech.
+   *
+   * Die flache Seite des Zahns liegt schon auf der Aussenflaeche des Blechs
+   * (`z0`); das Blech noch einmal zur Hoehe zu addieren zaehlt es doppelt.
+   * Gemessen sprang die Dicke dadurch am Uebergang von 88 auf 120 mm — genau
+   * die Stelle, an der das Ende dicker aussah als die Mitte.
+   */
+  const basisH = STREBE_H_OBEN * verjuengung(SCHALEN_ABSCHNITTE);
   const STATIONEN: Array<[number, number, number]> = [
-    [0, 0.11, 0.075],
-    [0.12, 0.092, 0.06],
-    [0.24, 0.062, 0.04],
-    [0.32, 0.045, 0.028],
+    [0, basisB, basisH],
+    [0.09, basisB * 0.82, basisH * 0.84],
+    [0.18, basisB * 0.58, basisH * 0.62],
+    [0.25, basisB * 0.34, basisH * 0.4],
   ];
   const R = 0.7; // Biegeradius der Zeichnung
   /* Die flache Seite liegt auf der Verstaerkung, also aussen auf dem Blech. */
@@ -1327,16 +1363,24 @@ export function baueGreiferspitze(st: Stoffe): THREE.Group {
   geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
   geo.setIndex(idx);
   geo.computeVertexNormals();
-  const zahn = new THREE.Mesh(geo, st.bolzen);
+  /*
+   * Dasselbe Gusseisen wie die Schale, nicht das helle Bolzenmaterial.
+   *
+   * Ansage 13.09.2026: „wie kann es sein, dass das Ende dicker ist als die
+   * Mitte?" Gemessen war es das nicht — die Spitze laeuft von 72 auf 25 mm zu
+   * und schliesst buendig an das Schalenende an. Es war die FARBE: In Hellgrau
+   * las sie sich als aufgesetzter Schuh. Die Skizze zeigt ein Stueck aus
+   * dickem gegossenem Eisen.
+   */
+  const zahn = new THREE.Mesh(geo, st.guss);
   zahn.name = "07_ZAHN";
   g.add(zahn);
-  /* Zwei Schrauben Ø26 bei 55 und 145 mm halten ihn auf der Verstaerkung. */
-  for (const x of [0.055, 0.145]) {
-    const loch = new THREE.Mesh(rohr(0.017, 0.013, 0.09), st.blech);
-    loch.rotation.x = Math.PI / 2;
-    loch.position.set(0, -x, -(z0 + 0.03));
-    g.add(loch);
-  }
+  /*
+   * Keine Schrauben an der Spitze. Die Bohrung sitzt laut Skizze OBEN am Kopf
+   * des Zinkens, wo er am Stempel haengt — nicht unten. Und mit 90 mm Laenge
+   * standen die Huelsen 9 mm ueber die Schale hinaus, die dort nur noch 72 mm
+   * breit ist.
+   */
   return g;
 }
 
