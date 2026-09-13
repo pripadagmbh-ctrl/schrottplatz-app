@@ -1,77 +1,61 @@
 import * as THREE from "three";
-import {
-  ABSCHNITT,
-  MASS,
-  OFFEN,
-  SCHALEN_ABSCHNITTE,
-  SCHALEN_BOGEN,
-  STEMPEL_AUGE,
-  ZU,
-  schalenStationen,
-} from "../grapple/teile";
 
 /**
  * Geometrie der Spinne — die eine Wahrheit für Modell, Kollider und
  * Bodenanschlag.
  *
- * Stand 13.09.2026: Der Bagger trägt jetzt den Fünfschalengreifer nach der
- * Explosionszeichnung. Vorher lagen hier eigene Zahlen für eine Sichelkralle,
- * und daneben stand in `src/grapple/` ein zweites, genaueres Modell, das nur
- * die Vorschauseite zu sehen bekam. Genau davor warnt E-154: Zwei Modelle
- * laufen auseinander, sobald man an einem von beiden etwas ändert. Deshalb
- * steht hier keine Zahl mehr, sondern nur noch die Ableitung.
+ * Stand: zurück auf den 12.09.2026 mittags (Ansage 13.09.2026: „kannst du
+ * einfach wieder die Spinne von gestern Mittag nehmen?").
  *
- * Die alte Sichelform liegt unter `docs/archiv/spinne-sichel/`.
+ * Dazwischen lagen zwei Tage Formarbeit: Trogschalen statt Finger, ein Strunk
+ * statt des Gelenkrings, 170°-Haken, dann ein gleichmäßiger 86°-Bogen aus dem
+ * Datenblatt. Die Zwischenstände stehen in `docs/entscheidungen.md` (E-115 bis
+ * E-151) und in der Historie; hier steht wieder die Sichelkralle, die vorher
+ * da war.
  *
- * Was sich damit im Spiel ändert, nachgemessen:
+ * Die Maße stammen aus dem Datenblatt der Sennebogen MG4.1-800-HO5, sind aber
+ * fürs Spiel vergrößert: Öffnungsweite 3,38 m statt 2,225 m. Nachgerechnet
+ * ergibt die Kette unten
  *
- *            alt (Sichel)   neu (Fünfschalen)
- *   offen      3,38 m           2,30 m
- *   geschlossen 1,51 m          1,78 m
- *   Bauhöhe     2,14 m          2,49 m
+ *   offen (Spreizung 1,25)   Spitzenweite 3,38 m   Tiefe 1,11 m
+ *   geschlossen (Spreizung 0) Spitzen treffen sich auf der Achse (r = 0,00 m)
  *
- * Der Greifer nimmt also einen kleineren Biss, baut aber höher. Beides folgt
- * aus der Positionsliste und ist nicht frei gewählt — die Herleitung steht in
- * `src/grapple/teile.ts` und in `docs/greifer-mehrschalen.md`.
+ * Wer an `CLAW_SEG_LEN` oder `CLAW_SEG_BEND` dreht, muss beides nachrechnen —
+ * vor allem das Schließen auf der Achse, denn davon hängt ab, ob der Korb
+ * überhaupt zugeht.
  */
 
-/** Radius des Bolzenkreises, an dem die Schalen hängen (Stempelauge). */
-export const CLAW_RING_R = STEMPEL_AUGE.r;
-/** Höhe dieses Kreises, gemessen ab Kardangelenk. */
-export const CLAW_RING_Y = STEMPEL_AUGE.y;
-/** Länge eines Schalenabschnitts (m). */
-export const CLAW_SEG_LEN = ABSCHNITT;
-/** Krümmung je Abschnitt (rad). */
-export const CLAW_SEG_BEND = SCHALEN_BOGEN;
-/** Abschnitte je Schale. */
-export const CLAW_SEGMENTS = SCHALEN_ABSCHNITTE;
-/** Zahl der Schalen. */
-export const CLAW_COUNT = MASS.schalen;
-/** Spreizung offen (rad) — der Öffnungsanschlag der Schalen. */
-export const CLAW_OPEN_SPLAY = OFFEN;
+/** Radius des Gelenkrings, an dem die Krallen hängen = ØC/2 aus dem Datenblatt. */
+export const CLAW_RING_R = 0.757;
+/** Unterkante Traverse, gemessen ab Kardangelenk */
+export const CLAW_RING_Y = -0.9;
+/** Länge eines Krallensegments */
+export const CLAW_SEG_LEN = 0.26;
+/** Krümmung je Segment (rad) — gleichmäßig, also ein Kreisbogen von 63° */
+export const CLAW_SEG_BEND = 0.22;
+/** Segmente je Kralle */
+export const CLAW_SEGMENTS = 6;
+/** Zahl der Krallen */
+export const CLAW_COUNT = 5;
+/** Spreizung der ganz offenen Spinne (rad) */
+export const CLAW_OPEN_SPLAY = 1.25;
 /**
- * Spreizung geschlossen (rad).
+ * Spreizung der GESCHLOSSENEN Spinne (rad).
  *
- * Null, und das ist keine Rundung: Der Radius der Schalenmittellinie fällt von
- * Station zu Station um `ABSCHNITT · sin(θ − Spreizung)`. Nicht-positiv ist das
- * genau dann, wenn die geschlossene Spreizung den Anstellwinkel der obersten
- * Station nicht übersteigt. Nur so schließt die Spinne zur Birne statt zum Fass.
+ * Hier wieder schlicht 0: Mit dem großen Gelenkring von 0,757 m hängt die
+ * Kralle bei 0 senkrecht nach unten und krümmt sich von dort zur Achse, wo die
+ * Spitzen sich treffen. Der Wert steht nur deshalb als eigene Konstante da,
+ * weil die Greiflogik und die Tests ihn brauchen — mit dem kleinen Bolzenkreis
+ * vom 12.09. abends war er 0,85, und die Annahme „0 heißt zu" steckte an vier
+ * Stellen im Code.
  */
-export const CLAW_CLOSED_SPLAY = ZU;
+export const CLAW_CLOSED_SPLAY = 0;
 
+/** Aufsummierte Krümmung bis Station `i`. */
 export const CLAW_BEND_KUM: number[] = Array.from(
   { length: CLAW_SEGMENTS + 1 },
   (_, i) => i * CLAW_SEG_BEND
 );
-
-/**
- * Stützstellen der Schale im Frame ihres Drehpunkts — einmal gerechnet.
- *
- * `clawPoint` läuft pro Bild für jede Schale und jede Station mehrfach; eine
- * Neuberechnung (oder gar ein neues Array) je Aufruf wäre auf dem Tablet
- * spürbar. Die Stationen ändern sich nie, nur die Drehung um sie.
- */
-const STATIONEN = schalenStationen();
 
 /**
  * Punkt auf der Mittellinie einer Kralle, im Frame der Spinne.
@@ -85,12 +69,15 @@ export function clawPoint(
   k: number,
   out: THREE.Vector3
 ): THREE.Vector3 {
-  const p = STATIONEN[Math.max(0, Math.min(CLAW_SEGMENTS, Math.round(k)))]!;
-  const c = Math.cos(-splay);
-  const sn = Math.sin(-splay);
-  const r = CLAW_RING_R + (p.y * sn + p.z * c);
-  const y = CLAW_RING_Y + (p.y * c - p.z * sn);
-  return out.set(Math.sin(a) * r, y, Math.cos(a) * r);
+  let y = 0;
+  let z = 0;
+  for (let i = 0; i < k; i++) {
+    const th = -splay + i * CLAW_SEG_BEND;
+    y -= CLAW_SEG_LEN * Math.cos(th);
+    z -= CLAW_SEG_LEN * Math.sin(th);
+  }
+  const r = CLAW_RING_R + z;
+  return out.set(Math.sin(a) * r, CLAW_RING_Y + y, Math.cos(a) * r);
 }
 
 /**

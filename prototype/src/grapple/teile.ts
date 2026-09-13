@@ -112,11 +112,20 @@ export const SCHALEN_BOGEN = (17.5 * Math.PI) / 180;
  *
  *   Drehpunkt   an Station 0 — dem OBEREN Ende —, 0,30 m nach innen versetzt
  *   Stempelauge r 0,59 m, y −1,5335 m
- *   Anschläge   0° geschlossen, 51° offen
+ *   Anschläge   0° geschlossen, 65° offen
  *   geschlossen 1,78 m breit, Loch Ø 0,12 m, 2,40 m hoch  (Liste: 2,40 m)
- *   offen       2,30 m Spitzenweite                       (Liste: 2,30 m)
- *   Zylinder    0,69 m geschlossen, 0,50 m offen — fährt zum SCHLIESSEN aus
- *   Moment      Schließen 1,5-mal Öffnen
+ *   offen       2,30 m Spitzenweite, 2,52 m Hüllkreis     (Liste: 2,30 m)
+ *
+ * Die 2,30 m der Liste sind die SPITZENWEITE, nicht der Hüllkreis. Zuerst hatte
+ * ich sie als Hüllmaß gelesen und kam auf 51° Öffnung; die Spitzen standen dann
+ * nur 1,86 m auseinander. Im Spiel fielen damit zwei Schrottsorten durch — das
+ * Waggon-Drehgestell und das LKW-Fahrerhaus, beide 1,90 m in der mittleren
+ * Kante. Ein Datenblatt nennt bei einem Greifer die Öffnungsweite von Spitze zu
+ * Spitze; so hat es auch das Vorgängermodell gelesen. Mit 65° trifft sie auf den
+ * Zentimeter, und die Gesamthöhe bleibt bei 2,40 m, weil die vom geschlossenen
+ * Zustand kommt.
+ *   Zylinder    0,75 m geschlossen, 0,48 m offen — fährt zum SCHLIESSEN aus
+ *   Moment      Schließen 1,7-mal Öffnen
  *
  * Der Drehpunkt saß vorher an Station 1, also 0,30 m UNTER dem oberen Ende.
  * Das war der Fehler hinter drei Beanstandungen auf einmal: Die Schale ragte
@@ -142,11 +151,11 @@ export const STEMPEL_AUGE = { r: 0.59, y: -1.5335 };
  * Abschnitte nach außen, bevor die Schale einzog.
  */
 export const ZU = 0;
-export const OFFEN = (51 * Math.PI) / 180;
+export const OFFEN = (65 * Math.PI) / 180;
 /** Obere Schalenanbindung — wo der Zylinder angreift, im Frame des Drehpunkts. */
-export const OBERE_ANBINDUNG = { y: 0.12, z: 0.2 };
+export const OBERE_ANBINDUNG = { y: 0.1, z: 0.24 };
 /** Oberer Zylinderanschluss an der Mitteltraverse, im Frame des Greifers. */
-export const ZYLINDER_AUFNAHME = { r: 0.35, y: -0.88 };
+export const ZYLINDER_AUFNAHME = { r: 0.35, y: -0.86 };
 /**
  * Höhe der Mitteltraverse im Frame des Greifers (m).
  *
