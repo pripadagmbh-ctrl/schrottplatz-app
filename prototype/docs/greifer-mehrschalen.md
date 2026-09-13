@@ -7,9 +7,9 @@ Animationen.
 | | |
 |---|---|
 | **Datei** | `docs/greifer-mehrschalen.glb` (glTF 2.0, binär) |
-| **Größe** | 255 kB · 74 Meshes · 3888 Dreiecke |
+| **Größe** | 277 kB · 75 Meshes · 4720 Dreiecke |
 | **Einheit** | Meter, Y oben, rechtshändig (glTF-Standard) |
-| **Abmessungen** | geschlossen 1,89 × 2,63 m · offen 3,02 × 2,82 m |
+| **Abmessungen** | geschlossen 2,06 × 2,65 m · offen 3,02 × 3,11 m |
 | **Ursprung** | Kardangelenk oben, also der Punkt, an dem der Greifer am Stiel hängt |
 | **Quelle** | `src/grapple/` — `form.ts` (Maße) · `parts.ts` (Bauteile) · `rig.ts` (Rig) |
 | **Neu erzeugen** | `npx vite-node tools/greifer-export.ts` |
@@ -30,10 +30,11 @@ GRAPPLE_ROOT                       Ursprung = Aufhängepunkt am Stiel
     ├── ROTATOR_DREHKRANZ
     ├── ROTATOR_DURCHFUEHRUNG
     └── GRAPPLE_HEAD               Mitteltraverse, ein Gussteil
-        ├── HEAD_GRUNDKOERPER
-        ├── HEAD_UNTERFLANSCH
-        ├── HEAD_ZYLINDERAUFNAHME_01…05
-        ├── HEAD_LAGERBOCK_01…05
+        ├── HEAD_GRUNDKOERPER       Gussblock mit Frästaschen + Zapfen, ein Netz
+        ├── HEAD_ZAPFEN_DECKEL
+        ├── HEAD_VENTILBLOCK        Ölverteiler unter dem Zapfen
+        ├── HEAD_ZYLINDERBOLZEN_01…05
+        ├── HEAD_LAGERBOCK_01…05    am untersten Ende des Zapfens
         ├── PIVOT_PIN_01…05         Gelenkbolzen (sichtbar, nicht beweglich)
         ├── HYDRAULIC_LINES
         │   └── HYDRAULIC_LINE_01…05
@@ -67,7 +68,7 @@ Rotators.
 |---|---|---|---|
 | Schalen öffnen/schließen | `SHELL_01…05` | `rotation.x` (im glTF: `quaternion`) | 0 rad (zu) … −0,913 rad (offen), alle fünf synchron |
 | Zylinder folgt | `CYLINDER_01…05` | `rotation.x` | wird aus der Schalenstellung gerechnet |
-| Kolbenstange fährt | `CYL_ROD_01…05` | `position.y` + `scale.y` | 0,55 m … 0,77 m Auszug |
+| Kolbenstange fährt | `CYL_ROD_01…05` | `position.y` + `scale.y` | 0,80 m zu … 1,09 m offen |
 | Greifer drehen | `ROTATOR` | `rotation.y` | frei, unabhängig von den Schalen |
 | Heben | `GRAPPLE_ROOT` | `position` | nur als Vorlage; am Bagger übernimmt das der Arm |
 
@@ -133,6 +134,65 @@ genau diese Sparsamkeit macht das Gerät industriell statt bunt.
 
 ---
 
+## 4a. Der Kopf ist ein Gussblock mit Frästaschen
+
+Er war zwei Anläufe lang ein glatter Kegelstumpf, an dem die Zylinder außen an
+Ohren hingen. Befund dazu im Klartext: *„Der Greiferkopf ist kein Vollklotz, wo
+die Hülsen angeschweißt bzw. die Hydraulikzylinder außen angebracht sind. Die
+Zylinder laufen nach innen, weil es entsprechende Fräsungen für die Zylinder
+gibt."*
+
+Jetzt ist je Schale eine senkrechte Tasche in den Block gefräst, in der der
+Zylinder liegt; dazwischen stehen die Rippen. Deshalb ist der Kopf von oben
+gezahnt und nicht rund, und deshalb sieht man von außen die Zylinder in ihren
+Nischen statt davor.
+
+Das hat drei Dinge nach sich gezogen, die alle nachgerechnet sind:
+
+1. **Die Zylinderachse rückt nach innen**, von 0,92 auf 0,66 Bolzenkreisradien.
+   Die ganze Anlenkung wurde deshalb neu abgetastet.
+2. **Das Rohr wird dünner**, von 30 auf 24 cm. Am 12.09. war es absichtlich dick
+   gemacht worden, weil dünne Zylinder außen am Kopf im Bild untergingen.
+   Versenkt dreht sich das um: Ein dickes Rohr zwingt die Fräsung nach außen und
+   den Kopf auf 1,81 m Durchmesser — fast so breit wie der geschlossene Greifer.
+3. **Unter dem Block sitzt der Gusszapfen**, der nach unten aufweitet und an
+   seinem untersten Ende die Lagerböcke der Schalen trägt — *„man sieht da auch
+   gut, wo die Zähne befestigt sind, am untersten Ende vom Zapfen."* Darunter
+   der gelbe Ölverteiler, das einzige Gelb am Gerät.
+
+---
+
+## 4b. Die Kraft liegt beim Schließen
+
+*„Die Kraft wird für das Schließen benötigt, nicht das Öffnen."* Nachgerechnet
+war es vorher genau verkehrt herum — das Schließmoment betrug **57 %** des
+Öffnungsmoments, aus zwei Gründen gleichzeitig:
+
+- Geschlossen wird durch **Einfahren**, und einfahrend drückt der Zylinder nur
+  auf die Ringfläche: 84 % der Kolbenfläche bei dieser Stange.
+- Der **Hebelarm** am Drehbolzen war geschlossen am kleinsten (0,26 m gegen
+  0,35 m offen). Die Kraft fehlte dort, wo sie gebraucht wird.
+
+**Am Einfahren lässt sich nichts ändern.** Bei versenkten Zylindern ist es
+geometrisch zwingend: Damit Ausfahren schließt, müsste die Lasche nach außen
+über die geschlossene Schalenkontur hinausstehen — abgetastet bis 1,4
+Bolzenkreisradien, also Hörner, die es an der Maschine nicht gibt. Auf den
+Fotos ist es auch genau so: offen stehen die Kolbenstangen weit heraus.
+
+**Am Hebelarm dagegen sehr wohl.** Die Lasche zeigt jetzt als Ausleger nach
+innen statt nach oben. Damit steht der Zylinder im geschlossenen Zustand fast
+senkrecht auf ihr, und der Hebelarm ist dort am größten:
+
+| Öffnung | 0,0 | 0,25 | 0,5 | 0,75 | 1,0 |
+|---|---|---|---|---|---|
+| Hebelarm | 0,38 m | 0,34 m | 0,30 m | 0,27 m | 0,24 m |
+
+Schließmoment zu Öffnungsmoment: **1,30**. `test/greifer.test.ts` rechnet es
+nach und verlangt zusätzlich, dass der Hebelarm über den ganzen Weg monoton
+fällt — wer an der Lasche dreht, erfährt es dort.
+
+---
+
 ## 5. Woher die Maße kommen
 
 Aus dem Datenblatt der MG4.1-800-HO5, und zwar aus **allen sechs Maßen
@@ -173,7 +233,7 @@ Schalenform gewählt."
 
 ## 6. Geprüft wird, nicht geschätzt
 
-`test/greifer.test.ts`, 14 Prüfungen. Die wichtigen:
+`test/greifer.test.ts`, 16 Prüfungen. Die wichtigen:
 
 - **Bewegungsfreiheit.** Über 21 Stellungen werden alle Eckpunkte aller
   Schalenteile in Weltkoordinaten gerechnet und geprüft, ob jede Schale in
@@ -183,9 +243,12 @@ Schalenform gewählt."
   deren Winkel zur Spitze hin ins Unermessliche wuchs (bei 6 cm Radius ergaben
   10 cm Wange 96°).
 - **Zylinder.** Länger als sein Rohr in jeder Stellung, Hub über 15 cm, Neigung
-  unter 25°, und die Linie Aufnahme–Lasche läuft überall mindestens 3 cm
-  außerhalb des Grundkörpers — sonst steckt der Zylinder im Guss und ist im
-  Bild nicht zu sehen.
+  unter 25°, die Achse überall innerhalb ihrer Frästasche, die Tasche selbst
+  ohne Anschnitt am Kern des Kopfes, und die Rippen an jeder Höhe weiter außen
+  als die Rohraußenkante — sonst sieht man den Zylinder nicht in der Nische,
+  sondern davor.
+- **Kraftrichtung.** Hebelarm geschlossen größer als offen, über den ganzen Weg
+  monoton fallend, Schließmoment mindestens 1,2-mal Öffnungsmoment.
 - **Pivots.** Jeder Schalenknoten sitzt exakt auf seinem Gelenkbolzen.
 - **Maße** gegen das Datenblatt, mit 14 cm Toleranz.
 

@@ -270,3 +270,43 @@ export function baueGreifer(st: Stoffe = stoffe()): Greifer {
 
 /** Alle Schwenkwinkel, die im Rig vorkommen — für Prüfungen und Animationen. */
 export const SCHWENK_BEREICH = { zu: ZU, offen: OFFEN };
+
+/**
+ * Hebelarm des Zylinders am Drehbolzen bei gegebenem Schwenk (m).
+ *
+ * Der senkrechte Abstand des Drehbolzens von der Wirkungslinie Aufnahme →
+ * Lasche. Das Moment an der Schale ist Zylinderkraft mal diesem Arm, und
+ * deshalb entscheidet er darüber, ob die Maschine ihre Kraft dort hat, wo
+ * zugegriffen wird.
+ */
+export function hebelarm(schwenk: number): number {
+  const l = laschePunkt(schwenk);
+  const ar = ZYLINDER_AUFNAHME.r * BOLZENKREIS;
+  const ay = ZYLINDER_AUFNAHME.y * KOPFHOEHE;
+  const d = Math.max(Math.hypot(l.r - ar, l.y - ay), 1e-6);
+  const ux = (l.r - ar) / d;
+  const uy = (l.y - ay) / d;
+  return Math.abs((BOLZENKREIS - ar) * uy - (-KOPFHOEHE - ay) * ux);
+}
+
+/**
+ * Verhältnis Kolbenstange zu Kolben.
+ *
+ * Bestimmt, wie viel Kraft beim Einfahren übrig bleibt: Die Ringfläche ist
+ * `1 − (Stange/Kolben)²` der Kolbenfläche. Eine dünne Stange ist hier kein
+ * Detail, sondern der halbe Gewinn.
+ */
+export const STANGENVERHAELTNIS = 0.4;
+/** Anteil der Kolbenfläche, der beim Einfahren wirkt. */
+export const RINGFLAECHE = 1 - STANGENVERHAELTNIS * STANGENVERHAELTNIS;
+
+/**
+ * Schließmoment geteilt durch Öffnungsmoment, bei gleichem Öldruck.
+ *
+ * Über 1 heißt: Die Maschine drückt beim Zugreifen stärker zu, als sie aufgeht
+ * — so gehört es sich. Geschlossen wird durch Einfahren, dort wirkt nur die
+ * Ringfläche; dass es trotzdem reicht, kommt allein vom Hebelarm.
+ */
+export function kraftverhaeltnis(): number {
+  return (hebelarm(ZU) / hebelarm(OFFEN)) * RINGFLAECHE;
+}

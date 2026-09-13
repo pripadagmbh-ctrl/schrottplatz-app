@@ -13,11 +13,15 @@ import * as THREE from "three";
 import {
   ABSCHNITT,
   BOLZENKREIS,
+  KOPF_OBERKANTE,
+  TASCHE_HALBWINKEL,
+  kopfKontur,
   HAUT,
   KOPFHOEHE,
   LASCHE,
   MASSSTAB,
   ROHRLAENGE,
+  ZYLINDER_RADIUS,
   SCHALEN,
   SCHALE_HALBWINKEL,
   STATIONEN,
@@ -46,6 +50,7 @@ export interface Stoffe {
   chrom: THREE.MeshStandardMaterial;
   gummi: THREE.MeshStandardMaterial;
   verschleiss: THREE.MeshStandardMaterial;
+  ventil: THREE.MeshStandardMaterial;
 }
 
 export function stoffe(): Stoffe {
@@ -67,6 +72,9 @@ export function stoffe(): Stoffe {
     chrom: m("Kolbenstange_chrom", 0xd7dce1, 0.11, 0.95),
     gummi: m("Hydraulikschlauch", 0x15181a, 0.85, 0.05),
     verschleiss: m("Verschleissflaeche", 0x8b9299, 0.35, 0.85),
+    /* Der Ventilblock unter dem Zapfen ist auf dem Foto gelb — das einzige
+     * Gelb am Geraet, und genau deshalb faellt er auf. */
+    ventil: m("Ventilblock_gelb", 0xc9a81f, 0.5, 0.4),
   };
 }
 
@@ -222,43 +230,122 @@ export function baueRotator(st: Stoffe): THREE.Group {
 /* ------------------------------------------------------- (3) GRAPPLE_HEAD */
 
 /**
- * Greiferkopf (Mitteltraverse): Grundkörper, Zylinderaufnahmen, Lagerböcke.
+ * Greiferkopf (Mitteltraverse): Gussblock mit gefrästen Taschen, Unterflansch,
+ * Lagerböcke und Gusszapfen.
  *
- * „Mitteltraverse aus hochfestem Stahlguss" (Prospekt, Seite 2) — ein Teil,
- * nicht mehrere. Der Körper läuft nach unten leicht ein, damit die Zylinder
- * außen frei daran vorbeilaufen; die Lagerböcke überbrücken den Rest bis zum
- * Bolzenkreis.
+ * „Mitteltraverse aus hochfestem Stahlguss" (Prospekt) — ein Teil, nicht
+ * mehrere.
  *
- * Die Eckenzahl folgt der Schalenzahl: zwei Ecken je Schale, damit jede
- * Lagerstelle auf einer Fläche sitzt und nicht auf einer Kante.
+ * Der Kopf war bis zum 13.09.2026 ein glatter Kegelstumpf, an dem die Zylinder
+ * außen an Ohren hingen. Befund dazu, im Klartext: „Der Greiferkopf ist kein
+ * Vollklotz, wo die Hülsen angeschweißt bzw. die Hydraulikzylinder außen
+ * angebracht sind. Die Zylinder laufen nach innen, weil es entsprechende
+ * Fräsungen für die Zylinder gibt."
+ *
+ * Genau so ist es jetzt gebaut: In den Block ist je Schale eine senkrechte
+ * Tasche gefräst, in der der Zylinder liegt; zwischen den Taschen stehen die
+ * Rippen. Deshalb ist der Kopf von oben gezahnt und nicht rund, und deshalb
+ * sieht man von außen die Zylinder in ihren Nischen statt davor.
+ *
+ * Das hat die Anlenkung mitgezogen: Versenkt rückt die Zylinderachse von 0,92
+ * auf 0,72 Bolzenkreisradien nach innen, und der Zylinder steht dadurch fast
+ * senkrecht (5° statt 12°) — wie auf dem Foto.
+ *
+ * Unter dem Block hängt der Gusszapfen. Er war zwischendurch ganz entfallen,
+ * weil ich ihn für den Träger der Schalen gehalten hatte — das ist er nicht,
+ * die Schalen hängen an den Lagerböcken am Blockrand. Er ist trotzdem da: der
+ * mittige Gusskegel, um den sich die Schalen schließen.
  */
 export function baueKopf(st: Stoffe): THREE.Group {
   const g = new THREE.Group();
   g.name = "GRAPPLE_HEAD";
   const R = BOLZENKREIS;
-  const oben = -0.28 * KOPFHOEHE;
-  const koerper = new THREE.Mesh(
-    new THREE.CylinderGeometry(
-      0.74 * R,
-      0.66 * R,
-      oben + KOPFHOEHE + 0.04 * KOPFHOEHE,
-      SCHALEN * 2
-    ),
-    st.lack
-  );
-  koerper.name = "HEAD_GRUNDKOERPER";
-  koerper.position.y = (oben - KOPFHOEHE) / 2;
-  koerper.rotation.y = Math.PI / (SCHALEN * 2);
-  g.add(koerper);
+  const OBEN = KOPF_OBERKANTE * KOPFHOEHE;
+  const UNTEN = -KOPFHOEHE;
+  /*
+   * Ungleiche Hoehenstufen, dichter dort, wo sich die Kontur aendert: am Bauch
+   * des Zapfens und im Auslauf der Fraesung. Gleichmaessige Stufen haetten
+   * genau diese beiden Knicke verschmiert.
+   */
+  const STUFEN = [KOPF_OBERKANTE, -0.4, -0.55, -0.7, -0.8, -0.86, -0.93, -1.0];
+  /*
+   * Wenige Stützstellen, aber die Kanten zwischen Rippe und Tasche doppelt:
+   * Dort stehen zwei Ecken auf demselben Punkt, jede nur mit ihrer eigenen
+   * Fläche verbunden. `computeVertexNormals` mittelt dann nicht über die Kante
+   * hinweg, und die Fräsung bekommt einen scharfen Rand statt eines weichen
+   * Übergangs — ohne dass das Netz insgesamt feiner werden muss.
+   */
+  const RIPPE_N = 3;
+  const TASCHE_N = 4;
+  const winkel: number[] = [];
+  const sektor = (Math.PI * 2) / SCHALEN;
+  for (let i = 0; i < SCHALEN; i++) {
+    const a = (i / SCHALEN) * Math.PI * 2;
+    const rippeVon = a + TASCHE_HALBWINKEL;
+    const rippeBis = a + sektor - TASCHE_HALBWINKEL;
+    for (let k = 0; k <= RIPPE_N; k++) {
+      winkel.push(rippeVon + ((rippeBis - rippeVon) * k) / RIPPE_N);
+    }
+    for (let k = 0; k <= TASCHE_N; k++) {
+      winkel.push(rippeBis + ((2 * TASCHE_HALBWINKEL) * k) / TASCHE_N);
+    }
+  }
 
-  const rand = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.72 * R, 0.66 * R, 0.1 * KOPFHOEHE, SCHALEN * 2),
+  const n = netz();
+  const lagen: number[][] = [];
+  for (let h = 0; h < STUFEN.length; h++) {
+    const y = STUFEN[h]! * KOPFHOEHE;
+    const reihe: number[] = [];
+    for (const th of winkel) {
+      const r = kopfKontur(th, y);
+      reihe.push(
+        punkt(n, r * Math.sin(th), y, r * Math.cos(th), th / (Math.PI * 2), h / (STUFEN.length - 1))
+      );
+    }
+    lagen.push(reihe);
+  }
+  for (let h = 0; h < STUFEN.length - 1; h++) {
+    for (let j = 0; j < winkel.length; j++) {
+      const j2 = (j + 1) % winkel.length;
+      viereck(n, lagen[h]![j]!, lagen[h]![j2]!, lagen[h + 1]![j2]!, lagen[h + 1]![j]!);
+    }
+  }
+  // Deckel oben und unten, als Fächer auf die Achse
+  const mitteOben = punkt(n, 0, OBEN, 0, 0.5, 0);
+  const mitteUnten = punkt(n, 0, UNTEN, 0, 0.5, 1);
+  for (let j = 0; j < winkel.length; j++) {
+    const j2 = (j + 1) % winkel.length;
+    n.idx.push(mitteOben, lagen[0]![j2]!, lagen[0]![j]!);
+    const letzte = lagen[STUFEN.length - 1]!;
+    n.idx.push(mitteUnten, letzte[j]!, letzte[j2]!);
+  }
+  const block = new THREE.Mesh(fertig(n, "GreiferkopfGeo"), st.lack);
+  block.name = "HEAD_GRUNDKOERPER";
+  g.add(block);
+
+  /*
+   * Ventilblock unter dem Zapfen.
+   *
+   * Auf dem Foto von unten (13.09.2026) sitzt mittig unter dem Guss ein gelber
+   * Block mit den Schlauchanschluessen — der Oelverteiler, von dem die vier
+   * bzw. fuenf Zylinder gespeist werden. Er ist klein, aber er ist das
+   * einzige, was unten aus der Mitte herausschaut, und ohne ihn wirkt die
+   * Unterseite wie abgesaegt.
+   */
+  const ventil = new THREE.Mesh(
+    new THREE.BoxGeometry(0.3 * R, 0.14 * KOPFHOEHE, 0.3 * R),
+    st.ventil
+  );
+  ventil.name = "HEAD_VENTILBLOCK";
+  ventil.position.y = UNTEN - 0.05 * KOPFHOEHE;
+  g.add(ventil);
+  const deckel = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.2 * R, 0.14 * R, 0.07 * KOPFHOEHE, SCHALEN * 2),
     st.stahl
   );
-  rand.name = "HEAD_UNTERFLANSCH";
-  rand.position.y = -KOPFHOEHE + 0.05 * KOPFHOEHE;
-  rand.rotation.y = Math.PI / (SCHALEN * 2);
-  g.add(rand);
+  deckel.name = "HEAD_ZAPFEN_DECKEL";
+  deckel.position.y = UNTEN + 0.01 * KOPFHOEHE;
+  g.add(deckel);
 
   for (let i = 0; i < SCHALEN; i++) {
     const a = (i / SCHALEN) * Math.PI * 2;
@@ -266,27 +353,30 @@ export function baueKopf(st: Stoffe): THREE.Group {
     const cos = Math.cos(a);
     const nr = String(i + 1).padStart(2, "0");
 
-    const aufnahme = new THREE.Mesh(
-      new THREE.BoxGeometry(0.2 * R, 0.16 * KOPFHOEHE, 0.34 * R),
-      st.stahl
-    );
-    aufnahme.name = `HEAD_ZYLINDERAUFNAHME_${nr}`;
-    aufnahme.position.set(
-      sin * 0.79 * R,
-      ZYLINDER_AUFNAHME.y * KOPFHOEHE,
-      cos * 0.79 * R
-    );
-    aufnahme.rotation.y = a;
-    g.add(aufnahme);
-
+    // Lagerbock: die Gabel am Blockrand, die den Schalenbolzen hält
     const lagerbock = new THREE.Mesh(
-      new THREE.BoxGeometry(0.3 * R, 0.18 * KOPFHOEHE, 0.42 * R),
+      new THREE.BoxGeometry(0.32 * R, 0.2 * KOPFHOEHE, 0.4 * R),
       st.stahl
     );
     lagerbock.name = `HEAD_LAGERBOCK_${nr}`;
-    lagerbock.position.set(sin * 0.83 * R, -KOPFHOEHE + 0.05 * KOPFHOEHE, cos * 0.83 * R);
+    lagerbock.position.set(sin * 0.9 * R, UNTEN + 0.06 * KOPFHOEHE, cos * 0.9 * R);
     lagerbock.rotation.y = a;
     g.add(lagerbock);
+
+    // Bolzen, auf dem das Zylinderrohr in seiner Tasche schwenkt
+    const bolzen = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.06 * R, 0.06 * R, 0.42 * R, 10),
+      st.bolzen
+    );
+    bolzen.name = `HEAD_ZYLINDERBOLZEN_${nr}`;
+    bolzen.position.set(
+      sin * ZYLINDER_AUFNAHME.r * R,
+      ZYLINDER_AUFNAHME.y * KOPFHOEHE,
+      cos * ZYLINDER_AUFNAHME.r * R
+    );
+    bolzen.rotation.y = a;
+    bolzen.rotation.z = Math.PI / 2;
+    g.add(bolzen);
   }
   return g;
 }
@@ -520,12 +610,12 @@ export function baueSpitze(st: Stoffe): THREE.Mesh {
  */
 export function baueZylinder(st: Stoffe): { rohr: THREE.Mesh; stange: THREE.Mesh } {
   const rohr = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.115 * MASSSTAB, 0.12 * MASSSTAB, ROHRLAENGE, 14),
+    new THREE.CylinderGeometry(ZYLINDER_RADIUS * 0.96, ZYLINDER_RADIUS, ROHRLAENGE, 14),
     st.gruen
   );
   rohr.position.y = -ROHRLAENGE / 2;
   const stange = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.062 * MASSSTAB, 0.062 * MASSSTAB, 1, 10),
+    new THREE.CylinderGeometry(ZYLINDER_RADIUS * 0.5, ZYLINDER_RADIUS * 0.5, 1, 10),
     st.chrom
   );
   stange.position.y = -0.5;

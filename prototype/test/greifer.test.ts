@@ -12,6 +12,12 @@ import * as THREE from "three";
 import {
   BOLZENKREIS,
   KOPFHOEHE,
+  KOPF_KERN,
+  KOPF_OBERKANTE,
+  TASCHE_MITTE,
+  TASCHE_RADIUS,
+  ZYLINDER_RADIUS,
+  rippenRadius,
   MASSSTAB,
   OFFEN,
   ROHRLAENGE,
@@ -24,7 +30,13 @@ import {
   spitzenweite,
   tiefe,
 } from "../src/grapple/form";
-import { baueGreifer, zylinderLaenge, zylinderNeigung } from "../src/grapple/rig";
+import {
+  baueGreifer,
+  hebelarm,
+  kraftverhaeltnis,
+  zylinderLaenge,
+  zylinderNeigung,
+} from "../src/grapple/rig";
 
 /** Sektor je Schale: bei fünf Schalen 72°, also 36° zu jeder Seite. */
 const SEKTOR_HALB = Math.PI / SCHALEN;
@@ -168,6 +180,25 @@ describe("Greifer — Bewegungsfreiheit der Schalen", () => {
 });
 
 describe("Greifer — Zylinder", () => {
+  it("hat seine Kraft beim Schließen, nicht beim Öffnen", () => {
+    /*
+     * Der Punkt, auf den es bei einem Greifer ankommt (Ansage 13.09.2026).
+     * Geschlossen wird durch Einfahren — bei versenkten Zylindern geht es
+     * geometrisch nicht anders —, und einfahrend wirkt nur die Ringfläche.
+     * Ausgeglichen wird das über den Hebelarm, der zum Schließen hin wächst.
+     */
+    expect(hebelarm(ZU), "Hebelarm geschlossen kleiner als offen").toBeGreaterThan(
+      hebelarm(OFFEN)
+    );
+    let vorher = Infinity;
+    for (let s = 0; s <= 20; s++) {
+      const h = hebelarm(schwenkFuer(s / 20));
+      expect(h, `Hebelarm wächst beim Öffnen (Stellung ${s / 20})`).toBeLessThan(vorher);
+      vorher = h;
+    }
+    expect(kraftverhaeltnis(), "Schließmoment unter dem Öffnungsmoment").toBeGreaterThan(1.2);
+  });
+
   it("fährt beim Öffnen aus und beim Schließen ein", () => {
     const zu = zylinderLaenge(ZU);
     const offen = zylinderLaenge(OFFEN);
@@ -189,19 +220,23 @@ describe("Greifer — Zylinder", () => {
     }
   });
 
-  it("läuft frei neben dem Kopf, nicht durch ihn hindurch", () => {
+  it("liegt in seiner Frästasche, nicht im Guss und nicht daneben", () => {
     /*
-     * Der Grundkörper ist ein Kegelstumpf von 0,74 auf 0,66 Bolzenkreisradien.
-     * Die Verbindungslinie Aufnahme–Lasche muss überall außerhalb davon liegen,
-     * sonst steckt der Zylinder im Guss und ist im Bild nicht zu sehen.
+     * Seit dem 13.09.2026 läuft der Zylinder nicht mehr außen am Kopf vorbei,
+     * sondern in einer Tasche darin. Geprüft wird deshalb anders herum: Die
+     * Achse muss über ihre ganze Länge INNERHALB der Tasche liegen — mit
+     * Wandstärke zur Taschenwand — und die Tasche selbst darf den Kern des
+     * Kopfes nicht anschneiden.
      */
     const g = baueGreifer();
-    const oben = -0.28 * KOPFHOEHE;
-    const kopfRadius = (y: number): number => {
-      if (y > oben) return 0.42 * BOLZENKREIS;
-      const t = Math.min(1, Math.max(0, (y - oben) / (-KOPFHOEHE - oben)));
-      return (0.74 + (0.66 - 0.74) * t) * BOLZENKREIS;
-    };
+    const d = TASCHE_MITTE * BOLZENKREIS;
+    const rn = TASCHE_RADIUS * BOLZENKREIS;
+    const rZyl = ZYLINDER_RADIUS;
+
+    expect(d - rn, "die Fräsung schneidet den Kern des Kopfes an").toBeGreaterThan(
+      KOPF_KERN * BOLZENKREIS
+    );
+
     const a = new THREE.Vector3();
     const b = new THREE.Vector3();
     const p = new THREE.Vector3();
@@ -215,13 +250,28 @@ describe("Greifer — Zylinder", () => {
           .applyMatrix4(z.gelenk.matrixWorld);
         for (let k = 0; k <= 12; k++) {
           p.lerpVectors(a, b, k / 12);
+          if (p.y < -KOPFHOEHE) continue; // unterhalb des Kopfes endet die Tasche
           const r = Math.hypot(p.x, p.z);
           expect(
-            r - kopfRadius(p.y),
-            `Zylinder steckt im Kopf (Öffnung ${s / 10})`
-          ).toBeGreaterThan(0.03);
+            rn - Math.abs(r - d) - rZyl,
+            `Zylinder verlässt seine Tasche (Öffnung ${s / 10}, r ${r.toFixed(2)})`
+          ).toBeGreaterThan(0);
         }
       }
+    }
+  });
+
+  it("bleibt versenkt — die Rippen stehen außen über dem Rohr", () => {
+    /*
+     * Der eigentliche Punkt des Umbaus: Von außen sieht man den Zylinder in
+     * seiner Nische, nicht davor. Dafür muss die Rippe an jeder Höhe weiter
+     * außen liegen als die Außenkante des Rohres.
+     */
+    const rZyl = ZYLINDER_RADIUS;
+    const aussen = TASCHE_MITTE * BOLZENKREIS + ZYLINDER_RADIUS;
+    for (let h = 0; h <= 10; h++) {
+      const y = KOPF_OBERKANTE * KOPFHOEHE + ((-KOPFHOEHE - KOPF_OBERKANTE * KOPFHOEHE) * h) / 10;
+      expect(rippenRadius(y), `Rippe zu flach bei y ${y.toFixed(2)}`).toBeGreaterThan(aussen);
     }
   });
 });
