@@ -88,7 +88,16 @@ describe("Greifer — Form der Schale", () => {
         `Station ${k + 1} ist breiter als ${k}`
       ).toBeLessThanOrEqual(schalenHalbbreite(k) + 1e-9);
     }
-    expect(schalenHalbbreite(SCHALEN_ABSCHNITTE)).toBeLessThan(schalenHalbbreite(0) * 0.4);
+    /*
+     * Das Ende misst 200 mm gegen 400 mm oben, also die Haelfte. Diese Zahl
+     * ist nicht gewaehlt, sondern gefordert: Querschnitt C-C der Zeichnung
+     * `zahngreifer` zeigt ein Schalenende von 200 mm, auf dem ein Zahn von
+     * 110 mm und zwei Wangen von je 20 mm sitzen. Schmaler geht es nicht,
+     * ohne den Zahn zu verlieren.
+     */
+    expect(schalenHalbbreite(SCHALEN_ABSCHNITTE)).toBeLessThanOrEqual(
+      schalenHalbbreite(0) * 0.55
+    );
   });
 
   it("ist nicht in sich verwunden", () => {
@@ -422,7 +431,14 @@ describe("Greifer — Hüllmaße", () => {
      */
     expect(auf.breite, "öffnet nicht").toBeGreaterThan(zu.breite * 1.25);
     expect(zu.breite).toBeGreaterThan(1.0);
-    expect(auf.breite).toBeLessThan(2.6);
+    /*
+     * 3,10 m statt 2,60. Der Greifer oeffnet weiter, seit die Spitzen offen
+     * senkrecht stehen sollen (Ansage 13.09.2026) — das verlangt einen Schwenk
+     * von 96,25°, naemlich genau die Tangente am Schalenende. Die Spitzenweite
+     * waechst dadurch von 2,30 auf 3,02 m. Die Schranke faengt weiterhin ab,
+     * dass der Greifer ins Uferlose aufgeht.
+     */
+    expect(auf.breite).toBeLessThan(3.1);
     /*
      * Die Zusammenfassung der Zeichnung nennt 1,85 m Höhe. Gebaut sind es
      * 2,3 m, weil die Einzelmaße der Kopfbaugruppen zusammen schon 1,23 m
