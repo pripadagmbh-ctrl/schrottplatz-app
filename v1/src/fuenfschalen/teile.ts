@@ -706,6 +706,22 @@ function je(v: ProStation, k: number): number {
   return typeof v === "number" ? v : (v[k] ?? v[v.length - 1] ?? 0);
 }
 
+/**
+ * Fase an den vier Längskanten, als Anteil der kleineren Querschnittsseite.
+ *
+ * Vorlage 14.09.2026: „die Flächen lesen sich als gekantetes bzw. gegossenes
+ * Blech mit Kanten." Ein gegossener Träger hat gebrochene Kanten, und genau die
+ * machen ihn als Guss lesbar: Man sieht einen schmalen Streifen, der anders im
+ * Licht steht als Rücken und Flanke. Ohne sie bleibt ein Vierkantprofil, und
+ * bei weicher Schattierung wird daraus im Bild ein Schlauch.
+ *
+ * SW 14.09.2026 — 16 % der kleineren Seite, also 21 mm am Bolzen (130 mm hoch)
+ * und 6 mm am Zahnfuss (39 mm). Die Fase ändert die SEITENANSICHT nicht: Sie
+ * schneidet die Ecken in der Breitenrichtung weg, und dort blickt die
+ * Silhouette hindurch.
+ */
+const FASE = 0.16;
+
 export function strang(
   stationen: Array<{ y: number; z: number; th: number }>,
   x: ProStation,
@@ -722,11 +738,26 @@ export function strang(
     uv.push(u, v);
     return i;
   };
-  const quad = (a: number, b: number, c: number, d: number): void => {
-    idx.push(a, b, c, a, c, d);
+  /** Querschnitt an Station k: acht Ecken, die vier Längskanten gefast. */
+  const schnitt = (k: number): Array<[number, number]> => {
+    const bk = je(breite, k);
+    const dk = je(dicke, k);
+    const vk = je(versatz, k);
+    const c = FASE * Math.min(bk, dk);
+    const hb = bk / 2;
+    return [
+      [-hb + c, vk],
+      [hb - c, vk],
+      [hb, vk + c],
+      [hb, vk + dk - c],
+      [hb - c, vk + dk],
+      [-hb + c, vk + dk],
+      [-hb, vk + dk - c],
+      [-hb, vk + c],
+    ];
   };
-  const ecken: number[][] = [];
-  for (let k = 0; k < stationen.length; k++) {
+  /** Ein Querschnittspunkt in Weltlage des Strangs. */
+  const punkt = (k: number, dx: number, dn: number): [number, number, number] => {
     const s0 = stationen[k]!;
     /*
      * Die Aussennormale des Bogens ist (-sin th, cos th), NICHT (sin th, cos th).
@@ -740,34 +771,45 @@ export function strang(
      * Blech, sondern laengs daneben — in der Seitenansicht die Einschnuerung
      * in der Mitte („die Mitte ist zu duenn", 13.09.2026).
      */
-    const ny = -Math.sin(s0.th);
-    const nz = Math.cos(s0.th);
-    const xk = je(x, k);
-    const vk = je(versatz, k);
-    const dk = je(dicke, k);
-    const bk = je(breite, k);
-    const reihe: number[] = [];
-    for (const [dx, dn] of [
-      [-bk / 2, vk],
-      [bk / 2, vk],
-      [bk / 2, vk + dk],
-      [-bk / 2, vk + dk],
-    ] as Array<[number, number]>) {
-      reihe.push(
-        p(xk + dx, s0.y + dn * ny, s0.z + dn * nz, (dx + bk / 2) / bk, k / stationen.length)
-      );
+    return [
+      je(x, k) + dx,
+      s0.y + dn * -Math.sin(s0.th),
+      s0.z + dn * Math.cos(s0.th),
+    ];
+  };
+  const N = 8;
+  /*
+   * JEDE FLÄCHE BEKOMMT EIGENE ECKPUNKTE.
+   *
+   * Vorher teilten sich die anliegenden Flächen ihre Punkte, und
+   * `computeVertexNormals` hat dort gemittelt: Aus acht scharfen Längskanten
+   * wurde eine weiche Rundung, aus dem Gussträger im Betrachter ein Schlauch.
+   * Mit eigenen Punkten je Fläche bleibt die Kante quer scharf — und längs,
+   * über die Stationen hinweg, wird weiter gemittelt, die Sichel also glatt.
+   * Das ist derselbe Unterschied wie zwischen einem gefalteten Blech und einem
+   * gerollten Rohr.
+   */
+  for (let e = 0; e < N; e++) {
+    const f = (e + 1) % N;
+    let vor: [number, number] | null = null;
+    for (let k = 0; k < stationen.length; k++) {
+      const s = schnitt(k);
+      const v = k / (stationen.length - 1);
+      const a = p(...punkt(k, s[e]![0], s[e]![1]), e / N, v);
+      const b = p(...punkt(k, s[f]![0], s[f]![1]), (e + 1) / N, v);
+      if (vor) idx.push(vor[0], vor[1], b, vor[0], b, a);
+      vor = [a, b];
     }
-    ecken.push(reihe);
   }
-  for (let k = 0; k < ecken.length - 1; k++) {
-    for (let e = 0; e < 4; e++) {
-      const f = (e + 1) % 4;
-      quad(ecken[k]![e]!, ecken[k]![f]!, ecken[k + 1]![f]!, ecken[k + 1]![e]!);
+  /* Stirnflächen als Fächer — sie brauchen ihre eigenen Punkte ebenfalls. */
+  for (const k of [0, stationen.length - 1]) {
+    const s = schnitt(k);
+    const ring = s.map(([dx, dn], j) => p(...punkt(k, dx, dn), j / N, k === 0 ? 0 : 1));
+    for (let j = 1; j + 1 < N; j++) {
+      if (k === 0) idx.push(ring[0]!, ring[j + 1]!, ring[j]!);
+      else idx.push(ring[0]!, ring[j]!, ring[j + 1]!);
     }
   }
-  const letzte = ecken.length - 1;
-  quad(ecken[0]![3]!, ecken[0]![2]!, ecken[0]![1]!, ecken[0]![0]!);
-  quad(ecken[letzte]![0]!, ecken[letzte]![1]!, ecken[letzte]![2]!, ecken[letzte]![3]!);
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
@@ -1423,8 +1465,33 @@ export function baueGreiferschale(
   const versaetze: number[] = [];
   /* Ohne die letzte Fersenstation — die ist Station 0 und kommt aus `fein`. */
   for (const f of ferse.slice(0, -1)) {
-    /* Weich überblendet, damit der Körper am Bolzen satt bleibt und erst danach abnimmt. */
-    const w = f.t <= 0 ? 0 : f.t * f.t * (3 - 2 * f.t);
+    /*
+     * Die SCHULTER — hier geht der Arm in die Schale über, und man sieht es.
+     *
+     * Vorher lief eine einzige weiche Blende über die ganze Ferse: Der Arm
+     * wurde von der ersten Station an gleichmässig dünner und war irgendwann
+     * die Schale. Auf der Herstellerzeichnung vom 14.09.2026 ist das anders —
+     * dort ist „eine sichtbare Schulter, wo der Arm in die Schale übergeht".
+     *
+     * Jetzt sind es zwei Abschnitte: Über die ersten `SCHULTER_AB` der Ferse
+     * nimmt der Arm nur um `SCHULTER_VOR` seines Weges ab, bleibt also satt;
+     * danach fällt er über ein Drittel der Ferse auf den Schalenquerschnitt.
+     * In der Seitenansicht ist das ein Knick in der Rückenlinie statt einer
+     * durchgehenden Rundung.
+     *
+     * Die drei Zahlen sind Startwerte (SW 14.09.2026), nach Augenmass an der
+     * Zeichnung: knapp die halbe Ferse trägt den Arm, der Absatz sitzt im
+     * zweiten Drittel. Sie ändern nichts an Bolzen- und Schalenquerschnitt —
+     * nur daran, WO dazwischen die Dicke verloren geht.
+     */
+    const SCHULTER_AB = 0.42;
+    const SCHULTER_BIS = 0.74;
+    const SCHULTER_VOR = 0.22;
+    const knie = Math.max(0, Math.min(1, (f.t - SCHULTER_AB) / (SCHULTER_BIS - SCHULTER_AB)));
+    const w =
+      f.t <= 0
+        ? 0
+        : SCHULTER_VOR * f.t + (1 - SCHULTER_VOR) * knie * knie * (3 - 2 * knie);
     /* Hinter dem Bolzen läuft die Nabe rund aus — Ellipse statt Stirnfläche. */
     const nase = f.t < 0 ? Math.sqrt(1 - f.t * f.t) : 1;
     /*
@@ -1506,6 +1573,197 @@ export function baueGreiferschale(
 
 /* ------------------------------------------------------ 07 Greiferspitze */
 
+/** Biegeradius des Zahns (m) — aus der Zeichnung `zahngreifer` vom 13.09.2026. */
+const ZAHN_R = 0.7;
+/**
+ * Stationen des Zahns: Abstand vom Sitz (m), Breite und Höhe als Faktor der Basis.
+ *
+ * Vier Stationen statt sechs, und das Ende bleibt stumpf. Ansage 13.09.2026:
+ * „Kantenschutz braucht nicht so viel Detailtiefe und sind eher stumpfe
+ * Elemente." Die Zeichnung läuft auf 22 × 14 mm aus; hier endet der Zahn bei
+ * 74 × 20 mm. Das ist Kantenschutz, keine Schneide.
+ *
+ * Die Verjüngung lief einmal auf 0,34 der Basisbreite aus (41 mm bei 120 mm
+ * Basis) — eine Nadel. Ansage 14.09.2026: „die Zacken sind spitzer als beim
+ * Original"; beim Vorbild sind es kurze, breite, angeschraubte Keile. Die Höhe
+ * darf dabei nicht mitwachsen, sonst meldet `schalenform.test.ts` zu Recht,
+ * dass das Ende dicker ist als die Mitte.
+ *
+ * Steht seit dem 14.09.2026 hier oben statt im Bauteil, weil `zahnEigenwinkel`
+ * dieselben Zahlen braucht: Die Anstellung des Zahns folgt aus seiner eigenen
+ * Biegung, und die steckt in diesen vier Zeilen.
+ */
+const ZAHN_STATIONEN: Array<[number, number, number]> = [
+  [0, 1, 1],
+  [0.09, 0.9, 0.86],
+  [0.18, 0.76, 0.68],
+  [0.25, 0.62, 0.52],
+];
+
+/** Breite und Höhe des Zahns an seinem Sitz (m) — der Querschnitt des Schalenendes. */
+function zahnBasis(): { b: number; h: number } {
+  return {
+    b: 2 * schalenHalbbreite(SCHALEN_ABSCHNITTE),
+    /*
+     * Die Basis ist genau die Strebenhöhe am Schalenende — NICHT plus Blech.
+     * Die flache Seite des Zahns liegt schon auf der Aussenfläche des Blechs;
+     * das Blech noch einmal zur Höhe zu addieren zählt es doppelt. Gemessen
+     * sprang die Dicke dadurch am Übergang von 88 auf 120 mm.
+     */
+    h: STREBE_H_OBEN * verjuengung(SCHALEN_ABSCHNITTE),
+  };
+}
+
+/**
+ * Ein Querschnitt des Zahns, gebogen, im Zahnrahmen — ohne Anstellung, ohne `z0`.
+ *
+ * Das Profil ist ein Fünfeck: flache Innenseite, zwei abgeschrägte Schultern,
+ * First in der Mitte. Gebogen wird wie in der Vorlage — die Länge entlang der
+ * Achse bleibt erhalten, sie wird nur zum Bogen; Punkte weiter aussen liegen
+ * auf grösserem Radius.
+ *
+ * Die Höhe läuft nach +z, die Länge nach −y. Eine Drehung um x um `th` bildet
+ * lokales (0,0,1) auf (0, −sin th, cos th) ab — und genau das IST die
+ * Aussennormale des Bogens; (0,−1,0) wird zur Tangente. Der Zahn steht damit
+ * auf dem Blech und setzt die Sichel fort.
+ */
+function zahnRing(si: number): Array<[number, number, number]> {
+  const [x, fb, fh] = ZAHN_STATIONEN[si]!;
+  const { b, h } = zahnBasis();
+  const hb = (b * fb) / 2;
+  const hh = h * fh;
+  const w = x / ZAHN_R;
+  return (
+    [
+      [-hb, 0],
+      [hb, 0],
+      [hb * 0.84, hh * 0.65],
+      [0, hh],
+      [-hb * 0.84, hh * 0.65],
+    ] as Array<[number, number]>
+  ).map(([pz, py]) => {
+    const r = ZAHN_R + py;
+    return [pz, -(r * Math.sin(w)), -ZAHN_R + r * Math.cos(w)] as [number, number, number];
+  });
+}
+
+/** Schwerpunkt eines Zahnquerschnitts im Zahnrahmen. */
+function zahnMitte(si: number): { y: number; z: number } {
+  const r = zahnRing(si);
+  return {
+    y: r.reduce((s, q) => s + q[1], 0) / r.length,
+    z: r.reduce((s, q) => s + q[2], 0) / r.length,
+  };
+}
+
+/**
+ * Wie schief steht der Zahn in sich selbst? (rad)
+ *
+ * Zurückgegeben wird die Drehung um x, die seine ACHSE senkrecht stellt, wenn
+ * sein Rahmen nicht gedreht ist. Die Achse ist die Verbindung der beiden
+ * Stirnflächen-Schwerpunkte, nicht die Tangente am Sitz: Der Zahn ist über
+ * seine 250 mm mit R 0,70 gebogen, seine Achse liegt also rund eine halbe
+ * Biegung hinter der Sitztangente. Gemessen 12,15°.
+ *
+ * Genau daran ist der Anschlag `OFFEN` vorbeigegangen. Er ist so gewählt, dass
+ * die TANGENTE des Schalenendes offen senkrecht steht (Ansage 13.09.2026: „die
+ * Spitzen senkrecht"). Der Zahn steht danach noch um seine eigene Biegung
+ * schräg — auf der Herstellerzeichnung vom 14.09.2026 tut er das nicht.
+ */
+export function zahnEigenwinkel(): number {
+  const a = zahnMitte(0);
+  const e = zahnMitte(ZAHN_STATIONEN.length - 1);
+  const dy = e.y - a.y;
+  const dz = e.z - a.z;
+  /* Gesucht ist θ mit dy·sin θ + dz·cos θ = 0, also θ = atan2(dz, −dy). */
+  return Math.atan2(dz, -dy);
+}
+
+/**
+ * Anstellwinkel des Zahns GEGEN DIE SCHALE (rad) — eine feste Zahl, keine
+ * Animation.
+ *
+ * An einem echten Greifer ist der Zahn starr angeschraubt. Dass er offen
+ * senkrecht steht, ergibt sich aus der Form des Schalenendes: Der Sitz ist
+ * schräg gegossen. Das ist diese Zahl.
+ *
+ * Hergeleitet, nicht gewählt. Die Weltdrehung des Zahns ist
+ *
+ *   −Schwenk + `schalenEnde().th` + Anstellung
+ *
+ * und lotrecht steht er, wenn sie bei Schwenk = `OFFEN` gerade
+ * `zahnEigenwinkel()` beträgt. Umgestellt:
+ *
+ *   Anstellung = OFFEN − schalenEnde().th + zahnEigenwinkel()
+ *
+ * Mit dem heutigen Formsatz sind `OFFEN` und `schalenEnde().th` dieselben
+ * 96,25°, es bleiben die 12,15° der Eigenbiegung. Die Formel bleibt trotzdem
+ * stehen: Wer `OFFEN` anfasst, bekommt die Anstellung mitgeführt, statt den
+ * Zahn wieder schief zu stellen.
+ */
+export function zahnAnstellung(offen = OFFEN): number {
+  return offen - schalenEnde().th + zahnEigenwinkel();
+}
+
+/** Wie hoch der Zahnsitz über der Mittellinie der Schale liegt (m). */
+function zahnZ0(): number {
+  return woelbungBei(schalenHalbbreite(SCHALEN_ABSCHNITTE), SCHALEN_ABSCHNITTE) + BLECH;
+}
+
+/**
+ * Der Sitz — Anstellung und Einsitztiefe in einem.
+ *
+ * `dreh` dreht einen Punkt des Zahnrahmens um den Schwerpunkt der Sitzfläche,
+ * also um den Punkt, in dem die Zahnachse die Schale verlässt: Die Spitze
+ * wandert, der Sitz nicht. `tief` schiebt den Zahn anschliessend so weit in die
+ * Schale hinein, dass die angeschrägte Sitzfläche nirgends von ihrem
+ * Schalenende abhebt — ohne sie klafft dort ein Keil von knapp 4 mm.
+ */
+function zahnSitz(offen = OFFEN): {
+  dreh: (py: number, pz: number) => [number, number];
+  tief: number;
+} {
+  const w = zahnAnstellung(offen);
+  const c = Math.cos(w);
+  const s = Math.sin(w);
+  const nabe = zahnMitte(0);
+  const dreh = (py: number, pz: number): [number, number] => [
+    nabe.y + (py - nabe.y) * c - (pz - nabe.z) * s,
+    nabe.z + (py - nabe.y) * s + (pz - nabe.z) * c,
+  ];
+  let tief = 0;
+  for (const q of zahnRing(0)) tief = Math.min(tief, dreh(q[1], q[2])[0]);
+  return { dreh, tief };
+}
+
+/**
+ * Die Achse des gebauten Zahns, im Rahmen der Greiferspitze.
+ *
+ * Dasselbe für den Zahn, was `feineStationen` für die Sichel ist: Punkt und
+ * Tangente, mit der Aussennormalen (−sin th, cos th). Der Formwächter braucht
+ * sie, seit der Zahn nicht mehr auf dem Kreis der Schale weiterläuft — ein
+ * Strahl längs der SCHALENnormalen schneidet ihn jetzt schräg und meldet
+ * Dicken, die es nicht gibt.
+ */
+export function zahnBahn(je = 4, offen = OFFEN): Array<{ y: number; z: number; th: number; k: number }> {
+  const { dreh, tief } = zahnSitz(offen);
+  const w0 = zahnAnstellung(offen);
+  const z0 = zahnZ0();
+  const letzte = ZAHN_STATIONEN.length - 1;
+  const aus: Array<{ y: number; z: number; th: number; k: number }> = [];
+  for (let i = 0; i <= letzte * je; i++) {
+    const k = i / je;
+    const a = Math.min(letzte - 1, Math.floor(k));
+    const t = k - a;
+    const mA = zahnMitte(a);
+    const mB = zahnMitte(a + 1);
+    const [py, pz] = dreh(mA.y + (mB.y - mA.y) * t, mA.z + (mB.z - mA.z) * t);
+    const x = ZAHN_STATIONEN[a]![0] + (ZAHN_STATIONEN[a + 1]![0] - ZAHN_STATIONEN[a]![0]) * t;
+    aus.push({ y: py - tief, z: z0 + pz, th: w0 + x / ZAHN_R, k });
+  }
+  return aus;
+}
+
 /**
  * Greiferspitze — geschmiedet, austauschbar, fünfmal.
  *
@@ -1520,7 +1778,7 @@ export function baueGreiferschale(
  * wie das Schalenende, keinen Millimeter mehr. Was darunter heraussteht, sind
  * nur noch die beiden Zacken — gleich groß, schmal, auf einen Punkt zulaufend.
  */
-export function baueGreiferspitze(st: Stoffe): THREE.Group {
+export function baueGreiferspitze(st: Stoffe, offen = OFFEN): THREE.Group {
   const g = new THREE.Group();
   g.name = "07_GREIFERSPITZE";
   /*
@@ -1552,39 +1810,14 @@ export function baueGreiferspitze(st: Stoffe): THREE.Group {
    * genau der Querschnitt, den Blech und Strebe am Schalenende haben; von dort
    * laeuft sie auf eine stumpfe, gerundete Spitze aus.
    */
-  const basisB = 2 * schalenHalbbreite(SCHALEN_ABSCHNITTE);
   /*
-   * Die Basis ist genau die Strebenhoehe am Schalenende — NICHT plus Blech.
-   *
-   * Die flache Seite des Zahns liegt schon auf der Aussenflaeche des Blechs
-   * (`z0`); das Blech noch einmal zur Hoehe zu addieren zaehlt es doppelt.
-   * Gemessen sprang die Dicke dadurch am Uebergang von 88 auf 120 mm — genau
-   * die Stelle, an der das Ende dicker aussah als die Mitte.
+   * Kurzer breiter Keil, keine Nadel — Stationen und Querschnitt stehen jetzt
+   * oben bei `ZAHN_STATIONEN`, weil auch `zahnEigenwinkel` sie braucht.
    */
-  const basisH = STREBE_H_OBEN * verjuengung(SCHALEN_ABSCHNITTE);
-  /*
-   * Kurzer breiter Keil, keine Nadel.
-   *
-   * Ansage 14.09.2026: „die Zacken sind spitzer als beim Original" — beim
-   * Vorbild sind das kurze, breite, angeschraubte Keile. Die Verjuengung lief
-   * vorher auf 0,34 der Basisbreite aus (41 mm bei 120 mm Basis); das ist eine
-   * Schneide, kein Kantenschutz. Sie laeuft jetzt auf 0,62 aus — bei 120 mm
-   * Basis endet der Zahn 74 mm breit und 20 mm hoch.
-   *
-   * Die Hoehe darf dabei nicht mitwachsen: Der Waechter `schalenform.test.ts`
-   * verlangt, dass die Seitenansicht von oben nach unten nur duenner wird und
-   * am Ende am duennsten ist. Breit wird der Zahn quer zur Seitenansicht, und
-   * genau dort sieht man ihn beim Zupacken.
-   */
-  const STATIONEN: Array<[number, number, number]> = [
-    [0, basisB, basisH],
-    [0.09, basisB * 0.9, basisH * 0.86],
-    [0.18, basisB * 0.76, basisH * 0.68],
-    [0.25, basisB * 0.62, basisH * 0.52],
-  ];
-  const R = 0.7; // Biegeradius der Zeichnung
   /* Die flache Seite liegt auf der Verstaerkung, also aussen auf dem Blech. */
-  const z0 = woelbungBei(schalenHalbbreite(SCHALEN_ABSCHNITTE), SCHALEN_ABSCHNITTE) + BLECH;
+  const z0 = zahnZ0();
+  /* Anstellung und Einsitz — der Zahn sitzt SCHRAEG auf dem Schalenende. */
+  const { dreh, tief } = zahnSitz(offen);
 
   const pos: number[] = [];
   const uv: number[] = [];
@@ -1595,53 +1828,51 @@ export function baueGreiferspitze(st: Stoffe): THREE.Group {
     uv.push(tu, tv);
     return i;
   };
+  /* Eckpunkte, wie sie die Stationen ergeben — für die Stirnkappen gebraucht. */
+  const ecken = ZAHN_STATIONEN.map((_s, si) =>
+    zahnRing(si).map((q) => {
+      const [py, pz] = dreh(q[1], q[2]);
+      return [q[0], py - tief, z0 + pz] as [number, number, number];
+    })
+  );
   /*
-   * Biegen wie in der Vorlage: Die Laenge entlang der Achse bleibt erhalten,
-   * sie wird nur zum Bogen. Punkte weiter aussen liegen auf groesserem Radius.
+   * Fünf Flächen, fünf eigene Punktreihen — dieselbe Regel wie im `strang`.
+   *
+   * Der Querschnitt ist ein Fünfeck mit First: flache Innenseite, zwei
+   * abgeschrägte Schultern, Rücken. Teilen sich die Flächen ihre Punkte, mittelt
+   * `computeVertexNormals` den First weg, und der Zahn liest sich als runder
+   * Dorn statt als gegossener Keil.
    */
-  const ringe = STATIONEN.map(([x, b, h], si) => {
-    const hb = b / 2;
-    const profil: Array<[number, number]> = [
-      [-hb, 0],
-      [hb, 0],
-      [hb * 0.84, h * 0.65],
-      [0, h],
-      [-hb * 0.84, h * 0.65],
-    ];
-    return profil.map(([pz, py], j) => {
-      const w = x / R;
-      const r = R + py;
-      /*
-       * Die Hoehe laeuft nach +z, die Laenge nach −y.
-       *
-       * Eine Drehung um x um `th` bildet lokales (0,0,1) auf (0, −sin th,
-       * cos th) ab — und genau das IST die Aussennormale des Bogens. Lokales
-       * (0,−1,0) wird zu (0, −cos th, −sin th), der Tangente. Der Zahn steht
-       * damit auf dem Blech und setzt die Sichel fort.
-       *
-       * Vorher war die Hoehe negiert, um zu einer Schale zu passen, deren
-       * Normale selbst falsch herum gerechnet war. Beide Fehler zusammen sahen
-       * am oberen Ende richtig aus und liefen nach unten auseinander.
-       */
-      return p(pz, -(r * Math.sin(w)), z0 + (-R + r * Math.cos(w)), j / 5, si / 5);
-    });
-  });
-  for (let i = 0; i < ringe.length - 1; i++) {
-    const a2 = ringe[i]!;
-    const b2 = ringe[i + 1]!;
-    for (let k = 0; k < a2.length; k++) {
-      const k2 = (k + 1) % a2.length;
-      idx.push(a2[k]!, b2[k]!, b2[k2]!, a2[k]!, b2[k2]!, a2[k2]!);
-    }
-  }
-  const kappe = (ring: number[], gedreht: boolean): void => {
+  const N = ecken[0]!.length;
+  /*
+   * ZUERST die beiden Stirnflächen, in der Reihenfolge des Querschnitts.
+   *
+   * Nicht aus Bauzwang, sondern als Vertrag: Die ersten N Punkte des Netzes
+   * sind der Sitzquerschnitt, die nächsten N die Spitze. Daran messen die
+   * Wächter Länge und Achse des Zahns (`test/fuenfschalen.test.ts`) und daran
+   * misst `tools/fuenfschalen/abcde.ts`. Vorher lagen die Ringe der Reihe nach
+   * im Puffer; seit jede Fläche eigene Punkte hat, tun sie das nicht mehr.
+   */
+  const kappe = (si: number, gedreht: boolean): void => {
+    const ring = ecken[si]!.map((q, j) => p(...q, j / N, gedreht ? 0 : 1));
     for (let k = 1; k < ring.length - 1; k++) {
       if (gedreht) idx.push(ring[0]!, ring[k + 1]!, ring[k]!);
       else idx.push(ring[0]!, ring[k]!, ring[k + 1]!);
     }
   };
-  kappe(ringe[0]!, true);
-  kappe(ringe[ringe.length - 1]!, false);
+  kappe(0, true);
+  kappe(ecken.length - 1, false);
+  for (let e = 0; e < N; e++) {
+    const f = (e + 1) % N;
+    let vor: [number, number] | null = null;
+    for (let si = 0; si < ecken.length; si++) {
+      const v = si / (ecken.length - 1);
+      const a = p(...ecken[si]![e]!, e / N, v);
+      const b = p(...ecken[si]![f]!, (e + 1) / N, v);
+      if (vor) idx.push(vor[0], b, vor[1], vor[0], a, b);
+      vor = [a, b];
+    }
+  }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
   geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
