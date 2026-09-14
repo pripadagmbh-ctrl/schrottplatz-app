@@ -1,3 +1,22 @@
+import type { Tondiagnose } from "../audio/tonzustand";
+
+/**
+ * Die Tonzeile des Overlays.
+ *
+ * Eigene Funktion, damit sie ohne Browser geprueft werden kann. Sie ist die
+ * Lehre aus dem 14.09.2026: Im Overlay stand `Ton: interrupted · Musik an
+ * (laeuft)`, waehrend gar nichts lief — die Anzeige hat auf die falsche Faehrte
+ * gefuehrt. Ab jetzt steht dort, ob wirklich Ton herauskommt, und wie oft
+ * vergeblich geweckt wurde.
+ */
+export function tonZeile(a: Tondiagnose): string {
+  const lage = a.hoerbar ? "hoerbar" : "stumm";
+  // Weckrufe nur zeigen, wenn es welche gab — sonst Rauschen in der Anzeige
+  const weck = a.weckversuche > 0 ? ` · ${a.weckversuche} Weckruf${a.weckversuche === 1 ? "" : "e"}` : "";
+  const musik = !a.musicWanted ? "aus" : a.musicRunning ? "an, laeuft" : "an, wartet";
+  return `Ton: ${a.ctx} (${lage})${weck} · Musik ${musik}`;
+}
+
 /** F3-Debug-Overlay: FPS, Physik-Körper (gesamt/wach), Griff-Status. Budget-Wächter ab M0. */
 export class DebugOverlay {
   private el: HTMLElement;
@@ -34,7 +53,7 @@ export class DebugOverlay {
       msBild: number;
       /** Zustand des Tonsystems — auf dem Geraet die einzige Moeglichkeit
        *  nachzusehen, warum nichts zu hoeren ist. */
-      audio: { ctx: string; musicWanted: boolean; musicRunning: boolean };
+      audio: Tondiagnose;
       /** Was Lambert treibt und wie viele Koerper er dabei je Minute weckt
        *  (Auftrag 11.09.2026, Phase 0.2) */
       lambert: { taetigkeit: string; geweckteProMinute: number };
@@ -57,8 +76,7 @@ export class DebugOverlay {
       `Beweglich: ${stats.dynamic} (wach: ${stats.dynAwake})<br />` +
       `Zeichenrufe: ${stats.calls} · ${(stats.tris / 1000).toFixed(0)}k Dreiecke<br />` +
       `Arbeit: Physik ${this.physGeglaettet.toFixed(1)} ms · Bild ${this.bildGeglaettet.toFixed(1)} ms<br />` +
-      `Ton: ${stats.audio.ctx} · Musik ${stats.audio.musicWanted ? "an" : "aus"}` +
-      `${stats.audio.musicRunning ? " (laeuft)" : ""}<br />` +
+      `${tonZeile(stats.audio)}<br />` +
       `Gegriffen: ${stats.gripped} Obj / ${stats.grippedKg.toFixed(0)} kg<br />` +
       `Lambert: ${stats.lambert.taetigkeit} · weckt ` +
       `${stats.lambert.geweckteProMinute.toFixed(0)}/min`;

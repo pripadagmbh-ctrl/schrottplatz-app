@@ -77,6 +77,9 @@ export class Music {
   private fuzzKurve = zerrkurve(0.62);
   private bassKurve = zerrkurve(0.22);
   private rauschen: AudioBuffer | null = null;
+  /** Grundpegel der Musik; ueber setVolume verstellbar und nach einer
+   *  Unterbrechung wieder anzufahren. SW seit M1: 0,16. */
+  private zielPegel = 0.16;
 
   constructor(
     private ctx: BaseAudioContext,
@@ -117,8 +120,28 @@ export class Music {
     // sanft einblenden, damit die Musik nicht hereinplatzt
     this.gain.gain.cancelScheduledValues(this.ctx.currentTime);
     this.gain.gain.setValueAtTime(this.gain.gain.value, this.ctx.currentTime);
-    this.gain.gain.linearRampToValueAtTime(0.16, this.ctx.currentTime + 2.5);
+    this.gain.gain.linearRampToValueAtTime(this.zielPegel, this.ctx.currentTime + 2.5);
     this.timer = window.setInterval(() => this.schedule(), 120);
+  }
+
+  /**
+   * Nach einer Tonunterbrechung (iOS: `interrupted`) den Faden neu aufnehmen.
+   *
+   * `start()` hilft hier nicht: Das Laufflag steht weiter auf true, die Methode
+   * steigt sofort wieder aus — genau deshalb meldete das Overlay „Musik an
+   * (laeuft)", waehrend nichts zu hoeren war. Hier wird der Taktgeber neu
+   * gesetzt (im Hintergrund raeumt iOS Intervalle ab), die Planungsuhr auf das
+   * Jetzt gestellt und der Pegel wieder angefahren.
+   */
+  wiederaufnehmen(): void {
+    if (!this.running) return;
+    window.clearInterval(this.timer);
+    this.nextTime = this.ctx.currentTime + 0.1;
+    this.timer = window.setInterval(() => this.schedule(), 120);
+    this.gain.gain.cancelScheduledValues(this.ctx.currentTime);
+    this.gain.gain.setValueAtTime(this.gain.gain.value, this.ctx.currentTime);
+    // kuerzere Blende als beim Start: die Musik lief ja schon, sie war nur weg
+    this.gain.gain.linearRampToValueAtTime(this.zielPegel, this.ctx.currentTime + 0.8);
   }
 
   stop(): void {
@@ -138,7 +161,8 @@ export class Music {
 
   /** Lautstaerke 0..1, bezogen auf den eingestellten Grundpegel. */
   setVolume(v: number): void {
-    this.gain.gain.setTargetAtTime(0.16 * Math.max(0, Math.min(1, v)), this.ctx.currentTime, 0.2);
+    this.zielPegel = 0.16 * Math.max(0, Math.min(1, v));
+    this.gain.gain.setTargetAtTime(this.zielPegel, this.ctx.currentTime, 0.2);
   }
 
   /** Alle faelligen Toene bis zum Vorausschau-Fenster einplanen. */

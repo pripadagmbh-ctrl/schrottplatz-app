@@ -3,8 +3,33 @@
  * Audio ist der primäre Belohnungskanal: jeder Abwurf klingt nach seinem Material,
  * richtig = angenehmer Doppelton, falsch = stumpfer Missklang.
  * Startet erst nach der ersten echten Nutzereingabe (Browser-Autoplay-Policy).
+ *
+ * Tonwaechter (Befund 14.09.2026, iPad): Der Tonkanal faellt auf iOS in den
+ * Zustand `interrupted`, sobald die Seite in den Hintergrund geht, der
+ * Bildschirm sperrt oder ein Anruf kommt — und er kommt ohne ausdrueckliches
+ * `resume()` nicht zurueck. Deshalb wird hier aus DREI Richtungen geweckt:
+ * bei jeder Nutzergeste, bei `visibilitychange`/`pageshow`/`focus` und direkt
+ * am Kanal ueber `statechange` — letzteres fuer den Ausfall mitten im Spiel,
+ * bei dem es gar keine Geste gibt, an der man sich festhalten koennte.
  */
 import { Music } from "./music";
+import { brauchtNeuaufbau, brauchtWeckruf, istHoerbar, type Tondiagnose } from "./tonzustand";
+
+/**
+ * Nachfassfristen in Millisekunden. `resume()` loest sein Versprechen auf iOS
+ * auch dann ein, wenn der Kanal gleich wieder stumm wird — dem Versprechen
+ * allein darf man also nicht glauben, man muss nachsehen.
+ * SW: 250 ms (unmittelbar nach der Geste) und 1200 ms (nachdem das System die
+ * Unterbrechung abgeschlossen hat).
+ */
+const NACHSEHEN_MS = [250, 1200];
+/**
+ * So viele Weckrufe duerfen vergeblich bleiben, bevor der Kanal beim naechsten
+ * Antippen komplett neu gebaut wird. SW: 3 — die ersten beiden koennen daran
+ * scheitern, dass gerade keine Nutzergeste anlag (dann verweigert Safari das
+ * Aufwecken); beim dritten ist der Kanal vermutlich verloren.
+ */
+const NEUAUFBAU_AB = 3;
 
 export class AudioManager {
   private ctx: AudioContext | null = null;
@@ -17,15 +42,30 @@ export class AudioManager {
   private hydraulicGain: GainNode | null = null;
   private hydOsc: OscillatorNode | null = null;
   private scrapeGain: GainNode | null = null;
+  /** Alle Dauerquellen, damit sie nach einer Unterbrechung ersetzt werden koennen */
+  private dauerquellen: AudioScheduledSourceNode[] = [];
+  /** Vergebliche Weckrufe, seit der Ton zuletzt lief */
+  private weckversuche = 0;
+  /** Seit dem letzten hoerbaren Moment gab es eine Unterbrechung */
+  private unterbrochen = false;
 
   constructor() {
-    const start = () => this.ensureStarted();
+    const start = (): void => this.ensureStarted();
     // Mobile Browser geben den Ton erst nach einer echten Geste frei, und
     // welches Ereignis dabei zählt, unterscheidet sich je nach System — daher
     // auf alle üblichen hören.
     for (const ev of ["pointerdown", "pointerup", "touchend", "click", "keydown"]) {
       window.addEventListener(ev, start, { once: false, passive: true });
     }
+    // Rueckkehr aus dem Hintergrund. Ohne diesen Handler bleibt ein auf
+    // `interrupted` gefallener Kanal stumm, bis der Spieler zufaellig tippt.
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) this.ensureStarted();
+    });
+    // Safari meldet die Rueckkehr aus dem Seiten-Zwischenspeicher (bfcache)
+    // nur ueber `pageshow`; nach einem App-Wechsel kommt teils nur `focus`.
+    window.addEventListener("pageshow", start);
+    window.addEventListener("focus", start);
   }
 
   /** Musik an/aus. Liefert den neuen Zustand. */
@@ -42,80 +82,221 @@ export class AudioManager {
     return this.musicWanted;
   }
 
-  /** Zustandsbericht für Fehlersuche und Tests. */
-  get diagnostics(): { ctx: string; musicWanted: boolean; musicRunning: boolean } {
+  /**
+   * Zustandsbericht für Fehlersuche und Tests — bewusst ehrlich: `musicRunning`
+   * meldet nur dann „laeuft", wenn der Kanal auch wirklich Ton durchlaesst.
+   * Vorher stand im Overlay „Musik an (laeuft)", waehrend der Kanal auf
+   * `interrupted` stand und nichts zu hoeren war.
+   */
+  get diagnostics(): Tondiagnose {
+    const zustand = (this.ctx?.state as string | undefined) ?? "keiner";
+    const hoerbar = istHoerbar(zustand);
     return {
-      ctx: this.ctx?.state ?? "keiner",
+      ctx: zustand,
       musicWanted: this.musicWanted,
-      musicRunning: this.music?.enabled ?? false,
+      musicRunning: (this.music?.enabled ?? false) && hoerbar,
+      hoerbar,
+      weckversuche: this.weckversuche,
     };
   }
 
+  /**
+   * Einstiegspunkt aller Weckrichtungen: baut den Kanal beim ersten Mal auf,
+   * weckt ihn danach, und baut ihn notfalls neu.
+   */
   private ensureStarted(): void {
-    if (this.ctx) {
-      // Auf dem Handy kann der Ton jederzeit wieder einschlafen (Anruf,
-      // Bildschirm aus, Tabwechsel) — bei jeder Geste erneut aufwecken.
-      if (this.ctx.state !== "running") this.ctx.resume().catch(() => {});
-      if (this.musicWanted) this.music?.start();
+    const ctx = this.ctx;
+    if (!ctx) {
+      this.baueKanal();
       return;
     }
+    const zustand = ctx.state as string;
+    if (brauchtNeuaufbau(zustand) || (this.weckversuche >= NEUAUFBAU_AB && !istHoerbar(zustand))) {
+      this.neuAufbauen();
+      return;
+    }
+    if (brauchtWeckruf(zustand)) {
+      this.weckruf();
+      return;
+    }
+    this.laeuftWieder();
+  }
+
+  /**
+   * `resume()` anstossen und nachsehen, ob es geholfen hat. Der Weckruf gilt
+   * so lange als vergeblich, bis das Gegenteil festgestellt ist — deshalb wird
+   * hier hochgezaehlt und erst in `laeuftWieder()` zurueckgesetzt.
+   */
+  private weckruf(): void {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    this.unterbrochen = true;
+    this.weckversuche++;
+    ctx.resume().catch(() => {});
+    for (const ms of NACHSEHEN_MS) window.setTimeout(() => this.nachsehen(), ms);
+  }
+
+  /** Hat der Weckruf gegriffen? Wenn nein: noch einmal schieben. */
+  private nachsehen(): void {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const zustand = ctx.state as string;
+    if (istHoerbar(zustand)) {
+      this.laeuftWieder();
+      return;
+    }
+    if (brauchtWeckruf(zustand)) ctx.resume().catch(() => {});
+  }
+
+  /**
+   * Der Kanal ist (wieder) offen. Nach einer Unterbrechung werden die
+   * Dauerquellen ersetzt: Auf iOS gelten Oszillatoren und Rauschschleifen
+   * danach zwar weiter als laufend, geben aber nichts mehr aus.
+   */
+  private laeuftWieder(): void {
+    this.weckversuche = 0;
+    if (this.unterbrochen) {
+      this.unterbrochen = false;
+      this.baueDauertoene();
+      this.music?.wiederaufnehmen();
+    }
+    if (this.musicWanted) this.music?.start();
+  }
+
+  /** Kanal samt Musik von Grund auf neu. Letzte Rettung, wenn nichts weckt. */
+  private neuAufbauen(): void {
+    const alt = this.ctx;
+    this.stoppeDauertoene();
     try {
-      this.ctx = new AudioContext();
-      this.master = this.ctx.createGain();
+      this.music?.stop();
+    } catch {
+      /* toter Kanal — egal, er wird ohnehin verworfen */
+    }
+    this.music = null;
+    this.ctx = null;
+    this.master = null;
+    // Der Rauschpuffer gehoert zum alten Kanal und waere im neuen unbrauchbar
+    this.cachedNoise = null;
+    this.weckversuche = 0;
+    this.unterbrochen = false;
+    try {
+      alt?.close().catch(() => {});
+    } catch {
+      /* war schon zu */
+    }
+    this.baueKanal();
+  }
+
+  private baueKanal(): void {
+    try {
+      const ctx = new AudioContext();
+      this.ctx = ctx;
+      this.master = ctx.createGain();
       this.master.gain.value = 0.5;
-      this.master.connect(this.ctx.destination);
+      this.master.connect(ctx.destination);
+      this.unterbrochen = false;
+      this.weckversuche = 0;
+
+      // Der Kanal meldet selbst, wenn er einschlaeft — der einzige Weg, einen
+      // Ausfall mitten im Spiel (Anruf, Kontrollzentrum) sofort zu bemerken.
+      ctx.onstatechange = (): void => {
+        if (this.ctx !== ctx) return; // gehoert zu einem verworfenen Kanal
+        const z = ctx.state as string;
+        if (istHoerbar(z)) this.laeuftWieder();
+        else if (brauchtWeckruf(z)) this.weckruf();
+      };
 
       // Hintergrundmusik, zur Laufzeit erzeugt — keine fremden Aufnahmen
-      this.music = new Music(this.ctx, this.master);
+      this.music = new Music(ctx, this.master);
       if (this.musicWanted) this.music.start();
 
-      // Diesel-Loop: tiefer Sägezahn + Tiefpass, Drehzahl folgt der Aktivität
-      this.engineOsc = this.ctx.createOscillator();
-      this.engineOsc.type = "sawtooth";
-      this.engineOsc.frequency.value = 48;
-      const engineFilter = this.ctx.createBiquadFilter();
-      engineFilter.type = "lowpass";
-      engineFilter.frequency.value = 220;
-      this.engineGain = this.ctx.createGain();
-      this.engineGain.gain.value = 0.05;
-      this.engineOsc.connect(engineFilter).connect(this.engineGain).connect(this.master);
-      this.engineOsc.start();
+      this.baueDauertoene();
 
-      // Hydraulik: kein Zischen mehr, sondern ein dezenter Pumpenton, der beim
-      // Bedienen mitläuft (Design-Wunsch 2026-08-29)
-      this.hydOsc = this.ctx.createOscillator();
-      this.hydOsc.type = "triangle";
-      this.hydOsc.frequency.value = 118;
-      const hydFilter = this.ctx.createBiquadFilter();
-      hydFilter.type = "lowpass";
-      hydFilter.frequency.value = 520;
-      this.hydraulicGain = this.ctx.createGain();
-      this.hydraulicGain.gain.value = 0;
-      this.hydOsc.connect(hydFilter).connect(this.hydraulicGain).connect(this.master);
-      this.hydOsc.start();
-      // leichtes Pulsieren der Pumpe
-      const lfo = this.ctx.createOscillator();
-      lfo.frequency.value = 7.5;
-      const lfoGain = this.ctx.createGain();
-      lfoGain.gain.value = 5;
-      lfo.connect(lfoGain).connect(this.hydOsc.frequency);
-      lfo.start();
-
-      // Kratzen auf Beton: helleres, raueres Rauschband — Gain folgt der Kontakt-Intensität
-      const scrapeNoise = this.ctx.createBufferSource();
-      scrapeNoise.buffer = this.noiseBuffer();
-      scrapeNoise.loop = true;
-      const scrapeFilter = this.ctx.createBiquadFilter();
-      scrapeFilter.type = "bandpass";
-      scrapeFilter.frequency.value = 2600;
-      scrapeFilter.Q.value = 1.2;
-      this.scrapeGain = this.ctx.createGain();
-      this.scrapeGain.gain.value = 0;
-      scrapeNoise.connect(scrapeFilter).connect(this.scrapeGain).connect(this.master);
-      scrapeNoise.start();
+      // Frisch angelegte Kanaele starten auf iOS haeufig als `suspended`
+      if (brauchtWeckruf(ctx.state as string)) this.weckruf();
     } catch {
       this.ctx = null; // Audio bleibt aus, Spiel läuft weiter
     }
+  }
+
+  /**
+   * Motor, Hydraulik und Kratzen laufen dauerhaft. Sie liegen in einer eigenen
+   * Methode, weil sie nach jeder Tonunterbrechung ersetzt werden muessen.
+   */
+  private baueDauertoene(): void {
+    const ctx = this.ctx;
+    const master = this.master;
+    if (!ctx || !master) return;
+    this.stoppeDauertoene();
+
+    // Diesel-Loop: tiefer Sägezahn + Tiefpass, Drehzahl folgt der Aktivität
+    this.engineOsc = ctx.createOscillator();
+    this.engineOsc.type = "sawtooth";
+    this.engineOsc.frequency.value = 48;
+    const engineFilter = ctx.createBiquadFilter();
+    engineFilter.type = "lowpass";
+    engineFilter.frequency.value = 220;
+    this.engineGain = ctx.createGain();
+    this.engineGain.gain.value = 0.05;
+    this.engineOsc.connect(engineFilter).connect(this.engineGain).connect(master);
+    this.engineOsc.start();
+
+    // Hydraulik: kein Zischen mehr, sondern ein dezenter Pumpenton, der beim
+    // Bedienen mitläuft (Design-Wunsch 2026-08-29)
+    this.hydOsc = ctx.createOscillator();
+    this.hydOsc.type = "triangle";
+    this.hydOsc.frequency.value = 118;
+    const hydFilter = ctx.createBiquadFilter();
+    hydFilter.type = "lowpass";
+    hydFilter.frequency.value = 520;
+    this.hydraulicGain = ctx.createGain();
+    this.hydraulicGain.gain.value = 0;
+    this.hydOsc.connect(hydFilter).connect(this.hydraulicGain).connect(master);
+    this.hydOsc.start();
+    // leichtes Pulsieren der Pumpe
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = 7.5;
+    const lfoGain = ctx.createGain();
+    lfoGain.gain.value = 5;
+    lfo.connect(lfoGain).connect(this.hydOsc.frequency);
+    lfo.start();
+
+    // Kratzen auf Beton: helleres, raueres Rauschband — Gain folgt der Kontakt-Intensität
+    const scrapeNoise = ctx.createBufferSource();
+    scrapeNoise.buffer = this.noiseBuffer();
+    scrapeNoise.loop = true;
+    const scrapeFilter = ctx.createBiquadFilter();
+    scrapeFilter.type = "bandpass";
+    scrapeFilter.frequency.value = 2600;
+    scrapeFilter.Q.value = 1.2;
+    this.scrapeGain = ctx.createGain();
+    this.scrapeGain.gain.value = 0;
+    scrapeNoise.connect(scrapeFilter).connect(this.scrapeGain).connect(master);
+    scrapeNoise.start();
+
+    this.dauerquellen = [this.engineOsc, this.hydOsc, lfo, scrapeNoise];
+  }
+
+  /** Alte Dauerquellen abstellen und abhaengen, damit nichts doppelt laeuft. */
+  private stoppeDauertoene(): void {
+    for (const q of this.dauerquellen) {
+      try {
+        q.stop();
+      } catch {
+        /* nie gestartet oder schon gestoppt */
+      }
+      try {
+        q.disconnect();
+      } catch {
+        /* schon abgehaengt */
+      }
+    }
+    this.dauerquellen = [];
+    this.engineOsc = null;
+    this.engineGain = null;
+    this.hydOsc = null;
+    this.hydraulicGain = null;
+    this.scrapeGain = null;
   }
 
   /** Pro Frame: activity 0..1 (Achsbewegung), load 0..1 (Traglast-Anteil). */
