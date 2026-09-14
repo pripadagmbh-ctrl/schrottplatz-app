@@ -1,6 +1,5 @@
 import { PRESS_CENTER, PRESS_INNER } from "./press";
 import {
-  YARD_W,
   YARD_D,
   YARD_MIN_X,
   YARD_MAX_X,
@@ -8,12 +7,18 @@ import {
   SUED_HOCH_VON,
   SUED_HOCH_RAMPE,
   OST_HOCH_BIS,
-  YARD_CX,
   GATE_X,
   KAFFEE_POS,
   KAFFEE_FUSS,
+  BUCHT_X_VON,
+  BUCHT_X_BIS,
+  BUCHT_Z,
+  TRENNSTEINE,
+  TRENNSTEIN_X,
+  TRENNSTEIN_L,
+  TRENNSTEIN_T,
 } from "./yard";
-import { officeFootprints } from "./office";
+import { officeFootprints, hallenFootprints } from "./office";
 import { CONFIGS, type ContainerConfig } from "./containers";
 
 /**
@@ -163,10 +168,19 @@ function bayObstacles(cfg: ContainerConfig): Obstacle[] {
   // Sie steht zwei Lagen hoeher als die Flanken (siehe containers.ts), damit
   // beim Einfuellen nichts dahinterfaellt.
   const stirn = cfg.facing === "east" ? -hw : hw;
-  const waende: Obstacle[] = [
-    { x: cfg.x, z: cfg.z - hd, hw, hd: BAY_T, top, label: `${L} Süd` },
-    { x: cfg.x, z: cfg.z + hd, hw, hd: BAY_T, top, label: `${L} Nord` },
-  ];
+  /*
+   * `shareSouth`/`shareNorth` nehmen eine Flanke heraus — dort steht schon
+   * etwas: bei der ersten Mulde der Westflanke die Aussenmauer, bei den
+   * beiden anderen die Nordwand ihres Nachbarn (E-010). Die Steine dafuer
+   * entfallen schon in containers.ts; ohne diese Zeilen bliebe hier eine
+   * unsichtbare Wand stehen. Genau so ein Paar aus gebautem und verzeichnetem
+   * Stand ist am 12.09.2026 als „unsichtbare Barriere" aufgefallen.
+   */
+  const waende: Obstacle[] = [];
+  if (!cfg.shareSouth)
+    waende.push({ x: cfg.x, z: cfg.z - hd, hw, hd: BAY_T, top, label: `${L} Süd` });
+  if (!cfg.shareNorth)
+    waende.push({ x: cfg.x, z: cfg.z + hd, hw, hd: BAY_T, top, label: `${L} Nord` });
   /*
    * `shareEast` nimmt die Stirnwand heraus (Ansage 13.09.2026: „Rueckwaende
    * raus, nur Seitenwaende"). Die Steine dafuer entfallen schon in
@@ -187,21 +201,94 @@ function bayObstacles(cfg: ContainerConfig): Obstacle[] {
 }
 
 export const STATIC_OBSTACLES: Obstacle[] = [
-  // --- Umrandung aus Betonlego, Einfahrt im Nordwesten ausgespart ---
-  { x: YARD_CX, z: -HZ, hw: YARD_W / 2, hd: WALL_T / 2, top: WALL_H, label: "Südwand" },
   /*
-   * Hinter den beiden Boxen steht die Suedmauer hoeher (yard.ts). Ohne diesen
+   * --- Umrandung aus Betonlego, Einfahrt im Nordwesten ausgespart ---
+   *
+   * Die Suedmauer steht seit E-010 in ZWEI Stuecken: Zwischen `BUCHT_X_VON`
+   * und `BUCHT_X_BIS` geht die Ausbuchtung nach Sueden auf. Als ein Eintrag
+   * ueber die ganze Breite laege quer vor ihrer Oeffnung eine unsichtbare
+   * Wand, und der Bagger kaeme nicht in die Bucht.
+   */
+  {
+    x: (YARD_MIN_X + BUCHT_X_VON) / 2,
+    z: -HZ,
+    hw: (BUCHT_X_VON - YARD_MIN_X) / 2,
+    hd: WALL_T / 2,
+    top: WALL_H,
+    label: "Südwand West",
+  },
+  {
+    x: (BUCHT_X_BIS + YARD_MAX_X) / 2,
+    z: -HZ,
+    hw: (YARD_MAX_X - BUCHT_X_BIS) / 2,
+    hd: WALL_T / 2,
+    top: WALL_H,
+    label: "Südwand Ost",
+  },
+  /*
+   * Hinter den Mulden steht die Suedmauer hoeher (yard.ts). Ohne diesen
    * Eintrag liesse `hitsObstacle` den Greifer auf 2 m durch sie hindurch, weil
    * die Mauer dort nur mit 1,8 m verzeichnet waere.
    */
   {
-    x: (SUED_HOCH_VON - SUED_HOCH_RAMPE + YARD_MAX_X) / 2,
+    x: (SUED_HOCH_VON - SUED_HOCH_RAMPE + BUCHT_X_VON) / 2,
     z: -HZ,
-    hw: (YARD_MAX_X - (SUED_HOCH_VON - SUED_HOCH_RAMPE)) / 2,
+    hw: (BUCHT_X_VON - (SUED_HOCH_VON - SUED_HOCH_RAMPE)) / 2,
     hd: WALL_T / 2,
     top: SUED_HOCH,
     label: "Südwand hoch",
   },
+  {
+    x: (BUCHT_X_BIS + YARD_MAX_X) / 2,
+    z: -HZ,
+    hw: (YARD_MAX_X - BUCHT_X_BIS) / 2,
+    hd: WALL_T / 2,
+    top: SUED_HOCH,
+    label: "Südwand hoch Ost",
+  },
+  /*
+   * Die Ausbuchtung: zwei Schenkel nach Sueden und die Rueckwand quer dazu,
+   * alle auf `SUED_HOCH` — „rundum mit hoher Wand" (E-010).
+   */
+  {
+    x: BUCHT_X_VON,
+    z: (-HZ + BUCHT_Z) / 2,
+    hw: WALL_T / 2,
+    hd: (-HZ - BUCHT_Z) / 2,
+    top: SUED_HOCH,
+    label: "Buchtwand West",
+  },
+  {
+    x: BUCHT_X_BIS,
+    z: (-HZ + BUCHT_Z) / 2,
+    hw: WALL_T / 2,
+    hd: (-HZ - BUCHT_Z) / 2,
+    top: SUED_HOCH,
+    label: "Buchtwand Ost",
+  },
+  {
+    x: (BUCHT_X_VON + BUCHT_X_BIS) / 2,
+    z: BUCHT_Z,
+    hw: (BUCHT_X_BIS - BUCHT_X_VON) / 2,
+    hd: WALL_T / 2,
+    top: SUED_HOCH,
+    label: "Buchtwand Süd",
+  },
+  /*
+   * Die Trennsteine zwischen den beiden Halden. Sie stehen hier mit ihrer
+   * WIRKLICHEN Hoehe je Saeule (0,6 bis 2,4 m) — `hitsObstacle` laesst den
+   * Arm ueber alles hinweg, was niedriger ist als er selbst, und genau das
+   * soll hier passieren: „sodass der Zugriff von Mischschrott zu
+   * Stahlschrott fluessig laeuft."
+   */
+  ...TRENNSTEINE.map((s, i) => ({
+    x: TRENNSTEIN_X,
+    z: s.z,
+    hw: TRENNSTEIN_T / 2,
+    hd: TRENNSTEIN_L / 2,
+    top: s.hoehe,
+    label: `Trennstein ${i + 1}`,
+  })),
   /* Dasselbe an der Ostmauer, hinter der Presse (yard.ts). */
   {
     x: YARD_MAX_X,
@@ -275,6 +362,20 @@ export const STATIC_OBSTACLES: Obstacle[] = [
     hd,
     top: 5.4,
     label: "Betriebsgebäude",
+  })),
+
+  /*
+   * Die drei Sortierhallen an der Nordwand (E-010). In dieser Phase sind es
+   * leere Huellen ohne Funktion — als Hindernis zaehlen sie trotzdem von der
+   * ersten Sekunde an, sonst faehrt der erste Haendler hindurch.
+   */
+  ...hallenFootprints().map(([x, z, hw, hd], i) => ({
+    x,
+    z,
+    hw,
+    hd,
+    top: 6.9,
+    label: `Halle ${i + 1}`,
   })),
 ];
 

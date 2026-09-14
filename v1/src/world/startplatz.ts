@@ -12,14 +12,31 @@
  * Testlauf statt im ersten Bild.
  */
 
-/** Mitte und Streuung des unsortierten Starthaufens (m). */
-export const START_HAUFEN = { x: 6.2, z: -19.0, streuung: 2.9, teile: 85 };
+/*
+ * Nachtrag 14.09.2026 (E-010): Der Haufen ist mit dem Mischschrott in die
+ * Ausbuchtung gezogen.
+ *
+ * Er liegt jetzt an der VORDEREN Kante der Halde (z −29,2), nicht in ihrer
+ * Mitte: Man graebt sich von vorn hinein, und die Mitte laege 12,1 m vom Sitz
+ * und damit ausserhalb des Schwenkbands. Bei (4,0 | −32,0) mit 2,6 m Streuung
+ * reicht der Haufen von z −34,6 bis −29,4 und liegt vollstaendig in der Box
+ * (die von −38,2 bis −29,2 geht); sein naechster Rand steht 7,9 m vom Sitz.
+ */
 
-/** Die beiden Altfahrzeuge am Rand des Haufens. */
+/** Mitte und Streuung des unsortierten Starthaufens (m). */
+export const START_HAUFEN = { x: 4.0, z: -32.0, streuung: 2.6, teile: 85 };
+
+/**
+ * Die beiden Altfahrzeuge am Rand des Haufens.
+ *
+ * Beide stehen an der vorderen Kante der Mischschrottbox, 4,2 m auseinander —
+ * ein Auto ist 1,8 m breit, sie stehen also nebeneinander und nicht
+ * ineinander.
+ */
 export const START_AUTOS: Array<{ x: number; z: number }> = [
-  { x: 3.6, z: -18.0 },
-  { x: 8.8, z: -19.0 },
+  { x: 1.4, z: -30.0 },
+  { x: 5.6, z: -30.2 },
 ];
 
 /** Streuschrott ringsum: zehn Teile auf einem Kreis um den Haufen. */
-export const START_STREU = { x: 6.2, z: -19.0, radius: 3.0, teile: 10 };
+export const START_STREU = { x: 4.0, z: -32.0, radius: 2.6, teile: 10 };

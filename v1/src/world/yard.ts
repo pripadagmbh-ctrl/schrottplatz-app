@@ -2,9 +2,22 @@ import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 
 /** Position der Brückenwaage in der Nordspur (SW) */
-/** Brückenwaage direkt hinter der Einfahrt */
-export const WEIGH_X = -22;
-export const WEIGH_Z = 24;
+/**
+ * Brückenwaage direkt neben dem Büro.
+ *
+ * E-010 (14.09.2026): „die Waage direkt neben das Büro (−27,5 | 23,5)". Sie
+ * stand vorher mittig in der Einfahrt bei (−22 | 24); dort lag sie neben
+ * nichts, und Mario musste quer über den Hof, um ein Wiegeergebnis
+ * abzuzeichnen. Jetzt schaut das Bürofenster darauf.
+ *
+ * Die Fahrtrichtung bleibt Nord–Süd. Der Konzeptplan zeichnet die Waage
+ * 9 m lang in x, also quer — dann müsste jeder Anlieferer erst nach Westen
+ * am Büro vorbei und wieder zurück nach Osten fahren, weil das Büro das
+ * westliche Ende der Reihe besetzt. Die Lage ist übernommen, die Ausrichtung
+ * nicht (siehe Bericht zum Paket).
+ */
+export const WEIGH_X = -27.5;
+export const WEIGH_Z = 23.5;
 /** Platzmaße (SW) — deutlich größer als die Ausgangsfläche */
 /**
  * Platzgrenzen. Der Platz ist NICHT um x = 0 zentriert (Wunsch 10.09.2026):
@@ -30,7 +43,14 @@ export const YARD_D = 58;
  * `SUED_HOCH_RAMPE` Meter auf die normale Hoehe zurueck — eine Mauer, die
  * auf voller Hoehe abbricht, sieht aus wie ein abgebrochenes Bauteil.
  */
-export const SUED_HOCH_VON = -6.6;
+/*
+ * Seit E-010 (14.09.2026) reicht das erhoehte Stueck weiter nach Westen: Die
+ * Mulde Alu+Zink steht mit ihrer Suedseite an der Aussenmauer und bekommt
+ * dort keine eigene Wand, sondern nur eine Erhoehung (ausdrueckliche Ansage).
+ * Sie reicht von x −10,1 bis −5,9; die Mauer steht deshalb ab −10,5 hoch und
+ * laeuft davor ueber die Rampe aus.
+ */
+export const SUED_HOCH_VON = -10.5;
 /*
  * 4,8 m — acht Blockreihen à 0,6 m, also so hoch wie die Boxen davor.
  *
@@ -55,6 +75,55 @@ export const SUED_HOCH_RAMPE = 4.5;
 export const OST_HOCH_BIS = -23.0;
 /** Einfahrt in der linken hinteren Ecke (Nordwesten) */
 export const GATE_X = -22;
+
+/* ----------------------------------------------------- Die Ausbuchtung ---- */
+/**
+ * Hinter dem Bagger woelbt sich die Platzgrenze nach Sueden aus (E-010).
+ *
+ * Darin liegen die beiden Halden — Mischschrott und Stahlschrott —, rundum
+ * mit hoher Wand. Die Suedmauer war hinter dem Bagger ohnehin schon auf
+ * `SUED_HOCH` erhoeht; die Ausbuchtung setzt dort an, wo diese Wand steht,
+ * statt eine zweite zu erfinden: Zwischen `BUCHT_X_VON` und `BUCHT_X_BIS`
+ * bleibt die Suedmauer weg, dafuer laufen zwei Schenkel nach Sueden und eine
+ * Rueckwand quer dazu.
+ *
+ * Zahlen aus `tools/platzkonzept.mjs` (`bxA`, `bxB`, `BUCHT_Z`).
+ */
+export const BUCHT_X_VON = -6.5;
+export const BUCHT_X_BIS = 7.5;
+export const BUCHT_Z = -38.5;
+/** Ist diese x-Stelle der Suedmauer von der Ausbuchtung ausgespart? */
+export function inBucht(x: number): boolean {
+  return x > BUCHT_X_VON && x < BUCHT_X_BIS;
+}
+
+/**
+ * Die Trennsteine zwischen den beiden Halden — eine Pyramide.
+ *
+ * Ansage 14.09.2026: „sodass der Zugriff von Mischschrott zu Stahlschrott
+ * fluessig laeuft." In der Mitte stehen sie 2,4 m hoch, zu beiden Seiten
+ * laufen sie auf 0,6 m ab. Die Kralle greift also ueber die Kante hinweg, und
+ * man sieht trotzdem, wo die eine Halde aufhoert.
+ *
+ * Es sind dieselben Steine wie in der Umrandung (1,6 x 0,6 x 0,6 m) — sie
+ * gehen in dieselbe InstancedMesh und kosten damit keinen Zeichenruf extra.
+ * 2,4 m sind genau vier Lagen, 0,6 m eine.
+ */
+export const TRENNSTEIN_L = 1.6;
+export const TRENNSTEIN_T = 0.6;
+export const TRENNSTEIN_H = 0.6;
+/** Mittellinie der Steinreihe: die Fuge zwischen den beiden Halden. */
+export const TRENNSTEIN_X = 0.5;
+
+/**
+ * Lage und Hoehe jeder Saeule, von der Bucht-Oeffnung nach hinten.
+ *
+ * Sechs Saeulen a 1,6 m decken die 9,0 m Haldentiefe ab. Die Lagen laufen
+ * 1–2–4–4–2–1: in der Mitte 2,4 m, an beiden Enden 0,6 m.
+ */
+export const TRENNSTEINE: Array<{ z: number; hoehe: number }> = [1, 2, 4, 4, 2, 1].map(
+  (lagen, i) => ({ z: -29.9 - i * TRENNSTEIN_L, hoehe: lagen * TRENNSTEIN_H })
+);
 
 /**
  * Janines Kaffeewagen steht an der Nordwand vor den Graffiti, oestlich der
@@ -325,10 +394,17 @@ export class Yard {
       depthWrite: false,
     });
     // Streckenzüge, die den echten Fahrspuren folgen
+    /*
+     * Nach dem Umbau (E-010) laufen sie anders: von der Einfahrt ueber die
+     * Waage am Buero, dann nach Sueden — einmal auf die Verladespur vor den
+     * Silos, einmal auf die Abkippspur links neben dem Bagger, einmal an der
+     * Silo-Reihe entlang fuer die sortenreinen Kipper.
+     */
     const wege: Array<Array<[number, number]>> = [
-      [[GATE_X, 34], [GATE_X, 24], [-14, 18.5], [0, 19], [0, 7]],
-      [[-14, 18.5], [-9, 13], [-9, 7.5]],
-      [[-14, 18.5], [-3.5, 19], [-3.5, 8]],
+      [[GATE_X, 34], [GATE_X, 28], [WEIGH_X, 22.5], [WEIGH_X, 16]],
+      [[WEIGH_X, 16], [-20, 12], [-18, 6], [-18, -13]],
+      [[WEIGH_X, 16], [-12, 10], [-2, 4], [2.0, -14]],
+      [[WEIGH_X, 16], [-30, 12], [-30, -26]],
     ];
     for (const weg of wege) {
       for (let i = 0; i < weg.length - 1; i++) {
@@ -450,15 +526,21 @@ export class Yard {
       m.position.set(x, 0.02, z);
       scene.add(m);
     };
-    // Nordspur: Randmarkierungen links/rechts der Fahrgasse
-    for (let z = 20; z > 10; z -= 2.4) {
-      mark(-2.4, z, true);
-      mark(2.4, z, true);
+    /*
+     * Randmarkierungen der Verladespur (E-010): Der Abholer setzt auf x −18
+     * zurueck, der Bagger steht 7,5 m westlich davon. Die Striche zeigen dem
+     * Spieler, wo der LKW gleich stehen wird — vorher lagen sie bei x 16 und
+     * damit 5,5 m ausserhalb der Platzmauer.
+     */
+    for (let z = 4; z > -16; z -= 2.4) {
+      mark(-19.8, z, true);
+      mark(-16.2, z, true);
     }
-    // Ostspur nach Süden
-    for (let z = 20; z > -12; z -= 2.4) mark(16, z, true);
-    // Abzweig nach Westen zum Verladeplatz
-    for (let x = 15; x > 6; x -= 2.2) mark(x, -13, false);
+    // Abkippspur links neben dem Bagger
+    for (let z = 0; z > -15; z -= 2.4) {
+      mark(0.2, z, true);
+      mark(3.8, z, true);
+    }
   }
 
   /**
@@ -609,6 +691,24 @@ export class Yard {
     ground.position.x = YARD_CX; // der Platz liegt nicht mehr im Ursprung
     ground.receiveShadow = true;
     scene.add(ground);
+
+    /*
+     * Der Boden der Ausbuchtung (E-010). Ein eigenes Stueck statt eines
+     * groesseren Rechtecks: `YARD_D` haengt an Dutzenden Rechnungen — von der
+     * Mauerschleife bis zur Hindernisliste —, und die Bucht ist nun einmal
+     * keine Rechteckflaeche.
+     */
+    const buchtTex = tex.clone();
+    buchtTex.needsUpdate = true;
+    buchtTex.repeat.set(9, 6);
+    const bucht = new THREE.Mesh(
+      new THREE.PlaneGeometry(BUCHT_X_BIS - BUCHT_X_VON, -YARD_D / 2 - BUCHT_Z),
+      new THREE.MeshStandardMaterial({ map: buchtTex, roughness: 1 })
+    );
+    bucht.rotation.x = -Math.PI / 2;
+    bucht.position.set((BUCHT_X_VON + BUCHT_X_BIS) / 2, 0, (-YARD_D / 2 + BUCHT_Z) / 2);
+    bucht.receiveShadow = true;
+    scene.add(bucht);
 
     // Kollider deutlich größer als der sichtbare Platz: Nichts darf je ins Leere fallen,
     // auch wenn etwas über die Mauer geworfen wird.
@@ -994,7 +1094,21 @@ export class Yard {
     // Nord- und Südwand (Einfahrtslücke im Norden bei GATE_X)
     for (let x = YARD_MIN_X + BL / 2; x < YARD_MAX_X; x += BL) {
       if (!(Math.abs(x - GATE_X) < 4.5)) place(x, hz, true);
-      place(x, -hz, true, suedReihen(x));
+      // Wo die Ausbuchtung nach Sueden aufgeht, steht keine Suedmauer.
+      if (!inBucht(x)) place(x, -hz, true, suedReihen(x));
+    }
+    /*
+     * Die Ausbuchtung: zwei Schenkel nach Sueden und die Rueckwand quer dazu,
+     * alle auf `SUED_HOCH` — „rundum mit hoher Wand" (E-010). Sie schliessen
+     * an das erhoehte Stueck der Suedmauer an, statt daneben zu stehen.
+     */
+    const buchtReihen = Math.round(SUED_HOCH / BH);
+    for (let z = -hz - BL / 2; z > BUCHT_Z; z -= BL) {
+      place(BUCHT_X_VON, z, false, buchtReihen);
+      place(BUCHT_X_BIS, z, false, buchtReihen);
+    }
+    for (let x = BUCHT_X_VON + BL / 2; x < BUCHT_X_BIS; x += BL) {
+      place(x, BUCHT_Z, true, buchtReihen);
     }
     // Ost- und Westwand
     for (let z = -hz + BL / 2; z < hz; z += BL) {
@@ -1002,6 +1116,7 @@ export class Yard {
       // Hinter der Presse so hoch wie die Suedmauer, sonst normal
       place(YARD_MAX_X, z, false, z <= OST_HOCH_BIS ? Math.round(SUED_HOCH / BH) : ROWS);
     }
+    this.buildTrennsteine(place);
 
     const wallMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95 });
     const bauen = (geo: THREE.BufferGeometry, liste: Array<{ m: THREE.Matrix4; f: THREE.Color }>): void => {
@@ -1031,17 +1146,32 @@ export class Yard {
         wallBody
       );
     };
-    addWall(YARD_CX, -hz, YARD_W, BT);
+    /*
+     * Die Suedmauer in zwei Stuecken links und rechts der Ausbuchtung — als
+     * ein durchgehender Quader liefe sie quer durch deren Oeffnung, und der
+     * Bagger koennte nicht in die Bucht greifen.
+     */
+    addWall((YARD_MIN_X + BUCHT_X_VON) / 2, -hz, BUCHT_X_VON - YARD_MIN_X, BT);
+    addWall((BUCHT_X_BIS + YARD_MAX_X) / 2, -hz, YARD_MAX_X - BUCHT_X_BIS, BT);
+    // Die drei Waende der Ausbuchtung, alle auf voller Hoehe
+    for (const bx of [BUCHT_X_VON, BUCHT_X_BIS])
+      addWall(bx, (-hz + BUCHT_Z) / 2, BT, -hz - BUCHT_Z, SUED_HOCH);
+    addWall((BUCHT_X_VON + BUCHT_X_BIS) / 2, BUCHT_Z, BUCHT_X_BIS - BUCHT_X_VON, BT, SUED_HOCH);
+    // Die Trennsteine zwischen den Halden: je Saeule ein Quader
+    for (const s of TRENNSTEINE)
+      addWall(TRENNSTEIN_X, s.z, TRENNSTEIN_T, TRENNSTEIN_L, s.hoehe);
     /*
      * Das erhoehte Stueck bekommt einen zweiten Quader obendrauf. Er muss
      * sein, nicht nur die Steine: `hitsObstacle` laesst den Greifer ueber
      * alles hinweg, was niedriger ist als er selbst — ohne diesen Kollider
      * fuehre er durch die sichtbare Mauer hindurch.
      */
+    const hochVon = SUED_HOCH_VON - SUED_HOCH_RAMPE;
+    addWall((hochVon + BUCHT_X_VON) / 2, -hz, BUCHT_X_VON - hochVon, BT, SUED_HOCH);
     addWall(
-      (SUED_HOCH_VON - SUED_HOCH_RAMPE + YARD_MAX_X) / 2,
+      (BUCHT_X_BIS + YARD_MAX_X) / 2,
       -hz,
-      YARD_MAX_X - (SUED_HOCH_VON - SUED_HOCH_RAMPE),
+      YARD_MAX_X - BUCHT_X_BIS,
       BT,
       SUED_HOCH
     );
@@ -1063,6 +1193,21 @@ export class Yard {
     addWall((gateR + YARD_MAX_X) / 2, hz, YARD_MAX_X - gateR, BT);
 
     this.buildGate(scene, gateL, gateR, hz);
+  }
+
+  /**
+   * Die Pyramide aus Trennsteinen zwischen Mischschrott und Stahlschrott.
+   *
+   * Sie benutzt denselben Setzer wie die Umrandung — dieselben Steine,
+   * dieselbe InstancedMesh, kein zusaetzlicher Zeichenruf. Uebergeben wird nur
+   * die Zahl der Lagen je Saeule; die Hoehenkurve steht in `TRENNSTEINE`.
+   */
+  private buildTrennsteine(
+    place: (x: number, z: number, alongX: boolean, reihen?: number) => void
+  ): void {
+    for (const s of TRENNSTEINE) {
+      place(TRENNSTEIN_X, s.z, false, Math.round(s.hoehe / 0.6));
+    }
   }
 
   /**

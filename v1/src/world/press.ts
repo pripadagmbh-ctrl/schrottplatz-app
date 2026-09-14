@@ -49,7 +49,22 @@ import type { CompositeManager } from "../dismantle/composites";
  * Jetzt (5,5 | −24,3): Klappe bis −28,15, also 55 cm vor der Suedmauer,
  * Rahmen bis 9,77, also 43 cm vor der Ostmauer.
  */
-const CENTER = new THREE.Vector3(5.5, 0, -24.3);
+/*
+ * Nachtrag 14.09.2026, Platzumbau E-010: von (5,5 | −24,3) auf (6,6 | −24,6).
+ *
+ * Der Konzeptplan zeichnet sie auf (7,3 | −26,0). Beides geht nicht:
+ *
+ *  - In x endet der Rahmen bei Mitte + 3,325 m. Bei x 7,3 waeren das 10,63,
+ *    die Ostmauer beginnt innen bei 10,20 — 43 cm in der Wand. 6,6 laesst
+ *    27 cm Luft.
+ *  - In z schwingt die Deckelklappe 3,85 m ueber die Mitte hinaus (gemessen
+ *    an der offenen Maschine). Bei z −26,0 reichte sie bis −29,85, die
+ *    Suedmauer steht innen bei −28,7. Bei −24,6 endet sie auf −28,45.
+ *
+ * Damit steht sie 7,4 m vom Bagger statt der geplanten 8,5 — beides liegt im
+ * Schwenkband 5,8 bis 9,2 m (`test/platz.test.ts`).
+ */
+const CENTER = new THREE.Vector3(6.6, 0, -24.6);
 /** Mitte der Presskammer — auch fuer Hindernisliste und Tests. */
 export const PRESS_CENTER = CENTER;
 // Die Schwelle gilt fuer Objekte wie fuer Pakete — sie steht in materials/purity.ts.

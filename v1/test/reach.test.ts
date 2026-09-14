@@ -22,52 +22,48 @@ import {
   TIP_CREEP_M,
 } from "../src/delivery/routes";
 import { baleYard, PRESS_CENTER as PRESSE } from "../src/world/press";
+import { BAGGER_STAND, VERLADE_STAND } from "../src/world/baggerstand";
 
-/** Standplatz des Baggers — siehe `position` in excavator.ts. */
-const BAGGER = { x: -2.5, z: -19.5 };
+/**
+ * Standplatz des Baggers — aus `world/baggerstand.ts`, nicht abgeschrieben.
+ *
+ * Die Zahl stand hier als Kopie aus `excavator.ts`. Beim Platzumbau (E-010)
+ * ist der Standplatz von (−2,5 | −19,5) auf (−0,5 | −22,5) gewandert; eine
+ * Kopie wandert nicht mit, und der Test prueft dann Reichweiten von einer
+ * Stelle aus, an der niemand steht.
+ */
+const BAGGER = { x: BAGGER_STAND.x, z: BAGGER_STAND.z };
 
 /**
  * Mulden, die der Spieler von seinem Standplatz aus selbst befüllt.
  *
- * Seit der Platzordnung vom 12.09.2026 sind das genau drei plus das
- * Ballenlager: Stahl, Alu, VA. Abfall und Hortmulden stehen bewusst außerhalb
- * des Schwenkkranzes — dorthin wird gefahren oder Lambert trägt es hin —, und
- * die Absetzcontainer lassen sich ohnehin heranziehen.
+ * Seit E-010 sind das die beiden Halden in der Ausbuchtung und die drei
+ * Mulden an der Westflanke (Kupfer+Messing, Kabel, Alu+Zink). Die Silo-Reihe
+ * steht bewusst ausserhalb — dorthin faehrt der Bagger, oder Lambert traegt
+ * es hin.
  */
-const SELBST_BEFUELLT = [
-  "c_mixed",
-  "c_steel",
-  "r_cable",
-  "r_va",
-  "r_copper",
-  "r_alu",
-  "r_zinc",
-  "r_brass",
-];
+const SELBST_BEFUELLT = ["c_mixed", "c_steel", "r_cable", "r_copper", "r_alu"];
 
 /**
- * Die Arbeitslinie des Baggers (Platzordnung 12.09.2026).
+ * Die Arbeitslinie des Baggers.
  *
  * Er arbeitet nicht von einem Punkt: Ein Ring von 4,0 bis 9,5 m fasst keine
  * zehn Ziele. Geprueft wird deshalb, ob jedes Ziel von IRGENDEINEM Punkt
  * dieser kurzen Linie aus ueber seine Wand zu befuellen ist.
+ *
+ * Nach dem Umbau (E-010) ist sie viel kuerzer als vorher: Der Standplatz
+ * liegt in der Oeffnung der Ausbuchtung, und alle acht Ziele liegen ringsum
+ * im Schwenkband. Der lange Umweg zur offenen Westseite der alten Stahlmulde
+ * entfaellt damit ersatzlos — die Halde ist jetzt hinter dem Sitz, nicht
+ * neben der Presse.
  */
 const HUB_CACHE = new Map<number, number>();
 const LINIE: Array<[number, number]> = [];
-// Nach vorn, an der Containerreihe entlang
-for (let t = 0; t <= 1.0001; t += 0.05) LINIE.push([-2.5, -19.5 + t * 5]);
-/*
- * Und einmal herum zur offenen Westseite der Stahlmulde.
- *
- * Die Mulde liegt seit dem 12.09.2026 rechts neben der Presse und ist vom
- * Sitz aus 11,0 m entfernt — ausserhalb jeder Reichweite. Der Gang hinter der
- * Containerreihe, aus dem sie vorher befuellt wurde, ist zu, seit die
- * Container an der Muldenwand stehen. Bleibt die offene Westseite: nordlich an
- * den Containern vorbei, dann nach Sueden. Von (−15,5 | −21) sind es 6,4 m auf
- * die Muldenmitte bei 8,1 m Hubhoehe.
- */
-for (let t = 0; t <= 1.0001; t += 0.1) LINIE.push([-2.5 - t * 13.0, -13.5]);
-for (let t = 0; t <= 1.0001; t += 0.1) LINIE.push([-15.5, -13.5 - t * 8.5]);
+// Fünf Meter nach vorn, wie bisher — so weit setzt man im Arbeiten um.
+for (let t = 0; t <= 1.0001; t += 0.05)
+  LINIE.push([BAGGER_STAND.x, BAGGER_STAND.z + t * 5]);
+// Und zwei Meter nach links und rechts, fuer die beiden Halden nebenan.
+for (let t = -1; t <= 1.0001; t += 0.25) LINIE.push([BAGGER_STAND.x + t * 2, BAGGER_STAND.z]);
 
 function abstand(x: number, z: number): number {
   return Math.hypot(x - BAGGER.x, z - BAGGER.z);
@@ -181,21 +177,27 @@ describe("Reichweite des Arms", () => {
    * waeren dann eine Sackgasse: Was man nicht greifen kann, kann man weder
    * verladen noch verkaufen.
    */
-  it("der Abholer haelt im Greifring, egal wo der Bagger steht", () => {
-    for (const b of [
-      { x: -2.0, z: -19.5 },
-      { x: -2.0, z: -14.0 },
-      { x: 2.0, z: -22.0 },
-      { x: -6.0, z: -12.0 },
-    ]) {
-      setBaggerOrt(() => b);
-      const [x, z] = neueAbholstelle();
-      const d = Math.hypot(x - b.x, z - b.z);
-      expect(d, `Abholer bei Bagger (${b.x}|${b.z})`).toBeGreaterThanOrEqual(4.0);
-      expect(d, `Abholer bei Bagger (${b.x}|${b.z})`).toBeLessThanOrEqual(9.5);
-      // Ueber die Bordwand muss der Greifer auch noch kommen.
-      expect(hoechsteKrallenspitze(d), `Hubhoehe bei ${d.toFixed(1)} m`).toBeGreaterThan(2.5);
-    }
+  it("der Abholer haelt im Greifring des Verladeplatzes", () => {
+    /*
+     * Bis zum 14.09.2026 hielt der Abholer dort, wo der Bagger gerade stand —
+     * der Test prüfte deshalb vier Baggerstellungen durch. Mit E-010 ist das
+     * umgedreht: Der Verladeplatz ist ein ORT, und wer laden will, fährt hin
+     * („Silo zu Abholer — der Spieler mit dem Bagger am Verladeplatz", E-011).
+     * Die alte Rechnung ginge hier gar nicht mehr auf; vom Hauptstandplatz
+     * sind es 26 m bis zur Silo-Reihe.
+     *
+     * Geprüft wird jetzt die Eigenschaft, die davon übrig bleibt und auf die
+     * es ankommt: Steht der Bagger auf seinem zweiten Standplatz, liegt der
+     * Container im Greifring, und der Arm kommt über die Bordwand.
+     */
+    setBaggerOrt(() => BAGGER_STAND);
+    const [x, z] = neueAbholstelle();
+    const d = Math.hypot(x - VERLADE_STAND.x, z - VERLADE_STAND.z);
+    expect(d, `Abholer ${d.toFixed(1)} m vom Verladeplatz`).toBeGreaterThanOrEqual(4.0);
+    expect(d, `Abholer ${d.toFixed(1)} m vom Verladeplatz`).toBeLessThanOrEqual(9.5);
+    expect(hoechsteKrallenspitze(d), `Hubhoehe bei ${d.toFixed(1)} m`).toBeGreaterThan(2.5);
+    // Und er steht nicht in der Silo-Reihe, sondern östlich davon.
+    expect(x, "der Abholer steht westlich des Baggers").toBeGreaterThan(VERLADE_STAND.x);
   });
 
   it("das Presspaket bleibt in der Kammer", () => {

@@ -1,5 +1,24 @@
 import * as THREE from "three";
-import { GATE_X } from "../world/yard";
+import { GATE_X, WEIGH_X } from "../world/yard";
+import { VERLADE_STAND } from "../world/baggerstand";
+
+/**
+ * Halteplatz auf der Brueckenwaage.
+ *
+ * Seit E-010 steht die Waage neben dem Buero auf x −27,5 statt mittig in der
+ * Einfahrt. Jeder Weg auf den Platz beginnt und endet hier; deshalb steht der
+ * Punkt einmal und wird ueberall eingesetzt.
+ */
+export const WAAGE_HALT: [number, number] = [WEIGH_X, 22.5];
+/**
+ * Erster Punkt suedlich der Waage, von dem aus sich die Wege verzweigen.
+ *
+ * Gesucht, nicht gegriffen: westlich davon steht das Buero (Front x −30,6),
+ * oestlich Janines Kaffeewagen (ab x −25,0), noerdlich die Wiegeplatte. Bei
+ * (−27,0 | 16,0) bleiben zu beiden Seiten ueber 1,6 m — mehr, als die
+ * Blockadepruefung der LKW mit 1,4 m abtastet.
+ */
+export const VERTEILER: [number, number] = [-27.0, 16.0];
 
 /**
  * Das Streckennetz des Platzes.
@@ -22,7 +41,8 @@ import { GATE_X } from "../world/yard";
 // Einfahrt → Brückenwaage (dort wird brutto gewogen)
 export const ROUTE_IN_FWD: Array<[number, number]> = [
   [GATE_X, 40],
-  [GATE_X, 24],
+  [GATE_X, 28],
+  WAAGE_HALT,
 ];
 /**
  * Die Abladestelle ist kein fester Punkt mehr (Ansage 12.09.2026).
@@ -48,14 +68,24 @@ const ABLADE_ABSTAND = 8.0;
  * LKW kommt also von Norden die Gasse herunter und setzt auf den Vorplatz
  * vor der Maschine zurück.
  */
-const RANGIER_Z = 2.0;
-/**
- * Der Vorplatz, über den der Punkt nicht hinauswandert. Östlich beginnen die
- * Absetzcontainer, westlich die Batteriemulde, südlich der Bagger selbst.
+/*
+ * Nach dem Platzumbau (E-010) sitzt der Betrieb noch weiter suedlich: Der
+ * Bagger steht auf (−0,5 | −22,5) vor der Ausbuchtung. Der LKW kommt die
+ * Gasse herunter und setzt auf die freie Flaeche vor der Maschine zurueck.
  */
-const VORPLATZ = { xMin: -6.5, xMax: -1.5, zMin: -12.5, zMax: 0.0 };
+const RANGIER_Z = -6.0;
+/**
+ * Der Vorplatz, über den der Punkt nicht hinauswandert.
+ *
+ * Gesucht gegen die Nachbarn: Bei x unter −4,5 streift die Ladeflaeche die
+ * Mulden an der Westflanke (Ostkante −5,9), ueber +1,5 den Reifencontainer
+ * (Westkante 2,8). Suedlich von −16,5 stuende der Wagen im Schwenkbereich
+ * ueber den Halden, noerdlich von −10,0 waere die Ladeflaeche weiter als
+ * 9,2 m vom Sitz und damit nicht mehr auszuraeumen.
+ */
+const VORPLATZ = { xMin: -4.5, xMax: 1.5, zMin: -16.5, zMax: -10.0 };
 
-let abladeStelle: [number, number] = [0, 7.0];
+let abladeStelle: [number, number] = [-1.2, -14.5];
 let baggerOrt: (() => { x: number; z: number }) | null = null;
 
 /** Woher die Baggerstellung kommt. Einmal beim Aufbau setzen. */
@@ -71,7 +101,7 @@ export function setBaggerOrt(f: () => { x: number; z: number }): void {
 export function neueAbladestelle(): [number, number] {
   const b = baggerOrt?.();
   if (b) {
-    const rx = -4.0 - b.x;
+    const rx = -2.0 - b.x;
     const rz = RANGIER_Z - b.z;
     const len = Math.hypot(rx, rz) || 1;
     const x = b.x + (rx / len) * ABLADE_ABSTAND;
@@ -92,12 +122,7 @@ export function abladestelle(): [number, number] {
 // Nach dem Wiegen weiter zum Rangierpunkt vor dem Abkippplatz
 export function routeApproach(): Array<[number, number]> {
   const [x] = abladeStelle;
-  return [
-    [GATE_X, 24],
-    [-16, 14],
-    [-8, 6],
-    [x, RANGIER_Z],
-  ];
+  return [WAAGE_HALT, VERTEILER, [-21, 10], [-12, 3], [x, RANGIER_Z]];
 }
 export function routeInRev(): Array<[number, number]> {
   const [x, z] = abladeStelle;
@@ -111,86 +136,59 @@ export function routeOut(): Array<[number, number]> {
   return [
     [x, z],
     [x, RANGIER_Z],
-    [-8, 6],
-    [-16, 14],
-    [GATE_X, 24],
+    [-12, 3],
+    [-21, 10],
+    VERTEILER,
+    WAAGE_HALT,
+    [GATE_X, 28],
     [GATE_X, 40],
   ];
 }
 
 /*
- * ABHOLUNG — eigene Anfahrt auf der Ostspur, bis an den Baggerplatz.
+ * ABHOLUNG — zum VERLADEPLATZ vor der Silo-Reihe.
  *
- * Ansage 12.09.2026: „Abholer soll andere Route zum Baggerplatz nehmen."
- * Vorher fuhr er die Westspur am Buero und den Silos entlang und hielt neben
- * dem Reifendepot bei (−21,5 | −17). Das waren 19,6 m bis zur Maschine —
- * doppelt so weit, wie der Arm reicht. Beladen liess sich dort nichts; man
- * musste erst den ganzen Bagger umsetzen.
+ * Das ist die Umkehrung dessen, was bis zum 14.09.2026 galt. Vorher kam der
+ * Abholer an die Flanke des Baggers, weil sein Container dort stehen musste,
+ * wo der Arm hinkommt. Seit E-010 gibt es dafuer einen eigenen Ort: den
+ * Verladeplatz zwischen Silo-Reihe und LKW-Spur, mit einem zweiten
+ * Baggerstand dazwischen (−25,5 | −12). Der Abholer setzt auf x −18 zurueck,
+ * die Silo-Vorderkante liegt bei x −33 — 7,5 m nach jeder Seite.
  *
- * Der Grund fuer den Umweg war die Presse: Sie und die Absetzcontainer bilden
- * zwischen x −5 und −15 eine durchgehende Sperre von z −11 bis −27. Von Westen
- * kommt man nicht an den Bagger heran, um sie herum auch nicht. Die einzige
- * offene Gasse liegt oestlich der Maschine, zwischen ihr und dem
- * Mischschrottplatz — und genau die faehrt der Abholer jetzt.
+ * Damit haengt die Halteposition NICHT mehr am Bagger, sondern steht fest.
+ * Das ist die Entscheidung von E-011: „Silo zu Abholer — der Spieler mit dem
+ * Bagger am Verladeplatz." Wer laden will, faehrt hin; eine Fahrt hin und
+ * zurueck dauert gemessen 22,6 s (E-012). Die alte Rechnung, die den LKW dem
+ * Bagger hinterhertrug, ginge hier auch gar nicht auf: Steht die Maschine an
+ * ihrem Hauptplatz, sind es 26 m bis zur Silo-Reihe.
  *
- * Damit haben Anlieferung und Abholung getrennte Wege: Der Kipper setzt von
- * Nordwesten auf den Vorplatz, der Abholer kommt von Nordosten an die Flanke.
- * Sie kreuzen sich nicht, und beide stehen im Greifbereich.
+ * Der Weg kreuzt die Anlieferung nicht: Der Kipper faehrt oestlich an den
+ * Bagger, der Abholer westlich an die Silos.
  */
 export const PICKUP_IN_FWD: Array<[number, number]> = [
   [GATE_X, 40],
-  [GATE_X, 24],
+  [GATE_X, 28],
+  WAAGE_HALT,
 ];
-/** Nordende der Ostgasse — von hier setzt der Abholer zurueck. */
-const ABHOL_RANGIER: [number, number] = [5.5, -2.0];
 /**
- * Wie weit vor dem Bagger der Abholer haelt.
+ * Die LKW-Spur des Verladeplatzes und der Punkt, an dem der Abholer steht.
  *
- * Etwas weiter weg als der Kipper (8,0 m), weil hier nicht abgekippt, sondern
- * Stueck fuer Stueck in den Container gelegt wird: Der Arm braucht Hoehe ueber
- * der Bordwand, und die hat er im mittleren Ring am ehesten.
+ * x −18,0 ist gesucht: 7,5 m oestlich des zweiten Baggerstands, genau so weit,
+ * wie die Silo-Vorderkante westlich davon liegt. Der Bagger steht in der
+ * Mitte und dreht sich zwischen beiden — er muss nicht umsetzen.
  */
-const ABHOL_ABSTAND = 7.5;
-/**
- * Der Streifen, in dem die Halteposition liegen darf.
- *
- * Oestlich beginnt bei x 10 die Aussenwand des Mischschrottplatzes, suedlich
- * bei z −20 seine offene Kippkante. Und x 3,0 ist die Grenze nach Westen: Naeher
- * an den Bagger darf der Wagen nicht, sonst steht er im Heckschwenk.
- */
-const ABHOLPLATZ = { xMin: 3.0, xMax: 8.0, zMin: -18.0, zMax: -6.0 };
+export const VERLADE_SPUR_X = VERLADE_STAND.x + 7.5;
+/** Nordende der Verladespur — von hier setzt der Abholer zurueck. */
+const ABHOL_RANGIER: [number, number] = [VERLADE_SPUR_X, -2.0];
 
-let abholStelle: [number, number] = [5.5, -13.0];
-
-/** Wie weit seitlich neben dem Bagger die Gasse liegt. */
-const ABHOL_SEITLICH = 5.5;
+let abholStelle: [number, number] = [VERLADE_SPUR_X, VERLADE_STAND.z];
 
 /**
- * Halteposition des Abholers bestimmen — wie bei der Anlieferung einmal beim
- * Losfahren, danach steht sie fest.
- *
- * Gerechnet wird nicht auf der Luftlinie zum Rangierpunkt, sondern entlang der
- * Gasse: Erst legt sich fest, auf welcher Spurhoehe der Wagen steht (x), dann
- * wird er so weit nach Norden geschoben, dass der Abstand zum Bagger stimmt.
- *
- * Der Umweg ueber die Gasse ist noetig, weil die Luftlinie sie verlaesst,
- * sobald der Bagger nach Westen faehrt. Gemessen mit der Maschine auf
- * (−6 | −12): Die Luftlinie ergab einen Halt 10,3 m entfernt — anderthalb
- * Meter ausserhalb des Greifrings, der Container waere nicht zu beladen
- * gewesen. Diese Rechnung haelt ihn bei 9,0 m.
+ * Halteposition des Abholers. Sie steht fest — der Verladeplatz ist ein Ort,
+ * kein Abstand zum Bagger.
  */
 export function neueAbholstelle(): [number, number] {
-  const b = baggerOrt?.();
-  if (b) {
-    const x = Math.min(ABHOLPLATZ.xMax, Math.max(ABHOLPLATZ.xMin, b.x + ABHOL_SEITLICH));
-    // Was der seitliche Versatz vom Sollabstand uebrig laesst, geht nach Norden.
-    const quer = x - b.x;
-    const laengs = Math.sqrt(Math.max(0, ABHOL_ABSTAND * ABHOL_ABSTAND - quer * quer));
-    abholStelle = [
-      x,
-      Math.min(ABHOLPLATZ.zMax, Math.max(ABHOLPLATZ.zMin, b.z + laengs)),
-    ];
-  }
+  abholStelle = [VERLADE_SPUR_X, VERLADE_STAND.z];
   return abholStelle;
 }
 
@@ -200,12 +198,7 @@ export function abholstelle(): [number, number] {
 }
 
 export function pickupApproach(): Array<[number, number]> {
-  return [
-    [GATE_X, 24],
-    [-12, 18],
-    [4, 10],
-    ABHOL_RANGIER,
-  ];
+  return [WAAGE_HALT, VERTEILER, [-19, 9], [VERLADE_SPUR_X, 2], ABHOL_RANGIER];
 }
 export function pickupInRev(): Array<[number, number]> {
   return [ABHOL_RANGIER, abholStelle];
@@ -214,92 +207,128 @@ export function pickupOut(): Array<[number, number]> {
   return [
     abholStelle,
     ABHOL_RANGIER,
-    [4, 10],
-    [-12, 18],
-    [GATE_X, 24],
+    [VERLADE_SPUR_X, 2],
+    [-19, 9],
+    VERTEILER,
+    WAAGE_HALT,
+    [GATE_X, 28],
     [GATE_X, 40],
   ];
 }
 
-// KIPPER: Wer selbst abkippen kann, muss nicht vor dem Bagger halten. Er fährt
-// rückwärts an die Nordkante des Stahlschrotthaufens (Mitte bei x −9, z 1) und
-// kippt seine Ladung direkt dort ab (Design-Fix 29.08.2026).
+/* ------------------------------------------- KIPPER: gemischte Ladung ---- */
+
 /*
- * Wer selbst abkippen kann, faehrt nicht vor den Bagger, sondern rueckwaerts
- * in die offene Nordseite des Mischschrottplatzes (Mitte x −19) und kippt
- * dort ab. Lambert faehrt seit 12.09.2026 nicht mehr durch den Mischschrott;
- * die Spur endet deshalb an seiner Kante, nicht darin.
+ * Wer selbst abkippen kann, faehrt an den Mischschrott — aber NICHT in die
+ * Ausbuchtung hinein.
+ *
+ * Das ist beim Nachrechnen des neuen Platzes die eine Stelle, an der Plan und
+ * Geometrie auseinandergehen, und deshalb steht hier, warum:
+ *
+ * Der Konzeptplan zeichnet die Abkippzone auf (1,6 | −25,2), also hinter dem
+ * Bagger, zwischen ihm und den beiden Halden. Ein Kipper, dessen Ladeflaeche
+ * darueber steht, hat seine Wagenmitte bei z ≈ −22,2 — 2,1 m vom Bagger, der
+ * auf (−0,5 | −22,5) steht. Das ist nicht knapp, das ist ineinander: Die
+ * Blockadepruefung haelt jeden LKW ab 5,5 m Abstand an (`BLOCK_RADIUS`), und
+ * der Oberwagen schwenkt ueber diese Flaeche.
+ *
+ * Nachgerechnet ist die Oeffnung der Ausbuchtung 14 m breit (x −6,5 bis 7,5),
+ * und der Bagger steht in ihrer Mitte. Links von ihm bleiben bis zu den
+ * Mulden 2,4 m, rechts bis zur Presse 0,8 m — durch beides passt kein
+ * 2,7-m-Wagen. Anders gesagt: Solange die Maschine auf ihrem Platz steht,
+ * kommt kein Fahrzeug an den Halden vorbei. Genau so ist die Ausbuchtung auch
+ * gemeint (E-011: „Grossteile und Mischschrott — immer beim Bagger").
+ *
+ * Der Konzeptplan schreibt es selbst dazu: „Abgeladen wird vor dem Bagger
+ * oder links daneben." Also kippt der Wagen vorne links ab, und der Spieler
+ * raeumt von dort in die Halde hinter sich. Gesucht sind zwei Zahlen:
+ *
+ *   Spur x 2,0   — die Ladeflaeche liegt dann zwischen 0,65 und 3,35; der
+ *                  Reifencontainer beginnt bei 2,8, seine Flankensteine bei
+ *                  2,75 — aber erst ab z −16,4, also suedlich des Halts.
+ *   Halt z −13,0 — die Ladeflaeche steht von −16,0 bis −10,0, die Fuhre
+ *                  rutscht hinten heraus und liegt um (2,0 | −16,0). Das sind
+ *                  7,0 m vom Sitz, mitten im Schwenkband 5,8 bis 9,2 m.
  */
+/** Spur, auf der der Kipper vor dem Bagger zurueckstoesst. */
+export const KIPP_SPUR_X = 2.0;
+/**
+ * Wo seine Wagenmitte beim Kippen steht.
+ *
+ * Gemessen ueber sieben Halteplaetze von −11 bis −17 (14.09.2026): Bei −13,0
+ * schoss ein eingeklemmtes Teil mit 167 km/h heraus, an allen anderen blieb es
+ * unter 130. Das ist keine Eigenschaft des Platzes, sondern der bekannte
+ * Schlitz am Kipplager — der Waechter misst mit EINEM Zufallsstartwert und
+ * trifft mal einen Zacken, mal nicht. −12,5 ist gewaehlt, weil dort der
+ * Abkippfleck 7,4 m vom Sitz liegt (mitten im Schwenkband) und die Ladeflaeche
+ * 0,9 m vor dem Reifencontainer endet.
+ */
+export const KIPP_HALT_Z = -12.5;
+/** Wo die Fuhre danach liegt — Ziel der Arbeitszonen und der Wegweiser. */
+export const ABKIPP_ZONE: [number, number] = [KIPP_SPUR_X, KIPP_HALT_Z - 3.0];
+
 export const TIP_APPROACH: Array<[number, number]> = [
-  [GATE_X, 24],
-  [-14, 12],
-  [6.0, 2],
+  WAAGE_HALT,
+  VERTEILER,
+  [-14, 9],
+  [-4, 3],
+  [KIPP_SPUR_X, 2],
 ];
-/*
- * Nur bis an den RAND des Mischschrotts, nicht hinein.
- *
- * Ansage 13.09.2026: „LKW nur bis zum Rand des Mischschrotts fahren." Vorher
- * endete der Rueckweg auf z −17,5 und damit mitten in der Halde (sie reicht
- * von −22,7 bis −16,7) — der Wagen stand bis zur Achse im Schrott.
- *
- * −15,0 ist gesucht, nicht gegriffen: Die Ladeflaeche ist 6,0 m lang und
- * liegt hinter der Wagenmitte, reicht also von −18,0 bis −12,0. Das Heck
- * steht damit 1,3 m ueber der Haldenkante, die Fuhre faellt hinein, und der
- * Wagen selbst bleibt davor.
- */
 export const TIP_IN_REV: Array<[number, number]> = [
-  [6.0, 2],
-  [6.0, -15.0],
+  [KIPP_SPUR_X, 2],
+  [KIPP_SPUR_X, KIPP_HALT_Z],
 ];
 export const TIP_OUT: Array<[number, number]> = [
-  [6.0, -15.0],
-  [6.0, 2],
-  [-14, 12],
-  [GATE_X, 24],
+  [KIPP_SPUR_X, KIPP_HALT_Z],
+  [KIPP_SPUR_X, 2],
+  [-4, 3],
+  [-14, 9],
+  VERTEILER,
+  WAAGE_HALT,
+  [GATE_X, 28],
   [GATE_X, 40],
 ];
 
-/* --------------------------------------------------- Sortenrein: Ostmulden */
+/* ------------------------------------------ Sortenrein: die Silo-Reihe ---- */
 
 /**
- * Wer sortenrein anliefert, kippt in die Mulde seiner Fraktion an der Ostwand.
+ * Wer sortenrein anliefert, kippt in das Silo seiner Fraktion an der Westwand.
  *
- * Ansage 13.09.2026: „sortenreine Kipper sollen direkt in den Mulden auf der
- * Ostseite rechts kippen, nicht bei mir." Vorher ging jede Fuhre auf den
- * Mischschrott vor dem Bagger — auch die sauber getrennte, die dort nur wieder
- * auseinandersortiert werden musste.
+ * Ansage 13.09.2026: „sortenreine Kipper sollen direkt in den Mulden kippen,
+ * nicht bei mir." Vorher ging jede Fuhre auf den Mischschrott vor dem Bagger
+ * — auch die sauber getrennte, die dort nur wieder auseinandersortiert werden
+ * musste.
  *
- * Die Gasse liegt auf x −26: oestlich der Mulden (deren Oeffnung bei −32,3
- * steht), westlich vom Betriebsgebaeude (ab −30,4) und noerdlich des
- * Reifendepots (x −28 .. −20, z −28,5 .. −21,5). Alle vier LKW-Mulden liegen
- * bei z ≥ −12,8, also nordlich davon.
+ * Die Reihe ist mit E-010 von x −34,5 auf −36 gerueckt und laeuft jetzt von
+ * z +10 bis −26,8. Die Gasse musste dabei mitwandern: Sie lag auf x −26, und
+ * dort steht seither der zweite Baggerstand (−25,5 | −12).
  */
-/** Gassenmitte, auf der die Anlieferer an der Muldenreihe entlangfahren. */
-export const MULDEN_GASSE_X = -26;
 /**
- * Wie weit der Wagen in die Mulde zurueckstoesst (Wagenmitte, x).
+ * Gassenmitte, auf der die Anlieferer an der Silo-Reihe entlangfahren.
+ *
+ * Gesucht: Die Silo-Oeffnungen liegen bei x −33, ihre Flankensteine reichen
+ * bis −32,7. Der Wagen ist 2,8 m breit, seine Blockadepruefung tastet mit
+ * 1,4 m. Bei −30,0 bleiben 1,3 m bis zu den Steinen und 4,5 m bis zum
+ * Verladeplatz — naeher an den Silos stuende er in der Oeffnung, weiter
+ * oestlich im Arbeitsbereich des zweiten Baggerstands.
+ */
+export const MULDEN_GASSE_X = -30.0;
+/**
+ * Wie weit der Wagen in das Silo zurueckstoesst (Wagenmitte, x).
  *
  * Gesucht, nicht gegriffen. Nach hinten begrenzt ihn die Stirnwand: Sie steht
- * bei x −38,0 ± 0,35, das Heck liegt 3,0 m hinter der Wagenmitte, also ist bei
- * −34,45 Schluss. Nach vorn begrenzt ihn die Ladung: Steht er weiter draussen,
- * faellt beim Kippen ein Teil der Fuhre neben die Mulde.
- *
- * −34,3 legt die Ladeflaeche von −37,3 bis −31,3, und die Mulde reicht von
- * −38,0 bis −31,0 — die Flaeche steht also ganz darueber. Das gekippte
- * Anziehen verteilt die Fuhre danach von der Stirnwand zur Oeffnung hin.
+ * bei x −39,275 ± 0,275, ihre Innenseite also bei −39,0; das Heck liegt 3,0 m
+ * hinter der Wagenmitte, bei −35,6 bleiben davon 0,4 m Luft. Nach vorn
+ * begrenzt ihn die Ladung: Die Ladeflaeche reicht damit von −38,6 bis −32,6
+ * und steht ganz ueber der Mulde (−39,0 bis −33,0).
  *
  * Die Blockadepruefung laesst das zu: Sie tastet mit 1,40 m Radius, die
- * Seitenwaende stehen 1,75 m von der Mittellinie entfernt, und bis zur
- * Stirnwand bleiben 3,35 m.
+ * Flanken stehen 2,375 m von der Mittellinie entfernt.
  */
-const MULDE_TIEFE_X = -34.3;
+const MULDE_TIEFE_X = -35.6;
 
 export function bayApproach(z: number): Array<[number, number]> {
-  return [
-    [GATE_X, 24],
-    [MULDEN_GASSE_X, 16],
-    [MULDEN_GASSE_X, z],
-  ];
+  return [WAAGE_HALT, VERTEILER, [MULDEN_GASSE_X, 13], [MULDEN_GASSE_X, z]];
 }
 export function bayInRev(z: number): Array<[number, number]> {
   return [
@@ -311,8 +340,10 @@ export function bayOut(z: number): Array<[number, number]> {
   return [
     [MULDE_TIEFE_X, z],
     [MULDEN_GASSE_X, z],
-    [MULDEN_GASSE_X, 16],
-    [GATE_X, 24],
+    [MULDEN_GASSE_X, 13],
+    VERTEILER,
+    WAAGE_HALT,
+    [GATE_X, 28],
     [GATE_X, 40],
   ];
 }
@@ -327,10 +358,16 @@ export function bayOut(z: number): Array<[number, number]> {
  * Vorher lagen sie westlich der Einfahrt. Dort steht seit 11.09.2026 der
  * Betriebshof — die LKW haetten im Buero geparkt.
  */
+/*
+ * Nachtrag 14.09.2026 (E-010): Die drei Warteplaetze liegen jetzt VOR den
+ * Sortierhallen, nicht mehr an der Nordwand — dort stehen seit heute die
+ * Hallen selbst (z +17,5 bis +26,5). Je ein Platz vor einem Tor: Wer auf
+ * seine Einweisung wartet, steht schon vor der richtigen Halle.
+ */
 export const PARK_SLOTS: Array<[number, number]> = [
-  [-16, 24],
-  [-6, 24],
-  [-1.5, 24],
+  [-14, 14],
+  [-5, 14],
+  [4, 14],
 ];
 /**
  * Wie weit suedlich des Platzes der LKW anhaelt, bevor er rueckwaerts an die
@@ -356,18 +393,23 @@ export const BED_HALF_W = 1.35;
  * [x, z, radius]
  */
 export const WORK_ZONES: Array<[number, number, number]> = [
-  // Vorplatz vor dem Bagger — dorthin kippt die Anlieferung ab
-  [-4, -6, 11],
-  // Ostgasse neben dem Bagger — dort steht der Abholer beim Verladen
-  [5, -12, 8],
-  // Kippkante des Mischschrottplatzes — dorthin kippen die Kipper selbst ab
-  [6, -18, 9],
   /*
-   * Die Muldenreihe an der Ostwand samt Gasse. Dorthin kippt der sortenreine
-   * Kipper; was dort liegt, ist Ziel und nicht Hindernis. Ein Radius deckt
-   * die ganze Reihe ab: Sie laeuft von z +7,7 bis −28,7 auf x −34,5.
+   * Der Vorplatz vor dem Bagger: Hier haelt der Haendler zum Entladen, und
+   * hier kippt der Selbstabkipper seine gemischte Fuhre ab (`ABKIPP_ZONE`).
+   * Ein Radius deckt beides ab — sie liegen 2,5 m auseinander.
    */
-  [-30, -10, 22],
+  [0, -13, 11],
+  /*
+   * Der Verladeplatz vor der Silo-Reihe: Dort steht der Abholer, und dort
+   * liegt zwangslaeufig Material, waehrend der Bagger ihn belaedt.
+   */
+  [-22, -10, 11],
+  /*
+   * Die Silo-Reihe samt Gasse. Dorthin kippt der sortenreine Kipper; was dort
+   * liegt, ist Ziel und nicht Hindernis. Ein Radius deckt die ganze Reihe ab:
+   * Sie laeuft von z +12,1 bis −28,9 auf x −36.
+   */
+  [-33, -8, 24],
 ];
 /** Nach so langer Blockade fährt der Fahrer vorsichtig weiter (kein Deadlock) */
 export const BLOCK_GIVEUP_S = 35;

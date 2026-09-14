@@ -83,6 +83,48 @@ export interface ContainerConfig {
    * die ohnehin zwischen den Behaeltern standen.
    */
   sortierbox?: boolean;
+  /**
+   * Weitere Fraktionen, die hier ebenfalls richtig liegen.
+   *
+   * E-010 legt zwei Paare zusammen: Kupfer + Messing in eine Mulde, Alu +
+   * Zink in eine. Beide Fraktionen stehen schon im Katalog; es braucht nur
+   * ein gemeinsames Ziel. Ohne dieses Feld zaehlte der halbe Inhalt als
+   * Verunreinigung — Messing im Kupferbehaelter druecke die Reinheit und
+   * damit den Erlös (Reinheit² , Briefing Kap. 7).
+   *
+   * Abgerechnet wird nach `fractionId`: Wer Kupfer und Messing zusammen
+   * abgibt, bekommt fuer alles den Kupferpreis. Das ist die bewusste
+   * Vereinfachung dieser Zusammenlegung.
+   */
+  mitFraktionen?: string[];
+  /**
+   * Baulich fertig, aber noch ohne Fraktion.
+   *
+   * Das E-Motoren-Silo steht in der Reihe (E-010), aber Material, Preis und
+   * Herkunft von Elektromotoren sind offen (E-011). Es wird deshalb gebaut
+   * und beschriftet, zaehlt aber nichts: kein Ziel fuer Lambert, kein Ziel
+   * fuer einen sortenreinen Kipper, keine Abrechnung. Eine erfundene Fraktion
+   * waere schlimmer als eine leere Box.
+   */
+  nurHuelle?: boolean;
+  /**
+   * Lagermulde in der Silo-Reihe: das ENDE des Materialwegs.
+   *
+   * Dorthin faehrt ein sortenreiner Kipper, und dorthin traegt Lambert aus
+   * den Mulden am Bagger. Bis zum 14.09.2026 wurde das aus `kind === "bay" &&
+   * !sortierbox` erschlossen und haing damit an der Reihenfolge in dieser
+   * Liste — wer eine Mulde davorschob, schickte den halben Verkehr an den
+   * falschen Ort. Jetzt steht es dran.
+   */
+  lager?: boolean;
+}
+
+/**
+ * Gehoert diese Fraktion in diesen Behaelter? Beruecksichtigt die
+ * zusammengelegten Paare (`mitFraktionen`).
+ */
+export function gehoertHierhin(cfg: ContainerConfig, fractionId: string): boolean {
+  return cfg.fractionId === fractionId || (cfg.mitFraktionen?.includes(fractionId) ?? false);
 }
 
 /**
@@ -92,285 +134,161 @@ export interface ContainerConfig {
  */
 export const CONFIGS: ContainerConfig[] = [
   /*
-   * ORTSKONZEPT (Ansage 12.09.2026, aus der Sicht des Fahrers beschrieben):
-   * „Der Bagger steht und schaut Richtung Janine, rechts neben mir der
-   * Stahlschrottcontainer, hinter mir die Presse im Süden, und in
-   * West-West-Süd-Richtung der Mischschrott."
+   * PLATZORDNUNG NACH E-010 (14.09.2026) — die Ausbuchtung.
    *
-   * Janine steht bei +z, also blickt die Maschine dorthin.
-   *
-   * ACHTUNG, hier ist zweimal etwas schiefgegangen: Der Code nennt +z Norden
-   * und +x Osten, aber wer nach +z blickt, hat +x LINKS auf dem Schirm.
-   * Gemessen am 12.09.2026 durch Projektion mit der echten Spielkamera. Die
-   * Himmelsrichtungen im Quelltext bilden also einen gespiegelten Kompass —
-   * verlass dich nicht darauf, sondern auf diese Regel:
+   * Aus der Sicht des Fahrers beschrieben. Der Code nennt +z Norden und +x
+   * Osten, aber wer nach +z blickt, hat +x LINKS auf dem Schirm (gemessen am
+   * 12.09.2026 mit der Spielkamera). Es gilt also:
    *
    *   rechts vom Sitz = −x        links vom Sitz = +x
    *   vor dem Sitz    = +z        hinter dem Sitz = −z
    *
-   * Daraus folgt der Platz (Ansage 12.09.2026, aus der Sicht des Fahrers):
+   * Der Bagger steht auf (−0,5 | −22,5) (`world/baggerstand.ts`) und schaut
+   * nach Norden. Hinter ihm woelbt sich die Platzgrenze nach Sueden aus; in
+   * dieser Ausbuchtung liegen die beiden Halden, nur durch niedrige
+   * Trennsteine getrennt. Rechts vom Sitz (−x) die drei Mulden an der
+   * Westflanke, links (+x) Presse, Muell und Reifen. Alles im Schwenkband
+   * 5,8 bis 9,2 m — nachgerechnet in `test/platz.test.ts`, gezeichnet mit
+   * `tools/platzkonzept.mjs`.
    *
-   *   hinten   Presse (an der Wand)        rechts        Stahlcontainer 40 m³
-   *   rechts hinten  Reifendepot           links hinten  Mischschrott
-   *   rechts vorne   sechs Absetzcontainer links vorne   Batteriemulde
-   *   rechts aussen  Silos, am Büro vorbei fährt der Abholer sie ab
-   *
-   * Der Bagger arbeitet auf einer kurzen Linie von (−5 | −18,5) nach
-   * (−5 | −13,5). Alles steht bewusst eng beieinander (Ansage 12.09.2026:
-   * „Du kannst das alles viel enger aneinanderstellen, der Bagger braucht
-   * nicht so viel Abstand zu der Presse") — die Untergrenze setzt der Arm
-   * selbst: Unter 4,0 m kommt er gar nicht auf den Boden, und über eine Wand
-   * muss die Krallenspitze 40 cm Luft behalten. Ein Ring von 4,0 bis 9,5 m fasst nicht elf Ziele, und ein
-   * Umschlagbagger fährt im Betrieb ohnehin ein paar Meter hin und her.
-   * Geprüft wird das in `test/reach.test.ts`.
+   * Die Silo-Reihe an der Westwand liegt bewusst AUSSERHALB des Bandes. Das
+   * war frueher totes Gewicht; seit die Haendler selbst in die Hallen fahren
+   * und Lambert von dort in die Silos raeumt, ist es richtig (E-010): Der
+   * Schwenkkreis muss nur fassen, was durch die Haende des Spielers geht.
    */
 
   /*
-   * MISCHSCHROTT — links hinten, eine von zwei gleich grossen Boxen.
+   * MISCHSCHROTT — in der Ausbuchtung, links hinter dem Bagger.
    *
-   * Hier kippt jeder ab, der gemischt anliefert, und von hier holt der Bagger
-   * alles Weitere. Die Wände sind doppelt gesetzt und fünf Meter hoch (Ansage
-   * 12.09.2026: „da müssten natürlich die Wände doppelt sein und sehr hoch,
-   * damit wir den Mischschrott auch ohne Probleme stapeln können").
+   * Hier liegt der Mengenstrom. Die Halde hat keine eigenen Waende mehr: Was
+   * sie haelt, ist die Ausbuchtung selbst (`yard.ts`, `BUCHT_*`), rundum
+   * 4,8 m hoch. Eine zweite Wand innen daneben waere ein Baufehler.
    *
-   * Aber nur EINE Wand, und zwar die, die ohnehin Platzgrenze ist (Ansage
-   * 12.09.2026: „die natürlichen Abgrenzungen vom Mischschrott soll eigentlich
-   * nur die Außenwand sein und daneben der Bagger, anders braucht's eigentlich
-   * keine Abgrenzung"). Hinten übernimmt die erhöhte Südmauer.
-   *
-   * Auch die Rückwand zur Presse ist weg (Ansage 13.09.2026: „da, wo der
-   * Mischschrott ist, da kommt einfach die Presse hin … und der Mischschrott
-   * liegt einfach nur daneben, ohne dass das irgendwie abgegrenzt wird").
-   * Die Presse steht damit in der Ecke und der Haufen reicht bis an sie heran.
+   * Bei einer Halde zaehlt die VORDERE Kante, nicht die Mitte — man graebt
+   * sich von vorn hinein (E-010). Die liegt bei z −29,2 und damit 8,1 m vom
+   * Sitz.
    */
-  { id: "c_mixed", fractionId: "mixed", label: "MISCHSCHROTT", kind: "halde", x: 6.2,
-    z: -19.7, size: [8.0, 6.0, 5.0], wandPlus: 10.0,
-    haldeWaende: { rueck: false, aussen: true, trenn: false } },
-
-  /*
-   * STAHLSCHROTT — die zweite Box, rechts neben dem Mischschrott.
-   *
-   * Ansage 13.09.2026: „hinter mir bzw. im Suedosten, da war ja eine Mulde
-   * quasi, die wird abgerissen, die Wand wird erhoeht, die Aussenwand vom
-   * Platz. Und dann wird quasi rechts eine neue Grenze gezogen, damit du
-   * quasi zwei gleiche Boxen hast. Also einmal Mischschrott und dann einmal
-   * Stahlschrott."
-   *
-   * Die alte Mulde hatte eine eigene Aussenwand und einen abgewinkelten
-   * Schenkel nach rechts, 6,5 x 5,0 m und 3 m hoch. Beides faellt weg. Was
-   * bleibt, ist spiegelbildlich zum Mischschrott: gleiche Groesse, gleiche
-   * Wandhoehe, hinten die erhoehte Platzmauer, und statt der Ostmauer eine
-   * neue Wand auf der rechten Seite. Zum Bagger hin (+z) und zum Mischschrott
-   * hin (+x) bleibt sie offen.
-   *
-   * Die Stahlbox hat am 13.09.2026 ihre eigene Wand verloren (Ansage: „Wand
-   * entfernen lassen") und ist dabei von 8 auf 4 m Breite zurueckgegangen:
-   * Dort, wo sie stand, liegt jetzt die Reihe der vier Lego-Mulden. Was sie
-   * haelt, ist die erhoehte Suedmauer im Ruecken.
-   */
-  { id: "c_steel", fractionId: "steel", label: "STAHLSCHROTT", kind: "halde", x: -5.5,
-    z: -25.7, size: [4.0, 6.0, 5.0],
+  { id: "c_mixed", fractionId: "mixed", label: "MISCHSCHROTT", kind: "halde", x: 4.0,
+    z: -33.7, size: [6.8, 9.0, 5.0],
     haldeWaende: { rueck: false, aussen: false, nord: false, trenn: false } },
 
   /*
-   * SCHUTT — Absetzcontainer neben der Presse, zum Vorsammeln.
+   * STAHLSCHROTT — die zweite Halde, rechts daneben, gleich gross.
    *
-   * Ansage 13.09.2026: „neben der Presse kommt ein Schuttcontainer zum
-   * Vorsammeln." Was beim Sortieren an Bauschutt anfaellt, soll nicht quer
-   * ueber den Platz zu den Silos, sondern gleich neben der Maschine liegen —
-   * von dort holt es der Abholer ab.
+   * Zwischen beiden stehen nur die Trennsteine (`yard.ts`, `TRENNSTEINE`):
+   * in der Mitte 2,4 m, zu beiden Seiten auf 0,6 m ablaufend. Ansage
+   * 14.09.2026: „sodass der Zugriff von Mischschrott zu Stahlschrott
+   * fluessig laeuft."
    *
-   * Der Platz ist die Luecke zwischen Presse und Stahlbox an der Suedmauer.
-   * Vier Meter Behaelter brauchen dort Raum: Die Presse beginnt bei x 1,23,
-   * also muss die Stahlbox bis −3,8 zurueck. Sie ist deshalb von x −1,8 auf
-   * −7,8 gewandert; es bleiben 50 cm Luft auf jeder Seite.
+   * Stahl bekommt kein Silo mehr (E-010): Er ist der groesste Mengenstrom
+   * und wird direkt an der Halde verladen; ein Silo dafuer waere ein Umweg.
    */
-  { id: "r_rubble", fractionId: "rubble", label: "SCHUTT", kind: "bay", x: -1.3,
-    z: -26.0, size: [4.0, 4.0, 2.0], shareNorth: true },
+  { id: "c_steel", fractionId: "steel", label: "STAHLSCHROTT", kind: "halde", x: -3.0,
+    z: -33.7, size: [6.8, 9.0, 5.0],
+    haldeWaende: { rueck: false, aussen: false, nord: false, trenn: false } },
 
   /*
-   * GROSSTEILE — offene Fläche rechts neben der Stahlmulde.
+   * DIE DREI MULDEN AN DER WESTFLANKE — rechts vom Sitz.
    *
-   * Ansage 12.09.2026: „neben der rechten Muldenbegrenzung würde ich Metalle,
-   * die größer sind, also größere Aluminiumteile und so was, da platzieren,
-   * und damit kann Lambert mit dem Radlader genau die Teile aufladen und in
-   * die Silos bringen." Keine Wände: Was hier liegt, soll der Lader von der
-   * Seite aufnehmen können.
-   */
-  /*
-   * Am 13.09.2026 von (−16,6 | −22,0) nach (−20,0 | −14,0) gerueckt: Sie lag
-   * genau vor den offenen Seiten der neuen Sortiermulden. Lambert haette quer
-   * durch sie hindurchfahren muessen, um sie zu erreichen — und durch eine
-   * Zone, in der Material liegt, faehrt er nicht. Zwischen ihr und der
-   * Muldenreihe bleibt jetzt eine Gasse von 4,5 m; dort steht auch sein
-   * Posten.
-   */
-  { id: "c_alu_gross", fractionId: "alu", label: "GROSSTEILE ALU", kind: "pile", x: -20.0,
-    z: -14.0, size: [6.5, 5.0, 0] },
-  /*
-   * REIFENDEPOT — rechts hinten, offene Fläche ohne Wände.
+   * Von der Platzmauer nach vorn: Alu+Zink, Kabel, Kupfer+Messing. Sie haben
+   * nur Seitenwaende, keine Rueckwand (E-006, Ansage 13.09.2026:
+   * „Rueckwaende raus, nur Seitenwaende"): Der Greifer setzt von oben ein,
+   * Lambert faehrt mit dem Radlader von Westen hinein. `shareEast` nimmt die
+   * Stirnwand heraus; `test/platz.test.ts` haelt fest, dass sie weg bleibt.
    *
-   * Reifen fallen ständig an und werden selten abgeholt; sie brauchen Fläche,
-   * keine Mulde. Heinz kümmert sich darum (Ansage 12.09.2026).
+   * Zwei Paare sind zusammengelegt (E-010): Kupfer + Messing, Alu + Zink.
+   * Vier Ziele waeren an dieser Flanke nicht unterzubringen, ohne dass eines
+   * unter die innere Grenze von 5,8 m rutscht.
+   *
+   * Die erste steht mit ihrer Suedseite an der Aussenmauer und braucht dort
+   * keine eigene Wand, nur eine Erhoehung (ausdrueckliche Ansage 14.09.2026)
+   * — deshalb `shareSouth` und `SUED_HOCH_VON = −10,5` in `yard.ts`. Die
+   * beiden anderen teilen sich je die Nordwand ihres Nachbarn; zwei
+   * Steinreihen mit 20 cm Luft dazwischen saehen aus wie ein Baufehler.
+   *
+   * 4,0 m Tiefe statt der 3,2 aus dem Konzeptplan: Die offene Spinne misst
+   * 3,38 m, und wer eine Mulde schmaler macht, kann sie nicht mehr ausraeumen
+   * (`test/spinnenmass.test.ts`). Die Reihe ist dafuer um 0,6 m nach Norden
+   * gerueckt, damit die erste Mulde nicht in der Aussenmauer steht.
    */
-  { id: "c_tires", fractionId: "tires", label: "REIFEN", kind: "pile", x: -24.0,
-    z: -25.0, size: [8.0, 7.0, 0] },
+  { id: "r_alu", fractionId: "alu", mitFraktionen: ["zinc"], label: "ALU + ZINK",
+    kind: "bay", x: -8.0, z: -26.6, size: [4.2, 4.0, 2.0],
+    sortierbox: true, shareEast: true, shareSouth: true },
+  { id: "r_cable", fractionId: "cable", label: "KABEL", kind: "bay", x: -8.0,
+    z: -22.4, size: [4.2, 4.0, 2.0], sortierbox: true, shareEast: true, shareSouth: true },
+  { id: "r_copper", fractionId: "copper", mitFraktionen: ["brass"], label: "KUPFER + MESSING",
+    kind: "bay", x: -8.0, z: -18.2, size: [4.2, 4.0, 2.0],
+    sortierbox: true, shareEast: true, shareSouth: true },
 
   /*
-   * ABSETZCONTAINER — sechs Stück rechts vorne, in Reichweite.
+   * MUELL — der grosse schwarze Container links hinten.
    *
-   * Kabel, VA, Kupfer, Alu, Zink, Messing. Beweglich, damit man sich den
-   * heranzieht, mit dem man gerade arbeitet. Kupfer und Messing bleiben
-   * getrennt: doppelter Preisunterschied, und wer beides in einen Behälter
-   * wirft, bekommt für alles den Messingpreis.
+   * Konzeptplan 14.09.2026: „Beim Stahlschrott ein grosser schwarzer
+   * Muellcontainer, ein kleiner fuer Reifen davor." Was beim Sortieren an
+   * Bauschutt und Restmuell anfaellt, wandert hier hinein statt quer ueber
+   * den Platz zu den Silos.
    *
-   * Das Mass kommt nicht aus dem Gefuehl, sondern aus dem Greifer (Ansage
-   * 12.09.2026: „Container und Presse muessen mindestens so gross sein, dass
-   * ich mit der Spinne reinfassen kann"). Offen ist die Spinne 3,38 m breit;
-   * mit 30 cm Luft beidseits ergibt das die lichte Weite. Das Aussenmass liegt
-   * darueber, weil die Waende Dicke haben.
+   * Kein `lager`: Ein sortenreiner Kipper faehrt nicht hierher, sondern in
+   * die BAUMISCH-Mulde an der Westwand — hier steht der Bagger im Weg.
    *
-   * Seit die Schale die Sichelform der Vorlage hat (12.09.2026), oeffnet die
-   * Spinne 3,50 statt 3,38 m — und prompt war der Container 4 cm zu klein.
-   * Gefunden hat das `test/spinnenmass.test.ts`, nicht das Auge. Genau dafuer
-   * steht er da: Wer an der Spinne dreht, merkt es hier. `test/spinnenmass.test.ts` haelt das
-   * fest, damit kein spaeterer Umbau sie wieder zu eng macht.
-   *
-   * Vorher waren es 2,8 x 1,8 und zuletzt 3,6 x 2,3 m. In beiden Faellen kam
-   * der Greifer offen nicht hinein: Er setzte auf den Raendern auf. Befuellen
-   * ging noch — man laesst von oben fallen —, Ausraeumen nicht mehr. Ein
-   * Behaelter, den man nicht leeren kann, ist eine Sackgasse.
-   *
-   * Der Preis steht in E-106: Bei dieser Groesse liegt die linke Spalte
-   * ausserhalb des Greifrings. Sie ist beweglich (E-081) — man zieht sich den
-   * Behaelter heran, mit dem man gerade arbeitet.
+   * Lage gesucht, nicht gegriffen: 3,6 m Front, weil die Spinne offen 3,38 m
+   * misst; x 8,0, weil die Stirnwand bei 10,08 endet und die Ostmauer innen
+   * bei 10,20 beginnt; z −20,2, weil die Presse bis −22,23 reicht und 25 cm
+   * Luft bleiben sollen.
    */
-  /*
-   * ABSETZCONTAINER — fuenf Stueck, einzeln, in einer Reihe vom Bagger weg.
-   *
-   * Ansage 13.09.2026: „Container sollen massiver werden und sind nie
-   * zusammenhaengend sondern einzeln. Neue Anordnung: Aluminium und VA am
-   * naechsten zum Bagger, dann Kabel, dann Kupfer, dann Messing; Zink erstmal
-   * weglassen."
-   *
-   * Vorher standen sie als Block 2x3 dicht beieinander bei x −7,5/−11,8 — mit
-   * 4,3 m Abstand bei 4,7 m Breite beruehrten sie sich sogar. Jetzt hat jeder
-   * 1,1 m Luft zum naechsten, und die Reihenfolge folgt dem Abstand zum
-   * Bagger (der auf x −5 arbeitet):
-   *
-   *   ALU      5,0 m
-   *   VA       5,5 m   — das Paar direkt neben der Maschine
-   *   KABEL    5,5 m
-   *   KUPFER   8,5 m
-   *   MESSING  9,3 m
-   *
-   * Die Plaetze sind nicht gegriffen, sondern gesucht: Fuenf Behaelter von
-   * 4,7 m passen ueberhaupt nicht alle in den Reichweitenring von 9,8 m um
-   * die 5 m kurze Arbeitslinie — nachgerechnet blieben nur drei uebrig. Mit
-   * 4,0 m gehen alle fuenf, und der Greifer passt weiterhin hinein: Er misst
-   * offen 3,02 m ueber die Spitzen, lichte Weite sind 3,88 m. Dass die
-   * Behaelter kleiner werden duerfen, ist die Folge davon, dass die Spinne
-   * nach der Zeichnung gebaut ist statt vergroessert — vorher waren es
-   * 3,38 m Spitzenweite.
-   *
-   * Zink faellt weg. Die Fraktion bleibt im Katalog, sie hat nur keinen
-   * eigenen Behaelter mehr.
-   */
-  /*
-   * Nachtrag 13.09.2026: zurueck zu ZWEI NEBENEINANDER, aber getrennt.
-   *
-   * „Ansonsten die Container so wie die angeordnet waren vorher, zwei
-   * nebeneinander. Das war okay. Die sollen nur nicht zusammenhaengen. Und
-   * der erste Container soll Alu sein, rechts daneben VA. Dann kommt Kabel,
-   * dann Kupfer. Und ich denke, das reicht erst mal."
-   *
-   * Also wieder das Raster von vorher (Spalten bei x −7,3 und −11,8), nur mit
-   * Luft: Die alten Behaelter waren 4,7 m breit bei 4,3 m Abstand — sie
-   * beruehrten einander. Mit 4,0 m bleiben 0,5 m zwischen den Spalten und
-   * 0,7 m zwischen den Reihen.
-   *
-   * Vier statt fuenf. Messing faellt damit weg wie vorher schon Zink; beide
-   * Fraktionen bleiben im Katalog, sie haben nur keinen eigenen Behaelter.
-   *
-   * Reihenfolge nach der Ansage, rechts ist −x:
-   *
-   *   ALU    (−7,3 | −12,8)   5,1 m    VA     (−11,8 | −12,8)   9,5 m
-   *   KABEL  (−7,3 | −17,5)   4,8 m    KUPFER (−11,8 | −17,5)   9,3 m
-   *
-   * Die Abstaende sind gesucht, nicht gegriffen: Bei x −12,2 lagen VA und
-   * Kupfer mit 9,8 und 9,7 m ausserhalb des Rings von 9,5 m.
-   */
-  /*
-   * Die vier Sortiermulden haben nur SEITENWAENDE, keine Rueckwand.
-   *
-   * Ansage 13.09.2026: „Rueckwaende raus, nur Seitenwaende." Es bleiben also
-   * die beiden Flanken je Mulde — sie trennen die Fraktionen, und mehr braucht
-   * es nicht: Der Greifer setzt von oben ein, der Radlader faehrt von vorn
-   * hinein, und nach hinten haelt die Nachbarreihe.
-   *
-   * Die vier Mulden sind offen zu LAMBERT hin, nicht zum Bagger.
-   *
-   * Ansage 13.09.2026: „Lego-Mulden fuer Alu, VA, Kabel und Kupfer dort
-   * hinsetzen" — und davor: „Lambert faehrt von der Ostseite ran … und macht
-   * die Mulden leer." Der Bagger fuellt von oben, ueber die Wand; der Radlader
-   * braucht die offene Seite, sonst kommt er mit der Schaufel nicht hinein.
-   * Mit Oeffnung zum Bagger stand er hinter der Rueckwand und die Box wurde
-   * nie leer (gemessen: 4 von 4 blieben liegen).
-   */
-  { id: "r_alu", fractionId: "alu", label: "ALU", kind: "bay", x: -10.0,
-    z: -10.0, size: [4.5, 4.6, 2.0], sortierbox: true, shareEast: true },
-  { id: "r_va", fractionId: "va", label: "EDELSTAHL VA", kind: "bay", x: -10.0,
-    z: -14.6, size: [4.5, 4.6, 2.0], sortierbox: true, shareEast: true, shareSouth: true },
-  { id: "r_cable", fractionId: "cable", label: "KABEL", kind: "bay", x: -10.0,
-    z: -19.2, size: [4.5, 4.6, 2.0], sortierbox: true, shareEast: true, shareSouth: true },
-  { id: "r_copper", fractionId: "copper", label: "KUPFER", kind: "bay", x: -10.0,
-    z: -23.8, size: [4.5, 4.6, 2.0], sortierbox: true, shareEast: true, shareSouth: true },
+  { id: "r_rubble", fractionId: "rubble", label: "MUELL", kind: "bay", x: 8.0,
+    z: -20.2, size: [3.6, 3.0, 2.2] },
 
   /*
-   * MULDENREIHE an der Ostwand — acht statt vier.
+   * REIFEN — der kleine Container davor.
    *
-   * Bisher lagen hier vier Lagermulden, die der Radlader fuellt: Holz,
-   * Baumisch, Kunststoff, VA. Dazu kommen jetzt vier fuer die Fraktionen, die
-   * sortenrein angeliefert werden (Ansage 13.09.2026: „sortenreine Kipper
-   * sollen direkt in den Mulden auf der Ostseite rechts kippen, nicht bei
-   * mir"). Der Fahrer setzt selbst zurueck und kippt dort ab; der
-   * Arbeitsbereich vor dem Bagger bleibt frei.
+   * Reifen fallen staendig an und werden selten abgeholt. Vorher war das eine
+   * offene Flaeche von 8 x 7 m ganz hinten rechts; im neuen Platz ist es ein
+   * Absetzcontainer im Schwenkband, 6,7 m vom Sitz.
    *
-   * Die Reihe konnte dafuer nicht laenger werden, sie war schon voll: Zwischen
-   * der Suedmauer (z −28,7) und der ersten Halle (z +8,0) liegen 36,7 m, und
-   * vier weitere mit dem alten Abstand von 7,0 m haetten 56 m gebraucht. Die
-   * Mulden ruecken deshalb zusammen: 4,2 m Front statt 6,0 bei 4,6 m
-   * Achsabstand, acht davon brauchen 36,4 m.
-   *
-   * Was die Front verliert, holt die TIEFE zurueck — sie kostet nichts, weil
-   * die Reihe an der Wand steht und nach hinten Platz ist: 7,0 m statt 4,4.
-   * Das ist kein Schoenheitsmass, sondern noetig: Die Ladeflaeche eines
-   * Kippers ist 6,0 m lang, und bei 4,4 m Tiefe landete gemessen nur ein
-   * Drittel der Fuhre in der Mulde, der Rest davor.
-   *
-   * Die Front bleibt ueber 3,02 m: Daran haengt die Spinne, die zwischen die
-   * Flanken passen muss (`spinnenmass`).
-   *
-   * Reihenfolge von der Einfahrt her: erst die vier, die der LKW anfaehrt,
-   * dann die vier, die der Radlader bedient. So kreuzt kein Anlieferer die
-   * halbe Reihe, und keiner faehrt an den Reifen (x −28 .. −20) vorbei.
+   * Absichtlich ein `rolloff` und keine Mulde: Mit 2,6 m Front kaeme die
+   * offene Spinne nicht hinein — der Behaelter wird nicht ausgeraeumt,
+   * sondern vom Abrollkipper ganz mitgenommen. Als Mulde waere er eine
+   * Sackgasse (`test/spinnenmass.test.ts` prueft genau das fuer Mulden).
    */
-  { id: "c_steel_lager", fractionId: "steel", label: "STAHL-LAGER", kind: "bay", x: -34.5,
-    z: 5.6, size: [7.0, 4.2, 3.5], facing: "east" },
-  { id: "c_alu_lager", fractionId: "alu", label: "ALU-LAGER", kind: "bay", x: -34.5,
-    z: 1.0, size: [7.0, 4.2, 3.0], facing: "east" },
-  { id: "c_cable_lager", fractionId: "cable", label: "KABEL-LAGER", kind: "bay", x: -34.5,
-    z: -3.6, size: [7.0, 4.2, 3.0], facing: "east" },
-  { id: "c_copper_lager", fractionId: "copper", label: "KUPFER-LAGER", kind: "bay", x: -34.5,
-    z: -8.2, size: [7.0, 4.2, 3.0], facing: "east" },
-  { id: "c_va_lager", fractionId: "va", label: "VA-LAGER", kind: "bay", x: -34.5,
-    z: -12.8, size: [7.0, 4.2, 3.5], facing: "east" },
-  { id: "c_wood", fractionId: "wood", label: "HOLZ", kind: "bay", x: -34.5,
-    z: -17.4, size: [7.0, 4.2, 3.0], facing: "east" },
-  { id: "c_rubble", fractionId: "rubble", label: "BAUMISCH", kind: "bay", x: -34.5,
-    z: -22.0, size: [7.0, 4.2, 3.0], facing: "east" },
-  { id: "c_plastic", fractionId: "plastic", label: "KUNSTSTOFF", kind: "bay", x: -34.5,
-    z: -26.6, size: [7.0, 4.2, 3.0], facing: "east" },
+  { id: "c_tires", fractionId: "tires", label: "REIFEN", kind: "rolloff", x: 4.1,
+    z: -17.6, size: [2.6, 2.4, 1.4] },
+
+  /*
+   * DIE SILO-REIHE an der Westwand — neun statt acht.
+   *
+   * E-010: E-Motoren, Batterien, Alu, Kabel, Kupfer, VA, Holz, Baumisch,
+   * Kunststoff. Stahl entfaellt. Achsabstand 4,6 m ab z +10, alle auf x −36
+   * mit der Oeffnung nach Osten zum Platz. Davor liegt der Verladeplatz.
+   *
+   * 6,0 m Front statt 7,0: Hinter der Reihe bleibt damit 1,0 m bis zur
+   * Westmauer (frueher 2,0). Die Front bleibt weit ueber den 3,38 m, die die
+   * offene Spinne misst.
+   *
+   * `lager: true` heisst: Hierhin faehrt der sortenreine Kipper, und hierhin
+   * traegt Lambert aus den Mulden am Bagger. Die Behaelter am Bagger tragen
+   * das Kennzeichen bewusst nicht — sonst traegt Lambert aus der Alu-Mulde in
+   * die Alu-Mulde (gemessen am 13.09.2026: 4 von 4 blieben liegen).
+   */
+  { id: "c_emotor", fractionId: "mixed", label: "E-MOTOREN", kind: "bay", x: -36,
+    z: 10.0, size: [6.0, 4.2, 3.0], facing: "east", nurHuelle: true },
+  { id: "c_battery", fractionId: "battery", label: "BATTERIEN", kind: "bay", x: -36,
+    z: 5.4, size: [6.0, 4.2, 3.0], facing: "east", lager: true },
+  { id: "c_alu_lager", fractionId: "alu", mitFraktionen: ["zinc"], label: "ALU-LAGER",
+    kind: "bay", x: -36, z: 0.8, size: [6.0, 4.2, 3.0], facing: "east", lager: true },
+  { id: "c_cable_lager", fractionId: "cable", label: "KABEL-LAGER", kind: "bay", x: -36,
+    z: -3.8, size: [6.0, 4.2, 3.0], facing: "east", lager: true },
+  { id: "c_copper_lager", fractionId: "copper", mitFraktionen: ["brass"],
+    label: "KUPFER-LAGER", kind: "bay", x: -36, z: -8.4, size: [6.0, 4.2, 3.0],
+    facing: "east", lager: true },
+  { id: "c_va_lager", fractionId: "va", label: "VA-LAGER", kind: "bay", x: -36,
+    z: -13.0, size: [6.0, 4.2, 3.5], facing: "east", lager: true },
+  { id: "c_wood", fractionId: "wood", label: "HOLZ", kind: "bay", x: -36,
+    z: -17.6, size: [6.0, 4.2, 3.0], facing: "east", lager: true },
+  { id: "c_rubble", fractionId: "rubble", label: "BAUMISCH", kind: "bay", x: -36,
+    z: -22.2, size: [6.0, 4.2, 3.0], facing: "east", lager: true },
+  { id: "c_plastic", fractionId: "plastic", label: "KUNSTSTOFF", kind: "bay", x: -36,
+    z: -26.8, size: [6.0, 4.2, 3.0], facing: "east", lager: true },
 ];
 
 /**
@@ -382,20 +300,19 @@ export const CONFIGS: ContainerConfig[] = [
 export function lagerMuldeFuer(fractionId: string | null): ContainerConfig | null {
   if (!fractionId) return null;
   /*
-   * Sortierboxen zaehlen NICHT als Lager.
+   * Nur die Silo-Reihe zaehlt als Lager (`lager: true`).
    *
-   * Seit dem 13.09.2026 sind die vier Sortierplaetze am Bagger ebenfalls
-   * Betonlego-Mulden (`kind: "bay"`) — und stehen in CONFIGS vor der Reihe an
-   * der Ostwand. Ohne diese Zeile schickte die Suche jeden sortenreinen
-   * Kipper und jede Fuhre Lamberts dorthin, wo das Material schon liegt:
-   * gemessen 0 von 11 Stueck im Ostlager, und Lambert trug aus der Alu-Box in
-   * die Alu-Box.
+   * Die Mulden am Bagger sind ebenfalls Betonlego-Boxen und standen in dieser
+   * Liste vorher davor — ohne Unterscheidung schickte die Suche jeden
+   * sortenreinen Kipper und jede Fuhre Lamberts dorthin, wo das Material
+   * schon liegt: gemessen 0 von 11 Stueck im Lager, und Lambert trug aus der
+   * Alu-Box in die Alu-Box. Bis zum 14.09.2026 hing die Unterscheidung an
+   * `!sortierbox` und damit an der Reihenfolge; jetzt steht sie am Datensatz.
+   *
+   * Zusammengelegte Paare zaehlen mit: Messing findet das Kupferlager
+   * (`gehoertHierhin`).
    */
-  return (
-    CONFIGS.find(
-      (c) => c.kind === "bay" && !c.sortierbox && c.fractionId === fractionId
-    ) ?? null
-  );
+  return CONFIGS.find((c) => c.lager === true && gehoertHierhin(c, fractionId)) ?? null;
 }
 
 /** Fangbereich über einer Haufen-Zone (Zonen-Zählung + Ampel) */
@@ -1298,7 +1215,7 @@ export class ContainerManager {
       const c = this.byId(item.containerId);
       c.itemIds.add(item.id);
       c.contentKg += item.massKg;
-      if (item.materialId !== c.cfg.fractionId) c.contaminationKg += item.massKg;
+      if (!gehoertHierhin(c.cfg, item.materialId)) c.contaminationKg += item.massKg;
     }
     for (const c of this.containers) {
       c.refreshLabel(c === this.hovered ? this.hoverAmpel : null);
@@ -1313,7 +1230,7 @@ export class ContainerManager {
           itemId: item.id,
           materialId: item.materialId,
           containerId: to,
-          correct: item.materialId === c.cfg.fractionId,
+          correct: gehoertHierhin(c.cfg, item.materialId),
         });
       }
     }
@@ -1335,7 +1252,7 @@ export class ContainerManager {
     }
     let result: { container: string; ampel: AmpelState } | null = null;
     if (over) {
-      const correct = carriedMaterialIds.filter((m) => m === over.cfg.fractionId).length;
+      const correct = carriedMaterialIds.filter((m) => gehoertHierhin(over.cfg, m)).length;
       const ampel: AmpelState =
         correct === carriedMaterialIds.length ? "green" : correct > 0 ? "yellow" : "red";
       this.hoverAmpel = ampel;

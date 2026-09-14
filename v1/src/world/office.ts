@@ -33,8 +33,7 @@ const TIEFE = 9.0;
 const BUERO_B = 6.2;
 const GESCHOSS = 3.1;
 const BUERO_H = GESCHOSS * 2;
-/** Halle: Breite (z) und Traufhöhe */
-const HALLE_B = 7.2;
+/** Halle: Traufhöhe (die Grundfläche steht bei HALLE_BREITE/HALLE_TIEFE) */
 const HALLE_H = 5.0;
 /** Wie hoch der First über der Traufe sitzt */
 const FIRST_BUERO = 1.7;
@@ -43,9 +42,31 @@ const FIRST_HALLE = 1.9;
 /** Mitte des Bürogebäudes — Bezugspunkt des ganzen Komplexes. */
 export const OFFICE_X = WAND_X + TIEFE / 2;
 export const OFFICE_Z = WAND_Z - BUERO_B / 2;
-/** Mitten der beiden Hallen, südlich anschliessend. */
-export const HALL1_Z = OFFICE_Z - BUERO_B / 2 - HALLE_B / 2;
-export const HALL2_Z = HALL1_Z - HALLE_B;
+/**
+ * Die drei Sortierhallen an der Nordwand (E-010, 14.09.2026).
+ *
+ * Bis dahin standen zwei Hallen an der Westwand, suedlich ans Buero gebaut.
+ * Dort liegt jetzt die Silo-Reihe: Sie beginnt bei z +10, das zweite
+ * Hallenschiff reichte bis z +15,2 — die beiden haetten sich ueberschnitten.
+ * Und sie haben einen neuen Zweck: „Haendler fahren ueber die Waage in ihre
+ * Halle und laden selbst ab" (E-011). Dafuer muessen sie hinter dem Tor
+ * liegen, nicht hinter dem Betriebshof.
+ *
+ * Masse aus dem Konzeptplan: je 7,5 m breit (x) und 9,0 m tief (z), Mitte auf
+ * z +22 — die Nordmauer steht innen bei +28,7, es bleiben also 2,2 m Luft.
+ * Das Tor zeigt nach Sueden auf den Platz.
+ */
+export const HALLEN_Z = 22;
+export const HALLE_BREITE = 7.5;
+export const HALLE_TIEFE = 9.0;
+export const HALLEN_X = [-14, -5, 4];
+
+/** Grundflächen der drei Hallen: [x, z, halbeBreite, halbeTiefe]. */
+export function hallenFootprints(): Array<[number, number, number, number]> {
+  return HALLEN_X.map(
+    (x) => [x, HALLEN_Z, HALLE_BREITE / 2, HALLE_TIEFE / 2] as [number, number, number, number]
+  );
+}
 /** Front des Komplexes (Ostseite) — davor ist freie Fläche. */
 export const OFFICE_FRONT_X = WAND_X + TIEFE;
 
@@ -66,11 +87,7 @@ export const BUERO_TUER = new THREE.Vector3(
  * benutzen kann, ohne eine Szene bauen zu müssen.
  */
 export function officeFootprints(): Array<[number, number, number, number]> {
-  return [
-    [OFFICE_X, OFFICE_Z, TIEFE / 2 + 0.2, BUERO_B / 2 + 0.2],
-    [OFFICE_X, HALL1_Z, TIEFE / 2 + 0.1, HALLE_B / 2],
-    [OFFICE_X, HALL2_Z, TIEFE / 2 + 0.1, HALLE_B / 2],
-  ];
+  return [[OFFICE_X, OFFICE_Z, TIEFE / 2 + 0.2, BUERO_B / 2 + 0.2]];
 }
 
 export class OfficeBuilding {
@@ -102,7 +119,8 @@ export class OfficeBuilding {
     });
 
     this.buildBuero(wand, sockel, dach, ziegel, glas, stahl);
-    for (const z of [HALL1_Z, HALL2_Z]) this.buildHalle(z, wellblech, dach, stahl);
+    // Die drei Sortierhallen stehen an der Nordwand, Tor nach Sueden (E-010).
+    for (const x of HALLEN_X) this.buildHalle(x, wellblech, dach, stahl);
     scene.add(this.group);
 
     if (world) this.buildCollider(world);
@@ -240,34 +258,43 @@ export class OfficeBuilding {
     this.group.add(g);
   }
 
-  /** Offene Halle mit Satteldach, Tor nach Osten — Rückwand an der Platzmauer. */
+  /**
+   * Offene Sortierhalle mit Satteldach, Tor nach SÜDEN zum Platz.
+   *
+   * Gebaut wird sie wie vorher in lokalen Achsen (lokales +x ist die Front);
+   * die Drehung um −90° legt die Front auf −z. So bleibt der Bau derselbe und
+   * nur die Lage ist neu — eine zweite Wandlogik waere eine zweite Wahrheit.
+   */
   private buildHalle(
-    z: number,
+    x: number,
     wellblech: THREE.Material,
     dach: THREE.Material,
     stahl: THREE.Material
   ): void {
     const g = new THREE.Group();
-    g.position.set(OFFICE_X, 0, z);
-    const rueck = new THREE.Mesh(new THREE.BoxGeometry(0.18, HALLE_H, HALLE_B), wellblech);
-    rueck.position.set(-TIEFE / 2, HALLE_H / 2, 0);
+    g.position.set(x, 0, HALLEN_Z);
+    g.rotation.y = -Math.PI / 2;
+    const T = HALLE_TIEFE; // lokale x-Achse: Tiefe der Halle (Weltachse z)
+    const B = HALLE_BREITE; // lokale z-Achse: Breite (Weltachse x)
+    const rueck = new THREE.Mesh(new THREE.BoxGeometry(0.18, HALLE_H, B), wellblech);
+    rueck.position.set(-T / 2, HALLE_H / 2, 0);
     rueck.castShadow = true;
     g.add(rueck);
     for (const sz of [-1, 1]) {
-      const seite = new THREE.Mesh(new THREE.BoxGeometry(TIEFE, HALLE_H, 0.18), wellblech);
-      seite.position.set(0, HALLE_H / 2, (sz * HALLE_B) / 2);
+      const seite = new THREE.Mesh(new THREE.BoxGeometry(T, HALLE_H, 0.18), wellblech);
+      seite.position.set(0, HALLE_H / 2, (sz * B) / 2);
       seite.castShadow = true;
       g.add(seite);
     }
-    this.satteldach(g, HALLE_B, TIEFE, HALLE_H, FIRST_HALLE, dach, wellblech);
+    this.satteldach(g, B, T, HALLE_H, FIRST_HALLE, dach, wellblech);
     // Torrahmen an der offenen Seite; der Giebel darüber bleibt frei
     for (const sz of [-1, 1]) {
       const pfosten = new THREE.Mesh(new THREE.BoxGeometry(0.26, HALLE_H, 0.26), stahl);
-      pfosten.position.set(TIEFE / 2, HALLE_H / 2, (sz * (HALLE_B - 0.7)) / 2);
+      pfosten.position.set(T / 2, HALLE_H / 2, (sz * (B - 0.7)) / 2);
       g.add(pfosten);
     }
-    const sturz = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.45, HALLE_B), stahl);
-    sturz.position.set(TIEFE / 2, HALLE_H - 0.3, 0);
+    const sturz = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.45, B), stahl);
+    sturz.position.set(T / 2, HALLE_H - 0.3, 0);
     g.add(sturz);
     this.group.add(g);
   }
@@ -286,10 +313,15 @@ export class OfficeBuilding {
       );
     };
     quader(OFFICE_X, OFFICE_Z, TIEFE / 2, BUERO_H / 2, BUERO_B / 2);
-    for (const z of [HALL1_Z, HALL2_Z]) {
-      quader(WAND_X, z, 0.12, HALLE_H / 2, HALLE_B / 2);
-      for (const sz of [-1, 1]) {
-        quader(OFFICE_X, z + (sz * HALLE_B) / 2, TIEFE / 2, HALLE_H / 2, 0.12);
+    /*
+     * Die Sortierhallen: Rueckwand im Norden, zwei Seitenwaende. Vorn bleibt
+     * es offen — sonst stuende vor dem Tor eine unsichtbare Front, und der
+     * Haendler kaeme nicht hinein.
+     */
+    for (const x of HALLEN_X) {
+      quader(x, HALLEN_Z + HALLE_TIEFE / 2, HALLE_BREITE / 2, HALLE_H / 2, 0.12);
+      for (const sx of [-1, 1]) {
+        quader(x + (sx * HALLE_BREITE) / 2, HALLEN_Z, 0.12, HALLE_H / 2, HALLE_TIEFE / 2);
       }
     }
   }

@@ -1,8 +1,8 @@
 import * as THREE from "three";
 import { umkugelRadius, type ItemManager, type ScrapItem } from "./scrapItems";
 import { hitsObstacle, slideAround } from "./obstacles";
-import { CONFIGS, type ContainerConfig } from "./containers";
-import { KAFFEE_ROT } from "./yard";
+import { CONFIGS, gehoertHierhin, type ContainerConfig } from "./containers";
+import { KAFFEE_ROT, BUCHT_Z } from "./yard";
 import { findeBox, ausBox, type Box } from "./boxen";
 import {
   wegFrei,
@@ -14,7 +14,7 @@ import {
   type Zone,
 } from "./weg";
 import { KAFFEE_THEKE } from "./yard";
-import { HALL1_Z, OFFICE_X } from "./office";
+import { OFFICE_X } from "./office";
 import {
   WheelLoader,
   LOADER_SPEED,
@@ -289,8 +289,16 @@ const OSTPOSTEN = new THREE.Vector3(-15.0, 0, -18.0);
  * gerade abgekippte Ladung noch uebereinander lag.
  */
 const BOX_MAX_Y = 3.5;
-/** Abstellplatz: vorne in der ersten Halle, Schaufel zum Tor. */
-const RADLADER_PARKPLATZ = new THREE.Vector3(OFFICE_X + 1.5, 0, HALL1_Z);
+/**
+ * Abstellplatz des Radladers: vor dem Buero, suedlich daneben.
+ *
+ * Er stand bis zum 14.09.2026 in der ersten Werkstatthalle an der Westwand.
+ * Die gibt es dort nicht mehr — die Hallen sind an die Nordwand gezogen, die
+ * Silo-Reihe hat ihren Platz eingenommen (E-010). Die Koordinate bleibt
+ * dieselbe, damit sich an Lamberts Verhalten nichts aendert; sie steht jetzt
+ * nur ausgeschrieben statt als Hallenmitte.
+ */
+const RADLADER_PARKPLATZ = new THREE.Vector3(OFFICE_X + 1.5, 0, 18.8);
 /** Blickrichtung dort — aus der Halle heraus (+X). */
 const RADLADER_PARKYAW = Math.PI / 2;
 
@@ -1542,12 +1550,13 @@ export class StaffManager {
      * in die Alu-Box und die Box wird nie leer (gemessen: 4 von 4 blieben
      * liegen, und er meldete sich nie ab).
      */
-    const passend = CONFIGS.filter(
-      (c) =>
-        (c.kind === "bay" || c.kind === "rolloff") &&
-        !c.sortierbox &&
-        c.fractionId === materialId
-    );
+    /*
+     * Seit E-010 traegt das Kennzeichen `lager` die Unterscheidung, nicht mehr
+     * `!sortierbox`: Ziel ist die Silo-Reihe an der Westwand, Quelle sind die
+     * Mulden am Bagger. Zusammengelegte Paare finden ihr Lager mit
+     * (`gehoertHierhin`) — Messing landet im Kupferlager.
+     */
+    const passend = CONFIGS.filter((c) => c.lager === true && gehoertHierhin(c, materialId));
     return passend.find((c) => c.kind === "rolloff") ?? passend[0];
   }
 
@@ -1573,8 +1582,23 @@ export class StaffManager {
    * Scheisse." Er hatte dort nichts zu suchen und stand staendig im Weg oder
    * schob etwas an, das gerade gegriffen werden sollte.
    */
+  /*
+   * Die Grenze kommt seit E-010 aus den Mulden selbst, nicht mehr aus einer
+   * abgeschriebenen −6,0.
+   *
+   * Die Sortiermulden sind am 14.09.2026 an die Westflanke gezogen und reichen
+   * dort bis x −5,9. Mit der festen Schranke lag ihr oestliches Drittel im
+   * Sperrgebiet: Gemessen blieben zwei von vier Stuecken liegen, weil sie in
+   * der offenen Mulde ein Stueck nach Osten gerollt waren und damit als
+   * unerreichbar galten — Lambert meldete sich nie ab. Die Regel bleibt
+   * dieselbe (er faehrt nicht in den Arbeitsbereich des Baggers), sie wird nur
+   * dort gezogen, wo die Mulden heute enden.
+   */
+  private static readonly REVIER_X =
+    Math.max(...CONFIGS.filter((c) => c.sortierbox).map((c) => c.x + c.size[0] / 2)) + 0.5;
+
   private static imBaggerrevier(x: number, z: number): boolean {
-    return x > -6.0 && z < 2.0 && z > -29.0;
+    return x > StaffManager.REVIER_X && z < 2.0 && z > BUCHT_Z;
   }
 
   private reachable(tx: number, tz: number): boolean {

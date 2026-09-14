@@ -27,6 +27,7 @@ import { ItemManager } from "../src/world/scrapItems";
 import { StaffManager } from "../src/world/people";
 import { CONFIGS } from "../src/world/containers";
 import { WEIGH_X, WEIGH_Z, KAFFEE_POS } from "../src/world/yard";
+import { BAGGER_STAND } from "../src/world/baggerstand";
 
 beforeAll(async () => {
   await initPhysics();
@@ -74,9 +75,20 @@ function platz(stueck: number): {
     KAFFEE_POS,
     new THREE.Vector3(-30, 0, 25)
   );
-  /* Der Bagger steht auf seiner Arbeitslinie, weit weg von den Boxen. */
-  staff.getExcavatorPos = () => new THREE.Vector3(-2.5, 0, -19.5);
-  staff.getGrapplePos = () => new THREE.Vector3(-2.5, 3, -19.5);
+  /*
+   * Der Bagger steht auf seinem Standplatz — der kommt aus `baggerstand.ts`
+   * und nicht mehr als abgeschriebene Zahl hierher.
+   *
+   * Beim Platzumbau (E-010) ist genau daran zwei Stunden lang gesucht worden:
+   * Mit der alten Zahl (−2,5 | −19,5) stand die Spinne 4,97 m von der Hälfte
+   * der Ladung entfernt, und Lambert fasst nichts an, was näher als 5,5 m an
+   * ihr liegt (`GRAPPLE_KEEPOUT`). Gemessen blieben zwei von vier Stücken
+   * liegen — nicht weil Lambert etwas verlernt hätte, sondern weil der Test
+   * den Bagger an eine Stelle setzte, an der er seit dem Umbau nicht mehr
+   * steht. Vom echten Standplatz aus sind es 8,0 m.
+   */
+  staff.getExcavatorPos = () => new THREE.Vector3(BAGGER_STAND.x, 0, BAGGER_STAND.z);
+  staff.getGrapplePos = () => new THREE.Vector3(BAGGER_STAND.x, 3, BAGGER_STAND.z);
   staff.setLoader(true);
   const schritt = (s: number): void => {
     for (let i = 0; i < Math.round(s * 60); i++) {

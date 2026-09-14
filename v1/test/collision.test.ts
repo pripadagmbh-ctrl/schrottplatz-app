@@ -1,14 +1,22 @@
 import { describe, it, expect } from "vitest";
 import * as THREE from "three";
 import { CONFIGS } from "../src/world/containers";
-import { YARD_MIN_X, YARD_MAX_X, YARD_D } from "../src/world/yard";
+import {
+  YARD_MIN_X,
+  YARD_MAX_X,
+  YARD_D,
+  BUCHT_X_VON,
+  BUCHT_X_BIS,
+  BUCHT_Z,
+} from "../src/world/yard";
 import {
   STATIC_OBSTACLES,
   hitsObstacle,
   slideAround,
 } from "../src/world/obstacles";
-import { OFFICE_X, OFFICE_Z, officeFootprints } from "../src/world/office";
+import { OFFICE_X, OFFICE_Z, officeFootprints, hallenFootprints } from "../src/world/office";
 import { PRESS_CENTER } from "../src/world/press";
+import { BAGGER_STAND } from "../src/world/baggerstand";
 import { WEIGH_X, WEIGH_Z } from "../src/world/yard";
 import {
   CLAW_OPEN_SPLAY,
@@ -53,13 +61,24 @@ const REICHWEITE_M = 9.8;
  * woanders standen. Ein Test, der seine eigene Wahrheit mitbringt, prüft
  * nichts.
  */
-/** Was der Spieler selbst befuellt (Platzordnung 12.09.2026). */
-const SORTIERMULDEN = CONFIGS.filter((c) =>
-  ["r_cable", "r_va", "r_copper", "r_alu", "r_zinc", "r_brass"].includes(c.id)
-);
-/** Standplatz des Baggers — siehe `position` in excavator.ts. */
-const BAGGER_X = -2.5;
-const BAGGER_Z = -19.5;
+/**
+ * Was der Spieler selbst befuellt.
+ *
+ * Seit E-010 sind es drei statt vier: Kupfer und Messing teilen sich eine
+ * Mulde, Alu und Zink ebenfalls, und VA hat am Bagger kein eigenes Ziel mehr.
+ * Die Liste kommt deshalb aus dem Kennzeichen `sortierbox` und nicht mehr aus
+ * abgeschriebenen IDs — sonst prueft sie irgendwann Mulden, die es nicht gibt.
+ */
+const SORTIERMULDEN = CONFIGS.filter((c) => c.sortierbox === true);
+/**
+ * Standplatz des Baggers — aus `world/baggerstand.ts`, nicht abgeschrieben.
+ *
+ * Vorher stand hier die Zahl aus `excavator.ts` als Kopie. Beim Platzumbau
+ * (E-010) ist der Standplatz gewandert, die Kopie nicht — und der Test prueft
+ * dann die Reichweite von einer Stelle aus, an der niemand steht.
+ */
+const BAGGER_X = BAGGER_STAND.x;
+const BAGGER_Z = BAGGER_STAND.z;
 /** Die Silos an der Ostwand, an denen der Abholer entlangfaehrt. */
 const SILOS = CONFIGS.filter((c) =>
   ["c_wood", "c_rubble", "c_plastic", "c_va_lager"].includes(c.id)
@@ -82,11 +101,21 @@ describe("Feste Bauten", () => {
     }
   });
 
-  it("stellt Büro und Halle von Anfang an in den Weg", () => {
+  it("stellt Büro und Hallen von Anfang an in den Weg", () => {
     // Sie stehen von der ersten Sekunde an da — nicht erst nach einem Kauf.
     expect(hitsObstacle(OFFICE_X, OFFICE_Z, 0)?.label).toBe("Betriebsgebäude");
-    const [, halle] = officeFootprints();
-    expect(hitsObstacle(halle[0], halle[1], 0)?.label).toBe("Betriebsgebäude");
+    /*
+     * Die beiden Werkstatthallen an der Westwand sind am 14.09.2026 zu den
+     * drei Sortierhallen an der Nordwand geworden (E-010); dort, wo sie
+     * standen, liegt jetzt die Silo-Reihe. Geprüft wird weiter dieselbe
+     * Eigenschaft — Hallen sperren von Anfang an —, nur an ihrem neuen Ort
+     * und aus ihrer eigenen Grundrissliste statt aus der des Büros.
+     */
+    const hallen = hallenFootprints();
+    expect(hallen.length, "es fehlen Hallen").toBe(3);
+    for (const [x, z] of hallen) {
+      expect(hitsObstacle(x, z, 0)?.label, `Halle bei (${x}|${z})`).toMatch(/^Halle /);
+    }
   });
 
   it("stellt den Betriebshof neben die Waage in die hintere Ecke", () => {
@@ -103,8 +132,17 @@ describe("Feste Bauten", () => {
   });
 
   it("lässt die Zufahrt zur Waage frei", () => {
-    // Zwischen Gebaeudefront und Wiegeplatte muss ein LKW durchpassen.
-    for (let z = 14; z <= 27; z += 1) {
+    /*
+     * Zwischen Gebaeudefront und Wiegeplatte muss ein LKW durchpassen.
+     *
+     * Die Waage ist am 14.09.2026 neben das Buero gezogen (E-010) und steht
+     * damit nicht mehr in der Flucht des Tors: Sie liegt 5,5 m westlich davon.
+     * Oben endet die Spur deshalb bei z 26 statt 27 — bei 27 sind es nur noch
+     * 2,0 m bis zur Nordmauer, und dort faehrt auch niemand mehr; der Wagen
+     * kommt vom Tor herueber. Geprueft wird weiter dieselbe Eigenschaft: Auf
+     * der ganzen Wiegestrecke steht nichts im Weg.
+     */
+    for (let z = 14; z <= 26; z += 1) {
       expect(hitsObstacle(WEIGH_X, z, 2.0), `Waagenspur bei z=${z}`).toBeNull();
     }
   });
@@ -187,56 +225,62 @@ describe("Feste Bauten", () => {
     }
   });
 
-  it("der Mischschrottplatz hat nur die Aussenmauer, sonst nichts", () => {
+  it("die beiden Halden haben keine eigenen Wände — die Ausbuchtung hält sie", () => {
     /*
      * Ansage 13.09.2026: „die Abgrenzung, die du da neu gezogen hast, die
-     * gehoeren da eigentlich gar nicht hin bzw. koennen weg … die Presse
-     * kommt da hin und der Mischschrott liegt einfach nur daneben, ohne dass
-     * das irgendwie abgegrenzt wird."
+     * gehoeren da eigentlich gar nicht hin bzw. koennen weg … der Mischschrott
+     * liegt einfach nur daneben, ohne dass das irgendwie abgegrenzt wird."
      *
-     * Damit faellt auch die Rueckwand zur Presse. Uebrig bleibt genau das,
-     * was am 12.09. schon die Regel war: „die natuerlichen Abgrenzungen vom
-     * Mischschrott soll eigentlich nur die Aussenwand sein und daneben der
-     * Bagger, anders braucht's eigentlich keine Abgrenzung."
+     * Mit E-010 (14.09.2026) ist daraus die Ausbuchtung geworden: Die Halden
+     * liegen in einer Wanne, die rundum Platzgrenze ist. Die Eigenschaft
+     * bleibt dieselbe — KEINE eigene Wand um die Halde —, nur haelt sie jetzt
+     * die Buchtwand statt der alten Aussenmauer. Geprueft wird deshalb an
+     * derselben Stelle wie vorher, aber gegen das, was dort heute steht.
      */
     const h = CONFIGS.find((c) => c.id === "c_mixed")!;
+    const s = CONFIGS.find((c) => c.id === "c_steel")!;
     const [w, d] = h.size;
     expect(hitsObstacle(h.x, h.z, 0), "Innenraum frei").toBeNull();
+    expect(hitsObstacle(s.x, s.z, 0), "Innenraum der Stahlhalde frei").toBeNull();
+    // Nach Norden offen: dort steht der Bagger und greift hinein.
     expect(hitsObstacle(h.x, h.z + d / 2 + 1.2, 0), "Vorderseite offen").toBeNull();
-    expect(hitsObstacle(h.x + w / 2 + 0.4, h.z, 0), "Aussenwand sperrt").not.toBeNull();
+    // Aussen haelt die Buchtwand — dieselbe Probe, nur 10 cm weiter draussen.
+    const aussen = hitsObstacle(h.x + w / 2 + 0.2, h.z, 0);
+    expect(aussen, "Aussenwand sperrt").not.toBeNull();
+    expect(aussen!.label, "es ist nicht die Buchtwand").toContain("Bucht");
     /*
-     * Die Probe liegt NEBEN der Presse, nicht in ihr: Die Presse steht selbst
-     * dort hinten und ist zu Recht ein Hindernis. Gesucht ist die Wand, die
-     * frueher ueber die ganze Breite lief.
-     *
-     * Seit die Presse am 13.09.2026 von der Mauer abgerueckt ist, reicht sie
-     * bis x 8,83 — die freie Stelle liegt jetzt oestlich davon, nicht
-     * westlich.
+     * Zwischen den beiden Halden steht nur die Pyramide aus Trennsteinen. Sie
+     * darf den Arm nicht aufhalten: „sodass der Zugriff von Mischschrott zu
+     * Stahlschrott fluessig laeuft." Geprueft wird das ueber die Hoehe — auf
+     * 2,5 m ist dort nichts mehr.
      */
     expect(
-      hitsObstacle(h.x + w / 2 - 0.7, h.z - d / 2 - 0.4, 0),
-      "zur Presse hin darf keine Wand mehr stehen"
+      hitsObstacle(h.x - w / 2 - 0.4, h.z, 0, 2.5),
+      "zur Stahlhalde hin steht etwas Hohes im Weg"
     ).toBeNull();
-    for (const [name, z] of [
-      ["vorn", h.z + d / 2 - 1],
-      ["hinten", h.z - d / 4],
-    ] as Array<[string, number]>) {
-      expect(
-        hitsObstacle(h.x - w / 2 - 0.4, z, 0),
-        `zur Stahlbox hin muss es ${name} offen sein`
-      ).toBeNull();
-    }
   });
 
-  it("alles steht innerhalb der Platzgrenzen", () => {
-    // Seit die Ostgrenze an die Mulden herangerueckt ist (x 10,5 statt 40),
-    // muss geprueft werden, dass nichts jenseits davon liegt — sonst stuende
-    // eine Mulde oder ein Schrottberg ausserhalb der Mauer.
+  it("alles steht innerhalb der Platzgrenzen oder in der Ausbuchtung", () => {
+    /*
+     * Seit die Ostgrenze an die Mulden herangerueckt ist (x 10,5 statt 40),
+     * muss geprueft werden, dass nichts jenseits davon liegt.
+     *
+     * Seit E-010 gibt es eine zweite erlaubte Flaeche: die Ausbuchtung hinter
+     * dem Bagger. Sie ist Platz, nicht Ausland — was darin liegt, steht
+     * innerhalb der Mauern. Ein Behaelter muss also entweder ganz im Rechteck
+     * oder ganz in der Bucht liegen; halb draussen zaehlt weiter als Fehler.
+     */
     for (const c of CONFIGS) {
       const [w, d] = c.size;
       expect(c.x + w / 2, `${c.label} ragt ueber die Ostgrenze`).toBeLessThan(YARD_MAX_X);
       expect(c.x - w / 2, `${c.label} ragt ueber die Westgrenze`).toBeGreaterThan(YARD_MIN_X);
-      expect(Math.abs(c.z) + d / 2, `${c.label} ragt ueber Nord/Sued`).toBeLessThan(YARD_D / 2);
+      const imRechteck = Math.abs(c.z) + d / 2 < YARD_D / 2;
+      const inDerBucht =
+        c.x - w / 2 >= BUCHT_X_VON &&
+        c.x + w / 2 <= BUCHT_X_BIS &&
+        c.z - d / 2 >= BUCHT_Z &&
+        c.z + d / 2 <= -YARD_D / 2;
+      expect(imRechteck || inDerBucht, `${c.label} ragt ueber Nord/Sued`).toBe(true);
     }
   });
 
