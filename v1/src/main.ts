@@ -439,8 +439,8 @@ async function main(): Promise<void> {
   touch.onWheelTick = () => audio.playTick();
   // Auf iOS gibt es keine Vibration — der Klick ist dort die einzige Bestaetigung
   touch.onTap = () => audio.playTick();
-  // Fahrmodus hat keinen Knopf mehr — die Griff-Info sagt, woran man ist
-  touch.onDriveMode = (an) => hud.toast(an ? "Fahren an — linker Stick lenkt" : "Fahren aus");
+  // Fahren hat seit dem 14.09.2026 eine eigene Fläche und keinen Zustand mehr,
+  // den man ansagen müsste — deshalb hier auch keine Meldung.
 
   const helpEl = document.getElementById("help")!;
   if (touch.active) helpEl.style.display = "none"; // auf Touchgeräten stört die Tastenliste
