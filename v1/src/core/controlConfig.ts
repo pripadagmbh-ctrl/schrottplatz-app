@@ -41,19 +41,28 @@ export const AXIS_LABELS: Record<AxisId, string> = {
  *
  * Beide Y-Achsen sind umgekehrt, weil ein Stick nach vorne einen negativen
  * Bildschirmwert liefert, „nach oben drücken" aber „Arm heben" bedeuten soll.
+ *
+ * Auch das Drehen ist umgekehrt (Ansage 14.09.2026: Patrick hatte sich diese
+ * Belegung auf dem iPad eingestellt und wollte sie als Werkseinstellung). Der
+ * Grund liegt in der Blickrichtung: Der Spieler sitzt in der Kabine und dreht
+ * MIT dem Oberwagen. Stick nach links soll die Welt nach rechts wandern
+ * lassen — also den Oberwagen nach links schwenken. Ohne Umkehr fuehlt es sich
+ * an, als schoebe man die Landschaft statt die Maschine zu drehen.
  */
 export function defaultConfig(): ControlConfig {
   return {
     leftY: { fn: "boom", invert: true },
-    leftX: { fn: "cab", invert: false },
+    leftX: { fn: "cab", invert: true },
     rightY: { fn: "stick", invert: true },
     rightX: { fn: "grapple", invert: false },
   };
 }
 
-// v2: die Y-Achsen laufen jetzt richtig herum — alte Stände sollen die neue
-// Werkseinstellung bekommen, statt die verkehrte weiterzuschleppen
-const KEY = "schrottplatz.controls.v2";
+// v3: auch das Drehen laeuft jetzt umgekehrt (14.09.2026). Der Schluessel
+// wandert mit, damit bestehende Staende die neue Werkseinstellung bekommen,
+// statt die alte weiterzuschleppen — dieselbe Ueberlegung wie bei v2, als die
+// Y-Achsen gedreht wurden.
+const KEY = "schrottplatz.controls.v3";
 
 export function loadConfig(): ControlConfig {
   const base = defaultConfig();
