@@ -1,0 +1,2385 @@
+import * as THREE from "three";
+import { findeBox, type Box } from "../world/boxen";
+import RAPIER from "@dimforge/rapier3d-compat";
+import type { Input } from "../core/input";
+import { ExcavatorCollision, type ArmShape } from "./collision";
+import { InstrumentPanel, type InstrumentReadout } from "./instruments";
+import { buildDriver } from "./driver";
+import { baueSpinne } from "./grappleParts";
+import {
+  CLAW_COUNT,
+  CLAW_OPEN_SPLAY,
+  CLAW_CLOSED_SPLAY,
+  CLAW_RING_R,
+  CLAW_RING_Y,
+  CLAW_SEGMENTS,
+  clawPoint,
+  naechsteSpreizung,
+  NACHDRUECK_RESERVE,
+  WEICH_RESERVE,
+  clawTipDepth,
+  CLAW_MAX_DEPTH,
+} from "./clawGeometry";
+
+/**
+ * Fuchsbagger (Umschlagbagger) — M0.
+ * Kinematische Kette (Briefing Kap. 6.1): Der Arm ist animiert, NICHT physiksimuliert.
+ * Chassis und Greifer haben kinematische Rapier-Körper, damit sie Schrott wegschieben können.
+ * Der Greifer hängt in M0 immer lotrecht (Pendel/Auto-Nivellierung kommt später).
+ */
+
+// Geometrie (SW)
+/**
+ * Höchste Krallenspitze, die der Arm bei einem waagerechten Abstand vom
+ * Baggermittelpunkt noch erreicht — in Metern über dem Boden.
+ *
+ * Damit lässt sich prüfen, ob eine Mulde überhaupt zu befüllen ist: Der Arm
+ * hat einen scharfen Knick bei rund 6,5 m. Näher dran bleibt er eingeklappt
+ * und kommt kaum über zwei Meter; jenseits von 9,5 m reicht er gar nicht mehr.
+ * Ohne diese Rechnung stand die Sortierreihe bei 4,6 m mitten in der toten
+ * Zone, und keine Mulde war von der Standposition aus erreichbar.
+ *
+ * Reine Geometrie, kein Zustand — absichtlich ohne die Klasse benutzbar.
+ */
+export function hoechsteKrallenspitze(abstandM: number): number {
+  /*
+   * Die groesste Tiefe ueber alle Stellungen, nicht die der offenen Spinne.
+   * Mit der Sichelkralle vom 12.09. mittags haengt die geschlossene Spinne
+   * 13 cm tiefer als die offene — wer nur die offene rechnet, haelt den Arm
+   * fuer hoeher, als er ist, und der Greifer streift die Wand.
+   */
+  const tief = CLAW_MAX_DEPTH;
+  let best = -Infinity;
+  for (let b = BOOM_MIN; b <= BOOM_MAX; b += 0.004) {
+    for (let st = STICK_MIN; st <= STICK_MAX; st += 0.004) {
+      const x = BOOM_PIVOT.z + BOOM_LEN * Math.cos(b) + STICK_LEN * Math.cos(b + st);
+      if (Math.abs(x - abstandM) > 0.05) continue;
+      const y = BOOM_PIVOT.y + BOOM_LEN * Math.sin(b) + STICK_LEN * Math.sin(b + st);
+      best = Math.max(best, y - tief);
+    }
+  }
+  return best;
+}
+
+const BOOM_LEN = 5.2;
+const STICK_LEN = 4.0;
+/*
+ * Der Drehpunkt des Hauptarms sitzt hoeher als frueher (2,55 m), und der Arm
+ * darf weiter aufrichten (Wunsch 11.09.2026: "etwas hoeher vom Hauptarm und
+ * Ausleger"). Ein Umschlagbagger hat genau dieses Profil: hochgesetzter
+ * Oberwagen, steil stehender Ausleger, damit er ueber Bordwaende und
+ * Muldenraender langt.
+ *
+ * Nachgerechnet mit hoechsteKrallenspitze — so weit kommen die Krallenspitzen
+ * ueber Grund, je nach Abstand vom Bagger:
+ *
+ *          4,6 m   6,0 m   6,5 m   7,5 m   8,5 m   9,5 m
+ *   vorher  1,48    2,52    7,30    6,28    4,80    1,73
+ *   nachher 2,55    8,11    7,70    6,68    5,20    2,13
+ *
+ * Der Knick wandert damit von 6,5 auf 6,0 m nach innen: Auch die naeheren
+ * Mulden sind jetzt sauber zu befuellen, und ueber eine 3-m-Wand kommt der
+ * Greifer ab 4,6 m statt erst ab 6,5 m.
+ */
+const BOOM_PIVOT = new THREE.Vector3(0, 2.95, 0.55); // relativ zum Chassis-Ursprung (Boden)
+const GRAPPLE_LINK = 0.55; // Abstand Stielspitze → Palm-Oberkante
+
+// Räumschild vorn am Unterwagen
+const BLADE_W = 2.9; // Schildbreite (SW) — deckt die Spur der Maschine ab
+const BLADE_Z = 2.55; // Abstand vom Drehmittelpunkt nach vorn
+const BLADE_UP_Y = 0.62; // Bodenfreiheit im angehobenen Zustand
+const BLADE_TIME = 1.4; // s für einen vollen Hub
+
+const UP_Y = new THREE.Vector3(0, 1, 0);
+
+const PALM_TO_SENSOR = 0.75; // Palm-Zentrum → Sensor in der Mitte des Schalenkorbs
+
+// Achsgrenzen (SW)
+const BOOM_MIN = THREE.MathUtils.degToRad(5);
+const BOOM_MAX = THREE.MathUtils.degToRad(70);
+const STICK_MIN = THREE.MathUtils.degToRad(-140);
+const STICK_MAX = THREE.MathUtils.degToRad(-25);
+
+// Geschwindigkeiten (SW aus Briefing Kap. 5.1)
+const DRIVE_MAX = 1.4; // m/s ≈ 5 km/h
+const STEER_RATE = 0.7; // rad/s
+/*
+ * Drehwerk.
+ *
+ * Das Datenblatt einer solchen Maschine nennt 7 bis 9 Umdrehungen je Minute,
+ * also 42 bis 54 Grad je Sekunde. Das ist aber das **Hoechste, was sie kann**,
+ * und ein Fahrer benutzt es fast nie: Er zieht den Hebel so weit, wie er die
+ * Last noch im Griff hat. Im Spiel gibt es diesen Unterschied nicht — die
+ * Taste kennt nur ganz oder gar nicht, und damit faehrt der Spieler staendig
+ * Anschlag. Das Endtempo muss darum ein Arbeitstempo sein, nicht das Maximum
+ * der Maschine.
+ *
+ * 45 Grad je Sekunde waren zu viel. Danach ging es auf 36 und dann auf 28 —
+ * beides Reaktionen auf "zu schnell", beide falsch abgeleitet: Beurteilt
+ * wurde eine Maschine, die 0,5 s zum Anlaufen brauchte und deren Rampe in
+ * beide Richtungen weich war. Die kroch los und riss dann. Nicht das
+ * Endtempo war zu hoch, die Reaktion war zu traege.
+ *
+ * Danach zurueck auf 36 gestellt mit der Begruendung, die traege Reaktion sei
+ * die Ursache gewesen. War sie nicht: "das Drehwerk ist zu schnell, das merke
+ * ich doch" (11.09.2026). Wer faehrt, hat recht. 28 Grad je Sekunde, knapp
+ * fuenf Umdrehungen je Minute; die Spitze laeuft damit auf 8 m Radius mit
+ * 3,8 m/s, also 14 km/h.
+ *
+ * Das frueher gemeldete "zu langsam" galt nicht dem Grundtempo, sondern der
+ * Last: "alles bis vier, fuenf Tonnen sollte kein Problem sein". Dafuer
+ * sorgt tempoFaktor, nicht CAB_MAX.
+ */
+export const CAB_MAX = THREE.MathUtils.degToRad(28);
+const BOOM_RATE = THREE.MathUtils.degToRad(19);
+const STICK_RATE = THREE.MathUtils.degToRad(24);
+const ROTATOR_STEP = THREE.MathUtils.degToRad(15); // pro Mausrad-Raste
+/**
+ * Dauerdrehung des Rotators. Vorher wurde je Bild ein fester Winkel addiert,
+ * nicht je Sekunde: Bei 60 Bildern ergab das 54°/s, bei 30 Bildern auf dem
+ * Tablet nur 27 — der Rotator war dort halb so schnell wie am Rechner, ohne
+ * dass es jemand so gebaut hätte. Jetzt zeitbasiert, und deutlich zügiger:
+ * Ein Schrottgreifer dreht die Ladung flott in die Mulde, er zirkelt nicht.
+ */
+/*
+ * Gemessen am 11.09.2026: 160 Grad je Sekunde drehen die Ladung so schnell
+ * herum, dass jede Bewegung nach Zappeln aussieht. Ein Rotator unter Last
+ * dreht spuerbar langsamer als frei; 105 Grad je Sekunde sind zuegig genug,
+ * um die Mulde zu treffen, ohne dass die Ladung herumgeschleudert wird.
+ */
+const ROTATOR_SPEED = THREE.MathUtils.degToRad(120); // rad/s
+/**
+ * Last und Tempo.
+ *
+ * Die Hydraulik ist druckgeregelt: Bis zur Nennlast dreht das Drehwerk fast
+ * genauso schnell wie leer, zu spueren ist die Last im Anlauf. Vorher war es
+ * andersherum modelliert — zwei Tonnen halbierten das Tempo der ganzen
+ * Maschine, und das Arbeiten wurde zaeh, obwohl zwei Tonnen fuer ein Geraet
+ * dieser Groesse nichts sind (Befund 11.09.2026).
+ */
+const NENNLAST_KG = 5000;
+/** Was bei Nennlast an Endtempo fehlt */
+const LAST_TEMPO = 0.15;
+/** Darueber wird es deutlich: bei doppelter Nennlast bleibt die Haelfte. */
+const UEBERLAST_TEMPO = 0.35;
+/** Um so viel laenger braucht der Anlauf bei Nennlast */
+const LAST_ANLAUF = 0.9;
+
+/** Endtempo-Faktor fuer eine Last (1 = leer). */
+export function tempoFaktor(lastKg: number): number {
+  const bisNenn = Math.min(Math.max(lastKg, 0) / NENNLAST_KG, 1);
+  const ueber = Math.min(Math.max(lastKg - NENNLAST_KG, 0) / NENNLAST_KG, 1);
+  return 1 - LAST_TEMPO * bisNenn - UEBERLAST_TEMPO * ueber;
+}
+
+/** Anlauf- und Auslauframpe (s) fuer eine Last. */
+export function anlaufZeit(lastKg: number): number {
+  const bisNenn = Math.min(Math.max(lastKg, 0) / NENNLAST_KG, 1);
+  return RAMP_TIME * (1 + LAST_ANLAUF * bisNenn);
+}
+
+/** Ab diesem Schliessgrad treffen sich die Krallenspitzen. */
+/**
+ * Kollider-Reihen je Kralle, quer zur Krallenrichtung.
+ *
+ * Eine. Am 12.09. abends waren es drei (E-117), weil die 0,90 m breite
+ * Trogschale mit einer einzigen Kapselkette physisch ein 18 cm dicker Draht
+ * war und Material links und rechts daran vorbeifiel. Mit der Rueckkehr zur
+ * Sichelkralle vom Mittag ist das hinfaellig: Die ist an der Wurzel 0,40 m
+ * breit und laeuft auf 0,15 m aus. Drei Reihen mit 0,30 rad Seitenversatz
+ * laegen bei 0,7 m Radius rund 0,21 m neben der Mitte — also ausserhalb der
+ * Kralle, die man sieht.
+ */
+const KOLLIDER_REIHEN = 1;
+/** Seitenversatz der aeusseren Reihen (rad Umfangswinkel). */
+const KOLLIDER_ABSTAND = 0.30; // rad — Seitenversatz der aeusseren Kollider-Reihen
+
+const SCHNAPP_AB = 0.93;
+/** Bis hierher gilt eine Kralle als am Teil anliegend (m) */
+const KONTAKT_NAH = 0.14;
+/** So tief duerfen die Spitzen in Material beissen, bevor der Arm anhaelt (m) */
+const EINDRING_OK = 0.18;
+/** Erst ab dieser Masse gilt ein Teil als Brocken, der den Arm aufhaelt (kg) */
+const EINDRING_SCHWER_KG = 350;
+/** Totband des Bodenanschlags (m) — darunter wird nicht nachgeregelt */
+const BODEN_TOLERANZ = 0.012;
+/** So lange haelt die Abwaertssperre nach dem letzten Kontakt (s) */
+const BODEN_SPERRE_S = 0.2;
+/** So lange haelt eine einmal gefundene Sperre, statt neu zu regeln (s) */
+const EINDRING_HALT_S = 0.35;
+/** Wie weit die Schalen beim Anschlag zurueckfedern (rad) */
+const ANSCHLAG_GRAD = THREE.MathUtils.degToRad(4.5);
+/** Wie lange der Rueckprall nachschwingt (s) */
+const ANSCHLAG_S = 0.22;
+
+/** Um so viel traeger laeuft der Arm an, wenn er ganz im Material steckt */
+const PFLUG_TRAEGHEIT = 1.5;
+/** Zeitkonstante, mit der die Spitzenbeschleunigung fuers Pendel geglaettet wird (s) */
+const ACC_GLAETTUNG_S = 0.09;
+/**
+ * Zusaetzliche Rueckstellung des Kardangelenks, als Vielfaches der
+ * Schwerkraftrueckstellung. 1 halbiert den Ausschlag gegenueber einem frei
+ * haengenden Pendel.
+ */
+const GELENK_STEIFE = 1.0;
+/** Dämpfung des Pendels leer und bei Nennlast */
+const PENDEL_DAEMPFUNG_LEER = 5.0;
+const PENDEL_DAEMPFUNG_LAST = 4.0;
+/** Groesster Ausschlag je Achse (rad) — darueber wird es zur Abrissbirne */
+const PENDEL_MAX = THREE.MathUtils.degToRad(17);
+
+/** Halbe Breite des Unterwagens — damit rechnet die Fahrzeugsperre. */
+const UNTERWAGEN_R = 2.6;
+
+const CLOSE_TIME = 0.4; // s (SW)
+const OPEN_TIME = 0.3; // s (SW)
+/*
+ * Anlauf- und Auslauframpe.
+ *
+ * War 0,38, wurde im Lauf des 11.09.2026 auf 0,5 erhoeht, um die Maschine
+ * schwer wirken zu lassen. Zusammen mit einem halbierten Endtempo, weichen
+ * Rampenecken und einem beissenden Pflugwiderstand wurde daraus aber zaeh
+ * statt schwer ("die Mechanik ist im Verlauf schlechter geworden").
+ *
+ * Schwer heisst nicht langsam, sondern: sofort reagieren und dabei Masse
+ * haben. Die Masse steckt im Pendel, im Pfluegen und im Auslauf — nicht
+ * darin, dass der Hebel erst mal nichts tut. 0,3 s.
+ */
+const RAMP_TIME = 0.3;
+const CAB_LIFT_MAX = 2.6; // m Kabinenhub für besseren Überblick (SW)
+const CAB_LIFT_SPEED = 0.75; // m/s (SW)
+
+export class Excavator {
+  // Spielzustand
+  // Standplatz mittig: Stahlhaufen links, Boxenreihe rechts, Presse hinten
+  /**
+  * Standplatz: vor der Presse, Blick nach Norden zu Janine (Ansage
+  * 12.09.2026). Von hier liegt die Presse bei +180°, der Stahlcontainer bei
+  * +93°, der Mischschrott bei −116°.
+  */
+  /*
+   * So dicht an den Stahlcontainern, wie der Arm es zulaesst.
+   *
+   * Gewuenscht waren 20 bis 50 cm Luft (12.09.2026). Das geht nicht: Der Arm
+   * hat einen Mindestradius von 4,0 m — naeher kommt die Krallenspitze gar
+   * nicht auf den Boden. Bei 0,5 m Abstand stuende die Maschine am Container
+   * und koennte ihn nicht befuellen. 4,0 m ist die Untergrenze, und genau
+   * darauf steht sie jetzt.
+   */
+  readonly position = new THREE.Vector3(-2.5, 0, -19.5);
+  heading = 0; // rad, 0 = +Z
+  cabYaw = 0;
+  boomAngle = THREE.MathUtils.degToRad(35);
+  stickAngle = THREE.MathUtils.degToRad(-70);
+  rotatorYaw = 0;
+  /** Drehgeschwindigkeit der Spinne (rad/s) — treibt das Herausreißen */
+  private rotatorVel = 0;
+  private lastRotatorYaw = 0;
+  closure = 0; // 0 offen .. 1 zu
+  closing = false;
+
+  // gerampte Achsgeschwindigkeiten
+  private driveVel = 0;
+  private cabVel = 0;
+  private boomVel = 0;
+  private stickVel = 0;
+
+  // Szene
+  readonly root = new THREE.Group(); // Chassis (Ursprung am Boden)
+  private cabGroup = new THREE.Group();
+  private boomGroup = new THREE.Group();
+  private stickGroup = new THREE.Group();
+  private stickTip = new THREE.Object3D();
+  readonly grappleGroup = new THREE.Group(); // top-level, hängt lotrecht
+  private fingerPivots: THREE.Group[] = [];
+  /**
+   * Greifer-Hydraulik: Die Zylinder sind über Gelenke mit Traverse und Schale
+   * verbunden und werden IM Spinnen-Koordinatensystem berechnet — so bilden sie
+   * mit den Schalen eine Einheit und schwingen mit dem Pendel mit.
+   */
+  private grappleCylinders: Array<{
+    pivot: THREE.Group;
+    fromLocal: THREE.Vector3;
+    toLocalOnShell: THREE.Vector3;
+    barrel: THREE.Mesh;
+    rod: THREE.Mesh;
+    barrelLen: number;
+  }> = [];
+  private joyLeft!: THREE.Group;
+  private joyRight!: THREE.Group;
+  private cabinEye = new THREE.Object3D();
+  /** Hubschlitten der Fahrerkabine (Taste X) */
+  private cabLiftGroup = new THREE.Group();
+  private cabLift = 0; // aktuelle Hubhöhe in m
+  private cabLiftTarget = 0;
+  // letzte Achseingaben (-1..1) für die Joystick-Animation in der Kabine
+  private inCab = 0;
+  private inBoom = 0;
+  private inStick = 0;
+  private inGrapple = 0;
+
+  // Physik
+  chassisBody!: RAPIER.RigidBody;
+  grappleBody!: RAPIER.RigidBody;
+  private clawColliders: RAPIER.Collider[] = [];
+  private clawA = new THREE.Vector3();
+  private clawB = new THREE.Vector3();
+  private clawMid = new THREE.Vector3();
+  private clawDir = new THREE.Vector3();
+  private clawQuat = new THREE.Quaternion();
+  /** Ausleger und Stiel bekommen eigene Kollider, damit der Kran nicht
+   *  durch Schrott oder LKW hindurchtaucht (Design-Fix 2026-08-29) */
+  private boomBody!: RAPIER.RigidBody;
+  private stickBody!: RAPIER.RigidBody;
+  private boomMesh!: THREE.Mesh;
+  private stickMesh!: THREE.Mesh;
+
+  /** Touch-Achsen (Tablet/Smartphone); null auf Desktop */
+  touch: {
+    cab: number;
+    stick: number;
+    boom: number;
+    rotator: number;
+    drive: number;
+    steer: number;
+    grab: boolean;
+    grapple: number;
+  } | null = null;
+  /** gemerkter Spinnen-Zustand für die Stick-Steuerung (Stick neutral = halten) */
+  private grappleHold = false;
+
+  /** von außen gesetzt (GripSystem): getragene Masse → Achsen werden träger */
+  carriedMassKg = 0;
+  /** Anzahl der Teile im Greifer — bestimmt mit, wie weit die Spinne schließt */
+  carriedCount = 0;
+
+  /** Bodenkontakt der Zackenspitzen (Kap. 6.1: Boden ist immer harter Widerstand) */
+  readonly groundContact = { active: false, intensity: 0, point: new THREE.Vector3() };
+
+  /**
+   * Körper, in die der Arm nicht eintauchen darf (LKW). Sie sind kinematisch,
+   * kollidieren also nicht von selbst mit dem ebenfalls kinematischen Arm —
+   * deshalb wird die Achsbewegung bei Überlappung zurückgenommen.
+   */
+  obstacleBodies: Set<number> = new Set();
+  /** Die eigenen Koerper des Baggers — ein Zielstrahl darf sie nicht treffen. */
+  readonly selfHandles: Set<number> = new Set();
+  /** true, solange der Arm gegen ein Fahrzeug drückt (fürs HUD/Audio) */
+  armBlocked = false;
+
+  // Pendel der Spinne am Kardan-Gelenk (x: Kippen um Welt-X, y: um Welt-Z)
+  private swing = new THREE.Vector2();
+  private swingVel = new THREE.Vector2();
+  /** Geglaettete Beschleunigung der Stielspitze (m/s²) */
+  private tipAcc = new THREE.Vector2();
+  private prevTip = new THREE.Vector3();
+  private prevTipVel = new THREE.Vector3();
+  private pendulumInit = false;
+
+  private hydraulics: Array<{
+    a: THREE.Object3D;
+    b: THREE.Object3D;
+    barrel: THREE.Mesh;
+    rod: THREE.Mesh;
+    barrelLen: number;
+  }> = [];
+
+  private world!: RAPIER.World;
+
+  constructor(scene: THREE.Scene, world: RAPIER.World) {
+    this.world = world;
+    this.buildMeshes();
+    scene.add(this.root);
+    scene.add(this.grappleGroup);
+    this.buildHydraulics(scene);
+    this.buildBodies(world);
+    this.syncMeshes();
+  }
+
+  /**
+   * Sichtbare Hydraulik (Design-Wunsch): Hubzylinder Kabine→Ausleger (2×),
+   * Stielzylinder auf dem Ausleger, dazu Schläuche entlang der Arm-Oberseite.
+   * Zylinder = Rohr + Kolbenstange, die sich zwischen zwei Ankern längt/kürzt.
+   */
+  private buildHydraulics(scene: THREE.Scene): void {
+    // Kabinen-Lenker leben in Weltkoordinaten
+    for (const l of this.cabLinks) {
+      l.mesh.geometry.dispose();
+      l.mesh.geometry = new THREE.BoxGeometry(0.14, 1, 0.16);
+      scene.add(l.mesh);
+    }
+    const barrelMat = new THREE.MeshStandardMaterial({ color: 0x2b2e31, roughness: 0.6 });
+    const rodMat = new THREE.MeshStandardMaterial({ color: 0xb8bec4, roughness: 0.25, metalness: 0.8 });
+    const addCyl = (
+      parentA: THREE.Object3D,
+      la: [number, number, number],
+      parentB: THREE.Object3D,
+      lb: [number, number, number],
+      barrelLen: number,
+      rBarrel: number
+    ): void => {
+      const a = new THREE.Object3D();
+      a.position.set(...la);
+      parentA.add(a);
+      const b = new THREE.Object3D();
+      b.position.set(...lb);
+      parentB.add(b);
+      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(rBarrel, rBarrel, 1, 10), barrelMat);
+      const rod = new THREE.Mesh(new THREE.CylinderGeometry(rBarrel * 0.55, rBarrel * 0.55, 1, 8), rodMat);
+      barrel.castShadow = true;
+      scene.add(barrel);
+      scene.add(rod);
+      this.hydraulics.push({ a, b, barrel, rod, barrelLen });
+    };
+    // Hubzylinder des Auslegers: sitzen tief am Oberwagen-Deck links und rechts
+    // neben dem Auslegerfuß (nicht an der Kabine) und greifen nach oben an den
+    // Ausleger — so sieht es an echten Umschlagbaggern aus.
+    addCyl(this.cabGroup, [-0.52, 0.02, 1.05], this.boomGroup, [-0.28, -0.2, 2.6], 1.7, 0.1);
+    addCyl(this.cabGroup, [0.52, 0.02, 1.05], this.boomGroup, [0.28, -0.2, 2.6], 1.7, 0.1);
+    // Kabinenhub: zwei kleine Zylinder unten links und rechts an der Kabine
+    addCyl(this.cabGroup, [-1.5, 0.3, 0.1], this.cabLiftGroup, [-1.5, 0.95, 0.1], 1.1, 0.055);
+    addCyl(this.cabGroup, [-0.6, 0.3, 0.1], this.cabLiftGroup, [-0.6, 0.95, 0.1], 1.1, 0.055);
+    // Stielzylinder: Ausleger-Oberseite → Stiel-Anlenkung
+    addCyl(this.boomGroup, [0, 0.34, 3.4], this.stickGroup, [0, 0.2, 0.35], 1.2, 0.08);
+
+    // Hydraulikschläuche oben auf dem Ausleger (2×) + Bogen über das Stielgelenk
+    const hoseMat = new THREE.MeshStandardMaterial({ color: 0x1c1e20, roughness: 0.9 });
+    for (const hx of [-0.07, 0.07]) {
+      const curve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(hx, 0.38, 0.25),
+        new THREE.Vector3(hx, 0.52, 1.8),
+        new THREE.Vector3(hx, 0.46, 3.6),
+        new THREE.Vector3(hx, 0.32, BOOM_LEN - 0.15),
+      ]);
+      const hose = new THREE.Mesh(new THREE.TubeGeometry(curve, 24, 0.028, 6), hoseMat);
+      this.boomGroup.add(hose);
+    }
+    const stickCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0, 0.34, -0.45),
+      new THREE.Vector3(0, 0.3, 0.1),
+      new THREE.Vector3(0, 0.24, 0.9),
+    ]);
+    const stickHose = new THREE.Mesh(new THREE.TubeGeometry(stickCurve, 16, 0.028, 6), hoseMat);
+    this.stickGroup.add(stickHose);
+  }
+
+  private armPos = new THREE.Vector3();
+  private armQuat = new THREE.Quaternion();
+  private tmpPrevPos = new THREE.Vector3();
+  private armShapes: ArmShape[] = [];
+
+  /**
+   * Geglätteter Widerstand des Materials, durch das die Spinne pflügt.
+   * Ohne Glättung ruckelt die Bewegung, weil die verdrängte Masse von Bild
+   * zu Bild springt.
+   */
+  private plowFactor = 1;
+
+  /** Handles der gerade gegriffenen Körper — die blockieren die Spinne nicht. */
+  grippedHandles = new Set<number>();
+  /** Faktor aus dem Baggerausbau — von main gesetzt (1 = ohne Ausbau) */
+  getSpeedBonus: (() => number) | null = null;
+
+  /** Position des Platzwarts — von main gesetzt, damit der Arm ihn verschont */
+  getStaffPos: (() => THREE.Vector3 | null) | null = null;
+  /** Prüfung von Fahrwerk, Arm und Spinne gegen alles Festinstallierte */
+  private collision!: ExcavatorCollision;
+
+  // Rechenpuffer für die Hydraulik-Zylinder
+  private tmpA = new THREE.Vector3();
+  private tmpB = new THREE.Vector3();
+  private tmpDir = new THREE.Vector3();
+  private static UP = new THREE.Vector3(0, 1, 0);
+
+  private updateHydraulics(): void {
+    // Weltmatrizen frisch berechnen — sonst sitzen die Zylinder auf den
+    // Posen des letzten Frames
+    this.root.updateWorldMatrix(true, true);
+    this.grappleGroup.updateWorldMatrix(true, true);
+    for (const h of this.hydraulics) {
+      h.a.getWorldPosition(this.tmpA);
+      h.b.getWorldPosition(this.tmpB);
+      this.tmpDir.copy(this.tmpB).sub(this.tmpA);
+      const dist = Math.max(this.tmpDir.length(), 0.2);
+      this.tmpDir.normalize();
+      const q = new THREE.Quaternion().setFromUnitVectors(Excavator.UP, this.tmpDir);
+      h.barrel.position.copy(this.tmpA).addScaledVector(this.tmpDir, h.barrelLen / 2);
+      h.barrel.quaternion.copy(q);
+      h.barrel.scale.set(1, h.barrelLen, 1);
+      const rodLen = Math.max(dist - h.barrelLen + 0.15, 0.15);
+      h.rod.position.copy(this.tmpB).addScaledVector(this.tmpDir, -rodLen / 2);
+      h.rod.quaternion.copy(q);
+      h.rod.scale.set(1, rodLen, 1);
+    }
+  }
+
+  // ---------- Aufbau ----------
+
+  private buildMeshes(): void {
+    // Firmenfarbe PRIPADA: helles Umschlagbagger-Grün (Art Direction Kap. 16)
+    const machineBlue = new THREE.MeshStandardMaterial({ color: 0x5bbf46, roughness: 0.55 });
+    const dark = new THREE.MeshStandardMaterial({ color: 0x2b2e31, roughness: 0.8 });
+    // Greifer-Farbgebung nach Vorbild: dunkle Hardox-Schalen, fast schwarze Kanten
+    const glass = new THREE.MeshStandardMaterial({ color: 0x9fc4d8, roughness: 0.2 });
+
+    // Chassis + 4 Räder
+    const chassis = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.9, 4.4), machineBlue);
+    chassis.position.y = 1.15;
+    chassis.castShadow = true;
+    this.root.add(chassis);
+    const wheelGeo = new THREE.CylinderGeometry(0.62, 0.62, 0.5, 20);
+    wheelGeo.rotateZ(Math.PI / 2);
+    for (const [x, z] of [
+      [-1.25, 1.5],
+      [1.25, 1.5],
+      [-1.25, -1.5],
+      [1.25, -1.5],
+    ]) {
+      const w = new THREE.Mesh(wheelGeo, dark);
+      w.position.set(x, 0.62, z);
+      w.castShadow = true;
+      this.root.add(w);
+    }
+
+    // Oberwagen: verglaste Hochkabine + Gegengewicht
+    this.cabGroup.position.set(0, 1.6, 0);
+    this.root.add(this.cabGroup);
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(2.9, 0.35, 3.2), dark);
+    deck.position.y = 0.18;
+    this.cabGroup.add(deck);
+    this.buildCabin(machineBlue, dark, glass);
+    // Motorhaube mit Lüftungsgittern + Gegengewicht (wie am Umschlagbagger)
+    const hood = new THREE.Mesh(new THREE.BoxGeometry(2.5, 1.0, 1.7), machineBlue);
+    hood.position.set(0, 0.85, -1.0);
+    hood.castShadow = true;
+    this.cabGroup.add(hood);
+    const louver = new THREE.MeshStandardMaterial({ color: 0x1f2224, roughness: 0.8 });
+    for (const sx of [-1.27, 1.27]) {
+      for (let i = 0; i < 4; i++) {
+        const slot = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.5, 0.12), louver);
+        slot.position.set(sx, 0.9, -1.55 + i * 0.32);
+        this.cabGroup.add(slot);
+      }
+    }
+    const counterweight = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.75, 0.7), dark);
+    counterweight.position.set(0, 0.5, -2.0);
+    counterweight.castShadow = true;
+    this.cabGroup.add(counterweight);
+    this.buildOutriggers(machineBlue, dark);
+
+    // Ausleger
+    this.boomGroup.position.copy(BOOM_PIVOT).sub(new THREE.Vector3(0, 1.6, 0)); // relativ zum Oberwagen
+    this.cabGroup.add(this.boomGroup);
+    const boom = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.62, BOOM_LEN), machineBlue);
+    boom.position.z = BOOM_LEN / 2;
+    boom.castShadow = true;
+    this.boomGroup.add(boom);
+    this.boomMesh = boom;
+    this.buildBoomLogo();
+
+    // Stiel
+    this.stickGroup.position.z = BOOM_LEN;
+    this.boomGroup.add(this.stickGroup);
+    const stick = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.45, STICK_LEN), machineBlue);
+    stick.position.z = STICK_LEN / 2;
+    stick.castShadow = true;
+    this.stickGroup.add(stick);
+    this.stickMesh = stick;
+    this.stickTip.position.z = STICK_LEN;
+    this.stickGroup.add(this.stickTip);
+
+    /*
+     * BEFESTIGUNG AM AUSLEGER (Ansage 13.09.2026: „Greifer braucht Befestigung
+     * am Ausleger").
+     *
+     * Vorher endete der Stiel stumpf und die Spinne hing daran, ohne dass am
+     * Stiel etwas zu sehen war. Jetzt sitzt dort ein Gusskopf, aus dem zwei
+     * Laschen herauswachsen, dazu der Bolzen und zwei Sicherungsscheiben.
+     *
+     * Der Halter haengt im Stielframe und kippt deshalb mit dem Stiel mit —
+     * genau wie beim Vorbild, wo darunter das Pendelgelenk sitzt. Er ist
+     * beim Rueckbau auf die Sichelkralle am 13.09.2026 stehen geblieben: Er
+     * gehoert zum Stiel, nicht zur Spinne, und haengt an keiner ihrer Formen.
+     */
+    const halter = new THREE.Group();
+    halter.position.z = STICK_LEN;
+    this.stickGroup.add(halter);
+    const kopf = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.52, 0.36), dark);
+    kopf.position.z = -0.1;
+    kopf.castShadow = true;
+    halter.add(kopf);
+    for (const sx of [-1, 1]) {
+      const lasche = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.3, 0.2), dark);
+      lasche.position.set(sx * 0.16, -0.22, 0);
+      lasche.castShadow = true;
+      halter.add(lasche);
+    }
+    const halterBolzen = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.05, 0.05, 0.44, 10),
+      dark
+    );
+    halterBolzen.rotation.z = Math.PI / 2;
+    halterBolzen.position.y = -0.32;
+    halter.add(halterBolzen);
+    for (const sx of [-0.21, 0.21]) {
+      const scheibe = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.03, 10), dark);
+      scheibe.rotation.z = Math.PI / 2;
+      scheibe.position.set(sx, -0.32, 0);
+      halter.add(scheibe);
+    }
+
+    // Kardan-Aufhängung: zwei ineinandergreifende Gelenkgabeln (90° verdreht)
+    // zwischen Stielspitze und Spinne — statt eines schlichten Zylinders.
+    const buildYoke = (y: number, alongX: boolean): void => {
+      const yoke = new THREE.Group();
+      yoke.position.y = y;
+      if (!alongX) yoke.rotation.y = Math.PI / 2;
+      for (const side of [-1, 1]) {
+        const plate = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.2, 0.16), dark);
+        plate.position.set(side * 0.1, -0.09, 0);
+        plate.castShadow = true;
+        yoke.add(plate);
+      }
+      const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.3, 10), dark);
+      pin.rotation.z = Math.PI / 2;
+      pin.position.y = -0.16;
+      yoke.add(pin);
+      this.grappleGroup.add(yoke);
+    };
+    const stub = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.12, 10), dark);
+    stub.position.y = -0.05;
+    this.grappleGroup.add(stub);
+    buildYoke(-0.1, true); // obere Gabel: Bolzen quer
+    buildYoke(-0.3, false); // untere Gabel: 90° verdreht — greift in die obere
+    /*
+     * Die Spinne steht Bauteil fuer Bauteil in `grappleParts.ts`.
+     *
+     * Hier stand sie als ein Block von 270 Zeilen mitten im Baggermodell. Das
+     * war der eigentliche Grund, warum die Formarbeit am 12.09.2026 fuenfmal
+     * hintereinander danebenging: Es liess sich nie ein Teil allein aendern
+     * und nie zuordnen, welche Aenderung was bewirkt hat (Ansage: „baue
+     * erstmal die einzelnen Bauteile").
+     */
+    const spinne = baueSpinne();
+    this.grappleGroup.add(spinne.gruppe);
+    this.fingerPivots.push(...spinne.gelenke);
+    for (const z of spinne.zylinder) {
+      this.grappleCylinders.push({
+        pivot: z.gelenk,
+        fromLocal: z.obenLokal,
+        toLocalOnShell: z.untenAmGelenk,
+        barrel: z.rohr,
+        rod: z.stange,
+        barrelLen: z.rohrLaenge,
+      });
+    }
+  }
+
+  /**
+   * Verglaste Hochkabine mit Innenausbau (Kabinensicht, Briefing Kap. 5.2):
+   * Rahmen + Glasflächen, Sitz, zwei Konsolen mit ISO-Joysticks, die die
+   * Achseingaben live mitbewegen. Kabinenzentrum lokal (-0.6, *, 0.6).
+   */
+  private cabLinks: Array<{ a: THREE.Object3D; b: THREE.Object3D; mesh: THREE.Mesh }> = [];
+  /** Alles am Fahrer außer Unterarmen/Händen — in der Ego-Sicht unsichtbar */
+  private driverBody: THREE.Object3D[] = [];
+
+  /**
+   * Ego-Perspektive: In der Kabinenansicht sieht der Fahrer nur seine eigenen
+   * Unterarme an den Joysticks, sonst nichts von sich selbst.
+   */
+  setFirstPerson(active: boolean): void {
+    for (const o of this.driverBody) o.visible = !active;
+  }
+  /** Abstützpratzen: eingefahren (0) bis ausgefahren (1), Taste O */
+  private outriggerGroups: THREE.Group[] = [];
+  /*
+   * Eingefahren beim Start (Ansage 12.09.2026: „die Stützen sollen immer oben
+   * sein, damit man grade am Anfang des Spiels direkt losfahren kann"). Auf
+   * ausgefahrenen Stützen ist das Fahren gesperrt — wer neu anfängt, drückte
+   * sonst auf Gas und verstand nicht, warum nichts passiert.
+   */
+  private outriggerDown = 0;
+  private outriggerTarget = 0;
+  /** true, solange der Spieler auf Stützen zu fahren versucht (für HUD/Ton) */
+  blockedByOutriggers = false;
+  /** Aufbockhöhe: so weit hebt sich die Maschine auf den Stützen (m) */
+  static readonly JACK_UP_M = 0.34;
+  /** Räumschild: 0 = angehoben, 1 = am Boden */
+  private bladeDown = 0;
+  private bladeTarget = 0;
+  private bladeGroup!: THREE.Group;
+  private bladeBody!: RAPIER.RigidBody;
+  private tmpQuat = new THREE.Quaternion();
+
+  /** Schild heben/senken (Taste G bzw. Knopf). */
+  toggleBlade(): boolean {
+    this.bladeTarget = this.bladeTarget > 0.5 ? 0 : 1;
+    return this.bladeTarget > 0.5;
+  }
+
+  get bladeIsDown(): boolean {
+    return this.bladeDown > 0.5;
+  }
+
+  private buildCabin(
+    frameMat: THREE.MeshStandardMaterial,
+    darkMat: THREE.MeshStandardMaterial,
+    glassBase: THREE.MeshStandardMaterial
+  ): void {
+    // Kabine deutlich weiter nach links gesetzt, damit der Ausleger nicht ins
+    // Blickfeld ragt (Design-Fix 2026-08-29)
+    const cx = -1.05;
+    const cz = 0.6;
+    // Kabinenausleger (wie am Vorbild): zwei Parallelogramm-Lenker heben die
+    // Kabine nach vorn-oben; sie bleibt dabei waagerecht.
+    for (const rx of [-0.42, 0.42]) {
+      const base = new THREE.Object3D();
+      base.position.set(cx + rx, 0.35, cz - 1.35);
+      this.cabGroup.add(base);
+      const tip = new THREE.Object3D();
+      tip.position.set(cx + rx, 0.5, cz - 0.72);
+      this.cabLiftGroup.add(tip);
+      // Lenker liegt in Weltkoordinaten (wird in buildHydraulics zur Szene gehängt)
+      const link = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.16, 1), frameMat);
+      link.castShadow = true;
+      this.cabLinks.push({ a: base, b: tip, mesh: link });
+    }
+    // Alles Weitere sitzt im Hubschlitten und fährt mit der Kabine hoch
+    this.cabGroup.add(this.cabLiftGroup);
+    const glass = new THREE.MeshStandardMaterial({
+      color: glassBase.color,
+      roughness: 0.08,
+      metalness: 0.1,
+      transparent: true,
+      opacity: 0.22,
+      side: THREE.DoubleSide,
+    });
+
+    // Boden: hinten Blech, vorn eine Glasscheibe im Fußbereich — so sieht der
+    // Fahrer senkrecht nach unten auf den Greifer (Design-Wunsch 2026-08-29)
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.07, 0.75), darkMat);
+    floor.position.set(cx, 0.58, cz - 0.33);
+    this.cabLiftGroup.add(floor);
+    // Fußscheibe: schräg eingesetzt, sie schließt vorn an die Frontscheibe an.
+    // Rahmen: eine dünne Querstrebe in der Mitte, dazu zwei Randstreben, die
+    // den Übergang zur Frontscheibe bilden.
+    const footPane = new THREE.Group();
+    footPane.position.set(cx, 0.6, cz + 0.36);
+    footPane.rotation.x = -0.42; // Vorderkante höher, Anschluss an die Frontscheibe
+    this.cabLiftGroup.add(footPane);
+    const footGlass = new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.035, 0.7), glass);
+    footPane.add(footGlass);
+    const crossBar = new THREE.Mesh(new THREE.BoxGeometry(1.04, 0.028, 0.045), darkMat);
+    crossBar.position.y = 0.03;
+    footPane.add(crossBar);
+    for (const sx of [-0.5, 0.5]) {
+      const edge = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.045, 0.72), darkMat);
+      edge.position.set(sx, 0.02, 0);
+      footPane.add(edge);
+    }
+    // Dach: hinten Blech, vorn eine Querscheibe zum Blick nach oben auf den
+    // Ausleger (Design-Wunsch 2026-08-29)
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.09, 0.85), frameMat);
+    roof.position.set(cx, 2.1, cz - 0.32);
+    roof.castShadow = true;
+    this.cabLiftGroup.add(roof);
+    // Vordere Dachscheibe um ~40° nach unten geneigt: sie führt vom Dach zur
+    // Frontscheibe und gibt den Blick nach oben auf den Ausleger frei
+    const roofGlass = new THREE.Mesh(new THREE.BoxGeometry(1.06, 0.04, 0.78), glass);
+    roofGlass.position.set(cx, 1.98, cz + 0.42);
+    roofGlass.rotation.x = THREE.MathUtils.degToRad(40);
+    this.cabLiftGroup.add(roofGlass);
+    const roofBar = new THREE.Mesh(new THREE.BoxGeometry(1.16, 0.05, 0.06), frameMat);
+    roofBar.position.set(cx, 2.06, cz + 0.3);
+    this.cabLiftGroup.add(roofBar);
+    for (const [px, pz] of [
+      [-0.52, -0.66],
+      [0.52, -0.66],
+      [-0.52, 0.66],
+      [0.52, 0.66],
+    ]) {
+      const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.45, 0.08), frameMat);
+      pillar.position.set(cx + px, 1.33, cz + pz);
+      pillar.castShadow = true;
+      this.cabLiftGroup.add(pillar);
+    }
+    // Glas: Front (bis in den Fußbereich hinunter), Heck, links, rechts
+    const panes: Array<[number, number, number, number, number, number]> = [
+      // [x, y, z, sx, sy, sz]
+      [cx, 1.28, cz + 0.69, 1.0, 1.52, 0.03],
+      [cx, 1.33, cz - 0.69, 1.0, 1.42, 0.03],
+      [cx - 0.54, 1.33, cz, 0.03, 1.42, 1.3],
+      [cx + 0.54, 1.33, cz, 0.03, 1.42, 1.3],
+    ];
+    for (const [x, y, z, sx, sy, sz] of panes) {
+      const pane = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), glass);
+      pane.position.set(x, y, z);
+      this.cabLiftGroup.add(pane);
+    }
+
+    // Bordinstrument rechts vorn an der Säule — zeigt Achswinkel, Hydraulik
+    // und Greiferstatus, wie das Display in der echten Maschine
+    this.instruments = new InstrumentPanel(this.cabLiftGroup, cx, cz);
+    this.instruments.draw(this.readout());
+
+    // Sitz + Konsolen
+    const seatMat = new THREE.MeshStandardMaterial({ color: 0x24272a, roughness: 0.9 });
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.12, 0.5), seatMat);
+    seat.position.set(cx, 0.95, cz - 0.2);
+    this.cabLiftGroup.add(seat);
+    const backrest = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.62, 0.1), seatMat);
+    backrest.position.set(cx, 1.3, cz - 0.48);
+    this.cabLiftGroup.add(backrest);
+    // Kopfstütze
+    const headrest = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.22, 0.12), seatMat);
+    headrest.position.set(cx, 1.76, cz - 0.47);
+    headrest.castShadow = true;
+    this.cabLiftGroup.add(headrest);
+    for (const sx of [-0.09, 0.09]) {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.13, 8), darkMat);
+      post.position.set(cx + sx, 1.63, cz - 0.47);
+      this.cabLiftGroup.add(post);
+    }
+    for (const side of [-1, 1]) {
+      const console = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.28, 0.44), darkMat);
+      console.position.set(cx + side * 0.36, 1.02, cz + 0.02);
+      this.cabLiftGroup.add(console);
+      // Moderner Kreuzhebel: Faltenbalg, ergonomischer Griff mit Daumentaste
+      // und Vorderfinger-Wippe — statt Kugelknauf (Design-Wunsch 2026-08-29).
+      const pivot = new THREE.Group();
+      pivot.position.set(cx + side * 0.36, 1.16, cz + 0.1);
+      const rubber = new THREE.MeshStandardMaterial({ color: 0x17191b, roughness: 0.95 });
+      const gripMat = new THREE.MeshStandardMaterial({ color: 0x24282c, roughness: 0.45 });
+      const accent = new THREE.MeshStandardMaterial({
+        color: 0xd97a1f,
+        roughness: 0.35,
+        emissive: 0x3a1f00,
+      });
+      // Faltenbalg (drei Wülste)
+      for (let b = 0; b < 3; b++) {
+        const bellow = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.055 - b * 0.006, 0.062 - b * 0.006, 0.035, 12),
+          rubber
+        );
+        bellow.position.y = 0.03 + b * 0.037;
+        pivot.add(bellow);
+      }
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.021, 0.025, 0.12, 10), gripMat);
+      shaft.position.y = 0.18;
+      pivot.add(shaft);
+      // Griff: leicht nach hinten geneigter, abgerundeter Körper
+      const grip = new THREE.Mesh(new THREE.CapsuleGeometry(0.048, 0.1, 4, 12), gripMat);
+      grip.position.set(0, 0.29, -0.012);
+      grip.rotation.x = -0.22;
+      grip.castShadow = true;
+      pivot.add(grip);
+      // Daumentaste oben
+      const thumb = new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.019, 0.014, 10), accent);
+      thumb.position.set(0, 0.365, 0.012);
+      thumb.rotation.x = -0.22;
+      pivot.add(thumb);
+      // Wippe für den Zeigefinger vorn
+      const trigger = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.032, 0.018), accent);
+      trigger.position.set(0, 0.285, 0.05);
+      trigger.rotation.x = 0.25;
+      pivot.add(trigger);
+
+      // Unterarm und Hand hängen am Hebel: Sie kippen mit ihm mit und liegen
+      // AUSSEN am Griff, nicht zwischen Fahrer und Joystick.
+      const armSkin = new THREE.MeshStandardMaterial({ color: 0xe3b18c, roughness: 0.8 });
+      // Nach Fotoreferenz: Unterarm läuft schräg von hinten-unten heran, die
+      // Faust liegt oben auf dem Griff und umschließt ihn.
+      const forearm = new THREE.Mesh(new THREE.CapsuleGeometry(0.054, 0.34, 4, 10), armSkin);
+      forearm.position.set(side * 0.06, 0.28, -0.28);
+      forearm.rotation.set(1.28, 0, side * 0.18);
+      forearm.castShadow = true;
+      pivot.add(forearm);
+      // Faust: ein liegender, abgerundeter Block um den Griff, davor der
+      // Daumen — einfache Formen, aber anatomisch plausibel
+      const fist = new THREE.Mesh(new THREE.CapsuleGeometry(0.052, 0.075, 4, 10), armSkin);
+      fist.position.set(0, 0.315, -0.01);
+      fist.rotation.set(Math.PI / 2, 0, 0);
+      fist.castShadow = true;
+      pivot.add(fist);
+      const thumbFinger = new THREE.Mesh(new THREE.CapsuleGeometry(0.02, 0.055, 4, 8), armSkin);
+      thumbFinger.position.set(-side * 0.042, 0.318, 0.035);
+      thumbFinger.rotation.set(1.35, 0, side * 0.35);
+      pivot.add(thumbFinger);
+
+      this.cabLiftGroup.add(pivot);
+      if (side < 0) this.joyLeft = pivot;
+      else this.joyRight = pivot;
+    }
+
+    this.driverBody = buildDriver(this.cabLiftGroup, cx, cz);
+    this.buildNamePlate(cx, cz);
+
+    // Augpunkt der Kabinenkamera: Kopf an der Lehne, Konsolen liegen im Blickfeld
+    this.cabinEye.position.set(cx, 1.68, cz - 0.4);
+    this.cabLiftGroup.add(this.cabinEye);
+  }
+
+  /**
+   * Fahrerfigur „Daniel" im Sitz — stilisierte Low-Poly-Figur im Artstyle des
+   * Spiels. In der Kabinenansicht wird der Kopf ausgeblendet, damit er nicht
+   * vor der Kamera steht.
+   */
+
+  /**
+   * Abstützpratzen (Design nach Vorbildfoto 2026-08-29): vier ausgestellte
+   * Stützbeine mit Hydraulikzylinder und Tellerfuß — das prägende Merkmal
+   * eines Umschlagbaggers. Rein visuell, das Abstützen wird nicht simuliert.
+   */
+  private buildOutriggers(
+    frameMat: THREE.MeshStandardMaterial,
+    darkMat: THREE.MeshStandardMaterial
+  ): void {
+    const rodMat = new THREE.MeshStandardMaterial({
+      color: 0xb8bec4,
+      roughness: 0.25,
+      metalness: 0.8,
+    });
+    this.buildBlade(darkMat, frameMat, rodMat);
+
+    const UP = new THREE.Vector3(0, 1, 0);
+    for (const [sx, sz] of [
+      [-1, 1],
+      [1, 1],
+      [-1, -1],
+      [1, -1],
+    ] as const) {
+      /*
+       * Kurze Pratzen, gerade zur Seite (Ansage 12.09.2026: „einfach nur vom
+       * Bagger links und rechts weg … die duerften da keinen Meter weit
+       * rausgucken, sondern eher fuenfzig Zentimeter oder dreissig").
+       *
+       * Vorher spreizten sie sich diagonal nach aussen-hinten und standen
+       * 1,3 m ueber den Unterwagen hinaus — auf einem Platz, auf dem jetzt
+       * alles dicht beieinandersteht, war das die Maschine mit dem groessten
+       * Fussabdruck. Jetzt sind es massive Anbauteile: quer heraus, 45 cm
+       * ueber die Kante, und sie folgen der Laengsachse statt ins Kreuz zu
+       * gehen.
+       */
+      const from = new THREE.Vector3(sx * 1.05, 0.85, sz * 1.35);
+      const to = new THREE.Vector3(sx * 1.8, 0.7, sz * 1.35);
+      const dir = to.clone().sub(from);
+      const len = dir.length();
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.34, len + 0.3), darkMat);
+      arm.position.copy(from).addScaledVector(dir.clone().normalize(), len / 2);
+      arm.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir.clone().normalize());
+      arm.castShadow = true;
+      this.root.add(arm);
+      // Stempel + Tellerfuß in einer Gruppe — fahren gemeinsam ein und aus
+      const foot = new THREE.Group();
+      foot.position.set(to.x, 0, to.z);
+      this.root.add(foot);
+      this.outriggerGroups.push(foot);
+      /*
+       * Eckig statt rund (Ansage 12.09.2026: „nicht so runde Stuetzen,
+       * sondern schmale herausstehende Stuetzen mit eckigen Bodenplatten").
+       * Ein Zylinder liest sich als Hydraulikstempel; hier soll es nach
+       * angeschweisstem Stahl aussehen, also ein schlankes Kastenprofil, das
+       * nach unten leicht zulaeuft.
+       */
+      const cyl = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.5, 0.26), frameMat);
+      cyl.position.y = 0.42;
+      cyl.castShadow = true;
+      foot.add(cyl);
+      const rod = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.35, 0.17), rodMat);
+      rod.position.y = 0.14;
+      foot.add(rod);
+      const pad = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.14, 0.62), darkMat);
+      pad.position.y = 0.07;
+      pad.castShadow = true;
+      foot.add(pad);
+      void UP;
+    }
+  }
+
+  /** Dezentes Fahrerschild außen an der Kabinentür: „BAGGERFAHRER — DANIEL". */
+  private buildNamePlate(cx: number, cz: number): void {
+    const canvas = document.createElement("canvas");
+    canvas.width = 512;
+    canvas.height = 160;
+    const ctx = canvas.getContext("2d")!;
+    ctx.fillStyle = "#1b1f22";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = "#c8cdd1";
+    ctx.lineWidth = 5;
+    ctx.strokeRect(8, 8, canvas.width - 16, canvas.height - 16);
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#9aa2a8";
+    ctx.font = "bold 30px 'Arial Black', Impact, sans-serif";
+    ctx.fillText("BAGGERFAHRER", canvas.width / 2, 58);
+    ctx.fillStyle = "#eef1f3";
+    ctx.font = "bold 58px 'Arial Black', Impact, sans-serif";
+    ctx.fillText("DANIEL", canvas.width / 2, 118);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.anisotropy = 4;
+    const plate = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.6, 0.19),
+      new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6 })
+    );
+    plate.position.set(cx - 0.56, 1.0, cz - 0.12);
+    plate.rotation.y = -Math.PI / 2;
+    this.cabLiftGroup.add(plate);
+  }
+
+  /** „PRIPADA" in weißer Blockschrift auf beiden Auslegerflanken. */
+  private buildBoomLogo(): void {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1024;
+    canvas.height = 256;
+    const ctx = canvas.getContext("2d")!;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 160px 'Arial Black', Impact, sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.letterSpacing = "12px";
+    ctx.fillText("PRIPADA", 40, canvas.height / 2 + 6);
+    // Signet rechts neben der Wortmarke
+    const sx0 = 880;
+    const sy0 = canvas.height / 2;
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 26;
+    ctx.beginPath();
+    ctx.arc(sx0, sy0, 78, -Math.PI / 2, Math.PI * 0.75);
+    ctx.stroke();
+    ctx.lineWidth = 22;
+    ctx.beginPath();
+    ctx.arc(sx0 - 13, sy0 - 7, 40, Math.PI * 0.5, Math.PI * 1.75);
+    ctx.stroke();
+    ctx.fillRect(sx0 - 35, sy0 - 7, 22, 92);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.anisotropy = 4;
+    const mat = new THREE.MeshStandardMaterial({
+      map: tex,
+      transparent: true,
+      roughness: 0.55,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+    });
+    for (const side of [-1, 1] as const) {
+      const plane = new THREE.Mesh(new THREE.PlaneGeometry(2.7, 0.52), mat);
+      plane.position.set(side * 0.216, 0.03, BOOM_LEN * 0.46);
+      plane.rotation.y = (side * Math.PI) / 2;
+      this.boomGroup.add(plane);
+    }
+  }
+
+  private buildBodies(world: RAPIER.World): void {
+    this.chassisBody = world.createRigidBody(
+      RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(
+        this.position.x,
+        this.position.y + 1.15,
+        this.position.z
+      )
+    );
+    world.createCollider(RAPIER.ColliderDesc.cuboid(1.2, 0.75, 2.2), this.chassisBody);
+
+    // Räumschild als eigener kinematischer Körper: abgesenkt schiebt es
+    // Schrott vor sich her, angehoben liegt es über allem
+    this.bladeBody = world.createRigidBody(
+      RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(0, 5, 0)
+    );
+    world.createCollider(
+      RAPIER.ColliderDesc.cuboid(BLADE_W / 2, 0.42, 0.16)
+        .setTranslation(0, 0.42, 0)
+        .setFriction(0.9),
+      this.bladeBody
+    );
+
+    // Ausleger + Stiel als kinematische Kollider — der Kran schiebt Schrott
+    // beiseite, statt hindurchzutauchen
+    this.boomBody = world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased());
+    world.createCollider(
+      RAPIER.ColliderDesc.cuboid(0.21, 0.31, BOOM_LEN / 2 - 0.1),
+      this.boomBody
+    );
+    this.stickBody = world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased());
+    world.createCollider(
+      RAPIER.ColliderDesc.cuboid(0.16, 0.225, STICK_LEN / 2 - 0.1),
+      this.stickBody
+    );
+
+    this.armShapes = [
+      { mesh: () => this.boomMesh, half: [0.21, 0.31, BOOM_LEN / 2 - 0.1] },
+      { mesh: () => this.stickMesh, half: [0.16, 0.225, STICK_LEN / 2 - 0.1] },
+    ];
+    this.collision = new ExcavatorCollision({
+      world,
+      position: this.position,
+      grappleGroup: this.grappleGroup,
+      armShapes: this.armShapes,
+      obstacleBodies: this.obstacleBodies,
+      grippedHandles: this.grippedHandles,
+      getStaffPos: () => this.getStaffPos?.() ?? null,
+    });
+
+    for (const b of [this.chassisBody, this.bladeBody, this.boomBody, this.stickBody]) {
+      this.selfHandles.add(b.handle);
+    }
+    this.grappleBody = world.createRigidBody(
+      RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(0, 5, 0)
+    );
+    world.createCollider(
+      RAPIER.ColliderDesc.cylinder(0.22, 0.5).setTranslation(0, -GRAPPLE_LINK - 0.2, 0),
+      this.grappleBody
+    );
+    this.selfHandles.add(this.grappleBody.handle);
+    // Die Krallen bekommen eigene Kollider — je zwei Kapseln bilden die Sichel
+    // grob nach. Ohne sie fuhr die Spinne sichtbar durch Schrottteile hindurch.
+    /*
+     * Drei Kollider-Reihen je Schale statt einer.
+     *
+     * Eine Schale ist oben 0,90 m breit. Mit einer einzigen Kapselkette auf
+     * der Mittellinie war sie physisch ein 20 cm dicker Draht — Material fiel
+     * links und rechts daran vorbei, obwohl man die Schale davor sah. Die
+     * Reihen liegen auf der Mitte und auf 60 % der halben Breite zu jeder
+     * Seite; an der Spitze laufen sie ohnehin zusammen, weil die Schale dort
+     * schmal wird.
+     */
+    for (let i = 0; i < CLAW_COUNT * KOLLIDER_REIHEN * 2; i++) {
+      this.clawColliders.push(
+        world.createCollider(RAPIER.ColliderDesc.capsule(0.16, 0.09), this.grappleBody)
+      );
+    }
+  }
+
+  /**
+   * Krallen-Kollider der aktuellen Öffnung nachführen. Beim Tragen werden sie
+   * abgeschaltet: die Last hängt am Gelenk und würde sonst herausgequetscht.
+   */
+  private updateClawColliders(): void {
+    const carrying = this.carriedCount > 0 || this.clawGraceS > 0;
+    for (let c = 0; c < CLAW_COUNT; c++) {
+      const a = (c / CLAW_COUNT) * Math.PI * 2;
+      // Jede Kralle mit ihrem eigenen Winkel — sonst stuenden die Kollider
+      // woanders als die Zacken, die man sieht
+      const splay = this.clawSplayIst[c] ?? this.currentSplay();
+      for (let reihe = 0; reihe < KOLLIDER_REIHEN; reihe++) {
+      /*
+       * Die Reihe sitzt um `u` neben der Mittellinie. `clawPoint` nimmt den
+       * Umfangswinkel als ersten Parameter — ein Punkt der Schale bei
+       * Seitenversatz u ist deshalb schlicht `clawPoint(a + u, …)`. Der Radius
+       * haengt nicht vom Winkel ab, also stimmt das ohne Umrechnung.
+       */
+      const u = (reihe - (KOLLIDER_REIHEN - 1) / 2) * KOLLIDER_ABSTAND;
+      for (let h = 0; h < 2; h++) {
+        const col = this.clawColliders[(c * KOLLIDER_REIHEN + reihe) * 2 + h];
+        col.setEnabled(!carrying);
+        if (carrying) continue;
+        clawPoint(a + u, splay, h * (CLAW_SEGMENTS / 2), this.clawA);
+        clawPoint(a + u, splay, (h + 1) * (CLAW_SEGMENTS / 2), this.clawB);
+        this.clawMid.addVectors(this.clawA, this.clawB).multiplyScalar(0.5);
+        this.clawDir.subVectors(this.clawB, this.clawA);
+        const len = this.clawDir.length();
+        if (len < 1e-4) continue;
+        this.clawDir.divideScalar(len);
+        this.clawQuat.setFromUnitVectors(UP_Y, this.clawDir);
+        col.setHalfHeight(Math.max(len / 2 - 0.1, 0.03));
+        col.setTranslationWrtParent(this.clawMid);
+        col.setRotationWrtParent(this.clawQuat);
+      }
+      }
+    }
+  }
+
+  // ---------- Simulation ----------
+
+  /** Einmal pro Render-Frame: diskrete Eingaben (Mausrad-Rotator, Kabinenhub). */
+  handleDiscreteInput(input: Input): void {
+    if (!input.shiftHeld && input.wheelDelta !== 0) {
+      this.rotatorYaw += input.wheelDelta * ROTATOR_STEP;
+    }
+    
+    if (input.wasPressed("KeyX")) this.toggleCabLift();
+    if (input.wasPressed("KeyO")) this.toggleOutriggers();
+  }
+
+  /** Kabine hoch-/runterfahren (Taste X oder Touch-Knopf). */
+  toggleCabLift(): void {
+    this.cabLiftTarget = this.cabLiftTarget > 0.1 ? 0 : CAB_LIFT_MAX;
+  }
+
+  /** Abstützpratzen aus-/einfahren (Taste O oder Touch-Knopf). */
+  toggleOutriggers(): void {
+    this.outriggerTarget = this.outriggerTarget > 0.5 ? 0 : 1;
+  }
+
+  /**
+   * Standflaechen der Fahrzeuge auf dem Hof — von main gesetzt. Solange das
+   * nicht gesetzt ist, faehrt der Bagger wie bisher ungebremst.
+   */
+  getVehicleBoxes: (() => Box[]) | null = null;
+  /** Stand der letzte Fahrversuch vor einem LKW? Fuers HUD. */
+  blockedByVehicle = false;
+
+  /** Aktuelle Kabinenhöhe (0 = unten) — fürs HUD. */
+  get cabLiftHeight(): number {
+    return this.cabLift;
+  }
+
+  /** Ein fester Physik-Step (dt = 1/60). Reihenfolge: Achsen → Meshes → kinematische Körper. */
+  update(dt: number, input: Input): void {
+    // Last: kostet kaum Endtempo, aber Anlauf (siehe tempoFaktor/anlaufZeit).
+    // Dazu kommt der Widerstand des Materials, durch das die Spinne gerade
+    // pflügt — der bremst wirklich, denn dagegen arbeitet die Maschine.
+    // Der Baggerausbau macht die Hydraulik schneller
+    /*
+     * Der Ausbau macht die Maschine wacher, nicht schneller.
+     *
+     * Vorher ging der Ausbaubonus aufs Endtempo. Gemessen am 11.09.2026 drehte
+     * das Drehwerk damit 60,8 statt der eingestellten 45 Grad je Sekunde, und
+     * die Spinne lief mit 9,2 m/s — 33 km/h auf 8,7 m Radius. Das war das
+     * "zu wild". Das Endtempo ist eine Eigenschaft der Maschine und bleibt
+     * darum, wo es hingehoert (42 bis 54 Grad je Sekunde, siehe CAB_MAX); der
+     * Bonus verkuerzt stattdessen die Rampe, die Maschine spricht also
+     * schneller an.
+     */
+    const ausbau = this.getSpeedBonus?.() ?? 1;
+    const carried = tempoFaktor(this.carriedMassKg);
+    /*
+     * Im Material kommt die Maschine auch langsamer in Fahrt, nicht nur
+     * langsamer voran. Vorher bremste das Pfluegen nur das Endtempo — der
+     * Arm sprang also genauso munter an und war bloss frueher fertig. Das
+     * las sich wie ein Spielzeug, das durch Watte faehrt.
+     */
+    const rampe =
+      (anlaufZeit(this.carriedMassKg) / ausbau) *
+      THREE.MathUtils.lerp(1, PFLUG_TRAEGHEIT, 1 - this.plowFactor);
+    this.plowFactor += (this.collision.plowFactor() - this.plowFactor) * Math.min(dt * 6, 1);
+    const loadFactor = carried * this.plowFactor;
+    // Zustand vor der Bewegung merken (für die Fahrzeug-Sperre unten)
+    const prevBoom = this.boomAngle;
+    const prevStick = this.stickAngle;
+    const prevCabYaw = this.cabYaw;
+    const prevPos = this.tmpPrevPos.copy(this.position);
+
+    // --- Fahrwerk ---
+    // Auf ausgefahrenen Stützen steht die Maschine aufgebockt — dann wird
+    // nicht gefahren, so wie es sich gehört.
+    const wantsDrive = clamp1(input.axis("KeyS", "KeyW") + (this.touch?.drive ?? 0));
+    const rawSteer = clamp1(input.axis("KeyA", "KeyD") + (this.touch?.steer ?? 0));
+    this.blockedByOutriggers =
+      this.outriggerDown > 0.15 && (wantsDrive !== 0 || rawSteer !== 0);
+    const locked = this.outriggerDown > 0.15;
+    const driveTarget = (locked ? 0 : wantsDrive) * DRIVE_MAX;
+    this.driveVel = ramp(this.driveVel, driveTarget, (DRIVE_MAX / RAMP_TIME) * dt);
+    const steer = locked ? 0 : rawSteer;
+    if (Math.abs(this.driveVel) > 0.05 || steer !== 0) {
+      const dir = this.driveVel >= 0 ? 1 : -1;
+      const speedFactor = THREE.MathUtils.clamp(Math.abs(this.driveVel) / DRIVE_MAX, 0.35, 1);
+      this.heading -= steer * STEER_RATE * speedFactor * dir * dt;
+    }
+    const naechstesX = this.position.x + Math.sin(this.heading) * this.driveVel * dt;
+    const naechstesZ = this.position.z + Math.cos(this.heading) * this.driveVel * dt;
+    /*
+     * Nicht durch stehende LKW fahren (Befund 11.09.2026). Der Unterwagen ist
+     * gut 2,6 m breit; genau darum wird die Standflaeche des Fahrzeugs
+     * erweitert. Ist der Schritt belegt, bleibt die Maschine stehen und das
+     * Tempo faellt auf null — sie schiebt keinen LKW vor sich her.
+     */
+    const boxen = this.getVehicleBoxes?.();
+    if (boxen && findeBox(naechstesX, naechstesZ, boxen, UNTERWAGEN_R)) {
+      this.driveVel = 0;
+      this.blockedByVehicle = true;
+    } else {
+      this.blockedByVehicle = false;
+      this.position.x = naechstesX;
+      this.position.z = naechstesZ;
+    }
+
+    // --- Oberwagen / Ausleger / Stiel (mit Last-Trägheit) ---
+    // Zweitbelegung Pfeil-Block (einhändiges Testen): ←/→ Oberwagen,
+    // ↑/↓ Stiel, Bild↑/Bild↓ Ausleger
+    // Tastatur + Touch-Sticks auf dieselben Achsen
+    const t = this.touch;
+    if (t?.rotator) this.rotatorYaw += t.rotator * ROTATOR_SPEED * dt;
+    this.inCab = clamp1(axis2(input, "KeyE", "KeyQ", "ArrowRight", "ArrowLeft") + (t?.cab ?? 0));
+    this.inBoom = clamp1(axis2(input, "KeyF", "KeyR", "PageDown", "PageUp") + (t?.boom ?? 0));
+    this.inStick = clamp1(axis2(input, "KeyG", "KeyT", "ArrowDown", "ArrowUp") + (t?.stick ?? 0));
+    const cabTarget = this.inCab * CAB_MAX * loadFactor;
+    this.cabVel = ramp(this.cabVel, cabTarget, (CAB_MAX / rampe) * dt);
+    this.cabYaw += this.cabVel * dt;
+
+    /*
+     * Liegt die Spinne auf, wird die Abwaertsrichtung gar nicht erst
+     * kommandiert. Welche Achsrichtung "abwaerts" ist, haengt von der
+     * Armstellung ab: Beim Ausleger senkt ein negativer Winkel die Spitze nur,
+     * solange er vor der Senkrechten steht.
+     */
+    const gesamtWinkel = this.boomAngle + this.stickAngle;
+    const dBoomTip = BOOM_LEN * Math.cos(this.boomAngle) + STICK_LEN * Math.cos(gesamtWinkel);
+    const dStickTip = STICK_LEN * Math.cos(gesamtWinkel);
+    let boomEingabe = this.inBoom;
+    let stickEingabe = this.inStick;
+    if (this.bodenSperre) {
+      if (boomEingabe * dBoomTip < 0) boomEingabe = 0;
+      if (stickEingabe * dStickTip < 0) stickEingabe = 0;
+    }
+
+    const boomTarget = boomEingabe * BOOM_RATE * loadFactor;
+    this.boomVel = ramp(this.boomVel, boomTarget, (BOOM_RATE / rampe) * dt);
+    this.boomAngle = THREE.MathUtils.clamp(this.boomAngle + this.boomVel * dt, BOOM_MIN, BOOM_MAX);
+
+    const stickTarget = stickEingabe * STICK_RATE * loadFactor;
+    this.stickVel = ramp(this.stickVel, stickTarget, (STICK_RATE / rampe) * dt);
+    this.stickAngle = THREE.MathUtils.clamp(
+      this.stickAngle + this.stickVel * dt,
+      STICK_MIN,
+      STICK_MAX
+    );
+
+    // --- Spinne ---
+    // Spinne: Tastatur, Maus und Druckgriff schließen mit voller Kraft.
+    // Der rechte Stick arbeitet stufenlos — je weiter der Ausschlag, desto
+    // schneller schließt bzw. öffnet die Spinne; neutral hält den Zustand.
+    const cmd = this.touch?.grapple ?? 0;
+    const held = input.mouseHeld(0) || input.isDown("Space") || (this.touch?.grab ?? false);
+    // für die Hebelanimation in der Kabine
+    this.inGrapple = held ? 1 : THREE.MathUtils.clamp(cmd, -1, 1);
+    let closeRate: number;
+    if (held) {
+      closeRate = dt / CLOSE_TIME;
+      this.grappleHold = true;
+    } else if (cmd !== 0) {
+      const intensity = Math.min(Math.abs(cmd), 1);
+      closeRate = cmd > 0 ? (intensity * dt) / CLOSE_TIME : (-intensity * dt) / OPEN_TIME;
+      this.grappleHold = cmd > 0;
+    } else if (this.touch) {
+      closeRate = 0; // Stick neutral: Position halten
+    } else {
+      closeRate = -dt / OPEN_TIME; // Tastatur losgelassen: öffnet
+      this.grappleHold = false;
+    }
+    const closureVorher = this.closure;
+    this.closure = THREE.MathUtils.clamp(this.closure + closeRate, 0, 1);
+    /*
+     * Zuschnappen: Wenn die Zaehne aufeinandertreffen, klingt das metallisch —
+     * am deutlichsten, wenn nichts dazwischen ist (Wunsch 11.09.2026). Der
+     * Moment ist genau der, in dem die Spinne die Schliessgrenze erreicht und
+     * keine Kralle von Material blockiert wird; dann treffen sich die Spitzen
+     * tatsaechlich.
+     */
+    if (
+      closeRate > 0 &&
+      closureVorher < SCHNAPP_AB &&
+      this.closure >= SCHNAPP_AB &&
+      !this.krallenBlockiert
+    ) {
+      const haerte = held ? 0.55 : 1;
+      this.anschlagStaerke = haerte;
+      this.anschlag(haerte);
+      this.onClawSnap?.(haerte);
+    }
+    this.updateAnschlag(dt);
+    // „closing" steuert das Greifsystem: Zupacken solange die Spinne schließt
+    // oder geschlossen gehalten wird
+    this.closing = held || closeRate > 0 || (this.grappleHold && this.closure > 0.5);
+
+    // Kabinenhub fährt gleichmäßig auf die Zielhöhe
+    const liftStep = CAB_LIFT_SPEED * dt;
+    this.cabLift += THREE.MathUtils.clamp(this.cabLiftTarget - this.cabLift, -liftStep, liftStep);
+    // Abstützpratzen ein-/ausfahren
+    const outStep = dt / 2.2;
+    this.outriggerDown += THREE.MathUtils.clamp(
+      this.outriggerTarget - this.outriggerDown,
+      -outStep,
+      outStep
+    );
+    // Aufbocken: die ganze Maschine steigt auf den Stützen. Über position.y
+    // wandern Arm, Greifer und Physikkörper mit — nur die Optik anzuheben
+    // würde den Greifer von seinem Kollider trennen.
+    this.position.y = this.outriggerDown * Excavator.JACK_UP_M;
+
+    // Räumschild heben und senken
+    const bladeStep = dt / BLADE_TIME;
+    this.bladeDown += THREE.MathUtils.clamp(
+      this.bladeTarget - this.bladeDown,
+      -bladeStep,
+      bladeStep
+    );
+
+    // Drehgeschwindigkeit der Spinne für das Herausreißen festhalten
+    this.rotatorVel = (this.rotatorYaw - this.lastRotatorYaw) / Math.max(dt, 1e-4);
+    this.lastRotatorYaw = this.rotatorYaw;
+
+    // Erst die Pose dieses Bildes herstellen, dann aufsetzen: Die Strahlen
+    // gehen von den Krallenspitzen aus, und die stehen sonst noch dort, wo sie
+    // im letzten Bild waren — beim Schwenken misst man dann die falsche Stelle.
+    this.clawGraceS = Math.max(0, this.clawGraceS - dt);
+    this.syncMeshes();
+    this.resolveGroundClamp();
+    this.updateClawBlocking(dt);
+    this.syncMeshes();
+
+    // Fahrwerk und Arm werden getrennt geprüft: ein Hindernis neben den
+    // Rädern darf den Ausleger nicht mit stilllegen.
+    const col = this.collision;
+    if (col.chassisHits() && col.chassisFree) {
+      this.position.copy(prevPos);
+      this.driveVel = 0;
+      this.syncMeshes();
+      col.chassisFree = !col.chassisHits();
+    } else if (!col.chassisHits()) {
+      col.chassisFree = true;
+    }
+
+    // Arm, Stiel und Spinne. Wichtig ist der Fluchtweg: Steckt der Arm
+    // wirklich einmal fest, werden Bewegungen wieder durchgelassen — sonst
+    // verkantet er sich unrettbar, weil auch die befreiende Bewegung
+    // zurückgenommen würde.
+    if (col.armHits()) {
+      this.armBlocked = true;
+      if (col.armFree) {
+        this.boomAngle = prevBoom;
+        this.stickAngle = prevStick;
+        this.cabYaw = prevCabYaw;
+        this.boomVel = 0;
+        this.stickVel = 0;
+        this.cabVel = 0;
+        this.syncMeshes();
+        // Hilft das Zurücknehmen überhaupt? Wenn nicht, sitzt er fest und
+        // darf sich im nächsten Bild frei herausbewegen.
+        col.armFree = !col.armHits();
+      }
+    } else {
+      this.armBlocked = false;
+      col.armFree = true;
+    }
+
+    this.integratePendulum(dt);
+    this.syncBodies();
+
+    if (this.groundContact.active) {
+      this.groundContact.point.set(
+        this.grappleGroup.position.x,
+        0.05,
+        this.grappleGroup.position.z
+      );
+    }
+  }
+
+  /**
+   * Boden ist immer harter Widerstand (Kap. 6.1): Ausleger/Stiel werden so
+   * geklemmt, dass die Zackenspitzen nie unter den Boden geraten. Kontakt bei
+   * gleichzeitiger Dreh-/Fahrbewegung liefert die Kratz-Intensität für
+   * Sound + Staub/Funken.
+   */
+  /**
+   * Aktuelle Spreizung der Schalen. Geschlossen legen sie sich zur Kalotte
+   * zusammen — es sei denn, es liegt Material darin: dann bleibt die Spinne
+   * so weit offen, wie die Ladung Platz braucht.
+   */
+  /** Aktuelle Spreizung — die Zielhilfe braucht sie fuer den Ringdurchmesser. */
+  get splay(): number {
+    return this.currentSplay();
+  }
+
+  private currentSplay(): number {
+    /*
+     * Geschlossen ist nicht mehr Spreizung 0, sondern CLAW_CLOSED_SPLAY.
+     * Ladung haelt die Schalen darueber hinaus offen — das kommt oben drauf.
+     */
+    const minSplay =
+      CLAW_CLOSED_SPLAY +
+      Math.min(
+        0.5,
+        this.carriedCount * 0.06 + Math.min(this.carriedMassKg / NENNLAST_KG, 1) * 0.28
+      );
+    // Der Anschlag federt kurz zurueck — siehe anschlag().
+    return THREE.MathUtils.lerp(CLAW_OPEN_SPLAY, minSplay, this.closure) + this.anschlagWinkel;
+  }
+
+  /*
+   * Leeres Zuschnappen mit sichtbarem Anschlag (Auftrag 11.09.2026, Phase 1.4).
+   *
+   * Treffen die Zaehne ohne Material aufeinander, gingen sie bisher lautlos
+   * und weich in die Endlage. Echte Schalen schlagen auf und federn ein Stueck
+   * zurueck. Der Rueckprall ist eine gedaempfte Feder auf dem Spreizwinkel:
+   * Er springt um ANSCHLAG_GRAD auf und klingt in ANSCHLAG_S ab. Der Klang
+   * dazu haengt am selben Ereignis.
+   */
+  private anschlagWinkel = 0;
+  private anschlagRest = 0;
+
+  private anschlag(haerte: number): void {
+    this.anschlagWinkel = ANSCHLAG_GRAD * haerte;
+    this.anschlagRest = ANSCHLAG_S;
+  }
+
+  private updateAnschlag(dt: number): void {
+    if (this.anschlagRest <= 0) {
+      this.anschlagWinkel = 0;
+      return;
+    }
+    this.anschlagRest = Math.max(0, this.anschlagRest - dt);
+    // Abklingende Schwingung: einmal auf, einmal zurueck, dann ruhig
+    const t = 1 - this.anschlagRest / ANSCHLAG_S;
+    // Nur nach OBEN federn: Weiter zu als bis zum Anschlag geht nicht, das
+    // ist ja gerade der Anschlag. Ohne die Klemmung schwang der Winkel in die
+    // Gegenrichtung und die Schalen gingen kurz zu weit zu (gemessen: -0,8°).
+    this.anschlagWinkel = Math.max(
+      0,
+      ANSCHLAG_GRAD * Math.cos(t * Math.PI * 1.5) * (1 - t) * (1 - t) * this.anschlagStaerke
+    );
+  }
+
+  private anschlagStaerke = 1;
+
+  /**
+   * Spreizung je Kralle. Bisher bekamen alle fuenf denselben Winkel — die
+   * Spinne ging immer gleichmaessig zu, auch wenn eine Stange zwischen zwei
+   * Zaehnen steckte. Jede Kralle hat jetzt ihren eigenen Weg: Was blockiert
+   * ist, bleibt stehen, der Rest geht weiter zu.
+   */
+  private clawSplayIst: number[] = new Array(CLAW_COUNT).fill(CLAW_OPEN_SPLAY);
+  /**
+   * Schonfrist nach dem Loslassen: Solange sie laeuft, sind die Krallen-Kollider
+   * abgeschaltet. Beim Oeffnen sind die Zacken noch fast zu und die Spinne sinkt
+   * noch — ohne die Frist quetschen die kinematischen Krallen das eben
+   * losgelassene Teil gegen den Boden, und es schiesst weg (v2 E-018).
+   */
+  private clawGraceS = 0;
+  /** Verbleibendes Nachdruecken je Kralle, damit sie nicht schlagartig steht */
+  private clawReserve: number[] = new Array(CLAW_COUNT).fill(NACHDRUECK_RESERVE);
+  /** Was jeder Zahn zuletzt vorgefunden hat: 0 frei, 1 weich, 2 hart. */
+  private clawArt: Array<0 | 1 | 2> = new Array(CLAW_COUNT).fill(0);
+  private blockTmp = new THREE.Vector3();
+  // Feine Tastkugel: Mit 0,14 blieb der Zahn sichtbar auf Abstand stehen,
+  // als griffe er ins Leere. Er soll bis fast an das Teil heran.
+  private blockShape = new RAPIER.Ball(0.08);
+  private static readonly IDENT = { x: 0, y: 0, z: 0, w: 1 };
+  /**
+   * Wie schnell eine freie Kralle ihrem Sollwinkel folgt. Bewusst hoch: Eine
+   * unbehinderte Spinne soll sich anfuehlen wie vorher, sichtbar werden soll
+   * nur, was haengen bleibt.
+   */
+  private static readonly CLAW_RATE = 4.0; // rad/s
+
+  /**
+   * Sitzt diese Kralle bei der angepeilten Spreizung auf etwas auf?
+   *
+   * Geprüft wird nur gegen bewegliche Koerper — Schrott, Wracks, Ladung. Beton,
+   * Waende und Muldenboeden sind fest und duerfen die Zaehne nicht festhalten:
+   * Auf ebenem Boden schliesst ein Greifer sehr wohl, die Spitzen schleifen
+   * dann ueber die Platte.
+   */
+  /**
+   * Gibt dieser Koerper unter den Zaehnen nach? Von aussen gesetzt, weil der
+   * Bagger den Schrottkatalog nicht kennt. Ohne Zuordnung blockiert alles
+   * Bewegliche — die vorsichtige Annahme.
+   */
+  clawBlockedBy: ((body: RAPIER.RigidBody) => boolean) | null = null;
+
+  /** Schonfrist starten — vom Greifsystem beim Loslassen gerufen. */
+  startClawGrace(sekunden = 0.6): void {
+    this.clawGraceS = Math.max(this.clawGraceS, sekunden);
+  }
+  /**
+   * Ein Zahn ist in ein nachgiebiges Teil eingedrungen. Wer sich aufspiessen
+   * laesst, soll es hinterher ansehen — sonst steckt das Teil unversehrt auf
+   * der Zacke und nichts erklaert, warum.
+   */
+  onClawPierce: ((body: RAPIER.RigidBody) => void) | null = null;
+  /**
+   * Die Zaehne schlagen aufeinander. Der Parameter sagt, wie hart: 1 = leer
+   * durchgeschnappt, weniger, wenn Material dazwischenliegt.
+   */
+  onClawSnap: ((haerte: number) => void) | null = null;
+
+  /**
+   * Was ein Zahn an dieser Stelle vorfindet.
+   *
+   * FREI: nichts im Weg. WEICH: etwas Nachgiebiges — Blech, ein Fass, eine
+   * Waschmaschine. HART: massiver Stahl, ein Traeger, ein Motorblock.
+   *
+   * Der Unterschied zwischen WEICH und HART ist nicht mehr „geht hindurch"
+   * gegen „steht", sondern nur noch, wie weit der Zahn eindringt (Ansage
+   * 12.09.2026: „die Spinne soll die Zaehne bei Bedarf dem Objekt angepasst
+   * schliessen, aber eine gewisse Starre bzw. Kraft muss jeder Zahn haben").
+   */
+  private clawBlocked(a: number, splay: number): { art: 0 | 1 | 2; koerper: RAPIER.RigidBody | null } {
+    clawPoint(a, splay, CLAW_SEGMENTS, this.blockTmp);
+    this.grappleGroup.localToWorld(this.blockTmp);
+    let art: 0 | 1 | 2 = 0;
+    let koerper: RAPIER.RigidBody | null = null;
+    this.world.intersectionsWithShape(
+      this.blockTmp,
+      Excavator.IDENT,
+      this.blockShape,
+      (c) => {
+        const b = c.parent();
+        if (!b) return true;
+        if (this.selfHandles.has(b.handle)) return true;
+        if (!b.isDynamic()) return true;
+        if (this.clawBlockedBy ? this.clawBlockedBy(b) : true) {
+          art = 2;
+          koerper = b;
+          return false; // massiv — weitersuchen bringt nichts
+        }
+        // Nachgiebig: Der Zahn drueckt sich hinein, aber er faehrt nicht mehr
+        // glatt hindurch. Ein weiches Teil bleibt der weichste Fund, falls
+        // nebenan noch etwas Massives liegt — darum weitersuchen.
+        if (art === 0) {
+          art = 1;
+          koerper = b;
+        }
+        return true;
+      }
+    );
+    return { art, koerper };
+  }
+
+  /**
+   * Krallen einzeln nachfuehren. Oeffnen geht immer — sonst bliebe eine Kralle
+   * fuer immer stecken, sobald sie einmal aufsitzt. Schliessen nur so weit, wie
+   * Platz ist.
+   */
+  private updateClawBlocking(dt: number): void {
+    // Der Merker gilt je Schritt. Die Schnappabfrage weiter oben liest den
+    // Stand des Vorschritts — bei 60 Hz ist das ein Sechzigstel Versatz.
+    this.krallenBlockiert = false;
+    const ziel = this.currentSplay();
+    const schritt = Excavator.CLAW_RATE * dt;
+    for (let c = 0; c < CLAW_COUNT; c++) {
+      const ist = this.clawSplayIst[c]!;
+      if (ziel >= ist) {
+        const auf = naechsteSpreizung(ist, ziel, schritt, false, this.clawReserve[c]!);
+        this.clawSplayIst[c] = auf.winkel;
+        this.clawReserve[c] = auf.reserve;
+        // Beim Oeffnen hat der Zahn nichts mehr vor sich; sonst behielte er
+        // seinen alten Fund und bekaeme beim naechsten Schliessen kein
+        // frisches Weggeld.
+        this.clawArt[c] = 0;
+        continue;
+      }
+      const naechste = Math.max(ziel, ist - schritt);
+      const a = (c / CLAW_COUNT) * Math.PI * 2;
+      const fund = this.clawBlocked(a, naechste);
+      if (fund.art !== 0) this.krallenBlockiert = true;
+      /*
+       * Jeder Zahn hat sein eigenes Weggeld. Trifft er auf etwas anderes als
+       * eben noch, bekommt er den Vorrat dieser Haerte: an massivem Stahl
+       * einen Ruck, an Nachgiebigem gut das Dreifache — so weit drueckt er
+       * sich hinein, und dann steht er. Vorher gab es fuer Nachgiebiges gar
+       * keine Grenze: Der Zahn lief durch das Teil hindurch bis zum Anschlag,
+       * und das Objekt sah aus, als haette es der Greifer gar nicht beruehrt.
+       */
+      if (fund.art !== this.clawArt[c]) {
+        this.clawArt[c] = fund.art;
+        this.clawReserve[c] = fund.art === 1 ? WEICH_RESERVE : NACHDRUECK_RESERVE;
+      }
+      const vorher = this.clawReserve[c]!;
+      const zu = naechsteSpreizung(ist, ziel, schritt, fund.art !== 0, vorher);
+      this.clawSplayIst[c] = zu.winkel;
+      this.clawReserve[c] = zu.reserve;
+      /*
+       * Die Beule kommt erst, wenn der Zahn sein Weggeld aufgebraucht hat —
+       * also wirklich hineingedrueckt hat. Ein Antippen soll noch nichts
+       * verformen.
+       */
+      if (fund.art === 1 && vorher > 0 && zu.reserve <= 0 && fund.koerper) {
+        this.onClawPierce?.(fund.koerper);
+      }
+    }
+  }
+
+  /**
+   * Hat in diesem Schritt eine Kralle Material vor sich gehabt?
+   *
+   * Das war der Grund, warum das Schnappgeraeusch nie zu hoeren war: Die
+   * Bedingung fragte `!this.clawBlocked` ab — und das ist die METHODE, also
+   * immer wahr. Die Verneinung war damit immer falsch, und der Anschlag hat
+   * nie ausgeloest (gemessen im Labor 11.09.2026: null Ausloesungen in
+   * 40 Schritten bis zum vollen Schliessen).
+   */
+  private krallenBlockiert = false;
+
+  /** Wie weit die Spinne tatsaechlich zu ist — die am weitesten offene Kralle zaehlt. */
+  get clawSplayMax(): number {
+    let max = 0;
+    for (const v of this.clawSplayIst) max = Math.max(max, v);
+    return max;
+  }
+
+  private aufsetzRay = new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 });
+
+  /**
+   * Höhe der Fläche unter den Krallenspitzen — Beton, Ladefläche, Muldenboden,
+   * was auch immer dort liegt.
+   *
+   * Vorher rechnete der Bodenanschlag gegen eine gedachte Ebene bei y = 0. Auf
+   * dem Betonplatz stimmte das ungefähr; über einer Ladefläche gar nicht, und
+   * die Spinne sank sichtbar durch die Mulde. Jetzt wird gemessen statt
+   * angenommen: ein Strahl je Spitze, senkrecht nach unten. Maßgeblich ist die
+   * höchste getroffene Fläche — an ihr setzt die Spinne auf, auch wenn nur eine
+   * Kralle über der Mulde steht.
+   *
+   * Ausgenommen sind die eigenen Körper und die Ladung: Sonst setzte die Spinne
+   * auf ihrer eigenen Kralle oder auf dem Teil auf, das sie gerade trägt.
+   */
+  private surfaceUnderClaws(_splay: number): number {
+    this.grappleGroup.updateWorldMatrix(true, false);
+    // EIN Strahl, aus der Mitte der Spinne senkrecht nach unten.
+    //
+    // Vorher waren es fuenf, einer je Spitze, und massgeblich war die hoechste
+    // getroffene Flaeche. Das laesst die Spinne schweben: Steht eine einzige
+    // Spitze ueber einer Bordwand, dem Chassis oder gar der Kabine, haengt der
+    // ganze Greifer an dieser Hoehe fest und kommt nicht mehr an das Material
+    // auf der Ladeflaeche heran. Der Kontakt soll aber hart sein — man soll das
+    // Gewicht des Arms spueren, nicht ueber der Fuhre gebremst werden.
+    //
+    // Die Mitte ist der Punkt, mit dem der Greifer aufsetzt. Eine Spitze, die
+    // ueber den Muldenrand hinausragt, ist eine Frage der Darstellung, nicht
+    // des Anschlags. Nebenbei kostet das ein Fuenftel der Strahlen.
+    this.aufsetzRay.origin.x = this.grappleGroup.position.x;
+    this.aufsetzRay.origin.y = this.grappleGroup.position.y;
+    this.aufsetzRay.origin.z = this.grappleGroup.position.z;
+    const treffer = this.world.castRay(
+      this.aufsetzRay,
+      20,
+      true,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      (c) => {
+        const b = c.parent();
+        if (!b) return false;
+        if (this.selfHandles.has(b.handle)) return false;
+        // Die eigene Ladung ist kein Boden. Seit gefasste Teile kinematisch
+        // mitgefuehrt werden, sind sie nicht mehr dynamisch — ohne diese Zeile
+        // setzt die Spinne auf dem Teil auf, das sie gerade traegt, und wird
+        // beim Zupacken nach oben gedrueckt.
+        if (this.grippedHandles.has(b.handle)) return false;
+        // NUR tragender Grund: Beton, Waende, Muldenboeden, Ladeflaechen.
+        // Loser Schrott zaehlt ausdruecklich nicht — sonst setzt die Spinne
+        // auf dem Haufen auf, statt hineinzugreifen.
+        return !b.isDynamic();
+      }
+    );
+    return treffer ? this.aufsetzRay.origin.y - treffer.timeOfImpact : 0;
+  }
+
+  /**
+   * Wie tief stecken die Krallenspitzen gerade in losem Material?
+   * (Auftrag 11.09.2026, Phase 1.4: "nicht in Materialkoerper eintauchen")
+   *
+   * Der Bodenanschlag oben zaehlt nur tragenden Grund — loser Schrott bleibt
+   * bewusst aussen vor, sonst setzt die Spinne auf dem Haufen auf, statt
+   * hineinzugreifen. Gemessen im Labor (11.09.2026) steckte dadurch eine
+   * Kralle 22,8 cm tief in einem liegenden Teil, dauerhaft: Der Kontakt loest
+   * sich nicht, weil das Teil am Boden liegt, hohe Reibung hat und die weichen
+   * Kontaktwerte den Rest tun.
+   *
+   * Der erste Versuch hat den Arm bei jedem Eintauchen ueber fuenf Zentimeter
+   * angehoben — und zwar je Schritt neu. Das ergab einen Regelkreis, der
+   * schwingt: gemessen 39 Richtungswechsel je Sekunde bei 13 mm Ausschlag.
+   * Im Spiel war das eine Naehmaschine (Befund 11.09.2026: "sie ist mehr wie
+   * ein Presslufthammer beim Reingreifen").
+   *
+   * Jetzt gilt die Sperre nur noch gegen BROCKEN, die sich nicht beiseite
+   * schieben lassen (ab EINDRING_SCHWER_KG), und sie haelt ihren Wert kurz
+   * fest, statt ihn jeden Schritt neu zu suchen. In losen Haufen woehlt die
+   * Spinne wieder, wie sie soll: Kleinteile werden verdraengt, nicht
+   * umfahren.
+   */
+  private eindringtiefe(splay: number): number {
+    if (this.grippedHandles.size > 0) return 0; // beim Tragen sind die Krallen aus
+    this.grappleGroup.updateWorldMatrix(true, false);
+    const mitte = this.grappleGroup.position;
+    let tiefste = 0;
+    // Teile im Umkreis einsammeln — nur die koennen ueberhaupt getroffen sein
+    this.world.intersectionsWithShape(
+      { x: mitte.x, y: mitte.y, z: mitte.z },
+      { x: 0, y: 0, z: 0, w: 1 },
+      this.eindringShape,
+      (col) => {
+        const b = col.parent();
+        if (!b || !b.isDynamic()) return true;
+        if (this.selfHandles.has(b.handle) || this.grippedHandles.has(b.handle)) return true;
+        // Was sich schieben laesst, wird geschoben — nicht umfahren
+        if (b.mass() < EINDRING_SCHWER_KG) return true;
+        for (let c = 0; c < CLAW_COUNT; c++) {
+          const a = (c / CLAW_COUNT) * Math.PI * 2;
+          clawPoint(a, this.clawSplayIst[c] ?? splay, CLAW_SEGMENTS, this.clawA);
+          this.clawA.applyMatrix4(this.grappleGroup.matrixWorld);
+          const pr = col.projectPoint(
+            { x: this.clawA.x, y: this.clawA.y, z: this.clawA.z },
+            false
+          );
+          if (!pr || !pr.isInside) continue;
+          const d = Math.hypot(
+            pr.point.x - this.clawA.x,
+            pr.point.y - this.clawA.y,
+            pr.point.z - this.clawA.z
+          );
+          if (d > tiefste) tiefste = d;
+        }
+        return true;
+      }
+    );
+    return tiefste;
+  }
+
+  private eindringShape = new RAPIER.Ball(2.0);
+  /** Liegt die Spinne auf? Dann sperrt die Abwaertsrichtung im naechsten Schritt. */
+  private bodenSperre = false;
+  private bodenSperreS = 0;
+  /** Festgehaltener Anschlag gegen Brocken und seine Restzeit */
+  private eindringGrenze = 0;
+  private eindringHaltS = 0;
+
+  private resolveGroundClamp(): void {
+    // Spitzentiefe direkt aus der Krallengeometrie — so bleibt der Bodenanschlag
+    // richtig, auch wenn sich Form oder Öffnungswinkel ändern.
+    const splay = this.currentSplay();
+    const tipDepth = clawTipDepth(splay);
+    // Gemessene Fläche statt angenommener Ebene: darauf setzt die Spinne auf.
+    const flaeche = this.surfaceUnderClaws(splay);
+    // tipY() rechnet ab der Maschinenbasis; steht die Maschine aufgebockt,
+    // ist der Boden entsprechend weiter unten
+    let minTipY = flaeche + tipDepth + 0.02 - this.position.y;
+    /*
+     * Brocken unter den Spitzen: ein Stueck Biss ja, durchtauchen nein. Der
+     * gefundene Anschlag wird kurz festgehalten (EINDRING_HALT_S) — sonst
+     * sucht die Regelung ihn jeden Schritt neu und faengt an zu schwingen.
+     */
+    const tipYJetzt =
+      BOOM_PIVOT.y +
+      BOOM_LEN * Math.sin(this.boomAngle) +
+      STICK_LEN * Math.sin(this.boomAngle + this.stickAngle);
+    if (this.eindringHaltS > 0) {
+      this.eindringHaltS -= 1 / 60;
+      minTipY = Math.max(minTipY, this.eindringGrenze);
+    } else {
+      const tief = this.eindringtiefe(splay);
+      if (tief > EINDRING_OK) {
+        this.eindringGrenze = tipYJetzt + (tief - EINDRING_OK);
+        this.eindringHaltS = EINDRING_HALT_S;
+        minTipY = Math.max(minTipY, this.eindringGrenze);
+      }
+    }
+    const tipY = () =>
+      BOOM_PIVOT.y +
+      BOOM_LEN * Math.sin(this.boomAngle) +
+      STICK_LEN * Math.sin(this.boomAngle + this.stickAngle);
+
+    /*
+     * Totband: Erst ab gut einem Zentimeter Verletzung wird nachgeregelt.
+     * Ohne das korrigiert die Mechanik jede Kleinigkeit, die der Messstrahl
+     * zwischen zwei Schritten anders sieht — und genau daraus entsteht das
+     * Zittern (gemessen 39, danach noch 15 Richtungswechsel je Sekunde).
+     */
+    let clamped = false;
+    let guard = 0;
+    while (tipY() < minTipY - BODEN_TOLERANZ && guard++ < 80) {
+      clamped = true;
+      const total = this.boomAngle + this.stickAngle;
+      const dStick = STICK_LEN * Math.cos(total);
+      const canStick =
+        Math.abs(dStick) > 0.4 &&
+        ((dStick > 0 && this.stickAngle < STICK_MAX - 0.002) ||
+          (dStick < 0 && this.stickAngle > STICK_MIN + 0.002));
+      if (canStick) {
+        this.stickAngle += Math.sign(dStick) * 0.004;
+      } else if (this.boomAngle < BOOM_MAX - 0.002) {
+        this.boomAngle += 0.004;
+      } else {
+        break;
+      }
+    }
+
+    /*
+     * Aufliegen heisst: nicht weiter nach unten. Bisher wurde erst
+     * integriert und danach zurueckgeschoben — das ergab je Schritt einen
+     * Ruck von einigen Millimetern hin und zurueck, gemessen 39
+     * Richtungswechsel je Sekunde bei 13 mm Ausschlag. Im Spiel war das eine
+     * Naehmaschine (Befund 11.09.2026).
+     *
+     * Jetzt merkt sich die Maschine den Anschlag, und die Achsen kommen im
+     * naechsten Schritt gar nicht erst in diese Richtung los — so wie ein
+     * Zylinder am Ende seines Hubs steht.
+     */
+    // Die Sperre haelt kurz nach, damit sie nicht im Sekundentakt auf- und
+    // zugeht, wenn der Messstrahl mal danebentrifft.
+    if (clamped || tipY() < minTipY + BODEN_TOLERANZ) this.bodenSperreS = BODEN_SPERRE_S;
+    else this.bodenSperreS = Math.max(0, this.bodenSperreS - 1 / 60);
+    this.bodenSperre = this.bodenSperreS > 0;
+    if (clamped) {
+      // abwärts gerichtete Achsgeschwindigkeiten hart stoppen
+      const total = this.boomAngle + this.stickAngle;
+      const dBoom = BOOM_LEN * Math.cos(this.boomAngle) + STICK_LEN * Math.cos(total);
+      const dStick = STICK_LEN * Math.cos(total);
+      if (this.boomVel * dBoom < 0) this.boomVel = 0;
+      if (this.stickVel * dStick < 0) this.stickVel = 0;
+    }
+    // Kontakt gilt auch beim Aufliegen (Spitzen ruhen auf dem Boden), nicht nur
+    // beim aktiven Hineindrücken — sonst bleibt das Kratzen beim Drehen stumm.
+    const resting = tipY() < minTipY + 0.04;
+    this.groundContact.active = clamped || resting;
+    this.groundContact.intensity = this.groundContact.active
+      ? Math.min(1, (Math.abs(this.cabVel) * 9 + Math.abs(this.driveVel) * 1.5) / 3)
+      : 0;
+  }
+
+  private syncMeshes(): void {
+    this.root.position.copy(this.position);
+    this.root.rotation.y = this.heading;
+    this.cabGroup.rotation.y = this.cabYaw;
+    // Kabine fährt am Ausleger nach oben UND ein Stück nach vorn
+    this.cabLiftGroup.position.y = this.cabLift;
+    this.cabLiftGroup.position.z = this.cabLift * 0.34;
+    for (const g of this.outriggerGroups) {
+      g.position.y = (1 - this.outriggerDown) * 0.72; // eingefahren = angehoben
+    }
+    // Schild: gesenkt sitzt die Schneide knapp über dem Beton
+    if (this.bladeGroup) {
+      this.bladeGroup.position.y = (1 - this.bladeDown) * BLADE_UP_Y;
+      this.bladeGroup.rotation.x = (1 - this.bladeDown) * 0.35; // gehoben angewinkelt
+    }
+    // Kabinen-Lenker zwischen Oberwagen und Kabinenschlitten ausrichten
+    for (const l of this.cabLinks) {
+      l.a.updateWorldMatrix(true, false);
+      l.b.updateWorldMatrix(true, false);
+      l.a.getWorldPosition(this.tmpA);
+      l.b.getWorldPosition(this.tmpB);
+      this.tmpDir.copy(this.tmpB).sub(this.tmpA);
+      const len = Math.max(this.tmpDir.length(), 0.2);
+      this.tmpDir.normalize();
+      l.mesh.position.copy(this.tmpA).addScaledVector(this.tmpDir, len / 2);
+      l.mesh.quaternion.setFromUnitVectors(Excavator.UP, this.tmpDir);
+      l.mesh.scale.set(1, len, 1);
+    }
+    this.boomGroup.rotation.x = -this.boomAngle;
+    this.stickGroup.rotation.x = -this.stickAngle;
+
+    // Greifer lotrecht unter die Stielspitze setzen
+    const tip = new THREE.Vector3();
+    this.stickTip.getWorldPosition(tip);
+    this.grappleGroup.position.copy(tip);
+    this.grappleGroup.rotation.set(0, this.heading + this.cabYaw + this.rotatorYaw, 0);
+
+    // Zacken: offen weit gespreizt. Geschlossen fügen sich die Schalen zur
+    // dichten Kalotte — es sei denn, es liegt Material darin: dann bleibt die
+    // Spinne so weit offen, wie die Ladung Platz braucht.
+    this.fingerPivots.forEach((pivot, i) => {
+      // Die Schale ist im geschlossenen Zustand gebaut; gedreht wird nur die
+      // Abweichung davon.
+      pivot.rotation.x = -((this.clawSplayIst[i] ?? this.currentSplay()) - CLAW_CLOSED_SPLAY);
+    });
+    this.updateClawColliders();
+
+    this.updateHydraulics();
+
+    this.updateGrappleCylinders();
+
+    // Joysticks samt Unterarmen kippen genau so, wie der Spieler steuert:
+    // links Hauptarm und Oberwagen, rechts Ausleger und Spinne. Vorher stand
+    // hier noch die alte Belegung, weshalb die Hände nicht zur Bewegung passten.
+    if (this.joyLeft && this.joyRight) {
+      const tilt = 0.35;
+      // Achse hoch (+1) → Hebel nach vorn, wie beim Wischen nach oben
+      this.joyLeft.rotation.x = this.inBoom * tilt;
+      this.joyLeft.rotation.z = this.inCab * tilt; // rechts = Oberwagen rechts
+      this.joyRight.rotation.x = this.inStick * tilt;
+      this.joyRight.rotation.z = this.inGrapple * tilt; // rechts = schließen
+    }
+  }
+
+  /**
+   * Gedämpftes Pendel am Kardan-Gelenk (Design-Wunsch 2026-08-27): Die Spinne
+   * schwenkt aus, angetrieben von der Beschleunigung der Stielspitze —
+   * Fliehkraft beim Drehen, Ruck beim Anfahren/Stoppen. Schwere Last pendelt
+   * länger nach (weniger Dämpfung). Am Boden aufliegend beruhigt sie sich sofort.
+   */
+  private integratePendulum(dt: number): void {
+    const tip = this.grappleGroup.position;
+    if (!this.pendulumInit) {
+      this.prevTip.copy(tip);
+      this.pendulumInit = true;
+    }
+    const velX = (tip.x - this.prevTip.x) / dt;
+    const velZ = (tip.z - this.prevTip.z) / dt;
+    // Teleport (Tests/Spawns): Pendel nicht mit Riesenimpuls füttern
+    if (Math.hypot(velX, velZ) > 30) {
+      this.swingVel.set(0, 0);
+      this.prevTipVel.set(velX, 0, velZ);
+      this.prevTip.copy(tip);
+      return;
+    }
+    const CAP = 15; // m/s² (SW)
+    const ax = THREE.MathUtils.clamp((velX - this.prevTipVel.x) / dt, -CAP, CAP);
+    const az = THREE.MathUtils.clamp((velZ - this.prevTipVel.z) / dt, -CAP, CAP);
+    this.prevTipVel.set(velX, 0, velZ);
+    this.prevTip.copy(tip);
+
+    /*
+     * Die Beschleunigung wird zweimal aus Positionsdifferenzen gebildet, und
+     * das rauscht: Gemessen am 11.09.2026 zitterte die Spinne im gleichmaessigen
+     * Schwenk um ±3,5 Grad, obwohl ein gedaempftes Pendel unter
+     * gleichbleibender Fliehkraft ruhig stehen muss. Das war Zahlenrauschen,
+     * keine Physik. Darum wird die Beschleunigung geglaettet, bevor sie das
+     * Pendel antreibt.
+     */
+    const glatt = Math.min(dt / ACC_GLAETTUNG_S, 1);
+    this.tipAcc.x += (ax - this.tipAcc.x) * glatt;
+    this.tipAcc.y += (az - this.tipAcc.y) * glatt;
+
+    const L = 1.5; // wirksame Pendellänge Gelenk→Lastschwerpunkt (SW)
+    const G = 9.81;
+    /*
+     * Rueckstellung: Schwerkraft **und** Gelenk.
+     *
+     * Ein frei haengendes Pendel stellt sich bei 45 Grad Schwenk auf gut
+     * 27 Grad schraeg (gemessen) — rechnerisch richtig, sieht aber aus wie
+     * eine Abrissbirne. Eine echte Spinne haengt nicht frei: Im Kardangelenk
+     * sitzt Reibung, und der Schlauchbaum zieht sie zurueck. Das ist hier als
+     * zusaetzliche Rueckstellung modelliert; sie halbiert den Ausschlag,
+     * ohne das Pendeln als solches wegzunehmen.
+     */
+    const rueck = (G / L) * (1 + GELENK_STEIFE);
+    // schwere Last: weniger Dämpfung → längeres Nachpendeln (SW)
+    const damping = THREE.MathUtils.lerp(
+      PENDEL_DAEMPFUNG_LEER,
+      PENDEL_DAEMPFUNG_LAST,
+      Math.min(this.carriedMassKg / NENNLAST_KG, 1)
+    );
+    this.swingVel.x +=
+      (-rueck * Math.sin(this.swing.x) - damping * this.swingVel.x + this.tipAcc.y / L) * dt;
+    this.swingVel.y +=
+      (-rueck * Math.sin(this.swing.y) - damping * this.swingVel.y - this.tipAcc.x / L) * dt;
+    this.swing.x = THREE.MathUtils.clamp(this.swing.x + this.swingVel.x * dt, -PENDEL_MAX, PENDEL_MAX);
+    this.swing.y = THREE.MathUtils.clamp(this.swing.y + this.swingVel.y * dt, -PENDEL_MAX, PENDEL_MAX);
+    if (this.groundContact.active) {
+      this.swing.multiplyScalar(0.75);
+      this.swingVel.multiplyScalar(0.5);
+    }
+
+    const yaw = this.heading + this.cabYaw + this.rotatorYaw;
+    const qYaw = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yaw, 0));
+    const qTilt = new THREE.Quaternion().setFromEuler(new THREE.Euler(this.swing.x, 0, this.swing.y));
+    this.grappleGroup.quaternion.copy(qTilt).multiply(qYaw);
+  }
+
+  private cylA = new THREE.Vector3();
+  private cylB = new THREE.Vector3();
+  private cylDir = new THREE.Vector3();
+
+  /**
+   * Zylinder zwischen Traversen-Gelenk und Schale ausrichten — alles im
+   * lokalen Spinnenraum, damit sie beim Pendeln nicht nachhinken.
+   */
+  private updateGrappleCylinders(): void {
+    for (const c of this.grappleCylinders) {
+      this.cylA.copy(c.fromLocal);
+      this.cylB.copy(c.toLocalOnShell).applyEuler(c.pivot.rotation).add(c.pivot.position);
+      this.cylDir.copy(this.cylB).sub(this.cylA);
+      const dist = Math.max(this.cylDir.length(), 0.2);
+      this.cylDir.normalize();
+      const q = new THREE.Quaternion().setFromUnitVectors(Excavator.UP, this.cylDir);
+      c.barrel.position.copy(this.cylA).addScaledVector(this.cylDir, c.barrelLen / 2);
+      c.barrel.quaternion.copy(q);
+      c.barrel.scale.set(1, c.barrelLen, 1);
+      const rodLen = Math.max(dist - c.barrelLen + 0.08, 0.08);
+      c.rod.position.copy(this.cylB).addScaledVector(this.cylDir, -rodLen / 2);
+      c.rod.quaternion.copy(q);
+      c.rod.scale.set(1, rodLen, 1);
+    }
+  }
+
+  private syncBodies(): void {
+    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, this.heading, 0));
+    this.chassisBody.setNextKinematicTranslation({
+      x: this.position.x,
+      y: this.position.y + 1.15,
+      z: this.position.z,
+    });
+    this.chassisBody.setNextKinematicRotation({ x: q.x, y: q.y, z: q.z, w: q.w });
+
+    // Schildkörper der Weltpose des Schildmeshes nachführen
+    this.bladeGroup.updateWorldMatrix(true, false);
+    this.bladeGroup.getWorldPosition(this.tmpA);
+    this.bladeGroup.getWorldQuaternion(this.tmpQuat);
+    this.bladeBody.setNextKinematicTranslation({
+      x: this.tmpA.x,
+      y: this.tmpA.y,
+      z: this.tmpA.z,
+    });
+    this.bladeBody.setNextKinematicRotation({
+      x: this.tmpQuat.x,
+      y: this.tmpQuat.y,
+      z: this.tmpQuat.z,
+      w: this.tmpQuat.w,
+    });
+
+    // Arm-Kollider den Meshes nachführen
+    for (const [mesh, body] of [
+      [this.boomMesh, this.boomBody],
+      [this.stickMesh, this.stickBody],
+    ] as const) {
+      mesh.updateWorldMatrix(true, false);
+      mesh.getWorldPosition(this.armPos);
+      mesh.getWorldQuaternion(this.armQuat);
+      body.setNextKinematicTranslation(this.armPos);
+      body.setNextKinematicRotation({
+        x: this.armQuat.x,
+        y: this.armQuat.y,
+        z: this.armQuat.z,
+        w: this.armQuat.w,
+      });
+    }
+
+    const gq = this.grappleGroup.quaternion;
+    this.grappleBody.setNextKinematicTranslation({
+      x: this.grappleGroup.position.x,
+      y: this.grappleGroup.position.y,
+      z: this.grappleGroup.position.z,
+    });
+    this.grappleBody.setNextKinematicRotation({ x: gq.x, y: gq.y, z: gq.z, w: gq.w });
+  }
+
+  /**
+   * Wie viel Gewalt gerade auf eine gefasste Baugruppe wirkt (0..1).
+   *
+   * Das Drehen der Spinne zählt am stärksten — genau damit reißt man einen
+   * Motor aus seiner Aufhängung. Dazu kommt die Bewegung von Ausleger, Stiel
+   * und Oberwagen, also das Reißen mit dem ganzen Arm.
+   */
+  get tearViolence(): number {
+    const dreh = Math.min(Math.abs(this.rotatorVel) / 0.9, 1);
+    const arm =
+      (Math.abs(this.boomVel) / BOOM_RATE +
+        Math.abs(this.stickVel) / STICK_RATE +
+        Math.abs(this.cabVel) / CAB_MAX) /
+      3;
+    return Math.min(1, dreh * 0.7 + arm * 0.5);
+  }
+
+  /** Achs-Aktivität 0..1 — treibt Motor-/Hydrauliksound (Kap. 15). */
+  get activity(): number {
+    return Math.min(
+      1,
+      Math.abs(this.driveVel) / DRIVE_MAX +
+        Math.abs(this.cabVel) / CAB_MAX +
+        Math.abs(this.boomVel) / BOOM_RATE +
+        Math.abs(this.stickVel) / STICK_RATE
+    );
+  }
+
+  /** Weltposition des Greif-Sensors (zwischen den Fingerspitzen) — pendelt mit. */
+  private instruments!: InstrumentPanel;
+
+  /**
+   * Bordinstrument: eine Leinwand-Textur auf einer Platte an der rechten
+   * Säule. Sie wird viermal je Sekunde neu gezeichnet — häufiger bringt nichts
+   * und kostet nur Zeit.
+   */
+  /**
+   * Räumschild vorn am Unterwagen (Design-Wunsch 29.08.2026).
+   *
+   * Abgesenkt lässt sich damit loser Schrott vor der Maschine
+   * zusammenschieben — das spart viele Einzelgriffe beim Aufräumen. Gehoben
+   * hängt es angewinkelt über dem Boden und stört nicht.
+   */
+  private buildBlade(
+    dark: THREE.Material,
+    frame: THREE.Material,
+    rod: THREE.Material
+  ): void {
+    const g = new THREE.Group();
+    g.position.set(0, 0, BLADE_Z);
+    this.root.add(g);
+    this.bladeGroup = g;
+
+    // Schildblatt: leicht nach vorn geneigt, mit umlaufender Kante
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(BLADE_W, 0.72, 0.16), dark);
+    blade.position.set(0, 0.42, 0);
+    blade.rotation.x = -0.22;
+    blade.castShadow = true;
+    g.add(blade);
+    // Schneide unten, hell abgesetzt wie angeschliffener Stahl
+    const edge = new THREE.Mesh(
+      new THREE.BoxGeometry(BLADE_W, 0.14, 0.2),
+      new THREE.MeshStandardMaterial({ color: 0x9aa2a8, roughness: 0.4, metalness: 0.9 })
+    );
+    edge.position.set(0, 0.07, 0.03);
+    g.add(edge);
+    // Seitenwangen, damit das Material nicht seitlich wegläuft
+    for (const s of [-1, 1]) {
+      const wing = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.62, 0.5), dark);
+      wing.position.set((s * BLADE_W) / 2, 0.4, 0.22);
+      g.add(wing);
+    }
+    // Verstrebungen zum Fahrgestell samt Hubzylinder
+    for (const s of [-1, 1]) {
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.9), frame);
+      arm.position.set(s * 0.7, 0.5, -0.45);
+      g.add(arm);
+      const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.5, 8), frame);
+      cyl.position.set(s * 0.42, 0.78, -0.3);
+      cyl.rotation.x = 0.9;
+      g.add(cyl);
+      const piston = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.34, 8), rod);
+      piston.position.set(s * 0.42, 0.55, -0.16);
+      piston.rotation.x = 0.9;
+      g.add(piston);
+    }
+  }
+
+  /** Zustand fürs Bordinstrument zusammenstellen. */
+  private readout(): InstrumentReadout {
+    return {
+      boomAngle: this.boomAngle,
+      stickAngle: this.stickAngle,
+      cabYaw: this.cabYaw,
+      closure: this.closure,
+      carriedMassKg: this.carriedMassKg,
+      carriedCount: this.carriedCount,
+      outriggerDown: this.outriggerDown,
+      activity: this.activity,
+    };
+  }
+
+  /** Anzeigen auffrischen (aus der Hauptschleife, gedrosselt). */
+  updateInstruments(dt: number): void {
+    this.instruments.update(dt, this.readout());
+  }
+
+  getSensorPosition(out: THREE.Vector3): THREE.Vector3 {
+    return out
+      .set(0, -GRAPPLE_LINK - 0.2 - PALM_TO_SENSOR, 0)
+      .applyQuaternion(this.grappleGroup.quaternion)
+      .add(this.grappleGroup.position);
+  }
+
+  private basketTmp = new THREE.Vector3();
+  private basketTip = new THREE.Vector3();
+  private basketQuatInv = new THREE.Quaternion();
+
+  /**
+   * Liegt der Weltpunkt wirklich im Schalenkorb?
+   *
+   * Vorher genügte eine Kugel um den Greifer, wodurch Material angehoben wurde,
+   * das gar nicht zwischen den Schalen lag — es schwebte sichtbar darunter.
+   * Jetzt wird gegen die tatsächliche Krallengeometrie geprüft: oben der
+   * Gelenkring, unten die Spitzen, seitlich der Kreis, den die Krallen bei der
+   * aktuellen Öffnung aufspannen.
+   */
+  isInsideGrapple(worldPoint: THREE.Vector3): boolean {
+    const p = this.basketTmp
+      .copy(worldPoint)
+      .sub(this.grappleGroup.position)
+      .applyQuaternion(this.basketQuatInv.copy(this.grappleGroup.quaternion).invert());
+    // clawPoint legt den Umfangswinkel auf x/z: bei a = 0 steht der Radius in z
+    clawPoint(0, this.currentSplay(), CLAW_SEGMENTS, this.basketTip);
+    const tipY = this.basketTip.y;
+    const tipR = Math.max(this.basketTip.z, 0);
+    // Wenig Luft nach oben und unten. Vorher waren es 0,45 bzw. 0,35 m — damit
+    // galt als gefasst, was gut einen halben Meter neben der Spinne schwebte,
+    // ohne jede Beruehrung. Der Zuschlag stammt aus der Zeit vor der
+    // Oberflaechen-Projektion unten in tryGrab: Damals wurde der Schwerpunkt
+    // geprueft, und sperrige Teile waren sonst nicht zu fassen. Seit der
+    // naechstgelegene Oberflaechenpunkt zaehlt, braucht es das nicht mehr.
+    if (p.y > CLAW_RING_Y + 0.22 || p.y < tipY - 0.18) return false;
+    // Radius des Korbs auf dieser Höhe: vom Gelenkring zur Spitze verjüngt
+    const t = THREE.MathUtils.clamp((CLAW_RING_Y - p.y) / Math.max(CLAW_RING_Y - tipY, 0.01), 0, 1);
+    const r = THREE.MathUtils.lerp(CLAW_RING_R, tipR, t) + 0.14;
+    return Math.hypot(p.x, p.z) <= r;
+  }
+
+  /**
+   * Wie viele Krallen beruehren diesen Koerper gerade?
+   *
+   * Der Korbtest oben fragt nur, ob der naechstgelegene Oberflaechenpunkt im
+   * Schalenraum liegt. Eine Kiste, die mit einer Ecke hineinragt, besteht ihn —
+   * und hing dann sichtbar halb neben der Spinne in der Luft (Befund
+   * 11.09.2026: "Teile werden mit hochgehoben, obwohl sie gar nicht richtig in
+   * der Spinne liegen"). Wer wirklich gefasst ist, hat mehrere Schalen an sich.
+   *
+   * Geprueft werden Spitze und Mitte jeder Kralle gegen die Oberflaeche.
+   */
+  krallenKontakte(body: RAPIER.RigidBody): number {
+    const col = body.collider(0);
+    if (!col) return 0;
+    this.grappleGroup.updateWorldMatrix(true, false);
+    let treffer = 0;
+    for (let c = 0; c < CLAW_COUNT; c++) {
+      const a = (c / CLAW_COUNT) * Math.PI * 2;
+      const splay = this.clawSplayIst[c] ?? this.currentSplay();
+      let nah = false;
+      for (const seg of [CLAW_SEGMENTS, Math.round(CLAW_SEGMENTS * 0.6)]) {
+        clawPoint(a, splay, seg, this.clawA);
+        this.clawA.applyMatrix4(this.grappleGroup.matrixWorld);
+        const pr = col.projectPoint({ x: this.clawA.x, y: this.clawA.y, z: this.clawA.z }, false);
+        if (!pr) continue;
+        const d = Math.hypot(
+          pr.point.x - this.clawA.x,
+          pr.point.y - this.clawA.y,
+          pr.point.z - this.clawA.z
+        );
+        if (pr.isInside || d <= KONTAKT_NAH) {
+          nah = true;
+          break;
+        }
+      }
+      if (nah) treffer++;
+    }
+    return treffer;
+  }
+
+  /** Zielpunkt für die Kamera (Oberwagen). */
+  getCameraTarget(out: THREE.Vector3): THREE.Vector3 {
+    return out.copy(this.position).add(new THREE.Vector3(0, 2.6, 0));
+  }
+
+  /** Augpunkt der Kabinenkamera (Weltkoordinaten). */
+  getCabinEye(out: THREE.Vector3): THREE.Vector3 {
+    return this.cabinEye.getWorldPosition(out);
+  }
+
+  /** Blickrichtungs-Basis der Kabine (Fahrwerk + Oberwagen). */
+  get cabinBaseYaw(): number {
+    return this.heading + this.cabYaw;
+  }
+}
+
+/** Wert schrittweise Richtung Ziel bewegen (lineare Rampe). */
+/**
+ * Rampe mit weichen Ecken.
+ *
+ * Eine reine Gerade springt beim Loslassen von voller Beschleunigung auf
+ * null — genau dieser Knick liest sich als Ruck. Nahe am Ziel wird die
+ * Schrittweite darum kleiner: ein S statt einer Geraden. Die letzten rund
+ * zwoelf Schritte (0,2 s) laufen mit gedrosseltem Schritt aus, der Rest der
+ * Rampe bleibt unveraendert schnell.
+ */
+function ramp(current: number, target: number, maxStep: number): number {
+  const diff = target - current;
+  if (Math.abs(diff) <= maxStep) return target;
+  /*
+   * Weiche Ecke nur beim Ausrollen, nicht beim Anfahren.
+   *
+   * Zuerst wurde in beide Richtungen gedaempft — damit fuehlte sich auch der
+   * Hebeldruck weich an, und die Maschine wirkte teigig statt schwer. Beim
+   * Anfahren soll sie sofort anliegen; nur der letzte Rest beim Ausrollen
+   * wird weich, denn dort sitzt der Ruck.
+   */
+  const bremst = Math.abs(target) < Math.abs(current);
+  if (!bremst) return current + Math.sign(diff) * maxStep;
+  const naehe = Math.min(1, Math.abs(diff) / (maxStep * 10));
+  return current + Math.sign(diff) * maxStep * (0.4 + 0.6 * naehe);
+}
+
+function clamp1(v: number): number {
+  return THREE.MathUtils.clamp(v, -1, 1);
+}
+
+/** Zwei Tastenpaare auf eine Achse summieren (Haupt- + Zweitbelegung). */
+function axis2(input: Input, n1: string, p1: string, n2: string, p2: string): number {
+  return THREE.MathUtils.clamp(input.axis(n1, p1) + input.axis(n2, p2), -1, 1);
+}

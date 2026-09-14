@@ -1,8 +1,13 @@
 name: Deploy zu GitHub Pages
 
-# Baut den Prototyp (unverändert auf die Root-URL) und Bagerana v2 (Unterpfad /v2/).
+# Baut den Prototyp (unverändert auf die Root-URL), v1 (Unterpfad /v1/) und
+# Bagerana v2 (Unterpfad /v2/).
 # Prototyp-URL bleibt: https://<user>.github.io/schrottplatz-app/
+# v1-URL:              https://<user>.github.io/schrottplatz-app/v1/
 # v2-URL:              https://<user>.github.io/schrottplatz-app/v2/
+#
+# Alle drei bauen mit `base: "./"`, also relativen Pfaden — deshalb braucht
+# keiner von ihnen seinen Unterpfad zu kennen.
 
 on:
   push:
@@ -34,6 +39,13 @@ jobs:
         working-directory: prototype
         run: npm run build
 
+      - name: v1 — Abhängigkeiten
+        working-directory: v1
+        run: npm ci
+      - name: v1 — Bauen
+        working-directory: v1
+        run: npm run build
+
       - name: v2 — Abhängigkeiten
         working-directory: v2/web
         run: npm ci
@@ -44,10 +56,12 @@ jobs:
         working-directory: v2/web
         run: npm run build
 
-      - name: Zusammenführen (Prototyp = Root, v2 = /v2/)
+      - name: Zusammenführen (Prototyp = Root, v1 = /v1/, v2 = /v2/)
         run: |
           mkdir -p site
           cp -r prototype/dist/. site/
+          mkdir -p site/v1
+          cp -r v1/dist/. site/v1/
           mkdir -p site/v2
           cp -r v2/web/dist/. site/v2/
 

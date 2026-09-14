@@ -1,0 +1,637 @@
+import * as THREE from "three";
+import RAPIER from "@dimforge/rapier3d-compat";
+import { SORTENREIN_AB } from "../materials/purity";
+import type { ItemManager } from "./scrapItems";
+import type { CompositeManager } from "../dismantle/composites";
+
+/**
+ * Schrottschere / Paketierpresse (Design 2026-08-29):
+ * Aufbau wie eine oben offene Containermulde — Schrott wird von oben mit der
+ * Spinne eingefüllt. Der Zyklus:
+ *   1. Zwei dicke Eisenplatten (Deckelklappen) schließen von beiden Seiten von
+ *      oben und drücken dabei teilweise von oben ins Material.
+ *   2. Der Pressstempel läuft von RECHTS nach LINKS durch die Mulde und presst
+ *      das Paket gegen die linke Stirnwand.
+ *   3. Stempel zurück, Klappen auf — das Paket liegt fertig in der Mulde.
+ *
+ * Sicherheitsprinzip (Kap. 6): Beide Werkzeuge sind kinematisch und stoppen vor
+ * dem Material (Klemmgrenze), das eigentliche Plattdrücken ist ein
+ * Zustandswechsel der Teile — nichts wird gegen eine Wand zerquetscht.
+ */
+
+// Südwestlich hinter dem Bagger, auf dem früheren Störstoffplatz. Mittig
+// hinter der Maschine schnitt die Schere in die vorderste Sortiermulde;
+// hier steht sie frei neben dem Stahlschrotthaufen, und die offene Seite
+// bleibt in Reichweite (Design-Fix 29.08.2026).
+// Seit der neuen Platzordnung (12.09.2026) steht sie an der Suedgrenze,
+// direkt hinter dem Bagger: „hinter mir die Presse im Sueden".
+// Kuerzer und ein Stueck zur Seite (Ansage 12.09.2026), damit der Bagger
+// naeher an den Mischschrottplatz rueckt. Und quergestellt: Sie lag vom Sitz
+// aus waagerecht im Bild und nahm die ganze Breite ein; hochkant steht sie in
+// einer Reihe mit Stahlmulde und Halde.
+/*
+ * Die Presse steht ganz links in der Ecke (Ansage 13.09.2026: „Presse steht
+ * ganz links in der Ecke, davor liegt Mischschrott"). Links vom Fahrersitz ist
+ * +x, hinten ist −z; die Platzgrenze liegt bei x 10,5 und z −29.
+ */
+/*
+ * Abstand zur Mauer, wegen der Klappe.
+ *
+ * Ansage 13.09.2026: „die Presse braucht ein wenig Abstand zur Mauer wegen
+ * der Klappe." Gemessen an der offenen Maschine: Die Deckelplatte reichte bis
+ * z −29,85, die Innenseite der Suedmauer liegt bei −28,7 — sie schwang also
+ * 1,15 m in die Mauer hinein. Die Klappe haengt an der Suedseite (`makeLid(-1,
+ * true)`), deshalb geht es nach Norden.
+ *
+ * In x stand sie ebenfalls in der Wand: Der Rahmen reichte bis 10,87, die
+ * Ostmauer beginnt innen bei 10,20.
+ *
+ * Jetzt (5,5 | −24,3): Klappe bis −28,15, also 55 cm vor der Suedmauer,
+ * Rahmen bis 9,77, also 43 cm vor der Ostmauer.
+ */
+const CENTER = new THREE.Vector3(5.5, 0, -24.3);
+/** Mitte der Presskammer — auch fuer Hindernisliste und Tests. */
+export const PRESS_CENTER = CENTER;
+// Die Schwelle gilt fuer Objekte wie fuer Pakete — sie steht in materials/purity.ts.
+/**
+ * Wo das fertige Paket liegen bleibt: in der Kammer.
+ *
+ * Es gibt kein Ballenlager, und ausgeworfen wird auch nichts (Ansage
+ * 12.09.2026: "Ballen bleiben in Presse, ohne Abscheiden"). Das Paket bleibt
+ * da, wo es entstanden ist, und wandert von dort in den Behaelter seiner
+ * Fraktion — Stahlballen in den 40er, Alupaket in den Alucontainer. Solange es
+ * in der Kammer liegt, blockiert es die naechste Fuhre, und genau das soll es
+ * auch.
+ *
+ * Dazwischen war es einmal anders: Die Presse warf das Paket zum Bagger hin
+ * aus, und weil die Maschine nur gut vier Meter danebensteht, musste die
+ * Auswurfstelle gesucht werden, damit sie ueberhaupt im Greifring landet. Der
+ * Aufwand ist mit der Ansage weggefallen — die Kammer ist die Stelle.
+ */
+export function baleYard(): { x: number; z: number; w: number; d: number } {
+  return { x: CENTER.x, z: CENTER.z, w: INNER_W - 2.2, d: INNER_D - 1.2 };
+}
+/**
+ * Die Mulde liegt längs Ost–West, in einer Flucht mit dem Stahlschrottplatz
+ * darüber: Die 10 m lange Seite läuft parallel zum Haufen (x −13,5 bis −3,5),
+ * die 4 m Tiefe schließt südlich daran an (z −9 bis −5). Die Deckelklappen
+ * legen sich dadurch nach Norden und Süden weg, und der Bagger füllt von oben
+ * über die lange Seite ein (Design-Fix 02.09.2026).
+ */
+// Wieder laengs gestellt (Ansage 12.09.2026: „es kann auch die Presse
+// gedreht werden, damit ein bisschen mehr Platz auf der Seite entsteht").
+const ROT = 0;
+// Große Mulde: die lange offene Seite zeigt nach Norden zum Baggerplatz,
+// damit von dort bequem eingefüllt werden kann (Design 2026-08-29).
+// Breite wie der Stahlschrottplatz (11 m), direkt daneben: So bildet die
+// Schere mit dem Haufen eine Flucht. Die geringe Tiefe hält die Deckelklappen
+// kurz — die Spinne reicht bequem darüber (Wunsch 02.09.2026).
+/*
+ * 15 % kuerzer und 20 % schmaler als vorher (Ansage 13.09.2026). Aus 7,00 x
+ * 4,70 m werden 5,95 x 3,76 m. Der Greifer passt weiterhin hinein: offen misst
+ * er 3,02 m ueber die Spitzen, es bleiben also 37 cm auf jeder Seite.
+ */
+const INNER_W = 5.95; // x — Länge, Pressweg (rechts → links)
+// Schmaler (Ansage 12.09.2026: „die Presse erscheint immer noch zu tief,
+// die kann ruhig noch ein bisschen schmaler werden").
+/*
+ * z — Tiefe der Kammer. Sie bestimmt, ob die Spinne ueberhaupt hineinkommt.
+ *
+ * Befund 12.09.2026: „bei Presse kam ich nicht an Boden." Gemessen ist die
+ * Spinne offen 3,38 m breit (`clawSpan(CLAW_OPEN_SPLAY)`), die Kammer war
+ * 3,20 m tief — der Greifer setzte auf den beiden Laengswaenden auf, bevor
+ * er unten war. 4,20 m lassen beidseits gut 40 cm Luft, und das ist das
+ * Mindestmass fuer jeden Behaelter auf dem Platz: Was man befuellen soll,
+ * muss man auch ausraeumen koennen.
+ */
+/*
+ * Nachtrag 13.09.2026, Rueckbau auf die Sichelkralle: 3,76 geht nicht mehr.
+ *
+ * Die 3,76 m waren die geforderten −20 % und gingen nur, solange der
+ * Fuenfschalengreifer eingebaut war — der misst offen 3,02 m. Die Sichelkralle
+ * von gestern misst 3,38 m; mit 30 cm Luft je Seite braucht die Kammer 3,98 m.
+ * Bei 3,76 setzte der Greifer wieder auf den Laengswaenden auf, und ein
+ * Behaelter, den man nicht ausraeumen kann, ist eine Sackgasse
+ * (`spinnenmass`).
+ *
+ * 4,05 statt der urspruenglichen 4,70 sind damit −14 % statt −20. Die Laenge
+ * bleibt bei den geforderten −15 %.
+ */
+const INNER_D = 4.05;
+/** Lichte Masse der Kammer — fuer Tests und Platzplanung. */
+export const PRESS_INNER = { laenge: INNER_W, tiefe: INNER_D };
+const WALL_H = 1.9;
+const PLATE_T = 0.3; // dicke Eisenplatten (SW)
+const LID_HINGE_Y = WALL_H - 0.1;
+// Offen legen sich die Klappen nach außen weg, statt hochkant über der Mulde
+// zu stehen — so bleibt der Blick auf die Schere frei (Design-Fix 29.08.2026)
+const LID_OPEN_ANGLE = 2.65; // rad ≈ 152°, die Platten liegen fast flach außen
+const RAM_HOME_X = INNER_W / 2 - 0.35;
+const RAM_END_X = -INNER_W / 2 + 1.1; // Restdicke = Paketdicke (SW)
+
+const LID_TIME = 1.6; // s (SW)
+const RAM_FWD_TIME = 3.0;
+const RAM_HOLD_TIME = 0.9;
+const RAM_BACK_TIME = 2.0;
+
+type Phase = "idle" | "lidsClose" | "ramFwd" | "hold" | "ramBack" | "lidsOpen";
+
+export class PressManager {
+  /** Faktor aus der größeren Presse — von main gesetzt (1 = Grundausbau) */
+  getBaleBonus: (() => number) | null = null;
+
+  private lidLeft = new THREE.Group();
+  private lidRight = new THREE.Group();
+  /** Hubzylinder der Deckelplatten (Winkelhebel-Antrieb) */
+  private linkages: Array<{
+    a: THREE.Object3D;
+    b: THREE.Object3D;
+    barrel: THREE.Mesh;
+    rod: THREE.Mesh;
+    barrelLen: number;
+  }> = [];
+  private lidLeftBody: RAPIER.RigidBody;
+  private lidRightBody: RAPIER.RigidBody;
+  private ram: THREE.Mesh;
+  private ramBody: RAPIER.RigidBody;
+  private group!: THREE.Group;
+  private localP = new THREE.Vector3();
+  private phase: Phase = "idle";
+  private t = 0;
+  private lidAngle = LID_OPEN_ANGLE; // 0 = zu
+  /** Zweites Gelenk der Klappe: faltet die aeussere Haelfte auf die innere. */
+  private falten: Array<{ gruppe: THREE.Group; seite: -1 | 1; weg: number }> = [];
+  private ramX = RAM_HOME_X;
+  private ramBackFrom = RAM_END_X;
+  private ramTarget = RAM_END_X;
+  private stamped = false;
+
+  onStart: (() => void) | null = null;
+  onLidsClosed: (() => void) | null = null;
+  /** (Anzahl gepresster Teile, Position) */
+  onStamp: ((count: number, pos: THREE.Vector3) => void) | null = null;
+
+  constructor(
+    scene: THREE.Scene,
+    world: RAPIER.World,
+    private items: ItemManager,
+    private composites: CompositeManager
+  ) {
+    const steel = new THREE.MeshStandardMaterial({ color: 0x4a5157, roughness: 0.6, metalness: 0.55 });
+    const heavy = new THREE.MeshStandardMaterial({ color: 0x3a4045, roughness: 0.5, metalness: 0.7 });
+
+    const group = new THREE.Group();
+    group.position.copy(CENTER);
+    group.rotation.y = ROT;
+    scene.add(group);
+    this.group = group;
+    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, ROT, 0));
+    const body = world.createRigidBody(
+      RAPIER.RigidBodyDesc.fixed()
+        .setTranslation(CENTER.x, 0, CENTER.z)
+        .setRotation({ x: q.x, y: q.y, z: q.z, w: q.w })
+    );
+
+    // --- Mulde: Boden + vier Wände, oben offen ---
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(INNER_W + 0.7, 0.3, INNER_D + 0.7), steel);
+    floor.position.y = 0.15;
+    floor.receiveShadow = true;
+    group.add(floor);
+    world.createCollider(
+      RAPIER.ColliderDesc.cuboid((INNER_W + 0.7) / 2, 0.15, (INNER_D + 0.7) / 2).setTranslation(0, 0.15, 0),
+      body
+    );
+    // [x, z, sx, sz] — Längswände (z±) und Stirnwände (x±)
+    const walls: Array<[number, number, number, number]> = [
+      [0, -(INNER_D / 2 + 0.175), INNER_W + 0.7, 0.35],
+      [0, INNER_D / 2 + 0.175, INNER_W + 0.7, 0.35],
+      [-(INNER_W / 2 + 0.175), 0, 0.35, INNER_D],
+      [INNER_W / 2 + 0.175, 0, 0.35, INNER_D],
+    ];
+    for (const [wx, wz, sx, sz] of walls) {
+      const wall = new THREE.Mesh(new THREE.BoxGeometry(sx, WALL_H, sz), steel);
+      wall.position.set(wx, WALL_H / 2 + 0.3, wz);
+      wall.castShadow = true;
+      wall.receiveShadow = true;
+      group.add(wall);
+      world.createCollider(
+        RAPIER.ColliderDesc.cuboid(sx / 2, WALL_H / 2, sz / 2).setTranslation(wx, WALL_H / 2 + 0.3, wz),
+        body
+      );
+    }
+    // Der gelbe Warnbalken auf der Muldenkante ist weg (Ansage 12.09.2026:
+    // „der gelbe Balken da, der kann sowieso weg, der hat für mich jetzt keine
+    // große Funktion"). Er lag als durchgehender Riegel quer im Bild und war
+    // das Auffaelligste an der ganzen Maschine, ohne etwas zu bedeuten.
+
+    /*
+     * EINE Deckelplatte statt zweier (Ansage 12.09.2026: „weil's ja eigentlich
+     * nur der Deckel ist, reicht es, wenn wir einen klappbaren Ausleger haben
+     * auf einer Seite … ein Pressenkonzept, das nicht so viel Breite
+     * braucht").
+     *
+     * Zwei Klappen, die sich beim Öffnen nach beiden Seiten flach hinlegen,
+     * brauchten links und rechts je zwei Meter Luft — die Maschine war doppelt
+     * so breit wie ihre Kammer. Jetzt klappt eine einzige Platte zur
+     * baggerabgewandten Seite weg; die andere Seite bleibt eine feste Wand.
+     */
+    const lidReach = INNER_D / 2 + 0.14; // wie weit die Platte zur Mitte reicht
+    const lidLen = INNER_W + 0.25; // über die ganze Muldenlänge
+    // Drei Hebelpaare je Klappe: Bei 10 m Breite trügen zwei die Platte
+    // sichtbar zu wenig.
+    const leverX = [-INNER_W / 2 + 1.1, 0, INNER_W / 2 - 1.1];
+    const rodMat = new THREE.MeshStandardMaterial({
+      color: 0xb8bec4,
+      roughness: 0.22,
+      metalness: 0.85,
+    });
+
+    /*
+     * `voll` baut die einzige echte Deckelplatte: Sie spannt jetzt ueber die
+     * ganze Kammerbreite, weil es keine Gegenklappe mehr gibt. Die andere
+     * Seite bleibt als leere Gruppe bestehen, damit der Bewegungsablauf
+     * unveraendert weiterlaeuft — sie zeigt nur nichts mehr.
+     */
+    const makeLid = (
+      side: -1 | 1,
+      voll: boolean
+    ): { pivot: THREE.Group; body: RAPIER.RigidBody } => {
+      const pivot = new THREE.Group();
+      pivot.position.set(0, LID_HINGE_Y + 0.3, side * (INNER_D / 2 + 0.12));
+      /*
+       * Zweiteilig statt einer grossen Platte (Ansage 12.09.2026: „ich wuensch
+       * mir eher, dass die Klappe noch mal geklappt ist").
+       *
+       * Eine Platte, die ueber die ganze Kammer reicht, schwingt beim Oeffnen
+       * als ein Brett nach aussen und braucht dort genauso viel Platz, wie sie
+       * lang ist. Gefaltet legt sich die aeussere Haelfte auf die innere — die
+       * Maschine kommt mit der halben Ausladung aus.
+       */
+      const spann = voll ? INNER_D + 0.28 : 0.001;
+      const halbSpann = spann / 2;
+      const plate = new THREE.Mesh(new THREE.BoxGeometry(lidLen, PLATE_T, halbSpann), heavy);
+      plate.position.z = -side * (halbSpann / 2);
+      plate.castShadow = true;
+      plate.visible = voll;
+      pivot.add(plate);
+      // Zweites Gelenk am Ende der inneren Haelfte
+      const falte = new THREE.Group();
+      // Ausgangslage: eingefahren; `update` schiebt sie heraus.
+      falte.position.z = 0;
+      pivot.add(falte);
+      const plate2 = new THREE.Mesh(new THREE.BoxGeometry(lidLen, PLATE_T, halbSpann), heavy);
+      plate2.position.z = -side * (halbSpann / 2);
+      plate2.castShadow = true;
+      plate2.visible = voll;
+      falte.add(plate2);
+      // Fuehrungsschiene statt Scharnier: die Haelfte faehrt aus, sie klappt
+      // nicht mehr (Ansage 12.09.2026).
+      const schiene = new THREE.Mesh(new THREE.BoxGeometry(lidLen, 0.12, 0.2), heavy);
+      schiene.position.z = -side * (halbSpann - 0.1);
+      schiene.visible = voll;
+      falte.add(schiene);
+      if (voll) this.falten.push({ gruppe: falte, seite: side, weg: halbSpann });
+      // Quer-Versteifungen auf der Platte
+      for (const rx of voll ? [-4.2, -2.5, -0.8, 0.8, 2.5, 4.2] : []) {
+        const rib = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.1, halbSpann - 0.25), heavy);
+        rib.position.set(rx, PLATE_T / 2 + 0.05, -side * (halbSpann / 2));
+        pivot.add(rib);
+      }
+      // Scharnierrohr längs
+      /*
+       * Auch das Scharnierrohr ist nicht mehr gelb. Es lief als durchgehender
+       * Strang ueber die ganze Kammerlaenge und war genau der Balken, der
+       * zweimal beanstandet wurde — die Farbe machte aus einem Bauteil ein
+       * Ausrufezeichen.
+       */
+      const hinge = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.15, 0.15, lidLen + 0.2, 10),
+        heavy
+      );
+      hinge.rotation.z = Math.PI / 2;
+      hinge.visible = voll;
+      pivot.add(hinge);
+      // Winkelhebel: stehen nach außen-oben ab und werden von den Zylindern gezogen
+      for (const lx of voll ? leverX : []) {
+        const lever = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.86, 0.26), heavy);
+        lever.position.set(lx, 0.34, side * 0.2);
+        lever.rotation.x = -side * 0.42;
+        lever.castShadow = true;
+        pivot.add(lever);
+        const anchor = new THREE.Object3D();
+        anchor.position.set(lx, 0.68, side * 0.42);
+        pivot.add(anchor);
+        // Fester Zylinderbock unten außen an der Mulde
+        const base = new THREE.Object3D();
+        base.position.set(lx, 0.6, side * (INNER_D / 2 + 1.25));
+        group.add(base);
+        const stand = new THREE.Mesh(new THREE.BoxGeometry(0.44, 1.2, 0.44), steel);
+        stand.position.copy(base.position);
+        stand.position.y = 0.6;
+        stand.castShadow = true;
+        group.add(stand);
+        // Kräftiger als nötig gezeichnet: Die Hubzylinder sollen die Mechanik
+        // erzählen, nicht als Striche verschwinden (Wunsch 02.09.2026).
+        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 1, 12), heavy);
+        const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 1, 10), rodMat);
+        barrel.castShadow = true;
+        scene.add(barrel);
+        scene.add(rod);
+        this.linkages.push({ a: base, b: anchor, barrel, rod, barrelLen: 1.1 });
+      }
+      group.add(pivot);
+      const lidBody = world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased());
+      world.createCollider(
+        RAPIER.ColliderDesc.cuboid(lidLen / 2, PLATE_T / 2, lidReach / 2),
+        lidBody
+      );
+      return { pivot, body: lidBody };
+    };
+    const south = makeLid(-1, true);
+    const north = makeLid(1, false);
+    this.lidLeft = south.pivot;
+    this.lidLeftBody = south.body;
+    this.lidRight = north.pivot;
+    this.lidRightBody = north.body;
+
+    // --- Pressstempel: fährt längs durch die Mulde ---
+    this.ram = new THREE.Mesh(new THREE.BoxGeometry(PLATE_T * 1.4, WALL_H - 0.1, INNER_D - 0.1), heavy);
+    this.ram.position.set(RAM_HOME_X, WALL_H / 2 + 0.3, 0);
+    this.ram.castShadow = true;
+    group.add(this.ram); // im Muldenrahmen — dreht mit
+    this.ramBody = world.createRigidBody(
+      RAPIER.RigidBodyDesc.kinematicPositionBased()
+    );
+    world.createCollider(
+      RAPIER.ColliderDesc.cuboid((PLATE_T * 1.4) / 2, (WALL_H - 0.1) / 2, (INNER_D - 0.1) / 2),
+      this.ramBody
+    );
+    // Zylinderbock rechts hinter dem Stempel
+    /*
+     * Der gelbe Stempelbock am Kammerende ist weg (Ansage 12.09.2026: „bei
+     * der Presse ist immer noch der gelbe Balken … das sieht komisch aus und
+     * kann weg, es wird ja sowieso nur noch die Ballen gepresst und es bleibt
+     * in der Presse, deshalb kann man das Anbauteil entfernen"). Er war das
+     * letzte grosse gelbe Stueck an der Maschine und stand quer im Bild.
+     */
+
+    this.syncTools();
+  }
+
+  start(): boolean {
+    if (this.phase !== "idle") return false;
+    this.phase = "lidsClose";
+    this.t = 0;
+    this.onStart?.();
+    return true;
+  }
+
+  get running(): boolean {
+    return this.phase !== "idle";
+  }
+
+  /** Ist der Punkt in der Muldenkammer? (Prüfung im gedrehten Muldenrahmen) */
+  private inChamber(p: { x: number; y: number; z: number }): boolean {
+    const l = this.toLocal(p);
+    return (
+      Math.abs(l.x) < INNER_W / 2 + 0.2 &&
+      Math.abs(l.z) < INNER_D / 2 + 0.2 &&
+      l.y < WALL_H + 1.0
+    );
+  }
+
+  private toLocal(p: { x: number; y: number; z: number }): THREE.Vector3 {
+    this.localP.set(p.x, p.y, p.z);
+    return this.group.worldToLocal(this.localP);
+  }
+
+  /** Oberkante des Materials — die Klappen drücken nur bis knapp darüber. */
+  private pileTop(): number {
+    let top = 0.3;
+    for (const item of this.items.items) {
+      const p = item.body.translation();
+      if (this.inChamber(p)) top = Math.max(top, p.y + 0.3);
+    }
+    for (const car of this.composites.cars) {
+      const p = car.body.translation();
+      if (this.inChamber(p)) top = Math.max(top, p.y + 0.75);
+    }
+    return top;
+  }
+
+  /** Weltposition des Muldenzentrums auf Arbeitshöhe (für Partikel/Toasts). */
+  get centerWorld(): THREE.Vector3 {
+    return CENTER.clone().setY(1.0);
+  }
+
+  /**
+   * Endposition des Stempels = linke Stirnwand + Paketdicke. Die Dicke wächst
+   * mit der Materialmenge — so wird nie mehr Material in den Raum gedrückt, als
+   * hineinpasst (Klemmschutz), und der Stempel fährt trotzdem sichtbar durch.
+   */
+  private computeRamTarget(): number {
+    let count = 0;
+    let cars = 0;
+    for (const item of this.items.items) {
+      if (this.inChamber(item.body.translation())) count++;
+    }
+    for (const car of this.composites.cars) {
+      if (this.inChamber(car.body.translation())) cars++;
+    }
+    const thickness = 0.4 + 0.14 * count + 1.4 * cars;
+    return THREE.MathUtils.clamp(-INNER_W / 2 + thickness, RAM_END_X, RAM_HOME_X - 0.4);
+  }
+
+  /** Kleinstmöglicher Klappenwinkel, damit die Platte nicht ins Material presst. */
+  private lidLimit(): number {
+    const need = this.pileTop() + 0.08 - (LID_HINGE_Y + 0.3);
+    const arm = INNER_D / 2;
+    if (need <= 0) return 0;
+    return Math.min(LID_OPEN_ANGLE, Math.asin(Math.min(need / arm, 1)));
+  }
+
+  update(dt: number): void {
+    if (this.phase !== "idle") this.t += dt;
+    switch (this.phase) {
+      case "lidsClose": {
+        const target = this.lidLimit();
+        const k = Math.min(this.t / LID_TIME, 1);
+        this.lidAngle = THREE.MathUtils.lerp(LID_OPEN_ANGLE, target, k);
+        if (k >= 1) {
+          this.phase = "ramFwd";
+          this.t = 0;
+          this.stamped = false;
+          this.ramTarget = this.computeRamTarget();
+          this.onLidsClosed?.();
+        }
+        break;
+      }
+      case "ramFwd": {
+        const k = Math.min(this.t / RAM_FWD_TIME, 1);
+        this.ramX = THREE.MathUtils.lerp(RAM_HOME_X, this.ramTarget, k);
+        // Auf halbem Weg zuschlagen: ab hier ist alles flach und braucht Platz
+        if (k >= 0.5 && !this.stamped) {
+          this.stamped = true;
+          this.stamp();
+        }
+        if (k >= 1) {
+          this.phase = "hold";
+          this.t = 0;
+        }
+        break;
+      }
+      case "hold":
+        if (this.t >= RAM_HOLD_TIME) {
+          this.phase = "ramBack";
+          this.ramBackFrom = this.ramX;
+          this.t = 0;
+        }
+        break;
+      case "ramBack": {
+        const k = Math.min(this.t / RAM_BACK_TIME, 1);
+        this.ramX = THREE.MathUtils.lerp(this.ramBackFrom, RAM_HOME_X, k);
+        if (k >= 1) {
+          this.phase = "lidsOpen";
+          this.t = 0;
+        }
+        break;
+      }
+      case "lidsOpen": {
+        const k = Math.min(this.t / LID_TIME, 1);
+        this.lidAngle = THREE.MathUtils.lerp(this.lidLimit(), LID_OPEN_ANGLE, k);
+        if (k >= 1) this.phase = "idle";
+        break;
+      }
+      case "idle":
+        return;
+    }
+    this.syncTools();
+  }
+
+  /** Klappen- und Stempelpose auf Meshes + kinematische Körper übertragen. */
+  private syncTools(): void {
+    // Klappen schwenken um die Längsachse (X): Süd negativ, Nord positiv
+    this.lidLeft.rotation.x = -this.lidAngle;
+    this.lidRight.rotation.x = this.lidAngle;
+    /*
+     * Die zweite Haelfte FAEHRT AUS, statt zu klappen (Ansage 12.09.2026:
+     * „die zweite Haelfte, um die Mulde zu bedecken, soll ausfahrbar sein,
+     * also hydraulisch ausfahrbar").
+     *
+     * Geschlossen ist sie ganz heraus und deckt die Kammer; beim Oeffnen
+     * zieht sie sich unter die erste Haelfte zurueck. Dadurch schwenkt beim
+     * Oeffnen nur noch eine halbe Plattenlaenge nach aussen.
+     */
+    const ausfahrt = 1 - this.lidAngle / LID_OPEN_ANGLE;
+    for (const f of this.falten) {
+      f.gruppe.position.z = -f.seite * f.weg * ausfahrt;
+    }
+    const wp = new THREE.Vector3();
+    const wq = new THREE.Quaternion();
+    for (const [pivot, lidBody] of [
+      [this.lidLeft, this.lidLeftBody],
+      [this.lidRight, this.lidRightBody],
+    ] as const) {
+      const plate = pivot.children[0];
+      plate.updateWorldMatrix(true, false);
+      plate.getWorldPosition(wp);
+      plate.getWorldQuaternion(wq);
+      lidBody.setNextKinematicTranslation({ x: wp.x, y: wp.y, z: wp.z });
+      lidBody.setNextKinematicRotation({ x: wq.x, y: wq.y, z: wq.z, w: wq.w });
+    }
+    this.ram.position.x = this.ramX;
+    this.ram.updateWorldMatrix(true, false);
+    this.ram.getWorldPosition(wp);
+    this.ram.getWorldQuaternion(wq);
+    this.ramBody.setNextKinematicTranslation({ x: wp.x, y: wp.y, z: wp.z });
+    this.ramBody.setNextKinematicRotation({ x: wq.x, y: wq.y, z: wq.z, w: wq.w });
+    this.updateLinkages();
+  }
+
+  private linkA = new THREE.Vector3();
+  private linkB = new THREE.Vector3();
+  private linkDir = new THREE.Vector3();
+  private static UP = new THREE.Vector3(0, 1, 0);
+
+  /** Hubzylinder zwischen festem Bock und Winkelhebel nachführen. */
+  private updateLinkages(): void {
+    for (const l of this.linkages) {
+      l.a.getWorldPosition(this.linkA);
+      l.b.getWorldPosition(this.linkB);
+      this.linkDir.copy(this.linkB).sub(this.linkA);
+      const dist = Math.max(this.linkDir.length(), 0.25);
+      this.linkDir.normalize();
+      const q = new THREE.Quaternion().setFromUnitVectors(PressManager.UP, this.linkDir);
+      l.barrel.position.copy(this.linkA).addScaledVector(this.linkDir, l.barrelLen / 2);
+      l.barrel.quaternion.copy(q);
+      l.barrel.scale.set(1, l.barrelLen, 1);
+      const rodLen = Math.max(dist - l.barrelLen + 0.12, 0.12);
+      l.rod.position.copy(this.linkB).addScaledVector(this.linkDir, -rodLen / 2);
+      l.rod.quaternion.copy(q);
+      l.rod.scale.set(1, rodLen, 1);
+    }
+  }
+
+  /**
+   * Zuschlagen: alles in der Mulde wird zu Paketen.
+   *
+   * Alles in der Kammer wird zu EINEM Paket — die Presse sortiert nicht.
+   * Wer ein sortenreines Paket will, muss sortenrein einlegen; das Paket
+   * merkt sich seine Zusammensetzung und bringt gemischt entsprechend
+   * weniger (Design-Fix 29.08.2026).
+   */
+  private stamp(): void {
+    const inChamber = this.items.items.filter((it) => this.inChamber(it.body.translation()));
+    let count = 0;
+    if (inChamber.length === 1) {
+      // ein einzelnes Teil ergibt noch kein Paket — das wird nur gestaucht
+      if (this.items.flattenItem(inChamber[0])) count++;
+    } else if (inChamber.length > 1) {
+      // Zusammensetzung festhalten, auch die von schon gepressten Paketen
+      const anteile = new Map<string, number>();
+      for (const it of inChamber) {
+        for (const c of it.composition ?? [{ materialId: it.materialId, massKg: it.massKg }]) {
+          anteile.set(c.materialId, (anteile.get(c.materialId) ?? 0) + c.massKg);
+        }
+      }
+      const composition = [...anteile].map(([materialId, massKg]) => ({ materialId, massKg }));
+      // Die dominante Fraktion gibt dem Paket Farbe und Namen
+      const dominant = composition.reduce((a, b) => (b.massKg > a.massKg ? b : a));
+      const kg = composition.reduce((s, c) => s + c.massKg, 0);
+      for (const it of inChamber) {
+        const wasCar = this.composites.despawnByBody(it.body);
+        this.items.remove(it, !wasCar);
+      }
+      // Das fertige Paket wandert ins Ballenlager östlich der Kammer —
+      // dort liegt es griffbereit für den Abholer, statt der Presse im Weg
+      /*
+       * Was zusammen in die Presse geht, kommt als Mischschrott heraus — eine
+       * Presse sortiert nicht (Wunsch 11.09.2026). Nur wenn praktisch nichts
+       * Fremdes dabei war, bleibt das Paket sortenrein und bringt den besseren
+       * Preis. Genau darin liegt der Anreiz, vorher zu trennen.
+       */
+      const reinheit = dominant.massKg / Math.max(kg, 1);
+      const paketMaterial = reinheit >= SORTENREIN_AB ? dominant.materialId : "mixed";
+      const lager = baleYard();
+      this.items.spawnBale(
+        paketMaterial,
+        kg,
+        new THREE.Vector3(
+          lager.x + (Math.random() - 0.5) * (lager.w - 1.2),
+          1.4,
+          lager.z + (Math.random() - 0.5) * (lager.d - 1.4)
+        ),
+        composition
+      );
+      count += inChamber.length;
+    }
+    for (const car of this.composites.cars) {
+      if (!this.inChamber(car.body.translation())) continue;
+      if (car.crushStage < 2) {
+        car.pressCrush();
+        count++;
+      }
+    }
+    this.onStamp?.(count, CENTER.clone().setY(1.0));
+  }
+}

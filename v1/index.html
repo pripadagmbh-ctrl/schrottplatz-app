@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <title>PRIPADA Schrottplatz</title>
+    <meta name="description" content="Umschlagbagger auf dem Schrottplatz: annehmen, greifen, sortieren, pressen und verladen." />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <meta name="theme-color" content="#1a1c1e" />
+    <!-- Vollbild ohne Browserleisten, wenn die Seite als App abgelegt wird -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Schrottplatz" />
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+    <link rel="apple-touch-icon" href="icon-192.png" />
+    <style>
+      html, body {
+        margin: 0; padding: 0; height: 100%; overflow: hidden; background: #1a1c1e;
+        /* Kein Doppeltipp- oder Pinch-Zoom: der Doppeltipp gehört dem Spiel */
+        touch-action: none; overscroll-behavior: none;
+        -webkit-user-select: none; user-select: none;
+        -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+      }
+      canvas { touch-action: none; }
+      /* iOS markiert sonst beim Tippen/Halten Elemente (blaue Auswahl, Lupe) */
+      * {
+        -webkit-user-select: none; user-select: none;
+        -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+      }
+      ::selection { background: transparent; }
+      #app { position: fixed; inset: 0; }
+      canvas { display: block; }
+      .hud {
+        position: fixed; color: #e8e8e4; font: 13px/1.5 "Consolas", monospace;
+        background: rgba(20, 22, 24, 0.72); border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 6px; padding: 8px 12px; pointer-events: none; user-select: none;
+      }
+      #help { top: 12px; left: 12px; }
+      #help b { color: #f0b429; }
+      #gripinfo { bottom: 12px; left: 50%; transform: translateX(-50%); font-size: 14px; }
+      #money { top: 12px; right: 12px; font-size: 15px; color: #f0d060; }
+      #shift { top: 46px; right: 12px; font-size: 13px; color: #f0d060; }
+      #load { display: none; bottom: 44px; left: 50%; transform: translateX(-50%); font-size: 14px; white-space: nowrap; }
+      #debug { top: 80px; right: 12px; display: none; text-align: right; }
+      #loading {
+        position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+        color: #e8e8e4; font: 16px "Consolas", monospace; background: #1a1c1e;
+      }
+      /* --- Touch-Steuerung (Tablet/Smartphone) --- */
+      #touch { display: none; position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+      /* Aufsetzflaechen: linke und rechte Bildhaelfte, unsichtbar. Der Stick
+         entsteht dort, wo der Daumen aufsetzt, und verschwindet beim Loslassen
+         (Design 09.09.2026, Vorbild Bagerana/v2). Die Zonen liegen unter den
+         Knoepfen, damit FAHREN, Rotator und Raedchen zuerst drankommen. */
+      #touch .zone {
+        position: absolute; top: 0; bottom: 0; width: 50%;
+        pointer-events: auto; touch-action: none; z-index: 0;
+      }
+      #zone-left { left: 0; }
+      #zone-right { right: 0; }
+      /* left/top setzt die Steuerung auf den Aufsetzpunkt; margin zentriert */
+      #touch .pad {
+        position: absolute; width: 138px; height: 138px; margin: -69px 0 0 -69px;
+        border-radius: 50%; background: rgba(20,22,24,0.35);
+        border: 2px solid rgba(255,255,255,0.25); pointer-events: none; touch-action: none;
+        z-index: 1;
+      }
+      #touch .pad[hidden] { display: none; }
+      #touch .knob {
+        position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px;
+        border-radius: 50%; background: rgba(240,180,41,0.75); pointer-events: none;
+      }
+      #touch .btn {
+        position: absolute; pointer-events: auto; touch-action: none; user-select: none;
+        z-index: 2;
+        background: rgba(20,22,24,0.6); border: 2px solid rgba(255,255,255,0.28); color: #e8e8e4;
+        font: 600 12px/1 "Consolas", monospace; border-radius: 10px; padding: 11px 6px;
+        text-align: center;
+      }
+      #touch .btn.down { background: rgba(240,180,41,0.65); color: #1a1c1e; }
+      /* FAHREN-Umschalter statt Fadenkreuz (Wunsch 10.09.2026, Vorbild v2):
+         Solange er an ist, wird der linke Stick zu Gas und Lenkung. Vier feste
+         Pfeiltasten waren auf dem Glas ohnehin schlecht zu treffen, und man
+         konnte nicht gleichzeitig lenken und den Arm bewegen. */
+      /* Menueknopf oben rechts — weit weg von beiden Daumen. Er oeffnet die
+         Pause, in der Speichern, Steuerung und Neues Spiel liegen. */
+      #btn-menu {
+        top: 12px; right: 12px; width: 46px; height: 46px; padding: 0;
+        line-height: 46px; font-size: 20px; z-index: 3;
+      }
+      /* Rotator: zwei Tasten am rechten Bildrand in Daumenhoehe.
+         Sie hatten ihre Position nur in der Handy-Regel weiter unten; auf dem
+         Tablet fehlte jede Angabe. Ein absolut positioniertes Element ohne
+         Offsets bleibt an seinem Platz im Fluss stehen — beide landeten
+         uebereinander in der linken oberen Ecke, sichtbar war nur eine
+         (Befund iPad 11.09.2026). */
+      /* Mit "#touch" davor, sonst gewinnt "#touch .btn" mit seinem Innenrand
+         und die Tasten werden 22 px hoeher als gedacht — dann ueberlappen sie. */
+      #touch #btn-rot-l, #touch #btn-rot-r {
+        right: 12px; width: 54px; height: 50px; line-height: 46px;
+        padding: 0; font-size: 20px;
+      }
+      #touch #btn-rot-l { bottom: 238px; }
+      #touch #btn-rot-r { bottom: 180px; }
+
+      /* Die Funktions-Elemente tragen nur noch ihre Tastencodes; sichtbar wird
+         davon nichts. Der Kranz zeichnet sich selbst. */
+      .hidden-actions { display: none; }
+
+      /* --- Funktionskranz am rechten Joystickkopf ---
+         Rechten Daumen kurz stillhalten, der Kranz klappt um ihn auf. Kein
+         festes Ziel, das man streifen kann: Er erscheint dort, wo der Daumen
+         schon liegt — wie die schwebenden Sticks selbst. */
+      #radial { position: absolute; pointer-events: none; z-index: 4; width: 0; height: 0; }
+      #radial[hidden] { display: none; }
+      #radial .sektor {
+        position: absolute; left: 0; top: 0;
+        width: 76px; height: 30px; margin: -15px 0 0 -38px;
+        border-radius: 8px; background: rgba(20,22,24,0.88);
+        border: 2px solid rgba(255,255,255,0.28); color: #e8e8e4;
+        font: 600 11px/26px "Consolas", monospace; text-align: center;
+        transition: transform 0.09s ease-out;
+      }
+      #radial .sektor.sel {
+        background: rgba(240,180,41,0.92); color: #1a1c1e; border-color: #f0d060;
+        transform: scale(1.15);
+      }
+      #radial .nabe {
+        position: absolute; left: 0; top: 0; width: 26px; height: 26px;
+        margin: -13px 0 0 -13px; border-radius: 50%;
+        background: rgba(240,180,41,0.5); border: 2px solid rgba(255,255,255,0.4);
+      }
+      /* Flache Displays (Handy quer): alles eine Nummer kleiner, sonst
+         verdecken Sticks und Tasten das halbe Bild. */
+      @media (max-height: 430px) {
+        #touch .pad { width: 108px; height: 108px; margin: -54px 0 0 -54px; }
+        #touch .knob { width: 44px; height: 44px; margin: -22px 0 0 -22px; }
+        #btn-menu { top: 8px; right: 8px; width: 40px; height: 40px; line-height: 40px; font-size: 18px; }
+        #radial .sektor { width: 66px; height: 26px; margin: -13px 0 0 -33px; font-size: 10px; line-height: 22px; }
+        /* neben den rechten Stick statt darüber — oben liegt die Tastenleiste */
+        #touch #btn-rot-l, #touch #btn-rot-r {
+          bottom: 14px; width: 46px; height: 40px; line-height: 36px; font-size: 17px;
+        }
+        #touch #btn-rot-l { right: 190px; }
+        #touch #btn-rot-r { right: 132px; }
+        /* endet über dem rechten Stick, sonst legen sich die Tasten darauf */
+        #help { display: none; }
+        /* Konto und Tagesablauf nach links: rechts oben braucht die
+           Tastenleiste den Platz, sobald sie zweispaltig umbricht */
+        #money { top: 8px; left: 8px; right: auto; font-size: 12px; padding: 4px 8px; }
+        #shift { top: 34px; left: 8px; right: auto; font-size: 11px; padding: 4px 8px; }
+        #gripinfo { bottom: 6px; font-size: 12px; padding: 4px 10px; }
+        #toast { top: 60px; font-size: 12px; }
+      }
+      /* --- Pausenmenü --- */
+      #pause {
+        display: none; position: fixed; inset: 0; z-index: 20;
+        background: rgba(12,14,16,0.72); backdrop-filter: blur(3px);
+        align-items: center; justify-content: center;
+      }
+      #pause.open { display: flex; }
+      #pause .panel {
+        background: rgba(24,27,30,0.96); border: 2px solid rgba(255,255,255,0.18);
+        border-radius: 14px; padding: 24px 28px; text-align: center; min-width: 260px;
+        color: #e8e8e4; font-family: "Consolas", monospace;
+        /* Auf flachen Displays passt die Liste nicht aufs Bild — dann wird sie
+           scrollbar, statt unten abgeschnitten zu werden. */
+        /* border-box, damit die Innenabstände in die Höhenschranke zählen —
+           sonst ragt das Feld trotz Begrenzung unten aus dem Bild */
+        box-sizing: border-box;
+        max-height: 88vh; overflow-y: auto; -webkit-overflow-scrolling: touch;
+        touch-action: pan-y; overscroll-behavior: contain;
+      }
+      /* Flache Displays (Handy quer, etwa iPhone 13 mini mit 812 x 375):
+         Untereinander gestapelte Knopflisten passen dort nicht mehr aufs Bild.
+         Das Pausenmenue steht deshalb zweispaltig — Ueberschrift und Hinweis
+         laufen ueber beide Spalten. Scrollen in einem Menue ist die schlechtere
+         Loesung: Man sieht nicht, dass es weitergeht. */
+      @media (max-height: 430px) {
+        #pause .panel {
+          padding: 12px 16px; min-width: 300px; max-height: 94vh;
+          display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px;
+          align-content: start;
+        }
+        #pause h1, #pause .hint { grid-column: 1 / -1; }
+        #pause h1 { margin: 0 0 4px; font-size: 17px; letter-spacing: 3px; }
+        #pause button { margin: 0; padding: 9px 10px; font-size: 12px; }
+        #pause .hint { margin: 6px 0 0; font-size: 10px; line-height: 1.45; }
+        /* Ankauf, Abholung und Ausbau hatten gar keine Regeln fuer flache
+           Displays — dort standen 22 px Polster und 19-px-Ueberschriften. */
+        #pickup .panel, #haggle .panel, #shop .panel {
+          padding: 12px 16px; min-width: 260px; max-width: 92vw; max-height: 92vh;
+        }
+        #pickup h2, #haggle h2, #shop h2 { margin: 0 0 4px; font-size: 15px; letter-spacing: 2px; }
+        #pickup .sub, #haggle .sub, #shop .sub { margin: 0 0 8px; font-size: 11px; line-height: 1.45; }
+        #pickup button, #haggle button, #shop button {
+          margin: 5px 0; padding: 9px 12px; font-size: 12px;
+        }
+        /* Der Ausbau ist die laengste Liste — sie bekommt einen eigenen
+           Scrollbereich, damit der Schliessen-Knopf sichtbar bleibt. */
+        #shop-list { max-height: 46vh; overflow-y: auto; }
+        #controls-menu { padding: 12px 16px; min-width: 240px; max-height: 94vh; }
+        #controls-menu h2 { margin: 0 0 8px; font-size: 15px; }
+        #controls-menu button { margin: 5px 0; padding: 9px 12px; font-size: 13px; }
+        #controls-menu .hint { margin: 8px 0 0; font-size: 10px; line-height: 1.5; }
+        #controls-menu .row { margin: 4px 0; gap: 6px; }
+        #controls-menu .row label { flex-basis: 88px; font-size: 11px; }
+        #controls-menu select { padding: 5px 4px; font-size: 11px; }
+        #controls-menu .inv { padding: 5px 8px; font-size: 11px; }
+      }
+      #pause h1 { margin: 0 0 18px; font-size: 26px; letter-spacing: 6px; color: #f0b429; }
+      #pause button {
+        display: block; width: 100%; margin: 8px 0; padding: 13px 18px; cursor: pointer;
+        background: rgba(46,52,57,0.95); color: #e8e8e4; font: 600 15px "Consolas", monospace;
+        border: 2px solid rgba(255,255,255,0.22); border-radius: 9px; touch-action: manipulation;
+      }
+      #pause button:hover, #pause button:active { background: rgba(240,180,41,0.75); color: #1a1c1e; }
+      #pause .hint { margin: 16px 0 0; font-size: 11px; line-height: 1.7; color: #9aa2a8; }
+      /* --- Steuerungsmenü: eigenständige Tafel neben dem Pausenfeld --- */
+      #controls-menu {
+        display: none;
+        background: rgba(24,27,30,0.96); border: 2px solid rgba(255,255,255,0.18);
+        border-radius: 14px; padding: 20px 24px; text-align: center; min-width: 280px;
+        color: #e8e8e4; font-family: "Consolas", monospace;
+        box-sizing: border-box; max-height: 88vh; overflow-y: auto;
+        -webkit-overflow-scrolling: touch; touch-action: pan-y; overscroll-behavior: contain;
+      }
+      #controls-menu.open { display: block; }
+      #controls-menu button {
+        display: block; width: 100%; margin: 8px 0; padding: 12px 18px; cursor: pointer;
+        background: rgba(46,52,57,0.95); color: #e8e8e4; font: 600 15px "Consolas", monospace;
+        border: 2px solid rgba(255,255,255,0.22); border-radius: 9px; touch-action: manipulation;
+      }
+      #controls-menu button:hover, #controls-menu button:active {
+        background: rgba(240,180,41,0.75); color: #1a1c1e;
+      }
+      #controls-menu .hint { margin: 14px 0 0; font-size: 11px; line-height: 1.6; color: #9aa2a8; }
+      /* solange die Steuerung offen ist, tritt das Pausenfeld zurück */
+      #pause.settings .panel { display: none; }
+      #controls-menu h2 { margin: 0 0 14px; font-size: 19px; letter-spacing: 3px; color: #f0b429; }
+      #controls-menu .row {
+        display: flex; align-items: center; gap: 8px; margin: 7px 0; text-align: left;
+      }
+      #controls-menu .row label { flex: 0 0 108px; font-size: 12px; color: #c8ced2; }
+      #controls-menu select {
+        flex: 1; padding: 8px 6px; border-radius: 7px; background: rgba(46,52,57,0.95);
+        color: #e8e8e4; border: 2px solid rgba(255,255,255,0.22);
+        font: 13px "Consolas", monospace;
+      }
+      #controls-menu .inv {
+        flex: 0 0 auto; padding: 8px 10px; border-radius: 7px; cursor: pointer;
+        background: rgba(46,52,57,0.95); border: 2px solid rgba(255,255,255,0.22);
+        color: #9aa2a8; font: 600 13px "Consolas", monospace; touch-action: manipulation;
+      }
+      #controls-menu .inv.on { background: rgba(240,180,41,0.75); color: #1a1c1e; }
+      #controls-menu .warn { margin: 10px 0 0; font-size: 11px; color: #e08a5a; min-height: 15px; }
+
+      /* --- Geführter Einstieg --- */
+      #tutorial {
+        display: none; position: fixed; left: 12px; bottom: 12px; z-index: 12;
+        max-width: 320px; pointer-events: none;
+      }
+      #tutorial.open { display: block; }
+      /* Auf dem Tablet nach oben: unten links lag die Karte auf dem
+         FAHREN-Umschalter, und seit die Sticks schweben, ist die untere linke
+         Ecke der natuerliche Platz fuer den linken Daumen. Oben links steht
+         nichts im Weg — die Tastenliste ist auf Touchgeraeten ausgeblendet. */
+      body.touch #tutorial { top: 12px; bottom: auto; }
+      /* Im flachen Layout stehen Konto und Tagesablauf oben links — Karte darunter.
+         Muss hinter der Grundregel stehen: gleiche Spezifitaet, es zaehlt die Reihenfolge. */
+      @media (max-height: 430px) {
+        body.touch #tutorial { top: 66px; }
+      }
+      /* Die Karte selbst schluckt keine Beruehrung mehr: ein Daumen darauf
+         setzt den Stick, nur der Ueberspringen-Knopf faengt seinen Tipp ab. */
+      #tutorial .karte {
+        background: rgba(20,23,26,0.92); border: 2px solid rgba(240,180,41,0.55);
+        border-left-width: 5px; border-radius: 10px; padding: 12px 14px;
+        color: #e8e8e4; font-family: "Consolas", monospace; pointer-events: none;
+      }
+      #tutorial .kopf {
+        display: flex; justify-content: space-between; align-items: center;
+        font-size: 11px; color: #9aa2a8; margin-bottom: 6px;
+      }
+      #tutorial button {
+        background: none; border: 1px solid rgba(255,255,255,0.22); border-radius: 5px;
+        color: #9aa2a8; font: 400 11px "Consolas", monospace; padding: 3px 8px;
+        cursor: pointer; touch-action: manipulation; pointer-events: auto;
+      }
+      #tutorial button:hover { color: #e8e8e4; border-color: rgba(255,255,255,0.5); }
+      #tutorial h3 {
+        margin: 0 0 5px; font-size: 15px; letter-spacing: 1px; color: #f0b429;
+      }
+      #tutorial p { margin: 0; font-size: 12.5px; line-height: 1.55; color: #c8ced2; }
+      @media (max-height: 430px) {
+        #tutorial { max-width: 260px; bottom: 8px; left: 8px; }
+        #tutorial p { font-size: 11px; }
+      }
+      /* --- Dialoge: Abholung bestellen, Verhandeln, Platz ausbauen ---
+         Ein gemeinsamer Stil für alle drei. Sie waren zuvor ohne jede Regel
+         im Dokument und wurden dadurch unsichtbar hinter dem Bild gerendert:
+         Der Fahrer wartete auf eine Antwort, die niemand geben konnte. */
+      #pickup, #haggle, #shop {
+        display: none; position: fixed; inset: 0; z-index: 22;
+        background: rgba(12, 14, 16, 0.72);
+        align-items: center; justify-content: center;
+      }
+      #pickup.open, #haggle.open, #shop.open { display: flex; }
+      #pickup .panel, #haggle .panel, #shop .panel {
+        background: rgba(24, 27, 30, 0.97); border: 2px solid rgba(255,255,255,0.18);
+        border-radius: 14px; padding: 22px 26px; text-align: center;
+        min-width: 300px; max-width: 460px; max-height: 86vh; overflow-y: auto;
+        color: #e8e8e4; font-family: "Consolas", monospace;
+      }
+      #pickup h2, #haggle h2, #shop h2 {
+        margin: 0 0 6px; font-size: 19px; letter-spacing: 3px; color: #f0b429;
+      }
+      #pickup .sub, #haggle .sub, #shop .sub {
+        margin: 0 0 14px; font-size: 12px; line-height: 1.6; color: #9aa2a8;
+      }
+      #pickup button, #haggle button, #shop button {
+        display: block; width: 100%; margin: 7px 0; padding: 12px 16px; cursor: pointer;
+        background: rgba(46,52,57,0.95); color: #e8e8e4;
+        font: 600 14px "Consolas", monospace; border: 2px solid rgba(255,255,255,0.22);
+        border-radius: 9px; touch-action: manipulation;
+      }
+      #pickup button:hover, #haggle button:hover, #shop button:hover:not(:disabled),
+      #pickup button:active, #haggle button:active {
+        background: rgba(240,180,41,0.75); color: #1a1c1e;
+      }
+      #shop button { text-align: left; }
+      #shop button:disabled { opacity: 0.42; cursor: default; }
+      #shop button .preis, #pickup button .kg, #haggle button .eur {
+        float: right; color: #9aa2a8; font-weight: 400;
+      }
+      #shop button .preis { font-weight: 700; }
+      #shop button:hover:not(:disabled) .preis,
+      #pickup button:hover .kg, #haggle button:hover .eur { color: #3a3020; }
+      #shop button small {
+        display: block; margin-top: 3px; font-weight: 400; font-size: 11px; color: #9aa2a8;
+      }
+      #shop button:hover:not(:disabled) small { color: #3a3020; }
+      #shop-close, #pickup-cancel { text-align: center !important; margin-top: 14px !important; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="help" class="hud">
+      <b>Steuerung</b> (H: ein/aus)<br />
+      W/S&nbsp;&nbsp;Fahren &nbsp;·&nbsp; A/D&nbsp;&nbsp;Lenken<br />
+      Q/E oder ←/→&nbsp;&nbsp;Oberwagen drehen<br />
+      R/F oder Bild↑/↓&nbsp;&nbsp;Ausleger heben/senken<br />
+      T/G oder ↑/↓&nbsp;&nbsp;Stiel weg/ran<br />
+      LMB halten&nbsp;&nbsp;Spinne schließen<br />
+      Mausrad&nbsp;&nbsp;Rotator &nbsp;·&nbsp; Shift+Rad&nbsp;&nbsp;Zoom<br />
+      MMB ziehen&nbsp;&nbsp;Kamera/Kopfblick &nbsp;·&nbsp; F3&nbsp;&nbsp;Debug<br />
+      C&nbsp;&nbsp;Ansicht: Orbit → Draufsicht → Kabine<br />
+      X&nbsp;&nbsp;Kabine hoch/runter &nbsp;·&nbsp; O&nbsp;&nbsp;Stützen aus/ein<br />
+      V&nbsp;&nbsp;Abholung rufen / abfahren &nbsp;·&nbsp; B&nbsp;&nbsp;Schere<br />
+      Y&nbsp;&nbsp;Lambert rufen (räumt die Sortierboxen leer)<br />
+      I&nbsp;&nbsp;Räumschild heben/senken<br />
+      J&nbsp;&nbsp;LKW zur Waage schicken &nbsp;·&nbsp; U&nbsp;&nbsp;Radio<br />
+      M&nbsp;&nbsp;Markierungen an/aus &nbsp;·&nbsp; K&nbsp;&nbsp;Speichern<br />
+      ESC oder P&nbsp;&nbsp;Pause<br />
+      Z&nbsp;&nbsp;Platz ausbauen (Maschinen kaufen)<br />
+      L&nbsp;&nbsp;Stand laden &nbsp;·&nbsp; N&nbsp;&nbsp;Neues Spiel
+    </div>
+    <div id="gripinfo" class="hud">Greifer: offen</div>
+    <div id="money" class="hud">Konto: 0 €</div>
+    <div id="shift" class="hud">Annahme</div>
+    <div id="load" class="hud"></div>
+    <div id="toast" class="hud" style="top: 56px; left: 50%; transform: translateX(-50%); opacity: 0; transition: opacity 0.4s; color: #f0d060;"></div>
+    <div id="debug" class="hud"></div>
+    <div id="touch">
+      <div class="zone" id="zone-left"></div>
+      <div class="zone" id="zone-right"></div>
+      <div class="pad" id="touch-left" hidden><div class="knob"></div></div>
+      <div class="pad" id="touch-right" hidden><div class="knob"></div></div>
+      <div class="btn" id="btn-rot-l">↺</div>
+      <div class="btn" id="btn-rot-r">↻</div>
+      <!-- Funktionskranz: zeichnet sich selbst um den rechten Daumen -->
+      <div id="radial" hidden></div>
+      <!-- Menue oben rechts, weit weg von beiden Daumen -->
+      <div class="btn" id="btn-menu">☰</div>
+      <!-- Traeger der Tastencodes; unsichtbar, der Kranz liest Beschriftung
+           und Reihenfolge daraus. So bleibt die Zuordnung an einer Stelle. -->
+      <div class="hidden-actions">
+        <span id="btn-cab">KABINE</span>
+        <span id="btn-outrig">STÜTZEN</span>
+        <span id="btn-blade">SCHILD</span>
+        <span id="btn-press">SCHERE</span>
+        <span id="btn-pickup">ABHOLEN</span>
+        <span id="btn-away">ZUR WAAGE</span>
+        <span id="btn-lambert">LAMBERT</span>
+        <span id="btn-marks">SCHILDER</span>
+      </div>
+      <!-- Nicht auf den Joystickkopf: Ausbau, Musik und Pause sind keine
+           Maschinenfunktionen. Sie liegen hinter dem Menue oben rechts, wo man
+           sie in Ruhe sucht — und der Kranz bleibt mit acht Eintraegen so weit
+           gefaechert, dass sich nichts ueberlappt. -->
+      <div class="hidden-actions" id="menu-actions">
+        <span id="btn-shop">AUSBAU</span>
+        <span id="btn-music">MUSIK</span>
+        <span id="btn-pause">PAUSE</span>
+      </div>
+    </div>
+    <div id="pause">
+      <div class="panel">
+        <h1>PAUSE</h1>
+        <button id="pause-resume">Weiterspielen</button>
+        <button id="pause-controls">Steuerung</button>
+        <button id="pause-shop">Platz ausbauen</button>
+        <button id="pause-music">Musik an/aus</button>
+        <button id="pause-save">Speichern</button>
+        <button id="pause-load">Stand laden</button>
+        <button id="pause-new">Neues Spiel</button>
+        <p class="hint">
+          Linker Stick: Hauptarm &amp; Oberwagen · Rechter Stick: Ausleger &amp; Spinne<br />
+          ↺ ↻ Spinne drehen · Doppeltipp links: fahren · rechts: Ansicht<br />
+          Rechten Daumen stillhalten: Funktionskranz
+        </p>
+      </div>
+      <div id="controls-menu">
+        <h2>STEUERUNG</h2>
+        <div class="row">
+          <label for="ax-leftY">Linker Stick ↕</label>
+          <select id="ax-leftY"></select>
+          <div class="inv" id="inv-leftY" title="Richtung umkehren">↕</div>
+        </div>
+        <div class="row">
+          <label for="ax-leftX">Linker Stick ↔</label>
+          <select id="ax-leftX"></select>
+          <div class="inv" id="inv-leftX" title="Richtung umkehren">↔</div>
+        </div>
+        <div class="row">
+          <label for="ax-rightY">Rechter Stick ↕</label>
+          <select id="ax-rightY"></select>
+          <div class="inv" id="inv-rightY" title="Richtung umkehren">↕</div>
+        </div>
+        <div class="row">
+          <label for="ax-rightX">Rechter Stick ↔</label>
+          <select id="ax-rightX"></select>
+          <div class="inv" id="inv-rightX" title="Richtung umkehren">↔</div>
+        </div>
+        <p class="warn" id="ctrl-warn"></p>
+        <button id="ctrl-reset">Werkseinstellung</button>
+        <button id="ctrl-back">Zurück</button>
+        <p class="hint">
+          Fahren schaltest du mit einem Doppeltipp in der linken Bildhälfte:
+          Solange es an ist, wird der linke Stick zu Gas und Lenkung — die
+          Belegung hier ruht so lange. Spinne drehen zusätzlich über ↺ ↻.
+        </p>
+      </div>
+    </div>
+    <div id="tutorial">
+      <div class="karte">
+        <div class="kopf"><span id="tut-schritt">1/6</span><button id="tut-skip">überspringen</button></div>
+        <h3 id="tut-titel"></h3>
+        <p id="tut-text"></p>
+      </div>
+    </div>
+    <div id="shop">
+      <div class="panel">
+        <h2>PLATZ AUSBAUEN</h2>
+        <p class="sub" id="shop-info"></p>
+        <div id="shop-list"></div>
+        <button id="shop-close">Zurück</button>
+      </div>
+    </div>
+    <div id="haggle">
+      <div class="panel">
+        <h2 id="haggle-who">KUNDE</h2>
+        <p class="sub" id="haggle-info"></p>
+        <div id="haggle-list"></div>
+      </div>
+    </div>
+    <div id="pickup">
+      <div class="panel">
+        <h2>ABHOLUNG BESTELLEN</h2>
+        <p class="sub">Wofür schickst du den LKW? Sortenrein bringt deutlich mehr.</p>
+        <div id="pickup-list"></div>
+        <button id="pickup-cancel">Abbrechen</button>
+      </div>
+    </div>
+    <div id="loading">Lade Physik …</div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

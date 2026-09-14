@@ -1,0 +1,1847 @@
+import * as THREE from "three";
+import RAPIER from "@dimforge/rapier3d-compat";
+import {
+  randomCargo,
+  type ItemManager,
+  type ScrapItem,
+  type ScrapShape,
+} from "../world/scrapItems";
+import type { CompositeManager, CarComposite } from "../dismantle/composites";
+import { WEIGH_Z, KAFFEE_THEKE } from "../world/yard";
+import { buildPerson, type PersonParts } from "../world/people";
+import type { Box } from "../world/boxen";
+import { packeLadung, stueckMass } from "./ladung";
+
+/** So lange haelt ein beladener Abholer auf der Waage fuer Marios Kontrolle. */
+const WIEGE_HALT_S = 6;
+/** Rueckwaertstempo beim Einparken (m/s) — Schrittgeschwindigkeit. */
+const PARK_RUECK_SPEED = 1.6;
+/** So weit darf die Ladung ueber die Bordwand ragen (m). */
+const LADUNG_UEBERSTAND = 0.35;
+/** Oberkante des Flaechenbodens im Ladeflaechen-System. */
+const LADE_BODEN = 0.1;
+/** Rand vorn und hinten, damit nichts ueber die Kante steht. */
+const LADE_RAND = 0.2;
+/** Gehtempo des Fahrers (m/s) */
+const FAHRER_TEMPO = 1.5;
+/** Rechenhilfe fuer boxen() — kein neuer Vektor je Bild. */
+const BOX_TMP = new THREE.Vector3();
+import { hitsObstacle } from "../world/obstacles";
+import { lagerMuldeFuer, type ContainerConfig } from "../world/containers";
+import { rollCustomer, vehicleForCustomer, type CustomerProfile } from "./customers";
+import { buildVehicleModel, wandHoehe } from "./vehicleModel";
+
+/**
+ * Anlieferungen M3: Kundenfahrzeuge auf fester Route (kinematisch).
+ * - KIPPER: Mulde hebt sich, die Ladung rutscht physisch herunter.
+ * - PRITSCHE: parkt — der Spieler lädt selbst mit der Spinne ab; leer → Abfahrt.
+ * - TIEFLADER: Pritsche mit Wrack (Auto), Spieler hebt es herunter.
+ * Die Ladung liegt als echte Physik-Objekte auf der (kinematischen) Ladefläche
+ * und fährt per Reibung mit.
+ */
+
+export type DeliveryKind = "kipper" | "pritsche" | "wrack" | "abholer" | "pkw";
+
+import {
+  ROUTE_IN_FWD,
+  neueAbladestelle,
+  routeApproach,
+  routeInRev,
+  routeOut,
+  PICKUP_IN_FWD,
+  neueAbholstelle,
+  pickupApproach,
+  pickupInRev,
+  pickupOut,
+  TIP_APPROACH,
+  TIP_IN_REV,
+  TIP_OUT,
+  bayApproach,
+  bayInRev,
+  bayOut,
+  PARK_SLOTS,
+  PARK_ANFAHRT_M,
+  PARK_TIME_S,
+  SPEED,
+  FIRST_DELAY_S,
+  NEXT_DELAY_S,
+  BLOCK_RADIUS,
+  BLOCKING_MASS_KG,
+  HONK_AFTER_S,
+  BED_HALF_W,
+  WORK_ZONES,
+  BLOCK_GIVEUP_S,
+  TIP_ANGLE,
+  TIP_CREEP_M,
+  TIP_CREEP_SPEED,
+  CRANE_SWING,
+} from "./routes";
+
+type Phase =
+  | "settleCargo"
+  | "in"
+  | "weighIn"
+  | "approach"
+  | "shiftPause"
+  | "reverseIn"
+  | "pauseBeforeUnload"
+  | "tipping"
+  | "tipHold"
+  | "tipCreep"
+  | "tipBack"
+  | "waitUnload"
+  | "waitLoad"
+  | "nudging"
+  | "toPark"
+  | "parkRueck"
+  | "parked"
+  | "out";
+
+interface Cargo {
+  items: ScrapItem[];
+  car: CarComposite | null;
+}
+
+/** Ladung fährt während des Transports kinematisch verriegelt mit (kein
+ *  Herunterfallen bei Kurven) und wird erst am Abladepunkt freigegeben. */
+interface RidingBody {
+  body: RAPIER.RigidBody;
+  localPos: THREE.Vector3;
+  localQuat: THREE.Quaternion;
+}
+
+class DeliveryVehicle {
+  readonly group = new THREE.Group();
+  private bedGroup = new THREE.Group();
+  private chassisBody: RAPIER.RigidBody;
+  private bedBody: RAPIER.RigidBody;
+  private phase: Phase = "settleCargo";
+  private routeS = 0;
+  private phaseT = 0;
+  private tip = 0;
+  cargo: Cargo = { items: [], car: null };
+  /** Anhänger des PKW — eigener Körper, Gelenk an der Kupplung */
+  private trailer: THREE.Group | null = null;
+  private trailerYawRel = 0;
+  private letztePos = new THREE.Vector3();
+  private letzterYaw = 0;
+  /** Ladekran der Händler — nur Bild, schwenkt beim Andocken zur Seite */
+  private crane: THREE.Group | null = null;
+  private craneSide = 1;
+  private craneSwing = 0;
+  /** Restweg des gekippten Anziehens (Phase tipCreep) */
+  private creepLeft = 0;
+  /** true, solange die Mulde waehrend der Abfahrt noch heruntergefahren wird */
+  private senken = false;
+  done = false;
+  private bedLen: number;
+  private riding: RidingBody[] = [];
+  private cargoReleased = false;
+  private blockedT = 0;
+  private honked = false;
+  private gaveUpWaiting = false;
+  /** Aufklappbare Bordwände (links/rechts) */
+  private sideWalls: Array<{
+    hinge: THREE.Group;
+    mesh: THREE.Mesh;
+    body: RAPIER.RigidBody;
+    dir: -1 | 1;
+  }> = [];
+  private sideOpen = 0; // 0 = zu, 1 = ganz aufgeklappt
+  private sideOpenTarget = 0;
+  private tailGate: { hinge: THREE.Group; mesh: THREE.Mesh; body: RAPIER.RigidBody } | null = null;
+  /** Bruttogewicht der Anlieferung (Wiegung bei der Einfahrt) */
+  bruttoKg = 0;
+  private weighedOut = false;
+  /** Restzeit des Kontrollhalts auf der Waage (nur Abholer) */
+  private wiegeHaltS = 0;
+  /** true, sobald der Abhol-LKW abfahrbereit ist (Spieler drückt V) */
+  private releaseRequested = false;
+  private justDeparted = false;
+
+  /** einmalig true, wenn der Abholer gerade losgefahren ist (→ abrechnen) */
+  consumeDeparted(): boolean {
+    if (!this.justDeparted) return false;
+    this.justDeparted = false;
+    return true;
+  }
+
+  /**
+   * Vom Hof schicken. Geht nur, solange noch nichts abgeladen ist — wer schon
+   * gekippt hat, muss auch bezahlt werden.
+   */
+  /**
+   * Ein Stück vorfahren, damit man an Schrott herankommt, der unter dem
+   * Fahrzeug liegt. Fährt entlang der Ausfahrtsroute und hält wieder an.
+   */
+  nudgeForward(meters = 3.5): boolean {
+    if (this.phase === "out" || this.phase === "nudging") return false;
+    this.nudgeReturn = this.phase;
+    this.nudgeTargetS = this.nearestS(this.routeOut) + meters;
+    this.routeS = this.nearestS(this.routeOut);
+    this.phase = "nudging";
+    return true;
+  }
+
+  /**
+   * Abladeplatz räumen. Wer einen Warteplatz zugewiesen bekommen hat, stellt
+   * sich dort ab und macht Pause; alle anderen fahren gleich vom Hof.
+   */
+  /**
+   * Anhänger nachführen. Ein Anhänger hat keinen eigenen Willen: Er dreht sich
+   * um seine Achse in die Richtung, in die die Kupplung ihn zieht. Das ist die
+   * übliche Einspur-Kinematik — je Meter Fahrweg dreht er um sin(Knickwinkel)
+   * geteilt durch den Abstand Kupplung–Achse.
+   *
+   * Rückwärts gilt sie nicht: Dort ist die Gleichung instabil, der Anhänger
+   * knickt ein. Ein Fahrer hält beim Rangieren dagegen, und genau das tut hier
+   * die Rückstellung — sonst stünde der Anhänger nach dem Andocken quer.
+   */
+  private updateTrailer(dt: number): void {
+    if (!this.trailer || dt <= 0) return;
+    const p = this.group.position;
+    const psi = this.group.rotation.y;
+    const dx = p.x - this.letztePos.x;
+    const dz = p.z - this.letztePos.z;
+    const strecke = Math.hypot(dx, dz);
+    const vorwaerts = Math.sin(psi) * dx + Math.cos(psi) * dz;
+    let dpsi = psi - this.letzterYaw;
+    while (dpsi > Math.PI) dpsi -= Math.PI * 2;
+    while (dpsi < -Math.PI) dpsi += Math.PI * 2;
+    this.letztePos.copy(p);
+    this.letzterYaw = psi;
+
+    const L = this.bedLen / 2 + 1.05; // Kupplung bis Anhängerachse
+    if (strecke > 1e-5 && vorwaerts > 0) {
+      this.trailerYawRel += -Math.sin(this.trailerYawRel) * (strecke / L) - dpsi;
+    } else {
+      this.trailerYawRel += (0 - this.trailerYawRel) * Math.min(1, dt * 2.5);
+    }
+    // Ein Anhänger knickt irgendwann an der Deichsel an — weiter geht es nicht
+    this.trailerYawRel = THREE.MathUtils.clamp(this.trailerYawRel, -0.75, 0.75);
+    this.trailer.rotation.y = this.trailerYawRel;
+  }
+
+  /**
+   * Aussteigen und zum Kaffeewagen hinuebergehen (Wunsch 11.09.2026).
+   *
+   * Der Fahrer klettert an der Fahrerseite heraus, geht zur Theke, steht dort
+   * mit seinem Becher und kommt zurueck, bevor die Pause endet. Erst wenn er
+   * wieder im Haus ist, faehrt der LKW los — ein LKW faehrt nicht ohne Fahrer.
+   */
+  private steigeAus(): void {
+    if (!this.fahrer) {
+      this.fahrer = buildPerson({ shirt: 0x3c4f63, trousers: 0x2b2f33, hair: 0x4a3a2e });
+      this.scene.add(this.fahrer.group);
+      // Becher in der Hand
+      const becher = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.045, 0.04, 0.1, 8),
+        new THREE.MeshStandardMaterial({ color: 0xe8e2d5, roughness: 0.6 })
+      );
+      becher.position.set(0.2, 1.02, 0.18);
+      this.fahrer.group.add(becher);
+    }
+    // Fahrerseite: links neben der Kabine, in Fahrtrichtung gesehen
+    const seite = new THREE.Vector3(-1.9, 0, 1.6).applyAxisAngle(
+      new THREE.Vector3(0, 1, 0),
+      this.group.rotation.y
+    );
+    this.fahrerTuer.set(
+      this.group.position.x + seite.x,
+      0,
+      this.group.position.z + seite.z
+    );
+    // Platz an der Theke, leicht versetzt, damit sich zwei nicht überlagern
+    this.fahrerTheke.set(
+      KAFFEE_THEKE.x + (Math.random() - 0.5) * 2.4,
+      0,
+      KAFFEE_THEKE.z - Math.random() * 0.8
+    );
+    this.fahrer.group.position.copy(this.fahrerTuer);
+    this.fahrer.group.visible = true;
+    this.fahrerState = "raus";
+    this.kaffeeGehabt = true;
+  }
+
+  /** Ein Schritt des Fahrers; ausserhalb der Pause ist nichts zu tun. */
+  private updateFahrer(dt: number): void {
+    const f = this.fahrer;
+    if (!f || this.fahrerState === "drin") return;
+    const ziel = this.fahrerState === "rein" ? this.fahrerTuer : this.fahrerTheke;
+    const g = f.group;
+    const dx = ziel.x - g.position.x;
+    const dz = ziel.z - g.position.z;
+    const d = Math.hypot(dx, dz);
+    if (d > 0.3 && this.fahrerState !== "kaffee") {
+      const schritt = Math.min(FAHRER_TEMPO * dt, d);
+      g.position.x += (dx / d) * schritt;
+      g.position.z += (dz / d) * schritt;
+      g.rotation.y = Math.atan2(dx, dz);
+      this.fahrerPhase += dt * 7;
+      const swing = Math.sin(this.fahrerPhase) * 0.45;
+      f.legLeft.rotation.x = swing;
+      f.legRight.rotation.x = -swing;
+      f.armLeft.rotation.x = -swing * 0.5;
+      return;
+    }
+    f.legLeft.rotation.x = 0;
+    f.legRight.rotation.x = 0;
+    if (this.fahrerState === "raus") {
+      this.fahrerState = "kaffee";
+      // zur Theke schauen und den Becher heben
+      const zx = KAFFEE_THEKE.x - g.position.x;
+      const zz = KAFFEE_THEKE.z + 1.2 - g.position.z;
+      g.rotation.y = Math.atan2(zx, zz);
+      f.armRight.rotation.x = -1.35;
+    } else if (this.fahrerState === "rein") {
+      this.fahrerState = "drin";
+      f.armRight.rotation.x = 0;
+      g.visible = false;
+    }
+  }
+
+  private leaveUnloadingBay(): void {
+    this.phaseT = 0;
+    if (this.parkSpot) {
+      this.phase = "toPark";
+    } else {
+      this.phase = "out";
+      this.routeS = 0;
+    }
+  }
+
+  /** true, solange über den Preis verhandelt wird — der Fahrer wartet dann. */
+  awaitingDeal = false;
+  /** Wird gerufen, wenn die Verhandlung in die Zeitgrenze läuft. */
+  onDealTimeout: (() => void) | null = null;
+  /** Bruttowiegung erledigt; verhindert, dass sie sich wiederholt */
+  private weighedIn = false;
+
+  /**
+   * Der Fahrer. Er entsteht erst, wenn er gebraucht wird — also beim ersten
+   * Halt auf dem Warteplatz. Fuer die meisten Fuhren gibt es ihn nie.
+   */
+  private fahrer: PersonParts | null = null;
+  private fahrerState: "drin" | "raus" | "kaffee" | "rein" = "drin";
+  private fahrerPhase = 0;
+  /** Pause schon gemacht? Sonst steigt er endlos wieder aus. */
+  private kaffeeGehabt = false;
+  private readonly fahrerTuer = new THREE.Vector3();
+  private readonly fahrerTheke = new THREE.Vector3();
+
+  /**
+   * Woher die Teile kommen, die auf der Flaeche liegen. Wird beim Anlegen
+   * gesetzt; gebraucht wird sie erst beim Wegfahren.
+   */
+  itemQuelle: ItemManager | null = null;
+
+  /**
+   * Aufbau der Ladeflaeche. Haendler fahren nicht alle denselben Wagen: mal
+   * flache Bordwaende, mal Rungen, mal ein geschlossener Kasten. Gewerbe und
+   * Privat bleiben flach — sie liefern kein Schuettgut. Die Ladung richtet
+   * sich nach der Bordwandhoehe, deshalb steht der Aufbau als Feld.
+   */
+  private readonly bodyStyleName: "flach" | "rungen" | "koffer";
+
+  /** Zugewiesener Warteplatz, null = fährt direkt vom Hof. */
+  parkSpot: [number, number] | null = null;
+  /** Wie lange die Pause dauert */
+  parkSeconds = 60;
+
+  /**
+   * Standfläche für die Kollisionsprüfung: Zugfahrzeug und, falls vorhanden,
+   * Anhänger einzeln — der knickt an der Kupplung ab und steht anders als
+   * das Zugfahrzeug.
+   */
+  boxen(out: Box[]): void {
+    const p = this.group.position;
+    out.push({
+      x: p.x,
+      z: p.z,
+      hw: 1.55,
+      hd: this.bedLen / 2 + 1.6,
+      rot: this.group.rotation.y,
+    });
+    if (this.trailer) {
+      const w = this.trailer.getWorldPosition(BOX_TMP);
+      // Der Anhänger hängt hinter der Kupplung; sein Mittelpunkt liegt eine
+      // halbe Ladeflächenlänge dahinter.
+      const rot = this.group.rotation.y + this.trailerYawRel;
+      out.push({
+        x: w.x - Math.sin(rot) * (this.bedLen / 2),
+        z: w.z - Math.cos(rot) * (this.bedLen / 2),
+        hw: 1.35,
+        hd: this.bedLen / 2 + 0.5,
+        rot,
+      });
+    }
+  }
+
+  /** Steht das Fahrzeug auf dem Warteplatz und macht Pause? */
+  get isParked(): boolean {
+    return this.phase === "parked" || this.phase === "toPark" || this.phase === "parkRueck";
+  }
+
+  private nudgeReturn: Phase = "waitUnload";
+  private nudgeTargetS = 0;
+
+  sendAway(): boolean {
+    if (this.phase === "out") return false;
+    // Was noch oben liegt, faehrt mit — sonst verliert der Wagen es unterwegs
+    this.verriegeleLadeflaeche();
+    this.phase = "out";
+    this.phaseT = 0;
+    // Dort in die Ausfahrt einfädeln, wo der Wagen gerade steht — sonst
+    // würde er an den Anfang der Ausfahrtsroute springen.
+    this.routeS = this.nearestS(this.routeOut);
+    this.sideOpenTarget = 0;
+    return true;
+  }
+
+  /** Bogenlänge des Routenpunkts, der der aktuellen Position am nächsten liegt. */
+  private nearestS(route: Array<[number, number]>): number {
+    const px = this.group.position.x;
+    const pz = this.group.position.z;
+    let best = 0;
+    let bestD = Infinity;
+    let s = 0;
+    for (let i = 0; i < route.length - 1; i++) {
+      const [ax, az] = route[i];
+      const [bx, bz] = route[i + 1];
+      const dx = bx - ax;
+      const dz = bz - az;
+      const len = Math.hypot(dx, dz);
+      if (len < 1e-6) continue;
+      // Projektion des Fahrzeugs auf dieses Segment
+      const t = Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / (len * len)));
+      const d = Math.hypot(px - (ax + dx * t), pz - (az + dz * t));
+      if (d < bestD) {
+        bestD = d;
+        best = s + len * t;
+      }
+      s += len;
+    }
+    return best;
+  }
+
+  private get isPickup(): boolean {
+    return this.kind === "abholer";
+  }
+  /** Fährt selbst ab: dann geht es direkt auf den Stahlschrotthaufen. */
+  private get isSelfTipping(): boolean {
+    return this.kind === "kipper";
+  }
+
+  /**
+   * Wer da anliefert. Bestimmt Menge, Material, Störstoffanteil und den Ton
+   * an der Waage. Abholer haben kein Profil — die kommen leer.
+   */
+  readonly customer: CustomerProfile | null;
+
+  /** Sortenreine Ladung? Ergibt sich aus der Kundschaft. */
+  get sortedMaterial(): string | null {
+    return this.customer?.sortedMaterial ?? null;
+  }
+
+  /**
+   * Die Mulde an der Ostwand, in die diese Fuhre gehoert — oder null.
+   *
+   * Nur fuer Kipper: Wer nicht selbst kippen kann, wird vom Bagger entladen
+   * und muss dafuer vor der Maschine stehen. Und nur, wenn es die Fraktion
+   * dort ueberhaupt gibt; sonst bleibt es beim Mischschrott.
+   */
+  private get zielMulde(): ContainerConfig | null {
+    if (!this.isSelfTipping) return null;
+    return lagerMuldeFuer(this.sortedMaterial);
+  }
+  private get routeIn(): Array<[number, number]> {
+    return this.isPickup ? PICKUP_IN_FWD : ROUTE_IN_FWD;
+  }
+  /*
+   * Die eigene Anfahrt. Sie wird einmal festgelegt, wenn der Wagen von der
+   * Waage losfährt, und ändert sich danach nicht mehr — auch wenn der Bagger
+   * inzwischen weiterfährt. Sonst rutschte dem rückwärts setzenden Fahrer das
+   * Ziel unter den Rädern weg.
+   */
+  private meineAnfahrt: Array<[number, number]> | null = null;
+  private meinRueckweg: Array<[number, number]> | null = null;
+  private meineAusfahrt: Array<[number, number]> | null = null;
+
+  /**
+   * Halteposition nach der aktuellen Baggerstellung festlegen.
+   *
+   * Gilt fuer beide Richtungen: Der Anlieferer setzt auf den Vorplatz vor der
+   * Maschine, der Abholer in die Ostgasse daneben. Beide Stellen wandern mit
+   * dem Bagger mit, beide werden hier eingefroren.
+   */
+  private legeAbladestelleFest(): void {
+    if (this.isPickup) {
+      neueAbholstelle();
+      this.meineAnfahrt = pickupApproach();
+      this.meinRueckweg = pickupInRev();
+      this.meineAusfahrt = pickupOut();
+      return;
+    }
+    neueAbladestelle();
+    this.meineAnfahrt = routeApproach();
+    this.meinRueckweg = routeInRev();
+    this.meineAusfahrt = routeOut();
+  }
+
+  private get routeApproach(): Array<[number, number]> {
+    if (this.isPickup) return this.meineAnfahrt ?? pickupApproach();
+    const mulde = this.zielMulde;
+    if (mulde) return bayApproach(mulde.z);
+    if (this.isSelfTipping) return TIP_APPROACH;
+    return this.meineAnfahrt ?? routeApproach();
+  }
+  private get routeRev(): Array<[number, number]> {
+    if (this.isPickup) return this.meinRueckweg ?? pickupInRev();
+    const mulde = this.zielMulde;
+    if (mulde) return bayInRev(mulde.z);
+    if (this.isSelfTipping) return TIP_IN_REV;
+    return this.meinRueckweg ?? routeInRev();
+  }
+  private get routeOut(): Array<[number, number]> {
+    if (this.isPickup) return this.meineAusfahrt ?? pickupOut();
+    const mulde = this.zielMulde;
+    if (mulde) return bayOut(mulde.z);
+    if (this.isSelfTipping) return TIP_OUT;
+    return this.meineAusfahrt ?? routeOut();
+  }
+
+  constructor(
+    readonly kind: DeliveryKind,
+    private scene: THREE.Scene,
+    private world: RAPIER.World,
+    /** Ist an (x,z) etwas im Weg (Bagger oder liegender Schrott)? Dann wird gewartet. */
+    private getBlocker:
+      | ((x: number, z: number, r: number, ignore: Set<number>) => boolean)
+      | null = null,
+    private onHonk: (() => void) | null = null,
+    /** Wiegung bei Einfahrt (brutto) bzw. Ausfahrt (netto = brutto − tara) */
+    private onWeighIn: ((kg: number) => void) | null = null,
+    private onWeighOut: ((netKg: number) => void) | null = null,
+    customer: CustomerProfile | null = null
+  ) {
+    this.customer = kind === "abholer" ? null : (customer ?? rollCustomer());
+    // Der PKW-Anhänger ist kurz — ein Kofferraum voll, keine Fuhre
+    this.bedLen = kind === "pkw" ? 2.4 : kind === "wrack" ? 5.4 : kind === "kipper" ? 6.0 : 5.4;
+    this.bodyStyleName =
+      this.customer?.group === "haendler"
+        ? (["rungen", "rungen", "koffer", "flach"] as const)[Math.floor(Math.random() * 4)]
+        : "flach";
+    const teile = buildVehicleModel({
+      kind: this.kind,
+      bedLen: this.bedLen,
+      // Schrotthändler fahren ihren eigenen Ladekran mit — Gewerbe und
+      // Privatleute nicht. Der Kran laedt nichts ab, er gehoert zum Bild.
+      withCrane:
+        this.customer?.group === "haendler" &&
+        (this.kind === "kipper" || this.kind === "pritsche"),
+      // Haendler fahren nicht alle denselben Wagen: mal flache Bordwaende, mal
+      // der klassische Rungenaufbau, mal ein geschlossener Kasten. Gewerbe und
+      // Privat bleiben flach — sie liefern kein Schuettgut.
+      bodyStyle: this.bodyStyleName,
+      // Der Lackton haengt am Halter: Derselbe Haendler faehrt denselben Wagen
+      halter: this.customer?.name,
+      group: this.group,
+      bedGroup: this.bedGroup,
+      world: this.world,
+      sideWalls: this.sideWalls,
+      tailGate: null,
+    });
+    this.tailGate = teile.tailGate;
+    this.crane = teile.crane;
+    this.trailer = teile.trailer;
+    // Zu welcher Seite geschwenkt wird, entscheidet das Fahrzeug einmal —
+    // sonst schwenken alle gleich und es sieht nach Choreografie aus.
+    this.craneSide = Math.random() < 0.5 ? -1 : 1;
+    scene.add(this.group);
+    this.chassisBody = world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased());
+    // Oberkante MUSS unter dem Muldenboden (0,99 m) liegen UND das Chassis darf
+    // NICHT hinter das Muldenheck ragen — sonst landet abgekippte Ladung auf dem
+    // Chassis und fährt mit dem LKW davon
+    if (kind === "pkw") {
+      // Nur das Zugfahrzeug haengt am starren Rahmen. Der LKW-Kollider entfaellt
+      // hier: Er deckte die Anhaengerflaeche ab, und die schwenkt jetzt am
+      // Gelenk weg — ein starrer Kasten darueber waere schlicht falsch. Der
+      // Anhaenger ist ueber die Ladeflaechen-Koerper vorhanden, die dem Gelenk
+      // folgen.
+      const zugZ = this.bedLen + 1.05 + 0.35 + 2.15;
+      world.createCollider(
+        RAPIER.ColliderDesc.cuboid(0.95, 0.8, 2.3).setTranslation(0, 0.9, zugZ),
+        this.chassisBody
+      );
+    } else {
+      /*
+       * Der Rahmen liegt UNTER der Mulde und ist schmaler als sie.
+       *
+       * Vorher war er ein Kasten von 2,2 m Breite und reichte bis y 0,92 — der
+       * Muldenboden beginnt aber schon bei y 0,49. Beide Koerper sind
+       * kinematisch und ueberschnitten sich damit um 43 cm. Beim Kippen wurde
+       * die Ladung zwischen ihnen eingeklemmt: Zwei kinematische Koerper haben
+       * fuer den Loeser unendliche Masse, er drueckt das Teil mit Gewalt
+       * heraus. Gemessen 258 km/h, und danach lag es auf dem Rahmendeck,
+       * waehrend die Mulde darueber wegkippte — genau die Beanstandung
+       * „das Material bleibt auf dem Chassis und taucht unter der Ladeflaeche".
+       *
+       * Jetzt endet der Rahmen 4 cm unter dem Muldenboden und ist mit 1,1 m
+       * schmaler als die Mulde (2,7 m). Was ueber die Muldenkante rutscht,
+       * faellt daran vorbei zu Boden, statt auf einem Deck liegenzubleiben.
+       * Solide bleibt der LKW trotzdem: Darueber deckt der Muldenkoerper ab.
+       */
+      world.createCollider(
+        RAPIER.ColliderDesc.cuboid(0.55, 0.185, (this.bedLen + 1.6) / 2).setTranslation(
+          0,
+          0.265,
+          0.8
+        ),
+        this.chassisBody
+      );
+    }
+    this.bedBody = world.createRigidBody(
+      RAPIER.RigidBodyDesc.kinematicPositionBased().setCcdEnabled(true)
+    );
+    // Ladefläche: Boden + Wände. Innenbreite MUSS über dem breitesten Großteil
+    // liegen (Blechtafel 1,9 m), sonst klemmt die Ladung und die Physik explodiert.
+    const halfW = BED_HALF_W;
+    world.createCollider(
+      RAPIER.ColliderDesc.cuboid(halfW, 0.3, this.bedLen / 2).setTranslation(0, -0.26, this.bedLen / 2),
+      this.bedBody
+    );
+    // Abhol-LKW trägt einen hohen Container, damit geladenes Material hält
+    const wh = kind === "abholer" ? 1.25 : 0.32;
+    // Seitenwände sind eigene bewegliche Körper (siehe buildMeshes) — hier nur
+    // die feste Stirnwand und ggf. die Heckklappe
+    const walls: Array<[number, number, number, number, number]> = [
+      [0, wh, this.bedLen, halfW, 0.05], // vordere Wand (zur Kabine)
+    ];
+    if (kind !== "kipper") walls.push([0, wh, 0, halfW, 0.05]); // Heckklappe nur bei Pritschen
+    for (const [wx, wy, wz, hx, hz] of walls) {
+      world.createCollider(
+        RAPIER.ColliderDesc.cuboid(hx, wh, hz).setTranslation(wx, wy, wz),
+        this.bedBody
+      );
+    }
+    this.placeAt(this.routeIn, 0);
+    // Kinematische Körper SOFORT an den Routenstart setzen. Ohne das stehen sie
+    // einen Frame lang im Ursprung — mitten auf der Annahmefläche — und
+    // schleudern den dort liegenden Schrott quer über den Platz.
+    this.snapBodiesToPose();
+  }
+
+  /** Chassis + Ladefläche hart auf die aktuelle Mesh-Pose setzen (kein Interpolieren). */
+  private snapBodiesToPose(): void {
+    this.group.updateWorldMatrix(true, true);
+    const cq = new THREE.Quaternion();
+    this.group.getWorldQuaternion(cq);
+    this.chassisBody.setTranslation(this.group.position, false);
+    this.chassisBody.setRotation({ x: cq.x, y: cq.y, z: cq.z, w: cq.w }, false);
+    const bp = new THREE.Vector3();
+    const bq = new THREE.Quaternion();
+    this.bedGroup.getWorldPosition(bp);
+    this.bedGroup.getWorldQuaternion(bq);
+    this.bedBody.setTranslation({ x: bp.x, y: bp.y, z: bp.z }, false);
+    this.bedBody.setRotation({ x: bq.x, y: bq.y, z: bq.z, w: bq.w }, false);
+  }
+
+  /**
+   * Privatleute kommen nicht mit dem LKW, sondern mit dem eigenen Wagen und
+   * einem Anhänger — oder mit einem Kastenwagen. Das macht sie auf den ersten
+   * Blick von Gewerbe und Händlern unterscheidbar (Wunsch 02.09.2026).
+   */
+
+  /**
+   * Ladung auf der Fläche platzieren — DYNAMISCH: sie setzt sich in der
+   * settleCargo-Phase erst physisch auf die Mulde (löst Überlappungen auf),
+   * dann wird sie für die Fahrt verriegelt. Kinematisch spawnen würde beim
+   * Freigeben explodieren.
+   */
+  /**
+   * Wie voll die Ladefläche beladen wurde (0..1, Hüllvolumen der Stücke).
+   *
+   * Nach außen sichtbar, weil genau daran die Ansage hängt: „Händler kommen
+   * erst, wenn der Wagen voll beladen ist, sollten aber nie unter 30 %
+   * liegen" (12.09.2026). Ohne Messwert wäre das eine Behauptung.
+   */
+  ladeFuellung = 0;
+
+  loadCargo(items: ItemManager, composites: CompositeManager): void {
+    this.group.updateWorldMatrix(true, true);
+    if (this.isPickup) return; // Abholer kommt leer — der Spieler belädt ihn
+    if (this.kind === "wrack") {
+      const pos = new THREE.Vector3(0, 0.25, this.bedLen / 2);
+      this.bedGroup.localToWorld(pos);
+      this.cargo.car = composites.spawnCar(pos);
+      const q = new THREE.Quaternion();
+      this.group.getWorldQuaternion(q);
+      this.cargo.car.body.setRotation({ x: q.x, y: q.y, z: q.z, w: q.w }, true);
+      return;
+    }
+    /*
+     * Wie voll ein Wagen ankommt.
+     *
+     * Befund 12.09.2026: „die Schrott-LKW sind viel zu oft zu leer.
+     * Normalerweise kommen Haendler erst, wenn der Wagen voll beladen ist,
+     * sollten aber nie unter 30 % liegen."
+     *
+     * Vorher wurde eine feste Stueckzahl gewuerfelt — zehn bis dreizehn, davon
+     * die Haelfte Grossteile — und danach gepackt. Was nicht passte, fiel weg.
+     * Gemessen landeten so oft nur ein oder zwei Stuecke auf der Flaeche, und
+     * weil die angekuendigte Menge hinterher auf das heruntergeschrieben wird,
+     * was wirklich oben liegt, kam ein Haendler mit 251 kg an statt mit den
+     * gewuerfelten 2,5 bis 9 Tonnen.
+     *
+     * Jetzt wird nicht mehr gewuerfelt, sondern geladen, bis der Wagen voll
+     * ist: Erst ein paar Brocken, dann Nachschub in kleineren Stuecken, bis
+     * der Fuellgrad stimmt. Ein Haendler faehrt nicht mit einem Blech auf der
+     * Pritsche los.
+     */
+    const c = this.customer;
+    const klein = c?.group === "privat";
+    // Jede vierte grosse Fuhre bringt ein Schwergewicht — Tank, Fahrerhaus,
+    // Drehgestell. Dann passt weniger daneben, das ist gewollt.
+    const schwer = !klein && !this.sortedMaterial && Math.random() < 0.28;
+    /*
+     * Zielfuellung der Ladeflaeche. Der Haendler kommt voll — er faehrt nicht
+     * zweimal fuer dieselbe Strecke. Privatleute bringen einen Kofferraum,
+     * aber auch die nie weniger als knapp ein Drittel: Wer mit fast leerem
+     * Anhaenger vorfaehrt, haette zu Hause bleiben koennen.
+     */
+    const MINDEST_FUELLUNG = 0.3;
+    const zielFuellung = klein
+      ? MINDEST_FUELLUNG + Math.random() * 0.3
+      : c?.group === "gewerbe"
+        ? 0.68 + Math.random() * 0.24
+        : 0.78 + Math.random() * 0.18;
+
+    const halbBreite = BED_HALF_W - 0.08;
+    const nutzLaenge = this.bedLen - 2 * LADE_RAND;
+    const maxHoehe = wandHoehe(this.kind, this.bodyStyleName) + LADUNG_UEBERSTAND;
+    const raum = halbBreite * 2 * nutzLaenge * maxHoehe;
+
+    type Spec = { materialId: string; massKg: number; shape: ScrapShape };
+    let specs: Spec[] = [];
+    let stuecke = [] as ReturnType<typeof stueckMass>[];
+    let plaetze: Array<ReturnType<typeof packeLadung>[number]> = [];
+    let fuellung = 0;
+    /*
+     * Runde fuer Runde nachladen. Die erste Runde bringt die Brocken, jede
+     * weitere kleineres Zeug, das in die Luecken geht — genau so packt man
+     * einen Wagen auch in Wirklichkeit. `packeLadung` sortiert intern
+     * ohnehin gross zuerst, deshalb wird jedes Mal neu gepackt statt
+     * angestueckelt.
+     */
+    let leerlauf = 0;
+    for (let runde = 0; runde < 12 && fuellung < zielFuellung; runde++) {
+      const erste = runde === 0;
+      const nachschub = randomCargo(
+        erste ? (klein ? 4 : 8) : 6,
+        erste ? 0.5 : 0.08,
+        erste && schwer ? 0.55 : 0,
+        this.sortedMaterial ?? undefined
+      );
+      const kandidaten = [...specs, ...nachschub];
+      const st = kandidaten.map((sp) => stueckMass(sp.shape.kind, sp.shape.dims));
+      const pl = packeLadung(st, halbBreite, nutzLaenge, maxHoehe);
+      const liegen = pl.filter(Boolean).length;
+      // Deckel auf die Stueckzahl: Jedes Stueck ist ein eigener Physikkoerper.
+      // Bei sortenreinen Fuhren aus Kleinteilen kamen gemessen 42 auf eine
+      // Flaeche — das fuellt zwar schoen, kostet aber jedes Bild Rechenzeit.
+      if (liegen > 28 && !erste) break;
+      const belegt = st.reduce(
+        (a2, t, i) => a2 + (pl[i] ? t.r * 2 * (t.r * 2) * t.hoehe : 0),
+        0
+      );
+      const neueFuellung = raum > 0 ? belegt / raum : 0;
+      const dazu = neueFuellung - fuellung;
+      specs = kandidaten;
+      stuecke = st;
+      plaetze = pl;
+      fuellung = neueFuellung;
+      /*
+       * Abbrechen erst, wenn zwei Runden hintereinander nichts mehr bringen
+       * UND die Mindestfuellung steht. Mit nur einer Runde Geduld blieb es
+       * gelegentlich bei fuenf Stuecken haengen: Der erste Wurf legte ein
+       * Grossteil quer, und der naechste Nachschub fand zufaellig nichts, was
+       * daneben passte (gemessen: ein Haendler mit 305 kg).
+       */
+      if (!erste && dazu < 0.01) {
+        leerlauf++;
+        if (leerlauf >= 2 && fuellung >= MINDEST_FUELLUNG) break;
+        if (leerlauf >= 5) break;
+      } else {
+        leerlauf = 0;
+      }
+    }
+
+    const bedQuat = new THREE.Quaternion();
+    this.bedGroup.getWorldQuaternion(bedQuat);
+    /*
+     * Gewicht auf die angekuendigte Menge bringen — und zwar an den Stuecken,
+     * die wirklich oben liegen.
+     *
+     * Vorher lief das in zwei Stufen: erst alle Specs auf die Kundenmenge
+     * skalieren, dann das Fehlende der weggefallenen Stuecke auf die
+     * liegenden umlegen. Beide Stufen waren gedeckelt, und beide rechneten
+     * mit Stuecken, die nachher gar nicht auf der Flaeche lagen — gemessen
+     * kam ein Haendler mit 1,7 t an statt mit den gewuerfelten 2,5 bis 9 t.
+     *
+     * Jetzt zaehlt nur, was liegt: Die Summe der liegenden Stuecke wird auf
+     * die Kundenmenge gezogen. Der Deckel bleibt, damit kein Blech zwei
+     * Tonnen wiegt — greift er, faehrt der Kunde eben mit weniger vor, und
+     * die Waage sagt das auch.
+     */
+    this.ladeFuellung = fuellung;
+
+    const draufIdx = specs.map((_, i) => i).filter((i) => plaetze[i]);
+    const summeDrauf = draufIdx.reduce((a2, i) => a2 + specs[i]!.massKg, 0);
+    /*
+     * Der Deckel haengt an der Dichte, nicht an einem festen Faktor.
+     *
+     * Vorher stand hier ein Ausgleich von hoechstens 2,2 — und der reichte
+     * nie: Zehn Stuecke wiegen von Natur aus rund eine Tonne, ein Haendler
+     * bringt zwei bis neun. Gemessen kam er mit 1,7 t an. Ein fester Faktor
+     * ist dafuer auch das falsche Mass; die Frage ist nicht, wie stark man
+     * skaliert, sondern was ein Stueck dieser Groesse ueberhaupt wiegen kann.
+     *
+     * 2600 kg/m³ ist die Grenze: dichter Stahlschrott liegt bei 2000 bis
+     * 2500, massiver Stahl bei 7850 — aber ein massiver Block dieser Groesse
+     * waere kein Schrottstueck mehr, sondern ein Amboss. Der Faktor 0,55 auf
+     * das Huellvolumen traegt dem Rechnung, dass kaum ein Stueck seinen
+     * Quader ausfuellt.
+     */
+    const DICHTE_MAX = 2600;
+    const grenze = (i: number): number =>
+      DICHTE_MAX * Math.pow(stuecke[i]!.r * 2, 2) * stuecke[i]!.hoehe * 0.55;
+    const gewicht = new Map<number, number>();
+    for (const i of draufIdx) gewicht.set(i, specs[i]!.massKg);
+    if (c && summeDrauf > 0) {
+      let rest = c.massKg;
+      // Zwei Durchgaenge: erst proportional verteilen, dann das, was am
+      // Deckel haengengeblieben ist, auf die Stuecke mit Luft umlegen.
+      for (let runde = 0; runde < 2 && rest > 0; runde++) {
+        const offen = draufIdx.filter((i) => gewicht.get(i)! < grenze(i) - 1);
+        if (offen.length === 0) break;
+        const basis = offen.reduce((a2, i) => a2 + specs[i]!.massKg, 0) || 1;
+        const zuVerteilen = rest;
+        rest = 0;
+        for (const i of offen) {
+          const anteil = (specs[i]!.massKg / basis) * zuVerteilen;
+          const neu2 = Math.min(anteil, grenze(i));
+          gewicht.set(i, neu2);
+          rest += anteil - neu2;
+        }
+      }
+      // Was die Flaeche wirklich traegt, ist die Wahrheit — die Waage sagt es
+      // ohnehin, und der Kunde soll an der Waage nicht mehr versprechen.
+      (c as { massKg: number }).massKg = Math.round(
+        draufIdx.reduce((a2, i) => a2 + gewicht.get(i)!, 0)
+      );
+    }
+
+    specs.forEach((sp, i) => {
+      const platz = plaetze[i];
+      if (!platz) return;
+      sp.massKg = Math.max(1, Math.round(gewicht.get(i) ?? sp.massKg));
+      const local = new THREE.Vector3(
+        platz.x,
+        LADE_BODEN + platz.y + stuecke[i].hoehe / 2,
+        LADE_RAND + platz.z
+      );
+      this.bedGroup.localToWorld(local);
+      const it = items.spawnScrap(sp.materialId, sp.massKg, sp.shape, local, bedQuat);
+      // Das Setzen soll niemand sehen: erst wenn die Ladung ruhig liegt,
+      // taucht der LKW fertig beladen auf.
+      it.mesh.visible = false;
+      this.cargo.items.push(it);
+    });
+  }
+
+  /**
+   * Masse, die tatsächlich AUF der Ladefläche liegt — das wiegt die Brückenwaage.
+   * Abgekippter Schrott neben dem Fahrzeug darf nicht mitzählen, sonst fiele
+   * das Nettogewicht zu niedrig aus.
+   */
+  cargoMassKg(): number {
+    let sum = 0;
+    const local = new THREE.Vector3();
+    const onBed = (b: RAPIER.RigidBody, extra = 0): boolean => {
+      if (!b.isValid()) return false;
+      const p = b.translation();
+      local.set(p.x, p.y, p.z);
+      this.bedGroup.worldToLocal(local);
+      return (
+        Math.abs(local.x) < BED_HALF_W + 0.5 + extra &&
+        local.z > -0.5 - extra &&
+        local.z < this.bedLen + 0.5 + extra &&
+        local.y > -0.4 &&
+        local.y < 5.0 // hoch aufgetürmte Ladung zählt mit
+      );
+    };
+    for (const it of this.cargo.items) {
+      if (onBed(it.body)) sum += it.massKg;
+    }
+    if (this.cargo.car && onBed(this.cargo.car.body, 0.6)) sum += 950;
+    return sum;
+  }
+
+  /** Chassis + Ladefläche + Bordwände — Hindernisse für den Baggerarm. */
+  collectBodyHandles(out: Set<number>): void {
+    out.add(this.chassisBody.handle);
+    out.add(this.bedBody.handle);
+    for (const w of this.sideWalls) out.add(w.body.handle);
+  }
+
+  /** Abfahrt des Abhol-LKW freigeben (Taste V). */
+  requestRelease(): void {
+    this.releaseRequested = true;
+  }
+
+  get waitingForLoad(): boolean {
+    return this.phase === "waitLoad";
+  }
+
+  get phaseName(): string {
+    return this.phase;
+  }
+
+  /** Teile, die im Container auf der Ladefläche liegen (Abhol-LKW). */
+  containedItems(items: ItemManager): ScrapItem[] {
+    if (!this.isPickup) return [];
+    const local = new THREE.Vector3();
+    const out: ScrapItem[] = [];
+    for (const it of items.items) {
+      if (!it.body.isValid()) continue;
+      const p = it.body.translation();
+      local.set(p.x, p.y, p.z);
+      this.bedGroup.worldToLocal(local);
+      if (
+        Math.abs(local.x) < BED_HALF_W + 0.25 &&
+        local.z > -0.3 &&
+        local.z < this.bedLen + 0.3 &&
+        local.y > -0.4 &&
+        local.y < 2.6
+      ) {
+        out.push(it);
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Alles, was noch auf der Ladefläche liegt, für die Fahrt verriegeln.
+   *
+   * Ohne das verlor der Abhol-LKW seine Ladung, sobald er anfuhr: Die Fläche
+   * ist kinematisch, die Teile darauf sind dynamisch — der Wagen fährt unter
+   * ihnen weg, und sie bleiben auf dem Hof liegen (Befund 11.09.2026). Beim
+   * Anlieferer gilt dasselbe für Reste, die nicht abgeladen wurden; die
+   * fahren mit und zählen bei der Ausfahrtswiegung als Tara.
+   */
+  verriegeleLadeflaeche(): void {
+    const quelle = this.itemQuelle;
+    if (!quelle) return;
+    const schon = new Set(this.riding.map((r) => r.body.handle));
+    const local = new THREE.Vector3();
+    for (const it of quelle.items) {
+      if (!it.body.isValid() || schon.has(it.body.handle)) continue;
+      const p = it.body.translation();
+      local.set(p.x, p.y, p.z);
+      this.bedGroup.worldToLocal(local);
+      if (
+        Math.abs(local.x) < BED_HALF_W + 0.35 &&
+        local.z > -0.4 &&
+        local.z < this.bedLen + 0.4 &&
+        local.y > -0.4 &&
+        local.y < 3.0
+      ) {
+        this.lockToBed(it.body);
+      }
+    }
+    this.cargoReleased = false;
+  }
+
+  /** Ladung liegt ruhig? Erst dann wird für die Fahrt verriegelt. */
+  private cargoAtRest(): boolean {
+    for (const it of this.cargo.items) {
+      if (!it.body.isValid()) continue;
+      const v = it.body.linvel();
+      if (Math.hypot(v.x, v.y, v.z) > 0.9) return false;
+    }
+    return true;
+  }
+
+  /** Nach dem Setzen: alles für die Fahrt an die Mulde koppeln. */
+  private lockAllCargo(): void {
+    if (this.cargo.car) this.lockToBed(this.cargo.car.body);
+    for (const it of this.cargo.items) {
+      this.lockToBed(it.body);
+      it.mesh.visible = true; // jetzt liegt sie sauber — ab hier sichtbar
+    }
+  }
+
+  private lockToBed(body: RAPIER.RigidBody): void {
+    const p = body.translation();
+    const q = body.rotation();
+    const worldPos = new THREE.Vector3(p.x, p.y, p.z);
+    const localPos = this.bedGroup.worldToLocal(worldPos.clone());
+    const bedQuat = new THREE.Quaternion();
+    this.bedGroup.getWorldQuaternion(bedQuat);
+    const localQuat = bedQuat.clone().invert().multiply(new THREE.Quaternion(q.x, q.y, q.z, q.w));
+    body.setBodyType(RAPIER.RigidBodyType.KinematicPositionBased, false);
+    this.riding.push({ body, localPos, localQuat });
+  }
+
+  /** Ladung physisch freigeben (Kipper: beim Anheben; Pritsche: bei Ankunft). */
+  private releaseCargo(): void {
+    if (this.cargoReleased) return;
+    this.cargoReleased = true;
+    for (const r of this.riding) {
+      if (r.body.isValid()) r.body.setBodyType(RAPIER.RigidBodyType.Dynamic, true);
+    }
+    this.riding = [];
+  }
+
+  /**
+   * true, wenn alle Ladungsteile von der Fläche herunter sind (>4 m vom Fahrzeug).
+   * Bereits entfernte Körper (verkauft/gepresst) zählen als abgeladen — ihre
+   * translation() abzufragen würde die Physik-Engine zum Absturz bringen.
+   */
+  /**
+   * Ist die Ladeflaeche leer?
+   *
+   * Vorher galt der LKW erst als entladen, wenn JEDES Ladungsteil mehr als 4 m
+   * vom Fahrzeug entfernt lag. Wer den Schrott gleich neben dem LKW ablegte —
+   * und das tut man, der Haufen ist ja da —, sperrte ihn damit fest: Der
+   * Fahrer wartete auf etwas, das laengst nicht mehr auf seiner Flaeche lag.
+   * Genau das war "der LKW sieht leer aus und faehrt trotzdem nicht".
+   *
+   * Massgeblich ist jetzt, was auf der Flaeche liegt, nicht was daneben liegt.
+   * Ein Rest von 20 kg bleibt zulaessig — ein einzelnes verklemmtes Blech soll
+   * den Betrieb nicht anhalten.
+   */
+  private isUnloaded(): boolean {
+    return this.cargoMassKg() <= 20;
+  }
+
+  private placeAt(route: Array<[number, number]>, s: number, reverse = false): void {
+    // Punkt + Richtung entlang der Polylinie bei Bogenlänge s
+    let rest = s;
+    for (let i = 0; i < route.length - 1; i++) {
+      const [ax, az] = route[i];
+      const [bx, bz] = route[i + 1];
+      const segLen = Math.hypot(bx - ax, bz - az);
+      if (rest <= segLen || i === route.length - 2) {
+        const t = Math.min(rest / segLen, 1);
+        const x = ax + (bx - ax) * t;
+        const z = az + (bz - az) * t;
+        this.group.position.set(x, 0, z);
+        // Kabine (+Z) zeigt in Fahrtrichtung — rückwärts: Heck voran
+        this.group.rotation.y = Math.atan2(bx - ax, bz - az) + (reverse ? Math.PI : 0);
+        return;
+      }
+      rest -= segLen;
+    }
+  }
+
+  private routeLength(route: Array<[number, number]>): number {
+    let len = 0;
+    for (let i = 0; i < route.length - 1; i++) {
+      len += Math.hypot(route[i + 1][0] - route[i][0], route[i + 1][1] - route[i][1]);
+    }
+    return len;
+  }
+
+  /**
+   * Steht der Bagger (oder etwas anderes Blockierendes) auf dem nächsten
+   * Streckenabschnitt? Dann hält der Fahrer an und hupt — er fährt nie hindurch.
+   */
+  /**
+   * Steht ein festes Bauwerk im Weg? Das gilt immer — anders als loser Schrott
+   * laesst es sich nicht wegraeumen, und hindurchfahren darf niemand.
+   */
+  private isBlockedByBuilding(
+    route: Array<[number, number]>,
+    aheadS: number,
+    reverse: boolean
+  ): boolean {
+    const ax = this.group.position.x;
+    const az = this.group.position.z;
+    const probe = this.probePoint(route, aheadS, reverse);
+    for (let t = 0.3; t <= 1.001; t += 0.235) {
+      if (hitsObstacle(ax + (probe.x - ax) * t, az + (probe.z - az) * t, 1.4)) return true;
+    }
+    return false;
+  }
+
+  private isBlocked(route: Array<[number, number]>, aheadS: number, reverse: boolean): boolean {
+    if (!this.getBlocker) return false;
+    const ax = this.group.position.x;
+    const az = this.group.position.z;
+    const probe = this.probePoint(route, aheadS, reverse);
+    const bx = probe.x;
+    const bz = probe.z;
+    // Strecke abtasten: Bagger ODER liegender Schrott stoppen den Fahrer.
+    // Die eigene (verlorene) Ladung zählt nicht — sonst blockiert sich der
+    // Fahrer selbst und käme nie vom Platz.
+    const own = new Set<number>();
+    for (const it of this.cargo.items) {
+      if (it.body.isValid()) own.add(it.body.handle);
+    }
+    for (let t = 0.3; t <= 1.001; t += 0.235) {
+      if (this.getBlocker(ax + (bx - ax) * t, az + (bz - az) * t, BLOCK_RADIUS, own)) return true;
+    }
+    return false;
+  }
+
+  private probeVec = new THREE.Vector3();
+
+  /** Position, die das Fahrzeug bei Bogenlänge s einnehmen würde (ohne zu setzen). */
+  private probePoint(route: Array<[number, number]>, s: number, reverse: boolean): THREE.Vector3 {
+    const saveP = this.group.position.clone();
+    const saveR = this.group.rotation.y;
+    this.placeAt(route, s, reverse);
+    this.probeVec.copy(this.group.position);
+    this.group.position.copy(saveP);
+    this.group.rotation.y = saveR;
+    return this.probeVec;
+  }
+
+  /** Steht es gerade zur Kontrolle auf der Waage? (siehe VehicleManager) */
+  get aufDerWaage(): boolean {
+    if (this.phase === "weighIn") return true;
+    return this.isPickup && this.wiegeHaltS > 0;
+  }
+
+  /** Fahrschritt mit Blockade-Prüfung; liefert true, wenn tatsächlich gefahren wurde. */
+  private advance(route: Array<[number, number]>, step: number, reverse: boolean, dt: number): boolean {
+    // Bauten zuerst und ohne Ausnahme: Die Aufgeben-Regel unten ist fuer losen
+    // Schrott gedacht, der irgendwann weggeraeumt wird. Auf Mauern, Mulden und
+    // das Betriebsgebaeude darf sie nicht durchschlagen — sonst faehrt der LKW
+    // nach der Wartezeit einfach hindurch, und genau das war zu sehen.
+    if (this.isBlockedByBuilding(route, this.routeS + 4, reverse)) {
+      this.blockedT += dt;
+      if (this.blockedT > HONK_AFTER_S && !this.honked) {
+        this.honked = true;
+        this.onHonk?.();
+      }
+      return false;
+    }
+    // Sicherheitsabstand: 4 m vorausschauen (Heck bzw. Front)
+    if (!this.gaveUpWaiting && this.isBlocked(route, this.routeS + 4, reverse)) {
+      this.blockedT += dt;
+      if (this.blockedT > HONK_AFTER_S && !this.honked) {
+        this.honked = true;
+        this.onHonk?.();
+      }
+      // Nach langer Blockade fährt der Fahrer vorsichtig weiter — sonst würde
+      // ein liegen gebliebenes Teil das Fahrzeug für immer festsetzen.
+      if (this.blockedT > BLOCK_GIVEUP_S) this.gaveUpWaiting = true;
+      return false;
+    }
+    if (!this.gaveUpWaiting) {
+      this.blockedT = 0;
+      this.honked = false;
+    }
+    this.routeS += step;
+    this.placeAt(route, this.routeS, reverse);
+    return true;
+  }
+
+  update(dt: number): void {
+    this.phaseT += dt;
+    switch (this.phase) {
+      case "settleCargo":
+        // warten, bis sich der Ladungsberg gesetzt hat (max. 4 s)
+        if (this.isPickup || (this.phaseT > 1.2 && this.cargoAtRest()) || this.phaseT > 4) {
+          this.lockAllCargo();
+          this.phase = "in";
+          this.phaseT = 0;
+        }
+        break;
+      case "in":
+        this.advance(this.routeIn, SPEED * dt, false, dt);
+        if (this.routeS >= this.routeLength(this.routeIn)) {
+          // Anlieferer stehen jetzt auf der Brückenwaage; der Abholer kommt
+          // leer und faehrt durch. Fuer ihn steht hier fest, wo er haelt —
+          // sonst nirgends: Er ueberspringt `weighIn`, und genau darum stand
+          // er lange auf dem Vorgabewert und damit 9,9 m vom Bagger weg
+          // (gemessen 12.09.2026), statt an der gerechneten Stelle.
+          if (this.isPickup) this.legeAbladestelleFest();
+          this.phase = this.isPickup ? "approach" : "weighIn";
+          this.phaseT = 0;
+          this.routeS = 0;
+        }
+        break;
+      case "weighIn":
+        // Der Fahrer gibt Mario an der Waage die Papiere — das dauert einen
+        // Moment. Danach wird über den Preis geredet, und erst wenn man sich
+        // einig ist, fährt er auf den Platz. Solange bleibt er auf der Waage
+        // stehen (Design 02.09.2026).
+        if (this.phaseT > 2.5 && !this.weighedIn) {
+          this.weighedIn = true;
+          this.bruttoKg = this.cargoMassKg();
+          this.onWeighIn?.(this.bruttoKg); // kann awaitingDeal setzen
+        }
+        // Notausstieg: Bleibt die Antwort aus — weil der Spieler das Fenster
+        // übersieht oder wegklickt —, fährt der Fahrer nach einer halben
+        // Minute zum Marktpreis weiter. Ein wartender LKW darf den Betrieb
+        // nicht dauerhaft anhalten (Design-Fix 02.09.2026).
+        if (this.awaitingDeal && this.phaseT > 32) {
+          this.awaitingDeal = false;
+          this.onDealTimeout?.();
+        }
+        if (this.weighedIn && !this.awaitingDeal) {
+          // Jetzt, kurz vor dem Losfahren, steht fest, wo der Bagger ist —
+          // und damit, wo dieser Wagen abkippt.
+          if (!this.isSelfTipping) this.legeAbladestelleFest();
+          this.phase = "approach";
+          this.phaseT = 0;
+          this.routeS = 0;
+        }
+        break;
+      case "approach": {
+        const r = this.routeApproach;
+        this.advance(r, SPEED * dt, false, dt);
+        if (this.routeS >= this.routeLength(r)) {
+          this.phase = "shiftPause";
+          this.phaseT = 0;
+          this.routeS = 0;
+        }
+        break;
+      }
+      case "shiftPause":
+        if (this.phaseT > 0.5) {
+          this.phase = "reverseIn";
+          this.phaseT = 0;
+        }
+        break;
+      case "reverseIn":
+        this.advance(this.routeRev, SPEED * 0.6 * dt, true, dt); // rückwärts langsamer (SW)
+        if (this.routeS >= this.routeLength(this.routeRev)) {
+          this.phase = "pauseBeforeUnload";
+          this.phaseT = 0;
+        }
+        break;
+      case "pauseBeforeUnload":
+        // Pritschen klappen die Bordwände auf — der Schrott darf herunter.
+        // Kipper braucht das nicht (er kippt), der Container bleibt zu.
+        if (this.kind === "pritsche" || this.kind === "wrack") this.sideOpenTarget = 1;
+        if (!this.isPickup) this.releaseCargo();
+        if (this.phaseT > 1.2) {
+          this.phase = this.isPickup ? "waitLoad" : this.kind === "kipper" ? "tipping" : "waitUnload";
+          this.phaseT = 0;
+          this.routeS = 0;
+        }
+        break;
+      case "nudging": {
+        this.advance(this.routeOut, SPEED * 0.45 * dt, false, dt);
+        // am Ziel oder am Ende der Route: wieder anhalten und weitermachen
+        if (this.routeS >= this.nudgeTargetS || this.routeS >= this.routeLength(this.routeOut)) {
+          this.phase = this.nudgeReturn;
+          this.phaseT = 0;
+        }
+        break;
+      }
+      case "waitLoad":
+        // Abhol-LKW wartet, bis der Spieler den Container beladen hat und
+        // die Abfahrt freigibt (Taste V) — oder bis die Standzeit abläuft.
+        if (this.releaseRequested || this.phaseT > 240) {
+          this.justDeparted = true; // Container wird jetzt abgerechnet
+          this.verriegeleLadeflaeche();
+          this.phase = "out";
+          this.routeS = 0;
+        }
+        break;
+      case "tipping":
+        this.tip = Math.min(this.tip + dt / 4.2, 1);
+        if (this.tip >= 1) {
+          this.phase = "tipHold";
+          this.phaseT = 0;
+        }
+        break;
+      case "tipHold":
+        if (this.phaseT > 2.2) {
+          this.phase = "tipCreep";
+          this.creepLeft = TIP_CREEP_M;
+        }
+        break;
+      case "tipCreep": {
+        // Gekippt ein Stueck geradeaus ziehen, bevor die Mulde sinkt (v2-Vorbild).
+        // Senkt der LKW im Stand, bleibt Schrott auf der Flaeche liegen, sobald
+        // unten schon etwas im Weg ist — der Haufen wird ja mit jeder Fuhre
+        // hoeher. Zieht er gekippt weg, rutscht der Rest ueber die Kante nach.
+        const schritt = Math.min(TIP_CREEP_SPEED * dt, this.creepLeft);
+        this.group.position.x += Math.sin(this.group.rotation.y) * schritt;
+        this.group.position.z += Math.cos(this.group.rotation.y) * schritt;
+        this.creepLeft -= schritt;
+        this.snapBodiesToPose();
+        if (this.creepLeft <= 1e-6) {
+          // Die Mulde sinkt jetzt waehrend der Abfahrt weiter, nicht im Stand
+          this.senken = true;
+          this.leaveUnloadingBay();
+        }
+        break;
+      }
+      case "tipBack":
+        this.tip = Math.max(this.tip - dt / 1.5, 0);
+        if (this.tip <= 0) this.leaveUnloadingBay();
+        break;
+      case "waitUnload":
+        if (this.phaseT > 1 && this.isUnloaded()) this.leaveUnloadingBay();
+        break;
+      case "toPark": {
+        /*
+         * Zum Warteplatz rollen — aber nicht bis an die Wand: Der Fahrer
+         * haelt davor, dreht sich und setzt dann rueckwaerts an die
+         * Graffitiwand neben den Kaffeewagen (Wunsch 11.09.2026). Niemand
+         * stellt sich mit der Schnauze an die Mauer.
+         */
+        this.sideOpenTarget = 0;
+        const ziel = this.parkSpot!;
+        const dx = ziel[0] - this.group.position.x;
+        const dz = ziel[1] - PARK_ANFAHRT_M - this.group.position.z;
+        const d = Math.hypot(dx, dz);
+        if (d < 0.6) {
+          this.phase = "parkRueck";
+          this.phaseT = 0;
+          break;
+        }
+        const schritt = Math.min(SPEED * dt, d);
+        this.group.position.x += (dx / d) * schritt;
+        this.group.position.z += (dz / d) * schritt;
+        this.group.rotation.y = Math.atan2(dx, dz);
+        this.snapBodiesToPose();
+        break;
+      }
+      case "parkRueck": {
+        // Rueckwaerts an die Wand, dabei in die Laengsrichtung eindrehen.
+        const ziel = this.parkSpot!;
+        const dx = ziel[0] - this.group.position.x;
+        const dz = ziel[1] - this.group.position.z;
+        const d = Math.hypot(dx, dz);
+        if (d < 0.4) {
+          this.group.rotation.y = Math.PI; // Front zum Platz, Heck zur Wand
+          this.phase = "parked";
+          this.phaseT = 0;
+          this.snapBodiesToPose();
+          break;
+        }
+        const schritt = Math.min(PARK_RUECK_SPEED * dt, d);
+        this.group.position.x += (dx / d) * schritt;
+        this.group.position.z += (dz / d) * schritt;
+        // Die Front zeigt beim Zurueckstossen nach Sueden; sie dreht sich
+        // waehrend der Fahrt dorthin ein, statt zu springen.
+        const soll = Math.PI;
+        let diff = soll - this.group.rotation.y;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        this.group.rotation.y += diff * Math.min(dt * 1.6, 1);
+        this.snapBodiesToPose();
+        break;
+      }
+      case "parked":
+        // Kaffeepause: Der Fahrer steigt aus und geht zu Janine hinueber.
+        // Einmal pro Pause. Ohne diese Sperre stieg er sofort wieder aus,
+        // sobald er drin war, und der LKW fuhr nie los.
+        if (this.fahrerState === "drin" && !this.kaffeeGehabt && this.phaseT > 1.2) {
+          this.steigeAus();
+        }
+        // Rechtzeitig zurueck, sonst faehrt der LKW ohne ihn los
+        if (this.fahrerState === "kaffee" && this.phaseT > this.parkSeconds - 12) {
+          this.fahrerState = "rein";
+        }
+        if (this.phaseT > this.parkSeconds && this.fahrerState === "drin") {
+          this.phase = "out";
+          this.routeS = this.nearestS(this.routeOut);
+        }
+        break;
+      case "out":
+        this.sideOpenTarget = 0; // Bordwände zu, bevor es vom Platz geht
+        // Abholer halten auf der Waage, solange Mario die Ladung ansieht
+        if (this.wiegeHaltS > 0) {
+          this.wiegeHaltS -= dt;
+          break;
+        }
+        this.advance(this.routeOut, SPEED * dt, false, dt);
+        if (!this.weighedOut && this.group.position.z >= WEIGH_Z) {
+          this.weighedOut = true;
+          if (this.isPickup) {
+            // Voll vom Hof: kurz stehen bleiben, damit die Ladung geprüft wird
+            this.wiegeHaltS = WIEGE_HALT_S;
+          } else {
+            // Ausfahrtswiegung: leer über die Brückenwaage → Netto steht fest
+            const tara = this.cargoMassKg();
+            this.onWeighOut?.(Math.max(this.bruttoKg - tara, 0));
+          }
+        }
+        if (this.routeS >= this.routeLength(this.routeOut)) this.done = true;
+        break;
+    }
+
+    this.updateTrailer(dt);
+    this.updateFahrer(dt);
+
+    // Ladekran: beim Andocken zur Seite schwenken, damit der Ausleger nicht ueber
+    // der Ladeflaeche haengt und dem Baggerfahrer die Sicht und den Weg nimmt.
+    if (this.crane) {
+      const amPlatz =
+        this.phase === "pauseBeforeUnload" ||
+        this.phase === "waitUnload" ||
+        this.phase === "waitLoad" ||
+        this.phase === "tipping" ||
+        this.phase === "tipHold";
+      const ziel = amPlatz ? this.craneSide * CRANE_SWING : 0;
+      // Langsam: ein Kran schwenkt nicht, er dreht sich gemaechlich
+      this.craneSwing += THREE.MathUtils.clamp(ziel - this.craneSwing, -dt * 0.5, dt * 0.5);
+      this.crane.rotation.y = this.craneSwing;
+    }
+
+    // Nach dem gekippten Anziehen sinkt die Mulde waehrend der Abfahrt, nicht im
+    // Stand — der LKW haelt den Betrieb nicht auf, und der Rest rutscht unterwegs
+    // noch nach.
+    if (this.senken) {
+      this.tip = Math.max(this.tip - dt / 2.4, 0);
+      if (this.tip <= 0) this.senken = false;
+    }
+
+    // Kippwinkel: Fläche hebt sich vorn (Kabinenseite), Ladung rutscht hinten ab
+    this.bedGroup.rotation.x = -this.tip * TIP_ANGLE;
+
+    // Bordwände auf-/zuklappen
+    const openStep = dt / 1.6; // ~1,6 s für den vollen Weg (SW)
+    this.sideOpen += THREE.MathUtils.clamp(this.sideOpenTarget - this.sideOpen, -openStep, openStep);
+    // Klappen hängen im geöffneten Zustand senkrecht nach unten (90°)
+    for (const w of this.sideWalls) {
+      w.hinge.rotation.z = -w.dir * this.sideOpen * (Math.PI / 2);
+    }
+    if (this.tailGate) this.tailGate.hinge.rotation.x = this.sideOpen * (Math.PI / 2);
+
+    // Kinematische Körper nachführen
+    this.group.updateWorldMatrix(true, true);
+    const cq = new THREE.Quaternion();
+    this.group.getWorldQuaternion(cq);
+    this.chassisBody.setNextKinematicTranslation(this.group.position);
+    this.chassisBody.setNextKinematicRotation({ x: cq.x, y: cq.y, z: cq.z, w: cq.w });
+    const bp = new THREE.Vector3();
+    const bq = new THREE.Quaternion();
+    this.bedGroup.getWorldPosition(bp);
+    this.bedGroup.getWorldQuaternion(bq);
+    this.bedBody.setNextKinematicTranslation({ x: bp.x, y: bp.y, z: bp.z });
+    this.bedBody.setNextKinematicRotation({ x: bq.x, y: bq.y, z: bq.z, w: bq.w });
+
+    // Bordwand- und Heckklappen-Kollider nachführen
+    const flaps = this.tailGate ? [...this.sideWalls, this.tailGate] : this.sideWalls;
+    for (const w of flaps) {
+      w.mesh.updateWorldMatrix(true, false);
+      w.mesh.getWorldPosition(bp);
+      w.mesh.getWorldQuaternion(bq);
+      w.body.setNextKinematicTranslation({ x: bp.x, y: bp.y, z: bp.z });
+      w.body.setNextKinematicRotation({ x: bq.x, y: bq.y, z: bq.z, w: bq.w });
+    }
+
+    // mitfahrende Ladung nachführen
+    if (this.riding.length > 0) {
+      const wp = new THREE.Vector3();
+      for (const r of this.riding) {
+        if (!r.body.isValid()) continue;
+        wp.copy(r.localPos);
+        this.bedGroup.localToWorld(wp);
+        const wq = bq.clone().multiply(r.localQuat);
+        r.body.setNextKinematicTranslation({ x: wp.x, y: wp.y, z: wp.z });
+        r.body.setNextKinematicRotation({ x: wq.x, y: wq.y, z: wq.z, w: wq.w });
+      }
+    }
+  }
+
+  despawn(): void {
+    for (const w of this.sideWalls) this.world.removeRigidBody(w.body);
+    this.sideWalls = [];
+    // Was noch auf der Ladeflaeche klemmt, stellt der Fahrer beim Wegfahren ab —
+    // sonst fuehre er Material vom Platz und es waere fuer den Spieler weg.
+    //
+    // Frueher landete es auf einem FESTEN Punkt am Abladeplatz, in 0,6 bis 1,6 m
+    // Hoehe. Wer gerade woanders arbeitete, sah dort unvermittelt Schrott vom
+    // Himmel fallen — ohne Fahrzeug, ohne Zusammenhang. Jetzt wird nur abgesetzt,
+    // was wirklich auf der Flaeche liegt, und zwar dicht neben dem Fahrzeug auf
+    // dem Boden: Das liest sich als Abladen, nicht als Regen.
+    const gp = this.group.position;
+    const quer = { x: Math.cos(this.group.rotation.y), z: -Math.sin(this.group.rotation.y) };
+    const local = new THREE.Vector3();
+    let k = 0;
+    for (const it of this.cargo.items) {
+      if (!it.body.isValid()) continue;
+      const p = it.body.translation();
+      local.set(p.x, p.y, p.z);
+      this.bedGroup.worldToLocal(local);
+      const aufDerFlaeche =
+        Math.abs(local.x) < BED_HALF_W + 0.5 &&
+        local.z > -0.5 &&
+        local.z < this.bedLen + 0.5 &&
+        local.y > -0.4 &&
+        local.y < 5.0;
+      if (!aufDerFlaeche) continue; // liegt schon auf dem Platz — nicht anfassen
+      // Seitlich neben das Fahrzeug, knapp ueber dem Boden
+      const seite = 3.2 + (k % 3) * 0.9;
+      it.body.setTranslation(
+        { x: gp.x + quer.x * seite, y: 0.35, z: gp.z + quer.z * seite },
+        true
+      );
+      it.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      it.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      k++;
+    }
+    this.group.removeFromParent();
+    this.world.removeRigidBody(this.chassisBody);
+    this.world.removeRigidBody(this.bedBody);
+  }
+}
+
+export class VehicleManager {
+  private active: DeliveryVehicle | null = null;
+  /**
+   * Fahrzeuge, die abgeladen haben und auf dem Warteplatz stehen. Sie
+   * blockieren den Abladeplatz nicht mehr, sind aber weiter auf dem Hof —
+   * so ist immer Betrieb, statt dass der Platz zwischen zwei Fuhren
+   * leersteht (Wunsch 02.09.2026).
+   */
+  private parked: DeliveryVehicle[] = [];
+  private nextSpawnT = FIRST_DELAY_S;
+  private t = 0;
+  /** Anlieferungs-Zähler (für Tests/Statistik) */
+  deliveries = 0;
+  /**
+   * Während der Sortierphase macht die Einfahrt zu — es kommt kein Anlieferer
+   * mehr, bis der Platz wieder aufgeräumt ist. Abholer ruft der Spieler
+   * weiterhin selbst.
+   */
+  acceptDeliveries = true;
+  /**
+   * Faktor auf die Wartezeit bis zur nächsten Fuhre. Ein voller Platz
+   * bekommt etwas Luft, ein leerer Nachschub im Minutentakt.
+   */
+  intervalFactor = 1;
+
+  /** Baggerposition für die Blockade-Prüfung; von main gesetzt. */
+  getExcavatorPos: (() => THREE.Vector3) | null = null;
+  /** Hupe, wenn etwas zu lange im Weg steht. */
+  onHonk: (() => void) | null = null;
+  onWeighIn: ((kg: number) => void) | null = null;
+  onWeighOut: ((netKg: number) => void) | null = null;
+  /** Abhol-LKW fährt los → Containerinhalt abrechnen */
+  onPickupDepart: ((truck: DeliveryVehicle) => void) | null = null;
+
+  constructor(
+    private scene: THREE.Scene,
+    private world: RAPIER.World,
+    private items: ItemManager,
+    private composites: CompositeManager
+  ) {}
+
+  /**
+   * Steht an (x,z) etwas im Weg? Der Bagger blockiert, und ebenso am Boden
+   * liegender Schrott ab 25 kg — LKW fahren nicht darüber hinweg.
+   */
+  private blockedAt = (x: number, z: number, r: number, ignore: Set<number>): boolean => {
+    // Feste Bauten pruefen NICHT mehr hier: Sie haengen an isBlockedByBuilding,
+    // damit die Aufgeben-Regel nicht auf sie durchschlaegt.
+    const ex = this.getExcavatorPos?.();
+    if (ex && Math.hypot(ex.x - x, ex.z - z) < r) return true;
+    // In den Arbeitszonen (Abkipp-/Verladeplatz) darf Schrott liegen — dorthin
+    // muss das Fahrzeug ja gerade hin.
+    for (const [zx, zz, zr] of WORK_ZONES) {
+      if (Math.hypot(zx - x, zz - z) < zr) return false;
+    }
+    for (const it of this.items.items) {
+      // Nur wirklich sperrige Brocken halten einen LKW auf. Vorher blockierte
+      // schon jedes 25-kg-Teil, wodurch die Fahrspur nach dem Abkippen fast
+      // immer als versperrt galt — kleineres Zeug wird jetzt überrollt.
+      if (it.massKg < BLOCKING_MASS_KG || !it.body.isDynamic()) continue;
+      if (ignore.has(it.body.handle)) continue; // eigene Ladung
+      const p = it.body.translation();
+      if (p.y > 1.3) continue; // auf einer Ladefläche, nicht auf dem Fahrweg
+      if (Math.hypot(p.x - x, p.z - z) < r * 0.5) return true;
+    }
+    return false;
+  };
+
+  /** Sofort ein Fahrzeug schicken (Tests, Tutorial). */
+  /** Meldung, wenn ein Kunde eintrifft — für Begrüßung und HUD. */
+  onCustomerArrived: ((c: CustomerProfile) => void) | null = null;
+
+  spawnNow(kind?: DeliveryKind, kunde?: CustomerProfile): void {
+    if (this.active) return;
+    // Erst die Kundschaft, dann das Fahrzeug dazu: ein Privatmann kommt nicht
+    // mit dem Sattelzug, und ein Abbruchbetrieb nicht mit dem PKW-Anhänger.
+    // Zweimal zu würfeln hätte Fahrzeug und Kunde entkoppelt.
+    const gezogen = kunde ?? rollCustomer();
+    const k: DeliveryKind =
+      kind ?? vehicleForCustomer(gezogen);
+    const c = k === "abholer" ? null : gezogen;
+    this.active = new DeliveryVehicle(
+      k,
+      this.scene,
+      this.world,
+      this.blockedAt,
+      () => this.onHonk?.(),
+      (kg) => this.onWeighIn?.(kg),
+      (kg) => this.onWeighOut?.(kg),
+      c
+    );
+    this.active.itemQuelle = this.items;
+    if (c) this.onCustomerArrived?.(c);
+    // Händler bleiben gern noch auf einen Kaffee; Gewerbe hat es eilig.
+    // Nur freie Plätze vergeben, sonst stünde einer im anderen.
+    if (c && c.group !== "gewerbe" && Math.random() < (c.group === "haendler" ? 0.75 : 0.35)) {
+      const frei = PARK_SLOTS.filter(
+        (p) => !this.parked.some((v) => v.parkSpot?.[0] === p[0] && v.parkSpot?.[1] === p[1])
+      );
+      if (frei.length > 0) {
+        this.active.parkSpot = frei[Math.floor(Math.random() * frei.length)];
+        this.active.parkSeconds =
+          PARK_TIME_S[0] + Math.random() * (PARK_TIME_S[1] - PARK_TIME_S[0]);
+      }
+    }
+    this.active.loadCargo(this.items, this.composites);
+    if (k !== "abholer") this.deliveries++;
+  }
+
+  /** Abholung anfordern bzw. wartenden Abhol-LKW abfahren lassen. */
+  /**
+   * Fraktion, für die der Abholer bestellt wurde (null = gemischte Ladung).
+   * Danach richtet sich die Abrechnung: Wer Alu bestellt und Alu lädt,
+   * bekommt den vollen Preis.
+   */
+  pickupOrder: string | null = null;
+
+  /**
+   * Eine bestellte Abholung, die noch nicht fahren konnte.
+   *
+   * `null` heisst: nichts vorgemerkt. Sonst steht hier die bestellte Fraktion
+   * (die ihrerseits `null` sein darf, wenn gemischt geladen wird) — darum das
+   * Objekt drumherum statt eines blanken Strings.
+   */
+  private vorgemerkt: { order: string | null } | null = null;
+
+  /** Ist eine Abholung vorgemerkt? Fuer HUD und Tests. */
+  get abholungVorgemerkt(): boolean {
+    return this.vorgemerkt !== null;
+  }
+
+  /**
+   * Abholung anfordern bzw. wartenden Abhol-LKW abfahren lassen.
+   *
+   * Die Abholung hat Vorrang (Ansage 12.09.2026: „Abholung soll Vorrang
+   * bekommen“). Frueher fiel eine Bestellung ersatzlos aus, solange noch ein
+   * Anlieferer auf dem Hof war — man drueckte V, bekam „erst muss das Fahrzeug
+   * fertig werden“ und musste sich selbst merken, es spaeter nochmal zu
+   * versuchen. Jetzt wird sie vorgemerkt und faehrt als naechstes los, ohne die
+   * uebliche Wartezeit und noch vor jedem weiteren Anlieferer.
+   *
+   * Den laufenden Anlieferer schickt sie nicht weg. Der steht mit bezahlter
+   * Ladung auf dem Platz; ihn abzuwuergen waere kein Vorrang, sondern ein
+   * Verlust.
+   */
+  requestPickup(order?: string | null): "gerufen" | "abgefahren" | "vorgemerkt" {
+    if (this.active) {
+      if (this.active.kind === "abholer" && this.active.waitingForLoad) {
+        this.active.requestRelease();
+        return "abgefahren";
+      }
+      this.vorgemerkt = { order: order ?? null };
+      return "vorgemerkt";
+    }
+    this.pickupOrder = order ?? null;
+    this.spawnNow("abholer");
+    return "gerufen";
+  }
+
+  /**
+   * Alle Fahrzeuge sofort vom Hof nehmen.
+   *
+   * Gebraucht beim harten Szenenwechsel — Spielstand laden, Schicht neu
+   * beginnen —, wo ein halb abgeladener LKW aus dem alten Zustand stehen
+   * bliebe. Eine vorgemerkte Abholung bleibt bestehen: Die hat der Spieler
+   * bestellt, und sie gehoert nicht zum Fuhrpark, sondern zu seinem Auftrag.
+   */
+  raeumePlatz(): void {
+    this.active?.despawn();
+    this.active = null;
+    for (const v of this.parked) v.despawn();
+    this.parked.length = 0;
+    this.t = 0;
+    this.nextSpawnT = FIRST_DELAY_S;
+  }
+
+  /** Position des Fahrzeugs, solange es auf dem Platz rangiert/ablädt (für den Platzwart). */
+  maneuveringTruck(): THREE.Vector3 | null {
+    if (!this.active) return null;
+    const p = this.active.phaseName;
+    if (p === "reverseIn" || p === "shiftPause" || p === "pauseBeforeUnload" || p === "tipping") {
+      return this.active.group.position;
+    }
+    return null;
+  }
+
+  /**
+   * Steht gerade ein Fahrzeug zur Kontrolle auf der Waage? Dann kommt Mario
+   * aus dem Büro und sieht sich die Ladung an (Wunsch 11.09.2026).
+   *
+   * Bei der Einfahrt gilt das für jeden Anlieferer. Bei der Ausfahrt nur für
+   * Abholer: Die fahren beladen vom Hof, und was rausgeht, wird geprüft. Wer
+   * leer rausfährt, hat nichts vorzuzeigen — dafür bleibt er drin.
+   */
+  wiegeKontrolle(): THREE.Vector3 | null {
+    for (const v of [this.active, ...this.parked]) {
+      if (v && v.aufDerWaage) return v.group.position;
+    }
+    return null;
+  }
+
+  /**
+   * Standflächen aller Fahrzeuge auf dem Hof. Bagger und Radlader fragen das
+   * ab, bevor sie einen Schritt machen — vorher fuhren beide mitten durch
+   * stehende LKW hindurch (Befund 11.09.2026).
+   */
+  fahrzeugBoxen(): Box[] {
+    this.boxCache.length = 0;
+    if (this.active) this.active.boxen(this.boxCache);
+    for (const v of this.parked) v.boxen(this.boxCache);
+    return this.boxCache;
+  }
+  private boxCache: Box[] = [];
+
+  /** Der wartende Abhol-LKW (für Beladung/Verkauf), sonst null. */
+  get pickupTruck(): DeliveryVehicle | null {
+    return this.active && this.active.kind === "abholer" ? this.active : null;
+  }
+
+  /**
+   * Anlieferer vom Hof schicken — etwa wenn der Wagen offensichtlich leer ist
+   * oder man gerade keinen Platz hat. Er dreht ab und fährt zur Ausfahrt.
+   */
+  sendAway(): "weggeschickt" | "zuSpaet" | "niemandDa" {
+    if (!this.active || this.active.kind === "abholer") return "niemandDa";
+    return this.active.sendAway() ? "weggeschickt" : "zuSpaet";
+  }
+
+  /**
+   * „Mach mal Platz": Vor dem Abladen dreht der Fahrer ab, danach fährt er
+   * nur ein Stück vor — so kommt man an Schrott heran, der unter dem
+   * Fahrzeug liegt.
+   */
+  /**
+   * Den Wagen zur Waage schicken (Wunsch 11.09.2026).
+   *
+   * Vorher hiess der Befehl "Vorfahren" und ruckelte den LKW ein Stueck nach
+   * vorn. Gebraucht wird er aber, wenn hinten unsichtbar Reste liegen, die
+   * sich nicht greifen lassen — dann ist Vorfahren nur ein Umweg. Jetzt faehrt
+   * der Wagen ueber die Waage vom Hof, die Reste zaehlen als Tara, und
+   * bezahlt wird, was tatsaechlich abgeladen wurde.
+   */
+  zurWaage(): "geschickt" | "niemandDa" {
+    if (!this.active) return "niemandDa";
+    return this.active.sendAway() ? "geschickt" : "niemandDa";
+  }
+
+  /** Körper-Handles des aktiven Fahrzeugs — der Baggerarm taucht da nicht ein. */
+  obstacleHandles(out: Set<number>): Set<number> {
+    out.clear();
+    if (this.active) this.active.collectBodyHandles(out);
+    // Auch die Wartenden stehen im Weg — der Arm darf nicht hindurchfahren
+    for (const v of this.parked) v.collectBodyHandles(out);
+    return out;
+  }
+
+  /** Verhandlung läuft: Das Fahrzeug wartet an der Waage. */
+  set dealPending(v: boolean) {
+    if (this.active) this.active.awaitingDeal = v;
+  }
+
+  /** Rückmeldung, wenn die Verhandlung in die Zeitgrenze läuft. */
+  set onDealTimeout(fn: () => void) {
+    if (this.active) this.active.onDealTimeout = fn;
+  }
+
+  /** Wer gerade an der Waage steht — für die Verhandlung. */
+  get activeCustomer(): CustomerProfile | null {
+    return this.active?.customer ?? null;
+  }
+
+  get activeKind(): DeliveryKind | null {
+    return this.active?.kind ?? null;
+  }
+
+  /** Fraktion der laufenden Anlieferung, falls sie sortenrein ist. */
+  get activeSortedMaterial(): string | null {
+    return this.active?.sortedMaterial ?? null;
+  }
+
+  /**
+   * Zusammensetzung der wartenden Ladung nach Fraktion, absteigend nach
+   * Masse. Sichtbar wird das erst mit dem Büro — ohne Marktkenntnis sieht man
+   * einem gemischten Haufen auf der Ladefläche nicht an, was drinsteckt.
+   */
+  get activeCargoMix(): Array<{ materialId: string; kg: number; share: number }> {
+    const items = this.active?.cargo.items ?? [];
+    if (items.length === 0) return [];
+    const kgJe = new Map<string, number>();
+    let gesamt = 0;
+    for (const it of items) {
+      kgJe.set(it.materialId, (kgJe.get(it.materialId) ?? 0) + it.massKg);
+      gesamt += it.massKg;
+    }
+    if (gesamt <= 0) return [];
+    return [...kgJe.entries()]
+      .map(([materialId, kg]) => ({ materialId, kg, share: kg / gesamt }))
+      .sort((a, b) => b.kg - a.kg);
+  }
+
+  update(dt: number): void {
+    this.t += dt;
+    // Wartende Fahrzeuge weiterlaufen lassen: Pause, dann Ausfahrt
+    for (let i = this.parked.length - 1; i >= 0; i--) {
+      const v = this.parked[i];
+      v.update(dt);
+      if (v.done) {
+        v.despawn();
+        this.parked.splice(i, 1);
+      }
+    }
+    if (!this.active) {
+      // Vorrang: Eine vorgemerkte Abholung faehrt sofort, ohne Wartezeit und
+      // auch dann, wenn die Einfahrt fuer Anlieferer gerade zu ist.
+      if (this.vorgemerkt) {
+        this.pickupOrder = this.vorgemerkt.order;
+        this.vorgemerkt = null;
+        this.spawnNow("abholer");
+        return;
+      }
+      if (this.acceptDeliveries && this.t >= this.nextSpawnT) this.spawnNow();
+      return;
+    }
+    this.active.update(dt);
+    if (this.active.consumeDeparted()) this.onPickupDepart?.(this.active);
+    // Sobald das Fahrzeug den Abladeplatz Richtung Warteplatz verlässt, ist
+    // der Platz frei und der Nächste darf kommen — auch wenn der Vorige noch
+    // beim Kaffee steht.
+    if (this.active.isParked) {
+      this.parked.push(this.active);
+      this.active = null;
+      this.t = 0;
+      this.nextSpawnT =
+        (NEXT_DELAY_S[0] + Math.random() * (NEXT_DELAY_S[1] - NEXT_DELAY_S[0])) *
+        this.intervalFactor;
+      return;
+    }
+    if (this.active.done) {
+      this.active.despawn();
+      this.active = null;
+      this.t = 0;
+      this.nextSpawnT =
+        (NEXT_DELAY_S[0] + Math.random() * (NEXT_DELAY_S[1] - NEXT_DELAY_S[0])) *
+        this.intervalFactor;
+    }
+  }
+}

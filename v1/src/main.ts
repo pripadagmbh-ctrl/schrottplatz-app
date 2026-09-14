@@ -1,0 +1,1229 @@
+import * as THREE from "three";
+import { Input } from "./core/input";
+import { TouchControls } from "./core/touch";
+import { DebugOverlay } from "./core/debugOverlay";
+import { AimRing } from "./excavator/aimRing";
+import { EventBus } from "./core/events";
+import { initPhysics, PhysicsWorld } from "./physics/physicsWorld";
+import { GripSystem } from "./physics/gripSystem";
+import { Excavator } from "./excavator/excavator";
+import { OrbitCamera } from "./excavator/orbitCamera";
+import { Yard } from "./world/yard";
+import { ItemManager, type ScrapItem } from "./world/scrapItems";
+import { ContainerManager, type AmpelState } from "./world/containers";
+import { AudioManager } from "./audio/audioManager";
+import { Hud } from "./ui/hud";
+import { Particles } from "./world/particles";
+import { CompositeManager } from "./dismantle/composites";
+import { FenceManager } from "./world/fence";
+import { VehicleManager } from "./delivery/vehicles";
+import { PressManager } from "./world/press";
+import { randomCargo } from "./world/scrapItems";
+import { Shift } from "./economy/shift";
+import { Tutorial } from "./ui/tutorial";
+import { Reputation } from "./economy/reputation";
+import { UPGRADES, UpgradeState, type UpgradeId } from "./economy/upgrades";
+import { haggle, leavesOnRefusal, hint, OFFER_FACTOR, OFFER_LABEL, type Offer } from "./economy/haggle";
+import { LaneWatch } from "./delivery/laneWatch";
+import { Daylight, Floodlights } from "./world/daylight";
+import { hitsObstacle, setBuildingObstacles } from "./world/obstacles";
+import { START_HAUFEN, START_AUTOS, START_STREU } from "./world/startplatz";
+import { findeBox } from "./world/boxen";
+import { OfficeBuilding, BUERO_TUER } from "./world/office";
+import { Police } from "./world/police";
+import {
+  type AxisId,
+  type ControlFunction,
+  FUNCTION_LABELS,
+  defaultConfig,
+  saveConfig,
+} from "./core/controlConfig";
+import { Account, PURCHASE_PRICE_PER_KG } from "./economy/account";
+import { getMaterial, ABFALL } from "./materials/catalog";
+import { StaffManager } from "./world/people";
+import { WEIGH_X, WEIGH_Z, KAFFEE_POS } from "./world/yard";
+import { setBaggerOrt } from "./delivery/routes";
+import { clearSave, readSave, storeSave, type SaveData } from "./core/save";
+
+const FIXED_DT = 1 / 60;
+const MAX_STEPS_PER_FRAME = 5; // Spiral-of-death-Schutz
+const RECOUNT_INTERVAL = 10; // Container-Zählung alle 10 Steps
+
+async function main(): Promise<void> {
+  await initPhysics();
+  document.getElementById("loading")!.remove();
+
+  // --- Renderer & Szene ---
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  document.getElementById("app")!.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xb8c4cc); // leicht bewölkter Spätvormittag (Kap. 16)
+  scene.fog = new THREE.Fog(0xb8c4cc, 60, 140);
+
+  const hemi = new THREE.HemisphereLight(0xdde6ec, 0x6b6257, 0.85);
+  scene.add(hemi);
+  const sun = new THREE.DirectionalLight(0xfff4e0, 1.6);
+  sun.position.set(18, 30, 12);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.camera.left = -35;
+  sun.shadow.camera.right = 35;
+  sun.shadow.camera.top = 35;
+  sun.shadow.camera.bottom = -35;
+  sun.shadow.camera.far = 80;
+  scene.add(sun);
+
+  // Tageslauf und Flutlicht: vier Masten in den Ecken der Arbeitsfläche,
+  // alle nach innen gerichtet, schalten bei Dämmerung selbst zu
+  const daylight = new Daylight(scene, hemi, sun);
+  // Masten stehen dicht an der Umrandung, damit die Arbeitsflächen frei
+  // bleiben — der Platz misst 80 x 58 m
+  /*
+   * Der Mast auf (0 | −26) ist weg (Ansage 12.09.2026: „der eine Strahler
+   * muss da jetzt weg, weil der ein bisschen im Weg steht") — seit der
+   * Betrieb an der hinteren Grenze sitzt, stand er mitten in der Muldenreihe.
+   * Die beiden auf x 37 lagen ohnehin weit ausserhalb der Mauer, seit die
+   * Ostgrenze auf 10,5 gerueckt ist; sie stehen jetzt innen.
+   */
+  const floodlights = new Floodlights(scene, [
+    [-37, 26],
+    [-37, -26],
+    [-37, 2],
+    [9, 26],
+    [9, 8],
+    [0, 26],
+  ]);
+
+  // --- Spielobjekte ---
+  const bus = new EventBus();
+  const physics = new PhysicsWorld();
+  const input = new Input(renderer.domElement);
+  const touch = new TouchControls(renderer.domElement);
+  // Der Platz baut sich selbst; ein Handle brauchen wir nicht mehr, seit die
+  // Schrottberge nur noch Kulisse ausserhalb der Mauer sind.
+  new Yard(scene, physics.world);
+  /*
+   * Keine Wegweiser mehr (Ansage 13.09.2026: „wir koennen auch alle Schilder
+   * zur Benennung wegmachen. Die einzigen Schilder sind diese kleinen
+   * Containerschilder, dass man sieht, die dann auch aufleuchten, wenn ich
+   * ueber dem richtigen Container bin.").
+   *
+   * Uebrig bleibt genau das: die Behaelterschilder aus containers.ts, die
+   * beim richtigen Behaelter aufleuchten. Taste M schaltet sie weiter um.
+   */
+  const items = new ItemManager(scene, physics.world);
+  const containers = new ContainerManager(scene, physics.world, bus);
+  const composites = new CompositeManager(scene, physics.world, items, bus);
+  const account = new Account();
+
+  // Boot: vorhandener Spielstand → Welt aus dem Save; sonst Neues Spiel
+  const save = readSave();
+  let fence: FenceManager;
+  if (save) {
+    account.moneyEur = save.moneyEur;
+    fence = new FenceManager(scene, physics.world, items, bus, save.fencesBroken);
+    for (const it of save.items) {
+      items.spawnScrap(
+        it.materialId,
+        it.massKg,
+        it.shape,
+        new THREE.Vector3(it.pos[0], it.pos[1], it.pos[2]),
+        new THREE.Quaternion(it.rot[0], it.rot[1], it.rot[2], it.rot[3])
+      );
+    }
+    for (const c of save.cars) {
+      const car = composites.spawnCar(new THREE.Vector3(c.pos[0], c.pos[1], c.pos[2]));
+      car.body.setRotation({ x: c.rot[0], y: c.rot[1], z: c.rot[2], w: c.rot[3] }, true);
+      car.restoreState(c);
+    }
+  } else {
+    fence = new FenceManager(scene, physics.world, items, bus);
+    /*
+     * Grosser Berg in der Mischschrottbox. Die Annahmeflaeche bleibt frei,
+     * dort laden die Pritschen ab. Der Haufen ist am Anfang unsortiert — dass
+     * er als Verunreinigung zaehlt, ist gewollt: Aufraeumen ist die Aufgabe.
+     *
+     * NICHT in die Presskammer. Er lag bei (6,0 | −24,0) mit 2,9 m Streuung,
+     * also von z −26,9 bis −21,1 — und die Kammer geht von −28,2 bis −23,8.
+     * Gut die Haelfte des Haufens lag damit in der Presse, und eines der
+     * beiden Altfahrzeuge stand mit (8,0 | −26,0) genau darin (Ansage
+     * 13.09.2026: „achtet darauf, dass kein Schrott am Anfang in der Presse
+     * liegt"). `test/startplatz.test.ts` haelt den Abstand fest.
+     */
+    items.spawnPile(
+      new THREE.Vector3(START_HAUFEN.x, 0, START_HAUFEN.z),
+      START_HAUFEN.teile,
+      START_HAUFEN.streuung
+    );
+    // Altfahrzeuge am Rand des Haufens, beide in der Mischschrottbox
+    for (const a of START_AUTOS) composites.spawnCar(new THREE.Vector3(a.x, 0.5, a.z));
+    // Etwas Streuschrott neben dem Stahlhaufen — er lag frueher an den
+    // Schrottbergen, und die stehen jetzt ausserhalb der Mauer. Auf dem Platz
+    // soll alles, was nach Material aussieht, auch aufzunehmen sein.
+    randomCargo(START_STREU.teile).forEach((sp, i) => {
+      const a = (i / START_STREU.teile) * Math.PI * 2;
+      items.spawnScrap(
+        sp.materialId,
+        sp.massKg,
+        sp.shape,
+        // An den Mischschrott statt an den alten Platz (Ansage 12.09.2026:
+        // „es fallen immer noch am alten Platz Schrottteile runter").
+        new THREE.Vector3(
+          START_STREU.x + Math.cos(a) * START_STREU.radius,
+          0.8 + (i % 3) * 0.7,
+          START_STREU.z + Math.sin(a) * START_STREU.radius
+        )
+      );
+    });
+    // Erst jetzt setzen lassen, wenn alles Anfaengliche steht — Haufen, Autos
+    // und Streuschrott. Frueher waere sinnlos: die spaeter gespawnten Teile
+    // fallen in den Haufen und wecken ihn sofort wieder. So beginnt das erste
+    // Bild mit einem Platz, der bereits liegt.
+    items.settle(physics.world);
+  }
+  const vehicles = new VehicleManager(scene, physics.world, items, composites);
+  const press = new PressManager(scene, physics.world, items, composites);
+  const staff = new StaffManager(
+    scene,
+    items,
+    new THREE.Vector3(WEIGH_X, 0, WEIGH_Z),
+    KAFFEE_POS,
+    BUERO_TUER
+  );
+  // Mario kommt aus dem Buero, sobald ein LKW zur Kontrolle auf der Waage steht
+  staff.getWeighTruck = () => vehicles.wiegeKontrolle();
+  // Weder Bagger noch Radlader fahren durch einen stehenden LKW hindurch
+  staff.getVehicleBoxes = () => alleFahrzeugBoxen();
+  staff.getExcavatorPos = () => excavator.position;
+  const carPos: THREE.Vector3[] = [];
+  staff.getObstaclePositions = () => {
+    carPos.length = 0;
+    for (const c of composites.cars) {
+      const p = c.body.translation();
+      carPos.push(new THREE.Vector3(p.x, 0, p.z));
+    }
+    return carPos;
+  };
+
+  const buildSaveData = (): SaveData => ({
+    schemaVersion: 1,
+    savedAt: new Date().toISOString(),
+    moneyEur: account.moneyEur,
+    shift: shift.toJSON(),
+    reputation: ruf.toJSON(),
+    tutorial: tutorial.toJSON(),
+    upgrades: ausbau.toJSON(),
+    timeOfDay: daylight.time,
+    items: items.items
+      .filter((i) => i.shape)
+      .map((i) => {
+        const p = i.body.translation();
+        const r = i.body.rotation();
+        return {
+          materialId: i.materialId,
+          massKg: i.massKg,
+          shape: i.shape!,
+          pos: [p.x, p.y, p.z],
+          rot: [r.x, r.y, r.z, r.w],
+        };
+      }),
+    cars: composites.cars.map((c) => c.saveState),
+    fencesBroken: fence.brokenFlags,
+  });
+  const excavator = new Excavator(scene, physics.world);
+  /*
+   * Streifenwagen: kommt zwischendurch zur Kontrolle, ohne Folgen. Seine
+   * Standflaeche kommt zu den LKW dazu — auch durch ein Polizeiauto faehrt
+   * der Bagger nicht hindurch.
+   */
+  const polizei = new Police(scene, physics.world);
+  polizei.getExcavatorPos = () => excavator.position;
+  polizei.onFunk = (text) => hud.toast(text);
+  const alleFahrzeugBoxen = (): ReturnType<typeof vehicles.fahrzeugBoxen> => {
+    const boxen = vehicles.fahrzeugBoxen();
+    polizei.boxen(boxen);
+    return boxen;
+  };
+  excavator.getVehicleBoxes = alleFahrzeugBoxen;
+  const grip = new GripSystem(physics.world, excavator.grappleBody);
+  const orbit = new OrbitCamera(window.innerWidth / window.innerHeight);
+  const debug = new DebugOverlay();
+  const aimRing = new AimRing(scene);
+  const audio = new AudioManager();
+  const hud = new Hud();
+  const particles = new Particles(scene);
+
+  // --- Pausenmenü ---
+  // Tagesablauf: Annahme → Sortieren → Annahme (Briefing Kap. 21)
+  // Fahrspuren überwachen: liegt Schrott im Weg, steht der Betrieb
+  const lanes = new LaneWatch(items);
+  /*
+   * Die Anlieferung richtet sich nach der Maschine (Ansage 12.09.2026): Der
+   * LKW faehrt so nah an den Bagger heran, wie der Vorplatz es zulaesst.
+   * Deshalb muessen die Routen wissen, wo er steht.
+   */
+  setBaggerOrt(() => excavator.position);
+  let stoerfallGemeldet = false;
+  // Geführter Einstieg — zeigt den Kreislauf einmal und hält sich dann raus
+  const tutorial = new Tutorial();
+  tutorial.load(save?.tutorial);
+  const tutEl = document.getElementById("tutorial")!;
+  let tutSortiertKg = 0;
+  let tutGepresst = false;
+  let tutAbholer = false;
+  let tutPreis = false;
+  const zeigeTutorial = (): void => {
+    const st = tutorial.step;
+    if (!st) {
+      tutEl.classList.remove("open");
+      return;
+    }
+    document.getElementById("tut-schritt")!.textContent = tutorial.progress;
+    document.getElementById("tut-titel")!.textContent = st.title;
+    document.getElementById("tut-text")!.textContent = st.text;
+    tutEl.classList.add("open");
+  };
+  document.getElementById("tut-skip")!.addEventListener("click", () => {
+    tutorial.skip();
+    zeigeTutorial();
+  });
+  zeigeTutorial();
+
+  const shift = new Shift();
+  shift.load(save?.shift);
+  if (typeof save?.timeOfDay === "number") daylight.time = save.timeOfDay;
+  let looseKg = 0;
+  let looseTimer = 0;
+  let verdichtungsTimer = 0;
+  /**
+   * Lose auf dem Platz liegender Schrott. Alles, was nicht in einer Box liegt
+   * und am Boden ist, zählt — das ist die Arbeit, die noch vor dem Spieler
+   * liegt. Die Summe ändert sich träge, daher reicht viermal pro Sekunde.
+   */
+  const measureLoose = (): number => {
+    let kg = 0;
+    for (const it of items.items) {
+      if (it.containerId) continue;
+      if (!it.body.isValid() || !it.body.isDynamic()) continue;
+      if (it.body.translation().y > 2.5) continue; // noch auf einer Ladefläche
+      kg += it.massKg;
+    }
+    return kg;
+  };
+
+  const pauseEl = document.getElementById("pause")!;
+  let paused = false;
+  const setPaused = (v: boolean): void => {
+    paused = v;
+    pauseEl.classList.toggle("open", v);
+    if (!v) {
+      pauseEl.classList.remove("settings");
+      document.getElementById("controls-menu")!.classList.remove("open");
+    }
+  };
+  document.getElementById("pause-resume")!.addEventListener("click", () => setPaused(false));
+  document.getElementById("pause-save")!.addEventListener("click", () => {
+    hud.toast(storeSave(buildSaveData()) ? "Gespeichert." : "Speichern fehlgeschlagen!");
+    setPaused(false);
+  });
+  document.getElementById("pause-load")!.addEventListener("click", () => location.reload());
+  document.getElementById("pause-new")!.addEventListener("click", () => {
+    clearSave();
+    location.reload();
+  });
+
+  // --- Steuerungsmenü: die vier Stickachsen frei belegen ---
+  const AXIS_IDS: AxisId[] = ["leftY", "leftX", "rightY", "rightX"];
+  const warnEl = document.getElementById("ctrl-warn")!;
+  const renderControls = (): void => {
+    for (const id of AXIS_IDS) {
+      const sel = document.getElementById(`ax-${id}`) as HTMLSelectElement;
+      const b = touch.config[id];
+      if (sel.options.length === 0) {
+        for (const [fn, label] of Object.entries(FUNCTION_LABELS)) {
+          sel.add(new Option(label, fn));
+        }
+      }
+      sel.value = b.fn;
+      document.getElementById(`inv-${id}`)!.classList.toggle("on", b.invert);
+    }
+    // Doppelt belegte Funktionen sind erlaubt, aber selten gewollt — Hinweis
+    const used = AXIS_IDS.map((i) => touch.config[i].fn).filter((f) => f !== "none");
+    const doppelt = used.filter((f, i) => used.indexOf(f) !== i);
+    warnEl.textContent = doppelt.length
+      ? `Mehrfach belegt: ${[...new Set(doppelt)].map((f) => FUNCTION_LABELS[f]).join(", ")}`
+      : "";
+  };
+  for (const id of AXIS_IDS) {
+    document.getElementById(`ax-${id}`)!.addEventListener("change", (e) => {
+      touch.config[id].fn = (e.target as HTMLSelectElement).value as ControlFunction;
+      saveConfig(touch.config);
+      renderControls();
+    });
+    document.getElementById(`inv-${id}`)!.addEventListener("click", () => {
+      touch.config[id].invert = !touch.config[id].invert;
+      saveConfig(touch.config);
+      renderControls();
+    });
+  }
+  const showControls = (v: boolean): void => {
+    pauseEl.classList.toggle("settings", v);
+    document.getElementById("controls-menu")!.classList.toggle("open", v);
+    if (v) renderControls();
+  };
+  const ctrlBtn = document.getElementById("pause-controls")!;
+  if (!touch.active) ctrlBtn.style.display = "none";
+  ctrlBtn.addEventListener("click", () => showControls(true));
+  document.getElementById("ctrl-back")!.addEventListener("click", () => showControls(false));
+  document.getElementById("ctrl-reset")!.addEventListener("click", () => {
+    touch.config = defaultConfig();
+    saveConfig(touch.config);
+    renderControls();
+  });
+
+  // --- Abholung bestellen: Fraktion wählen, dann kommt der LKW ---
+  const pickupEl = document.getElementById("pickup")!;
+  const pickupListEl = document.getElementById("pickup-list")!;
+  const showPickup = (v: boolean): void => {
+    pickupEl.classList.toggle("open", v);
+    if (!v) return;
+    // Nur anbieten, was auch dasteht — mit der Menge, die bereitliegt
+    const kg = new Map<string, number>();
+    for (const it of items.items) {
+      if (!it.body.isValid() || !it.body.isDynamic()) continue;
+      for (const c of it.composition ?? [{ materialId: it.materialId, massKg: it.massKg }]) {
+        kg.set(c.materialId, (kg.get(c.materialId) ?? 0) + c.massKg);
+      }
+    }
+    pickupListEl.innerHTML = "";
+    const bestellen = (order: string | null, label: string): void => {
+      const b = document.createElement("button");
+      const menge = order ? kg.get(order) ?? 0 : [...kg.values()].reduce((a, c) => a + c, 0);
+      b.innerHTML = `${label}<span class="kg">${Math.round(menge)} kg</span>`;
+      b.addEventListener("click", () => {
+        showPickup(false);
+        const r = vehicles.requestPickup(order);
+        tutAbholer = true;
+        const was = order ? `für ${getMaterial(order).name}` : "für gemischte Ladung";
+        hud.toast(
+          r === "vorgemerkt"
+            ? `Abholung ${was} vorgemerkt — sie fährt als nächstes vor.`
+            : order
+              ? `Abholung ${was} bestellt — sortenrein laden!`
+              : `Abholung ${was} bestellt.`
+        );
+      });
+      pickupListEl.appendChild(b);
+    };
+    for (const id of [...kg.keys()].sort((a, b) => (kg.get(b) ?? 0) - (kg.get(a) ?? 0))) {
+      if (ABFALL.has(id)) continue; // Abfall bestellt kein Abnehmer
+      bestellen(id, getMaterial(id).name);
+    }
+    bestellen(null, "Gemischt (schlechter Preis)");
+  };
+  document.getElementById("pickup-cancel")!.addEventListener("click", () => showPickup(false));
+
+  touch.onWheelTick = () => audio.playTick();
+  // Auf iOS gibt es keine Vibration — der Klick ist dort die einzige Bestaetigung
+  touch.onTap = () => audio.playTick();
+  // Fahrmodus hat keinen Knopf mehr — die Griff-Info sagt, woran man ist
+  touch.onDriveMode = (an) => hud.toast(an ? "Fahren an — linker Stick lenkt" : "Fahren aus");
+
+  const helpEl = document.getElementById("help")!;
+  if (touch.active) helpEl.style.display = "none"; // auf Touchgeräten stört die Tastenliste
+  const sensorPos = new THREE.Vector3();
+
+  // --- Event-Verdrahtung (Kap. 17: Querverbindungen nur über Events) ---
+  grip.onGrabbed = (bodies) => {
+    // Klang nach dem, was tatsaechlich in der Schale liegt
+    const erstes = bodies.length > 0 ? items.itemByBody(bodies[0]) : null;
+    audio.playGrab(erstes?.materialId);
+    for (const b of bodies) {
+      fence.notifyGrabbed(b); // verankertes Zaunfeld? → losreißen
+      /*
+       * Was die Spinne fasst, verliert seine Scheiben. Fuenf Zaehne mit
+       * hundertsechzig Kilonewton nehmen darauf keine Ruecksicht — und ein
+       * Wrack, das nach dem Greifen noch alle Fenster hat, sieht falsch aus.
+       */
+      const it = items.itemByBody(b);
+      if (it) items.zerbrichGlas(it);
+    }
+  };
+  grip.onTear = () => audio.playTear();
+  /*
+   * Aufschlaege: Der wichtigste Klang auf dem Platz. Ob es metallisch
+   * wummert oder dumpf auf Beton klatscht, haengt daran, ob das Teil auf
+   * einer Ladeflaeche landet — dafuer dienen dieselben Standflaechen, die
+   * auch Bagger und Radlader vom Durchfahren abhalten.
+   */
+  items.onGlasBruch = (x, y, z) => bus.emit("glassShattered", { x, y, z });
+  /*
+   * Lambert am Werkzeug: Er flext die Alufelge vom Reifen. Das Trennen selbst
+   * macht der ItemManager — der Platzwart meldet nur, dass die Arbeit getan
+   * ist, und kennt darum weder Fraktionen noch Preise.
+   */
+  staff.getMuldenOrt = (id) => containers.ortVon(id);
+  staff.onFunken = (x, y, z) => {
+    particles.spawn(evPos.set(x, y, z), 5, 0xffc46b, 3.0, 0.5, 0.35);
+  };
+  staff.onTrennen = (it) => {
+    const name = it.shape?.name ?? getMaterial(it.materialId).name;
+    const teile = items.zerlege(it);
+    if (!teile) return;
+    audio.playTear();
+    const namen = teile.map((x) => getMaterial(x.materialId).name).join(" + ");
+    hud.toast(`Lambert hat ${name} getrennt: ${namen}`);
+  };
+  items.onAufprall = (item, wucht) => {
+    const p = item.body.translation();
+    const aufStahl = findeBox(p.x, p.z, alleFahrzeugBoxen(), 0.4) !== null;
+    audio.playAufprall(item.materialId, wucht, aufStahl);
+  };
+  // Zaehne treffen aufeinander — hoerbar, auch wenn nichts drin ist
+  excavator.onClawSnap = (haerte) => audio.playClawSnap(haerte);
+  grip.partResolver = (pos) => composites.findPartNear(pos);
+  // Gewalt beim Herausreißen: Rotator-Drehung zählt am stärksten, dazu die
+  // Achsbewegung. Wer die Spinne am Motor verdreht, bekommt ihn schneller los.
+  grip.getViolence = () => excavator.tearViolence;
+  grip.insideGrapple = (pos) => excavator.isInsideGrapple(pos);
+  grip.krallenKontakte = (body) => excavator.krallenKontakte(body);
+  // Nach dem Loslassen bleiben die Krallen-Kollider kurz aus, sonst quetschen
+  // sie das eben abgeworfene Teil gegen den Boden.
+  grip.onReleaseGrace = () => excavator.startClawGrace();
+  // Woran die Zaehne stehen bleiben. Was sich quetschen laesst — Blech, Kabel,
+  // Faesser, Buntmetall, Draht — gibt nach: Der Greifer drueckt es platt oder
+  // schiebt es beiseite, genau wie in Wirklichkeit. Stehen bleibt er an
+  // massivem Stahl und an allem, was kein Schrottteil ist (Wracks).
+  excavator.clawBlockedBy = (body) => {
+    const it = items.itemByBody(body);
+    if (!it) return true; // Karosse, Presspaket, Unbekanntes: haelt
+    return !items.isCrushable(it);
+  };
+  // Aufgespiesst: Der Zahn geht durch nachgiebiges Material hindurch — dann
+  // soll man dem Teil hinterher ansehen, was passiert ist. Sonst steckt es
+  // unversehrt auf der Zacke und nichts erklaert, warum es dort haengt.
+  // flattenItem greift je Teil nur einmal, es bleibt also bei einem Knirschen.
+  excavator.onClawPierce = (body) => {
+    const it = items.itemByBody(body);
+    if (!it || !items.isCrushable(it) || !items.flattenItem(it)) return;
+    const p = body.translation();
+    audio.playDrop(it.materialId);
+    particles.spawn(new THREE.Vector3(p.x, p.y, p.z), 4, 0xb0b6bb, 1.4, 1.0, 0.45);
+  };
+  excavator.getStaffPos = () => staff.lambertPosition();
+  staff.getBlockingItem = () => {
+    const b = lanes.nearest(staff.lambertPosition());
+    return b ? b.item : null;
+  };
+  staff.getGrapplePos = () => {
+    excavator.getSensorPosition(sensorPos);
+    return sensorPos;
+  };
+  // Zudrücken: was nachgibt, wird in der Spinne plattgequetscht
+  grip.crusher = (body) => {
+    const it = items.items.find((i) => i.body.handle === body.handle);
+    /*
+     * Trennen geht vor Quetschen. Ein Rad ist nach der Dichteregel nicht
+     * quetschbar — es ist ja voll —, aber sehr wohl zu sprengen. Stuende die
+     * Pruefung zuerst, kaeme das Zerlegen nie dran.
+     */
+    if (it && items.brauchtWerkzeug(it)) {
+      hud.toast(`${it.shape?.name ?? "Das Teil"} braucht Werkzeug — Arbeit für Lambert.`);
+      return false;
+    }
+    if (!it || (!items.isCrushable(it) && !items.istTrennbar(it))) return false;
+    const p = body.translation();
+    const ort = new THREE.Vector3(p.x, p.y, p.z);
+    /*
+     * Manches faellt beim Zerquetschen auseinander, statt nur flach zu werden:
+     * Bei einer Kabeltrommel zerbricht das Holz, bevor das Kabel nachgibt, und
+     * danach liegt beides getrennt da (Wunsch 12.09.2026). Aus einem
+     * Mischschrott-Teil werden so sortenreine — das ist der Lohn fuer die
+     * Arbeit mit der Spinne.
+     */
+    const teile = items.zerlege(it);
+    if (teile) {
+      audio.playCrash(0.8);
+      particles.spawn(ort, 12, 0x9a8b74, 2.0, 1.4, 0.6);
+      const namen = teile.map((x) => getMaterial(x.materialId).name).join(" + ");
+      hud.toast(`Zerlegt: ${namen}`);
+      return true;
+    }
+    if (!items.flattenItem(it)) return false;
+    audio.playDrop(it.materialId);
+    particles.spawn(ort, 6, 0xb0b6bb, 1.6, 1.2, 0.5);
+    hud.toast(`${getMaterial(it.materialId).name} zusammengedrückt`);
+    return true;
+  };
+  bus.on("itemEntered", (e) => {
+    audio.playDrop(e.materialId);
+    if (e.correct) {
+      audio.playCorrect();
+      const it = items.items.find((i) => i.id === e.itemId);
+      if (it) {
+        account.noteSorted(it.massKg); // Geld gibt es erst bei der Abholung
+        tutSortiertKg += it.massKg;
+      }
+    } else {
+      audio.playWrong();
+    }
+  });
+  const evPos = new THREE.Vector3();
+  bus.on("glassShattered", (e) => {
+    audio.playGlass();
+    particles.spawn(evPos.set(e.x, e.y, e.z), 14, 0xcfe8f2, 2.4, 1.6, 0.5);
+  });
+  bus.on("crushed", (e) => {
+    audio.playCrash(1);
+    particles.spawn(evPos.set(e.x, e.y + 0.4, e.z), 12, 0x9a8b74, 2.2, 1.6, 0.7);
+    particles.spawn(evPos.set(e.x, e.y + 0.3, e.z), 6, 0xffc060, 4, 2, 0.4);
+  });
+  bus.on("fenceBroken", (e) => {
+    audio.playRattle();
+    particles.spawn(evPos.set(e.x, 0.3, e.z), 8, 0x9a8b74, 1.5, 1.2, 0.6);
+  });
+  press.onStart = () => {
+    audio.playGrab(); // Hydraulik läuft an
+    hud.toast("Schere: Klappen schließen …");
+  };
+  press.onLidsClosed = () => audio.playCrash(0.6); // Eisenplatten schlagen auf
+  press.onStamp = (count, pos) => {
+    if (count > 0) tutGepresst = true;
+    audio.playCrash(1);
+    audio.playTear();
+    particles.spawn(pos, 16, 0x9a8b74, 2.5, 1.8, 0.7);
+    particles.spawn(pos, 8, 0xffc060, 4, 2, 0.4);
+    hud.toast(count > 0 ? `Schere: ${count} Teil${count > 1 ? "e" : ""} zum Paket gepresst` : "Schere: Mulde war leer");
+  };
+  // Fahrer fahren weder durch den Bagger noch über liegenden Schrott (Kap. 13)
+  vehicles.getExcavatorPos = () => excavator.position;
+  vehicles.onHonk = () => {
+    audio.playWrong();
+    hud.toast("Der Fahrer hupt — Fahrspur ist blockiert!");
+  };
+  // Brückenwaage: voll rein, leer raus → Kunde bekommt sein Geld
+  // --- Platz ausbauen: verdientes Geld bekommt eine Verwendung ---
+  const ausbau = new UpgradeState();
+  ausbau.load(save?.upgrades);
+  /*
+   * Testmodus (11.09.2026): Alles ist von Anfang an da — Radlader, Bulldozer,
+   * Stapler, Magnet, Baggerausbau, grosse Presse, Buero und Halle. Gespielt
+   * wird gerade nicht die Wirtschaft, sondern die Maschinen; was man erst
+   * kaufen muss, kann man nicht pruefen.
+   *
+   * Stufen, Level und Freischaltungen kommen zurueck, sobald sie dran sind:
+   * Dann hier auf false stellen — die Kaufwege selbst sind unveraendert.
+   */
+  const ALLES_FREI = true;
+  if (ALLES_FREI) for (const u of UPGRADES) ausbau.buy(u.id);
+  // Betriebsgebäude: Büro und Halle stehen von Anfang an; sein Grundriss
+  // liegt fest in der Hindernisliste (world/obstacles.ts).
+  new OfficeBuilding(scene, physics.world);
+  const shopEl = document.getElementById("shop")!;
+  /** Wirkung eines gekauften Ausbaus sofort anwenden. */
+  const wendeAn = (id: UpgradeId): void => {
+    if (id === "loader") staff.setLoader(true);
+    // "office" und "hall" richten das vorhandene Gebäude ein — sie wirken
+    // über Abfragen (Marktkenntnis, Maschinenkauf), nicht über die Kulisse
+    if (id === "magnet") account.hasMagnet = true;
+    // dozer, forklift, boom und press wirken über Abfragen an anderer
+    // Stelle — hier ist nichts einzuschalten
+  };
+  for (const u of UPGRADES) if (ausbau.has(u.id)) wendeAn(u.id);
+  // Baggerausbau und größere Presse wirken über diese Abfragen
+  excavator.getSpeedBonus = () => (ausbau.has("boom") ? 1.35 : 1);
+  grip.getCapacityBonus = () => (ausbau.has("boom") ? 1.5 : 1);
+  press.getBaleBonus = () => (ausbau.has("press") ? 1.6 : 1);
+  // Bulldozer und Stapler tun Verschiedenes: der eine macht Lambert schneller,
+  // der andere lässt ihn schwerer heben. Wer beide hat, merkt beides.
+  staff.getSpeedBonus = () => (ausbau.has("dozer") ? 1.4 : 1);
+  staff.getLiftBonus = () => (ausbau.has("forklift") ? 2.5 : 1);
+  account.hasMagnet = ausbau.has("magnet");
+
+  const zeigeAusbau = (): void => {
+    const liste = document.getElementById("shop-list")!;
+    document.getElementById("shop-info")!.textContent =
+      `Konto ${Math.round(account.moneyEur)} € · ` +
+      `${(shift.turnoverKg / 1000).toFixed(1)} t umgeschlagen`;
+    liste.innerHTML = "";
+    for (const u of UPGRADES) {
+      const b = document.createElement("button");
+      const gekauft = ausbau.has(u.id);
+      const frei = ausbau.available(u.id, shift.turnoverKg);
+      const zahlbar = ausbau.affordable(u.id, shift.turnoverKg, account.moneyEur);
+      b.disabled = gekauft || !zahlbar;
+      const status = gekauft
+        ? "vorhanden"
+        : !frei
+          ? `ab ${(u.requiresTurnoverKg / 1000).toFixed(0)} t Umschlag`
+          : `${u.priceEur.toLocaleString("de-DE")} €`;
+      b.innerHTML = `${u.name}<span class="preis">${status}</span><small>${u.effect}</small>`;
+      if (!b.disabled) {
+        b.addEventListener("click", () => {
+          account.moneyEur -= u.priceEur;
+          ausbau.buy(u.id);
+          wendeAn(u.id);
+          audio.playSale();
+          hud.toast(`${u.name} gekauft — ${u.effect}`);
+          zeigeAusbau(); // Liste auffrischen
+        });
+      }
+      liste.appendChild(b);
+    }
+    shopEl.classList.add("open");
+  };
+  document.getElementById("shop-close")!.addEventListener("click", () =>
+    shopEl.classList.remove("open")
+  );
+  // Ausbau und Musik liegen nicht mehr auf dem Joystickkopf, sondern im Menue:
+  // Es sind keine Maschinenfunktionen, und der Kranz bleibt so weit gefaechert.
+  document.getElementById("pause-shop")!.addEventListener("click", () => {
+    setPaused(false);
+    zeigeAusbau();
+  });
+  document.getElementById("pause-music")!.addEventListener("click", () => {
+    hud.toast(audio.toggleMusic() ? "Musik an." : "Musik aus.");
+  });
+
+  // --- Verhandeln an der Waage ---
+  const ruf = new Reputation();
+  ruf.load(save?.reputation);
+  let preisFaktor = 1;
+  let zahlungsUnfaehig = false;
+  /**
+   * Fester Kurs für Gewerbekunden. Etwas über Markt: Sie liefern sortenrein
+   * und verlässlich, das ist den Aufschlag wert.
+   */
+  const GEWERBE_KURS = 1.06;
+  const haggleEl = document.getElementById("haggle")!;
+  const zeigeVerhandlung = (
+    kunde: import("./delivery/customers").CustomerProfile,
+    kg: number,
+    rein: string | null
+  ): void => {
+    preisFaktor = 1;
+    const marktEur = kg * PURCHASE_PRICE_PER_KG;
+    // Sortenrein heißt: klarer Marktwert, wenig zu behaupten
+    const reinheit = rein ? 1 : 0.45;
+    document.getElementById("haggle-who")!.textContent =
+      kunde.group === "haendler" ? `${kunde.name} ${kunde.subtitle}` : kunde.name;
+    // Mit Büro sieht man einer gemischten Ladung an, was drinsteckt — das
+    // ist die Marktkenntnis, die der Kaufeintrag verspricht.
+    const mix = ausbau.has("office") && !rein ? vehicles.activeCargoMix : [];
+    const zusammensetzung =
+      mix.length > 0
+        ? " · " +
+          mix
+            .slice(0, 3)
+            .map((m) => `${Math.round(m.share * 100)} % ${getMaterial(m.materialId).name}`)
+            .join(", ")
+        : "";
+    document.getElementById("haggle-info")!.textContent =
+      `${Math.round(kg)} kg ${rein ? getMaterial(rein).name : "Mischschrott"}${zusammensetzung} · ` +
+      `Marktpreis ${marktEur.toFixed(0)} € · ${hint(kunde)}`;
+    const liste = document.getElementById("haggle-list")!;
+    liste.innerHTML = "";
+    for (const offer of ["markt", "leicht", "hart"] as Offer[]) {
+      const b = document.createElement("button");
+      b.innerHTML =
+        `${OFFER_LABEL[offer]}<span class="eur">${(marktEur * OFFER_FACTOR[offer]).toFixed(0)} €</span>`;
+      b.addEventListener("click", () => {
+        haggleEl.classList.remove("open");
+        vehicles.dealPending = false;
+        tutPreis = true;
+        const r = haggle(
+          kunde,
+          offer,
+          reinheit,
+          ruf.get(kunde.group) / 100,
+          ausbau.has("office") // Büro: begründetes Angebot wird eher akzeptiert
+        );
+        preisFaktor = r.factor;
+        hud.toast(`${kunde.name}: „${r.reply}"`);
+        if (r.offense > 0.05) ruf.note("hartGedrueckt", kunde.group);
+        else if (offer === "markt") ruf.note("fairBezahlt", kunde.group);
+        // Händler nehmen ihre Ware wieder mit, wenn der Preis nicht stimmt
+        if (!r.accepted && leavesOnRefusal(kunde)) vehicles.sendAway();
+      });
+      liste.appendChild(b);
+    }
+    haggleEl.classList.add("open");
+  };
+
+  // Kundschaft meldet sich bei der Ankunft — Name, Herkunft und ein Wort
+  vehicles.onCustomerArrived = (c) => {
+    const wer =
+      c.group === "haendler"
+        ? `${c.name} ${c.subtitle}`
+        : c.group === "gewerbe"
+          ? c.name
+          : `${c.name} ${c.subtitle}`;
+    hud.toast(`${wer}: „${c.greeting}"`);
+  };
+  vehicles.onWeighIn = (kg) => {
+    const rein = vehicles.activeSortedMaterial;
+    hud.toast(
+      rein
+        ? `Waage: ${kg.toFixed(0)} kg brutto — sortenrein ${getMaterial(rein).name}.`
+        : `Waage: ${kg.toFixed(0)} kg brutto — bitte abladen.`
+    );
+    const kunde = vehicles.activeCustomer;
+    if (!kunde) return;
+    if (kunde.group === "gewerbe") {
+      // Betriebe verhandeln nicht. Sie liefern zuverlässig ab und bekommen
+      // dafür einen guten Kurs — das ist ihr Teil der Abmachung.
+      preisFaktor = GEWERBE_KURS;
+      ruf.note("sauberVerwogen", "gewerbe");
+      hud.toast(`${kunde.name}: „${kunde.greeting}" — fester Kurs, keine Diskussion.`);
+      return;
+    }
+    vehicles.dealPending = true; // der Fahrer wartet, bis der Preis steht
+    vehicles.onDealTimeout = () => {
+      haggleEl.classList.remove("open");
+      preisFaktor = 1;
+      hud.toast(`${kunde.name} wartet nicht länger — es gilt der Marktpreis.`);
+    };
+    zeigeVerhandlung(kunde, kg, rein);
+  };
+  vehicles.onWeighOut = (netKg) => {
+    // Der beim Wiegen ausgehandelte Faktor gilt für diese Fuhre
+    const paid = account.payDelivery(netKg, preisFaktor);
+    shift.deliveries++;
+    audio.playSale();
+    hud.toast(
+      preisFaktor < 1
+        ? `Waage: ${netKg.toFixed(0)} kg netto · ${paid.toFixed(0)} € (${Math.round(preisFaktor * 100)} %)`
+        : `Waage: ${netKg.toFixed(0)} kg netto · Kunde erhält ${paid.toFixed(0)} €`
+    );
+    preisFaktor = 1;
+  };
+  // Abhol-LKW fährt los → Container abrechnen (sortenrein zahlt sich aus)
+  vehicles.onPickupDepart = (truck) => {
+    const loaded = truck.containedItems(items);
+    const sale = account.sellContainer(loaded, items, composites, vehicles.pickupOrder);
+    if (sale.massKg > 0) {
+      shift.noteTurnover(sale.massKg);
+      audio.playSale();
+      hud.toast(
+        `Verkauft: ${sale.massKg.toFixed(0)} kg ${getMaterial(sale.dominant).name} · ` +
+          `${(sale.purity * 100).toFixed(0)} % sortenrein · +${sale.eur.toFixed(0)} €`
+      );
+    } else {
+      hud.toast("Container war leer — der LKW fährt umsonst.");
+    }
+  };
+
+  // --- Fester Physik-Step, von Loop und Test-Handle gemeinsam genutzt ---
+  let stepCount = 0;
+  /** Bildschleife rechnet selbst? Beim Messen von aussen abschaltbar. */
+  let autoStep = true;
+  /**
+   * Laeuft gerade ein Schritt? Die Messhilfe `__game.step()` und die
+   * Bildschleife duerfen sich nicht ueberlappen: Rapier bricht dann mit
+   * "recursive use of an object" ab, weil ein Kollider zweimal gleichzeitig
+   * angefasst wird (beim Messen am 11.09.2026 passiert).
+   */
+  let imSchritt = false;
+
+  function stepOnce(): void {
+    if (imSchritt) return;
+    imSchritt = true;
+    try {
+      schrittInhalt();
+    } finally {
+      imSchritt = false;
+    }
+  }
+
+  function schrittInhalt(): void {
+    excavator.update(FIXED_DT, input);
+    excavator.getSensorPosition(sensorPos);
+    grip.update(excavator.closure, excavator.closing, sensorPos, FIXED_DT);
+    excavator.carriedMassKg = grip.totalMassKg;
+    excavator.carriedCount = grip.grippedCount;
+    // Was in der Spinne hängt, darf sie nicht selbst blockieren
+    excavator.grippedHandles.clear();
+    for (const b of grip.grippedBodies) excavator.grippedHandles.add(b.handle);
+    vehicles.obstacleHandles(excavator.obstacleBodies);
+    // Karossen sind ebenfalls feste Störer: der Arm soll nicht hindurchfahren.
+    // Die Spinne selbst bleibt frei — sonst käme man nicht mehr zum Greifen ran.
+    for (const car of composites.cars) {
+      if (car.body.isValid()) excavator.obstacleBodies.add(car.body.handle);
+    }
+    physics.step();
+    // Behaelter sind schwere Koerper, die eine kinematische Spinne anstoesst —
+    // sie brauchen dieselbe Traegheitsbremse wie der Schrott, und zwar in
+    // jedem Schritt.
+    containers.bremseAlle();
+    items.clampSpeeds(FIXED_DT);
+    // Haufen zur Ruhe bringen: Ohne die Schlafhilfe bleiben rund drei Viertel
+    // der Teile dauerhaft wach und kosten jeden Frame Rechenzeit (gemessen:
+    // 89 von 118 nach 30 s). Teile am Greifer bleiben ausgenommen.
+    items.settleSleep(FIXED_DT, excavator.grappleBody.translation());
+    composites.update();
+    fence.update();
+    vehicles.update(FIXED_DT);
+    press.update(FIXED_DT);
+    staff.update(FIXED_DT, vehicles.maneuveringTruck());
+    polizei.update(FIXED_DT);
+    stepCount++;
+    if (stepCount % RECOUNT_INTERVAL === 0) {
+      const grippedHandles = new Set(grip.grippedBodies.map((b) => b.handle));
+      containers.recount(items, grippedHandles);
+    }
+  }
+
+  // Debug-Handle für automatisierte Smoke-Tests (nur Dev-Server, nicht im Build)
+  if (import.meta.env.DEV) {
+    (window as unknown as Record<string, unknown>).__game = {
+      excavator,
+      grip,
+      physics,
+      input,
+      THREE,
+      items,
+      containers,
+      composites,
+      fence,
+      vehicles,
+      account,
+      press,
+      bus,
+      saveNow: () => storeSave(buildSaveData()),
+      touch,
+      hitsObstacle,
+      daylight,
+      floodlights,
+      staff,
+      polizei,
+      lanes,
+      audio,
+      togglePause: () => setPaused(!paused),
+      isPaused: () => paused,
+      /**
+       * Schritte von aussen ausloesen (Messungen). `autoStep(false)` haelt
+       * vorher die Bildschleife an, sonst laufen zwei Schrittquellen
+       * gegeneinander.
+       */
+      step: (n: number) => {
+        for (let i = 0; i < n; i++) stepOnce();
+        items.syncMeshes();
+      },
+      autoStep: (an: boolean) => {
+        autoStep = an;
+      },
+    };
+  }
+
+  window.addEventListener("resize", () => {
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    orbit.resize(window.innerWidth / window.innerHeight);
+  });
+
+  // --- Hauptschleife ---
+  let accumulator = 0;
+  let msPhysik = 0;
+  let msBild = 0;
+  let lastTime = performance.now();
+  let frameCount = 0;
+  let labelsOn = true; // Zonen-Schilder sichtbar
+
+  function frame(): void {
+    const now = performance.now();
+    const frameDt = Math.min((now - lastTime) / 1000, 0.25);
+    lastTime = now;
+
+    touch.update(frameDt);
+    if (input.wasPressed("Escape") || input.wasPressed("KeyP") || touch.consumePress("Escape")) {
+      setPaused(!paused);
+    }
+    if (paused) {
+      // In der Pause ruht die Simulation; nur Rendern und Eingaben laufen weiter
+      renderer.render(scene, orbit.camera);
+      input.endFrame();
+      requestAnimationFrame(frame);
+      return;
+    }
+    excavator.touch = touch.active ? touch.axes : null;
+    if (touch.consumePress("KeyC")) orbit.touchViewPress = true;
+    if (touch.consumePress("KeyX")) excavator.toggleCabLift();
+    if (touch.consumePress("KeyO")) excavator.toggleOutriggers();
+    // I und J: liegen auf deutscher wie englischer Tastatur an derselben Stelle
+    if (input.wasPressed("KeyI") || touch.consumePress("KeyI")) {
+      hud.toast(excavator.toggleBlade() ? "Schild abgesenkt — schieben." : "Schild angehoben.");
+    }
+    if (input.wasPressed("KeyM") || touch.consumePress("KeyM")) {
+      labelsOn = !labelsOn;
+      containers.setLabelsVisible(labelsOn);
+      hud.toast(labelsOn ? "Markierungen an" : "Markierungen aus");
+    }
+    if (input.wasPressed("F3") || touch.consumePress("F3")) debug.toggle();
+    if (input.wasPressed("KeyH")) {
+      helpEl.style.display = helpEl.style.display === "none" ? "block" : "none";
+    }
+    // Abholung: steht ein beladener Container bereit, fährt er ab —
+    // sonst öffnet die Bestellung, in der die Fraktion gewählt wird
+    if (input.wasPressed("KeyV") || touch.consumePress("KeyV")) {
+      if (vehicles.pickupTruck?.waitingForLoad) {
+        vehicles.requestPickup();
+        hud.toast("Container geht raus …");
+      } else if (vehicles.abholungVorgemerkt) {
+        hud.toast("Die Abholung ist schon vorgemerkt und fährt als nächstes vor.");
+      } else {
+        // Auch bei belegtem Platz bestellbar: Die Abholung hat Vorrang und
+        // wird vorgemerkt, statt an einem laufenden Anlieferer zu scheitern.
+        showPickup(true);
+      }
+    }
+    /*
+     * Lambert rufen (Ansage 13.09.2026: „ich rufe Lambert, wenn voll, er
+     * kippt hinten in Silos"). Er kommt von der Ostseite, raeumt die
+     * Sortierboxen leer und faehrt das Material zu der Mulde seiner Fraktion
+     * an der Ostwand. Von sich aus kommt er nicht mehr.
+     */
+    if (input.wasPressed("KeyY") || touch.consumePress("KeyY")) {
+      const antwort = staff.rufeLambert();
+      hud.toast(
+        antwort === "kommt"
+          ? "Lambert kommt und räumt die Boxen leer."
+          : antwort === "schon unterwegs"
+            ? "Lambert ist schon dabei."
+            : "Lambert winkt ab — in den Boxen liegt nichts für ihn."
+      );
+    }
+    // Zur Waage schicken: Reste auf der Flaeche zaehlen dort als Tara
+    if (input.wasPressed("KeyJ") || touch.consumePress("KeyJ")) {
+      const r = vehicles.zurWaage();
+      if (r === "geschickt") hud.toast("Der Fahrer faehrt zur Waage.");
+      else hud.toast("Gerade ist kein Fahrzeug auf dem Platz.");
+    }
+    if (input.wasPressed("KeyZ") || touch.consumePress("KeyZ")) zeigeAusbau();
+    if (input.wasPressed("KeyU") || touch.consumePress("KeyU")) {
+      hud.toast(audio.toggleMusic() ? "Musik an." : "Musik aus.");
+    }
+    if (input.wasPressed("KeyK")) {
+      hud.toast(storeSave(buildSaveData()) ? "Gespeichert." : "Speichern fehlgeschlagen!");
+    }
+    if (input.wasPressed("KeyB") || touch.consumePress("KeyB")) {
+      if (!press.start()) hud.toast("Presse läuft bereits …");
+    }
+    if (input.wasPressed("KeyL")) {
+      location.reload(); // Boot lädt den letzten Stand
+    }
+    if (input.wasPressed("KeyN")) {
+      clearSave();
+      location.reload();
+    }
+    excavator.handleDiscreteInput(input); // Mausrad-Rotator, einmal pro Frame
+
+    accumulator += frameDt;
+    let steps = 0;
+    // Reine Arbeitszeit messen, nicht den Bildabstand: Safari synchronisiert auf
+    // 60 Hz und faellt auf glatte 30 zurueck, sobald 16,7 ms nicht reichen.
+    // frameDt zeigt dann 34,0 ms, egal ob die Arbeit 18 oder 33 ms dauert —
+    // jede Verbesserung bliebe unsichtbar, bis sie die Schwelle unterbietet.
+    const tPhysik = performance.now();
+    while (autoStep && accumulator >= FIXED_DT && steps < MAX_STEPS_PER_FRAME) {
+      stepOnce();
+      accumulator -= FIXED_DT;
+      steps++;
+    }
+    msPhysik = performance.now() - tPhysik;
+    if (steps === MAX_STEPS_PER_FRAME) accumulator = 0;
+
+    items.syncMeshes();
+    excavator.setFirstPerson(orbit.mode === "cabin"); // Ego-Sicht: nur die eigenen Unterarme
+    orbit.update(
+      frameDt,
+      input,
+      (out) => excavator.getCameraTarget(out),
+      (out) => {
+        excavator.getCabinEye(out);
+        return excavator.cabinBaseYaw;
+      }
+    );
+    const tBild = performance.now();
+    renderer.render(scene, orbit.camera);
+    msBild = performance.now() - tBild;
+
+    // --- HUD, Highlight, Ampel, Audio (pro Render-Frame) ---
+    excavator.getSensorPosition(sensorPos);
+    // Der Bodenring bekommt dasselbe Urteil wie die Griff-Info: die Ampel der
+    // Mulde darunter, sonst die Fraktionsfarbe des anvisierten Teils.
+    let ringAmpel: AmpelState | null = null;
+    let ringItem: ScrapItem | null = null;
+    if (grip.grippedCount > 0) {
+      items.setHighlight(null);
+      const carried = grip.grippedBodies
+        .map((b) => items.itemByBody(b))
+        .filter((i): i is NonNullable<typeof i> => !!i);
+      const hover = containers.updateHover(
+        sensorPos.x,
+        sensorPos.z,
+        carried.map((i) => i.materialId)
+      );
+      ringAmpel = hover?.ampel ?? null;
+      hud.showCarry(carried, hover);
+    } else {
+      containers.updateHover(sensorPos.x, sensorPos.z, []);
+      const tearing = grip.tearing;
+      if (tearing) {
+        items.setHighlight(null);
+        hud.showTearing(tearing.name, tearing.progress01);
+      } else if (excavator.closure < 0.3) {
+        const part = composites.findPartNear(sensorPos);
+        if (part) {
+          items.setHighlight(null);
+          hud.showPartHint(part.name);
+        } else {
+          const target = items.findNearest(sensorPos, 1.2);
+          items.setHighlight(target);
+          ringItem = target;
+          hud.showTarget(target);
+        }
+      } else {
+        items.setHighlight(null);
+        hud.showClosedEmpty();
+      }
+    }
+    aimRing.update({
+      world: physics.world,
+      sensorPos,
+      splay: excavator.splay,
+      selfHandles: excavator.selfHandles,
+      grippedHandles: excavator.grippedHandles,
+      hoverItem: ringItem,
+      ampel: ringAmpel,
+      dt: frameDt,
+    });
+
+    looseTimer += frameDt;
+    if (looseTimer > 0.25) {
+      looseKg = measureLoose();
+      looseTimer = 0;
+    }
+    daylight.update(frameDt);
+    floodlights.update(daylight.daylight);
+    // Kleinkram zusammenfassen, bevor die Teilezahl die Bildrate drückt
+    verdichtungsTimer += frameDt;
+    if (verdichtungsTimer > 4) {
+      verdichtungsTimer = 0;
+      const gespart = items.consolidate();
+      if (gespart > 0) hud.toast(`${gespart} Kleinteile zu Bündeln zusammengefasst`);
+    }
+    lanes.update(frameDt);
+    // Störfall nur beim Wechsel melden, nicht in Dauerschleife
+    if (lanes.blocked !== stoerfallGemeldet) {
+      stoerfallGemeldet = lanes.blocked;
+      hud.toast(lanes.blocked ? lanes.message + " — freiräumen!" : "Fahrspur wieder frei.");
+    }
+    if (
+      tutorial.update(frameDt, {
+        verhandeltGerade: haggleEl.classList.contains("open"),
+        preisVereinbart: tutPreis,
+        looseKg,
+        sortiertKg: tutSortiertKg,
+        gepresst: tutGepresst,
+        abholerBestellt: tutAbholer,
+        turnoverKg: shift.turnoverKg,
+      })
+    ) {
+      zeigeTutorial();
+    }
+    shift.update(frameDt, looseKg);
+    // Zahlungsdruck: Wer die Ware nicht bezahlen kann, bekommt keine mehr.
+    // Erst wenn wieder Geld hereinkommt, liefern die Händler weiter.
+    vehicles.acceptDeliveries = shift.acceptsDeliveries && account.canBuy;
+    if (!account.canBuy !== zahlungsUnfaehig) {
+      zahlungsUnfaehig = !account.canBuy;
+      if (zahlungsUnfaehig) {
+        hud.toast("Konto leer — es liefert niemand mehr. Erst verkaufen, dann ankaufen!");
+      } else {
+        hud.toast("Wieder zahlungsfähig — die Händler kommen zurück.");
+      }
+    }
+    vehicles.intervalFactor = shift.intervalFactor(looseKg);
+    hud.updateShift(`${daylight.clock} · ${shift.statusText(looseKg)}`, shift.jammed);
+    excavator.updateInstruments(frameDt);
+    containers.updateLabels(orbit.camera.position);
+    // Bewegliche Behaelter sind Hindernisse wie jedes Bauwerk — nur wandern
+    // sie, also melden sie sich jedes Bild neu.
+    setBuildingObstacles(containers.hindernisse());
+
+    // Wartet ein Abholer, zählt nur eins: wie sortenrein ist die Ladung?
+    // Daran hängt der Erlös, also gehört es laufend ins Bild.
+    const abholer = vehicles.pickupTruck;
+    if (abholer?.waitingForLoad) {
+      const geladen = abholer.containedItems(items);
+      const nachMaterial = new Map<string, number>();
+      let gesamt = 0;
+      for (const it of geladen) {
+        for (const c of it.composition ?? [{ materialId: it.materialId, massKg: it.massKg }]) {
+          nachMaterial.set(c.materialId, (nachMaterial.get(c.materialId) ?? 0) + c.massKg);
+          gesamt += c.massKg;
+        }
+      }
+      const bestellt = vehicles.pickupOrder;
+      const passend = bestellt
+        ? nachMaterial.get(bestellt) ?? 0
+        : Math.max(0, ...nachMaterial.values());
+      hud.updateLoad(gesamt, gesamt > 0 ? passend / gesamt : 1, bestellt);
+    } else {
+      hud.updateLoad(null, 1, null);
+    }
+    hud.updateMoney(account.moneyEur, containers.totalValue());
+    audio.updateEngine(excavator.activity, Math.min(grip.totalMassKg / 2000, 1));
+    // Platzkulisse: Wind, ferne Schlaege, Flex, Kraehen — und der
+    // Rueckfahrwarner, solange ein LKW rangiert.
+    audio.tickUmgebung(frameDt);
+    audio.setRueckfahrwarner(vehicles.maneuveringTruck() !== null);
+
+    // Bodenkontakt: Kratzen + Staub, bei hoher Intensität Funken (Kap. 6.1)
+    frameCount++;
+    particles.update(frameDt);
+    const gc = excavator.groundContact;
+    if (gc.active && gc.intensity > 0.03) {
+      audio.setScrape(gc.intensity);
+      if (frameCount % 3 === 0) particles.spawn(gc.point, 2, 0x9a8b74, 0.9, 0.9, 0.6);
+      if (gc.intensity > 0.45 && frameCount % 4 === 0) {
+        particles.spawn(gc.point, 3, 0xffc060, 3.5, 1.8, 0.4);
+      }
+    } else {
+      audio.setScrape(0);
+    }
+
+    const counts = physics.counts();
+    debug.update(frameDt, {
+      bodies: counts.bodies,
+      awake: counts.awake,
+      dynamic: counts.dynamic,
+      dynAwake: counts.dynAwake,
+      gripped: grip.grippedCount,
+      grippedKg: grip.totalMassKg,
+      calls: renderer.info.render.calls,
+      tris: renderer.info.render.triangles,
+      audio: audio.diagnostics,
+      lambert: {
+        taetigkeit: staff.taetigkeit,
+        geweckteProMinute: staff.geweckteProMinute,
+      },
+      msPhysik,
+      msBild,
+    });
+
+    input.endFrame();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+
+main().catch((err) => {
+  console.error("Startfehler:", err);
+  const el = document.getElementById("loading");
+  if (el) el.textContent = "Fehler beim Start — Konsole prüfen.";
+});

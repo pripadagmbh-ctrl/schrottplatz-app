@@ -3,3 +3,4 @@ dist/
 *.log
 .DS_Store
 v2/tools/iphone-test-log.txt
+.claude/worktrees/
