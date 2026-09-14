@@ -112,3 +112,63 @@ describe("Geführter Einstieg", () => {
     expect(t.step?.id).toBe("umsehen");
   });
 });
+
+/*
+ * Anhalten ist nicht Ueberspringen (Ansage 14.09.2026: „das Tutorial
+ * pausieren"). Uebersprungen ist fuer immer weg, angehalten wartet — und der
+ * Unterschied muss auch einen Neustart ueberleben.
+ */
+describe("Führung anhalten", () => {
+  it("rückt angehalten nicht weiter, auch wenn das Ziel erreicht ist", () => {
+    const t = new Tutorial();
+    t.togglePause();
+    // 20 Sekunden und ein erfülltes Ziel — ohne Pause wäre der Schritt gewechselt
+    const c = leer();
+    let gewechselt = false;
+    for (let i = 0; i < 40; i++) gewechselt = t.update(0.5, c) || gewechselt;
+    expect(gewechselt).toBe(false);
+    expect(t.step?.id).toBe("umsehen");
+  });
+
+  it("hält die Uhr an, statt sie weiterlaufen zu lassen", () => {
+    // Sonst wäre der erste Schritt nach der Pause sofort „reif" und die Führung
+    // spränge beim Fortsetzen ohne Zutun weiter.
+    const t = new Tutorial();
+    t.togglePause();
+    for (let i = 0; i < 40; i++) t.update(0.5, leer());
+    t.togglePause();
+    expect(t.update(0.5, leer())).toBe(false);
+  });
+
+  it("nimmt dort wieder auf, wo sie stand", () => {
+    const t = new Tutorial();
+    expect(t.togglePause()).toBe(true);
+    expect(t.paused).toBe(true);
+    expect(t.togglePause()).toBe(false);
+    expect(t.paused).toBe(false);
+    expect(t.step?.id).toBe("umsehen");
+  });
+
+  it("lässt sich nach dem Überspringen nicht mehr anhalten", () => {
+    const t = new Tutorial();
+    t.skip();
+    expect(t.togglePause()).toBe(false);
+    expect(t.paused).toBe(false);
+    expect(t.step).toBeNull();
+  });
+
+  it("merkt sich die Pause über einen Neustart", () => {
+    const t = new Tutorial();
+    t.togglePause();
+    const zweiter = new Tutorial();
+    zweiter.load(t.toJSON());
+    expect(zweiter.paused).toBe(true);
+    expect(zweiter.step?.id).toBe("umsehen");
+  });
+
+  it("gilt alten Spielständen ohne Pausenfeld als nicht angehalten", () => {
+    const t = new Tutorial();
+    t.load({ index: 1, finished: false });
+    expect(t.paused).toBe(false);
+  });
+});

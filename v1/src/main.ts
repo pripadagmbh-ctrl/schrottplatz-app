@@ -286,10 +286,18 @@ async function main(): Promise<void> {
     document.getElementById("tut-schritt")!.textContent = tutorial.progress;
     document.getElementById("tut-titel")!.textContent = st.title;
     document.getElementById("tut-text")!.textContent = st.text;
+    // Angehalten schrumpft die Karte auf ihren Kopf — aus dem Weg, aber nicht
+    // weg. Der Knopf sagt, was der naechste Tipp tut, nicht was gerade gilt.
+    tutEl.classList.toggle("pausiert", tutorial.paused);
+    document.getElementById("tut-pause")!.textContent = tutorial.paused ? "weiter" : "Pause";
     tutEl.classList.add("open");
   };
   document.getElementById("tut-skip")!.addEventListener("click", () => {
     tutorial.skip();
+    zeigeTutorial();
+  });
+  document.getElementById("tut-pause")!.addEventListener("click", () => {
+    tutorial.togglePause();
     zeigeTutorial();
   });
   zeigeTutorial();

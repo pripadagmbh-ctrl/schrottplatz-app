@@ -292,6 +292,15 @@
         cursor: pointer; touch-action: manipulation; pointer-events: auto;
       }
       #tutorial button:hover { color: #e8e8e4; border-color: rgba(255,255,255,0.5); }
+      #tutorial .kopf .knoepfe { display: flex; gap: 6px; }
+      /* Angehalten: Die Karte schrumpft auf ihren Kopf. Sie ist damit aus dem
+         Weg, aber nicht weg — das ist der Unterschied zum Ueberspringen.
+         Titel und Text werden nur ausgeblendet, nicht geleert, damit beim
+         Fortsetzen nichts neu aufgebaut werden muss. */
+      #tutorial.pausiert .karte { border-left-color: rgba(154,162,168,0.55); }
+      #tutorial.pausiert h3, #tutorial.pausiert p { display: none; }
+      #tutorial.pausiert .kopf { margin-bottom: 0; }
+      #tutorial.pausiert #tut-pause { color: #f0b429; border-color: rgba(240,180,41,0.55); }
       #tutorial h3 {
         margin: 0 0 5px; font-size: 15px; letter-spacing: 1px; color: #f0b429;
       }
@@ -458,7 +467,7 @@
     </div>
     <div id="tutorial">
       <div class="karte">
-        <div class="kopf"><span id="tut-schritt">1/6</span><button id="tut-skip">überspringen</button></div>
+        <div class="kopf"><span id="tut-schritt">1/6</span><span class="knoepfe"><button id="tut-pause">Pause</button><button id="tut-skip">überspringen</button></span></div>
         <h3 id="tut-titel"></h3>
         <p id="tut-text"></p>
       </div>

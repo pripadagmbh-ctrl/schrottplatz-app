@@ -100,6 +100,18 @@ export class Tutorial {
   private t = 0;
   /** Abgeschlossen oder abgebrochen — dann meldet sich die Führung nicht mehr */
   finished = false;
+  /**
+   * Angehalten: Die Führung bleibt stehen, wo sie ist, und rückt nicht weiter.
+   *
+   * Der Unterschied zu `finished` ist der ganze Sinn (Ansage 14.09.2026: „das
+   * Tutorial pausieren"): Übersprungen ist für immer weg, angehalten wartet.
+   * Wer den Platz erst einmal in Ruhe ansehen will, verliert die Führung nicht,
+   * und wer sie beim Ausprobieren im Weg hat, muss sie nicht opfern.
+   *
+   * Auch die Uhr steht dabei still. Sonst wäre der erste Schritt nach der Pause
+   * sofort „reif" und die Führung spränge beim Fortsetzen ohne Zutun weiter.
+   */
+  paused = false;
 
   get step(): TutorialStep | null {
     return this.finished ? null : (STEPS[this.index] ?? null);
@@ -114,7 +126,7 @@ export class Tutorial {
    * selbst weiter, die übrigen erst, wenn ihr Ziel erreicht ist.
    */
   update(dt: number, c: TutorialContext): boolean {
-    if (this.finished) return false;
+    if (this.finished || this.paused) return false;
     const step = STEPS[this.index];
     if (!step) {
       this.finished = true;
@@ -136,13 +148,21 @@ export class Tutorial {
     this.finished = true;
   }
 
-  toJSON(): { index: number; finished: boolean } {
-    return { index: this.index, finished: this.finished };
+  /** Anhalten oder fortsetzen. Gibt zurück, ob sie jetzt angehalten ist. */
+  togglePause(): boolean {
+    if (this.finished) return false;
+    this.paused = !this.paused;
+    return this.paused;
   }
 
-  load(d: { index?: number; finished?: boolean } | undefined): void {
+  toJSON(): { index: number; finished: boolean; paused: boolean } {
+    return { index: this.index, finished: this.finished, paused: this.paused };
+  }
+
+  load(d: { index?: number; finished?: boolean; paused?: boolean } | undefined): void {
     if (!d) return;
     this.index = d.index ?? 0;
     this.finished = d.finished ?? false;
+    this.paused = d.paused === true;
   }
 }
