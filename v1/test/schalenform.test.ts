@@ -41,6 +41,7 @@ import {
   fersenStationen,
   schalenEnde,
   stoffe,
+  zahnBahn,
 } from "../src/fuenfschalen/teile";
 
 /** Seitensilhouette (Blick längs der Breitenachse) als Maske, 1 mm je Pixel. */
@@ -141,7 +142,18 @@ function profil(): Array<{ k: number; dicke: number; loecher: number }> {
   const Cy = fein[0]!.y + R * Math.sin(fein[0]!.th);
   const Cz = fein[0]!.z - R * Math.cos(fein[0]!.th);
   const aus: Array<{ k: number; dicke: number; loecher: number }> = [];
-  for (let i = 0; i <= 18 * SCHALEN_ABSCHNITTE + 30; i += 3) {
+  /*
+   * Bis ans Schalenende, nicht darüber hinaus.
+   *
+   * Hier standen `+ 30` Schritte mehr — die Verlängerung des Schalenkreises
+   * über die Spitze hinaus, auf der der Zahn bis zum 14.09.2026 weiterlief. Seit
+   * er seine eigene Anstellung hat (`zahnAnstellung`), tut er das nicht mehr:
+   * Ein Strahl längs der SCHALENnormalen trifft ihn schräg und misst die
+   * Schräge als Dicke — gemeldet wurden 104 … 122 mm für einen Zahn, der an
+   * keiner Stelle dicker als 39 mm ist. Der Zahn wird deshalb längs SEINER
+   * Achse gemessen, in `zahnProfil`.
+   */
+  for (let i = 0; i <= 18 * SCHALEN_ABSCHNITTE; i += 3) {
     const th = fein[0]!.th + i * BOGEN;
     const px = -(Cz + R * Math.cos(th));
     const py = Cy - R * Math.sin(th);
@@ -220,17 +232,83 @@ function fersenProfil(): Array<{ t: number; dicke: number; drauf: boolean }> {
   return aus;
 }
 
+/**
+ * Der ZAHN, längs seiner eigenen Achse gemessen.
+ *
+ * Seit dem 14.09.2026 sitzt er mit `zahnAnstellung()` schräg auf dem
+ * Schalenende, damit er bei voll geöffnetem Greifer lotrecht steht (so zeigt
+ * ihn die Herstellerzeichnung). Damit läuft er nicht mehr auf dem Kreis der
+ * Schale weiter, und `profil` kann ihn nicht mehr mitmessen.
+ *
+ * Gemessen wird wie an der Ferse: der zusammenhängende Materialstreifen, durch
+ * den die Zahnachse läuft. Ein Strahl ohne diese Einschränkung verlässt den
+ * Zahn und trifft weiter aussen die Sichel wieder — das wäre eine Lücke, die
+ * keine ist.
+ */
+function zahnProfil(): Array<{ k: number; dicke: number; drauf: boolean }> {
+  const { drin } = silhouette();
+  const ende = schalenEnde();
+  const c = Math.cos(ende.th);
+  const s = Math.sin(ende.th);
+  const aus: Array<{ k: number; dicke: number; drauf: boolean }> = [];
+  for (const f of zahnBahn(6)) {
+    /* Aus dem Rahmen der Greiferspitze in den der Schale — dieselbe Montage wie oben. */
+    const y = ende.y + f.y * c - f.z * s;
+    const z = ende.z + f.y * s + f.z * c;
+    const th = f.th + ende.th;
+    const px = -z;
+    const py = y;
+    const nx = -Math.cos(th);
+    const ny = -Math.sin(th);
+    const trifft = (d: number): boolean => drin(px + nx * d, py + ny * d);
+    const lauf = (schritt: number): number => {
+      let d = 0;
+      let luft = 0;
+      while (Math.abs(d) < 0.12) {
+        d += schritt;
+        if (trifft(d)) luft = 0;
+        else if ((luft += Math.abs(schritt)) > 0.0035)
+          return d - schritt * (luft / Math.abs(schritt));
+      }
+      return d;
+    };
+    const drauf = trifft(0);
+    aus.push({ k: f.k, dicke: drauf ? (lauf(0.001) - lauf(-0.001)) * 1000 : 0, drauf });
+  }
+  return aus;
+}
+
 describe("Form der Greiferschale in der Seitenansicht", () => {
   const p = profil();
+  const zp = zahnProfil();
 
-  it("wird von der Aufhängung bis zur Zahnspitze nur dünner", () => {
+  it("wird von der Aufhängung bis zum Schalenende nur dünner", () => {
     const rueck = p.filter((s, i) => i > 0 && s.dicke > p[i - 1]!.dicke + 0.5);
     expect(rueck.map((s) => `k=${s.k.toFixed(2)}: ${s.dicke.toFixed(0)} mm`)).toEqual([]);
   });
 
+  /*
+   * Zwei Prüfungen statt einer — die zweite Hälfte der alten Zusage „bis zur
+   * Zahnspitze". Sie ist nicht weggefallen, sie wird nur längs der richtigen
+   * Achse gemessen. Der Zahn ist am Sitz im Schalenende vergraben; dort misst
+   * der Strahl Schale UND Zahn, deshalb fängt der Vergleich erst hinter dem
+   * Sitz an (k ≥ 0,5, rund 45 mm hinter der Trennfuge).
+   */
+  it("läuft vom Zahnsitz bis zur Zahnspitze nur dünner", () => {
+    const frei = zp.filter((s) => s.k >= 0.5);
+    const rueck = frei.filter((s, i) => i > 0 && s.dicke > frei[i - 1]!.dicke + 0.5);
+    expect(rueck.map((s) => `k=${s.k.toFixed(2)}: ${s.dicke.toFixed(0)} mm`)).toEqual([]);
+  });
+
+  it("setzt den Zahn ohne Absatz auf das Schalenende", () => {
+    /* Der Zahn darf am Sitz nicht dicker sein als die Schale, auf der er sitzt. */
+    expect(zp[0]!.dicke).toBeLessThan(p[p.length - 1]!.dicke + 1);
+  });
+
   it("ist am Ende am dünnsten, nicht in der Mitte", () => {
-    const duennste = p.reduce((a, b) => (b.dicke < a.dicke ? b : a));
-    expect(duennste.k).toBe(p[p.length - 1]!.k);
+    const alle = [...p.map((s) => ({ k: s.k, dicke: s.dicke })), ...zp.map((s) => ({ k: 6 + s.k, dicke: s.dicke }))];
+    const duennste = alle.reduce((a, b) => (b.dicke < a.dicke ? b : a));
+    expect(duennste.k).toBe(alle[alle.length - 1]!.k);
     expect(p[0]!.dicke).toBeGreaterThan(2.5 * duennste.dicke);
   });
 
@@ -262,5 +340,12 @@ describe("Form der Greiferschale in der Seitenansicht", () => {
       (s) => Math.abs(s.k) > 0.01 && Math.abs(s.k - SCHALEN_ABSCHNITTE) > 0.01
     );
     expect(innen.filter((s) => s.loecher > 0).map((s) => s.k)).toEqual([]);
+    /*
+     * Und im Zahn steht auf jeder Station Werkstoff auf der Achse — ohne die
+     * Stirnkappe an der Spitze, wo der Strahl in der Fläche liegt. Das ist
+     * dieselbe Ausnahme und derselbe Grund wie eine Zeile höher.
+     */
+    const letzte = zp[zp.length - 1]!.k;
+    expect(zp.filter((s) => s.k < letzte - 0.01 && !s.drauf).map((s) => s.k.toFixed(2))).toEqual([]);
   });
 });

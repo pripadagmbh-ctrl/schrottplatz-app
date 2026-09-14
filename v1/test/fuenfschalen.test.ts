@@ -266,17 +266,117 @@ describe("Fünfschalen — Mittelsäule", () => {
 describe("Fünfschalen — Maße", () => {
   it("baut den Zahn auf sein Sollmaß 120 × 250 × 80 mm", () => {
     /*
-     * Positionsliste 07 Greiferspitze: 0,25 × 0,12 × 0,08 m. Gemessen wird das
-     * Hüllmaß des gebogenen Zahns — die Tiefe enthält deshalb die Biegung
-     * (44 mm Pfeilhöhe über 250 mm bei R 0,70) und nur der Rest ist Querschnitt.
+     * Positionsliste 07 Greiferspitze: 0,25 × 0,12 × 0,08 m.
+     *
+     * Die Länge wird längs der ZAHNACHSE gemessen, als Summe der Abstände
+     * zwischen den Schwerpunkten der vier Querschnitte. Vorher stand hier das
+     * achsparallele Hüllmaß `max(s.y, s.z)`. Das war ein Stellvertreter, und er
+     * hat aufgehört zu stimmen, als der Zahn am 14.09.2026 seine Anstellung
+     * bekam: Ein um 12,15° gekippter Körper misst in der Hülle 260 statt
+     * 250 mm, obwohl an ihm kein Millimeter anders ist. Die Achse misst den
+     * Zahn, die Hülle misst seine Lage.
+     *
+     * Die Breite bleibt das Hüllmaß in x — die Anstellung dreht um x, quer zum
+     * Zahn ändert sich dadurch nichts.
      */
     const g = baueGreifer();
     g.setOeffnung(0);
+    const zahn = finde(g.wurzel, "SHELL_TIP_01").children[0] as THREE.Mesh;
+    const bb = new THREE.Box3().setFromObject(zahn);
+    expect(
+      bb.getSize(new THREE.Vector3()).x,
+      `Zahn ${(bb.getSize(new THREE.Vector3()).x * 1000).toFixed(0)} mm breit`
+    ).toBeCloseTo(0.12, 2);
+
+    const pos = zahn.geometry.getAttribute("position") as THREE.BufferAttribute;
+    const RING = 5; // fuenfeckiger Querschnitt, fuenf Punkte je Station
+    const mitte = (von: number): THREE.Vector3 => {
+      const s = new THREE.Vector3();
+      const v = new THREE.Vector3();
+      for (let i = 0; i < RING; i++) s.add(v.fromBufferAttribute(pos, von + i));
+      return s.multiplyScalar(1 / RING);
+    };
+    let laenge = 0;
+    for (let i = RING; i < pos.count; i += RING) laenge += mitte(i).distanceTo(mitte(i - RING));
+    expect(laenge, `Zahnlänge ${(laenge * 1000).toFixed(0)} mm`).toBeCloseTo(0.25, 2);
+  });
+
+  /**
+   * Die Eigenschaft vom 14.09.2026: OFFEN STEHT DER ZAHN LOTRECHT.
+   *
+   * Auf der Herstellerzeichnung zeigt der Zahn bei offenem Greifer senkrecht
+   * nach unten, während die Schale weit aufgeschwenkt ist. Bei uns tat er das
+   * nicht: `OFFEN` stellt die TANGENTE des Schalenendes senkrecht, und der Zahn
+   * ist über seine 250 mm mit R 0,70 noch einmal in sich gebogen — gemessen
+   * stand er 12,15° schräg nach innen.
+   *
+   * Der Zahn wird dafür NICHT gegengedreht. Er ist starr angeschraubt; was
+   * schräg ist, ist sein Sitz (`zahnAnstellung`, eine feste Zahl). Deshalb
+   * prüft dieser Wächter beides: lotrecht am Anschlag, und starr dazwischen —
+   * die Achse dreht über den ganzen Weg genau so viel wie die Schale.
+   */
+  const zahnachse = (g: ReturnType<typeof baueGreifer>): number => {
+    g.wurzel.updateMatrixWorld(true);
+    const zahn = finde(g.wurzel, "SHELL_TIP_01").children[0] as THREE.Mesh;
+    const pos = zahn.geometry.getAttribute("position") as THREE.BufferAttribute;
+    const RING = 5;
+    const mitte = (von: number): THREE.Vector3 => {
+      const s = new THREE.Vector3();
+      const v = new THREE.Vector3();
+      for (let i = 0; i < RING; i++) s.add(v.fromBufferAttribute(pos, von + i));
+      return s.multiplyScalar(1 / RING).applyMatrix4(zahn.matrixWorld);
+    };
+    const fuss = mitte(0);
+    const spitze = mitte(pos.count - RING);
+    const d = spitze.clone().sub(fuss);
+    const aussen = new THREE.Vector2(fuss.x, fuss.z).normalize();
+    return Math.atan2(d.x * aussen.x + d.z * aussen.y, -d.y);
+  };
+
+  it("stellt den Zahn bei voller Öffnung lotrecht", () => {
+    const g = baueGreifer();
+    g.setOeffnung(1);
+    const grad = (zahnachse(g) * 180) / Math.PI;
+    expect(Math.abs(grad), `Zahnachse ${grad.toFixed(2)}° gegen die Senkrechte`).toBeLessThan(0.5);
+  });
+
+  it("dreht den Zahn starr mit der Schale — keine laufende Korrektur", () => {
+    const g = baueGreifer();
+    for (let s = 0; s <= 20; s++) {
+      const t = s / 20;
+      g.setOeffnung(t);
+      /*
+       * Lotrecht bei `OFFEN`, starr dazwischen: Der gemessene Winkel (+ = Spitze
+       * nach aussen) ist genau `Schwenk − OFFEN`. Weicht er davon ab, dreht
+       * jemand den Zahn mit — und das wäre eine Animation, keine Anstellung.
+       */
+      const soll = ((schwenkFuer(t) - OFFEN) * 180) / Math.PI;
+      expect((zahnachse(g) * 180) / Math.PI, `Öffnung ${t.toFixed(2)}`).toBeCloseTo(soll, 1);
+    }
+  });
+
+  it("lässt die Zahnspitzen geschlossen auf der Achse zusammenlaufen", () => {
+    /*
+     * Die Anstellung verschiebt die Spitze. Geschlossen darf sie deshalb nicht
+     * von der Achse wegwandern — sonst geht der Korb nicht mehr zu. Gemessen
+     * wird der kleinste Radius, den ein Zahnpunkt geschlossen erreicht.
+     */
+    const g = baueGreifer();
+    g.setOeffnung(0);
+    g.wurzel.updateMatrixWorld(true);
     const zahn = finde(g.wurzel, "SHELL_TIP_01");
-    const bb = new THREE.Box3().setFromObject(zahn.children[0]!);
-    const s = bb.getSize(new THREE.Vector3());
-    expect(s.x, `Zahn ${(s.x * 1000).toFixed(0)} mm breit`).toBeCloseTo(0.12, 2);
-    expect(Math.max(s.y, s.z), "Zahnlänge").toBeCloseTo(0.25, 2);
+    const v = new THREE.Vector3();
+    let eng = Infinity;
+    zahn.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      const pos = m.geometry.getAttribute("position") as THREE.BufferAttribute;
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
+        eng = Math.min(eng, Math.hypot(v.x, v.z));
+      }
+    });
+    expect(eng, `Zahn kommt geschlossen nur bis r=${eng.toFixed(3)} m`).toBeLessThan(0.1);
   });
 
   it("öffnet weiter, als er hoch ist, und schließt auf der Achse", () => {
