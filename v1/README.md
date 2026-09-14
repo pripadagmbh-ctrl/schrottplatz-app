@@ -1,6 +1,16 @@
-# Prototyp — Schrottplatz-App
+# Rust'n'Reibach — v1
 
-Stand: **M3 abgeschlossen** (Anlieferung + Konto + Presse, siehe `docs/02_Briefing.md` Kap. 22).
+**`v1/` ist der Arbeitsordner.** Nachfolger des Prototyps, kopiert am 14.09.2026 vom Stand
+`f3c3c52`. `prototype/` und `v2/` bleiben eingefroren und werden nie geändert — die Regeln
+stehen in `../CLAUDE.md`, die Entscheidungen in `docs/entscheidungen.md` (ab E-001).
+
+Stand: **M1 gebaut, Gerätetest offen.** Zapfen statt breiter Ring an der Spinne (E-007),
+Rückwände raus an den vier Sortiermulden (E-006), Kommentar-Regel für Messwerte (E-008).
+Prüfkette grün: `npm test` 255 Tests in 27 Dateien, `npm run build` sauber. Abgenommen ist
+M1 erst nach Patricks Gerätetest — die Handgriffe stehen bei E-006 und E-007 im Log.
+
+Der Spielinhalt (M0–M3 weiter unten) ist vom Prototyp geerbt und unverändert gültig; diese
+Abschnitte beschreiben, was v1 mitbringt, nicht was in v1 entstanden ist.
 
 ## Starten
 
@@ -9,7 +19,21 @@ npm install
 npm run dev
 ```
 
-Dann http://localhost:5173 im Browser öffnen. `npm run build` erzeugt den Produktions-Build in `dist/`.
+Dann http://localhost:5173 im Browser öffnen.
+
+Für den Gerätetest auf iPad oder iPhone im selben WLAN:
+
+```bash
+npm run dev -- --host
+```
+
+Vite nennt dann eine Adresse der Form `http://<PC-IP>:5173` — die im Safari des Geräts
+öffnen. `npm run build` erzeugt den Produktions-Build in `dist/`, `npm test` fährt die
+Wächter. Beide müssen vor jeder Übergabe grün sein (Regel 8).
+
+Veröffentlicht wird v1 nach einem Merge auf `main` unter
+`pripadagmbh-ctrl.github.io/schrottplatz-app/v1/` (E-005). Der Merge braucht Patricks
+Freigabe und ist nach rund 70 Sekunden live.
 
 ## Steuerung (M0)
 
@@ -32,6 +56,12 @@ Dann http://localhost:5173 im Browser öffnen. `npm run build` erzeugt den Produ
 
 ## Platzanordnung & Wirtschaft (Stand 2026-08-29)
 
+> **Veraltet.** Der Platz wurde am 13.09.2026 umgebaut: vier Lego-Sortiermulden im
+> Westen (seit E-006 ohne Rückwand), acht Mulden an der Ostwand, Presse in der Ecke statt
+> an der Mauer. Die Skizze unten zeigt den Stand vom 29.08. und bleibt hier als Erklärung
+> des **Geldkreislaufs** stehen — der gilt unverändert. Für die Anordnung ist
+> `src/world/containers.ts` die Wahrheit.
+
 Der Bagger steht mittig auf (0, −1); alle Sortierziele liegen im Schwenkbereich
 (5,8–9,2 m), Fahren ist nur für Presse und Verladung nötig.
 
@@ -50,6 +80,14 @@ Jedes korrekt einsortierte Teil bringt sofort 0,05 €/kg Sortierprämie. Verkau
 wird über den Abhol-LKW: **V** ruft ihn, der Spieler belädt den Container mit der
 Spinne, **V** schickt ihn los — bezahlt wird Materialwert × Sortenreinheit², eine
 sortenreine Ladung bringt also ein Vielfaches.
+
+## Geerbt vom Prototyp — Spielinhalt M0 bis M3
+
+Die vier folgenden Abschnitte stammen unverändert aus dem Prototyp (Stand 29.08.2026)
+und beschreiben, was v1 an Spielinhalt mitbringt. Sie gelten weiter. Was seither **in
+v1** entschieden oder geändert wurde, steht ausschließlich in `docs/entscheidungen.md`
+und in den Messprotokollen unter `docs/messungen/` — dort und nicht hier nachschlagen,
+wenn die Beschreibung unten von dem abweicht, was das Spiel tut.
 
 ## M3-Umfang (verifiziert 2026-08-29)
 
@@ -118,8 +156,9 @@ sortenreine Ladung bringt also ein Vielfaches.
 
 - Arm ist **kinematisch** (animierte Winkel), nur Chassis + Greifer-Palm haben Kollider.
 - Greifen = Sensorkugel-Abfrage beim Schließen + **Fixed Joint** pro Objekt (Briefing Kap. 6.2).
-- Greifspinne: 5 Schalen-Zacken (Kugelsegmente), schließen ohne Durchsicht; Kollider der
-  Zacken folgen später.
+- Greifspinne: 5 Schalen-Zacken, seit E-007 am schlanken Zapfen statt am breiten Ring,
+  je acht Segmente. Die Kollider der Zacken folgen der Zeichnung (`updateClawColliders`) —
+  dass beide deckungsgleich sind, hält ein eigener Wächter in `test/greifer.test.ts` fest.
 - Module kommunizieren über den typisierten **EventBus** (`core/events.ts`) — itemEntered/
   itemLeft/grabbed/released; Audio und HUD hängen nur an Events.
 - Container-Zuordnung per **Zonen-Zählung** alle 10 Steps (gegriffene Items zählen nicht);

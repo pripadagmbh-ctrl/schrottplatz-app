@@ -144,3 +144,41 @@ die geschlossene Spinne sauber aus — Spitzen auf der Achse, keine Kralle, die 
 Nachbarin ragt? Passt sie offen noch in die Presskammer und zwischen die Muldenwände — die
 3,38 m sind gerechnet, nicht gefahren? Und wirkt der schlanke Zapfen aus dem Sitz heraus
 richtig, oder sieht die Aufhängung jetzt zu dünn aus für das, was daran hängt?
+
+### E-008 — Messwerte im Kommentar nennen ihre Messung; widerlegte Altwerte bleiben stehen (14.09.2026)
+
+**Entscheidung.** Ein Kommentar, der eine gemessene Zahl behauptet, nennt das Protokoll
+unter `docs/messungen/`, aus dem sie stammt. Wird eine solche Zahl später widerlegt, wird
+sie **nicht gelöscht**, sondern mit Datum und Grund als widerlegt markiert und stehen
+gelassen. Umgesetzt in `src/grapple/form.ts:83–99` und
+`src/excavator/grappleParts.ts:104–113`.
+
+**Begründung.** Beim Zapfen-Umbau (E-007) standen in genau diesen beiden Dateien
+Messwerte, die die Prüfung widerlegte: „Hub 0,26 m, Neigung bis 7,1 Grad, Hebelarm
+nirgends unter 0,19 m" und „bis 14° steil, nirgends weniger als 11 cm Hebelarm, Faktor
+1,70". Gemessen wurden zu diesem Zeitpunkt 0,1529 m Hub, 31,4° und 3 mm Hebelarm. Die
+Kommentare waren also nicht ungenau, sondern falsch — und zwar auf die gefährlichste Art:
+Sie beschrieben eine Lösung, die jemand einmal gefunden, aber nie in die Konstanten
+übernommen hatte. Wer sie las, hielt das Problem für gelöst. Ein Kommentar, der eine Zahl
+ohne Herkunft behauptet, ist damit schlimmer als gar kein Kommentar; Regel 3 („jede Zahl
+hat eine Herkunft") gilt ausdrücklich auch für Prosa, nicht nur für Konstanten.
+
+Dass die widerlegten Werte stehen bleiben, hat einen eigenen Grund: Der Faktor 1,70 tauchte
+zweimal auf, an zwei Stellen, mit zwei verschiedenen Nachbarzahlen. Gelöscht wäre er beim
+dritten Mal wieder aufgetaucht, weil niemand mehr wüsste, dass er schon einmal verworfen
+wurde. Als markierter Altwert kostet er drei Zeilen und spart die Diskussion.
+
+**Verworfene Alternative.** Die falschen Kommentare ersatzlos streichen — kürzer, aber die
+Zahl kommt wieder. Oder die Werte nur im Messprotokoll führen und die Kommentare ganz
+zahlenfrei halten — dann steht die Zahl nicht mehr dort, wo sie gebraucht wird, nämlich
+neben der Konstante, die jemand gerade ändern will. Ebenfalls verworfen: den
+Kolbenflächen-Faktor weiter zu führen. Das Modell kennt nur Außenradien, kein
+Bohrungsmaß; jede Angabe dazu wäre geraten. Ersatzlos gestrichen statt geschätzt.
+
+**Abnahmekriterium.** In `src/grapple/form.ts` und `src/excavator/grappleParts.ts` steht
+keine Messzahl mehr ohne Verweis auf `docs/messungen/2026-09-14_greifer-anlenkung.md`, und
+die beiden widerlegten Blöcke sind als solche gekennzeichnet. `npm test` grün (27 Dateien,
+255 Tests), `npm run build` grün.
+
+**Auf dem Gerät zu prüfen.** Nichts — diese Entscheidung ändert keine Zeile, die das Spiel
+ausführt. Sie steht hier, weil sie beim nächsten Greifer-Umbau die halbe Sucharbeit spart.
