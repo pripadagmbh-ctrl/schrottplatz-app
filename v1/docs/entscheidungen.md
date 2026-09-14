@@ -469,3 +469,115 @@ zu welcher Schaltfläche gehört? Und sieht man Lambert bei der Arbeit, oder suc
 
 **Reihenfolge der Umsetzung.** Lambert zuerst, nicht die Hallen: Er ist der Flaschenhals.
 Vier Hallen, die niemand leeren kann, sind wertlos.
+
+### E-012 — Fahrtempo 1,4 → 3,2 m/s, das Fahrwerk bekommt eine eigene Anlauframpe (14.09.2026)
+
+**Entscheidung.** Endtempo des Baggers auf **3,2 m/s** (11,5 km/h), Mitte des in E-010
+freigegebenen Bandes (`src/excavator/excavator.ts:116`). Das Fahrwerk löst sich von der
+gemeinsamen `RAMP_TIME` und bekommt eine eigene Anlauf- und Auslauframpe
+`DRIVE_RAMP_TIME = 0,7 s` (`:130`, angewandt `:1359`). `STEER_RATE` bleibt bei 0,7 rad/s
+(`:151`).
+
+**Begründung.** 5 km/h ist Kettenbagger-Tempo; der Fuchs ist ein Radbagger und fährt auf
+dem Platz real 10 bis 15 km/h. Eine Fahrt zum Verladeplatz und zurück dauerte 50,3 s und
+dauert jetzt 22,6 s.
+
+Die eigene Rampe ist der eigentliche Fund. **Eine Rampe ist eine Zeit, keine
+Beschleunigung.** Hätte man nur `DRIVE_MAX` angehoben, wäre die Beschleunigung von
+4,67 auf **10,67 m/s² = 1,09 g** gesprungen — Sportwagenwerte für eine 20-Tonnen-Maschine,
+und vermutlich genau die Zahl, an der der Gerätetest „Maschine oder Auto" gekippt wäre. Da
+`RAMP_TIME` auch Ausleger, Stiel und Oberwagen speist, durfte sie nicht wandern; daher die
+eigene Konstante. Kosten: 0,4 s über die Platzquerung.
+
+**Der Wendekreis wächst, und das ist richtig so.** Die Lenkung arbeitet mit fester
+Gierrate, der Radius ist damit schlicht `DRIVE_MAX / STEER_RATE`: 2,00 m vorher, **4,57 m**
+jetzt. Erst damit stimmt die Geometrie — 2,8 m Radstand bei 32° Einschlag ergeben 4,5 m;
+für die alten 2,00 m hätte die Achse 54° einschlagen müssen, was keine gelenkte Achse
+kann. Das war ein Panzerbogen.
+
+*Anmerkung zur Herkunft dieser Zahl:* Im Auftrag stand die Annahme, der Bogen werde bei
+höherem Tempo **enger**. Das ist falsch — er wird weiter. Die Annahme ist hier
+richtiggestellt, damit sie nicht wiederkommt (Regel aus E-008).
+
+**Verworfene Alternativen.** Nur `DRIVE_MAX` anheben (verdreifacht still die
+Beschleunigung). `STEER_RATE` auf 1,6 rad/s mitziehen, um die alten 2 m Radius zu halten
+(92 °/s — ein Kreisel, und genau das Auto-Gefühl, das vermieden werden sollte).
+Rückwärtstempo trennen: hydrostatische Fahrantriebe sind symmetrisch, und bei drehbarer
+Kabine ist „rückwärts" für den Spieler kein greifbarer Begriff — eigener Auftrag, falls
+gewünscht.
+
+**Nebenwirkungen, gemessen und bewusst gelassen.** Der Ausrollweg wächst von 0,21 m auf
+1,11 m — vor einer Mauer muss man deutlich früher loslassen; das ist gewollt und macht die
+Maschine schwer. Der Fahrschritt je Bild wächst auf 10,7 cm gegen eine Kollisionsschürze
+von 1,3 m, Tunneln ist damit rechnerisch ausgeschlossen. Der Kratzton bei aufliegender
+Spinne geht auf Anschlag, weil er mit einem absoluten Gewicht rechnet — mit 11 km/h über
+Beton zu schleifen darf lauter sein als mit 5. Am Touch-Stick beginnt der enge Lenkbereich
+erst bei rund einem Drittel Stickweg; Drehen auf der Stelle ist mit 14 °/s unverändert.
+
+**Abnahmekriterium.** Sieben Wächter in `test/fahrtempo.test.ts`: Tempo im Band 3,0–3,5;
+50 m aus dem Stand unter 20 s und über 14 s; Wenderadius zwischen 3 und 6 m;
+**Beschleunigung unter 6 m/s²** — der Wächter gegen die stille Nebenwirkung oben;
+Bremsweg unter 2 m; Tempo unabhängig von der Bildrate; Fahrschritt kleiner als die halbe
+Kollisionsschürze. Kein bestehender Test hing am alten Tempo.
+
+**Auf dem Gerät zu prüfen.** Einmal quer über den Platz und zurück, Gas durchgedrückt:
+**Die Frage ist nicht, ob es schneller ist, sondern ob es dabei noch schwer wirkt.** Zieht
+sie an wie etwas Schweres, das in Bewegung kommt, oder schnellt sie los? Dann ein Bogen bei
+voller Fahrt — fühlt sich der doppelt so weite Radius nach gelenkter Achse an, oder
+vermisst du die alte Wendigkeit? Und das Bremsen vor der Südmauer, auch auf dem iPhone
+mini, wo die Bildrate niedriger und der Fahrschritt doppelt so groß ist.
+
+### E-013 — Der Zinken des Fünfschalengreifers wird ein Gussstück (14.09.2026)
+
+**Entscheidung.** Lagerhülse, Zylinderauge und Sichel sind **ein Körper**, kein Klotz mit
+angehängter Klinge. Neu ist die Fersenkurve `fersenStationen()`
+(`src/fuenfschalen/teile.ts:446–511`): eine kubische Bézier vom Bolzen zur Station 0, die
+ihre Tangente von −90° — am Bolzen zeigt der Körper radial nach außen — auf die −8,75°
+dreht, mit denen die Schale beginnt. Kein Kreisbogen, weil Punkt und Tangente an beiden
+Enden vier Bedingungen sind und ein Kreis nur drei Freiheiten hat. Gebaut wird daraus **ein**
+Strang über Ferse und Schale (`:1291–1345`) statt 18 Strebenstücken plus zwei Quadern; die
+drei Kehlnähte entfallen, weil ein Gussstück keine hat.
+
+**Begründung.** Patrick am 14.09.2026 vor der Vorschau: „Man sieht, dass der Zinken aus zwei
+Elementen besteht. Von der Traverse gehen Metallblöcke weg, und daran ist der Zinken
+befestigt. Wahrscheinlich ist aber direkt an der Traverse eine Hülse, wo der Zahn
+festgemacht ist — der Zinken und dieser Metallblock, das ist eigentlich ein Gusselement."
+Vorbild ist der SENNEBOGEN MG4.1, Schalenform HO, bei dem jede Schale ein durchgehendes
+Gussstück ist.
+
+**Was es gekostet hat: nichts.** Kinematik Zahl für Zahl unverändert, Nettokorb 1.598 l
+(−0,5 l), größter Durchmesser 3,227 m, Sektorluft sogar 9,66° statt 7,3° durch die längere
+Lagerhülse. Und das Modell wurde **schlanker**: 322 → **212 Bauteile**, GLB 1.273 → 1.111 kB.
+Ein durchgehender Körper braucht weniger Teile als eine Stückelung.
+
+**Die flache Unterkante bleibt offen — und der Grund ist rechnerisch.** Patricks zweiter
+Wunsch war, dass bei offenem Greifer Zinken und Stempel eine Linie bilden. Das ist mit der
+Krümmung **nicht** zu erreichen: Wie tief der Zahn offen hängt, folgt aus dem Bolzenradius,
+nicht aus dem Bogen — der kürzt sich heraus. Gemessen bleiben 0,566 m Unterschied
+(Zahn −2,217 m, Stempel −1,652 m).
+
+Eine Variante B, die es erreicht (3 mm), ist gezeichnet und **nicht eingebaut**: Sie kostet
+die Sektorluft (9,7° → 0,7°), die Zylinderreserve (12 → 2 cm) und erzeugt **einen Totpunkt
+bei 83 % Öffnung** (Hebelarm 11 mm). Der Totpunkt ist kein Zufall dieser Zahlen: Solange
+die Zylinderaufnahme über der Bolzenebene sitzt, liegt er für jede Lösung bei 102–107°
+Schwenk, während die flache Unterkante mindestens 113° verlangt. **Die flache Unterkante
+ist also erst nach einer neuen Anlenkung zu haben** — was ohnehin offen ist (E-009,
+Zylinderneigung 38,9° gegen Ziel 20°, Hebelarm 0,0924 m gegen Ziel 0,10 m).
+
+**Verworfene Alternative.** Variante B sofort einbauen. Ein Totpunkt bei 83 % ist derselbe
+Fehler, der am 14.09. an der Sichelkralle behoben wurde (E-007): Die Schale steht fest,
+gleich wie viel Druck anliegt. Eine Form, die gut aussieht und nicht greift, ist keine
+Verbesserung.
+
+**Abnahmekriterium.** Zwei neue Wächter in `test/schalenform.test.ts`: „läuft von der
+Lagerhülse ohne Fuge in die Schale" und „ist am Bolzen am dicksten". Beide haben vor der
+Behebung echte Kerben gemeldet — eine Schulterkerbe von 50 mm und eine in der Bolzenmitte
+abgeschnittene Nabe, die dem Auge entgangen waren. Die drei alten Prüfungen sind wörtlich
+unverändert. `npm test` grün (281 Tests in 30 Dateien), `npm run build` grün.
+
+**Auf dem Gerät zu prüfen.** In der Vorschau (`/greifer.html`) den Greifer einmal ganz zu
+und ganz auf fahren: Liest sich jeder Zinken als **ein** Gussstück — Hülse, Auge, Bogen,
+Zahn — oder sieht man noch eine Trennung? Von schräg unten: Sitzt die Lagerhülse plausibel
+im Material oder wirkt sie aufgesetzt? Und die beiden Bilder nebeneinander
+(`docs/f5-greifer-seite.png` gegen `docs/f5-greifer-seite-flach.png`): Ist die flache
+Unterkante den Preis wert?
