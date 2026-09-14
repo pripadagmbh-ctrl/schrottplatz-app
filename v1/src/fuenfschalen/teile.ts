@@ -1701,8 +1701,8 @@ export function zahnEigenwinkel(): number {
  * stehen: Wer `OFFEN` anfasst, bekommt die Anstellung mitgeführt, statt den
  * Zahn wieder schief zu stellen.
  */
-export function zahnAnstellung(): number {
-  return OFFEN - schalenEnde().th + zahnEigenwinkel();
+export function zahnAnstellung(offen = OFFEN): number {
+  return offen - schalenEnde().th + zahnEigenwinkel();
 }
 
 /** Wie hoch der Zahnsitz über der Mittellinie der Schale liegt (m). */
@@ -1719,8 +1719,11 @@ function zahnZ0(): number {
  * Schale hinein, dass die angeschrägte Sitzfläche nirgends von ihrem
  * Schalenende abhebt — ohne sie klafft dort ein Keil von knapp 4 mm.
  */
-function zahnSitz(): { dreh: (py: number, pz: number) => [number, number]; tief: number } {
-  const w = zahnAnstellung();
+function zahnSitz(offen = OFFEN): {
+  dreh: (py: number, pz: number) => [number, number];
+  tief: number;
+} {
+  const w = zahnAnstellung(offen);
   const c = Math.cos(w);
   const s = Math.sin(w);
   const nabe = zahnMitte(0);
@@ -1742,9 +1745,9 @@ function zahnSitz(): { dreh: (py: number, pz: number) => [number, number]; tief:
  * Strahl längs der SCHALENnormalen schneidet ihn jetzt schräg und meldet
  * Dicken, die es nicht gibt.
  */
-export function zahnBahn(je = 4): Array<{ y: number; z: number; th: number; k: number }> {
-  const { dreh, tief } = zahnSitz();
-  const w0 = zahnAnstellung();
+export function zahnBahn(je = 4, offen = OFFEN): Array<{ y: number; z: number; th: number; k: number }> {
+  const { dreh, tief } = zahnSitz(offen);
+  const w0 = zahnAnstellung(offen);
   const z0 = zahnZ0();
   const letzte = ZAHN_STATIONEN.length - 1;
   const aus: Array<{ y: number; z: number; th: number; k: number }> = [];
@@ -1775,7 +1778,7 @@ export function zahnBahn(je = 4): Array<{ y: number; z: number; th: number; k: n
  * wie das Schalenende, keinen Millimeter mehr. Was darunter heraussteht, sind
  * nur noch die beiden Zacken — gleich groß, schmal, auf einen Punkt zulaufend.
  */
-export function baueGreiferspitze(st: Stoffe): THREE.Group {
+export function baueGreiferspitze(st: Stoffe, offen = OFFEN): THREE.Group {
   const g = new THREE.Group();
   g.name = "07_GREIFERSPITZE";
   /*
@@ -1814,7 +1817,7 @@ export function baueGreiferspitze(st: Stoffe): THREE.Group {
   /* Die flache Seite liegt auf der Verstaerkung, also aussen auf dem Blech. */
   const z0 = zahnZ0();
   /* Anstellung und Einsitz — der Zahn sitzt SCHRAEG auf dem Schalenende. */
-  const { dreh, tief } = zahnSitz();
+  const { dreh, tief } = zahnSitz(offen);
 
   const pos: number[] = [];
   const uv: number[] = [];
