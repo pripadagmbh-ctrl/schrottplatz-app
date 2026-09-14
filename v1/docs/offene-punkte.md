@@ -161,3 +161,79 @@ erledigt ist, bekommt den Commit dazu.
       Haus, Abrollkipper ohne Kran.
 
       Gehört zu „Maschinen" in Abschnitt 1 (E-016).
+
+- [ ] **Wracks kommen in verschiedenen Zuständen an** — fehlende Türen, fehlende
+      Reifen, Motor schon ausgeschlachtet (Patrick, 14.09.2026). Heute ist jedes
+      Auto identisch: `dismantle/carDef.ts` hat **genau einen Datensatz**, und
+      jedes Wrack bringt vollständig Motor, Getriebe und vier Räder mit.
+
+      *Warum es zählt:* Es macht aus dem Abladen eine **Einschätzung**. Heute
+      weiß man vorher, was drin ist, und arbeitet es ab. Mit wechselnden
+      Zuständen muss man hinsehen: Ist an dem noch was dran, oder ist das ein
+      leergeräumter Rumpf? Genau das ist die eigentliche Arbeit auf einem
+      Schrottplatz — und es gibt dem Verhandeln über den Ankaufspreis zum ersten
+      Mal einen Grund, denn ein ausgeschlachtetes Wrack ist weniger wert.
+
+      *Wie es gehen könnte, ohne neuen Code:* `CarDef` ist datengetrieben
+      angelegt (`dismantle/composites.ts:538`), die Baugruppen stehen einzeln in
+      `carDef.ts:88–149`. Es braucht also keine neue Mechanik, sondern nur die
+      Möglichkeit, **Teile beim Erzeugen wegzulassen** — plus sichtbare Spuren
+      dort, wo etwas fehlt: offene Radnabe statt Rad, leerer Türrahmen, offene
+      Motorhaube mit leerem Raum.
+
+      Der Zustand gehört an die **Anlieferung**, nicht ans Wrack: Welcher Händler
+      bringt gute Wracks und welcher nur Reste, ist eine Eigenschaft des Kunden
+      — wie Farbe und Krantyp eine Zeile weiter oben. Wer immer Ausgeschlachtetes
+      liefert, muss im Preis heruntergehen.
+
+      Gehört zu „Schrott" in Abschnitt 1 (E-016), und es ist der natürliche
+      erste Schritt zu Briefing Kap. 8.2 (sieben Zerlegeschritte mit
+      Reihenfolge), das bisher ganz offen ist.
+
+- [ ] **Motorräder sind einspurige Fahrzeuge** (Patrick, 14.09.2026). Im Spiel
+      gibt es sie noch nicht; die Notiz hält die Eigenschaft fest, auf die es
+      ankommt, wenn sie kommen.
+
+      *Was daraus folgt:* Ein einspuriges Fahrzeug **steht nicht von selbst**.
+      Ein Autowrack sitzt auf vier Rädern und bleibt, wo es liegt; ein Motorrad
+      fällt um, sobald man es loslässt. Auf dem Platz liegt es also auf der
+      Seite, im Stapel verkeilt, oder es lehnt an etwas. Aufrecht steht es nur
+      auf einem Ständer — und den hat ein Schrottmotorrad meistens nicht mehr.
+
+      Für die Physik heißt das: kein aufrechter Ruhezustand. Wer es hinstellt,
+      muss damit rechnen, dass es umkippt, und das ist richtig so.
+
+      Als Schrott ist es interessant, weil fast alles daran Buntmetall ist —
+      Motorblock aus Aluminium, Kabelbaum, Auspuff aus Edelstahl. Ein Motorrad
+      ist leicht, aber nicht billig.
+
+      *Offen:* Ob du sie als **Wrack zum Zerlegen** meinst (wie die Autos), als
+      **Schrottteil** (ein Stück, das man greift und einsortiert) oder als
+      **Anlieferfahrzeug**. Die Eigenschaft „einspurig" gilt für alle drei, der
+      Aufwand unterscheidet sich stark. Frag mich beim nächsten Mal danach, oder
+      schreib es dazu.
+
+      Gehört zu „Schrott" in Abschnitt 1 (E-016).
+
+- [ ] **Velos fehlen auch** (Patrick, 14.09.2026). Ebenfalls einspurig, siehe
+      die Notiz darüber — ein Fahrrad steht nicht von selbst, es liegt oder
+      lehnt.
+
+      *Warum ein Fahrrad als Schrottteil besonders ist:* Es ist der
+      Musterfall für „lohnt sich der Aufwand?". Ein einzelnes Rad wiegt kaum
+      etwas und bringt fast nichts. Ein **Haufen** alter Räder dagegen ist eine
+      Anlieferung, wie sie jeder Platz kennt — sie kommen nie einzeln.
+
+      Und es ist gemischt gebaut: Stahlrahmen oder Alurahmen, Alufelgen,
+      **Gummireifen als Störstoff**, Plastik am Sattel und an den Griffen. Damit
+      wird es zur Entscheidung: reinwerfen in den Mischschrott, oder die Reifen
+      abziehen und die Alurahmen heraussortieren. Genau die Rechnung, die den
+      Reinheitsgedanken im Spiel erst spürbar macht — an einem Gegenstand, den
+      jeder kennt.
+
+      *Wie es sparsam ginge:* Velos als **Bündel** anliefern, nicht als
+      Einzelteile — ein verkeiltes Knäuel wie die Maschendraht-Bündel, die es
+      schon gibt. Der Greifer holt daraus einzelne heraus. Das hält die Zahl der
+      Körper klein und sieht nebenbei richtig aus.
+
+      Gehört zu „Schrott" in Abschnitt 1 (E-016).
