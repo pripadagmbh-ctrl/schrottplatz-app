@@ -7,6 +7,7 @@ import { InstrumentPanel, type InstrumentReadout } from "./instruments";
 import { buildDriver } from "./driver";
 import { baueSpinne } from "./grappleParts";
 import { baueRad, radGeometrien, radStoffe, RAD_R } from "./wheelParts";
+import { BAGGER_STAND } from "../world/baggerstand";
 import {
   CLAW_COUNT,
   CLAW_OPEN_SPLAY,
@@ -385,7 +386,16 @@ export class Excavator {
    * und koennte ihn nicht befuellen. 4,0 m ist die Untergrenze, und genau
    * darauf steht sie jetzt.
    */
-  readonly position = new THREE.Vector3(-2.5, 0, -19.5);
+  /*
+   * Der Standplatz kommt aus `world/baggerstand.ts`, nicht aus einer Zahl hier.
+   *
+   * Bis zum 14.09.2026 stand hier fest (−2,5 | −19,5). Als der Platz nach E-010
+   * um (−0,5 | −22,5) herum neu gebaut wurde, blieb diese Zeile stehen — der
+   * Bagger sass 3,6 m neben dem Platz, fuer den jede Entfernung der
+   * Abnahmetabelle gerechnet war. Gefunden hat das nicht das Auge, sondern der
+   * Bericht des Platzumbaus, der die Datei nicht anfassen durfte.
+   */
+  readonly position = new THREE.Vector3(BAGGER_STAND.x, 0, BAGGER_STAND.z);
   heading = 0; // rad, 0 = +Z
   cabYaw = 0;
   boomAngle = THREE.MathUtils.degToRad(35);

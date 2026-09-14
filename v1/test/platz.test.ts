@@ -19,6 +19,7 @@
  * Gemessen wird gegen den gebauten Platz, nicht gegen den Konzeptplan: Die
  * Zahlen kommen aus `containers.ts`, `press.ts` und `obstacles.ts`.
  */
+import { readFile } from "node:fs/promises";
 import { describe, it, expect } from "vitest";
 import {
   BAGGER_STAND,
@@ -256,5 +257,23 @@ describe("Nichts steht im anderen", () => {
     expect(PRESS_CENTER.z - KLAPPE, "die Deckelklappe schlägt in die Südmauer").toBeGreaterThan(
       -YARD_D / 2 + WAND_INNEN
     );
+  });
+});
+
+/*
+ * Der Bagger muss dort stehen, wo der Platz fuer ihn gebaut wurde.
+ *
+ * Am 14.09.2026 stand in excavator.ts die alte Zahl (−2,5 | −19,5), waehrend
+ * der ganze Platz um (−0,5 | −22,5) herum neu gebaut war — 3,6 m daneben.
+ * Damit stimmte im Spiel keine einzige Entfernung der Abnahmetabelle, und es
+ * fiel niemandem auf, weil beide Zahlen fuer sich genommen richtig aussahen.
+ */
+describe("Der Bagger steht auf seinem Standplatz", () => {
+  it("nimmt seine Startposition aus baggerstand.ts, nicht aus einer eigenen Zahl", async () => {
+    const quelle = await readFile(new URL("../src/excavator/excavator.ts", import.meta.url), "utf8");
+    expect(quelle).toContain("BAGGER_STAND.x");
+    expect(quelle).toContain("BAGGER_STAND.z");
+    // Keine hart eingetragene Startposition mehr
+    expect(quelle).not.toMatch(/readonly position = new THREE\.Vector3\(-?\d/);
   });
 });
