@@ -437,7 +437,9 @@ const FLAT_SCALE_Y = 0.55;
 
 
 // Basis-Sortiment (SW) — Starthaufen und Zufalls-Ladungen speisen sich hieraus
-const SPECS: PileSpec[] = [
+/** Die Schrottteile des Platzes. Exportiert, damit Waechter die Zuordnung von
+ *  Bauform zu Teil pruefen koennen — genau dort lag der Vier-Reifen-Fehler. */
+export const SPECS: PileSpec[] = [
   { materialId: "steel", massKg: 60, kind: "box", dims: [0.15, 0.15, 1.3], bau: "buendel", name: "Profilstahl" },
   { materialId: "steel", massKg: 45, kind: "cyl", dims: [0.09, 1.1], bau: "rohrFlansch", name: "Rohr" },
   { materialId: "steel", massKg: 35, kind: "box", dims: [0.12, 0.12, 0.9] },
@@ -473,8 +475,8 @@ const SPECS: PileSpec[] = [
   { materialId: "steel", massKg: 30, kind: "box", dims: [0.65, 0.9, 0.6], bau: "weisseWare", name: "Elektroherd" },
   { materialId: "steel", massKg: 52, kind: "cyl", dims: [0.28, 1.4], bau: "tank", name: "Warmwasserspeicher" },
   { materialId: "steel", massKg: 48, kind: "box", dims: [1.6, 0.55, 0.7], name: "Badewanne" },
-  { materialId: "steel", massKg: 26, kind: "box", dims: [0.6, 0.9, 1.9], bau: "kleinfahrzeug", name: "Motorradrahmen" },
-  { materialId: "steel", massKg: 14, kind: "box", dims: [0.5, 0.7, 1.6], bau: "kleinfahrzeug", name: "Mopedrahmen" },
+  { materialId: "steel", massKg: 26, kind: "box", dims: [0.6, 0.9, 1.9], bau: "einspurig", name: "Motorradrahmen" },
+  { materialId: "steel", massKg: 14, kind: "box", dims: [0.5, 0.7, 1.6], bau: "einspurig", name: "Mopedrahmen" },
   { materialId: "steel", massKg: 120, kind: "box", dims: [1.1, 0.35, 0.9], bau: "schaufel", name: "Pflugschar" },
   { materialId: "steel", massKg: 85, kind: "cyl", dims: [0.34, 1.7], bau: "trommel", name: "Eggenwalze" },
   { materialId: "steel", massKg: 160, kind: "box", dims: [0.5, 0.5, 1.4], bau: "motor", name: "Traktor-Frontgewicht" },
