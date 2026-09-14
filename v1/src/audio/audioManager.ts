@@ -13,6 +13,7 @@
  * bei dem es gar keine Geste gibt, an der man sich festhalten koennte.
  */
 import { Music } from "./music";
+import { findeSender, STANDARD_SENDER, type Song } from "./songs";
 import { brauchtNeuaufbau, brauchtWeckruf, istHoerbar, type Tondiagnose } from "./tonzustand";
 
 /**
@@ -37,6 +38,12 @@ export class AudioManager {
   private music: Music | null = null;
   /** Musikwunsch des Spielers — gilt auch, bevor der Ton überhaupt läuft */
   private musicWanted = true;
+  /**
+   * Gewaehlter Sender. Steht auch dann schon fest, wenn es den Tonkanal noch
+   * gar nicht gibt: Die erste Geste baut ihn dann gleich mit dem richtigen
+   * Stueck auf, statt kurz das falsche anzuspielen.
+   */
+  private songWanted: string = STANDARD_SENDER;
   private engineOsc: OscillatorNode | null = null;
   private engineGain: GainNode | null = null;
   private hydraulicGain: GainNode | null = null;
@@ -80,6 +87,28 @@ export class AudioManager {
 
   get musicOn(): boolean {
     return this.musicWanted;
+  }
+
+  /** Kennung des gewaehlten Senders (fuer Menue und Spielstand). */
+  get songId(): string {
+    return this.songWanted;
+  }
+
+  /** Der gewaehlte Sender als Datensatz — Name, Frequenz, Beschreibung. */
+  get song(): Song {
+    return findeSender(this.songWanted);
+  }
+
+  /**
+   * Sender waehlen. Liefert true, wenn sich etwas geaendert hat. Das Radio
+   * bleibt dabei, wie es war: Ist es aus, bleibt es still.
+   */
+  setSong(id: string): boolean {
+    const gewaehlt = findeSender(id).id;
+    if (gewaehlt === this.songWanted) return false;
+    this.songWanted = gewaehlt;
+    this.music?.setSong(gewaehlt);
+    return true;
   }
 
   /**
@@ -207,7 +236,7 @@ export class AudioManager {
       };
 
       // Hintergrundmusik, zur Laufzeit erzeugt — keine fremden Aufnahmen
-      this.music = new Music(ctx, this.master);
+      this.music = new Music(ctx, this.master, this.songWanted);
       if (this.musicWanted) this.music.start();
 
       this.baueDauertoene();
