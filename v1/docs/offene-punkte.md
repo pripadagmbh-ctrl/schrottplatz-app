@@ -237,3 +237,32 @@ erledigt ist, bekommt den Commit dazu.
       Körper klein und sieht nebenbei richtig aus.
 
       Gehört zu „Schrott" in Abschnitt 1 (E-016).
+
+- [ ] **Bordwände und Türen an den LKW** (Patrick, 14.09.2026). Wie sich ein
+      Aufbau öffnet, hängt an seiner Bauart — und beides wird heute gleich
+      behandelt.
+
+      **Pritsche:** Die Seitenwände lassen sich links und rechts herunterklappen,
+      die Heckwand ebenso. **Heruntergeklappt hängen sie senkrecht nach unten**,
+      nicht waagerecht — sie bleiben an den Scharnieren hängen und pendeln an
+      der Bordwand. Heute klappen sie in die Waagerechte, und das ist der Fehler.
+
+      **Fester Aufbau (Koffer):** Klappt gar nicht, hat Türen. Und Türen öffnen
+      **seitlich**, nie nach oben oder unten.
+      - **Hinten:** zwei Flügel, die um 270° herumschlagen und **an der
+        Seitenwand einrasten**. So steht kein Flügel im Weg, wenn der Stapler
+        oder der Greifer heranmuss.
+      - **Seitentür:** wenn vorhanden, dann **nur auf einer Seite** — links
+        *oder* rechts, nicht beides.
+      - Ohne Seitentür ist ein fester Aufbau **ausschließlich über die Hecktür**
+        zu öffnen.
+
+      *Warum es zählt:* Es entscheidet, von wo aus der Bagger überhaupt an die
+      Ladung kommt. Ein Koffer ohne Seitentür muss mit dem Heck zum Bagger
+      stehen; eine Pritsche kann von drei Seiten entladen werden. Das ist keine
+      Optik, das ist die Anfahrt — und damit dieselbe Frage wie beim Abkippplatz
+      am Mischschrott.
+
+      Gehört zu „Maschinen" in Abschnitt 1 (E-016), zusammen mit der Notiz zu
+      Kranfarben und -typen: Welchen Aufbau ein Händler fährt, ist ebenfalls
+      eine Eigenschaft des Kunden.

@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { migrate, type SaveData } from "../src/core/save";
+import { CURRENT_SCHEMA, migrate, type SaveData } from "../src/core/save";
+import { STANDARD_SENDER } from "../src/audio/songs";
 
 /** M3-Abnahme: Spielstand mit Schema-Version + Migrationspfad von Anfang an. */
 
 const valid: SaveData = {
-  schemaVersion: 1,
+  schemaVersion: 2,
+  radio: { songId: "bluesrock" },
   savedAt: "2026-08-27T12:00:00Z",
   moneyEur: 5150,
   items: [
@@ -22,8 +24,16 @@ const valid: SaveData = {
   fencesBroken: [true, false, false, false, false, false],
 };
 
+/** Ein Stand aus der Zeit vor dem Radio: Schema 1, ohne Senderfeld. */
+const altV1 = (): Record<string, unknown> => {
+  const d = JSON.parse(JSON.stringify(valid)) as Record<string, unknown>;
+  d.schemaVersion = 1;
+  delete d.radio;
+  return d;
+};
+
 describe("Spielstand-Migration", () => {
-  it("gültiger v1-Stand läuft durch", () => {
+  it("gültiger v2-Stand läuft durch", () => {
     expect(migrate(JSON.parse(JSON.stringify(valid)))).toEqual(valid);
   });
   it("unbekannte/zukünftige Schema-Version wird abgelehnt", () => {
@@ -35,5 +45,31 @@ describe("Spielstand-Migration", () => {
     expect(migrate("quatsch")).toBeNull();
     expect(migrate({ schemaVersion: 1 })).toBeNull();
     expect(migrate({ ...valid, items: "nope" })).toBeNull();
+  });
+});
+
+describe("Migration v1 → v2: Radiosender", () => {
+  it("alter Stand bekommt den Standardsender und die neue Schema-Nummer", () => {
+    const d = migrate(altV1());
+    expect(d).not.toBeNull();
+    expect(d!.schemaVersion).toBe(CURRENT_SCHEMA);
+    expect(d!.radio).toEqual({ songId: STANDARD_SENDER });
+  });
+  it("alter Stand verliert dabei nichts anderes", () => {
+    const d = migrate(altV1())!;
+    expect(d.moneyEur).toBe(valid.moneyEur);
+    expect(d.items).toEqual(valid.items);
+    expect(d.cars).toEqual(valid.cars);
+    expect(d.fencesBroken).toEqual(valid.fencesBroken);
+  });
+  it("gewählter Sender bleibt beim Durchlauf erhalten", () => {
+    expect(migrate(JSON.parse(JSON.stringify(valid)))!.radio!.songId).toBe("bluesrock");
+  });
+  it("beschädigtes Senderfeld fällt auf den Standard zurück, nicht auf null", () => {
+    for (const kaputt of [null, 42, {}, { songId: 7 }, "bluesrock"]) {
+      const d = migrate({ ...JSON.parse(JSON.stringify(valid)), radio: kaputt });
+      expect(d).not.toBeNull();
+      expect(d!.radio).toEqual({ songId: STANDARD_SENDER });
+    }
   });
 });

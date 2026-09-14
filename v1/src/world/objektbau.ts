@@ -55,6 +55,8 @@ export type BauId =
   | "gitterturm"
   | "haufen"
   | "kleinfahrzeug"
+  | "einspurig"
+  | "wasserfahrzeug"
   | "moebel"
   | "beton"
   | "trommel"
@@ -532,16 +534,57 @@ function haufen(w: number, h: number, d: number): Bauteil {
   return fertig();
 }
 
-/** Quad, Roller, Jetski, Aufsitzmaeher: kleiner Koerper mit Sitz und Raedern. */
-function kleinfahrzeug(w: number, h: number, d: number): Bauteil {
+/**
+ * Quad, Aufsitzmaeher: kleiner Koerper mit Sitz und vier Raedern.
+ *
+ * Mit `raeder: "keine"` faellt das Radwerk weg — fuer Wasserfahrzeuge, die
+ * denselben gedrungenen Koerper haben, aber eben keine Reifen.
+ */
+function kleinfahrzeug(w: number, h: number, d: number, raeder: "vier" | "keine" = "vier"): Bauteil {
   const lack = lackton([LACK_ROT, LACK_BLAU, LACK_GRUEN, 0x1f2226], w, h, d);
   q(w * 0.7, h * 0.34, d * 0.8, lack, 0, -h * 0.06);
   q(w * 0.5, h * 0.2, d * 0.3, 0x24262a, 0, h * 0.2, -d * 0.08);
   q(w * 0.62, h * 0.16, d * 0.25, lack, 0, h * 0.12, d * 0.34);
   q(w * 0.9, 0.05, 0.05, CHROM, 0, h * 0.34, d * 0.26);
-  const rr = Math.min(h * 0.32, d * 0.14);
-  for (const sx of [-1, 1])
-    for (const sz of [-1, 1]) z(rr, w * 0.16, GUMMI, "x", sx * w * 0.42, -h * 0.3, sz * d * 0.3, 10);
+  if (raeder === "vier") {
+    const rr = Math.min(h * 0.32, d * 0.14);
+    for (const sx of [-1, 1])
+      for (const sz of [-1, 1]) z(rr, w * 0.16, GUMMI, "x", sx * w * 0.42, -h * 0.3, sz * d * 0.3, 10);
+  }
+  return fertig();
+}
+
+/**
+ * Motorrad, Moped: einspurig — zwei Raeder HINTEREINANDER, nicht vier.
+ *
+ * Ansage 14.09.2026: „Motorraeder kommen aktuell mit vier Reifen an." Sie
+ * liefen bis dahin ueber `kleinfahrzeug`, und das setzt seine Raeder in einer
+ * doppelten Schleife ueber beide Vorzeichen — vier Stueck, fest verdrahtet.
+ * Fuer ein Quad ist das richtig, fuer ein Motorrad nicht.
+ *
+ * Die Raeder stehen auf der Mittellinie (x = 0) und sind gross im Verhaeltnis
+ * zum Koerper: Bei einem Motorrad reicht das Rad fast bis zur Tankoberkante,
+ * waehrend beim Quad die Karosserie darueber steht. Genau daran erkennt man von
+ * weitem, was man vor sich hat.
+ *
+ * Dass ein einspuriges Fahrzeug nicht von selbst steht, ist eine Frage der
+ * Physik und nicht dieser Geometrie — es liegt auf dem Platz auf der Seite.
+ */
+function einspurig(w: number, h: number, d: number): Bauteil {
+  const lack = lackton([LACK_ROT, LACK_BLAU, LACK_GRUEN, 0x1f2226], w, h, d);
+  const rr = Math.min(h * 0.4, d * 0.21);
+  // Rahmenrohr vom Lenkkopf nach hinten, schmal — ein Motorrad ist duenn
+  q(w * 0.26, h * 0.2, d * 0.72, 0x3a3d41, 0, -h * 0.02);
+  // Tank vorn, Sitzbank dahinter
+  q(w * 0.38, h * 0.22, d * 0.3, lack, 0, h * 0.2, d * 0.16);
+  q(w * 0.34, h * 0.14, d * 0.26, 0x24262a, 0, h * 0.18, -d * 0.2);
+  // Motorblock tief zwischen den Raedern
+  q(w * 0.44, h * 0.24, d * 0.22, 0x4a4d52, 0, -h * 0.18, d * 0.02);
+  // Gabel und Lenker
+  q(w * 0.14, h * 0.5, w * 0.14, CHROM, 0, h * 0.14, d * 0.36);
+  q(w * 0.92, 0.045, 0.045, CHROM, 0, h * 0.4, d * 0.34);
+  // Zwei Raeder in einer Linie, vorn und hinten
+  for (const sz of [-1, 1]) z(rr, w * 0.17, GUMMI, "x", 0, -h * 0.26, sz * d * 0.36, 12);
   return fertig();
 }
 
@@ -679,6 +722,10 @@ export function baueGeometrie(bau: BauId, dims: number[], kind: string): Bauteil
       return haufen(w, h, d);
     case "kleinfahrzeug":
       return kleinfahrzeug(w, h, d);
+    case "einspurig":
+      return einspurig(w, h, d);
+    case "wasserfahrzeug":
+      return kleinfahrzeug(w, h, d, "keine");
     case "moebel":
       return moebel(w, h, d);
     case "beton":

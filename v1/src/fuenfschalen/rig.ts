@@ -274,7 +274,15 @@ export function baueGreifer(st: Stoffe = stoffe(), form: Formsatz = FORM_BOGEN):
      * dort läuft.
      */
     const ende = schalenEnde();
-    const spitze = baueGreiferspitze(st);
+    /*
+     * Der Anschlag `form.offen` geht bis in den ZAHN.
+     *
+     * Seine Anstellung folgt aus ihm (`zahnAnstellung`): Sie ist gerade so
+     * gross, dass der Zahn in der offenen Endlage lotrecht steht. Ein Formsatz
+     * mit anderem Anschlag muss sie also mitbekommen, sonst steht der Zahn in
+     * genau dem Mass schief, um das der Anschlag verschoben wurde.
+     */
+    const spitze = baueGreiferspitze(st, form.offen);
     spitze.name = `SHELL_TIP_${nr}`;
     spitze.position.set(0, ende.y, ende.z + schub);
     spitze.rotation.x = ende.th;

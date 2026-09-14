@@ -21,6 +21,7 @@ import { PressManager } from "./world/press";
 import { randomCargo } from "./world/scrapItems";
 import { Shift } from "./economy/shift";
 import { Tutorial } from "./ui/tutorial";
+import { installRadio } from "./ui/radio";
 import { Reputation } from "./economy/reputation";
 import { UPGRADES, UpgradeState, type UpgradeId } from "./economy/upgrades";
 import { haggle, leavesOnRefusal, hint, OFFER_FACTOR, OFFER_LABEL, type Offer } from "./economy/haggle";
@@ -211,7 +212,7 @@ async function main(): Promise<void> {
   };
 
   const buildSaveData = (): SaveData => ({
-    schemaVersion: 1,
+    schemaVersion: 2,
     savedAt: new Date().toISOString(),
     moneyEur: account.moneyEur,
     shift: shift.toJSON(),
@@ -219,6 +220,7 @@ async function main(): Promise<void> {
     tutorial: tutorial.toJSON(),
     upgrades: ausbau.toJSON(),
     timeOfDay: daylight.time,
+    radio: { songId: audio.songId },
     items: items.items
       .filter((i) => i.shape)
       .map((i) => {
@@ -439,8 +441,8 @@ async function main(): Promise<void> {
   touch.onWheelTick = () => audio.playTick();
   // Auf iOS gibt es keine Vibration — der Klick ist dort die einzige Bestaetigung
   touch.onTap = () => audio.playTick();
-  // Fahrmodus hat keinen Knopf mehr — die Griff-Info sagt, woran man ist
-  touch.onDriveMode = (an) => hud.toast(an ? "Fahren an — linker Stick lenkt" : "Fahren aus");
+  // Fahren hat seit dem 14.09.2026 eine eigene Fläche und keinen Zustand mehr,
+  // den man ansagen müsste — deshalb hier auch keine Meldung.
 
   const helpEl = document.getElementById("help")!;
   if (touch.active) helpEl.style.display = "none"; // auf Touchgeräten stört die Tastenliste
@@ -696,6 +698,14 @@ async function main(): Promise<void> {
   });
   document.getElementById("pause-music")!.addEventListener("click", () => {
     hud.toast(audio.toggleMusic() ? "Musik an." : "Musik aus.");
+  });
+  // Senderwahl fuers Kabinenradio. Der Ein/Aus-Schalter darueber bleibt, wie
+  // er war — hier wird nur gewaehlt, was liefe.
+  installRadio({
+    audio,
+    toast: (t) => hud.toast(t),
+    verlassePause: () => setPaused(false),
+    gewaehlt: save?.radio?.songId,
   });
 
   // --- Verhandeln an der Waage ---
