@@ -52,7 +52,11 @@ export class InstrumentPanel {
       new THREE.MeshBasicMaterial({ map: this.texture })
     );
     screen.position.z = 0.012;
+    // Namen nach dem Muster der Baggerteile (siehe excavator.ts, Baugruppe 06)
+    frame.name = "06_DISPLAY_RAHMEN";
+    screen.name = "06_DISPLAY_BILD";
     const holder = new THREE.Group();
+    holder.name = "06_DISPLAY";
     holder.add(frame, screen);
     // Rechts neben dem Fahrer: er blickt in +Z, seine rechte Seite ist −X.
     // Tief genug, dass das Display nicht in die Arbeitssicht ragt.

@@ -23,9 +23,17 @@ export function buildDriver(
 
     const g = new THREE.Group();
     g.position.set(cx, 0, cz);
+    g.name = "06_FAHRER";
     parent.add(g);
 
+    /*
+     * Jedes Koerperteil traegt seinen Namen, nach demselben Muster wie der
+     * Rest des Baggers (Baugruppe 06 = Kabine). Ohne Namen stand hier ein
+     * Dutzend Kapseln, ueber die sich nicht reden liess — und `setFirstPerson`
+     * schaltet genau diese Liste sichtbar und unsichtbar.
+     */
     const add = (
+      name: string,
       geo: THREE.BufferGeometry,
       mat: THREE.Material,
       x: number,
@@ -38,44 +46,50 @@ export function buildDriver(
       m.position.set(x, y, z);
       m.rotation.set(rx, 0, rz);
       m.castShadow = true;
+      m.name = `06_FAHRER_${name}`;
       g.add(m);
       return m;
     };
 
     // Von außen ist Daniel komplett zu sehen; in der Ego-Sicht bleiben nur die
     // Unterarme stehen. Alles aus runden Grundformen (Kapseln/Kugeln).
+    // −X ist rechts (Regel siehe `RAD_ECKEN` in excavator.ts), +X links
+    const seite = (sx: number): string => (sx > 0 ? "L" : "R");
     const body: THREE.Object3D[] = [];
-    body.push(add(new THREE.CapsuleGeometry(0.16, 0.3, 4, 12), shirt, 0, 1.42, -0.24));
-    body.push(add(new THREE.SphereGeometry(0.17, 12, 10), shirt, 0, 1.58, -0.24)); // Schultern
+    body.push(add("RUMPF", new THREE.CapsuleGeometry(0.16, 0.3, 4, 12), shirt, 0, 1.42, -0.24));
+    body.push(add("SCHULTERN", new THREE.SphereGeometry(0.17, 12, 10), shirt, 0, 1.58, -0.24));
     // Sitzende Beine (nur von außen sichtbar)
-    body.push(add(new THREE.CapsuleGeometry(0.12, 0.12, 4, 10), jeans, 0, 1.12, -0.16));
+    body.push(add("HUEFTE", new THREE.CapsuleGeometry(0.12, 0.12, 4, 10), jeans, 0, 1.12, -0.16));
     for (const sx of [-0.1, 0.1]) {
-      body.push(add(new THREE.CapsuleGeometry(0.07, 0.26, 4, 10), jeans, sx, 1.1, 0.02, Math.PI / 2));
-      body.push(add(new THREE.CapsuleGeometry(0.065, 0.24, 4, 10), jeans, sx, 0.88, 0.2));
-      body.push(add(new THREE.SphereGeometry(0.075, 10, 8), boot, sx, 0.7, 0.26));
+      const s = seite(sx);
+      body.push(add(`OBERSCHENKEL_${s}`, new THREE.CapsuleGeometry(0.07, 0.26, 4, 10), jeans, sx, 1.1, 0.02, Math.PI / 2));
+      body.push(add(`UNTERSCHENKEL_${s}`, new THREE.CapsuleGeometry(0.065, 0.24, 4, 10), jeans, sx, 0.88, 0.2));
+      body.push(add(`STIEFEL_${s}`, new THREE.SphereGeometry(0.075, 10, 8), boot, sx, 0.7, 0.26));
     }
     for (const sx of [-1, 1] as const) {
       // Oberarm gehört zum Körper, Unterarm + Hand bleiben in der Ego-Sicht
       body.push(
-        add(new THREE.CapsuleGeometry(0.058, 0.22, 4, 10), shirt, sx * 0.29, 1.44, -0.18, 0, sx * 0.28)
+        add(`OBERARM_${seite(sx)}`, new THREE.CapsuleGeometry(0.058, 0.22, 4, 10), shirt, sx * 0.29, 1.44, -0.18, 0, sx * 0.28)
       );
       // Unterarm und Hand sitzen am Joystick selbst (siehe buildCabin) und
       // bewegen sich mit ihm — der Oberarm bleibt am Körper.
     }
     // Hals, Kopf, Haare, Lederband
-    body.push(add(new THREE.CapsuleGeometry(0.05, 0.06, 4, 10), skin, 0, 1.73, -0.25));
-    const head = add(new THREE.SphereGeometry(0.115, 14, 12), skin, 0, 1.87, -0.25);
+    body.push(add("HALS", new THREE.CapsuleGeometry(0.05, 0.06, 4, 10), skin, 0, 1.73, -0.25));
+    const head = add("KOPF", new THREE.SphereGeometry(0.115, 14, 12), skin, 0, 1.87, -0.25);
     head.scale.set(1, 1.12, 1.02);
     body.push(head);
     const hairCap = new THREE.Mesh(new THREE.SphereGeometry(0.122, 14, 12), hair);
     hairCap.position.set(0, 1.9, -0.26);
     hairCap.scale.set(1, 0.95, 1.02);
+    hairCap.name = "06_FAHRER_HAARE";
     g.add(hairCap);
     body.push(hairCap);
     // kurze Haare — nur ein flacher Nackenansatz, kein Zopf
     const nape = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 10), hair);
     nape.position.set(0, 1.84, -0.3);
     nape.scale.set(1, 0.7, 0.7);
+    nape.name = "06_FAHRER_NACKENHAAR";
     g.add(nape);
     body.push(nape);
     const necklace = new THREE.Mesh(
@@ -84,6 +98,7 @@ export function buildDriver(
     );
     necklace.rotation.x = Math.PI / 2;
     necklace.position.set(0, 1.65, -0.23);
+    necklace.name = "06_FAHRER_LEDERBAND";
     g.add(necklace);
     body.push(necklace);
     return body;
