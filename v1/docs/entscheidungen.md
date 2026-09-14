@@ -359,7 +359,12 @@ Schwenkkreis muss nur fassen, was durch die Hände des Spielers geht.
 
 Das Tempo folgt daraus. 1,4 m/s sind 5 km/h, also Kettenbagger-Tempo; der Fuchs ist ein
 Radbagger und fährt auf dem Platz real 10 bis 15 km/h. Eine Fahrt zum Verladeplatz und
-zurück dauert heute rund 50 Sekunden, bei 3,0–3,5 m/s unter 20.
+zurück dauert heute rund 50 Sekunden, bei 3,0–3,5 m/s gut 20.
+
+*Nachgemessen am 14.09.2026 (E-012):* Die Schätzung „unter 20" war zu knapp —
+bei 35 m je Richtung braucht selbst ein Tempo ohne jede Anlauframpe 21,9 s.
+Gemessen sind 22,6 s. Der Wert ist hier richtiggestellt statt das Tempo an eine
+grobe Schätzung anzupassen (E-008).
 
 **Verworfene Alternativen.** *Alles in den Schwenkkreis* (Entwurf A, acht Ziele im Kreis
 von 8 m): geht geometrisch auf, lässt aber keine zwei Meter zwischen den Zielen — Kipper
