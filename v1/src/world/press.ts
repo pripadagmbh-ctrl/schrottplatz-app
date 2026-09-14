@@ -101,7 +101,16 @@ export const PRESS_CENTER = CENTER;
  * Aufwand ist mit der Ansage weggefallen — die Kammer ist die Stelle.
  */
 export function baleYard(): { x: number; z: number; w: number; d: number } {
-  return { x: CENTER.x, z: CENTER.z, w: INNER_W - 2.2, d: INNER_D - 1.2 };
+  /*
+   * `w` und `d` sind WELTachsen, die Kammermasse nicht: Seit die Maschine
+   * quersteht (`PRESS_ROT`), liegt die Kammerlaenge in z. Wer das hier
+   * vergisst, streut die Pakete quer zur Kammer — bei der fast quadratischen
+   * Kammer faellt es nicht auf, bei der naechsten Aenderung schon.
+   */
+  const quer = Math.abs(Math.sin(ROT)) > 0.5;
+  const laengs = INNER_W - 2.2;
+  const tief = INNER_D - 1.2;
+  return { x: CENTER.x, z: CENTER.z, w: quer ? tief : laengs, d: quer ? laengs : tief };
 }
 /**
  * Die Mulde liegt längs Ost–West, in einer Flucht mit dem Stahlschrottplatz
