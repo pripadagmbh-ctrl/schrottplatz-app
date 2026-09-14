@@ -642,3 +642,52 @@ in eine bewusste Entscheidung des Spielers und ist deshalb keine reine Technikfr
 **Auf dem Gerät zu prüfen.** Erledigt, siehe oben. Beim nächsten Gerätetest nebenbei
 mitnehmen: Steht in der Tonzeile eine Zahl bei „Weckrufe", war `resume()` mindestens einmal
 vergeblich — dann sind die Fristen 250/1200 ms zu knapp und gehören verlängert.
+
+### E-015 — Ziel ist eine mobile App, der Browser ist Zwischenlösung (14.09.2026)
+
+**Entscheidung.** Patrick am 14.09.2026: „Die Browser-Lösung ist nur Zwischenlösung, Ziel
+ist Mobile App." Damit gilt ab sofort: **Browser-Krücken werden nicht mehr gebaut**, wenn
+die App dieselbe Sache sauber löst. Der Browser bleibt die Arbeits- und Testumgebung, nicht
+das Ziel.
+
+**Der Anlass.** Auf dem iPhone kam kein Ton, Ursache war der physische Stummschalter
+(E-014). Im Browser ließe sich das nur über eine Krücke übergehen — ein stummes
+HTML-Audio-Element, das die Tonausgabe in eine andere Kategorie hebt. In einer App ist es
+keine Krücke, sondern eine Einstellung: Die Audio-Session wird auf *Playback* gesetzt, und
+damit spielt das Spiel legitim weiter, auch wenn das Gerät stumm gestellt ist. **Die Krücke
+wird deshalb nicht gebaut.**
+
+**Der Stand, gemessen am 14.09.2026.** `capacitor.config.json` existiert (App-ID
+`de.pripada.schrottplatz`, Name „PRIPADA Schrottplatz", `webDir: dist`), und `package.json`
+kennt `android:add`, `android:sync`, `android:open`. Aber: **keine Capacitor-Pakete in den
+Abhängigkeiten**, **keine Plattformordner** `android/` oder `ios/`, und die Konfiguration
+deckt **nur Android** ab. Die Skripte würden heute ins Leere laufen. Es ist ein Platzhalter,
+kein Gerüst.
+
+**Das Hindernis bei iOS.** Patrick testet auf iPad und iPhone mini, arbeitet aber auf
+Windows. **Eine iOS-App lässt sich auf Windows nicht bauen** — Xcode gibt es nur auf macOS,
+und das Signieren führt ebenfalls dort vorbei. Drei Wege: ein Mac (gekauft oder gemietet);
+macOS-Läufer in der CI, wofür es bei GitHub Actions schon einen Workflow im Projekt gibt;
+oder ein Bezahldienst. In jedem Fall ein Apple-Entwicklerkonto, ohne das die App nur sieben
+Tage auf dem eigenen Gerät bleibt. **Android baut dagegen direkt auf dem Windows-Rechner.**
+
+**Was die App nicht bringt, damit die Erwartung stimmt.** Capacitor macht das Spiel **nicht
+schneller** — es ist dieselbe WebKit-Engine wie in Safari, nur ohne Adressleiste. Die
+14,6 ms je Bild, die am 14.09. weder Physik noch Grafik zugeordnet werden konnten, wandern
+unverändert mit. Wer Bildrate sucht, sucht sie nicht in der Verpackung.
+
+**Was sie bringt.** Audio-Session statt Stummschalter-Krücke; volle Bildfläche ohne
+Browser-Rahmen und ohne versehentliche Safari-Gesten; Offline-Betrieb und ein Symbol auf dem
+Startbildschirm; ein Speicherstand, der nicht verschwindet, wenn Safari aufräumt.
+
+**Verworfene Alternative.** Das stumme HTML-Audio-Element jetzt bauen, um den Stummschalter
+im Browser zu übergehen. Es wäre ein Eingriff in eine bewusste Entscheidung des Spielers,
+und es wäre Arbeit an einer Umgebung, die verlassen werden soll. Stattdessen steht in
+`docs/` der Hinweis, dass am iPhone der Schalter zu prüfen ist.
+
+**Abnahmekriterium.** Keines für diesen Eintrag — er hält eine Richtung fest, kein Bauwerk.
+Wann die Verpackung angegangen wird, ist offen; der Stand oben ist der Ausgangspunkt.
+
+**Auf dem Gerät zu prüfen.** Nichts. Sobald ein erstes Paket gebaut ist, gehört an diese
+Stelle: startet die App ohne Browser-Rahmen, spielt der Ton bei stumm gestelltem Gerät, und
+überlebt der Speicherstand einen Neustart.
