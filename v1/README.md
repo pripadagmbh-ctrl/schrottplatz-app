@@ -77,6 +77,13 @@ Das schreibt `src/greifer/fuenfschalen.glb` neu; Maße und Befunde stehen in
 | B | Schere/Paketierpresse |
 | H | Hilfe ein/aus · F3 Debug-Overlay |
 
+Auf dem Touchgerät (Stand 14.09.2026): linke Bildhälfte = Armstick, rechte
+Hälfte = Auslegerstick (beide schweben, beide frei belegbar), **unten links ein
+eigenes Feld FAHREN** — hoch/runter gibt Gas, seitlich lenkt. Es ist immer
+scharf; den früheren Fahrmodus per Doppeltipp gibt es nicht mehr. Doppeltipp
+rechts wechselt die Ansicht, rechten Daumen stillhalten öffnet den
+Funktionskranz.
+
 ## Platzanordnung & Wirtschaft (Stand 2026-08-29)
 
 > **Veraltet.** Der Platz wurde am 13.09.2026 umgebaut: vier Lego-Sortiermulden im

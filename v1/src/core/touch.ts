@@ -1,20 +1,27 @@
 /**
  * Touch-Steuerung für Tablet und Smartphone (Briefing Kap. 5.1).
- * Aufteilung (Design 2026-08-29, Sticks überarbeitet 2026-09-09):
+ * Aufteilung (Design 2026-08-29, Sticks überarbeitet 2026-09-09,
+ * eigene Fahrfläche 2026-09-14):
  *   linke Bildhälfte  — X: Oberwagen drehen, Y: Hauptarm heben/senken
  *   rechte Bildhälfte — X: Spinne öffnen/schließen, Y: Ausleger heran/weg
- *   Beide Sticks schweben: Sie sind unsichtbar, erscheinen unter dem Daumen, wo
- *   er aufsetzt, und verschwinden beim Loslassen — kein Zielen auf feste Kreise
- *   mehr (Vorbild Bagerana/v2). Maßgeblich ist die Bildhälfte, nicht der Ort.
- *   (alle vier Achsen sind im Steuerungsmenü frei belegbar)
+ *   untere linke Ecke — eigene Fahrfläche: Y: Gas, X: Lenken. Sie liegt über
+ *                    der linken Hälfte und bekommt den Daumen zuerst.
+ *   Alle drei Sticks schweben: Sie erscheinen unter dem Daumen, wo er aufsetzt,
+ *   und verschwinden beim Loslassen — kein Zielen auf feste Kreise (Vorbild
+ *   Bagerana/v2). Maßgeblich ist die Zone, nicht der Ort.
+ *   (die vier Stickachsen sind im Steuerungsmenü frei belegbar; Gas und Lenken
+ *   nicht — die Fahrfläche kann nur fahren)
  *   ↺ / ↻          — Spinne links bzw. rechts drehen (Rotator)
- *   FAHREN         — Umschalter: solange er an ist, wird der linke Stick zu Gas
- *                    (Y) und Lenkung (X). Endet von selbst nach vier Sekunden
- *                    ohne Daumen auf dem linken Stick.
  *   Greifen        — über den rechten Stick (oder festen Fingerdruck)
- *   Extras         — Doppeltipp wechselt die Ansicht
+ *   Extras         — Doppeltipp rechts wechselt die Ansicht
  *   Rädchen        — die übrigen Funktionen, endlos drehbar
  *   Fünf Finger    — Debug-Overlay ein/aus (auf dem Tablet gibt es keine F3-Taste)
+ *
+ * Kein Fahrmodus mehr: Bis zum 14.09.2026 wurde der linke Stick per Doppeltipp
+ * zu Gas und Lenkung und fiel nach vier Sekunden von selbst zurück. Derselbe
+ * Stick tat damit mal das eine, mal das andere, und der Zustand wechselte auch
+ * ohne Zutun. Jetzt hat jede Aufgabe ihre eigene Fläche — man sieht und fühlt,
+ * woran man ist, statt es wissen zu müssen (Ansage Patrick, Variante C).
  */
 import { type ControlConfig, type AxisId, loadConfig } from "./controlConfig";
 
@@ -49,8 +56,13 @@ const RADIUS = 62; // px bis Vollausschlag
 const PRESSURE_GRAB = 0.55;
 /** Totzone der Spinnenachse — schützt vor ungewolltem Öffnen beim Baggern */
 const GRAPPLE_DEADZONE = 0.38;
-/** So lange darf der linke Stick unberuehrt bleiben, bevor der Fahrmodus endet */
-const DRIVE_AUTO_EXIT_S = 4;
+/**
+ * Totzone der Fahrfläche. Der Daumen setzt irgendwo auf und zieht von dort los;
+ * beim Abrollen wandert er leicht zur Seite, und die Maschine zöge dann schon
+ * von selbst an. 0,15 von 62 px Vollausschlag sind gut 9 px Spiel.
+ * // SW: Startwert zum Austesten, auf dem Gerät nachzujustieren
+ */
+const DRIVE_DEADZONE = 0.15;
 /** Bis hierhin gilt eine Berührung des Rädchens als Tipp, darüber als Blättern (px) */
 /** So lange muss der rechte Daumen stillhalten, bis der Kranz aufklappt */
 const RADIAL_HOLD_S = 0.4;
@@ -68,6 +80,18 @@ const DOUBLE_TAP_MS = 320;
 const DOUBLE_TAP_RADIUS = 60;
 
 const clamp1 = (v: number): number => Math.max(-1, Math.min(1, v));
+
+/**
+ * Rohausschlag der Fahrfläche in einen Fahrbefehl übersetzen: unterhalb der
+ * Totzone Null, darüber wieder auf den vollen Bereich gespreizt. Ohne das
+ * Spreizen begänne das Fahren bei 0,15 mit einem Ruck.
+ */
+export function fahrachse(v: number): number {
+  const a = Math.abs(v);
+  if (a <= DRIVE_DEADZONE) return 0;
+  const s = (a - DRIVE_DEADZONE) / (1 - DRIVE_DEADZONE);
+  return Math.sign(v) * Math.min(1, s);
+}
 
 export class TouchControls {
   /** Achsenbelegung — vom Steuerungsmenü geändert, im Browser gespeichert */
@@ -87,17 +111,12 @@ export class TouchControls {
   pressureSupported = false;
   private left: StickState | null = null;
   private right: StickState | null = null;
+  /** Eigene Fläche in der unteren linken Ecke — fährt immer, schaltet nie um. */
+  private drivePad: StickState | null = null;
   private pressed = new Set<string>();
   private held = new Set<string>();
   private pressureGrab = false;
   private lastTap = 0;
-  /**
-   * Fahrmodus (Vorbild v2). Vier feste Pfeiltasten waren auf dem Glas schlecht
-   * zu treffen, und man konnte nicht gleichzeitig lenken und den Arm bewegen.
-   * Jetzt uebernimmt der linke Stick das Fahren, solange der Modus laeuft.
-   */
-  private driveMode = false;
-  private driveIdleS = 0;
   private radialEl: HTMLElement | null = null;
   private radialItems: Array<{ el: HTMLElement; code: string }> = [];
   private radialSel = -1;
@@ -117,8 +136,11 @@ export class TouchControls {
     root.style.display = "block";
     // Merkmal fuers Stylesheet: nur auf Touchgeraeten sitzt die Tutorialkarte oben
     document.body.classList.add("touch");
-    this.left = this.makeStick("touch-left", "zone-left");
-    this.right = this.makeStick("touch-right", "zone-right");
+    this.left = this.makeStick("touch-left", "zone-left", "links");
+    this.right = this.makeStick("touch-right", "zone-right", "rechts");
+    // Nach den beiden Hälften angelegt, damit die Fahrfläche in der Überlappung
+    // den Daumen bekommt — sie liegt im Bild über der linken Hälfte.
+    this.drivePad = this.makeStick("touch-drive", "zone-drive", "fahren");
     this.bindSafety();
     this.bindDebugGeste();
     this.bindHold("btn-rot-l", "rotL");
@@ -202,8 +224,17 @@ export class TouchControls {
    * dadurch springt nichts, egal wo der Finger aufkommt. Den Zeiger fängt die
    * Zone ein, damit der Stick weiterläuft, wenn der Daumen über den Kreisrand
    * oder in die andere Bildhälfte wandert.
+   *
+   * Die Rolle entscheidet über drei Kleinigkeiten: Nur der rechte Stick
+   * wechselt per Doppeltipp die Ansicht, nur die Armsticks werten Fingerdruck
+   * als Greifen (fester Druck aufs Gaspedal darf die Spinne nicht schließen),
+   * und nur die Fahrfläche färbt sich beim Aufsetzen ein.
    */
-  private makeStick(padId: string, zoneId: string): StickState | null {
+  private makeStick(
+    padId: string,
+    zoneId: string,
+    rolle: "links" | "rechts" | "fahren"
+  ): StickState | null {
     const pad = document.getElementById(padId);
     const zone = document.getElementById(zoneId);
     if (!pad || !zone) return null;
@@ -228,7 +259,8 @@ export class TouchControls {
         st.travel = Math.max(0, pad.offsetWidth / 2 - knob.offsetWidth / 2 - 2);
         knob.style.transform = "translate(0,0)";
         zone.setPointerCapture(e.pointerId);
-        this.checkPressure(e);
+        if (rolle === "fahren") zone.classList.add("an");
+        else this.checkPressure(e);
         e.preventDefault();
       },
       { passive: false }
@@ -240,7 +272,7 @@ export class TouchControls {
         st.dx = clamp1((e.clientX - st.baseX) / RADIUS);
         st.dy = clamp1((e.clientY - st.baseY) / RADIUS);
         knob.style.transform = `translate(${st.dx * st.travel}px, ${st.dy * st.travel}px)`;
-        this.checkPressure(e);
+        if (rolle !== "fahren") this.checkPressure(e);
         e.preventDefault();
       },
       { passive: false }
@@ -254,18 +286,22 @@ export class TouchControls {
         this.radialOpen = false;
         this.radialHoldS = 0;
         this.closeRadial();
-      } else {
+      } else if (rolle !== "fahren") {
+        // Ein Tipp auf die Fahrfläche ist ein Gasstoß, kein Doppeltipp — sonst
+        // spränge beim Rangieren die Ansicht um.
         const dauer = performance.now() - st.downT;
         const weg = Math.hypot(e.clientX - st.baseX, e.clientY - st.baseY);
         if (dauer < TAP_MAX_MS && weg < TAP_MAX_MOVE) {
-          this.registerTap(e.clientX, e.clientY, st === this.left);
+          this.registerTap(e.clientX, e.clientY, rolle === "rechts");
         }
       }
+      if (rolle === "fahren") zone.classList.remove("an");
       TouchControls.resetStick(st);
       this.pressureGrab = false;
     });
     const abbruch = (e: PointerEvent): void => {
       if (st.id !== e.pointerId) return;
+      if (rolle === "fahren") zone.classList.remove("an");
       TouchControls.resetStick(st);
       this.pressureGrab = false;
     };
@@ -289,16 +325,17 @@ export class TouchControls {
    * überall aufsetzen dürfen: ohne sie gälten linker und rechter Daumen kurz
    * nacheinander als Doppeltipp und die Kamera spränge beim Baggern ständig um.
    */
-  private registerTap(x: number, y: number, links: boolean): void {
+  private registerTap(x: number, y: number, wechselt: boolean): void {
     const now = performance.now();
     const nah = Math.hypot(x - this.lastTapX, y - this.lastTapY) < DOUBLE_TAP_RADIUS;
     if (now - this.lastTap < DOUBLE_TAP_MS && nah) {
-      // Links doppelt: Fahren an/aus — dort liegt der Fahrdaumen ohnehin, und
-      // ein Knopf an dieser Stelle wurde staendig versehentlich getroffen.
-      // Rechts doppelt: Ansicht wechseln, wie bisher.
-      if (links) this.setDrive(!this.driveMode);
-      else this.pressed.add("KeyC");
-      this.onTap?.();
+      // Nur rechts wechselt die Ansicht. Links doppelt schaltete bis zum
+      // 14.09.2026 den Fahrmodus um — den gibt es nicht mehr, und die Kamera
+      // soll nicht plötzlich am Armdaumen hängen.
+      if (wechselt) {
+        this.pressed.add("KeyC");
+        this.onTap?.();
+      }
       this.lastTap = 0;
       return;
     }
@@ -344,9 +381,13 @@ export class TouchControls {
     });
   }
 
-  /** Beide Sticks, alle Halteknöpfe und das Druck-Greifen loslassen. */
+  /** Alle drei Flächen, alle Halteknöpfe und das Druck-Greifen loslassen. */
   releaseAll(): void {
-    for (const st of [this.left, this.right]) if (st) TouchControls.resetStick(st);
+    for (const st of [this.left, this.right, this.drivePad]) {
+      if (st) TouchControls.resetStick(st);
+    }
+    // Sonst bliebe die Fahrfläche eingefärbt, obwohl kein Daumen mehr aufliegt
+    document.getElementById("zone-drive")?.classList.remove("an");
     this.held.clear();
     this.pressureGrab = false;
     if (this.radialOpen) {
@@ -357,22 +398,6 @@ export class TouchControls {
     for (const id of ["btn-rot-l", "btn-rot-r"]) {
       document.getElementById(id)?.classList.remove("down");
     }
-  }
-
-  /** FAHREN-Umschalter. Tippen schaltet um, die Taste faerbt sich. */
-  private setDrive(v: boolean): void {
-    this.driveMode = v;
-    this.driveIdleS = 0;
-    TouchControls.vibrate(v ? 18 : 9);
-    this.onDriveMode?.(v);
-  }
-
-  /** Wechsel des Fahrmodus melden — main zeigt es in der Griff-Info an. */
-  onDriveMode: ((an: boolean) => void) | null = null;
-
-  /** true, solange der linke Stick fahrt statt den Arm bewegt. */
-  get isDriveMode(): boolean {
-    return this.driveMode;
   }
 
   private bindHold(id: string, key: string): void {
@@ -535,9 +560,7 @@ export class TouchControls {
     if (!this.active) return;
     const l = this.left;
     const r = this.right;
-    // Fahrmodus endet von selbst: Wer den Daumen vom linken Stick nimmt, will
-    // in aller Regel wieder baggern. Ohne das bleibt der Modus an, und der
-    // naechste Griff an den Stick faehrt die Maschine statt den Arm zu heben.
+    const f = this.drivePad;
     // Funktionskranz: rechten Daumen stillhalten laesst ihn aufklappen
     if (r && r.id !== null) {
       const still = Math.hypot(r.dx, r.dy) < RADIAL_STILL;
@@ -561,14 +584,6 @@ export class TouchControls {
       this.radialHoldS = 0;
     }
 
-    if (this.driveMode) {
-      if (l && l.id === null) {
-        this.driveIdleS += dt;
-        if (this.driveIdleS > DRIVE_AUTO_EXIT_S) this.setDrive(false);
-      } else {
-        this.driveIdleS = 0;
-      }
-    }
     // Die vier Stickachsen sind frei belegbar (Steuerungsmenü). Werkseinstellung:
     // Hauptarm und Oberwagen links, Ausleger und Spinne rechts.
     this.axes.cab = 0;
@@ -583,9 +598,6 @@ export class TouchControls {
       rightX: r ? r.dx : 0,
     };
     for (const id of ["leftY", "leftX", "rightY", "rightX"] as AxisId[]) {
-      // Im Fahrmodus gehoert der linke Stick dem Fahrwerk — die eingestellte
-      // Belegung ruht so lange.
-      if (this.driveMode && (id === "leftX" || id === "leftY")) continue;
       // Solange der Kranz offen ist, waehlt der rechte Stick aus, statt zu
       // steuern — sonst faehrt beim Auswaehlen der Arm mit.
       if (this.radialOpen && (id === "rightX" || id === "rightY")) continue;
@@ -624,13 +636,9 @@ export class TouchControls {
     this.axes.rotator = clamp1(
       (this.held.has("rotR") ? 1 : 0) - (this.held.has("rotL") ? 1 : 0) + rotAxis
     );
-    // Fahren: linker Stick im Fahrmodus, dazu weiterhin die Kippsteuerung
-    const fahrY = this.driveMode && l ? -l.dy : 0; // Stick nach oben = vorwaerts
-    const fahrX = this.driveMode && l ? l.dx : 0;
-    this.axes.drive = fahrY;
-    this.axes.steer = fahrX;
-    this.axes.drive = clamp1(this.axes.drive);
-    this.axes.steer = clamp1(this.axes.steer);
+    // Fahren: eigene Fläche, immer scharf. Nach oben ziehen = vorwärts.
+    this.axes.drive = f ? clamp1(fahrachse(-f.dy)) : 0;
+    this.axes.steer = f ? clamp1(fahrachse(f.dx)) : 0;
     this.axes.boom = clamp1(this.axes.boom);
     this.axes.stick = clamp1(this.axes.stick);
     this.axes.cab = clamp1(this.axes.cab);
