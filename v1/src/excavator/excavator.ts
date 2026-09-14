@@ -101,7 +101,53 @@ const STICK_MIN = THREE.MathUtils.degToRad(-140);
 const STICK_MAX = THREE.MathUtils.degToRad(-25);
 
 // Geschwindigkeiten (SW aus Briefing Kap. 5.1)
-const DRIVE_MAX = 1.4; // m/s ≈ 5 km/h
+/*
+ * Fahrtempo.
+ *
+ * Bis 14.09.2026 standen hier 1,4 m/s = 5 km/h. Das ist Kettenbagger-Tempo.
+ * Der Fuchs ist ein RADbagger und faehrt auf dem Platz real 10 bis 15 km/h;
+ * 1,4 war also kein bewusstes Spielgefuehl, sondern ein zu niedriger Wert.
+ * Der Platz misst 50,5 x 58 m, und mit dem Verladeplatz an der Westwand
+ * (E-010) wird zum ersten Mal ernsthaft gefahren: 35 m hin und zurueck
+ * dauerten bei 1,4 m/s rund 50 s, bei 3,2 m/s rund 23 s.
+ *
+ * 3,2 m/s = 11,5 km/h, die Mitte des von E-010 freigegebenen Bandes 3,0-3,5.
+ */
+const DRIVE_MAX = 3.2; // m/s ≈ 11,5 km/h (E-010, 14.09.2026)
+/*
+ * Anlauf und Auslauf des Fahrwerks — eigene Rampe, nicht die des Arms.
+ *
+ * Bis 14.09. teilte sich das Fahrwerk RAMP_TIME (0,3 s) mit Ausleger, Stiel
+ * und Oberwagen. Die Rampe ist aber eine ZEIT, und die Beschleunigung faellt
+ * hinten raus: bei 1,4 m/s in 0,3 s sind das 4,7 m/s². Haette man nur
+ * DRIVE_MAX angehoben, waeren daraus 10,7 m/s² geworden — 1,1 g, also die
+ * Beschleunigung eines flotten Autos. Genau das soll der Bagger nicht sein.
+ *
+ * Darum wandert die Rampe mit: 3,2 / 0,7 = 4,6 m/s², praktisch dieselbe
+ * Beschleunigung wie vorher. Geaendert wird das Endtempo, nicht das Anfahren.
+ * RAMP_TIME bleibt unangetastet, der Arm merkt von alledem nichts.
+ */
+const DRIVE_RAMP_TIME = 0.7; // s bis Endtempo (= 4,6 m/s², wie vor E-010)
+/*
+ * Lenkrate — bewusst unveraendert bei 0,7 rad/s (40 °/s).
+ *
+ * Die Lenkung arbeitet mit fester Gierrate mal Tempofaktor (siehe unten),
+ * und solange der Tempofaktor linear ist, kuerzt sich das Tempo heraus:
+ * Der Bogen hat immer den Radius DRIVE_MAX / STEER_RATE.
+ *   vorher: 1,4 / 0,7 = 2,00 m
+ *   nachher: 3,2 / 0,7 = 4,57 m
+ * Der Bogen wird also WEITER, nicht enger — bei gleicher Gierrate legt die
+ * Maschine je Grad mehr Strecke zurueck.
+ *
+ * Und erst damit stimmt die Geometrie: Ein Radbagger dieser Klasse hat rund
+ * 2,8 m Radstand und etwa 32° Lenkeinschlag, also 2,8 / tan(32°) = 4,5 m
+ * Wenderadius. Fuer die alten 2,00 m haette die Achse 54° einschlagen
+ * muessen — das kann keine gelenkte Achse. Eine mitgezogene Lenkrate
+ * (1,6 rad/s fuer den alten 2-m-Bogen) waere ein Kreisel gewesen.
+ *
+ * Eng rangiert wird weiter im Stand: ohne Gas, nur Lenken, dreht sie mit
+ * 0,35 * 0,7 = 0,245 rad/s = 14 °/s auf der Stelle. Das ist unveraendert.
+ */
 const STEER_RATE = 0.7; // rad/s
 /*
  * Drehwerk.
@@ -176,6 +222,49 @@ export function tempoFaktor(lastKg: number): number {
 export function anlaufZeit(lastKg: number): number {
   const bisNenn = Math.min(Math.max(lastKg, 0) / NENNLAST_KG, 1);
   return RAMP_TIME * (1 + LAST_ANLAUF * bisNenn);
+}
+
+/*
+ * Das Fahrwerk auf dem Papier — dieselben Konstanten und dieselbe Rampe wie
+ * im Spiel, nur ohne Welt drumherum. Damit laesst sich das Fahrtempo kopflos
+ * pruefen (test/fahrtempo.test.ts), ohne Three.js-Szene und ohne Rapier.
+ */
+export const FAHRWERK = { maxMS: DRIVE_MAX, rampeS: DRIVE_RAMP_TIME, lenkRadS: STEER_RATE };
+
+/**
+ * Wenderadius bei voller Fahrt und vollem Lenkausschlag (m).
+ *
+ * Die Gierrate ist STEER_RATE mal Tempofaktor; bei Vollgas ist der 1, also
+ * r = v / omega.
+ */
+export function wenderadius(): number {
+  return DRIVE_MAX / STEER_RATE;
+}
+
+/** Zeit (s) fuer eine gerade Strecke aus dem Stand bei Vollgas. */
+export function fahrzeit(streckeM: number, dt = 1 / 60): number {
+  let v = 0;
+  let s = 0;
+  let t = 0;
+  const schritt = (DRIVE_MAX / DRIVE_RAMP_TIME) * dt;
+  while (s < streckeM && t < 600) {
+    v = ramp(v, DRIVE_MAX, schritt);
+    s += v * dt;
+    t += dt;
+  }
+  return t;
+}
+
+/** Ausrollweg (m) vom Endtempo bis zum Stillstand, wenn das Gas losgelassen wird. */
+export function bremsweg(dt = 1 / 60): number {
+  let v = DRIVE_MAX;
+  let s = 0;
+  const schritt = (DRIVE_MAX / DRIVE_RAMP_TIME) * dt;
+  for (let i = 0; i < 6000 && v > 0; i++) {
+    v = ramp(v, 0, schritt);
+    s += v * dt;
+  }
+  return s;
 }
 
 /** Ab diesem Schliessgrad treffen sich die Krallenspitzen. */
@@ -1267,7 +1356,7 @@ export class Excavator {
       this.outriggerDown > 0.15 && (wantsDrive !== 0 || rawSteer !== 0);
     const locked = this.outriggerDown > 0.15;
     const driveTarget = (locked ? 0 : wantsDrive) * DRIVE_MAX;
-    this.driveVel = ramp(this.driveVel, driveTarget, (DRIVE_MAX / RAMP_TIME) * dt);
+    this.driveVel = ramp(this.driveVel, driveTarget, (DRIVE_MAX / DRIVE_RAMP_TIME) * dt);
     const steer = locked ? 0 : rawSteer;
     if (Math.abs(this.driveVel) > 0.05 || steer !== 0) {
       const dir = this.driveVel >= 0 ? 1 : -1;
