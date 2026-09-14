@@ -153,11 +153,121 @@ describe("Positionsliste des Baggers", () => {
      * sind fast gratis, BAUTEILE sind teuer, und jedes schattenwerfende Teil
      * wird zweimal gezeichnet.
      *
-     * Stand 14.09.2026 (Benennung, unveraendertes Modell):
-     *   117 Meshes unter root + 12 lose in der Szene = 129
-     *   9 980 Dreiecke, 167 Zeichenrufe (nur unter root gezaehlt)
+     * Stand 14.09.2026 nach dem Radumbau:
+     *   125 Meshes unter root + 12 lose in der Szene = 137
+     *   15 036 Dreiecke, 175 Zeichenrufe (nur unter root gezaehlt)
+     *
+     * Davor, bei der reinen Benennung: 117 + 12 = 129, 9 980 Dreiecke,
+     * 167 Zeichenrufe.
      */
     const meshes = baggerMeshes();
-    expect(meshes.length, "Bauteilzahl am Bagger").toBe(129);
+    expect(meshes.length, "Bauteilzahl am Bagger").toBe(137);
+  });
+});
+
+/**
+ * Waechter fuer das Rad — die Budgetregel und die Groesse.
+ *
+ * Beides kann still verlorengehen: Wer dem Reifen noch ein Detail gibt, macht
+ * schnell ein zweites Mesh daraus; wer an den Stollen dreht, aendert leicht den
+ * Aussenradius. Das eine kostet Zeichenrufe, das andere die Bodenfreiheit der
+ * ganzen Maschine.
+ */
+describe("Rad", () => {
+  const raeder = () => ["VL", "VR", "HL", "HR"].map((e) => scene.getObjectByName(`02_RAD_${e}`)!);
+
+  it("hat je Rad genau drei Bauteile: Reifen, Felge, Nabe", () => {
+    for (const rad of raeder()) {
+      const teile: string[] = [];
+      rad.traverse((o) => {
+        if (o instanceof THREE.Mesh) teile.push(o.name.replace(/^02_RAD_[VH][LR]_/, ""));
+      });
+      expect(teile.sort(), `${rad.name}`).toEqual(["FELGE", "NABE", "REIFEN"]);
+    }
+  });
+
+  it("der Reifen bleibt EIN Mesh und unter 800 Dreiecken", () => {
+    /*
+     * Die Budgetregel, gemessen auf Patricks Geraet (14.09.2026: FPS 48 ·
+     * Frame 21,0 ms · 1322 Zeichenrufe · 240k Dreiecke): Dreiecke sind fast
+     * gratis, BAUTEILE sind teuer. Der Reifen darf deshalb 800 Dreiecke haben
+     * statt der 60, die er als Zylinder hatte — solange er ein Mesh bleibt.
+     *
+     * Heute sind es 768: Karkasse 384 (32 Umfangssegmente x 6 Baender x 2),
+     * Stollen 384 (32 Quader x 12).
+     */
+    const reifen = scene.getObjectByName("02_RAD_VL_REIFEN") as THREE.Mesh;
+    expect(reifen, "Reifen nicht gefunden").toBeDefined();
+    expect(reifen.children.length, "der Reifen hat Unterteile — er muss EIN Mesh sein").toBe(0);
+    const geo = reifen.geometry as THREE.BufferGeometry;
+    const idx = geo.getIndex();
+    const n = Math.floor((idx ? idx.count : geo.getAttribute("position").count) / 3);
+    expect(n, `Reifen ${n} Dreiecke`).toBeLessThanOrEqual(800);
+    // ... und nicht wieder ein Zwanzigeck: unter 200 waere das Profil weg
+    expect(n, `Reifen ${n} Dreiecke — das Profil fehlt`).toBeGreaterThan(200);
+  });
+
+  it("nur der Reifen wirft Schatten", () => {
+    /*
+     * Jedes schattenwerfende Teil wird zweimal gezeichnet. Felge und Nabe
+     * liegen vollstaendig in der Silhouette des Reifens; ihr Schatten waere
+     * nicht zu sehen, wuerde aber acht Zeichenrufe kosten (vier Raeder x zwei).
+     */
+    for (const rad of raeder()) {
+      rad.traverse((o) => {
+        if (!(o instanceof THREE.Mesh)) return;
+        expect(o.castShadow, `${o.name} wirft Schatten`).toBe(o.name.endsWith("_REIFEN"));
+      });
+    }
+  });
+
+  it("behaelt Durchmesser 1,24 m und Breite 0,50 m", () => {
+    /*
+     * Der Raddurchmesser stimmt mit dem Vorbild (Sennebogen 840 E) ueberein
+     * und ist ausdruecklich NICHT Gegenstand des Umbaus. Gemessen wird ueber
+     * die Eckpunkte des Reifens, nicht ueber die Konstanten — sonst prueft der
+     * Test wieder nur sich selbst.
+     */
+    const reifen = scene.getObjectByName("02_RAD_VL_REIFEN") as THREE.Mesh;
+    reifen.updateMatrixWorld(true);
+    const pos = (reifen.geometry as THREE.BufferGeometry).getAttribute(
+      "position"
+    ) as THREE.BufferAttribute;
+    const p = new THREE.Vector3();
+    let rMax = 0;
+    let breite = 0;
+    for (let i = 0; i < pos.count; i++) {
+      p.fromBufferAttribute(pos, i);
+      // Lokal: Achse in Y (die Gruppendrehung macht daraus X)
+      rMax = Math.max(rMax, Math.hypot(p.x, p.z));
+      breite = Math.max(breite, Math.abs(p.y) * 2);
+    }
+    expect(rMax * 2, "Raddurchmesser").toBeCloseTo(1.24, 2);
+    expect(breite, "Reifenbreite").toBeCloseTo(0.5, 2);
+  });
+
+  it("der Bagger steht auf seinen Raedern, nicht darueber oder darin", () => {
+    /*
+     * Die Raeder haengen an der Achshoehe RAD_R ueber Grund. Weicht der
+     * Aussenradius davon ab, schwebt die Maschine oder saegt sich ein — und
+     * das faellt beim Fahren sofort auf, aber erst auf dem Geraet.
+     */
+    for (const rad of raeder()) {
+      expect(rad.position.y, `${rad.name} Achshoehe`).toBeCloseTo(0.62, 6);
+    }
+  });
+
+  it("die Raeder haben keinen eigenen Kollider — die Physik bleibt unberuehrt", () => {
+    /*
+     * Der Unterwagen ist fuer Rapier ein Quader; die Raeder waren dort nie
+     * vertreten. Optische Tiefe darf keine Physik kosten. Geprueft wird das
+     * hier so weit es kopflos geht: Kein Radknoten traegt einen Verweis auf
+     * einen Koerper, und die Radgruppen sind reine Anzeige.
+     */
+    for (const rad of raeder()) {
+      rad.traverse((o) => {
+        expect(o.userData.collider ?? null, `${o.name} traegt einen Kollider`).toBeNull();
+      });
+    }
   });
 });

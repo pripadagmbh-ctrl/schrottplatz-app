@@ -6,6 +6,7 @@ import { ExcavatorCollision, type ArmShape } from "./collision";
 import { InstrumentPanel, type InstrumentReadout } from "./instruments";
 import { buildDriver } from "./driver";
 import { baueSpinne } from "./grappleParts";
+import { baueRad, radGeometrien, radStoffe, RAD_R } from "./wheelParts";
 import {
   CLAW_COUNT,
   CLAW_OPEN_SPLAY,
@@ -658,14 +659,22 @@ export class Excavator {
     chassis.castShadow = true;
     chassis.name = "01_UNTERWAGEN";
     this.root.add(chassis);
-    const wheelGeo = new THREE.CylinderGeometry(0.62, 0.62, 0.5, 20);
-    wheelGeo.rotateZ(Math.PI / 2);
+    /*
+     * Räder: Reifen, Felge, Nabe — drei Bauteile je Rad statt eines Zylinders
+     * mit 20 Ecken. Die Form steht in `wheelParts.ts`, samt Begründung für
+     * jedes Maß und für die Budgetregel, aus der die Bauweise folgt.
+     *
+     * Hier bleibt nur, was der Bagger davon wissen muss: wo die Räder sitzen
+     * und welche Seite außen ist. Die Geometrie wird EINMAL gebaut und von
+     * allen vier Rädern geteilt; nur die Drehung unterscheidet links von
+     * rechts, damit Felgenscheibe und Nabenkappe nach außen zeigen.
+     */
+    const radGeo = radGeometrien();
+    const radSt = radStoffe(machineBlue);
     for (const [x, z, ecke] of RAD_ECKEN) {
-      const w = new THREE.Mesh(wheelGeo, dark);
-      w.position.set(x, 0.62, z);
-      w.castShadow = true;
-      w.name = `02_RAD_${ecke}`;
-      this.root.add(w);
+      const rad = baueRad(radGeo, radSt, ecke, x > 0);
+      rad.position.set(x, RAD_R, z);
+      this.root.add(rad);
     }
 
     // Oberwagen: verglaste Hochkabine + Gegengewicht
