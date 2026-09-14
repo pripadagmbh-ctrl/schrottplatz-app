@@ -762,3 +762,67 @@ Punkte oben nachweisbar erfüllt sind.
 
 **Auf dem Gerät zu prüfen.** Laufend, je Paket — dieser Eintrag ersetzt keinen Gerätetest,
 er ordnet sie nur.
+
+---
+
+### E-017 — Fahren schaltet über zwei Pedale unten in der Bildmitte (14.09.2026)
+
+**Entscheidung.** Unten in der Bildmitte stehen zwei gleich große Pedale. Sie sind
+Umschalter und Anzeige in einem — Gas geben sie nicht. Ein Tipp macht den **linken
+Stick** zu Gas und Lenkung; noch ein Tipp gibt ihm Hauptarm und Oberwagen zurück.
+Eingeschaltet leuchten beide Pedale bernsteinfarben und ihre Trittplatten stehen
+unten, wie durchgetreten. Kein Zeitablauf, kein Rückfall von selbst, immer sichtbar.
+
+**Begründung.** Zwei Vorgänger sind an genau zwei Dingen gescheitert, und dieser
+Entwurf heilt beide:
+
+- Der **Fahrmodus per Doppeltipp** (bis zum 14.09. vormittags) fiel nach vier
+  Sekunden Untätigkeit von allein zurück und war nirgends im Bild zu sehen. Man
+  wusste nie, woran man war.
+- Die **Fahrfläche unten links** (14.09. mittags) kostete dauerhaft ein Fünftel des
+  Bildes und einen dritten Stick. Patrick am Gerät: „das ist nicht so cool für den
+  User."
+
+Der Zustand steht jetzt im Bild, und er ändert sich nur von Hand.
+
+**Warum die Bildmitte geht, obwohl der Daumen dort nicht hinreicht.** Gemessen am
+14.09. reicht der Daumen von der unteren Ecke 478 Punkte weit; die Mitte des iPad
+quer liegt bei 590 — ohne Umgreifen unerreichbar. Das Pedal wird aber **einmal
+angetippt, nicht gehalten**; dafür darf man umgreifen. Halten müsste man es nur,
+wenn es selbst das Gas gäbe — und genau das tut es nicht. Patrick hatte das vorher
+so entschieden: „Die beiden Pedale sind nur visuell, gefahren wird das Ding
+weiterhin mit dem Dommel."
+
+**Verworfene Alternativen.**
+
+- Eigene Fahrfläche unten links, 400 × 200 px — kostete zu viel Bild (abgelehnt am Gerät).
+- Fahrmodus per Doppeltipp mit Vier-Sekunden-Ablauf — unsichtbar, fiel von selbst zurück.
+- Gas und Lenken als fünfte und sechste Achse im Steuerungsmenü — dann könnte man
+  sich das Fahren versehentlich wegstellen.
+- Beschriftung auf den Pedalen — der Zustand soll ohne Wort lesbar sein, an Farbe
+  **und** Form. Die Tests bewachen beides.
+
+**Wie die Überlagerung gelöst ist.** Nicht seitlich ausgewichen, sondern gestapelt:
+Die Pedale bekommen den untersten Streifen, Griff-Info und Ladeanzeige rücken auf
+Touchgeräten darüber (`index.html:44–52`). Auf der Maus-Fassung bleibt alles, wo es
+war. Beide Pedale sind 44 px in jede Richtung groß, mit `box-sizing: border-box`,
+damit die Zahl auch das Sichtbare meint.
+
+**Abnahmekriterium.** Patrick schaltet auf dem iPad ein und aus, ohne zu zögern, und
+weiß in jedem Moment am Bild, ob er fährt oder arbeitet. Auf dem iPhone mini
+überdeckt nichts die Griff-Info.
+
+**Auf dem Gerät zu prüfen.**
+
+1. Tipp auf ein Pedal — leuchten beide sofort, stehen die Trittplatten unten?
+2. Linken Daumen irgendwo links aufsetzen und ziehen: fährt sie an, ohne Ruck?
+   Lenkt sie in die erwartete Richtung?
+3. Pedal antippen, **während** der linke Daumen liegt: fühlt sich das Loslassen des
+   Sticks wie „einmal neu aufsetzen" an oder hakelig?
+4. Zwei, drei Minuten normal arbeiten: fragst du dich irgendwann, ob Fahren an ist?
+5. iPhone mini quer: verdecken die Pedale „Greifer: offen" oder die Reinheitsanzeige?
+
+**Offen.** Größe und Ort der Pedale sind Startwerte nach der 44-px-Regel, keine
+Messung — „größer / weiter oben / weiter auseinander" ist je eine Zeile CSS. Und
+falls das Umschalten sich zu leise anfühlt: Ein und Aus könnten zwei unterschiedliche
+Töne bekommen, dann hört man den Zustand, ohne hinzusehen.

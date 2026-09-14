@@ -274,7 +274,6 @@ spätere Sitzung — fängt oben an. Die Abschnitte folgen E-016: erst die Welt,
 dann der Kreislauf, dann die App.
 
 **In Arbeit, Stand 14.09.2026 abends:**
-- Fahrpedale unten Mitte (ersetzt die Fahrfläche von heute)
 - Fünf Baufehler am Platz: Legosteine stehen über · Wand durch Baum ·
   Firmenschild verdeckt · Scheinwerfer einmauern · Schneemobil mit vier
   Gummirädern
