@@ -25,6 +25,10 @@ export class DebugOverlay {
   private lastUpdate = 0;
   private physGeglaettet = 0;
   private bildGeglaettet = 0;
+  private mischGeglaettet = 0;
+  private vorGeglaettet = 0;
+  private logikGeglaettet = 0;
+  private restGeglaettet = 0;
 
   constructor() {
     this.el = document.getElementById("debug")!;
@@ -51,6 +55,12 @@ export class DebugOverlay {
       /** reine Arbeitszeit, unabhaengig vom 60/30-Riegel der Bildsynchronisation */
       msPhysik: number;
       msBild: number;
+      /** Bildinterpolation: mischen + zwei Weltmatrix-Durchlaeufe */
+      msMisch: number;
+      /** Eingaben und Tastenbefehle vor dem ersten Physikschritt */
+      msVor: number;
+      /** Spiellogik, HUD-Schreibvorgaenge, Ton, Partikel nach dem Zeichnen */
+      msLogik: number;
       /** Zustand des Tonsystems — auf dem Geraet die einzige Moeglichkeit
        *  nachzusehen, warum nichts zu hoeren ist. */
       audio: Tondiagnose;
@@ -64,6 +74,18 @@ export class DebugOverlay {
     // Arbeitszeiten schwanken je Bild stark — geglaettet sind sie ablesbar
     this.physGeglaettet += (stats.msPhysik - this.physGeglaettet) * 0.08;
     this.bildGeglaettet += (stats.msBild - this.bildGeglaettet) * 0.08;
+    this.mischGeglaettet += (stats.msMisch - this.mischGeglaettet) * 0.08;
+    this.vorGeglaettet += (stats.msVor - this.vorGeglaettet) * 0.08;
+    this.logikGeglaettet += (stats.msLogik - this.logikGeglaettet) * 0.08;
+    /*
+     * Die entscheidende Zahl fuer das Raetsel vom 14.09.2026: Frame 21,0 ms,
+     * Arbeit 6,4 ms. `Rest` ist der Unterschied — Zeit, die weder Physik noch
+     * Bild noch Spiellogik verbraucht. Steht dort fast der ganze Frame,
+     * wartet der Browser (Bildsynchronisation, Verbund der Grafikschicht);
+     * steht dort wenig, sitzt die Bremse in einer der anderen Zeilen.
+     */
+    const arbeit = stats.msVor + stats.msPhysik + stats.msMisch + stats.msBild + stats.msLogik;
+    this.restGeglaettet += (frameDt * 1000 - arbeit - this.restGeglaettet) * 0.08;
     if (!this.visible) return;
     const now = performance.now();
     if (now - this.lastUpdate < 250) return;
@@ -76,6 +98,8 @@ export class DebugOverlay {
       `Beweglich: ${stats.dynamic} (wach: ${stats.dynAwake})<br />` +
       `Zeichenrufe: ${stats.calls} · ${(stats.tris / 1000).toFixed(0)}k Dreiecke<br />` +
       `Arbeit: Physik ${this.physGeglaettet.toFixed(1)} ms · Bild ${this.bildGeglaettet.toFixed(1)} ms<br />` +
+      `Eingabe ${this.vorGeglaettet.toFixed(1)} · Misch ${this.mischGeglaettet.toFixed(1)} · ` +
+      `Logik ${this.logikGeglaettet.toFixed(1)} · Rest ${this.restGeglaettet.toFixed(1)} ms<br />` +
       `${tonZeile(stats.audio)}<br />` +
       `Gegriffen: ${stats.gripped} Obj / ${stats.grippedKg.toFixed(0)} kg<br />` +
       `Lambert: ${stats.lambert.taetigkeit} · weckt ` +

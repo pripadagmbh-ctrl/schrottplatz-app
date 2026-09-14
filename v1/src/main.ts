@@ -45,6 +45,7 @@ import { StaffManager } from "./world/people";
 import { WEIGH_X, WEIGH_Z, KAFFEE_POS } from "./world/yard";
 import { setBaggerOrt } from "./delivery/routes";
 import { clearSave, readSave, storeSave, type SaveData } from "./core/save";
+import { Zwischenbild } from "./core/zwischenbild";
 
 const FIXED_DT = 1 / 60;
 const MAX_STEPS_PER_FRAME = 5; // Spiral-of-death-Schutz
@@ -947,6 +948,21 @@ async function main(): Promise<void> {
   let accumulator = 0;
   let msPhysik = 0;
   let msBild = 0;
+  let msMisch = 0;
+  let msLogik = 0;
+  let msVor = 0;
+  /*
+   * Bildinterpolation (siehe core/zwischenbild.ts). Der Bagger wird fest
+   * angemeldet: Sein Wurzelknoten steht still, waehrend Ausleger und Oberwagen
+   * arbeiten — die Selbsterkennung wuerde ihn erst beim Losfahren bemerken.
+   * Alles andere, was sich bewegt (LKW, Radlader, Figuren, angestossene
+   * Behaelter), meldet sich beim ersten Meter selbst an.
+   */
+  const zwischenbild = new Zwischenbild();
+  for (const w of excavator.bildwurzeln()) zwischenbild.wurzel(w);
+  zwischenbild.beobachte(scene);
+  /** Netze des gegriffenen Schrotts — Puffer, damit je Schritt nichts anfaellt */
+  const gegriffeneNetze: THREE.Object3D[] = [];
   let lastTime = performance.now();
   let frameCount = 0;
   let labelsOn = true; // Zonen-Schilder sichtbar
@@ -1041,21 +1057,69 @@ async function main(): Promise<void> {
 
     accumulator += frameDt;
     let steps = 0;
+    let mischImSchritt = 0;
     // Reine Arbeitszeit messen, nicht den Bildabstand: Safari synchronisiert auf
     // 60 Hz und faellt auf glatte 30 zurueck, sobald 16,7 ms nicht reichen.
     // frameDt zeigt dann 34,0 ms, egal ob die Arbeit 18 oder 33 ms dauert —
     // jede Verbesserung bliebe unsichtbar, bis sie die Schwelle unterbietet.
     const tPhysik = performance.now();
+    // Alles vor dem ersten Schritt: Eingaben, Tastenbefehle, Menues
+    msVor = tPhysik - now;
     while (autoStep && accumulator >= FIXED_DT && steps < MAX_STEPS_PER_FRAME) {
       stepOnce();
       accumulator -= FIXED_DT;
+      /*
+       * Schrottlage ins Bild schreiben — bewusst IM Schritt, nicht danach.
+       * Das Zwischenbild erfasst hier den Stand; laege syncMeshes hinter der
+       * Schleife, waere der erfasste Stand der Teile einen Schritt aelter als
+       * der der Maschine, und die Ladung haenge sichtbar hinter den Krallen
+       * her. Bei 0 Schritten bewegt sich nichts, dann faellt auch nichts aus.
+       */
+      items.syncMeshes();
+      // Was in der Spinne haengt, muss mitgemischt werden — loser Schrott nicht
+      gegriffeneNetze.length = 0;
+      for (const b of grip.grippedBodies) {
+        const it = items.itemByBody(b);
+        if (it) gegriffeneNetze.push(it.mesh);
+      }
+      zwischenbild.zeitweise(gegriffeneNetze);
+      // Nach jedem Schritt erfassen, nicht nur am Frame-Ende: Faellt ein
+      // Doppelschritt an, ist der Vorzustand der vorletzte Schritt — sonst
+      // waere die Mischstrecke doppelt so lang wie das Zeitfenster.
+      const tErfasse = performance.now();
+      zwischenbild.erfasse();
+      mischImSchritt += performance.now() - tErfasse;
       steps++;
     }
-    msPhysik = performance.now() - tPhysik;
+    // Das Erfassen gehoert zur Bildinterpolation, nicht zur Physik — sonst
+    // waere die Physikzeile im Overlay nicht mehr mit frueheren Messungen
+    // vergleichbar.
+    msPhysik = performance.now() - tPhysik - mischImSchritt;
     if (steps === MAX_STEPS_PER_FRAME) accumulator = 0;
 
-    items.syncMeshes();
     excavator.setFirstPerson(orbit.mode === "cabin"); // Ego-Sicht: nur die eigenen Unterarme
+    /*
+     * Zwischenbild: Der Rest im Akkumulator sagt, wie weit das Bild zwischen
+     * den beiden letzten Physikschritten steht. Ohne das Mischen rueckt bei
+     * 48 Hz jedes vierte Bild die doppelte Strecke vor (Muster 2,1,1,1) —
+     * Patricks "zwei schnelle Bilder hintereinander" vom 14.09.2026.
+     *
+     * Reihenfolge: erst mischen, dann die Weltmatrizen frisch rechnen (die
+     * Kabinenkamera haengt am gezeichneten Augpunkt), dann die Kamera, dann
+     * zeichnen, dann alles auf den gerechneten Stand zurueck.
+     */
+    const tMisch = performance.now();
+    msMisch = mischImSchritt;
+    zwischenbild.zeichne(accumulator / FIXED_DT);
+    /*
+     * Nur in der Kabinenansicht: Der Augpunkt des Fahrers steckt in den
+     * Weltmatrizen des Baggers, also muessen die vor der Kamera frisch sein.
+     * Die Aussenansichten zielen auf `root.position` und brauchen das nicht —
+     * das spart einen Matrix-Durchlauf (gemessen 47 us je Durchlauf ueber die
+     * 336 Knoten der Maschine, 14.09.2026).
+     */
+    if (orbit.mode === "cabin") excavator.root.updateMatrixWorld(true);
+    msMisch += performance.now() - tMisch;
     orbit.update(
       frameDt,
       input,
@@ -1068,6 +1132,11 @@ async function main(): Promise<void> {
     const tBild = performance.now();
     renderer.render(scene, orbit.camera);
     msBild = performance.now() - tBild;
+    const tZurueck = performance.now();
+    zwischenbild.zurueck();
+    zwischenbild.weltmatrizen();
+    msMisch += performance.now() - tZurueck;
+    const tLogik = performance.now();
 
     // --- HUD, Highlight, Ampel, Audio (pro Render-Frame) ---
     excavator.getSensorPosition(sensorPos);
@@ -1215,7 +1284,14 @@ async function main(): Promise<void> {
       audio.setScrape(0);
     }
 
+    /*
+     * Messpunkt fuer das offene Raetsel vom 14.09.2026: Frame 21,0 ms, davon
+     * nur 6,4 ms Arbeit. Hier endet alles, was diese Schleife selbst tut —
+     * was im Frame darueber hinaus vergeht, liegt zwischen den Bildern
+     * (Bildsynchronisation, Browser, Verbund der Grafikschicht).
+     */
     const counts = physics.counts();
+    msLogik = performance.now() - tLogik;
     debug.update(frameDt, {
       bodies: counts.bodies,
       awake: counts.awake,
@@ -1232,6 +1308,9 @@ async function main(): Promise<void> {
       },
       msPhysik,
       msBild,
+      msMisch,
+      msVor,
+      msLogik,
     });
 
     input.endFrame();

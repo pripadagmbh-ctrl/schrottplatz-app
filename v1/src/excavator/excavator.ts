@@ -2551,9 +2551,37 @@ export class Excavator {
     return treffer;
   }
 
-  /** Zielpunkt für die Kamera (Oberwagen). */
+  /**
+   * Alles, was von der Maschine lose in der Szene haengt — fuer die
+   * Bildinterpolation (core/zwischenbild.ts).
+   *
+   * Die Selbsterkennung des Zwischenbilds nimmt nur Baugruppen mit eigenen
+   * Kindern; einzelne Netze bleiben aussen vor, sonst wuerde jedes Schrottteil
+   * einen Eintrag kosten. Hydraulikzylinder und Kabinenlenker rechnen aber in
+   * Weltkoordinaten und haengen darum als einzelne Netze direkt in der Szene
+   * (siehe buildHydraulics). Ohne diese Liste blieben genau sie ruckelig,
+   * waehrend der Rest der Maschine glatt laeuft — die Zylinder wuerden
+   * sichtbar neben ihren Ankerpunkten zittern.
+   */
+  bildwurzeln(): THREE.Object3D[] {
+    const raus: THREE.Object3D[] = [this.root, this.grappleGroup];
+    for (const l of this.cabLinks) raus.push(l.mesh);
+    for (const h of this.hydraulics) raus.push(h.barrel, h.rod);
+    return raus;
+  }
+
+  /**
+   * Zielpunkt für die Kamera (Oberwagen).
+   *
+   * Bewusst `this.root.position` und nicht `this.position`: Beide sind im
+   * Normalfall dieselbe Zahl (syncMeshes kopiert die eine in die andere), aber
+   * waehrend des Zeichnens steht in `root.position` die Zwischenpose der
+   * Bildinterpolation. Haengt die Kamera am gerechneten Stand, waehrend die
+   * Maschine gemischt gezeichnet wird, wackeln beide gegeneinander — der
+   * Bagger zittert dann vor einem ruhigen Hintergrund.
+   */
   getCameraTarget(out: THREE.Vector3): THREE.Vector3 {
-    return out.copy(this.position).add(new THREE.Vector3(0, 2.6, 0));
+    return out.copy(this.root.position).add(new THREE.Vector3(0, 2.6, 0));
   }
 
   /** Augpunkt der Kabinenkamera (Weltkoordinaten). */
