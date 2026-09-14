@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
+import { reihenstuecke } from "./legoreihe";
 
 /** Position der Brückenwaage in der Nordspur (SW) */
 /**
@@ -91,11 +92,22 @@ export const GATE_X = -22;
  */
 export const BUCHT_X_VON = -6.5;
 export const BUCHT_X_BIS = 7.5;
-export const BUCHT_Z = -38.5;
-/** Ist diese x-Stelle der Suedmauer von der Ausbuchtung ausgespart? */
-export function inBucht(x: number): boolean {
-  return x > BUCHT_X_VON && x < BUCHT_X_BIS;
-}
+/*
+ * Flacher seit dem 14.09.2026 abends: −35,5 statt −38,5.
+ *
+ * Ansage Patrick: „Die Ausbuchtung ist vielleicht ein bisschen zu tief, die
+ * vielleicht ein bisschen verkuerzen." Aus 9,5 m Tiefe werden 6,5.
+ *
+ * An der Erreichbarkeit aendert das nichts: Bei einer Halde zaehlt die
+ * VORDERE Kante, und die liegt weiter auf z −29,0. Was sich aendert, ist der
+ * Stauraum — 40,8 statt 61,2 m² je Halde, zusammen 81,6 statt 122,4 m².
+ */
+export const BUCHT_Z = -35.5;
+/*
+ * Die frühere Hilfsfunktion `inBucht(x)` ist weg: Seit die Umrandung aus
+ * `mauerLaeufe()` kommt, steht die Aussparung als eigener Lauf da und muss
+ * nicht mehr Stein für Stein abgefragt werden.
+ */
 
 /**
  * Die Trennsteine zwischen den beiden Halden — eine Pyramide.
@@ -118,12 +130,169 @@ export const TRENNSTEIN_X = 0.5;
 /**
  * Lage und Hoehe jeder Saeule, von der Bucht-Oeffnung nach hinten.
  *
- * Sechs Saeulen a 1,6 m decken die 9,0 m Haldentiefe ab. Die Lagen laufen
- * 1–2–4–4–2–1: in der Mitte 2,4 m, an beiden Enden 0,6 m.
+ * Vier Saeulen a 1,6 m decken die 6,5 m Haldentiefe ab (vorher sechs auf
+ * 9,5 m — die Ausbuchtung ist am 14.09.2026 abends flacher geworden). Die
+ * Lagen laufen 1–4–4–1: in der Mitte 2,4 m, an beiden Enden 0,6 m. Die
+ * Pyramide bleibt damit dieselbe Figur, nur kuerzer.
  */
-export const TRENNSTEINE: Array<{ z: number; hoehe: number }> = [1, 2, 4, 4, 2, 1].map(
+export const TRENNSTEINE: Array<{ z: number; hoehe: number }> = [1, 4, 4, 1].map(
   (lagen, i) => ({ z: -29.9 - i * TRENNSTEIN_L, hoehe: lagen * TRENNSTEIN_H })
 );
+
+/* -------------------------------------------------- Die Mauerläufe ------- */
+/** Steinmaß der Umrandung (Bestand seit 29.08.2026). */
+export const MAUER_STEIN = { laenge: 1.6, hoehe: 0.6, dicke: 0.6 };
+/** Halbe Breite der Einfahrtslücke in der Nordwand. */
+export const TOR_HALB = 4.5;
+
+/** Ein gerader Mauerlauf: von … bis auf einer Achse. */
+export interface Mauerlauf {
+  name: string;
+  /** Laufrichtung: „x" = Nord/Süd-Mauern, „z" = Ost/West-Mauern */
+  achse: "x" | "z";
+  /** Die feste Koordinate (z bei achse „x", sonst x) */
+  fest: number;
+  von: number;
+  bis: number;
+}
+
+/**
+ * Wo überall Umrandung steht — eine Liste statt vier Schleifen.
+ *
+ * Bis zum 14.09.2026 liefen die Schleifen in ganzen Steinlängen los und
+ * hörten auf, sobald die nächste Steinmitte über das Ende hinausging. Die
+ * Folge waren zwei Fehler auf einmal: An den Platzecken endete die Nord- und
+ * Südmauer bis zu 0,9 m vor der Ecke (eine Lücke), an der Ausbuchtung stand
+ * die Rückwand 0,4 m über den Schenkel hinaus (ein Überstand). Beides fällt
+ * auf, weil eine Mauer entweder in der Ecke ankommt oder eben nicht.
+ *
+ * Wem die Ecke gehört: An den vier Platzecken laufen Nord- und Südmauer
+ * durch, Ost- und Westmauer stoßen von innen an. An der Ausbuchtung ist es
+ * umgekehrt — dort laufen die beiden Schenkel durch, weil sie die langen
+ * Wände sind, und die Rückwand stößt an. So ist jedes Eckquadrat genau
+ * einmal besetzt: kein Loch, keine zwei Steine ineinander.
+ */
+export function mauerLaeufe(): Mauerlauf[] {
+  const hz = YARD_D / 2;
+  const t = MAUER_STEIN.dicke / 2;
+  const gateL = GATE_X - TOR_HALB;
+  const gateR = GATE_X + TOR_HALB;
+  return [
+    // Nordwand, links und rechts der Einfahrt — bündig an den Torpfosten
+    { name: "nord-west", achse: "x", fest: hz, von: YARD_MIN_X - t, bis: gateL },
+    { name: "nord-ost", achse: "x", fest: hz, von: gateR, bis: YARD_MAX_X + t },
+    // Südwand, links und rechts der Ausbuchtung
+    { name: "sued-west", achse: "x", fest: -hz, von: YARD_MIN_X - t, bis: BUCHT_X_VON - t },
+    { name: "sued-ost", achse: "x", fest: -hz, von: BUCHT_X_BIS + t, bis: YARD_MAX_X + t },
+    // Ost- und Westwand stoßen innen an
+    { name: "west", achse: "z", fest: YARD_MIN_X, von: -hz + t, bis: hz - t },
+    { name: "ost", achse: "z", fest: YARD_MAX_X, von: -hz + t, bis: hz - t },
+    // Die Ausbuchtung: zwei Schenkel (mit den Ecken) und die Rückwand quer
+    { name: "bucht-west", achse: "z", fest: BUCHT_X_VON, von: BUCHT_Z - t, bis: -hz - t },
+    { name: "bucht-ost", achse: "z", fest: BUCHT_X_BIS, von: BUCHT_Z - t, bis: -hz - t },
+    { name: "bucht-sued", achse: "x", fest: BUCHT_Z, von: BUCHT_X_VON + t, bis: BUCHT_X_BIS - t },
+  ];
+}
+
+/* --------------------------------------------------- Das Firmenschild ---- */
+/**
+ * Wo die Tafel „Rust’n’Reibach" steht — und warum genau dort.
+ *
+ * Befund 14.09.2026 (Patrick, auf dem Gerät): „Aktuell wird das Firmenschild
+ * durch die Halle verdeckt." Nachgemessen aus der Startansicht (Orbitkamera
+ * hinter dem Bagger, 11 m Abstand, 24° geneigt): Von 231 abgetasteten Punkten
+ * der alten Tafel auf (−10 | 7,5) waren **69 % frei und nur 60 % zugleich im
+ * Bild** — der untere Teil steckte hinter Halle 1 und Halle 2, der obere
+ * stand über dem oberen Bildrand.
+ *
+ * Zwischen Bürogebäude (bis x −30,6) und Halle 1 (ab x −17,75) bleibt ein
+ * Fenster frei: die Achse der Einfahrt. Auf die Tafelebene z +32 gerechnet
+ * reicht es von x −32,2 bis −22,8; davon braucht der LKW, der bei x −22
+ * hereinfährt, die östlichen 1,55 m (halbe Wagenbreite, `vehicles.ts`).
+ * Übrig bleiben rund 8 m — deshalb ist die Tafel von 14 × 7 m auf
+ * **8,0 × 4,0 m** geschrumpft; das Seitenverhältnis 2 : 1 der Zeichnung
+ * bleibt, sonst stünde die Wortmarke verzerrt da. Gemessen sind es jetzt
+ * **100 % frei und 100 % im Bild**, auf dem iPad (4:3) wie auf dem iPhone
+ * mini (2,16:1) — nachgerechnet in `test/kulisse.test.ts`.
+ *
+ * Damit steht sie auch wieder da, wo Patrick sie am 12.09.2026 haben wollte:
+ * „in der Naehe der Toreinfahrt".
+ *
+ * Verworfen: die Nordostecke (x +17,5), wo die volle Größe hingepasst hätte —
+ * dort stehen drei Bäume davor, und 18 % der Tafel blieben verdeckt. Höher
+ * hängen half nicht: Über den Hallendächern liegt die Tafel schon über dem
+ * oberen Bildrand (gemessen 71 % im Bild).
+ */
+export const SCHILD_POS = { x: -27.9, y: 6.8, z: YARD_D / 2 + 3 };
+export const SCHILD_B = 8.0;
+export const SCHILD_H = 4.0;
+
+/* ------------------------------------------------------- Die Bäume ------- */
+/** Kronenradius eines Baums bei Maßstab 1 (Geometrie in `buildLandscape`). */
+export const KRONE_R = 1.5;
+/**
+ * Luft zwischen Krone und Mauerkante (SW, 14.09.2026).
+ *
+ * 0,4 m: Ein Ast, der über eine Mauer hängt, sieht richtig aus; einer, der in
+ * ihr steckt, sieht nach Bauteilfehler aus. Näher als das ist im Bild nicht
+ * mehr zu unterscheiden.
+ */
+export const BAUM_ABSTAND = 0.4;
+
+/**
+ * Ein Baumstandort, der keine Mauer berührt — oder der nächstgelegene, der
+ * es nicht tut.
+ *
+ * Befund 14.09.2026 (Patrick, auf dem Gerät): „Bei den Ausbuchtungen für
+ * Stahlschrott und Mischschrott läuft eine Wand durch einen Baum. Entweder
+ * den Baum versetzen oder fällen."
+ *
+ * Nachgemessen stimmte es: Die Bäume werden mit einem festen Zufall rund um
+ * das Platz-RECHTECK gestreut, die Ausbuchtung nach Süden kam später dazu
+ * (E-010) — und niemand hat die Bäume gefragt. Zwei standen danach in der
+ * Wand: einer mit der Krone im Westschenkel, einer an der hinteren Ecke.
+ *
+ * Gefällt wird keiner. Der Baum rutscht auf der kürzesten Strecke aus der
+ * Wand heraus; das ist derselbe Kniff, mit dem `boxen.ts` Fahrzeuge an einer
+ * Kante entlanggleiten lässt, statt sie hineinzuschieben.
+ */
+export function baumStandort(
+  x: number,
+  z: number,
+  kronenRadius: number
+): { x: number; z: number } {
+  const hz = YARD_D / 2;
+  const rand = MAUER_STEIN.dicke / 2 + kronenRadius + BAUM_ABSTAND;
+  // Was ein Baum nicht berühren darf: die Platzfläche und die Ausbuchtung.
+  const gebaut: Array<[number, number, number, number]> = [
+    [YARD_MIN_X, YARD_MAX_X, -hz, hz],
+    [BUCHT_X_VON, BUCHT_X_BIS, BUCHT_Z, -hz],
+  ];
+  let px = x;
+  let pz = z;
+  // Drei Durchgänge: Wer aus der Bucht herausrutscht, darf nicht im Platz
+  // landen. Mehr braucht es bei zwei Rechtecken nicht.
+  for (let runde = 0; runde < 3; runde++) {
+    let versetzt = false;
+    for (const [x0, x1, z0, z1] of gebaut) {
+      if (px <= x0 - rand || px >= x1 + rand || pz <= z0 - rand || pz >= z1 + rand) continue;
+      // Der kürzeste Weg hinaus gewinnt — sonst wandert der Baum quer über
+      // den halben Platz.
+      const nachWest = px - (x0 - rand);
+      const nachOst = x1 + rand - px;
+      const nachSued = pz - (z0 - rand);
+      const nachNord = z1 + rand - pz;
+      const min = Math.min(nachWest, nachOst, nachSued, nachNord);
+      if (min === nachWest) px = x0 - rand;
+      else if (min === nachOst) px = x1 + rand;
+      else if (min === nachSued) pz = z0 - rand;
+      else pz = z1 + rand;
+      versetzt = true;
+    }
+    if (!versetzt) break;
+  }
+  return { x: px, z: pz };
+}
 
 /**
  * Janines Kaffeewagen steht an der Nordwand vor den Graffiti, oestlich der
@@ -352,44 +521,37 @@ export class Yard {
 
     const tex = new THREE.CanvasTexture(canvas);
     tex.anisotropy = 4;
-    const boardW = 14;
-    const boardH = 7;
-    /*
-     * Neben der Einfahrt statt hinter der Suedwand (Ansage 12.09.2026: „das
-     * PRIPADA Schild soll eh immer im sichtbaren Bereich der Default-
-     * Baggerauslegung sein, ich wuerde es in der Naehe der Toreinfahrt
-     * platzieren").
-     *
-     * Der Bagger steht auf (−2,5 | −19,5) und blickt nach +z. Bei x −10 liegt
-     * die Tafel damit knapp rechts der Blickachse und ist im Startbild zu
-     * sehen.
-     * Die Schauflaeche muss dafuer herumgedreht werden — sie zeigte bisher
-     * nach +z, jetzt nach −z, also auf den Platz.
-     */
-    const schildX = -10;
-    const z = YARD_D / 2 + 3;
+    const boardW = SCHILD_B;
+    const boardH = SCHILD_H;
+    const schildX = SCHILD_POS.x;
+    const z = SCHILD_POS.z;
     const board = new THREE.Mesh(
       new THREE.PlaneGeometry(boardW, boardH),
       new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7, side: THREE.DoubleSide })
     );
-    board.position.set(schildX, 7.5, z);
+    board.position.set(schildX, SCHILD_POS.y, z);
     board.rotation.y = Math.PI;
     scene.add(board);
     const frameMat = new THREE.MeshStandardMaterial({ color: 0x3a4045, roughness: 0.8 });
-    const frame = new THREE.Mesh(new THREE.BoxGeometry(boardW + 0.5, boardH + 0.5, 0.25), frameMat);
-    frame.position.set(schildX, 7.5, z + 0.2);
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(boardW + 0.4, boardH + 0.4, 0.22), frameMat);
+    frame.position.set(schildX, SCHILD_POS.y, z + 0.2);
     frame.castShadow = true;
     scene.add(frame);
     const body = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
     // Pfeiler liegen hinter der Tafel, nicht davor: Sonst schneiden ihre
     // Kanten in die Schrift. Die Schaufläche bleibt plan (Wunsch 02.09.2026).
-    for (const px of [-4.5, 4.5]) {
-      const post = new THREE.Mesh(new THREE.BoxGeometry(0.5, 8, 0.5), frameMat);
-      post.position.set(schildX + px, 4, z + 0.62);
+    const pfostenH = SCHILD_POS.y;
+    for (const px of [-boardW * 0.32, boardW * 0.32]) {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.45, pfostenH, 0.45), frameMat);
+      post.position.set(schildX + px, pfostenH / 2, z + 0.55);
       post.castShadow = true;
       scene.add(post);
       world.createCollider(
-        RAPIER.ColliderDesc.cuboid(0.25, 4, 0.25).setTranslation(schildX + px, 4, z + 0.62),
+        RAPIER.ColliderDesc.cuboid(0.225, pfostenH / 2, 0.225).setTranslation(
+          schildX + px,
+          pfostenH / 2,
+          z + 0.55
+        ),
         body
       );
     }
@@ -507,7 +669,13 @@ export class Yard {
         x = YARD_MAX_X + 5 + rnd() * 26;
         z = -hz + t * YARD_D;
       }
-      placeTree(x, z, 0.85 + rnd() * 0.8);
+      const scale = 0.85 + rnd() * 0.8;
+      // Befund 14.09.2026: „Bei den Ausbuchtungen für Stahlschrott und
+      // Mischschrott läuft eine Wand durch einen Baum." Der Platz wächst
+      // seit dem Umbau über sein altes Rechteck hinaus; die Bäume standen
+      // noch nach den alten Grenzen. Versetzen statt fällen.
+      const frei = baumStandort(x, z, KRONE_R * scale);
+      placeTree(frei.x, frei.z, scale);
     }
 
     // Auf einem der Bäume nördlich vom Platz steht ein Storchenhorst
@@ -1058,9 +1226,9 @@ export class Yard {
    */
 
   private buildWalls(scene: THREE.Scene, world: RAPIER.World): void {
-    const BL = 1.6; // Blocklänge
-    const BH = 0.6;
-    const BT = 0.6;
+    const BL = MAUER_STEIN.laenge; // Blocklänge
+    const BH = MAUER_STEIN.hoehe;
+    const BT = MAUER_STEIN.dicke;
     const ROWS = 3;
     // Die Umrandung besteht aus 498 Bloecken mit je zwei Nieten — rund 1.500
     // Meshes, und jedes einzeln gezeichnet war der groesste Posten in der
@@ -1078,20 +1246,39 @@ export class Yard {
     const block = new THREE.Object3D();
     const niete = new THREE.Object3D();
 
-    const place = (x: number, z: number, alongX: boolean, reihen = ROWS): void => {
+    /**
+     * Eine Säule Steine setzen. `laenge` ist die tatsächliche Länge des
+     * Steins: Am Ende einer Reihe steht ein kürzerer Endstein, damit die
+     * Mauer an der Kante aufhört statt darüber hinauszuragen (Befund
+     * 14.09.2026). Gestreckt wird die Instanz, die Noppen sitzen auf einer
+     * ungestreckten Grundmatrix — sonst wären sie am Endstein oval.
+     */
+    const place = (
+      x: number,
+      z: number,
+      alongX: boolean,
+      reihen = ROWS,
+      laenge = BL
+    ): void => {
+      const anteil = laenge / BL;
+      const noppen = anteil < 0.7 ? [0] : [-0.45 * anteil, 0.45 * anteil];
       for (let r = 0; r < reihen; r++) {
         const f = farben[n++ % 3]!;
         block.position.set(x, BH / 2 + r * BH, z);
         block.rotation.set(0, alongX ? 0 : Math.PI / 2, 0);
+        block.scale.set(1, 1, 1);
+        block.updateMatrix();
+        const ohneStreckung = block.matrix.clone();
+        block.scale.set(anteil, 1, 1);
         block.updateMatrix();
         bloecke.push({ m: block.matrix.clone(), f });
-        for (const s of [-0.45, 0.45]) {
+        for (const s of noppen) {
           niete.position.set(alongX ? s : 0, BH / 2 + 0.045, alongX ? 0 : s);
           niete.updateMatrix();
           // Block-Matrix mal lokale Matrix — genau die Rechnung, die vorher die
           // Eltern-Kind-Beziehung gemacht hat. So sitzt jede Niete auf den
           // Millimeter dort, wo sie vorher sass.
-          nieten.push({ m: block.matrix.clone().multiply(niete.matrix), f });
+          nieten.push({ m: ohneStreckung.clone().multiply(niete.matrix), f });
         }
       }
     };
@@ -1106,30 +1293,25 @@ export class Yard {
       if (t <= 0) return ROWS;
       return Math.round(ROWS + t * (SUED_HOCH / BH - ROWS));
     };
-    // Nord- und Südwand (Einfahrtslücke im Norden bei GATE_X)
-    for (let x = YARD_MIN_X + BL / 2; x < YARD_MAX_X; x += BL) {
-      if (!(Math.abs(x - GATE_X) < 4.5)) place(x, hz, true);
-      // Wo die Ausbuchtung nach Sueden aufgeht, steht keine Suedmauer.
-      if (!inBucht(x)) place(x, -hz, true, suedReihen(x));
-    }
     /*
-     * Die Ausbuchtung: zwei Schenkel nach Sueden und die Rueckwand quer dazu,
-     * alle auf `SUED_HOCH` — „rundum mit hoher Wand" (E-010). Sie schliessen
-     * an das erhoehte Stueck der Suedmauer an, statt daneben zu stehen.
+     * Alle Läufe aus `mauerLaeufe()` — jeder wird von Kante zu Kante
+     * ausgelegt, der letzte Stein ist ein kürzerer Endstein. Wie viele Reihen
+     * hoch, hängt vom Lauf ab: die Ausbuchtung rundum auf `SUED_HOCH`, die
+     * Ostmauer hinter der Presse ebenso, die Südmauer nach ihrer Rampe.
      */
     const buchtReihen = Math.round(SUED_HOCH / BH);
-    for (let z = -hz - BL / 2; z > BUCHT_Z; z -= BL) {
-      place(BUCHT_X_VON, z, false, buchtReihen);
-      place(BUCHT_X_BIS, z, false, buchtReihen);
-    }
-    for (let x = BUCHT_X_VON + BL / 2; x < BUCHT_X_BIS; x += BL) {
-      place(x, BUCHT_Z, true, buchtReihen);
-    }
-    // Ost- und Westwand
-    for (let z = -hz + BL / 2; z < hz; z += BL) {
-      place(YARD_MIN_X, z, false);
-      // Hinter der Presse so hoch wie die Suedmauer, sonst normal
-      place(YARD_MAX_X, z, false, z <= OST_HOCH_BIS ? Math.round(SUED_HOCH / BH) : ROWS);
+    const reihenFuer = (lauf: Mauerlauf, mitte: number): number => {
+      if (lauf.name.startsWith("bucht")) return buchtReihen;
+      if (lauf.name.startsWith("sued")) return suedReihen(mitte);
+      if (lauf.name === "ost") return mitte <= OST_HOCH_BIS ? buchtReihen : ROWS;
+      return ROWS;
+    };
+    for (const lauf of mauerLaeufe()) {
+      for (const s of reihenstuecke(lauf.von, lauf.bis, BL)) {
+        const reihen = reihenFuer(lauf, s.mitte);
+        if (lauf.achse === "x") place(s.mitte, lauf.fest, true, reihen, s.laenge);
+        else place(lauf.fest, s.mitte, false, reihen, s.laenge);
+      }
     }
     this.buildTrennsteine(place);
 

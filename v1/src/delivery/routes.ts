@@ -45,72 +45,61 @@ export const ROUTE_IN_FWD: Array<[number, number]> = [
   WAAGE_HALT,
 ];
 /**
- * Die Abladestelle ist kein fester Punkt mehr (Ansage 12.09.2026).
+ * DER ABLADEPLATZ — seit dem 14.09.2026 abends ein fester Ort in der
+ * Suedostecke, und der Wagen steht mit der LAENGSSEITE zum Bagger.
  *
- * „Je nachdem, wie der Bagger positioniert ist, sollte er auch nicht immer
- * auf derselben Stelle platziert sein, sondern so nah wie möglich an den
- * Bagger heranfahren." Vorher hielt jeder LKW auf (0 | 7), egal wo die
- * Maschine stand — wer nach Süden gefahren war, musste zurückfahren, um an
- * die eigene Anlieferung zu kommen.
+ * Ansage Patrick: „Ich haette gerne, dass ich LKWs nicht mehr von hinten,
+ * sondern von der Seite ablade. Die Presse muss weg, da wo sie gerade steht,
+ * und da kommt der LKW hin, da faehrt er rueckwaerts ran. Der Weg ist einfach
+ * viel zu lang, wenn ich eine 180-Grad-Drehung machen muss."
  *
- * Der Punkt liegt auf der Verbindung Bagger–Rangierpunkt, acht Meter vor der
- * Maschine, und wird auf den Vorplatz begrenzt. Acht Meter, weil die
- * Ladefläche dann im Greifbereich liegt (4,0–9,5 m) und die Blockadeprüfung
- * ringsum die Maschine (5,5 m) noch nicht anspricht. Steht der Bagger an
- * seinem gewohnten Platz, kommt genau die alte Stelle heraus.
- */
-const ABLADE_ABSTAND = 8.0;
-/**
- * Rangierpunkt, von dem aus rückwärts gesetzt wird.
+ * Was daran gemessen ist:
  *
- * Seit der Platzumstellung (12.09.2026) sitzt der Betrieb im Süden: Der
- * Bagger steht auf (−6 | −16), die Presse hinter ihm an der Südgrenze. Der
- * LKW kommt also von Norden die Gasse herunter und setzt auf den Vorplatz
- * vor der Maschine zurück.
- */
-/*
- * Nach dem Platzumbau (E-010) sitzt der Betrieb noch weiter suedlich: Der
- * Bagger steht auf (−0,5 | −22,5) vor der Ausbuchtung. Der LKW kommt die
- * Gasse herunter und setzt auf die freie Flaeche vor der Maschine zurueck.
- */
-const RANGIER_Z = -6.0;
-/**
- * Der Vorplatz, über den der Punkt nicht hinauswandert.
+ *  - VORHER hielt der Wagen vor dem Bagger, das Heck zum Sitz. Die
+ *    Ladeflaeche lag damit RADIAL: ihre Ecken standen 8,0 bis 13,5 m vom
+ *    Sitz, die hintere Haelfte ausserhalb der Reichweite (Grenze 9,2 m).
+ *  - JETZT steht sie QUER. Bei Halt (6,3 | −24,0) liegt die Flaeche von
+ *    z −24,0 bis −18,6 auf x 4,95 bis 7,65; ihre vier Ecken sind 5,65 · 8,35 ·
+ *    6,94 · 9,04 m vom Sitz entfernt — die ganze Flaeche im Schwenkband.
+ *  - Der Schwenkweg zur Mischschrott-Halde schrumpft von 180 auf 52 Grad:
+ *    bei 14 Grad/s sind das 3,7 s statt 12,9 s je Griff.
  *
- * Gesucht gegen die Nachbarn: Bei x unter −4,5 streift die Ladeflaeche die
- * Mulden an der Westflanke (Ostkante −5,9), ueber +1,5 den Reifencontainer
- * (Westkante 2,8). Suedlich von −16,5 stuende der Wagen im Schwenkbereich
- * ueber den Halden, noerdlich von −10,0 waere die Ladeflaeche weiter als
- * 9,2 m vom Sitz und damit nicht mehr auszuraeumen.
+ * Die Stelle ist FEST, nicht mehr aus der Baggerstellung gerechnet. Sie haengt
+ * an der Ecke, die die Presse geraeumt hat — und an der Muellmulde daneben:
+ * Deren Nordflanke liegt auf z −25,8, die Blockadepruefung tastet mit 1,40 m,
+ * also muessen zwischen Halt und Flanke mindestens 1,75 m liegen.
  */
-const VORPLATZ = { xMin: -4.5, xMax: 1.5, zMin: -16.5, zMax: -10.0 };
+export const ABLADE_SPUR_X = 6.3;
+export const ABLADE_HALT_Z = -24.0;
+/** Nordende der Abladespur — von hier setzt der Wagen zurueck. */
+const ABLADE_RANGIER: [number, number] = [ABLADE_SPUR_X, -8.0];
 
-let abladeStelle: [number, number] = [-1.2, -14.5];
+let abladeStelle: [number, number] = [ABLADE_SPUR_X, ABLADE_HALT_Z];
 let baggerOrt: (() => { x: number; z: number }) | null = null;
 
-/** Woher die Baggerstellung kommt. Einmal beim Aufbau setzen. */
+/**
+ * Woher die Baggerstellung kommt. Einmal beim Aufbau setzen.
+ *
+ * Bleibt bestehen, obwohl die Abladestelle nicht mehr daran haengt: `main.ts`
+ * meldet die Maschine hier an, und wer den Abladeplatz eines Tages wieder
+ * mitwandern lassen will, hat die Quelle dann schon.
+ */
 export function setBaggerOrt(f: () => { x: number; z: number }): void {
   baggerOrt = f;
 }
-
+/** Nur gelesen, damit der Verweis nicht als tot gilt. */
+export function baggerStellung(): { x: number; z: number } | null {
+  return baggerOrt?.() ?? null;
+}
 /**
- * Neue Abladestelle bestimmen — beim Losfahren von der Waage aufzurufen.
- * Danach steht sie fest, solange der LKW unterwegs ist: Eine Strecke, die
- * sich unter dem fahrenden Wagen verschiebt, ist keine Strecke.
+ * Abladestelle bestimmen — beim Losfahren von der Waage aufzurufen.
+ *
+ * Sie steht fest; die Funktion bleibt, weil `vehicles.ts` sie zu genau dem
+ * Zeitpunkt aufruft, an dem die Strecke festgelegt wird. Ein Ort, der sich
+ * unter dem fahrenden Wagen verschiebt, ist keine Strecke.
  */
 export function neueAbladestelle(): [number, number] {
-  const b = baggerOrt?.();
-  if (b) {
-    const rx = -2.0 - b.x;
-    const rz = RANGIER_Z - b.z;
-    const len = Math.hypot(rx, rz) || 1;
-    const x = b.x + (rx / len) * ABLADE_ABSTAND;
-    const z = b.z + (rz / len) * ABLADE_ABSTAND;
-    abladeStelle = [
-      Math.min(VORPLATZ.xMax, Math.max(VORPLATZ.xMin, x)),
-      Math.min(VORPLATZ.zMax, Math.max(VORPLATZ.zMin, z)),
-    ];
-  }
+  abladeStelle = [ABLADE_SPUR_X, ABLADE_HALT_Z];
   return abladeStelle;
 }
 
@@ -119,24 +108,24 @@ export function abladestelle(): [number, number] {
   return abladeStelle;
 }
 
-// Nach dem Wiegen weiter zum Rangierpunkt vor dem Abkippplatz
+/*
+ * Nach dem Wiegen quer ueber den Platz zum Rangierpunkt noerdlich der
+ * Abladespur. Der Weg laeuft noerdlich an der Muldenreihe vorbei (deren
+ * noerdlichste Mulde bei z −12,5 endet) und oestlich an der Kipperspur
+ * (x 2,0) — beide bleiben frei.
+ */
 export function routeApproach(): Array<[number, number]> {
-  const [x] = abladeStelle;
-  return [WAAGE_HALT, VERTEILER, [-21, 10], [-12, 3], [x, RANGIER_Z]];
+  return [WAAGE_HALT, VERTEILER, [-21, 10], [-12, 4], [-2, 1], ABLADE_RANGIER];
 }
 export function routeInRev(): Array<[number, number]> {
-  const [x, z] = abladeStelle;
-  return [
-    [x, RANGIER_Z],
-    [x, z],
-  ];
+  return [ABLADE_RANGIER, abladeStelle];
 }
 export function routeOut(): Array<[number, number]> {
-  const [x, z] = abladeStelle;
   return [
-    [x, z],
-    [x, RANGIER_Z],
-    [-12, 3],
+    abladeStelle,
+    ABLADE_RANGIER,
+    [-2, 1],
+    [-12, 4],
     [-21, 10],
     VERTEILER,
     WAAGE_HALT,
@@ -406,11 +395,17 @@ export const BED_HALF_W = 1.35;
  */
 export const WORK_ZONES: Array<[number, number, number]> = [
   /*
-   * Der Vorplatz vor dem Bagger: Hier haelt der Haendler zum Entladen, und
-   * hier kippt der Selbstabkipper seine gemischte Fuhre ab (`ABKIPP_ZONE`).
-   * Ein Radius deckt beides ab — sie liegen 2,5 m auseinander.
+   * Der Vorplatz vor dem Bagger: Hier kippt der Selbstabkipper seine
+   * gemischte Fuhre ab (`ABKIPP_ZONE`).
    */
   [0, -13, 11],
+  /*
+   * Der Abladeplatz in der Suedostecke (seit 14.09.2026 abends): Dort steht
+   * der Haendler quer, und dort liegt zwangslaeufig Material, waehrend der
+   * Spieler ihn ausraeumt. Ohne diese Zone haelt der naechste Wagen davor an
+   * und hupt, weil sein eigener Vorgaenger etwas hat liegen lassen.
+   */
+  [ABLADE_SPUR_X, ABLADE_HALT_Z + 2.5, 9],
   /*
    * Der Verladeplatz vor der Silo-Reihe: Dort steht der Abholer, und dort
    * liegt zwangslaeufig Material, waehrend der Bagger ihn belaedt.

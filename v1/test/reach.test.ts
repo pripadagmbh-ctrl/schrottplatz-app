@@ -15,10 +15,12 @@ import * as THREE from "three";
 import { hoechsteKrallenspitze, tempoFaktor, anlaufZeit, CAB_MAX } from "../src/excavator/excavator";
 import { CONFIGS } from "../src/world/containers";
 import {
-  neueAbladestelle,
   neueAbholstelle,
-  routeInRev,
   setBaggerOrt,
+  ABKIPP_ZONE,
+  ABLADE_SPUR_X,
+  ABLADE_HALT_Z,
+  BED_HALF_W,
   TIP_CREEP_M,
 } from "../src/delivery/routes";
 import { baleYard, PRESS_CENTER as PRESSE } from "../src/world/press";
@@ -89,31 +91,45 @@ describe("Reichweite des Arms", () => {
   });
 
   it("alles, was ein Kipper ablaedt, bleibt in Reichweite", () => {
-    // Der Arm erreicht den BODEN nur zwischen 3,0 und 9,5 m. Der Kipper dockt
-    // an, kippt und zieht dann gekippt an — der Rest der Fuhre rutscht auf
-    // dieser Strecke heraus. Reicht sie ueber 9,5 m hinaus, liegt dort Schrott,
-    // den man nicht mehr wegbekommt (Befund 10.09.2026).
-    //
-    // Die Abladestelle wandert seit 12.09.2026 mit dem Bagger, also genügt es
-    // nicht mehr, einen Punkt zu prüfen: Gefahren wird ueber den ganzen
-    // Vorplatz, und an jeder Stelle muss der Arm noch auf den Boden kommen.
-    for (const ort of [
-      { x: -4, z: -17 },
-      { x: -4, z: -12 },
-      { x: -6, z: -15 },
-      { x: -2, z: -14 },
-      { x: -4, z: -10 },
-    ]) {
-      setBaggerOrt(() => ort);
-      neueAbladestelle();
-      const r = routeInRev();
-      const dock = r[r.length - 1]!;
-      const weitesterPunkt = Math.hypot(dock[0] - ort.x, dock[1] + TIP_CREEP_M - ort.z);
+    /*
+     * Der Arm erreicht den BODEN nur zwischen 3,0 und 9,5 m. Der Kipper dockt
+     * an, kippt und zieht dann gekippt an — der Rest der Fuhre rutscht auf
+     * dieser Strecke heraus. Reicht sie ueber 9,5 m hinaus, liegt dort
+     * Schrott, den man nicht mehr wegbekommt (Befund 10.09.2026).
+     *
+     * Bis zum 14.09.2026 abends wanderte die Abladestelle mit dem Bagger, und
+     * der Test fuhr fuenf Baggerstellungen ab. Seitdem sind beide Orte FEST:
+     * der Selbstabkipper auf der Spur x 2,0 (`ABKIPP_ZONE`), der Haendler in
+     * der Suedostecke. Gemessen wird deshalb vom Standplatz aus — und zwar
+     * ueber die ganze Strecke, auf der die Fuhre herausrutscht: von der
+     * Abkippstelle bis zum Ende des Anziehens.
+     */
+    const [zx, zz] = ABKIPP_ZONE;
+    for (const weg of [0, TIP_CREEP_M]) {
+      const d = Math.hypot(zx - BAGGER_STAND.x, zz + weg - BAGGER_STAND.z);
       expect(
-        weitesterPunkt,
-        `Bagger auf (${ort.x}, ${ort.z}): letzter Abwurf bei ` +
-          `${weitesterPunkt.toFixed(1)} m — dort kommt der Arm nicht mehr auf den Boden`
+        d,
+        `Abwurf bei ${d.toFixed(1)} m — dort kommt der Arm nicht mehr auf den Boden`
       ).toBeLessThan(9.5);
+      expect(d, `Abwurf bei ${d.toFixed(1)} m — dort ist der Arm zu eng`).toBeGreaterThan(3.0);
+    }
+  });
+
+  it("und die Ladefläche des Händlers liegt ganz im Greifbereich", () => {
+    /*
+     * Der zweite Teil desselben Gedankens, seit der Wagen quer steht
+     * (14.09.2026 abends): Was auf seiner Flaeche liegt, muss man auch
+     * herunterbekommen. Vorher lag die hintere Haelfte bei 10 bis 13,5 m.
+     */
+    const laenge = 5.4;
+    for (const dx of [-BED_HALF_W, 0, BED_HALF_W]) {
+      for (const dz of [0, laenge / 2, laenge]) {
+        const d = Math.hypot(
+          ABLADE_SPUR_X + dx - BAGGER_STAND.x,
+          ABLADE_HALT_Z + dz - BAGGER_STAND.z
+        );
+        expect(d, `Ladefläche bei ${d.toFixed(1)} m`).toBeLessThan(9.5);
+      }
     }
   });
 

@@ -114,7 +114,8 @@ export const KATALOG_SPECS: PileSpec[] = [
   { materialId: "steel", massKg: 210, kind: "box", dims: [1.15, 1.0, 1.85], bau: "kleinfahrzeug", name: "Quad", zusammensetzung: [{ materialId: "steel", anteil: 0.62 }, { materialId: "plastic", anteil: 0.16 }, { materialId: "alu", anteil: 0.1 }, { materialId: "tires", anteil: 0.08 }, { materialId: "copper", anteil: 0.04 }] },
   { materialId: "steel", massKg: 175, kind: "box", dims: [1.2, 1.7, 2.2], bau: "kabine", name: "Golfwagen", zusammensetzung: [{ materialId: "steel", anteil: 0.55 }, { materialId: "plastic", anteil: 0.2 }, { materialId: "alu", anteil: 0.1 }, { materialId: "tires", anteil: 0.08 }, { materialId: "copper", anteil: 0.07 }] },
   { materialId: "steel", massKg: 95, kind: "box", dims: [0.7, 1.05, 1.9], bau: "einspurig", name: "Motorroller (komplett)", zusammensetzung: [{ materialId: "steel", anteil: 0.58 }, { materialId: "plastic", anteil: 0.2 }, { materialId: "alu", anteil: 0.12 }, { materialId: "tires", anteil: 0.06 }, { materialId: "copper", anteil: 0.04 }] },
-  { materialId: "steel", massKg: 205, kind: "box", dims: [1.15, 1.1, 2.2], bau: "kleinfahrzeug", name: "Schneemobil", zusammensetzung: [{ materialId: "steel", anteil: 0.55 }, { materialId: "plastic", anteil: 0.22 }, { materialId: "alu", anteil: 0.12 }, { materialId: "tires", anteil: 0.07 }, { materialId: "copper", anteil: 0.04 }] },
+  // Kufen vorn, Raupe hinten — kein Rad (Befund 14.09.2026, siehe objektbau.ts)
+  { materialId: "steel", massKg: 205, kind: "box", dims: [1.15, 1.1, 2.2], bau: "kufenRaupe", name: "Schneemobil", zusammensetzung: [{ materialId: "steel", anteil: 0.55 }, { materialId: "plastic", anteil: 0.22 }, { materialId: "alu", anteil: 0.12 }, { materialId: "tires", anteil: 0.07 }, { materialId: "copper", anteil: 0.04 }] },
   { materialId: "alu", massKg: 55, kind: "box", dims: [1.2, 0.45, 2.2], bau: "tank", name: "Ruderboot (Alu)" },
 
   // --- Fahrzeugschrott ---

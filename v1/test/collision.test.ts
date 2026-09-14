@@ -31,6 +31,8 @@ import {
   NACHDRUECK_RESERVE,
 } from "../src/excavator/clawGeometry";
 import {
+  ABLADE_SPUR_X,
+  ABLADE_HALT_Z,
   ROUTE_IN_FWD,
   routeApproach,
   routeInRev,
@@ -293,13 +295,40 @@ describe("Feste Bauten", () => {
     expect(luft, "die Mauer steht auf der Mulde").toBeGreaterThan(0.8);
   });
 
-  it("das Reifendepot hat keine Wände", () => {
-    const depot = CONFIGS.find((c) => c.id === "c_tires")!;
-    // Offene Flaeche, begrenzt nur von Presse und Stahlcontainer. Stuenden hier
-    // Waende in der Hindernisliste, stiesse der Arm gegen nichts Sichtbares.
+  it("an der alten Reifenstelle steht nichts mehr — und nichts Unsichtbares", () => {
+    /*
+     * Der Reifencontainer ist am 14.09.2026 abends ersatzlos entfallen
+     * (Ansage). Er stand auf (4,1 | −17,6), also genau in der Spur, in der
+     * jetzt der LKW an seinen Abladeplatz zurueckstoesst. Bleibt ein
+     * Hindernis zurueck, faehrt dort nie wieder ein Wagen durch — und zu
+     * sehen waere davon nichts.
+     */
+    expect(CONFIGS.find((c) => c.id === "c_tires"), "Reifencontainer steht noch im Katalog")
+      .toBeUndefined();
     for (const dz of [-3, 0, 3]) {
-      expect(hitsObstacle(depot.x, depot.z + dz, 0), "unsichtbare Wand").toBeNull();
+      expect(hitsObstacle(4.1, -17.6 + dz, 0), "unsichtbare Wand an der alten Reifenstelle")
+        .toBeNull();
     }
+  });
+
+  it("der neue LKW-Abladeplatz ist auf ganzer Länge frei", () => {
+    /*
+     * Der Wagen steht dort quer, 8,6 m lang und 3,1 m breit. Was ihn
+     * streift, sieht man erst, wenn er halb in einer Mulde steht.
+     */
+    for (let z = ABLADE_HALT_Z; z <= ABLADE_HALT_Z + 8.6; z += 0.4) {
+      for (const dx of [-1.55, 0, 1.55]) {
+        expect(
+          hitsObstacle(ABLADE_SPUR_X + dx, z, 0.2),
+          `Abladeplatz bei (${(ABLADE_SPUR_X + dx).toFixed(2)} | ${z.toFixed(1)}) zugestellt`
+        ).toBeNull();
+      }
+    }
+    // Und ringsum bleibt Luft: 1,0 m zur nächsten festen Wand.
+    expect(
+      hitsObstacle(ABLADE_SPUR_X, ABLADE_HALT_Z, 1.0),
+      "hinter dem Wagen ist es zu eng"
+    ).toBeNull();
   });
 
   it("lässt den Arm über niedrige Mauern schwenken, aber nicht hindurch", () => {
@@ -376,23 +405,24 @@ describe("Reichweite des Baggers", () => {
     expect(wand.top).toBeGreaterThan(flanke.top);
   });
 
-  it("die Presse steht in der Ecke, davor zwei gleich grosse Boxen", () => {
+  it("die Presse steht an der Westflanke, die zwei gleich grossen Boxen hinter dem Bagger", () => {
     /*
-     * Ansage 13.09.2026: „da, wo der Mischschrott ist, da kommt einfach die
-     * Presse hin … und dann wird quasi rechts eine neue Grenze gezogen, damit
-     * du quasi zwei gleiche Boxen hast. Also einmal Mischschrott und dann
-     * einmal Stahlschrott."
+     * Die Anordnung aus der Sitzperspektive: Links vom Sitz ist +x, rechts
+     * ist −x (E-086).
      *
-     * Geprueft wird die Anordnung aus der Sitzperspektive, nicht die
-     * Koordinate — links vom Sitz ist +x (E-086). Die Presse liegt links
-     * aussen in der Ecke, die Mischschrottbox daneben, die Stahlbox rechts
-     * davon, und beide Boxen sind gleich gross.
+     * Bis zum 14.09.2026 mittags stand die Presse LINKS aussen in der Ecke
+     * (Ansage 13.09.2026). Am Abend hat Patrick sie dort weggenommen: „Die
+     * Presse muss weg, da wo sie gerade steht, und da kommt der LKW hin." Sie
+     * steht jetzt RECHTS vom Sitz an der Westflanke. Geprueft wird weiter die
+     * Anordnung und nicht die Koordinate — nur eben die neue.
      */
     const halde = CONFIGS.find((c) => c.id === "c_mixed")!;
     const stahl = CONFIGS.find((c) => c.id === "c_steel")!;
     const presse = STATIC_OBSTACLES.find((o) => o.label === "Presse")!;
-    expect(presse.x, "Presse nicht links aussen in der Ecke").toBeGreaterThan(stahl.x);
+    expect(presse.x, "Presse nicht rechts vom Sitz").toBeLessThan(stahl.x);
     expect(halde.x, "Mischschrott nicht links von der Stahlbox").toBeGreaterThan(stahl.x);
+    // Und da, wo sie stand, darf keine unsichtbare Wand zurueckbleiben.
+    expect(hitsObstacle(6.6, -24.6, 0), "die alte Pressenstelle sperrt noch").toBeNull();
     /*
      * Gleich gross waren sie nur einen halben Tag. Am 13.09.2026 kam die Ansage
      * „Wand entfernen lassen, Lego-Mulden fuer Alu, VA, Kabel und Kupfer dort
@@ -425,8 +455,9 @@ describe("Reichweite des Baggers", () => {
     expect(presse.z).toBeCloseTo(PRESS_CENTER.z, 6);
     expect(hitsObstacle(PRESS_CENTER.x, PRESS_CENTER.z, 0), "Presse ist kein Hindernis")
       .not.toBeNull();
-    // Die alte Stelle muss frei sein — dort liegt jetzt die Stahlbox.
-    expect(hitsObstacle(-3.0, -26.0, 0), "alte Pressenstelle sperrt noch").toBeNull();
+    // Die Stelle, an der sie bis zum Abend des 14.09.2026 stand, muss frei
+    // sein — dort steht jetzt der LKW.
+    expect(hitsObstacle(6.6, -24.6, 0), "alte Pressenstelle sperrt noch").toBeNull();
   });
 
   it("schließt mittig, ohne dass die Spitzen sich überlappen", () => {

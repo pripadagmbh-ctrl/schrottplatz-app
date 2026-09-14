@@ -64,7 +64,24 @@ import type { CompositeManager } from "../dismantle/composites";
  * Damit steht sie 7,4 m vom Bagger statt der geplanten 8,5 — beides liegt im
  * Schwenkband 5,8 bis 9,2 m (`test/platz.test.ts`).
  */
-const CENTER = new THREE.Vector3(6.6, 0, -24.6);
+/*
+ * Nachtrag 14.09.2026 abends: die Presse raeumt die Ostecke.
+ *
+ * Ansage Patrick: „Die Presse muss weg, da wo sie gerade steht, und da kommt
+ * der LKW hin, da faehrt er rueckwaerts ran." Der Abladeplatz braucht die
+ * Ecke hinter dem Bagger, weil der Wagen dort mit der Laengsseite zum Sitz
+ * steht und nicht mehr von hinten ausgeraeumt werden muss.
+ *
+ * Die Presse geht dafuer an die WESTFLANKE, auf die Stelle der ersten
+ * Sortiermulde. Gesucht, nicht gegriffen:
+ *
+ *  - Der Plan nennt (−8,0 | −26,5). In z reicht der Rahmen Mitte ± 2,45 m;
+ *    bei −26,5 endet er auf −28,95, die Suedmauer steht innen bei −28,70.
+ *    Bei −26,0 bleiben 25 cm Luft.
+ *  - Abstand zum Sitz (−0,5 | −22,5): 8,28 m, mitten im Schwenkband
+ *    5,8 bis 9,2 m.
+ */
+const CENTER = new THREE.Vector3(-8.0, 0, -26.0);
 /** Mitte der Presskammer — auch fuer Hindernisliste und Tests. */
 export const PRESS_CENTER = CENTER;
 // Die Schwelle gilt fuer Objekte wie fuer Pakete — sie steht in materials/purity.ts.
@@ -84,7 +101,16 @@ export const PRESS_CENTER = CENTER;
  * Aufwand ist mit der Ansage weggefallen — die Kammer ist die Stelle.
  */
 export function baleYard(): { x: number; z: number; w: number; d: number } {
-  return { x: CENTER.x, z: CENTER.z, w: INNER_W - 2.2, d: INNER_D - 1.2 };
+  /*
+   * `w` und `d` sind WELTachsen, die Kammermasse nicht: Seit die Maschine
+   * quersteht (`PRESS_ROT`), liegt die Kammerlaenge in z. Wer das hier
+   * vergisst, streut die Pakete quer zur Kammer — bei der fast quadratischen
+   * Kammer faellt es nicht auf, bei der naechsten Aenderung schon.
+   */
+  const quer = Math.abs(Math.sin(ROT)) > 0.5;
+  const laengs = INNER_W - 2.2;
+  const tief = INNER_D - 1.2;
+  return { x: CENTER.x, z: CENTER.z, w: quer ? tief : laengs, d: quer ? laengs : tief };
 }
 /**
  * Die Mulde liegt längs Ost–West, in einer Flucht mit dem Stahlschrottplatz
@@ -95,7 +121,19 @@ export function baleYard(): { x: number; z: number; w: number; d: number } {
  */
 // Wieder laengs gestellt (Ansage 12.09.2026: „es kann auch die Presse
 // gedreht werden, damit ein bisschen mehr Platz auf der Seite entsteht").
-const ROT = 0;
+/*
+ * Vierteldrehung seit dem Umzug an die Westflanke (14.09.2026 abends).
+ *
+ * Die Deckelklappe haengt an der Suedseite der Maschine (`makeLid(-1, true)`)
+ * und legt sich beim Oeffnen dorthin flach hin — gemessen 3,85 m ueber die
+ * Mitte hinaus. An der Westflanke waere das die Suedmauer (innen −28,70). Mit
+ * ROT = 90° zeigt dieselbe Seite nach WESTEN, auf die freie Flaeche vor der
+ * Silo-Reihe; die Klappe endet dort bei x −11,85 und hat 20 m Luft.
+ *
+ * Gedreht wird die ganze Gruppe, nicht die Wandlogik: Kammer, Stempel,
+ * Klappe und Kollider sitzen unveraendert im Modell.
+ */
+const ROT = Math.PI / 2;
 // Große Mulde: die lange offene Seite zeigt nach Norden zum Baggerplatz,
 // damit von dort bequem eingefüllt werden kann (Design 2026-08-29).
 // Breite wie der Stahlschrottplatz (11 m), direkt daneben: So bildet die
@@ -106,7 +144,25 @@ const ROT = 0;
  * 4,70 m werden 5,95 x 3,76 m. Der Greifer passt weiterhin hinein: offen misst
  * er 3,02 m ueber die Spitzen, es bleiben also 37 cm auf jeder Seite.
  */
-const INNER_W = 5.95; // x — Länge, Pressweg (rechts → links)
+/*
+ * Kuerzer seit dem 14.09.2026 abends: „Die Presse ist, glaub ich, auch ein
+ * bisschen zu gross, die kann verkleinert werden, eher wie so ein Rechteck,
+ * wie ein Quader."
+ *
+ * Aus 5,95 x 4,05 m werden 4,20 x 4,05 m — im Grundriss fast ein Quadrat und
+ * damit ein Quader statt einer langen Wanne. Das ist ein Drittel weniger
+ * Grundflaeche (24,1 auf 17,0 m²).
+ *
+ * Weiter geht nicht: Die offene Sichelkralle misst 3,38 m, mit 30 cm Luft je
+ * Seite braucht die Kammer 3,98 m in BEIDEN Richtungen (`spinnenmass`). Wer
+ * unter dieses Mass geht, baut einen Behaelter, den man befuellen, aber nicht
+ * mehr ausraeumen kann.
+ *
+ * Die Form entscheidet Patrick am Bild (docs/messungen/
+ * 2026-09-14_presse.svg); 4,20 ist ein Vorschlag und haengt an dieser einen
+ * Zahl.
+ */
+const INNER_W = 4.2; // x — Länge, Pressweg (rechts → links)
 // Schmaler (Ansage 12.09.2026: „die Presse erscheint immer noch zu tief,
 // die kann ruhig noch ein bisschen schmaler werden").
 /*
@@ -135,6 +191,29 @@ const INNER_W = 5.95; // x — Länge, Pressweg (rechts → links)
 const INNER_D = 4.05;
 /** Lichte Masse der Kammer — fuer Tests und Platzplanung. */
 export const PRESS_INNER = { laenge: INNER_W, tiefe: INNER_D };
+/** Drehung der Maschine um die Hochachse (0 = Pressweg laeuft in x). */
+export const PRESS_ROT = ROT;
+/**
+ * Aussenmass des Rahmens in WELTachsen, halbe Ausdehnungen.
+ *
+ * Seit die Presse quersteht, sind Kammerlaenge und Weltachse nicht mehr
+ * dasselbe. Wer das uebersieht, traegt sie um 90 Grad verdreht in die
+ * Hindernisliste ein — und genau diese Klasse Fehler ist am 12.09.2026 als
+ * „unsichtbare Barriere" gemeldet worden. Deshalb steht die Umrechnung
+ * einmal hier, und Hindernisliste wie Tests rechnen dagegen.
+ */
+export const PRESS_FUSS = {
+  hw: (Math.abs(Math.cos(ROT)) * (INNER_W + 0.7) + Math.abs(Math.sin(ROT)) * (INNER_D + 0.7)) / 2,
+  hd: (Math.abs(Math.sin(ROT)) * (INNER_W + 0.7) + Math.abs(Math.cos(ROT)) * (INNER_D + 0.7)) / 2,
+};
+/**
+ * Wie weit die offene Deckelklappe ueber die Mitte hinausschwingt und wohin.
+ *
+ * Gemessen an der offenen Maschine: 3,85 m zur Klappenseite. Die Klappe
+ * haengt lokal im Sueden; die Drehung bildet das auf die Weltachsen ab.
+ */
+export const KLAPPE_WEG = 3.85;
+export const KLAPPE_RICHTUNG = { x: -Math.sin(ROT), z: -Math.cos(ROT) };
 const WALL_H = 1.9;
 const PLATE_T = 0.3; // dicke Eisenplatten (SW)
 const LID_HINGE_Y = WALL_H - 0.1;

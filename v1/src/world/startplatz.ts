@@ -40,7 +40,15 @@
  * 0,05 m/s; es ist ein Einschlaf-Problem des Haufens, kein Platzproblem, und
  * gehoert in ein eigenes Paket.
  */
-export const START_HAUFEN = { x: 4.0, z: -33.0, streuung: 2.9, teile: 85 };
+/*
+ * Nachtrag 14.09.2026 abends: von z −33,0 auf −32,0.
+ *
+ * Die Ausbuchtung ist auf 6,5 m Tiefe verkuerzt, die Mischschrott-Halde
+ * reicht damit von z −29,0 bis −35,0. Bei −33,0 haette der Haufen mit seinen
+ * 2,9 m Streuung bis −35,9 gereicht und waere hinten an der Buchtwand
+ * gelegen; auf −32,0 liegt er mit −34,9 bis −29,1 vollstaendig in der Halde.
+ */
+export const START_HAUFEN = { x: 4.0, z: -32.0, streuung: 2.9, teile: 85 };
 
 /**
  * Die beiden Altfahrzeuge, je eines an der vorderen Kante einer Halde.
@@ -58,4 +66,4 @@ export const START_AUTOS: Array<{ x: number; z: number }> = [
 ];
 
 /** Streuschrott ringsum: zehn Teile auf einem Kreis um den Haufen. */
-export const START_STREU = { x: 4.0, z: -33.0, radius: 2.9, teile: 10 };
+export const START_STREU = { x: 4.0, z: -32.0, radius: 2.9, teile: 10 };

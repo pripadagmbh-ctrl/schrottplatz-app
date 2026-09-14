@@ -3,6 +3,7 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import { getMaterial } from "../materials/catalog";
 import { maxSpeedFor } from "./scrapItems";
 import { computePurity, containerValue } from "../materials/purity";
+import { reihenstuecke } from "./legoreihe";
 import type { ItemManager, ScrapItem } from "./scrapItems";
 import type { EventBus } from "../core/events";
 
@@ -168,8 +169,15 @@ export const CONFIGS: ContainerConfig[] = [
    * sich von vorn hinein (E-010). Die liegt bei z −29,2 und damit 8,1 m vom
    * Sitz.
    */
+  /*
+   * Nachtrag 14.09.2026 abends: 6,0 m tief statt 9,0 (Ansage: „Die
+   * Ausbuchtung ist vielleicht ein bisschen zu tief, die vielleicht ein
+   * bisschen verkuerzen"). Die vordere Kante bleibt auf z −29,0 und damit die
+   * Entfernung zum Sitz; was sich aendert, ist der Stauraum: 40,8 statt
+   * 61,2 m² je Halde.
+   */
   { id: "c_mixed", fractionId: "mixed", label: "MISCHSCHROTT", kind: "halde", x: 4.0,
-    z: -33.7, size: [6.8, 9.0, 5.0],
+    z: -32.0, size: [6.8, 6.0, 5.0],
     haldeWaende: { rueck: false, aussen: false, nord: false, trenn: false } },
 
   /*
@@ -184,7 +192,7 @@ export const CONFIGS: ContainerConfig[] = [
    * und wird direkt an der Halde verladen; ein Silo dafuer waere ein Umweg.
    */
   { id: "c_steel", fractionId: "steel", label: "STAHLSCHROTT", kind: "halde", x: -3.0,
-    z: -33.7, size: [6.8, 9.0, 5.0],
+    z: -32.0, size: [6.8, 6.0, 5.0],
     haldeWaende: { rueck: false, aussen: false, nord: false, trenn: false } },
 
   /*
@@ -211,48 +219,83 @@ export const CONFIGS: ContainerConfig[] = [
    * (`test/spinnenmass.test.ts`). Die Reihe ist dafuer um 0,6 m nach Norden
    * gerueckt, damit die erste Mulde nicht in der Aussenmauer steht.
    */
+  /*
+   * Nachtrag 14.09.2026 abends: Die Presse hat die Suedhaelfte der Westflanke
+   * uebernommen, und die Reihe ist um zwei Muldenlaengen nach NORDEN
+   * gerueckt.
+   *
+   * Das kostet Reichweite, und zwar nachrechenbar. Vom Sitz (−0,5 | −22,5):
+   *
+   *   ALU + ZINK   (−7,6 | −20,9)   7,28 m   im Band
+   *   KABEL        (−7,6 | −16,7)   9,17 m   am aeusseren Rand (Grenze 9,20)
+   *   KUPFER + MSG (−7,6 | −12,5)  12,26 m   NICHT mehr im Band
+   *
+   * Die Flanke fasst neben der Presse nicht mehr drei Mulden im Schwenkband —
+   * das ist Geometrie, keine Meinung: Zwischen Pressenrahmen (Nordkante
+   * −23,55) und der aeusseren Grenze liegen keine drei Muldenlaengen. Patrick
+   * hat die Mulden ausdruecklich als zweitrangig eingestuft („die ueberlegen
+   * wir uns noch"); sie stehen deshalb ohne Konflikt in einer Flucht, und was
+   * daraus wird, entscheidet er (siehe Bericht zum Paket).
+   *
+   * x −7,6 statt −8,0: Das holt KABEL gerade noch ins Band (9,17 statt 9,48)
+   * und laesst der Presse trotzdem ihre Flucht.
+   *
+   * ALU + ZINK bekommt seine Suedflanke zurueck (`shareSouth` weg): Suedlich
+   * steht jetzt die Presse und keine Mauer mehr.
+   */
   { id: "r_alu", fractionId: "alu", mitFraktionen: ["zinc"], label: "ALU + ZINK",
-    kind: "bay", x: -8.0, z: -26.6, size: [4.2, 4.0, 2.0],
-    sortierbox: true, shareEast: true, shareSouth: true },
-  { id: "r_cable", fractionId: "cable", label: "KABEL", kind: "bay", x: -8.0,
-    z: -22.4, size: [4.2, 4.0, 2.0], sortierbox: true, shareEast: true, shareSouth: true },
+    kind: "bay", x: -7.6, z: -20.9, size: [4.2, 4.0, 2.0],
+    sortierbox: true, shareEast: true },
+  { id: "r_cable", fractionId: "cable", label: "KABEL", kind: "bay", x: -7.6,
+    z: -16.7, size: [4.2, 4.0, 2.0], sortierbox: true, shareEast: true, shareSouth: true },
   { id: "r_copper", fractionId: "copper", mitFraktionen: ["brass"], label: "KUPFER + MESSING",
-    kind: "bay", x: -8.0, z: -18.2, size: [4.2, 4.0, 2.0],
+    kind: "bay", x: -7.6, z: -12.5, size: [4.2, 4.0, 2.0],
     sortierbox: true, shareEast: true, shareSouth: true },
 
   /*
-   * MUELL — der grosse schwarze Container links hinten.
+   * MUELL — in der Suedostecke, unter dem neuen LKW-Abladeplatz.
    *
    * Konzeptplan 14.09.2026: „Beim Stahlschrott ein grosser schwarzer
-   * Muellcontainer, ein kleiner fuer Reifen davor." Was beim Sortieren an
-   * Bauschutt und Restmuell anfaellt, wandert hier hinein statt quer ueber
-   * den Platz zu den Silos.
+   * Muellcontainer." Was beim Sortieren an Bauschutt und Restmuell anfaellt,
+   * wandert hier hinein statt quer ueber den Platz zu den Silos.
    *
    * Kein `lager`: Ein sortenreiner Kipper faehrt nicht hierher, sondern in
    * die BAUMISCH-Mulde an der Westwand — hier steht der Bagger im Weg.
    *
-   * Lage gesucht, nicht gegriffen: 3,6 m Front, weil die Spinne offen 3,38 m
-   * misst; x 8,0, weil die Stirnwand bei 10,08 endet und die Ostmauer innen
-   * bei 10,20 beginnt; z −20,2, weil die Presse bis −22,23 reicht und 25 cm
-   * Luft bleiben sollen.
+   * NEUE LAGE (14.09.2026 abends), gesucht gegen den LKW-Abladeplatz:
+   * Der Wagen setzt jetzt auf x 6,3 bis z −24,0 zurueck. Damit die
+   * Blockadepruefung der LKW (1,40 m Tastradius) nicht an der Nordflanke der
+   * Mulde haengenbleibt, muss zwischen Halt und Flankenmitte 1,75 m liegen —
+   * das ergibt z −27,0. Die Suedflanke steht dann 22 cm vor der Suedmauer.
+   *
+   * 2,40 m tief statt 3,00: Bei 3,00 waere die Nordflanke 60 cm weiter
+   * noerdlich, der LKW muesste entsprechend vorruecken, und dann faellt die
+   * hintere Ecke seiner Ladeflaeche mit 9,4 m aus der Reichweite. Die Front
+   * bleibt bei 3,60 m — sie ist das Mass, das die offene Spinne (3,38 m)
+   * hineinlaesst.
+   *
+   * Vom Sitz sind es 8,75 m (vorher 8,81) — eines der vier Pflichtziele
+   * (Ansage: „vor allem an Mischschrott drankommen, an die Presse, an
+   * Stahlschrott und an den Muell").
    */
-  { id: "r_rubble", fractionId: "rubble", label: "MUELL", kind: "bay", x: 8.0,
-    z: -20.2, size: [3.6, 3.0, 2.2] },
+  /*
+   * Reifen gehoeren seit dem 14.09.2026 abends hierhin (`mitFraktionen`):
+   * Ihr eigener Container ist weg, und ohne diesen Eintrag zaehlte jeder
+   * Reifen als Verunreinigung und druecke die Reinheit des ganzen
+   * Behaelters (Briefing Kap. 7, Reinheit²). Abgerechnet wird nach
+   * `fractionId`, also zum Baumisch-Satz (−0,04 €/kg statt −0,05) — die
+   * bewusste Vereinfachung dieser Zusammenlegung, wie bei Kupfer + Messing.
+   */
+  { id: "r_rubble", fractionId: "rubble", mitFraktionen: ["tires"], label: "MUELL",
+    kind: "bay", x: 7.0, z: -27.0, size: [3.6, 2.4, 2.2] },
 
   /*
-   * REIFEN — der kleine Container davor.
-   *
-   * Reifen fallen staendig an und werden selten abgeholt. Vorher war das eine
-   * offene Flaeche von 8 x 7 m ganz hinten rechts; im neuen Platz ist es ein
-   * Absetzcontainer im Schwenkband, 6,7 m vom Sitz.
-   *
-   * Absichtlich ein `rolloff` und keine Mulde: Mit 2,6 m Front kaeme die
-   * offene Spinne nicht hinein — der Behaelter wird nicht ausgeraeumt,
-   * sondern vom Abrollkipper ganz mitgenommen. Als Mulde waere er eine
-   * Sackgasse (`test/spinnenmass.test.ts` prueft genau das fuer Mulden).
+   * REIFEN ist ersatzlos weg (Ansage 14.09.2026 abends: „Der Reifencontainer
+   * entfaellt ersatzlos"). Er stand auf (4,1 | −17,6) — genau in der Spur, in
+   * der jetzt der LKW an seinen Abladeplatz zurueckstoesst. Reifen zaehlen
+   * damit vorerst zum Muell; das Sortieren des Abfalls ist ausdruecklich
+   * vertagt.
    */
-  { id: "c_tires", fractionId: "tires", label: "REIFEN", kind: "rolloff", x: 4.1,
-    z: -17.6, size: [2.6, 2.4, 1.4] },
 
   /*
    * DIE SILO-REIHE an der Westwand — neun statt acht.
@@ -313,6 +356,35 @@ export function lagerMuldeFuer(fractionId: string | null): ContainerConfig | nul
    * (`gehoertHierhin`).
    */
   return CONFIGS.find((c) => c.lager === true && gehoertHierhin(c, fractionId)) ?? null;
+}
+
+/* ------------------------------------------------------ Muldenwände ------ */
+/** Maße eines Betonlegosteins in den Mulden (Bestand seit 27.08.2026). */
+export const MULDE_STEIN = { laenge: 1.5, hoehe: 0.5, dicke: 0.55 };
+
+/**
+ * Von wo bis wo die Steinreihen einer Mulde laufen.
+ *
+ * Steht als eigene Funktion da, damit `test/muldenwand.test.ts` dieselben
+ * Zahlen prüfen kann, die gebaut werden — der Bau selbst braucht eine Szene
+ * und eine Physikwelt und ist kopflos nicht zu messen.
+ *
+ * Die Flanken hören an der INNENkante der Rückwand auf, die Rückwand läuft
+ * dafür über die volle Breite durch (T-Stoß). Vorher überlappten sich beide
+ * an der Ecke und standen zugleich an beiden Enden über — Befund 14.09.2026.
+ */
+export function muldenWandSpannen(
+  w: number,
+  d: number,
+  hatRueckwand: boolean
+): { flanke: [number, number]; rueck: [number, number] } {
+  const T = MULDE_STEIN.dicke;
+  return {
+    // von der offenen Vorderkante bis an die Rückwand
+    flanke: [-w / 2, w / 2],
+    // quer darüber, bündig mit den Außenflächen der Flanken
+    rueck: hatRueckwand ? [-(d / 2 + T), d / 2 + T] : [0, 0],
+  };
 }
 
 /** Fangbereich über einer Haufen-Zone (Zonen-Zählung + Ampel) */
@@ -617,9 +689,9 @@ class GameContainer {
       // Betonlego-Box (Design-Wunsch 2026-08-27): drei Wände aus gestapelten
       // Beton-Legosteinen mit Noppen, vorn offen — wie auf echten Schrottplätzen.
       // Flachere Betonsteine, dafür eine Reihe mehr: wirkt weniger klotzig
-      const BLOCK_L = 1.5;
-      const BLOCK_H = 0.5;
-      const BLOCK_T = 0.55;
+      const BLOCK_L = MULDE_STEIN.laenge;
+      const BLOCK_H = MULDE_STEIN.hoehe;
+      const BLOCK_T = MULDE_STEIN.dicke;
       // Reihen aus der angegebenen Wandhöhe statt fest verdrahtet: Die Zahl in
       // CONFIGS hatte bisher keine Wirkung, jede Mulde bekam 5 Reihen à 0,5 m,
       // also 2,50 m Wand. Gemessen an der Armgeometrie ist das unerreichbar —
@@ -642,22 +714,46 @@ class GameContainer {
       const block = new THREE.Object3D();
       const niete = new THREE.Object3D();
       let bi = 0;
-      const placeBlock = (x: number, y: number, z: number, alongX: boolean): void => {
+      /**
+       * Einen Stein setzen. `laenge` ist die tatsächliche Länge: Ein
+       * Endstein ist kürzer als ein voller, damit die Reihe an der Wandkante
+       * aufhört und nicht darüber hinaus (Befund 14.09.2026).
+       *
+       * Gestreckt wird die Instanz, nicht die Geometrie — sonst bräuchte
+       * jede Länge ihre eigene und die Mulde wieder mehr Zeichenrufe. Die
+       * Noppen sitzen dafür auf einer ungestreckten Grundmatrix, sonst wären
+       * sie am Endstein zu Ovalen gequetscht.
+       */
+      const placeBlock = (
+        x: number,
+        y: number,
+        z: number,
+        alongX: boolean,
+        laenge = BLOCK_L
+      ): void => {
         const f = farben[bi % 5]!;
         // Jeder Block sitzt ein wenig anders — von Hand mit dem Stapler
         // gesetzt, nicht gegossen. Reiner Aufbau, keine Laufzeitkosten.
         const j = (n: number): number => (((bi * 9301 + n * 49297) % 233280) / 233280 - 0.5);
         block.position.set(x + j(1) * 0.05, y + j(2) * 0.02, z + j(3) * 0.05);
         block.rotation.set(j(4) * 0.02, (alongX ? 0 : Math.PI / 2) + j(5) * 0.035, j(6) * 0.018);
+        block.scale.set(1, 1, 1);
+        block.updateMatrix();
+        const ohneStreckung = block.matrix.clone();
+        block.scale.set(laenge / BLOCK_L, 1, 1);
         block.updateMatrix();
         bi++;
         bloecke.push({ m: block.matrix.clone(), f });
-        for (const s of [-0.4, 0.4]) {
+        // Ein kurzer Stein trägt eine Noppe in der Mitte, ein langer zwei —
+        // „quasi ein einzelner Legostein mit einem Element" (Ansage).
+        const anteil = laenge / BLOCK_L;
+        const noppen = anteil < 0.7 ? [0] : [-0.4 * anteil, 0.4 * anteil];
+        for (const s of noppen) {
           niete.position.set(alongX ? s : 0, BLOCK_H / 2 + 0.045, alongX ? 0 : s);
           niete.updateMatrix();
           // Block-Matrix mal lokale Matrix — dieselbe Rechnung wie vorher die
           // Eltern-Kind-Beziehung, also sitzt jede Niete unveraendert
-          nieten.push({ m: block.matrix.clone().multiply(niete.matrix), f });
+          nieten.push({ m: ohneStreckung.clone().multiply(niete.matrix), f });
         }
       };
       // Wände: Ostseite + Nord + Süd. Die WESTseite bleibt offen — dorthin
@@ -668,19 +764,28 @@ class GameContainer {
       // dahinter ist es verloren. Vorn ändert das nichts — dort wird
       // eingefüllt, und die Reichweite des Arms haengt an der Muldenmitte.
       const REIHEN_HINTEN = ROWS + 2;
+      /*
+       * Jede Lage wird von Wandkante zu Wandkante ausgelegt (`reihenstuecke`),
+       * mit halbem Versatz in jeder zweiten Lage. Vorher lief hier eine
+       * Schleife in ganzen Steinlängen mit 0,4 m Zugabe: An einer Mulde von
+       * 4,2 m Front stand die versetzte Lage vorn 0,75 m über die offene
+       * Kante und hinten 0,50 m über die Rückwand hinaus — „die Außenteile
+       * stehen immer ab" (Befund 14.09.2026).
+       */
+      const spannen = muldenWandSpannen(w, d, !cfg.shareEast);
       for (let r = 0; r < REIHEN_HINTEN; r++) {
         const y = BLOCK_H / 2 + r * BLOCK_H;
-        const off = (r % 2) * (BLOCK_L / 2);
+        const versatz = (r % 2) * (BLOCK_L / 2);
         if (r < ROWS) {
-          for (let x = -w / 2 + BLOCK_L / 2 - off; x < w / 2 + 0.4; x += BLOCK_L) {
-            if (!cfg.shareNorth) placeBlock(x, y, d / 2 + BLOCK_T / 2, true);
-            if (!cfg.shareSouth) placeBlock(x, y, -(d / 2 + BLOCK_T / 2), true);
+          for (const s of reihenstuecke(spannen.flanke[0], spannen.flanke[1], BLOCK_L, versatz)) {
+            if (!cfg.shareNorth) placeBlock(s.mitte, y, d / 2 + BLOCK_T / 2, true, s.laenge);
+            if (!cfg.shareSouth) placeBlock(s.mitte, y, -(d / 2 + BLOCK_T / 2), true, s.laenge);
           }
         }
         // Rückwand: entfällt, wenn die Nachbarmulde dahinter sie schon stellt
         if (!cfg.shareEast) {
-          for (let z = -d / 2 + BLOCK_L / 2 - off; z < d / 2 + 0.4; z += BLOCK_L) {
-            placeBlock(w / 2 + BLOCK_T / 2, y, z, false);
+          for (const s of reihenstuecke(spannen.rueck[0], spannen.rueck[1], BLOCK_L, versatz)) {
+            placeBlock(w / 2 + BLOCK_T / 2, y, s.mitte, false, s.laenge);
           }
         }
       }
@@ -714,8 +819,12 @@ class GameContainer {
       );
       const wallH = ROWS * BLOCK_H;
       for (const sz of [-1, 1]) {
+        // Genau so lang wie die Steine, die man sieht: von der offenen
+        // Vorderkante bis an die Rückwand. Vorher stand der Kollider 0,55 m
+        // länger als die Wand — vorn eine unsichtbare Barriere in der
+        // Einfüllöffnung, hinten eine hinter der Rückwand.
         world.createCollider(
-          RAPIER.ColliderDesc.cuboid(w / 2 + BLOCK_T, wallH / 2, BLOCK_T / 2).setTranslation(
+          RAPIER.ColliderDesc.cuboid(w / 2, wallH / 2, BLOCK_T / 2).setTranslation(
             0,
             wallH / 2,
             sz * (d / 2 + BLOCK_T / 2)

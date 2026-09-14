@@ -57,6 +57,7 @@ export type BauId =
   | "kleinfahrzeug"
   | "einspurig"
   | "wasserfahrzeug"
+  | "kufenRaupe"
   | "moebel"
   | "beton"
   | "trommel"
@@ -588,6 +589,48 @@ function einspurig(w: number, h: number, d: number): Bauteil {
   return fertig();
 }
 
+/**
+ * Schneemobil: vorn zwei Kufen, hinten eine Raupe — und kein einziges Rad.
+ *
+ * Befund 14.09.2026: Das Schneemobil lief über `kleinfahrzeug` und kam damit
+ * „mit vier Gummirädern" auf den Platz, wie das Motorrad vor ihm. Ein
+ * Schneemobil hat aber gar keine Räder: vorn zwei lenkbare Kufen, hinten ein
+ * Gummiband über Umlenkrollen. Das ist die Form, an der man es von weitem
+ * erkennt, und deshalb eine eigene Bauform statt einer Fallunterscheidung in
+ * `kleinfahrzeug`.
+ *
+ * Die Kufen stehen vorn weit auseinander (±0,40 · Breite), die Raupe läuft
+ * hinten auf der Mittellinie — vorn breit, hinten schmal. Genau das misst
+ * `test/kufenRaupe.test.ts`.
+ */
+function kufenRaupe(w: number, h: number, d: number): Bauteil {
+  const lack = lackton([LACK_ROT, LACK_BLAU, LACK_GRUEN, 0x1f2226], w, h, d);
+  // Wanne mit abfallender Haube nach vorn (+z)
+  q(w * 0.62, h * 0.3, d * 0.62, lack, 0, -h * 0.04);
+  q(w * 0.56, h * 0.24, d * 0.3, lack, 0, h * 0.14, d * 0.3);
+  // Sitzbank hinten, Lenker und Lenksäule
+  q(w * 0.42, h * 0.2, d * 0.4, 0x24262a, 0, h * 0.2, -d * 0.16);
+  q(w * 0.1, h * 0.26, w * 0.1, STAHL_DUNKEL, 0, h * 0.34, d * 0.2);
+  q(w * 0.88, 0.05, 0.05, CHROM, 0, h * 0.46, d * 0.2);
+  // Windschutz — dunkles Polycarbonat, keine Scheibe (kein zweiter Zeichenruf)
+  q(w * 0.46, h * 0.2, 0.04, 0x3a3f44, 0, h * 0.42, d * 0.34);
+  // Zwei Kufen vorn, mit Federbein und hochgezogener Spitze
+  for (const sx of [-1, 1]) {
+    q(w * 0.12, h * 0.06, d * 0.44, CHROM, sx * w * 0.4, -h * 0.46, d * 0.18);
+    q(w * 0.12, h * 0.16, 0.06, CHROM, sx * w * 0.4, -h * 0.38, d * 0.4);
+    q(w * 0.07, h * 0.3, w * 0.07, STAHL_DUNKEL, sx * w * 0.36, -h * 0.28, d * 0.18);
+    // Querlenker zur Wanne hin
+    q(w * 0.3, h * 0.05, w * 0.07, STAHL, sx * w * 0.25, -h * 0.38, d * 0.18);
+  }
+  // Raupe hinten: breites Gummiband auf der Mittellinie, über zwei Rollen
+  q(w * 0.44, h * 0.26, d * 0.58, GUMMI, 0, -h * 0.33, -d * 0.18);
+  for (const sz of [-1, 1])
+    z(h * 0.13, w * 0.42, GUMMI, "x", 0, -h * 0.33, -d * 0.18 + sz * d * 0.29, 10);
+  // Schneefänger hinten über der Raupe
+  q(w * 0.4, h * 0.16, 0.05, 0x24262a, 0, -h * 0.08, -d * 0.46);
+  return fertig();
+}
+
 /** Sofa, Schrank, Kuechenzeile: Korpus mit Front und Fuessen. */
 function moebel(w: number, h: number, d: number): Bauteil {
   const holz = lackton([0x7a5a3a, 0x8d7250, 0xbdb5a6, 0x4c4a46], w, h, d);
@@ -726,6 +769,8 @@ export function baueGeometrie(bau: BauId, dims: number[], kind: string): Bauteil
       return einspurig(w, h, d);
     case "wasserfahrzeug":
       return kleinfahrzeug(w, h, d, "keine");
+    case "kufenRaupe":
+      return kufenRaupe(w, h, d);
     case "moebel":
       return moebel(w, h, d);
     case "beton":
