@@ -29,7 +29,8 @@ import {
   abstandVomStand,
 } from "../src/world/baggerstand";
 import { CONFIGS, type ContainerConfig } from "../src/world/containers";
-import { PRESS_CENTER, PRESS_INNER } from "../src/world/press";
+import { ABLADE_SPUR_X, ABLADE_HALT_Z, BED_HALF_W } from "../src/delivery/routes";
+import { PRESS_CENTER, PRESS_FUSS, KLAPPE_WEG, KLAPPE_RICHTUNG } from "../src/world/press";
 import { STATIC_OBSTACLES, hitsObstacle } from "../src/world/obstacles";
 import {
   BUCHT_X_VON,
@@ -38,6 +39,7 @@ import {
   TRENNSTEINE,
   YARD_D,
   YARD_MAX_X,
+  YARD_MIN_X,
 } from "../src/world/yard";
 
 /** Die drei Mulden, die der Spieler selbst befüllt. */
@@ -62,9 +64,25 @@ function zielpunkt(c: ContainerConfig): [number, number] {
   return [c.x, c.z];
 }
 
-describe("Die acht Ziele liegen im Schwenkband", () => {
+/*
+ * DIE VIER PFLICHTZIELE (Ansage Patrick, 14.09.2026 abends).
+ *
+ * „Erst mal gucken, dass wir vor allem an Mischschrott drankommen, an die
+ * Presse, an Stahlschrott und an den Muell." Dazu kommt der Platz, an dem der
+ * LKW steht — er ist kein Behaelter, aber der Ort, von dem aus alles andere
+ * gefuellt wird.
+ *
+ * Bis dahin stand hier „die acht Ziele". Diese Acht sind nicht mehr
+ * erfuellbar: Die Presse hat die Suedhaelfte der Westflanke uebernommen, weil
+ * der LKW ihre alte Ecke braucht, und der Reifencontainer ist ersatzlos weg.
+ * Was uebrigbleibt, sind vier Pflichtziele plus Abladeplatz — und die drei
+ * Metallmulden, die Patrick ausdruecklich als zweitrangig eingestuft hat
+ * („die ueberlegen wir uns noch"). Der Waechter prueft deshalb ZWEI Dinge
+ * getrennt: die Pflicht hart, die Mulden als Bestandsaufnahme.
+ */
+describe("Die vier Pflichtziele liegen im Schwenkband", () => {
   const ziele: Array<[string, number, number]> = [
-    ...["c_mixed", "c_steel", ...SORTIERMULDEN, "r_rubble", "c_tires"].map((id) => {
+    ...["c_mixed", "c_steel", "r_rubble"].map((id) => {
       const c = cfg(id);
       const [x, z] = zielpunkt(c);
       return [c.label, x, z] as [string, number, number];
@@ -72,10 +90,10 @@ describe("Die acht Ziele liegen im Schwenkband", () => {
     ["PRESSE", PRESS_CENTER.x, PRESS_CENTER.z],
   ];
 
-  it("führt genau die acht Ziele der Abnahmetabelle", () => {
-    // Acht, nicht sieben: Fällt eines weg, ist die Tabelle aus E-010 nicht
-    // mehr erfüllbar, und das soll auffallen.
-    expect(ziele.length).toBe(8);
+  it("führt genau die vier Ziele der Abnahme", () => {
+    expect(ziele.map((z) => z[0]).sort()).toEqual(
+      ["MISCHSCHROTT", "MUELL", "PRESSE", "STAHLSCHROTT"].sort()
+    );
   });
 
   for (const [label, x, z] of ziele) {
@@ -88,6 +106,72 @@ describe("Die acht Ziele liegen im Schwenkband", () => {
       );
     });
   }
+
+  it("der LKW steht mit der ganzen Ladefläche im Band — das ist der Sinn des Umbaus", () => {
+    /*
+     * Ansage: „Ich haette gerne, dass ich LKWs nicht mehr von hinten, sondern
+     * von der Seite ablade."
+     *
+     * VORHER stand der Wagen radial vor dem Bagger: Seine Ladeflaeche lag von
+     * 8,0 bis 13,5 m, die hintere Haelfte war unerreichbar. JETZT steht er
+     * quer, und alle vier Ecken liegen im Band. Gemessen wird gegen die
+     * echten Masse aus `routes.ts` und `vehicles.ts`.
+     */
+    const halbeBreite = BED_HALF_W; // 1,35 m
+    const laenge = 5.4; // bedLen einer Pritsche (vehicles.ts)
+    const ecken: Array<[number, number]> = [];
+    for (const dx of [-halbeBreite, halbeBreite]) {
+      for (const dz of [0, laenge]) {
+        // Der Wagen setzt nach Sueden zurueck; die Ladeflaeche liegt
+        // NOERDLICH des Haltepunkts, quer zur Blickrichtung des Baggers.
+        ecken.push([ABLADE_SPUR_X + dx, ABLADE_HALT_Z + dz]);
+      }
+    }
+    for (const [x, z] of ecken) {
+      const d = abstandVomStand(x, z);
+      expect(d, `Ladeflächenecke (${x.toFixed(2)} | ${z.toFixed(2)}): ${d.toFixed(2)} m`)
+        .toBeLessThanOrEqual(SCHWENK_AUSSEN);
+    }
+    // Und die Mitte der Fläche liegt sauber im Band.
+    const mitte = abstandVomStand(ABLADE_SPUR_X, ABLADE_HALT_Z + laenge / 2);
+    expect(mitte).toBeGreaterThanOrEqual(SCHWENK_INNEN);
+    expect(mitte).toBeLessThanOrEqual(SCHWENK_AUSSEN);
+  });
+
+  it("und er steht quer, nicht mit dem Heck zum Bagger", () => {
+    /*
+     * Die Laengsachse des Wagens laeuft in z (er setzt auf der Spur nach
+     * Sueden zurueck), der Bagger steht im Westen. Der Winkel zwischen
+     * Laengsachse und der Richtung zum Sitz muss deshalb nahe 90 Grad sein —
+     * das ist „von der Seite" in einer Zahl.
+     */
+    const mx = ABLADE_SPUR_X;
+    const mz = ABLADE_HALT_Z + 2.7;
+    const zumSitz = Math.atan2(BAGGER_STAND.x - mx, BAGGER_STAND.z - mz);
+    const laengsachse = 0; // +z
+    let winkel = Math.abs((zumSitz - laengsachse) * (180 / Math.PI));
+    if (winkel > 180) winkel = 360 - winkel;
+    expect(Math.abs(winkel - 90), `${winkel.toFixed(0)}° statt quer`).toBeLessThan(25);
+  });
+
+  it("die Metallmulden sind zweitrangig — hier steht, was von ihnen im Band liegt", () => {
+    /*
+     * KEINE Zusicherung, sondern eine Bestandsaufnahme mit Zahl: Patrick
+     * entscheidet, was aus den drei Mulden wird. Faellt eine weitere aus dem
+     * Band, faellt es hier auf.
+     */
+    const drin = SORTIERMULDEN.map((id) => cfg(id)).filter((c) => {
+      const d = abstandVomStand(c.x, c.z);
+      return d >= SCHWENK_INNEN && d <= SCHWENK_AUSSEN;
+    });
+    expect(
+      drin.length,
+      "keine einzige Sortiermulde mehr in Reichweite — dann kann der Spieler nichts mehr sortieren"
+    ).toBeGreaterThanOrEqual(1);
+    // Stand 14.09.2026 abends: ALU+ZINK 7,28 m und KABEL 9,17 m sind drin,
+    // KUPFER+MESSING mit 12,31 m nicht.
+    expect(drin.map((c) => c.id)).toEqual(["r_alu", "r_cable"]);
+  });
 
   it("der Verladeplatz liegt symmetrisch zwischen Silo und LKW-Spur", () => {
     /*
@@ -241,24 +325,44 @@ describe("Nichts steht im anderen", () => {
     }
   });
 
-  it("die Presse steht in der Ecke, aber nicht in der Mauer", () => {
+  it("die Presse steht an der Westflanke, aber nicht in der Mauer", () => {
     /*
      * Gemessen, nicht geglaubt: Der Rahmen reicht über die lichte Kammer
      * hinaus, und die Deckelklappe schwingt noch einmal 3,85 m über die Mitte.
-     * Beides muss innerhalb der Mauern bleiben — der Konzeptplan setzte sie
-     * 43 cm in die Ostmauer und 1,15 m in die Südmauer.
+     * Beides muss innerhalb der Mauern bleiben.
+     *
+     * Seit dem 14.09.2026 abends steht die Maschine an der WESTFLANKE und um
+     * 90 Grad gedreht (der LKW hat ihre Ecke bekommen). Damit zeigt die
+     * Klappe nach Westen statt nach Süden — geprüft wird deshalb mit
+     * `KLAPPE_RICHTUNG` statt mit einem festen Vorzeichen; sonst prüfte der
+     * Wächter eine Seite, an der gar nichts mehr schwingt.
      */
-    const KLAPPE = 3.85;
     const WAND_INNEN = 0.3;
     expect(
-      PRESS_CENTER.x + (PRESS_INNER.laenge + 0.7) / 2,
+      PRESS_CENTER.x + PRESS_FUSS.hw,
       "die Presse steht in der Ostmauer"
     ).toBeLessThan(YARD_MAX_X - WAND_INNEN);
-    expect(PRESS_CENTER.z - KLAPPE, "die Deckelklappe schlägt in die Südmauer").toBeGreaterThan(
+    expect(
+      PRESS_CENTER.x - PRESS_FUSS.hw,
+      "die Presse steht in der Westmauer"
+    ).toBeGreaterThan(YARD_MIN_X + WAND_INNEN);
+    expect(
+      PRESS_CENTER.z - PRESS_FUSS.hd,
+      "die Presse steht in der Südmauer"
+    ).toBeGreaterThan(-YARD_D / 2 + WAND_INNEN);
+    // Und die offene Klappe dazu.
+    const klappeX = PRESS_CENTER.x + KLAPPE_RICHTUNG.x * KLAPPE_WEG;
+    const klappeZ = PRESS_CENTER.z + KLAPPE_RICHTUNG.z * KLAPPE_WEG;
+    expect(klappeX, "die Deckelklappe schlägt in die Westmauer").toBeGreaterThan(
+      YARD_MIN_X + WAND_INNEN
+    );
+    expect(klappeX, "die Deckelklappe schlägt in die Ostmauer").toBeLessThan(
+      YARD_MAX_X - WAND_INNEN
+    );
+    expect(klappeZ, "die Deckelklappe schlägt in die Südmauer").toBeGreaterThan(
       -YARD_D / 2 + WAND_INNEN
     );
-  });
-});
+  });});
 
 /*
  * Der Bagger muss dort stehen, wo der Platz fuer ihn gebaut wurde.

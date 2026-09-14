@@ -122,9 +122,17 @@ describe("Kein Baum steckt in einer Wand", () => {
         expect(weg, "ein Baum wandert quer über den Platz").toBeLessThan(krone + BAUM_ABSTAND + 1);
       }
     }
-    // Zwei waren es am 14.09.2026 — mehr wäre ein Kahlschlag, keiner ein
-    // Zeichen, dass die Prüfung nicht greift.
-    expect(versetzt).toBe(2);
+    /*
+     * Am Nachmittag des 14.09.2026 waren es zwei: einer stand mit der Krone
+     * im Westschenkel der Ausbuchtung, einer an ihrer hinteren Ecke. Am Abend
+     * ist die Ausbuchtung von 9,5 auf 6,5 m verkürzt worden — die hintere
+     * Ecke liegt seitdem 3 m weiter nördlich, und der zweite Baum steht von
+     * selbst frei. Bleibt einer.
+     *
+     * Mehr wäre ein Kahlschlag, keiner ein Zeichen, dass die Prüfung nicht
+     * greift.
+     */
+    expect(versetzt).toBe(1);
   });
 });
 

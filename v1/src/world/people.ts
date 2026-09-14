@@ -15,6 +15,7 @@ import {
 } from "./weg";
 import { KAFFEE_THEKE } from "./yard";
 import { OFFICE_X } from "./office";
+import { ABKIPP_ZONE } from "../delivery/routes";
 import {
   WheelLoader,
   LOADER_SPEED,
@@ -320,8 +321,16 @@ const FUNKEN_TAKT = 0.35;
 const HANDLAST_KG = 60;
 /** So lange setzt er zurueck, wenn ihm etwas den Weg versperrt (s) */
 const RUECKWAERTS_S = 1.6;
-/** Abkippplatz vor dem Bagger — dort landet die Fuhre, da faehrt er nicht hinein */
-const ABKIPP = { x: -4.0, z: -10, hw: 4.5, hd: 4.5 };
+/**
+ * Abkippplatz vor dem Bagger — dort landet die Fuhre, da faehrt er nicht
+ * hinein.
+ *
+ * Die Zahl stand hier als Kopie und zeigte am 14.09.2026 abends noch auf
+ * (−4,0 | −10), also auf eine Stelle, an der seit dem Platzumbau niemand mehr
+ * abkippt. Jetzt kommt sie aus `routes.ts` — dort, wo auch der Kipper sie
+ * liest.
+ */
+const ABKIPP = { x: ABKIPP_ZONE[0], z: ABKIPP_ZONE[1], hw: 4.5, hd: 4.5 };
 /** In diesem Umkreis muss ein Teil frei liegen, damit er es holt (m) */
 /** Um so viel wird eine Zone fuer die Wegpruefung geschrumpft (m) */
 const ZONE_RAND = 1.0;

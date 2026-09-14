@@ -92,7 +92,17 @@ export const GATE_X = -22;
  */
 export const BUCHT_X_VON = -6.5;
 export const BUCHT_X_BIS = 7.5;
-export const BUCHT_Z = -38.5;
+/*
+ * Flacher seit dem 14.09.2026 abends: −35,5 statt −38,5.
+ *
+ * Ansage Patrick: „Die Ausbuchtung ist vielleicht ein bisschen zu tief, die
+ * vielleicht ein bisschen verkuerzen." Aus 9,5 m Tiefe werden 6,5.
+ *
+ * An der Erreichbarkeit aendert das nichts: Bei einer Halde zaehlt die
+ * VORDERE Kante, und die liegt weiter auf z −29,0. Was sich aendert, ist der
+ * Stauraum — 40,8 statt 61,2 m² je Halde, zusammen 81,6 statt 122,4 m².
+ */
+export const BUCHT_Z = -35.5;
 /*
  * Die frühere Hilfsfunktion `inBucht(x)` ist weg: Seit die Umrandung aus
  * `mauerLaeufe()` kommt, steht die Aussparung als eigener Lauf da und muss
@@ -120,10 +130,12 @@ export const TRENNSTEIN_X = 0.5;
 /**
  * Lage und Hoehe jeder Saeule, von der Bucht-Oeffnung nach hinten.
  *
- * Sechs Saeulen a 1,6 m decken die 9,0 m Haldentiefe ab. Die Lagen laufen
- * 1–2–4–4–2–1: in der Mitte 2,4 m, an beiden Enden 0,6 m.
+ * Vier Saeulen a 1,6 m decken die 6,5 m Haldentiefe ab (vorher sechs auf
+ * 9,5 m — die Ausbuchtung ist am 14.09.2026 abends flacher geworden). Die
+ * Lagen laufen 1–4–4–1: in der Mitte 2,4 m, an beiden Enden 0,6 m. Die
+ * Pyramide bleibt damit dieselbe Figur, nur kuerzer.
  */
-export const TRENNSTEINE: Array<{ z: number; hoehe: number }> = [1, 2, 4, 4, 2, 1].map(
+export const TRENNSTEINE: Array<{ z: number; hoehe: number }> = [1, 4, 4, 1].map(
   (lagen, i) => ({ z: -29.9 - i * TRENNSTEIN_L, hoehe: lagen * TRENNSTEIN_H })
 );
 

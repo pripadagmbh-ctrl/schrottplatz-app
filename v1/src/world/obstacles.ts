@@ -1,4 +1,4 @@
-import { PRESS_CENTER, PRESS_INNER } from "./press";
+import { PRESS_CENTER, PRESS_FUSS } from "./press";
 import {
   YARD_D,
   YARD_MIN_X,
@@ -334,8 +334,11 @@ export const STATIC_OBSTACLES: Obstacle[] = [
   {
     x: PRESS_CENTER.x,
     z: PRESS_CENTER.z,
-    hw: (PRESS_INNER.laenge + 0.7) / 2,
-    hd: (PRESS_INNER.tiefe + 0.7) / 2,
+    // Weltachsen, nicht Kammerachsen: Seit dem 14.09.2026 steht die Maschine
+    // quer (`PRESS_ROT`), und ein um 90 Grad verdrehter Eintrag waere wieder
+    // eine unsichtbare Wand neben der sichtbaren.
+    hw: PRESS_FUSS.hw,
+    hd: PRESS_FUSS.hd,
     top: 2.2,
     label: "Presse",
   },
