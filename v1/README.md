@@ -84,32 +84,75 @@ scharf; den früheren Fahrmodus per Doppeltipp gibt es nicht mehr. Doppeltipp
 rechts wechselt die Ansicht, rechten Daumen stillhalten öffnet den
 Funktionskranz.
 
-## Platzanordnung & Wirtschaft (Stand 2026-08-29)
+## Der Platz (Stand 14.09.2026, E-010)
 
-> **Veraltet.** Der Platz wurde am 13.09.2026 umgebaut: vier Lego-Sortiermulden im
-> Westen (seit E-006 ohne Rückwand), acht Mulden an der Ostwand, Presse in der Ecke statt
-> an der Mauer. Die Skizze unten zeigt den Stand vom 29.08. und bleibt hier als Erklärung
-> des **Geldkreislaufs** stehen — der gilt unverändert. Für die Anordnung ist
-> `src/world/containers.ts` die Wahrheit.
-
-Der Bagger steht mittig auf (0, −1); alle Sortierziele liegen im Schwenkbereich
-(5,8–9,2 m), Fahren ist nur für Presse und Verladung nötig.
+Der Bagger steht auf **(−0,5 | −22,5)** und schaut nach Norden, zur Waage und zur
+Einfahrt. Sein Standplatz kommt aus `src/world/baggerstand.ts` — dieselbe Quelle,
+aus der auch die Abnahmemessung rechnet. Wer ihn verschiebt, verschiebt ihn dort
+und nirgendwo sonst.
 
 ```
-                    Brückenwaage (0, 15)
-                    Abkippplatz  (0, 7)
-  STAHLSCHROTT ····· [BAGGER] ····· GUSS · ALU · KUPFER · KABEL
-   (-9, 1), riesig    (0, -1)        Boxenreihe x = 5,4
-  STÖRSTOFF (-5,-8)      |
-                 SCHERE (0, -10.5)   VERLADEPLATZ (8, -13)
+                          EINFAHRT (x −22, Nordwand)
+   BÜRO   WAAGE      HALLE 1   HALLE 2   HALLE 3        (Nordwand, z 22)
+ ┌──────────────────────────────────────────────────────┐
+ │ E-MOTOREN                                            │
+ │ BATTERIEN                                            │
+ │ ALU · KABEL · KUPFER                                 │
+ │ VA · HOLZ · BAUMISCH      KUPFER+MSG                 │
+ │ KUNSTSTOFF                    KABEL         REIFEN   │
+ │   Silo-Reihe    [B2]        ALU+ZINK   [B]   MÜLL    │
+ │   x −36      Verladen                        PRESSE  │
+ └──────────────────────┬──────────────────┬────────────┘
+                        │  STAHL │ MISCH   │   Ausbuchtung
+                        └────────┴─────────┘   (z −29 … −38,5)
 ```
 
-**Geldkreislauf:** Anlieferer werden auf der Brückenwaage voll und nach dem
-Abladen leer gewogen — für die Nettomenge bekommt der Kunde 0,16 €/kg (Ausgabe).
-Jedes korrekt einsortierte Teil bringt sofort 0,05 €/kg Sortierprämie. Verkauft
-wird über den Abhol-LKW: **V** ruft ihn, der Spieler belädt den Container mit der
-Spinne, **V** schickt ihn los — bezahlt wird Materialwert × Sortenreinheit², eine
-sortenreine Ladung bringt also ein Vielfaches.
+**Acht Ziele im Schwenkbereich**, alle gemessen von `(−0,5 | −22,5)` — bei Halden
+zur vorderen Kante, bei Mulden und Containern zur Mitte:
+
+| Ziel | Abstand |
+|---|---|
+| Halde Mischschrott | 8,07 m |
+| Halde Stahlschrott | 7,15 m |
+| Presse | 7,40 m |
+| Müllcontainer | 8,81 m |
+| Reifencontainer | 6,72 m |
+| Mulde Alu + Zink | 8,55 m |
+| Mulde Kabel | 7,50 m |
+| Mulde Kupfer + Messing | 8,65 m |
+
+**Die Ausbuchtung** hinter dem Bagger wölbt sich nach Süden aus der Platzgrenze
+heraus, rundum mit 4,8 m hoher Wand. Darin die beiden Halden, getrennt durch eine
+Pyramide aus Betonlego — Lagen 1·2·4·4·2·1, also 0,6 bis 2,4 m hoch. Niedrig
+genug, dass der Zugriff von einer Halde zur anderen durchläuft.
+
+**Die Silo-Reihe** an der Westwand, neun Stück: E-Motoren, Batterien, Alu, Kabel,
+Kupfer, VA, Holz, Baumisch, Kunststoff. Stahl entfällt — Stahlschrott wird direkt
+an der Halde verladen. Das E-Motoren-Silo steht als Hülle, die Fraktion fehlt noch.
+
+**Der Verladeplatz** liegt zwischen Silo-Reihe und LKW-Spur: 7,5 m zur einen,
+7,5 m zur anderen Seite. Der Bagger steht dazwischen und greift aus dem Silo in
+den Container, ohne umzusetzen.
+
+**Die Hallen** an der Nordwand sind leere Hüllen. Was in ihnen passieren soll —
+Händler fahren selbst hinein, Lambert räumt sie in die Silos — steht in E-011 und
+ist noch nicht gebaut.
+
+### Geldkreislauf
+
+Anlieferer werden auf der Brückenwaage voll und nach dem Abladen leer gewogen —
+für die Nettomenge bekommt der Kunde 0,16 €/kg (Ausgabe). Verkauft wird über den
+Abhol-LKW: **V** ruft ihn, der Spieler belädt den Container mit der Spinne, **V**
+schickt ihn los.
+
+> **Zwei bekannte Fehler in dieser Rechnung**, festgehalten in der Bestandsaufnahme
+> vom 14.09.2026: Das Schild am Container rechnet mit Reinheit **hoch zwei**
+> (`materials/purity.ts:26`), ausgezahlt wird mit Reinheit **hoch drei**
+> (`economy/account.ts:138`) — bei 76 % Reinheit sind das 24 % weniger als
+> angeschrieben. Und die Sortierprämie von 0,05 €/kg steht zwar in
+> `account.ts:18`, wird aber nirgends benutzt. Beides gehört zu Abschnitt 2 in
+> E-016 und ist noch offen.
+
 
 ## Geerbt vom Prototyp — Spielinhalt M0 bis M3
 
