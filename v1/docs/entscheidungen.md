@@ -691,3 +691,74 @@ Wann die Verpackung angegangen wird, ist offen; der Stand oben ist der Ausgangsp
 **Auf dem Gerät zu prüfen.** Nichts. Sobald ein erstes Paket gebaut ist, gehört an diese
 Stelle: startet die App ohne Browser-Rahmen, spielt der Ton bei stumm gestelltem Gerät, und
 überlebt der Speicherstand einen Neustart.
+
+### E-016 — Erst die Welt, dann der Kreislauf, dann die App (14.09.2026)
+
+**Entscheidung.** Die Arbeit läuft in drei Abschnitten, in dieser Reihenfolge:
+
+**Abschnitt 1 — Die Welt.** Platz und Anordnung · Bagger · Schrott · Maschinen. Das ist
+das Wichtigste und kommt zuerst. Patrick am 14.09.2026: „Erstmal ist der Platz, die
+Anordnung, Bagger, Schrott und Maschinen das Wichtigste."
+
+**Abschnitt 2 — Der Kreislauf.** Vier Punkte, an denen sich messen lässt, wann das Spiel
+„fertig" genug für eine App ist. Die Messlatte: *Eine Schicht lässt sich von Anfang bis
+Ende spielen, und jede Zahl stimmt.*
+
+| | warum es zählt |
+|---|---|
+| Die Zahlen stimmen | Das Container-Schild rechnet mit Reinheit², ausgezahlt wird mit ³ (`materials/purity.ts:26` gegen `economy/account.ts:138`). Wer das einmal merkt, glaubt keiner Anzeige mehr — auch den richtigen nicht |
+| Der Kipper kippt sauber | Bis zu 141 km/h Ladung quer über den Platz, an der **ersten** Station des Kreislaufs |
+| Der Tag hat ein Ende | Die Uhr läuft endlos im Kreis (`world/daylight.ts:52`). Keine Bilanz, keine Pacht, kein Ziel |
+| Geld hat einen Zweck | `ALLES_FREI = true` (`main.ts:622`) — alle acht Ausbauten ab dem ersten Bild gekauft. Der Kontostand ist eine Zahl ohne Folgen |
+
+**Abschnitt 3 — Die Verpackung.** Erst Android als Probelauf (geht ohne Mac und ohne
+Entwicklerkonto direkt auf dem Windows-Rechner), dann iOS. Stand und Hindernisse in E-015.
+
+**Begründung.** Der Platz und die Maschinen sind das, was in jedem einzelnen Bild zu sehen
+ist. Ein Spielsystem lässt sich nachrüsten, ohne dass jemand das Vertrauen verliert; eine
+Welt, die nach Bauklötzen aussieht, prägt den Eindruck ab der ersten Sekunde. Dazu kommt
+ein praktischer Grund: Platz, Bagger und Greifer sind gerade in Arbeit und offen — sie
+jetzt fertigzumachen ist billiger, als sie liegenzulassen und später wieder hineinzudenken.
+
+**Verworfene Alternative — und sie ist gut begründet, deshalb steht sie hier.** Die
+Bestandsaufnahme vom 14.09.2026 empfahl die umgekehrte Reihenfolge: **erst die Zahlen**,
+weil sich Balancing nicht beurteilen lässt, solange die Anzeige lügt, und weil jede spätere
+Arbeit an der Wirtschaft auf falschen Werten aufsetzt. Das Argument bleibt richtig. Patrick
+hat anders entschieden, weil die Welt das ist, was man ansieht, und die Zahlen das, was man
+nachrechnet. **Die Folge, bewusst in Kauf genommen:** Wer in Abschnitt 1 etwas über Erlöse
+oder Reinheit misst, misst gegen eine Anzeige, von der wir wissen, dass sie um bis zu 24 %
+danebenliegt. Solche Messungen taugen bis dahin nur zum Vergleich mit sich selbst, nicht als
+absolute Zahl.
+
+**Was in Abschnitt 1 offen ist, Stand 14.09.2026.**
+
+*Platz und Anordnung:* der Umbau nach E-010 läuft — Ausbuchtung, Trennsteine, drei Mulden,
+Silo-Reihe auf neun, Verladeplatz, drei Hallen, Waage ans Büro.
+*Bagger:* Positionsliste und Namen (heute **0 von 117 Bauteilen** benannt), Räder als erste
+Baugruppe, danach die sieben weiteren aus dem Baggerkonzept. Budget: von 117 auf rund 250
+Bauteile, von 9.980 auf rund 40.000 Dreiecke — gemessen am Gerät, siehe E-010 und das
+Baggerkonzept.
+*Greifer:* Zahnwinkel, Facetten und Anlenkung laufen in einem eigenen Arbeitsbaum.
+*Schrott:* Teile liegen beim Start ineinander; die Ballen aus der Presse sehen „zu sauber"
+aus; die Formen der Schrottteile sind seit dem Prototyp unverändert.
+*Maschinen:* Presse, Radlader und die Kundenfahrzeuge. Ein Kunden-LKW hat heute **mehr
+Geometrie als der Bagger** — das Verhältnis stimmt nicht.
+
+**Drei Dinge, die jetzt billig sind und später teuer.** Sie gehören in Abschnitt 1
+mitgedacht, auch wenn sie nicht zur Welt zählen:
+
+1. **Das Speicherformat.** Solange niemand spielt, kostet eine Änderung nichts. Danach
+   kostet sie Fortschritt und Vertrauen. Ein Schema mit Migrationspfad existiert bereits.
+2. **Die Touch-Bedienung.** In der App ist sie die einzige Eingabe. Was am Tablet hakt,
+   hakt dort dauerhaft — der enge Lenkbereich hat sich mit E-012 bereits verschoben.
+3. **Die 14,6 ms je Bild**, die weder Physik noch Grafik sind (gemessen am 14.09.: Frame
+   21,0 ms gegen 6,4 ms Arbeit). In Safari lässt sich das dem Browser zuschieben, in der
+   App nicht — es ist dieselbe Engine.
+
+**Abnahmekriterium.** Keines für diesen Eintrag; er hält eine Reihenfolge fest. Abschnitt 1
+gilt als abgeschlossen, wenn Platz, Bagger, Greifer, Schrott und Maschinen je einen
+Gerätetest durch Patrick bestanden haben. Abschnitt 2 gilt als abgeschlossen, wenn die vier
+Punkte oben nachweisbar erfüllt sind.
+
+**Auf dem Gerät zu prüfen.** Laufend, je Paket — dieser Eintrag ersetzt keinen Gerätetest,
+er ordnet sie nur.
