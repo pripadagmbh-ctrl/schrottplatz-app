@@ -131,7 +131,22 @@ export const TRENNSTEINE: Array<{ z: number; hoehe: number }> = [1, 2, 4, 4, 2, 
  * 11.09.2026). Laengsseite an der Mauer, Verkaufsklappe nach Sueden zum Platz,
  * die Warteplaetze links und rechts daneben.
  */
-export const KAFFEE_POS = new THREE.Vector3(-10.5, 0, 27.0);
+/*
+ * Nachtrag 14.09.2026 (E-010): von (−10,5 | 27,0) auf (−9,5 | 15,5).
+ *
+ * An der alten Stelle steht seit heute die erste Sortierhalle (x −17,75 bis
+ * −10,25, z +17,5 bis +26,5) — gemessen lag der Wagen mit 2,75 x 0,9 m in
+ * ihrer Ecke. Der neue Platz ist die Luecke zwischen Halle 1 und Halle 2, ein
+ * paar Meter davor: Dort warten die Fahrer auf ihre Einweisung, und dort
+ * stehen auch die drei Warteplaetze.
+ *
+ * Ein Zwischenstand bei (−22,5 | 19,5) ist gemessen wieder verworfen worden:
+ * Der Wagen stand dort 3,9 m neben der Sehne, mit der ein LKW vier Meter
+ * vorausschaut — der erste Kipper blieb 292 Sekunden lang hinter der Waage
+ * stehen und kam nie auf den Platz. Feste Bauten kennen keine
+ * Aufgeben-Regel: Was sie versperren, bleibt versperrt.
+ */
+export const KAFFEE_POS = new THREE.Vector3(-9.5, 0, 15.5);
 /** Gedreht, damit die Klappe nach Sueden zeigt und der Wagen laengs zur Wand steht. */
 export const KAFFEE_ROT = Math.PI / 2;
 /** Grundriss des Wagens [halbe Breite in x, halbe Tiefe in z] — dreht mit. */

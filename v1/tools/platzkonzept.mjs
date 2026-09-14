@@ -55,7 +55,20 @@ kulisse.push(
   { label: 'HALLE 2', art: 'bau', x: -5, z: 22, size: [7.5, 9] },
   { label: 'HALLE 3', art: 'bau', x: 4, z: 22, size: [7.5, 9] });
 
-const d = (o) => Math.hypot(o.x - BAGGER.x, o.z - BAGGER.z);
+/*
+ * Abstand zum Standplatz — bei einer HALDE zur vorderen Kante, sonst zur
+ * Mitte.
+ *
+ * Nachgetragen am 14.09.2026: Der Plan rechnete auch bei den Halden mit der
+ * Mitte und schrieb daneben „12,1 m — Fahrt", waehrend die Abnahmetabelle in
+ * E-010 fuer denselben Haufen 8,1 m nennt. Beide Zahlen stimmen, sie messen
+ * nur Verschiedenes. Richtig ist die Kante: „Bei einer Halde zaehlt die
+ * vordere Kante, nicht die Mitte — man graebt sich von vorn hinein" (E-010).
+ */
+const d = (o) =>
+  o.art === "halde"
+    ? Math.hypot(o.x - BAGGER.x, o.z + o.size[1] / 2 - BAGGER.z)
+    : Math.hypot(o.x - BAGGER.x, o.z - BAGGER.z);
 
 function kasten(o, mitAbstand) {
   const [b, t] = o.size;
@@ -146,7 +159,7 @@ s += `<line x1="${px(MIN_X)}" y1="${y0}" x2="${px(MIN_X) + 10 * S}" y2="${y0}" s
 s += `<text x="${px(MIN_X) + 10 * S + 7}" y="${y0 + 4}" font-size="10" fill="${F.text}">10 m · grünes Band = Schwenkbereich 5,8–9,2 m</text>`;
 s += `</svg>`;
 
-writeFileSync("konzept-platz-4.svg", s);
-console.log("konzept-ausbuchtung.svg");
+writeFileSync("docs/platzkonzept-2026-09-14.svg", s);
+console.log("docs/platzkonzept-2026-09-14.svg");
 for (const o of ziele.filter((o) => o.art !== "abkipp"))
   console.log(`  ${o.label.padEnd(24)} ${d(o).toFixed(1).padStart(5)} m  ${d(o) <= R_AUSSEN + 1 ? "in Reichweite" : "FAHRT"}`);

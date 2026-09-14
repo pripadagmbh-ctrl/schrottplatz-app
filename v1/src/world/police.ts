@@ -52,9 +52,15 @@ const BUERO_HALT = new THREE.Vector3(OFFICE_FRONT_X + 4.5, 0, OFFICE_Z - 1.5);
  * herum: Der Betrieb sitzt jetzt im Sueden, und ein Streifenwagen hat weder
  * in der Muldenreihe noch zwischen Presse und Halde etwas zu suchen.
  */
+/*
+ * 14.09.2026 (E-010): Die beiden Nordpunkte sind nach Sueden gerueckt. An der
+ * Nordwand stehen jetzt die drei Sortierhallen (z +17,5 bis +26,5), und
+ * Janines Kaffeewagen ist auf (−22,5 | 19,5) gezogen — der alte Punkt
+ * (−24 | 20) lag mit 1,4 m Sicherheitsabstand mitten darin.
+ */
 const RUNDE: Array<[number, number]> = [
-  [-24, 20],
-  [-16, 16],
+  [-25, 16],
+  [-16, 13],
   [-8, 10],
   [-2, 2],
   [-4, -4],

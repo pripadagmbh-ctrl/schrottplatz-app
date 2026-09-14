@@ -23,13 +23,23 @@ import {
   SUED_HOCH,
   SUED_HOCH_VON,
   SUED_HOCH_RAMPE,
+  BUCHT_X_VON,
+  BUCHT_X_BIS,
+  BUCHT_Z,
+  TRENNSTEINE,
+  TRENNSTEIN_X,
+  TRENNSTEIN_L,
+  TRENNSTEIN_T,
 } from "../src/world/yard";
+import { BAGGER_STAND, VERLADE_STAND, SCHWENK_INNEN, SCHWENK_AUSSEN } from "../src/world/baggerstand";
+import { hallenFootprints, officeFootprints } from "../src/world/office";
 
 const HZ = YARD_D / 2;
 const RAND = 46;
 const M = 13; // Pixel je Meter
 const W = (YARD_MAX_X - YARD_MIN_X) * M + 2 * RAND;
-const H = YARD_D * M + 2 * RAND;
+/* Die Ausbuchtung ragt nach Sueden ueber den Platz hinaus — sie braucht Bild. */
+const H = (YARD_D + (-BUCHT_Z - HZ)) * M + 2 * RAND;
 const px = (x: number): number => RAND + (x - YARD_MIN_X) * M;
 const py = (z: number): number => RAND + (HZ - z) * M;
 
@@ -67,6 +77,11 @@ s(
   `<rect x="${px(YARD_MIN_X)}" y="${py(HZ)}" width="${(YARD_MAX_X - YARD_MIN_X) * M}" ` +
     `height="${YARD_D * M}" fill="#dcd8d2"/>`
 );
+/* Die Ausbuchtung hinter dem Bagger (E-010) */
+s(
+  `<rect x="${px(BUCHT_X_VON)}" y="${py(-HZ)}" width="${(BUCHT_X_BIS - BUCHT_X_VON) * M}" ` +
+    `height="${(-BUCHT_Z - HZ) * M}" fill="#dcd8d2"/>`
+);
 for (let x = Math.ceil(YARD_MIN_X / 5) * 5; x <= YARD_MAX_X; x += 5)
   s(`<line x1="${px(x)}" y1="${py(HZ)}" x2="${px(x)}" y2="${py(-HZ)}" stroke="#00000012"/>`);
 for (let z = -Math.floor(HZ / 5) * 5; z <= HZ; z += 5)
@@ -80,25 +95,40 @@ for (let z = -Math.floor(HZ / 5) * 5; z <= HZ; z += 5)
 const WT = 0.6;
 const mauer = (x: number, z: number, bx: number, bz: number): void =>
   kasten(x, z, bx, bz, "#a8a49c", "#6b6862", 'stroke-width="0.7"');
-mauer((YARD_MIN_X + YARD_MAX_X) / 2, -HZ, YARD_MAX_X - YARD_MIN_X, WT);
+/* Die Suedmauer in zwei Stuecken — dazwischen geht die Ausbuchtung auf. */
+mauer((YARD_MIN_X + BUCHT_X_VON) / 2, -HZ, BUCHT_X_VON - YARD_MIN_X, WT);
+mauer((BUCHT_X_BIS + YARD_MAX_X) / 2, -HZ, YARD_MAX_X - BUCHT_X_BIS, WT);
 /* Das erhoehte Stueck der Suedmauer — dunkler, mit der Hoehe daneben. */
 const hochVon = SUED_HOCH_VON - SUED_HOCH_RAMPE;
-kasten(
-  (hochVon + YARD_MAX_X) / 2,
-  -HZ,
-  YARD_MAX_X - hochVon,
-  WT * 1.6,
-  "#5f6670",
-  "#3b4149",
-  'stroke-width="0.8"'
-);
+const hochMauer = (x: number, z: number, bx: number, bz: number): void =>
+  kasten(x, z, bx, bz, "#5f6670", "#3b4149", 'stroke-width="0.8"');
+hochMauer((hochVon + BUCHT_X_VON) / 2, -HZ, BUCHT_X_VON - hochVon, WT * 1.6);
+hochMauer((BUCHT_X_BIS + YARD_MAX_X) / 2, -HZ, YARD_MAX_X - BUCHT_X_BIS, WT * 1.6);
+/* Die drei Waende der Ausbuchtung, alle auf voller Hoehe */
+for (const bx of [BUCHT_X_VON, BUCHT_X_BIS])
+  hochMauer(bx, (-HZ + BUCHT_Z) / 2, WT * 1.6, -HZ - BUCHT_Z);
+hochMauer((BUCHT_X_VON + BUCHT_X_BIS) / 2, BUCHT_Z, BUCHT_X_BIS - BUCHT_X_VON, WT * 1.6);
 beschriftung(
-  (hochVon + YARD_MAX_X) / 2,
-  -HZ + 1.9,
-  `Aussenmauer ${SUED_HOCH.toFixed(1).replace(".", ",")} m`,
+  (BUCHT_X_VON + BUCHT_X_BIS) / 2,
+  BUCHT_Z - 1.6,
+  `Ausbuchtung, Wand ${SUED_HOCH.toFixed(1).replace(".", ",")} m`,
   "#3b4149",
   10
 );
+/* Die Trennsteine zwischen den Halden — je dunkler, desto hoeher. */
+for (const t of TRENNSTEINE) {
+  const grau = Math.round(190 - (t.hoehe / 2.4) * 90);
+  kasten(
+    TRENNSTEIN_X,
+    t.z,
+    TRENNSTEIN_T,
+    TRENNSTEIN_L,
+    `rgb(${grau + 20},${grau},${grau - 25})`,
+    "#6b5535",
+    'stroke-width="0.6"'
+  );
+}
+beschriftung(TRENNSTEIN_X + 2.6, -34.0, "Trennsteine 0,6–2,4 m", "#6b5535", 9);
 mauer(YARD_MIN_X, 0, WT, YARD_D);
 mauer(YARD_MAX_X, 0, WT, YARD_D);
 mauer((YARD_MIN_X + GATE_X - 4.5) / 2, HZ, GATE_X - 4.5 - YARD_MIN_X, WT);
@@ -182,20 +212,36 @@ kasten(
 beschriftung(PRESS_CENTER.x, PRESS_CENTER.z, "PRESSE", "#16202b", 11);
 
 /* -------------------------------------------------------- Bagger, Bauten */
-/* Arbeitslinie wie in tools/platz.ts: (−2,5 | −19,5), fuenf Meter nach vorn. */
-s(
-  `<line x1="${px(-2.5)}" y1="${py(-19.5)}" x2="${px(-2.5)}" y2="${py(-14.5)}" ` +
-    `stroke="#c2410c" stroke-width="3" stroke-linecap="round"/>`
-);
-beschriftung(-2.5, -12.4, "BAGGER", "#c2410c", 10);
-kasten(WEIGH_X, WEIGH_Z, 3.2, 8.0, "#c8ccd0", "#7a7670", 'stroke-width="0.8"');
-beschriftung(WEIGH_X, WEIGH_Z, "WAAGE", "#2f343a", 9);
-kasten(-35.1, 25.5, 9.0, 9.0, "#cfd3d7", "#7a7670", 'stroke-width="0.8"');
-beschriftung(-35.1, 25.5, "BÜRO", "#2f343a", 9);
-for (const z of [18.8, 11.6]) {
-  kasten(-35.1, z, 9.0, 7.2, "#cfd3d7", "#7a7670", 'stroke-width="0.8"');
-  beschriftung(-35.1, z, "HALLE", "#2f343a", 9);
+/* Die beiden Standplaetze mit ihrem Schwenkband (world/baggerstand.ts). */
+for (const [stand, name] of [
+  [BAGGER_STAND, "BAGGER"],
+  [VERLADE_STAND, "VERLADEN"],
+] as Array<[{ x: number; z: number }, string]>) {
+  s(
+    `<circle cx="${px(stand.x)}" cy="${py(stand.z)}" r="${SCHWENK_AUSSEN * M}" ` +
+      `fill="#2c7a6622" stroke="#2c7a66" stroke-width="1" stroke-dasharray="5 4"/>`
+  );
+  s(
+    `<circle cx="${px(stand.x)}" cy="${py(stand.z)}" r="${SCHWENK_INNEN * M}" ` +
+      `fill="#dcd8d2" fill-opacity="0.85" stroke="#2c7a66" stroke-width="0.7" ` +
+      `stroke-dasharray="3 4"/>`
+  );
+  s(
+    `<circle cx="${px(stand.x)}" cy="${py(stand.z)}" r="9" fill="#c2410c" ` +
+      `stroke="#fff" stroke-width="2"/>`
+  );
+  beschriftung(stand.x, stand.z - 2.0, name, "#c2410c", 10);
 }
+kasten(WEIGH_X, WEIGH_Z, 4.6, 9.0, "#c8ccd0", "#7a7670", 'stroke-width="0.8"');
+beschriftung(WEIGH_X, WEIGH_Z, "WAAGE", "#2f343a", 9);
+for (const [x, z, hw, hd] of officeFootprints()) {
+  kasten(x, z, hw * 2, hd * 2, "#cfd3d7", "#7a7670", 'stroke-width="0.8"');
+  beschriftung(x, z, "BÜRO", "#2f343a", 9);
+}
+hallenFootprints().forEach(([x, z, hw, hd], i) => {
+  kasten(x, z, hw * 2, hd * 2, "#cfd3d7", "#7a7670", 'stroke-width="0.8"');
+  beschriftung(x, z, `HALLE ${i + 1}`, "#2f343a", 9);
+});
 
 /* ------------------------------------------------------------ Kopfzeile */
 s(
@@ -214,6 +260,34 @@ s(
 s(
   `<text x="${W - RAND - 2.5 * M}" y="${H - 26}" fill="#33383f" font-size="10" ` +
     `text-anchor="middle" font-family="system-ui,sans-serif">5 m</text>`
+);
+
+/* --------------------------------------------- Abnahmetabelle, gemessen */
+/*
+ * Die Zahlen, die in E-010 als Abnahmekriterium stehen — aber aus dem
+ * GEBAUTEN Platz gerechnet, nicht aus dem Konzeptplan abgeschrieben. Wer die
+ * beiden Bilder nebeneinanderlegt, sieht die Form; diese Liste sagt, wo sie
+ * auseinanderlaufen.
+ */
+const abstand = (x: number, z: number): number =>
+  Math.hypot(x - BAGGER_STAND.x, z - BAGGER_STAND.z);
+const ziele: Array<[string, number]> = [];
+for (const id of ["c_mixed", "c_steel", "r_alu", "r_cable", "r_copper", "r_rubble", "c_tires"]) {
+  const c = CONFIGS.find((k) => k.id === id)!;
+  // Bei einer Halde zaehlt die vordere Kante, sonst die Mitte (E-010).
+  const z = c.kind === "halde" ? c.z + c.size[1] / 2 : c.z;
+  ziele.push([c.label, abstand(c.x, z)]);
+}
+ziele.push(["PRESSE", abstand(PRESS_CENTER.x, PRESS_CENTER.z)]);
+console.log("Ziel                      Abstand   im Schwenkband 5,8–9,2 m?");
+for (const [label, d] of ziele) {
+  const drin = d >= SCHWENK_INNEN && d <= SCHWENK_AUSSEN;
+  console.log(`${label.padEnd(24)} ${d.toFixed(2).padStart(6)} m   ${drin ? "ja" : "NEIN"}`);
+}
+const siloKante = CONFIGS.find((c) => c.id === "c_va_lager")!;
+console.log(
+  `Verladeplatz: ${(VERLADE_STAND.x - (siloKante.x + siloKante.size[0] / 2)).toFixed(2)} m ` +
+    `zur Silo-Vorderkante, ${(VERLADE_STAND.x + 7.5 - VERLADE_STAND.x).toFixed(2)} m zur LKW-Spur`
 );
 
 writeFileSync(

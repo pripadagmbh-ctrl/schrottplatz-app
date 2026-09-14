@@ -23,20 +23,39 @@
  * (die von −38,2 bis −29,2 geht); sein naechster Rand steht 7,9 m vom Sitz.
  */
 
-/** Mitte und Streuung des unsortierten Starthaufens (m). */
-export const START_HAUFEN = { x: 4.0, z: -32.0, streuung: 2.6, teile: 85 };
+/**
+ * Mitte und Streuung des unsortierten Starthaufens (m).
+ *
+ * Die Streuung von 2,9 m ist die von vor dem Umbau und bleibt es mit Absicht.
+ * Beim Umzug in die Ausbuchtung war sie kurz auf 2,3 m verengt, damit der
+ * Haufen sicher in die Halde passt — nachgemessen mit `tools/platzlast.ts`
+ * (85 Teile, 30 Sekunden Spielzeit) blieben dabei 42 von 56 dynamischen
+ * Koerpern wach, bei 2,9 m dagegen keiner. Ein enger getuermter Haufen
+ * rutscht laenger in sich zusammen.
+ *
+ * ACHTUNG, das ist kein Freibrief: Ueber vier Laeufe kommt der Haufen auch
+ * mit 2,9 m nur in einem von vier Faellen ganz zur Ruhe. Das ist aber KEINE
+ * Folge des Umbaus — auf der alten Stelle (6,2 | −19,0) gemessen, blieb er in
+ * drei von drei Laeufen ebenfalls wach. Die Koerper kriechen dabei mit unter
+ * 0,05 m/s; es ist ein Einschlaf-Problem des Haufens, kein Platzproblem, und
+ * gehoert in ein eigenes Paket.
+ */
+export const START_HAUFEN = { x: 4.0, z: -33.0, streuung: 2.9, teile: 85 };
 
 /**
- * Die beiden Altfahrzeuge am Rand des Haufens.
+ * Die beiden Altfahrzeuge, je eines an der vorderen Kante einer Halde.
  *
- * Beide stehen an der vorderen Kante der Mischschrottbox, 4,2 m auseinander —
- * ein Auto ist 1,8 m breit, sie stehen also nebeneinander und nicht
- * ineinander.
+ * Nicht beide in den Mischschrott: Die Halde ist 6,8 m breit, und ihre linke
+ * Haelfte liegt 10,4 m vom Sitz — ausserhalb des Schwenkbands. Ein Wrack
+ * dort waere ein Wrack, an das man nicht herankommt. So steht eines vor dem
+ * Mischschrott (7,9 m) und eines in der noch leeren Stahlhalde (8,7 m), beide
+ * im Band, beide 1,5 m von den Trennsteinen weg und keines im Starthaufen
+ * (der reicht von z −35,9 bis −30,1).
  */
 export const START_AUTOS: Array<{ x: number; z: number }> = [
-  { x: 1.4, z: -30.0 },
-  { x: 5.6, z: -30.2 },
+  { x: 2.4, z: -29.8 },
+  { x: -2.2, z: -31.0 },
 ];
 
 /** Streuschrott ringsum: zehn Teile auf einem Kreis um den Haufen. */
-export const START_STREU = { x: 4.0, z: -32.0, radius: 2.6, teile: 10 };
+export const START_STREU = { x: 4.0, z: -33.0, radius: 2.9, teile: 10 };

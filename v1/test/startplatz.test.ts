@@ -61,18 +61,33 @@ describe("Anfangszustand des Platzes", () => {
     }
   });
 
-  it("alles Anfaengliche liegt in der Mischschrottbox", () => {
+  it("alles Anfaengliche liegt in einer der beiden Halden", () => {
     /*
-     * Sonst faengt das Spiel damit an, dass Material ausserhalb jeder Box
+     * Sonst faengt das Spiel damit an, dass Material ausserhalb jeder Zone
      * liegt und nirgends gezaehlt wird.
+     *
+     * Seit E-010 (14.09.2026) sind es ZWEI Halden statt einer: Mischschrott
+     * und Stahlschrott liegen nebeneinander in der Ausbuchtung, nur durch die
+     * Trennsteine geschieden. Der Haufen gehoert weiter in den Mischschrott;
+     * die beiden Wracks duerfen in beiden stehen, und eines steht mit Absicht
+     * in der noch leeren Stahlhalde — in der Mischschrotthalde waere es
+     * entweder im Haufen begraben oder 10,4 m vom Sitz und damit ausser
+     * Reichweite.
      */
-    const box = CONFIGS.find((c) => c.id === "c_mixed")!;
-    const [w, d] = box.size;
-    const drin = (x: number, z: number): boolean =>
-      Math.abs(x - box.x) <= w / 2 && Math.abs(z - box.z) <= d / 2;
-    expect(drin(START_HAUFEN.x, START_HAUFEN.z), "Haufenmitte nicht in der Box").toBe(true);
+    const halden = CONFIGS.filter((c) => c.kind === "halde");
+    expect(halden.length, "es gibt nicht mehr zwei Halden").toBe(2);
+    const inHalde = (x: number, z: number): boolean =>
+      halden.some(
+        (h) => Math.abs(x - h.x) <= h.size[0] / 2 && Math.abs(z - h.z) <= h.size[1] / 2
+      );
+    const misch = CONFIGS.find((c) => c.id === "c_mixed")!;
+    expect(
+      Math.abs(START_HAUFEN.x - misch.x) <= misch.size[0] / 2 &&
+        Math.abs(START_HAUFEN.z - misch.z) <= misch.size[1] / 2,
+      "Haufenmitte nicht in der Mischschrotthalde"
+    ).toBe(true);
     for (const [i, a] of START_AUTOS.entries()) {
-      expect(drin(a.x, a.z), `Altfahrzeug ${i} steht ausserhalb der Box`).toBe(true);
+      expect(inHalde(a.x, a.z), `Altfahrzeug ${i} steht in keiner Halde`).toBe(true);
     }
   });
 });

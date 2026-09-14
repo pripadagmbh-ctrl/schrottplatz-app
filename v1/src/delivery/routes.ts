@@ -306,13 +306,25 @@ export const TIP_OUT: Array<[number, number]> = [
 /**
  * Gassenmitte, auf der die Anlieferer an der Silo-Reihe entlangfahren.
  *
- * Gesucht: Die Silo-Oeffnungen liegen bei x −33, ihre Flankensteine reichen
- * bis −32,7. Der Wagen ist 2,8 m breit, seine Blockadepruefung tastet mit
- * 1,4 m. Bei −30,0 bleiben 1,3 m bis zu den Steinen und 4,5 m bis zum
- * Verladeplatz — naeher an den Silos stuende er in der Oeffnung, weiter
- * oestlich im Arbeitsbereich des zweiten Baggerstands.
+ * Gesucht und dann NACHGEMESSEN (14.09.2026, `tools/fuhren.ts`): Die
+ * Silo-Oeffnungen liegen bei x −33, ihre Flankensteine reichen bis −32,7.
+ *
+ * Mit der Gasse auf −30 blieb jeder dritte sortenreine Kipper beim Ausfahren
+ * stehen — gemessen 275 s ohne einen Meter Fortschritt, dreimal an
+ * verschiedenen Silos. Der Grund ist die Ecke: Ein LKW schaut vier Meter
+ * voraus, und zwar auf der SEHNE von seinem Standort zum Vorausschaupunkt,
+ * nicht der Strecke entlang. 2,8 m nach dem Silo lag dieser Punkt schon
+ * hinter der Ecke, die Sehne schnitt sie ab und kam der Flanke des
+ * Nachbarsilos auf 1,74 m nahe — die Schranke liegt bei 1,75 m. Ein
+ * Zentimeter, und das Fahrzeug steht fuer immer: Feste Bauten kennen keine
+ * Aufgeben-Regel.
+ *
+ * −28,0 macht die gerade Strecke aus dem Silo 7,6 m lang. Der
+ * Vorausschaupunkt bleibt damit auf ihr, solange der Wagen noch zwischen den
+ * Flanken steht, und die Sehne laeuft gerade heraus. Nachgemessen: 10 von 10
+ * Fuhren durch.
  */
-export const MULDEN_GASSE_X = -30.0;
+export const MULDEN_GASSE_X = -28.0;
 /**
  * Wie weit der Wagen in das Silo zurueckstoesst (Wagenmitte, x).
  *
