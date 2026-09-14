@@ -92,7 +92,7 @@ export interface Greifer {
  * eine ebene Rechnung — der Zylinder schwenkt nur um eine Achse.
  */
 function laschePunkt(schwenk: number): { r: number; y: number } {
-  const phi = -(schwenk - ZU);
+  const phi = -schwenk;
   const c = Math.cos(phi);
   const s = Math.sin(phi);
   return {
@@ -197,7 +197,7 @@ export function baueGreifer(st: Stoffe = stoffe()): Greifer {
     stand = Math.min(1, Math.max(0, t));
     const schwenk = schwenkFuer(stand);
     for (const s of schalen) {
-      s.gelenk.rotation.x = rund(-(schwenk - ZU));
+      s.gelenk.rotation.x = rund(-schwenk);
     }
     const l = laschePunkt(schwenk);
     const a = zylinderAmKopf(0);

@@ -17,6 +17,7 @@ import {
   SCHALEN,
   SEGMENTE,
   ZU,
+  clawPoint,
   clawSpan,
   clawTipDepth,
   schwenkFuer,
@@ -182,6 +183,49 @@ describe("Greifer — Bewegungsfreiheit der Schalen", () => {
         `${((sektorHalb - engste) * (180 / Math.PI)).toFixed(1)}° von ` +
         `${((sektorHalb * 180) / Math.PI).toFixed(0)}° genutzt`
     ).toBeGreaterThan(0);
+  });
+
+
+  /**
+   * Steht die gezeichnete Schale dort, wo `clawPoint` sie rechnet?
+   *
+   * Das ist keine Doppelung des Sektortests, sondern die Frage darunter. Der
+   * Sektortest sieht nur, DASS eine Schale im fremden Sektor steht; woher das
+   * kommt, sagt er nicht. Hier steht, dass Szenengraph und Rechnung dieselbe
+   * Kralle beschreiben.
+   *
+   * Der Anlass: Das Rig drehte den Gelenkpunkt um `-(Schwenk - ZU)` statt um
+   * `-Schwenk`. Solange „zu" die Spreizung 0 war, war beides dasselbe, und der
+   * Abzug stand zwei Tage unbemerkt im Code. Am Zapfen ist „zu" 0,5495: Die
+   * gezeichnete Kralle stand damit 31 Grad weiter zu als die gerechnete, schoss
+   * geschlossen 76 cm ueber die Achse und griff im Spiel neben dem Kollider.
+   *
+   * Geprueft wird an den Segmentknoten. Der Knoten `SHELL_SEG_0n_k` sitzt oben
+   * an Segment k, also auf Station k-1 der Kette.
+   */
+  it("zeichnet die Schale dort, wo clawPoint sie rechnet", () => {
+    const g = baueGreifer();
+    const soll = new THREE.Vector3();
+    const ist = new THREE.Vector3();
+    let groesster = 0;
+    let wo = "";
+    for (let s = 0; s <= 20; s++) {
+      g.setOeffnung(s / 20);
+      g.wurzel.updateMatrixWorld(true);
+      for (const schale of g.schalen) {
+        const nr = String(g.schalen.indexOf(schale) + 1).padStart(2, "0");
+        for (let k = 1; k <= SEGMENTE; k++) {
+          finde(g.wurzel, `SHELL_SEG_${nr}_${k}`)!.getWorldPosition(ist);
+          clawPoint(schale.winkel, schwenkFuer(s / 20), k - 1, soll);
+          const ab = ist.distanceTo(soll);
+          if (ab > groesster) {
+            groesster = ab;
+            wo = `Schale ${nr}, Station ${k - 1}, Oeffnung ${(s / 20).toFixed(2)}`;
+          }
+        }
+      }
+    }
+    expect(groesster, `${(groesster * 1000).toFixed(0)} mm daneben bei ${wo}`).toBeLessThan(0.002);
   });
 
   it("öffnet monoton — keine Stelle, an der die Schale zurückläuft", () => {

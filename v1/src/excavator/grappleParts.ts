@@ -13,9 +13,10 @@ import {
  *
  * Stand: zurück auf die Form vom 12.09.2026 mittags (Ansage 13.09.2026:
  * „kannst du einfach wieder die Spinne von gestern Mittag nehmen?"). Also
- * wieder Rotator, Gusstraverse, Gelenkring und fünf Sichelkrallen aus je sechs
- * Segmenten — nicht die Trogschalen und nicht der Gussblock mit Frästaschen,
- * die am 12. abends und am 13. morgens daraus geworden waren.
+ * wieder Rotator, Gusstraverse und fünf Sichelkrallen — nicht die Trogschalen
+ * und nicht der Gussblock mit Frästaschen, die am 12. abends und am 13.
+ * morgens daraus geworden waren. Am Ring hatte jede Kralle sechs Segmente;
+ * seit dem Zapfen sind es acht (`CLAW_SEGMENTS`).
  *
  * Was bleibt, ist die Zerlegung selbst. Vorher stand der ganze Greifer als
  * Block von 270 Zeilen mitten im Baggermodell, und genau das war der Grund,
@@ -67,35 +68,53 @@ const SEG_DICKE = [0.16, 0.15, 0.135, 0.12, 0.105, 0.095, 0.085, 0.075];
 /**
  * Anlenkung der Zylinder - abgetastet, nicht gegriffen (14.09.2026).
  *
- * Mit dem Zapfen hat sich die Aufgabe geaendert. Die Werte vom 13.09.
- * (Anlenkkreis 0,84 - Bock auf -0,38 - Lasche 0,20) waren fuer den breiten
- * Gelenkring von 0,757 m gesucht worden und fuer den Schwenkbereich 0 bis
- * 1,25. Am Zapfen von 0,40 m und ueber 0,55 bis 1,555 blieb davon nichts
- * uebrig: Hub 0,147 m statt der geforderten 0,15, Neigung bis 29,8 Grad statt
- * unter 20, und ein Hebelarm, der offen auf 0,049 m einbrach - das ist ein
- * Totpunkt, nicht mehr eine Anlenkung.
+ * Mit dem Zapfen hat sich die Aufgabe geaendert. Die Werte, die bis zum
+ * 14.09. hier standen (Anlenkkreis 0,66 - Bock auf -0,52 - Lasche
+ * {y -0,09; z 0,26}), waren fuer den breiten Gelenkring von 0,757 m gesucht
+ * worden und fuer einen Schwenkbereich, der bei Spreizung 0 begann. Am Zapfen
+ * von 0,40 m und ueber 0,5495 bis 1,555 blieb davon nichts uebrig -
+ * nachgerechnet 14.09.2026 mit `tools/anlenkung-abtastung.ts`:
  *
- * Neu abgetastet: 22 481 Familien bestehen alle Bedingungen. Es sind dieselben
- * wie beim ersten Mal - frei am Gussblock vorbei, steil, kein Totpunkt,
- * groesster Hebelarm im geschlossenen Zustand - dazu zwei Schranken, die aus
- * der Bauform kommen und nicht aus dem Suchraum: Der Anlenkbock darf nicht
+ *   Hub 0,153 m, also haarscharf ueber der geforderten Grenze von 0,15
+ *   Neigung bis 31,4 Grad statt unter 20
+ *   Hebelarm offen 0,055 m, im Durchlauf bis auf 0,003 m hinunter
+ *
+ * Das letzte ist kein schwacher Hebel mehr, sondern ein Totpunkt: Dort steht
+ * die Schale fest, gleich wie viel Druck anliegt. Die aelteren Ringwerte vom
+ * 13.09. (0,84 - -0,38 - {y -0,04; z 0,20}, im Prototyp-Zweig wip/zapfen) sind
+ * am Zapfen noch schlechter: Hub 0,033 m, Neigung 40,1 Grad, Hebelarm bis
+ * 0,004 m.
+ *
+ * Neu abgetastet mit `tools/anlenkung-abtastung.ts` unter sechs Bedingungen -
+ * zum Schliessen ausfahrend, Hub ueber 0,15, laenger als das Rohr, steiler als
+ * 20 Grad, kein Totpunkt, frei am Gussblock vorbei - dazu zwei Schranken, die
+ * aus der Bauform kommen und nicht aus der Mechanik: Der Anlenkbock darf nicht
  * breiter werden als der alte Ring, sonst steht wieder ein Schirm ueber dem
  * Korb; und die Lasche darf nicht weit aus dem Schalenruecken ragen, sonst
- * haengt sie im Schrott. Ohne diese beiden gewinnt die Suche mit einem
- * Anlenkkreis von 0,99 m und einer Lasche von 0,45 m - mechanisch glaenzend
- * und genau das, was weg sollte.
+ * haengt sie im Schrott. Ohne diese beiden gewinnt die Suche mit einem breiten
+ * Bock und einer langen Lasche - mechanisch glaenzend und genau das, was weg
+ * sollte (E-007). Mit ihnen halten 1 564 Familien alle sechs Bedingungen mit
+ * Reserve; die eingebaute ist eine davon.
  *
  * Uebrig bleibt ein Bock, der auf der Traversenflanke sitzt statt auf einem
- * Ausleger darueber:
+ * Ausleger darueber. Nachgemessen am 14.09.2026 (21 Stuetzstellen ueber den
+ * ganzen Weg, dieselben Rechenwege wie die Waechter in test/greifer.test.ts;
+ * Protokoll: docs/messungen/2026-09-14_greifer-anlenkung.md):
  *
- *   geschlossen 0,62 m   offen 0,36 m   Hub 0,26 m   Neigung bis 7,1 Grad
- *   Hebelarm 0,26 m geschlossen, 0,19 m offen, nirgends unter 0,19 m
- *   Luft zum Gussblock 0,06 m
+ *   Zylinderlaenge geschlossen 0,7332 m   offen 0,4571 m   Hub 0,2761 m
+ *   Neigung hoechstens 7,15 Grad (bei ganz offen)
+ *   Hebelarm 0,2848 m geschlossen, 0,1969 m offen, nirgends unter 0,1969 m
+ *   Luft zum Gussblock: Achse 0,1164 m, Rohrmantel 0,0504 m (bei ganz offen)
  *
  * Zum SCHLIESSEN faehrt er AUS - volle Kolbenflaeche. Schliessmoment zu
- * Oeffnungsmoment: 1,35.
+ * Oeffnungsmoment: 1,446.
+ *
+ * Die Zahlen in diesem Block standen bis zum 14.09. auf Werten, die die
+ * Messung widerlegt hat (0,62/0,36 m Laenge, 1,35 Momentverhaeltnis, 0,06 m
+ * Luft). Sie stammten aus der Abtastung selbst, die mit einer eigenen
+ * Laengenkonvention rechnet; hier steht jetzt, was das gebaute Modell liefert.
  */
-const ZYLINDERKREIS = 0.66;
+const ZYLINDERKREIS = 0.68;
 
 /**
  * Rotator — das Modul ganz oben, mit dem sich die Spinne dreht.
@@ -173,7 +192,8 @@ export function baueGelenkring(st: SpinnenStoffe): THREE.Group {
 }
 
 /**
- * Eine Sichelkralle: Lagerbock, sechs gebogene Segmente, stumpfe Spitze.
+ * Eine Sichelkralle: Lagerbock, `CLAW_SEGMENTS` gebogene Segmente (seit dem
+ * Zapfen acht, davor sechs), stumpfe Spitze.
  *
  * Gebaut als Kette ineinandersteckender Gruppen — jedes Segment sitzt eine
  * Segmentlänge tiefer als sein Vorgänger und ist um `CLAW_SEG_BEND` weiter
@@ -286,10 +306,10 @@ export function baueSpinne(st: SpinnenStoffe = spinnenStoffe()): Spinne {
       gelenk,
       obenLokal: new THREE.Vector3(
         Math.sin(a) * ZYLINDERKREIS,
-        -0.52,
+        -0.40,
         Math.cos(a) * ZYLINDERKREIS
       ),
-      untenAmGelenk: new THREE.Vector3(0, -0.09, 0.26),
+      untenAmGelenk: new THREE.Vector3(0, -0.22, 0.2),
       rohr,
       stange,
       rohrLaenge: 0.28,

@@ -1968,9 +1968,20 @@ export class Excavator {
     // dichten Kalotte — es sei denn, es liegt Material darin: dann bleibt die
     // Spinne so weit offen, wie die Ladung Platz braucht.
     this.fingerPivots.forEach((pivot, i) => {
-      // Die Schale ist im geschlossenen Zustand gebaut; gedreht wird nur die
-      // Abweichung davon.
-      pivot.rotation.x = -((this.clawSplayIst[i] ?? this.currentSplay()) - CLAW_CLOSED_SPLAY);
+    /*
+     * Um -Spreizung, nicht um -(Spreizung - ZU).
+     *
+     * Die Segmentkette ist bei Spreizung 0 gebaut: Segment i steht um i mal
+     * CLAW_SEG_BEND weiter gekippt als sein Vorgaenger, und clawPoint rechnet
+     * mit -Spreizung + i mal CLAW_SEG_BEND. Der Drehpunkt muss also genau
+     * -Spreizung liefern.
+     *
+     * Solange „zu" die Spreizung 0 war, war -(Spreizung - ZU) dasselbe und der
+     * Abzug fiel nicht auf. Am Zapfen ist „zu" 0,5495: Die gezeichnete Kralle
+     * stand damit 31 Grad weiter zu als die gerechnete und schoss geschlossen
+     * 76 cm ueber die Achse — jede Schale mitten im Sektor der uebernaechsten.
+     */
+      pivot.rotation.x = -(this.clawSplayIst[i] ?? this.currentSplay());
     });
     this.updateClawColliders();
 

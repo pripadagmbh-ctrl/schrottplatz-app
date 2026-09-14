@@ -29,7 +29,7 @@ import {
   GELENKRING,
   LASCHE,
   MITTELSTUECK,
-  RING_ROHR,
+  ZAPFEN,
   RING_Y,
   ROHR_R,
   ROHRLAENGE,
@@ -154,9 +154,9 @@ export function baueRotator(st: Stoffe): THREE.Group {
  * Mittelstück — der Stahlgussblock, an dem alles hängt, mit Gelenkring.
  *
  * Fünfeckig, weil fünf Krallen daran hängen: So sitzt jede Anlenkung auf einer
- * Fläche und nicht auf einer Kante. Der Gelenkring darunter ist der Kreis, auf
- * dem die Krallen sitzen — er ist es, der die Kralle so weit außen aufhängt,
- * dass sie ein großes C beschreibt.
+ * Fläche und nicht auf einer Kante. Darunter läuft der Zapfen weiter und trägt
+ * den Lagerkranz, auf dem die Krallen sitzen — schlank, damit im geöffneten
+ * Korb nichts steht, was das Ladevolumen wegnimmt.
  *
  * Obenauf die Schutzabdeckung (06): die flache Haube, die auf der
  * Explosionszeichnung als eigenes Teil neben dem Block liegt. Sie deckt die
@@ -179,14 +179,32 @@ export function baueMittelstueck(st: Stoffe): THREE.Group {
   haube.position.y = MITTELSTUECK.y + MITTELSTUECK.hoehe / 2 + 0.05;
   g.add(haube);
 
-  const ring = new THREE.Mesh(
-    new THREE.TorusGeometry(GELENKRING, RING_ROHR, 8, 22),
+  /*
+   * Der Zapfen, nicht mehr der Ring: eine Saeule von der Unterkante des
+   * Blocks herunter und darunter der Lagerkranz, auf dem die Krallen sitzen.
+   * Denselben Aufbau hat die Spinne im Spiel — es ist dieselbe Rechnung.
+   */
+  const saeuleUnten = MITTELSTUECK.y - MITTELSTUECK.hoehe / 2;
+  const saeule = new THREE.Mesh(
+    new THREE.CylinderGeometry(
+      ZAPFEN.saeuleOben,
+      ZAPFEN.saeuleUnten,
+      saeuleUnten - RING_Y + ZAPFEN.kranzHoehe * 0.64,
+      10
+    ),
+    st.guss
+  );
+  saeule.name = "HEAD_ZAPFEN";
+  saeule.position.y = (saeuleUnten + RING_Y) / 2;
+  g.add(saeule);
+
+  const kranz = new THREE.Mesh(
+    new THREE.CylinderGeometry(GELENKRING, GELENKRING * 0.88, ZAPFEN.kranzHoehe, 12),
     st.stahl
   );
-  ring.name = "HEAD_GELENKRING";
-  ring.rotation.x = Math.PI / 2;
-  ring.position.y = RING_Y;
-  g.add(ring);
+  kranz.name = "HEAD_LAGERKRANZ";
+  kranz.position.y = RING_Y;
+  g.add(kranz);
   return g;
 }
 

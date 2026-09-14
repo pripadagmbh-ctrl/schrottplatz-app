@@ -14,18 +14,26 @@ import * as THREE from "three";
  * da war.
  *
  * Die Maße stammen aus dem Datenblatt der Sennebogen MG4.1-800-HO5, sind aber
- * fürs Spiel vergrößert: Öffnungsweite 3,38 m statt 2,225 m. Nachgerechnet
- * ergibt die Kette unten
+ * fürs Spiel vergrößert: Öffnungsweite 3,38 m statt 2,225 m.
  *
- *   offen (Spreizung 1,25)   Spitzenweite 3,38 m   Tiefe 1,11 m
- *   geschlossen (Spreizung 0) Spitzen treffen sich auf der Achse (r = 0,00 m)
+ * Nachgerechnet ergibt die Kette unten (14.09.2026, acht Segmente am Zapfen;
+ * die Zahlen kommen aus `clawSpan`, `clawWidth` und `clawTipDepth` selbst,
+ * abgetastet über 2001 Stützstellen des Öffnungsweges):
+ *
+ *   offen (Spreizung 1,555)     Spitzenweite 3,3805 m   Spitzen 2,3413 m tief
+ *   geschlossen (Spreizung 0,5495)  Spitzen treffen sich auf der Achse
+ *                                   (Restweite 0,0015 m), 2,8312 m tief
+ *   tiefster Punkt über den ganzen Weg 2,8754 m, bei Spreizung 0,7702
+ *
+ * Der tiefste Punkt liegt also weder ganz offen noch ganz zu, sondern
+ * dazwischen — deshalb tastet `CLAW_MAX_DEPTH` den Weg ab, statt die beiden
+ * Endlagen zu vergleichen.
  *
  * Wer an `CLAW_SEG_LEN` oder `CLAW_SEG_BEND` dreht, muss beides nachrechnen —
  * vor allem das Schließen auf der Achse, denn davon hängt ab, ob der Korb
  * überhaupt zugeht.
  */
 
-/** Radius des Gelenkrings, an dem die Krallen hängen = ØC/2 aus dem Datenblatt. */
 /**
  * Radius des ZAPFENS, an dem die Krallen haengen.
  *
