@@ -266,3 +266,78 @@ erledigt ist, bekommt den Commit dazu.
       Gehört zu „Maschinen" in Abschnitt 1 (E-016), zusammen mit der Notiz zu
       Kranfarben und -typen: Welchen Aufbau ein Händler fährt, ist ebenfalls
       eine Eigenschaft des Kunden.
+
+## Was als Nächstes ansteht (Stand 14.09.2026)
+
+Geordnet nach Reihenfolge, nicht nach Größe. Wer hier weiterarbeitet — auch eine
+spätere Sitzung — fängt oben an. Die Abschnitte folgen E-016: erst die Welt,
+dann der Kreislauf, dann die App.
+
+**In Arbeit, Stand 14.09.2026 abends:**
+- Fahrpedale unten Mitte (ersetzt die Fahrfläche von heute)
+- Fünf Baufehler am Platz: Legosteine stehen über · Wand durch Baum ·
+  Firmenschild verdeckt · Scheinwerfer einmauern · Schneemobil mit vier
+  Gummirädern
+
+### Abschnitt 1 — die Welt
+
+1. **Die Presse versetzen.** Der schwerste offene Fehler. Sie sitzt direkt
+   nördlich der Mischschrott-Halde; zwischen ihr und der Stahlschrott-Halde
+   bleiben **2,9 m**, ein LKW ist 2,5 m breit. Rückwärts an den Mischschrott
+   ranzusetzen ist damit praktisch unmöglich — die erste Station des Kreislaufs
+   ist unbrauchbar. Patricks Vorschlag: Ausbuchtung etwas kürzer, Presse hinein,
+   hinter den Stahlschrott. **Erst zeichnen, dann bauen** (E-016).
+2. **Hallen zu den Silos**, alles auf die Ostseite, nicht dorthin, wo Janine
+   steht. Falls der Platz nicht reicht: Silos auf beide Seiten verteilen.
+   Gehört mit 1 in dieselbe Zeichnung.
+3. **Metallmulden zum Bagger hin niedrig schließen** — ein bis zwei Lagen, bei
+   abgesenkter Kabine noch zu sehen.
+4. **Pyramidenform auch an den Mulden?** Offene Frage an Patrick; zwischen den
+   Halden ist sie gebaut (Lagen 1·2·4·4·2·1).
+5. **VA hat am Bagger kein Ziel.** Drei Mulden, Edelstahl ist nicht dabei.
+   Entweder zur Kabelmulde dazu oder bewusst „VA fährt der Spieler zum Silo".
+6. **Elektromotoren fehlen als Fraktion** — das Silo steht als leere Hülle.
+   Offen: Preis, Form, Herkunft, und ob Verbrennungs- und Elektromotor dasselbe
+   Silo teilen.
+7. **Der Starthaufen schläft nicht zuverlässig ein** — einer von vier Läufen.
+   Kein Rückschritt, auf der alten Stelle war es schlechter. Eigenes Paket:
+   Haufen erst fallen lassen, Wracks setzen, wenn er ruht.
+8. **Menüknopf über der Kontoanzeige** auf dem iPad quer — „Konto: 1.25☰ €".
+   Bestand, kein neuer Fehler, gehört ins HUD.
+9. **Federnde LKW beim Abladen**, Wrackzustände, Motorräder und Velos,
+   Kranfarben, Bordwände und Türen — die Notizen weiter oben in dieser Datei.
+10. **Der Bagger nach dem Baggerkonzept**: Unterwagen, Abstützung, Drehkranz,
+    Oberwagen, Kabine mit Fahrer, Ausleger mit Schläuchen, Kleinteile. Räder und
+    Positionsliste sind fertig. Budget: von 125 auf rund 250 Bauteile.
+11. **Presse als offener Behälter statt Vollklotz.** Sie steht als volles
+    Rechteck in der Hindernisliste, 2,2 m hoch über die ganze Kammer — der
+    Greifer kommt nicht auf den Kammerboden. Wie die Sortiermulden bauen: Wände
+    ja, Deckel nein.
+12. **Greifer:** Traverse Ø 0,70 → Ø 1,10, ja oder nein? Das ist die einzige Tür
+    zu den offenen Kennwerten aus E-009 (Zylinderneigung, Hebelarm). Entscheidung
+    am Bild, 4.567 gerechnete Lösungen liegen bereit.
+
+### Abschnitt 2 — der Kreislauf
+
+13. **Die Zahlen stimmen.** Container-Schild rechnet Reinheit², ausgezahlt wird
+    Reinheit³ — bei 76 % Reinheit 24 % weniger als angeschrieben. Sortierprämie
+    steht im Code und wird nirgends benutzt. Abfall wird zum Pauschalpreis
+    angekauft und mit negativem Preis verkauft.
+14. **Der Kipper kippt sauber.** Bis 141 km/h Ladung quer über den Platz.
+    Zweite Ursache gefunden: der Schlitz am Kipplager. Dazu Heckklappe und die
+    Aufgeben-Regel. Der Wächter prüft mit *einem* Zufallsstartwert und misst
+    andere Solver-Einstellungen als das Spiel.
+15. **Lambert auf die Schiene** — eigene Fahrspur am Westrand, die den
+    Arbeitsbereich nie kreuzt. Voraussetzung für das Hallenkonzept aus E-011.
+16. **Hallen, Einweisung per Funk, Kapazität, Abholung auf Abruf** (E-011).
+17. **Der Tag hat ein Ende** — Bilanz, Pacht, Tagesziel. Und `ALLES_FREI = false`,
+    damit Geld einen Zweck bekommt.
+
+### Abschnitt 3 — die Verpackung
+
+18. **Android als Probelauf** (geht ohne Mac und ohne Entwicklerkonto), dann
+    iOS. Stand und Hindernisse in E-015. Capacitor macht das Spiel **nicht**
+    schneller — dieselbe Engine.
+19. **Die 14,6 ms je Bild**, die weder Physik noch Grafik sind. Frame 21,0 ms
+    gegen 6,4 ms gemessene Arbeit. In der App lässt sich das nicht mehr dem
+    Browser zuschieben.
