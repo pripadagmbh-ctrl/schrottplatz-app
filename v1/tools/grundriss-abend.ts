@@ -259,7 +259,7 @@ const blatt = (b: number, h: number, titel: string, unter: string, inhalt: strin
     "vorerst zum Müll (mitFraktionen).",
     "",
     "Metallmulden: ALU+ZINK 7,28 m im Band,",
-    "KABEL 9,17 m am Rand, KUPFER+MSG 12,31 m",
+    "KABEL 9,17 m am Rand, KUPFER+MSG 12,26 m",
     "außerhalb. Entscheidung offen.",
   ];
   for (const zeile of zeilen) {
