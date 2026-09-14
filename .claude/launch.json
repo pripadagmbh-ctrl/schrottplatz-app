@@ -2,6 +2,21 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "v1",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "v1",
+        "--",
+        "--host",
+        "--port",
+        "5175"
+      ],
+      "port": 5175
+    },
+    {
       "name": "prototype",
       "runtimeExecutable": "npm",
       "runtimeArgs": [

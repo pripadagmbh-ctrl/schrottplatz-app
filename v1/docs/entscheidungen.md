@@ -322,3 +322,145 @@ unsichtbaren Wände (Kollider folgen den Steinen nicht) und die Größe des GLB 
 
 Ins Spiel geht nichts, bevor diese Frage beantwortet ist. Bis dahin bleibt der Bagger, wie er
 ist.
+
+### E-010 — Der Platz bekommt eine Ausbuchtung, Hallen und einen Verladeplatz (14.09.2026)
+
+**Entscheidung.** Der Platz wird nach `docs/platzkonzept-2026-09-14.svg` neu geordnet. Fünf
+Teile:
+
+1. **Die Ausbuchtung.** Hinter dem Bagger wölbt sich die Platzgrenze nach Süden aus, rund
+   14 m breit und 9,5 m tief, rundum mit hoher Wand. Darin liegen die beiden Halden —
+   Mischschrott und Stahlschrott — voneinander nur durch niedrige Betonlego-Steine
+   getrennt, die in der Mitte am höchsten stehen (2,4 m) und zu beiden Seiten auf 0,6 m
+   ablaufen. Der Zugriff von einer Halde zur anderen bleibt damit flüssig.
+2. **Die Westflanke** trägt drei Mulden: von der Platzmauer nach vorn Alu+Zink, Kabel,
+   Kupfer+Messing. Die erste steht mit ihrer Südseite an der Außenmauer und braucht dort
+   keine eigene Wand, nur eine Erhöhung.
+3. **Die Ostseite** trägt Presse, Müllcontainer und Reifencontainer.
+4. **Drei Hallen** an der Nordwand hinter dem Tor, dazu die Brückenwaage direkt neben dem
+   Büro. Händler fahren über die Waage in ihre Halle und laden selbst ab.
+5. **Die Silo-Reihe** an der Westwand, neun statt acht: E-Motoren, Batterien, Alu, Kabel,
+   Kupfer, VA, Holz, Baumisch, Kunststoff. **Stahl entfällt** — Stahlschrott wird direkt
+   an der Halde verladen. Zwischen Silo-Reihe und LKW-Spur liegt der **Verladeplatz** mit
+   einem zweiten Baggerstand.
+
+Dazu: **Baggertempo von 1,4 auf 3,0–3,5 m/s** (5 auf 11–13 km/h).
+
+**Begründung.** Ansage vom 14.09.2026: Misch- und Stahlschrott hinter den Bagger, die
+Presse beim Mischschrott, beides mit hohen Wänden als Ausbuchtung der Platzgrenze. Die
+Südmauer ist hinter dem Bagger ohnehin schon auf 4,8 m erhöht (`src/world/yard.ts:44`) —
+die Ausbuchtung setzt also dort an, wo die hohe Wand steht, statt eine neue zu erfinden.
+
+Der eigentliche Gewinn ist ein Perspektivwechsel. Die acht Lager-Silos lagen 32 bis 38 m
+vom Bagger weg und waren damit totes Gewicht, gemessen mit `tools/platz.ts`. **Diese
+Entfernung ist nur ein Problem, solange der Spieler hinfahren muss.** Seit die Händler
+selbst in die Hallen fahren und Lambert von dort in die Silos räumt, ist sie richtig: Der
+Schwenkkreis muss nur fassen, was durch die Hände des Spielers geht.
+
+Das Tempo folgt daraus. 1,4 m/s sind 5 km/h, also Kettenbagger-Tempo; der Fuchs ist ein
+Radbagger und fährt auf dem Platz real 10 bis 15 km/h. Eine Fahrt zum Verladeplatz und
+zurück dauert heute rund 50 Sekunden, bei 3,0–3,5 m/s unter 20.
+
+**Verworfene Alternativen.** *Alles in den Schwenkkreis* (Entwurf A, acht Ziele im Kreis
+von 8 m): geht geometrisch auf, lässt aber keine zwei Meter zwischen den Zielen — Kipper
+und Radlader müssten sich durchfädeln. *Den Platz verkleinern*, um die Wege zu kürzen:
+falsch, seit der große Platz seinen Zweck hat. *Die Silo-Reihe näher heranholen*: gemessen
+kommen die Mulden dann auf 11 bis 13 m statt 14 bis 17 — besser, aber immer noch Fahrweg,
+und es kostet die Hallenzufahrt. *Stahl im Silo lassen*: Stahlschrott ist der größte
+Mengenstrom und wird ohnehin an der Halde verladen; ein Silo dafür wäre ein Umweg.
+
+**Zwei Maße, die beim Rechnen aufgefallen sind.** Der Bagger hat nicht nur eine äußere
+Grenze, sondern auch eine innere: Unter rund 5,8 m bekommt er den Arm nicht mehr eng genug
+zusammen. Reifencontainer (zuerst 4,8 m) und zweiter Baggerstand (zuerst 3,5 m vom Silo)
+standen beide zu **nah** und mussten heraus. Und bei einer Halde zählt die **vordere
+Kante**, nicht die Mitte — man gräbt sich von vorn hinein. Deshalb dürfen Halden tief sein
+und Mulden nicht.
+
+**Abnahmekriterium.** Gerechnet aus dem Konzeptplan, Schwenkband 5,8 bis 9,2 m:
+
+| Ziel | Abstand |
+|---|---|
+| Halde Mischschrott (vordere Kante) | 8,1 m |
+| Halde Stahlschrott (vordere Kante) | 7,2 m |
+| Presse | 8,5 m |
+| Müllcontainer | 8,8 m |
+| Reifencontainer | 7,3 m |
+| Mulde Alu+Zink | 8,9 m |
+| Mulde Kabel | 7,5 m |
+| Mulde Kupfer+Messing | 8,4 m |
+| Verladeplatz: Silo-Vorderkante / LKW-Spur | 7,5 m / 7,5 m |
+
+Acht von acht Zielen im Schwenkband, der Verladeplatz symmetrisch zwischen Silo und LKW.
+Gezeichnet mit `tools/platzkonzept.mjs`; wer am Platz dreht, rechnet damit nach.
+
+**Auf dem Gerät zu prüfen.** Reicht die Spinne aus dem Sitz an alle acht Ziele, ohne zu
+fahren? Läuft der Übergang von Mischschrott zu Stahlschrott über die Trennsteine wirklich
+flüssig, oder hakt die Kralle an der 2,4-m-Mitte? Kommst du am Verladeplatz aus dem Silo in
+den Container, ohne umzusetzen? Und fühlt sich das höhere Fahrtempo nach Maschine an oder
+nach Auto — eine Zahl allein entscheidet das nicht.
+
+### E-011 — Der Weg des Materials: Hallen, Einweisung per Funk, Abholung auf Abruf (14.09.2026)
+
+**Entscheidung.** Material nimmt künftig einen von drei Wegen, und der Spieler entscheidet
+mit:
+
+- **Kleinteile, sortenrein** — der Händler fährt selbst in eine Halle und lädt selbst ab.
+  Der Spieler weist ihn per Funk ein. Die Hallen sind trocken, die Mulden stehen darin.
+- **Halle zu Silo** — **Lambert.** Er ist der Einzige, der in die Halle kommt: Der Bagger
+  passt wegen der Deckenhöhe nicht hinein.
+- **Silo zu Abholer** — der Spieler mit dem Bagger am Verladeplatz.
+- **Großteile und Mischschrott** — immer beim Bagger. Kein Fahrer stapelt einen Träger in
+  eine Halle.
+
+Dazu zwei Auslöser für eine Abholung: **Lambert funkt, wenn eine Mulde bei rund 90 % ist**,
+und der Spieler kann eine Abholung **jederzeit selbst beauftragen**, auch halb voll.
+
+**Begründung.** Beschreibung des echten Betriebs vom 14.09.2026: Der Mischschrott ist der
+Mengenstrom, Metalle sind der kleinere Anteil; es gibt Händler, die sammeln und selten
+sortenrein kommen, und solche, die gemischt anliefern; die Metalle lädt man nicht beim
+Bagger ab, sondern sie fahren in die Sortierhallen.
+
+Daraus ergibt sich ein Gefälle, das trägt: Der Alltag ist Handarbeit am Mischschrott, und
+der sortenreine Händler ist der, bei dem **richtiges Einweisen allein** das große Geld
+bringt. Die Belohnung fürs Ausbauen ist damit nicht mehr Umsatz, sondern **weniger Arbeit
+bei mehr Ertrag** — und jede gekaufte Halle macht einen Händlertyp bedienbar, den man
+vorher von Hand abarbeiten musste. Das gibt dem heute abgeschalteten Ausbau-System
+(`src/main.ts:622`, `ALLES_FREI = true`) zum ersten Mal einen Zweck.
+
+Die selbst beauftragte Abholung ist der kaufmännische Zug: wenn viel Geld im Silo liegt und
+Geld gebraucht wird, soll man abrufen können, ohne auf Lamberts Meldung zu warten. Das ist
+genau die tägliche Entscheidung, die Briefing Kap. 10 verlangt (Kupfercontainer heute
+verkaufen?) und die im Spiel bisher fehlt. Damit sie eine Entscheidung bleibt und nicht zur
+Gewohnheit wird, braucht sie zwei Gegengewichte: **Teilladungen kosten** — der Abnehmer
+rechnet je Fahrt, nicht je Tonne — und **der Preis schwankt** (Briefing Kap. 10.1). Ohne
+beides ruft man immer sofort ab.
+
+**Verworfene Alternativen.** *Einweisung über ein Menü in mehreren Ebenen*: zu langsam für
+einen Spieler, der gerade einen Träger in der Luft hat. Stattdessen zwei, drei große
+Schaltflächen, die nur mögliche Ziele zeigen und den gemeinten Ort im Bild aufleuchten
+lassen. *Den LKW warten lassen, bis geantwortet wird*: nach rund 20 Sekunden entscheidet
+der Fahrer selbst und brummt — ein kleiner Ruf-Abzug, aber das Spiel steht nie still.
+*Ein Silo je Fraktion in der Einweisung anbieten*: bei acht Zielen je LKW ermüdet die
+Auswahl; drei Hallen reichen, die Feinsortierung in die neun Silos ist Lamberts Arbeit.
+*Freie Navigation für Lambert*: daran ist er schon einmal gescheitert. Er bekommt
+stattdessen **eine eigene Fahrspur am Westrand, die den Arbeitsbereich des Baggers nie
+kreuzt** — berechenbar statt klug, und der Platz wird um seine Spur herum entworfen.
+
+**Neue Fraktionen.** `battery` steht schon im Katalog (`src/materials/catalog.ts:41`,
+0,55 €/kg) und bekommt hier nur ein Ziel. **Elektromotoren fehlen noch** — Material, Preis,
+Form und Herkunft sind offen. Die Zerlegung reißt heute bereits Motor und Getriebe aus
+Wracks (`src/dismantle/carDef.ts`), ohne dass diese Teile ein eigenes Ziel hätten; ob
+Verbrennungs- und Elektromotor dasselbe Silo teilen, ist noch zu entscheiden.
+
+**Abnahmekriterium.** Ein sortenreiner Händler wird per Funk eingewiesen, fährt selbst in
+die genannte Halle, lädt ab, und der Spieler hat das Material nie berührt. Lambert räumt
+die Halle in das zugehörige Silo. Bei rund 90 % kommt sein Funkspruch. Eine selbst
+beauftragte Abholung bei halber Füllung bringt messbar weniger je Kilo als eine volle.
+Ohne diese drei Nachweise ist der Meilenstein nicht fertig.
+
+**Auf dem Gerät zu prüfen.** Reicht die Zeit, um einen Funkspruch zu beantworten, während
+du greifst — oder verpasst du ihn ständig? Ist auf dem iPhone mini zu erkennen, welcher Ort
+zu welcher Schaltfläche gehört? Und sieht man Lambert bei der Arbeit, oder sucht man ihn?
+
+**Reihenfolge der Umsetzung.** Lambert zuerst, nicht die Hallen: Er ist der Flaschenhals.
+Vier Hallen, die niemand leeren kann, sind wertlos.
