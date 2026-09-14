@@ -98,17 +98,19 @@ function zahnachse(g: ReturnType<typeof baueGreifer>): number {
   const zahn = zaehne(g)[0]!.getObjectByName("07_ZAHN") as THREE.Mesh;
   zahn.updateWorldMatrix(true, false);
   const pos = zahn.geometry.getAttribute("position") as THREE.BufferAttribute;
-  /* Die Ringe stehen in Bauordnung hintereinander, fünf Punkte je Ring. */
+  /*
+   * Die ersten fünf Punkte sind der Sitzquerschnitt, die nächsten fünf die
+   * Spitze — so legt `baueGreiferspitze` sie ab, genau für diese Messung.
+   */
   const RING = 5;
-  const mitte = (von: number): THREE.Vector3 => {
+  const mitte = (welche: number): THREE.Vector3 => {
     const s = new THREE.Vector3();
     const v = new THREE.Vector3();
-    for (let i = 0; i < RING; i++) s.add(v.fromBufferAttribute(pos, von + i));
+    for (let i = 0; i < RING; i++) s.add(v.fromBufferAttribute(pos, welche * RING + i));
     return s.multiplyScalar(1 / RING).applyMatrix4(zahn.matrixWorld);
   };
   const fuss = mitte(0);
-  const spitze = mitte(pos.count - RING);
-  const d = spitze.clone().sub(fuss);
+  const d = mitte(1).sub(fuss);
   /* Radiale Richtung am Fuß — dorthin zeigt „außen". */
   const aussen = new THREE.Vector2(fuss.x, fuss.z).normalize();
   const dr = d.x * aussen.x + d.z * aussen.y;

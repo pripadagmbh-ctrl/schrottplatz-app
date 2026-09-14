@@ -38,6 +38,25 @@ function finde(wurzel: THREE.Object3D, name: string): THREE.Object3D {
   return o;
 }
 
+/**
+ * Schwerpunkt einer Stirnfläche des Zahns (0 = Sitz, 1 = Spitze), in Weltlage.
+ *
+ * `baueGreiferspitze` legt die beiden Stirnquerschnitte als erste Punkte ins
+ * Netz — genau dafür. Seit jede der fünf Zahnflächen ihre eigenen Eckpunkte
+ * bekommt (damit der First nicht weggemittelt wird), liegen die Ringe nicht
+ * mehr der Reihe nach im Puffer, und ein Zugriff „alle 5 Punkte ein Ring"
+ * führte auf 891 statt 250 mm.
+ */
+function zahnStirn(zahn: THREE.Mesh, welche: 0 | 1): THREE.Vector3 {
+  const pos = zahn.geometry.getAttribute("position") as THREE.BufferAttribute;
+  const RING = 5; // fuenfeckiger Querschnitt
+  const s = new THREE.Vector3();
+  const v = new THREE.Vector3();
+  for (let i = 0; i < RING; i++) s.add(v.fromBufferAttribute(pos, welche * RING + i));
+  zahn.updateWorldMatrix(true, false);
+  return s.multiplyScalar(1 / RING).applyMatrix4(zahn.matrixWorld);
+}
+
 describe("Fünfschalen — Zeichnung gegen Rechnung", () => {
   /**
    * Steht die gezeichnete Schale dort, wo `mittellinie` sie rechnet?
@@ -268,13 +287,16 @@ describe("Fünfschalen — Maße", () => {
     /*
      * Positionsliste 07 Greiferspitze: 0,25 × 0,12 × 0,08 m.
      *
-     * Die Länge wird längs der ZAHNACHSE gemessen, als Summe der Abstände
-     * zwischen den Schwerpunkten der vier Querschnitte. Vorher stand hier das
-     * achsparallele Hüllmaß `max(s.y, s.z)`. Das war ein Stellvertreter, und er
-     * hat aufgehört zu stimmen, als der Zahn am 14.09.2026 seine Anstellung
-     * bekam: Ein um 12,15° gekippter Körper misst in der Hülle 260 statt
-     * 250 mm, obwohl an ihm kein Millimeter anders ist. Die Achse misst den
-     * Zahn, die Hülle misst seine Lage.
+     * Die Länge wird längs der ZAHNACHSE gemessen, als Abstand der beiden
+     * Stirnflächen-Schwerpunkte. Vorher stand hier das achsparallele Hüllmaß
+     * `max(s.y, s.z)`. Das war ein Stellvertreter, und er hat aufgehört zu
+     * stimmen, als der Zahn am 14.09.2026 seine Anstellung bekam: Ein um 12,15°
+     * gekippter Körper misst in der Hülle 260 statt 250 mm, obwohl an ihm kein
+     * Millimeter anders ist. Die Achse misst den Zahn, die Hülle seine Lage.
+     *
+     * Gemessen wird die Sehne, nicht die abgewickelte Länge — der Zahn ist mit
+     * R 0,70 gebogen, die Sehne über 250 mm ist 252,6 mm lang. Das liegt
+     * innerhalb der Toleranz und ist die Strecke, die man am Teil abgreift.
      *
      * Die Breite bleibt das Hüllmaß in x — die Anstellung dreht um x, quer zum
      * Zahn ändert sich dadurch nichts.
@@ -287,17 +309,7 @@ describe("Fünfschalen — Maße", () => {
       bb.getSize(new THREE.Vector3()).x,
       `Zahn ${(bb.getSize(new THREE.Vector3()).x * 1000).toFixed(0)} mm breit`
     ).toBeCloseTo(0.12, 2);
-
-    const pos = zahn.geometry.getAttribute("position") as THREE.BufferAttribute;
-    const RING = 5; // fuenfeckiger Querschnitt, fuenf Punkte je Station
-    const mitte = (von: number): THREE.Vector3 => {
-      const s = new THREE.Vector3();
-      const v = new THREE.Vector3();
-      for (let i = 0; i < RING; i++) s.add(v.fromBufferAttribute(pos, von + i));
-      return s.multiplyScalar(1 / RING);
-    };
-    let laenge = 0;
-    for (let i = RING; i < pos.count; i += RING) laenge += mitte(i).distanceTo(mitte(i - RING));
+    const laenge = zahnStirn(zahn, 0).distanceTo(zahnStirn(zahn, 1));
     expect(laenge, `Zahnlänge ${(laenge * 1000).toFixed(0)} mm`).toBeCloseTo(0.25, 2);
   });
 
@@ -318,17 +330,8 @@ describe("Fünfschalen — Maße", () => {
   const zahnachse = (g: ReturnType<typeof baueGreifer>): number => {
     g.wurzel.updateMatrixWorld(true);
     const zahn = finde(g.wurzel, "SHELL_TIP_01").children[0] as THREE.Mesh;
-    const pos = zahn.geometry.getAttribute("position") as THREE.BufferAttribute;
-    const RING = 5;
-    const mitte = (von: number): THREE.Vector3 => {
-      const s = new THREE.Vector3();
-      const v = new THREE.Vector3();
-      for (let i = 0; i < RING; i++) s.add(v.fromBufferAttribute(pos, von + i));
-      return s.multiplyScalar(1 / RING).applyMatrix4(zahn.matrixWorld);
-    };
-    const fuss = mitte(0);
-    const spitze = mitte(pos.count - RING);
-    const d = spitze.clone().sub(fuss);
+    const fuss = zahnStirn(zahn, 0);
+    const d = zahnStirn(zahn, 1).sub(fuss);
     const aussen = new THREE.Vector2(fuss.x, fuss.z).normalize();
     return Math.atan2(d.x * aussen.x + d.z * aussen.y, -d.y);
   };

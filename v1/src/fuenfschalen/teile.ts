@@ -706,6 +706,22 @@ function je(v: ProStation, k: number): number {
   return typeof v === "number" ? v : (v[k] ?? v[v.length - 1] ?? 0);
 }
 
+/**
+ * Fase an den vier Längskanten, als Anteil der kleineren Querschnittsseite.
+ *
+ * Vorlage 14.09.2026: „die Flächen lesen sich als gekantetes bzw. gegossenes
+ * Blech mit Kanten." Ein gegossener Träger hat gebrochene Kanten, und genau die
+ * machen ihn als Guss lesbar: Man sieht einen schmalen Streifen, der anders im
+ * Licht steht als Rücken und Flanke. Ohne sie bleibt ein Vierkantprofil, und
+ * bei weicher Schattierung wird daraus im Bild ein Schlauch.
+ *
+ * SW 14.09.2026 — 16 % der kleineren Seite, also 21 mm am Bolzen (130 mm hoch)
+ * und 6 mm am Zahnfuss (39 mm). Die Fase ändert die SEITENANSICHT nicht: Sie
+ * schneidet die Ecken in der Breitenrichtung weg, und dort blickt die
+ * Silhouette hindurch.
+ */
+const FASE = 0.16;
+
 export function strang(
   stationen: Array<{ y: number; z: number; th: number }>,
   x: ProStation,
@@ -722,11 +738,26 @@ export function strang(
     uv.push(u, v);
     return i;
   };
-  const quad = (a: number, b: number, c: number, d: number): void => {
-    idx.push(a, b, c, a, c, d);
+  /** Querschnitt an Station k: acht Ecken, die vier Längskanten gefast. */
+  const schnitt = (k: number): Array<[number, number]> => {
+    const bk = je(breite, k);
+    const dk = je(dicke, k);
+    const vk = je(versatz, k);
+    const c = FASE * Math.min(bk, dk);
+    const hb = bk / 2;
+    return [
+      [-hb + c, vk],
+      [hb - c, vk],
+      [hb, vk + c],
+      [hb, vk + dk - c],
+      [hb - c, vk + dk],
+      [-hb + c, vk + dk],
+      [-hb, vk + dk - c],
+      [-hb, vk + c],
+    ];
   };
-  const ecken: number[][] = [];
-  for (let k = 0; k < stationen.length; k++) {
+  /** Ein Querschnittspunkt in Weltlage des Strangs. */
+  const punkt = (k: number, dx: number, dn: number): [number, number, number] => {
     const s0 = stationen[k]!;
     /*
      * Die Aussennormale des Bogens ist (-sin th, cos th), NICHT (sin th, cos th).
@@ -740,34 +771,45 @@ export function strang(
      * Blech, sondern laengs daneben — in der Seitenansicht die Einschnuerung
      * in der Mitte („die Mitte ist zu duenn", 13.09.2026).
      */
-    const ny = -Math.sin(s0.th);
-    const nz = Math.cos(s0.th);
-    const xk = je(x, k);
-    const vk = je(versatz, k);
-    const dk = je(dicke, k);
-    const bk = je(breite, k);
-    const reihe: number[] = [];
-    for (const [dx, dn] of [
-      [-bk / 2, vk],
-      [bk / 2, vk],
-      [bk / 2, vk + dk],
-      [-bk / 2, vk + dk],
-    ] as Array<[number, number]>) {
-      reihe.push(
-        p(xk + dx, s0.y + dn * ny, s0.z + dn * nz, (dx + bk / 2) / bk, k / stationen.length)
-      );
+    return [
+      je(x, k) + dx,
+      s0.y + dn * -Math.sin(s0.th),
+      s0.z + dn * Math.cos(s0.th),
+    ];
+  };
+  const N = 8;
+  /*
+   * JEDE FLÄCHE BEKOMMT EIGENE ECKPUNKTE.
+   *
+   * Vorher teilten sich die anliegenden Flächen ihre Punkte, und
+   * `computeVertexNormals` hat dort gemittelt: Aus acht scharfen Längskanten
+   * wurde eine weiche Rundung, aus dem Gussträger im Betrachter ein Schlauch.
+   * Mit eigenen Punkten je Fläche bleibt die Kante quer scharf — und längs,
+   * über die Stationen hinweg, wird weiter gemittelt, die Sichel also glatt.
+   * Das ist derselbe Unterschied wie zwischen einem gefalteten Blech und einem
+   * gerollten Rohr.
+   */
+  for (let e = 0; e < N; e++) {
+    const f = (e + 1) % N;
+    let vor: [number, number] | null = null;
+    for (let k = 0; k < stationen.length; k++) {
+      const s = schnitt(k);
+      const v = k / (stationen.length - 1);
+      const a = p(...punkt(k, s[e]![0], s[e]![1]), e / N, v);
+      const b = p(...punkt(k, s[f]![0], s[f]![1]), (e + 1) / N, v);
+      if (vor) idx.push(vor[0], vor[1], b, vor[0], b, a);
+      vor = [a, b];
     }
-    ecken.push(reihe);
   }
-  for (let k = 0; k < ecken.length - 1; k++) {
-    for (let e = 0; e < 4; e++) {
-      const f = (e + 1) % 4;
-      quad(ecken[k]![e]!, ecken[k]![f]!, ecken[k + 1]![f]!, ecken[k + 1]![e]!);
+  /* Stirnflächen als Fächer — sie brauchen ihre eigenen Punkte ebenfalls. */
+  for (const k of [0, stationen.length - 1]) {
+    const s = schnitt(k);
+    const ring = s.map(([dx, dn], j) => p(...punkt(k, dx, dn), j / N, k === 0 ? 0 : 1));
+    for (let j = 1; j + 1 < N; j++) {
+      if (k === 0) idx.push(ring[0]!, ring[j + 1]!, ring[j]!);
+      else idx.push(ring[0]!, ring[j]!, ring[j + 1]!);
     }
   }
-  const letzte = ecken.length - 1;
-  quad(ecken[0]![3]!, ecken[0]![2]!, ecken[0]![1]!, ecken[0]![0]!);
-  quad(ecken[letzte]![0]!, ecken[letzte]![1]!, ecken[letzte]![2]!, ecken[letzte]![3]!);
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
@@ -1423,8 +1465,33 @@ export function baueGreiferschale(
   const versaetze: number[] = [];
   /* Ohne die letzte Fersenstation — die ist Station 0 und kommt aus `fein`. */
   for (const f of ferse.slice(0, -1)) {
-    /* Weich überblendet, damit der Körper am Bolzen satt bleibt und erst danach abnimmt. */
-    const w = f.t <= 0 ? 0 : f.t * f.t * (3 - 2 * f.t);
+    /*
+     * Die SCHULTER — hier geht der Arm in die Schale über, und man sieht es.
+     *
+     * Vorher lief eine einzige weiche Blende über die ganze Ferse: Der Arm
+     * wurde von der ersten Station an gleichmässig dünner und war irgendwann
+     * die Schale. Auf der Herstellerzeichnung vom 14.09.2026 ist das anders —
+     * dort ist „eine sichtbare Schulter, wo der Arm in die Schale übergeht".
+     *
+     * Jetzt sind es zwei Abschnitte: Über die ersten `SCHULTER_AB` der Ferse
+     * nimmt der Arm nur um `SCHULTER_VOR` seines Weges ab, bleibt also satt;
+     * danach fällt er über ein Drittel der Ferse auf den Schalenquerschnitt.
+     * In der Seitenansicht ist das ein Knick in der Rückenlinie statt einer
+     * durchgehenden Rundung.
+     *
+     * Die drei Zahlen sind Startwerte (SW 14.09.2026), nach Augenmass an der
+     * Zeichnung: knapp die halbe Ferse trägt den Arm, der Absatz sitzt im
+     * zweiten Drittel. Sie ändern nichts an Bolzen- und Schalenquerschnitt —
+     * nur daran, WO dazwischen die Dicke verloren geht.
+     */
+    const SCHULTER_AB = 0.42;
+    const SCHULTER_BIS = 0.74;
+    const SCHULTER_VOR = 0.22;
+    const knie = Math.max(0, Math.min(1, (f.t - SCHULTER_AB) / (SCHULTER_BIS - SCHULTER_AB)));
+    const w =
+      f.t <= 0
+        ? 0
+        : SCHULTER_VOR * f.t + (1 - SCHULTER_VOR) * knie * knie * (3 - 2 * knie);
     /* Hinter dem Bolzen läuft die Nabe rund aus — Ellipse statt Stirnfläche. */
     const nase = f.t < 0 ? Math.sqrt(1 - f.t * f.t) : 1;
     /*
@@ -1758,28 +1825,51 @@ export function baueGreiferspitze(st: Stoffe): THREE.Group {
     uv.push(tu, tv);
     return i;
   };
-  const ringe = ZAHN_STATIONEN.map((_s, si) =>
-    zahnRing(si).map((q, j) => {
+  /* Eckpunkte, wie sie die Stationen ergeben — für die Stirnkappen gebraucht. */
+  const ecken = ZAHN_STATIONEN.map((_s, si) =>
+    zahnRing(si).map((q) => {
       const [py, pz] = dreh(q[1], q[2]);
-      return p(q[0], py - tief, z0 + pz, j / 5, si / 5);
+      return [q[0], py - tief, z0 + pz] as [number, number, number];
     })
   );
-  for (let i = 0; i < ringe.length - 1; i++) {
-    const a2 = ringe[i]!;
-    const b2 = ringe[i + 1]!;
-    for (let k = 0; k < a2.length; k++) {
-      const k2 = (k + 1) % a2.length;
-      idx.push(a2[k]!, b2[k]!, b2[k2]!, a2[k]!, b2[k2]!, a2[k2]!);
-    }
-  }
-  const kappe = (ring: number[], gedreht: boolean): void => {
+  /*
+   * Fünf Flächen, fünf eigene Punktreihen — dieselbe Regel wie im `strang`.
+   *
+   * Der Querschnitt ist ein Fünfeck mit First: flache Innenseite, zwei
+   * abgeschrägte Schultern, Rücken. Teilen sich die Flächen ihre Punkte, mittelt
+   * `computeVertexNormals` den First weg, und der Zahn liest sich als runder
+   * Dorn statt als gegossener Keil.
+   */
+  const N = ecken[0]!.length;
+  /*
+   * ZUERST die beiden Stirnflächen, in der Reihenfolge des Querschnitts.
+   *
+   * Nicht aus Bauzwang, sondern als Vertrag: Die ersten N Punkte des Netzes
+   * sind der Sitzquerschnitt, die nächsten N die Spitze. Daran messen die
+   * Wächter Länge und Achse des Zahns (`test/fuenfschalen.test.ts`) und daran
+   * misst `tools/fuenfschalen/abcde.ts`. Vorher lagen die Ringe der Reihe nach
+   * im Puffer; seit jede Fläche eigene Punkte hat, tun sie das nicht mehr.
+   */
+  const kappe = (si: number, gedreht: boolean): void => {
+    const ring = ecken[si]!.map((q, j) => p(...q, j / N, gedreht ? 0 : 1));
     for (let k = 1; k < ring.length - 1; k++) {
       if (gedreht) idx.push(ring[0]!, ring[k + 1]!, ring[k]!);
       else idx.push(ring[0]!, ring[k]!, ring[k + 1]!);
     }
   };
-  kappe(ringe[0]!, true);
-  kappe(ringe[ringe.length - 1]!, false);
+  kappe(0, true);
+  kappe(ecken.length - 1, false);
+  for (let e = 0; e < N; e++) {
+    const f = (e + 1) % N;
+    let vor: [number, number] | null = null;
+    for (let si = 0; si < ecken.length; si++) {
+      const v = si / (ecken.length - 1);
+      const a = p(...ecken[si]![e]!, e / N, v);
+      const b = p(...ecken[si]![f]!, (e + 1) / N, v);
+      if (vor) idx.push(vor[0], b, vor[1], vor[0], a, b);
+      vor = [a, b];
+    }
+  }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
   geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
