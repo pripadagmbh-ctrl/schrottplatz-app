@@ -6,15 +6,57 @@
  * Dreiecke stattdessen direkt in einen Pixelpuffer gemalt und als PNG
  * geschrieben — ein Bild, das jeder Betrachter zeigt, in 200 kB statt 4 MB.
  *
- * Aufruf:  npx vite-node tools/fuenfschalen/rasterbild.ts
- * Ergebnis: docs/f5-greifer.png
+ * Aufruf:  npx vite-node tools/fuenfschalen/seitenbild.ts
+ *           npx vite-node tools/fuenfschalen/seitenbild.ts flach
+ * Ergebnis: docs/f5-greifer-seite.png  bzw.  docs/f5-greifer-seite-flach.png
  */
 import * as THREE from "three";
 import { deflateSync } from "node:zlib";
 import { writeFileSync } from "node:fs";
 import { stoffe } from "../../src/fuenfschalen/teile";
-import { baueGreifer } from "../../src/fuenfschalen/rig";
+import { FORM_BOGEN, Formsatz, baueGreifer } from "../../src/fuenfschalen/rig";
 import { dreiecke } from "../riss";
+
+/**
+ * Studie „flache Unterkante", 14.09.2026 — NICHT abgenommen, nur zum Ansehen.
+ *
+ * Aufgabe war: offen sollen die Unterkanten der fuenf Zinken und die des
+ * Stempels in einer Ebene liegen. Mit der Kruemmung allein geht das nicht (die
+ * Rechnung steht bei `Formsatz` in `rig.ts`). Es geht mit zwei Zahlen des
+ * Formvertrags, und dieser Satz ist ihre Loesung:
+ *
+ *   Bolzen von r 0,590 auf 0,516 nach innen, Schalenversatz von 0,300 auf
+ *   0,374 — die Summe bleibt 0,890, also bleibt die GESCHLOSSENE Form Punkt
+ *   fuer Punkt dieselbe (Volumen, Huellkreis, Bauhoehe unveraendert).
+ *   Schwenk von 96,25° auf 123°.
+ *
+ * Gemessen trifft er die Aufgabe: Zahnunterkante offen −1,655 gegen
+ * Stempelunterkante −1,652 m, Differenz 3 mm (Ziel ±50 mm).
+ *
+ * Und er hat einen Preis, der hier stehen bleibt, bis Patrick entscheidet:
+ *
+ *   Sektor      35,3° von 36° (heute 24,0°) — 0,7° Luft zur Nachbarschale.
+ *   Zylinder    kuerzeste Laenge 0,4385 m bei 0,42 m Rohr (heute 0,5405 m).
+ *   Hebelarm    faellt bei 83 % Oeffnung auf 0,011 m (heute nie unter 0,092).
+ *
+ * Der letzte Punkt ist ein TOTPUNKT: Bei 102,4° Schwenk stehen Bolzen,
+ * Zylinderaufnahme und Schalenauge auf einer Geraden, und die Schale liesse
+ * sich mit keinem Druck weiterdrehen. Das ist keine Eigenheit dieses Satzes —
+ * die Aufnahme sitzt ueber der Bolzenebene, und damit liegt der Totpunkt fuer
+ * JEDE Loesung dieser Aufgabe bei rund 102…107° Schwenk, waehrend die flache
+ * Unterkante mindestens 113° verlangt. Wer sie will, muss auch `OBERE_ANBINDUNG`
+ * oder `ZYLINDER_AUFNAHME` versetzen — genau die Entscheidung, die im
+ * Messprotokoll vom 14.09. als offener Punkt 1 steht.
+ */
+const FORM_FLACH: Formsatz = {
+  drehpunktR: 0.516,
+  versatz: 0.374,
+  offen: (123 * Math.PI) / 180,
+};
+
+const FLACH = process.argv.slice(2).includes("flach");
+const FORM = FLACH ? FORM_FLACH : FORM_BOGEN;
+const ZIEL = FLACH ? "docs/f5-greifer-seite-flach.png" : "docs/f5-greifer-seite.png";
 
 const BLICK = new THREE.Vector3(1, 0, 0);
 
@@ -97,12 +139,53 @@ function farbeZuRgb(hex: string): number[] {
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 
+/**
+ * Alle drei Felder im GLEICHEN Maßstab und auf derselben Höhenlinie.
+ *
+ * Vorher hat jedes Feld sich selbst eingepasst: Der offene Greifer ist der
+ * flachste, wurde also am kleinsten gezeichnet, und die drei Bilder waren
+ * untereinander nicht vergleichbar. Genau die Frage vom 14.09.2026 — liegen
+ * die Zahnunterkanten offen auf einer Ebene mit dem Stempel? — kann man daran
+ * nicht beantworten. Jetzt gilt für alle drei derselbe Maßstab, dieselbe
+ * Nullhöhe, und eine dünne Linie markiert die Unterkante der zentralen unteren
+ * Einheit.
+ */
+function huellmass(): { ax: number; bx: number; ay: number; by: number } {
+  let ax = Infinity;
+  let bx = -Infinity;
+  let ay = Infinity;
+  let by = -Infinity;
+  for (const t of [0, 0.5, 1]) {
+    const g = baueGreifer(stoffe(), FORM);
+    g.setOeffnung(t);
+    for (const d of dreiecke(g.wurzel, BLICK))
+      for (const q of d.p) {
+        ax = Math.min(ax, q[0]);
+        bx = Math.max(bx, q[0]);
+        ay = Math.min(ay, q[1]);
+        by = Math.max(by, q[1]);
+      }
+  }
+  return { ax, bx, ay, by };
+}
+
+/** Unterkante der zentralen unteren Einheit (Stempel) in Weltkoordinaten. */
+function stempelUnterkante(): number {
+  const g = baueGreifer(stoffe(), FORM);
+  g.wurzel.updateMatrixWorld(true);
+  const b = new THREE.Box3().setFromObject(g.stempel);
+  return b.min.y;
+}
+
+const HUELLE = huellmass();
+const STEMPEL_Y = stempelUnterkante();
+
 function male(oeffnung: number, x0: number, y0: number, w: number, h: number): void {
   rechteck(x0, y0, w, h, [255, 255, 255]);
   // Tiefenpuffer je Bildfeld zuruecksetzen — sonst blenden sich die Felder aus
   for (let yy = y0; yy < y0 + h; yy++)
     for (let xx = x0; xx < x0 + w; xx++) tiefe[yy * BREITE + xx] = -1e30;
-  const g = baueGreifer(stoffe());
+  const g = baueGreifer(stoffe(), FORM);
   g.setOeffnung(oeffnung);
   /*
  * Blickrichtung +x: Damit steht die Schale bei Winkel 0 exakt in der
@@ -112,18 +195,7 @@ function male(oeffnung: number, x0: number, y0: number, w: number, h: number): v
  * bei dieser Form schon mehrfach etwas vorgetaeuscht, was nicht da war.
  */
   const tr = dreiecke(g.wurzel, BLICK);
-  let ax = Infinity;
-  let bx = -Infinity;
-  let ay = Infinity;
-  let by = -Infinity;
-  for (const t of tr) {
-    for (const q of t.p) {
-      if (q[0] < ax) ax = q[0];
-      if (q[0] > bx) bx = q[0];
-      if (q[1] < ay) ay = q[1];
-      if (q[1] > by) by = q[1];
-    }
-  }
+  const { ax, bx, ay, by } = HUELLE;
   const s = Math.min((w - 40) / (bx - ax), (h - 60) / (by - ay));
   const cx = x0 + w / 2 - ((ax + bx) / 2) * s;
   const cy = y0 + h / 2 + 12 + ((ay + by) / 2) * s;
@@ -134,6 +206,9 @@ function male(oeffnung: number, x0: number, y0: number, w: number, h: number): v
       t.ecken
     );
   }
+  /* Höhenlinie der Stempelunterkante — gestrichelt, damit sie nichts verdeckt. */
+  const ly = Math.round(cy - STEMPEL_Y * s);
+  for (let x = x0 + 6; x < x0 + w - 6; x++) if ((x >> 2) % 2 === 0) setze(x, ly, 200, 60, 60);
 }
 
 const PANEL = Math.floor((BREITE - 4 * 10) / 3);
@@ -194,5 +269,5 @@ const png = Buffer.concat([
   chunk("IDAT", deflateSync(roh, { level: 9 })),
   chunk("IEND", Buffer.alloc(0)),
 ]);
-writeFileSync("docs/f5-greifer-seite.png", png);
-console.log(`docs/f5-greifer-seite.png ${BREITE}x${HOEHE}, ${(png.length / 1024).toFixed(0)} kB`);
+writeFileSync(ZIEL, png);
+console.log(`${ZIEL} ${BREITE}x${HOEHE}, ${(png.length / 1024).toFixed(0)} kB`);

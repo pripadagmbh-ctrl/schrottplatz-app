@@ -34,6 +34,7 @@
  */
 import * as THREE from "three";
 import {
+  DREHPUNKT,
   MASS,
   OBERE_ANBINDUNG,
   OFFEN,
@@ -69,6 +70,51 @@ export const LAGE = {
 /** Wie weit die Kolbenstange im Rohr steckt (m). */
 const EINSTAND = 0.06;
 
+/**
+ * Formsatz — die drei Zahlen, an denen die OFFENE Stellung hängt.
+ *
+ * Aufgabe 14.09.2026: Offen sollen die Unterkanten der fünf Zinken und die
+ * Unterkante der zentralen unteren Einheit in einer Ebene liegen. Gemessen am
+ * heutigen Stand hängen die Zähne 0,565 m tiefer.
+ *
+ * Nachgerechnet lässt sich das mit der Krümmung allein nicht beheben. Die Höhe
+ * der Zahnunterkante in der offenen Stellung ist
+ *
+ *   Y = Y_Bolzen + y_e · cos S + z_e · sin S
+ *
+ * mit (y_e, z_e) der Lage der Zahnunterkante im Schalenrahmen und S dem
+ * Schwenk. Geschlossen müssen sich die Spitzen auf der Achse treffen, also ist
+ * `z_e` = (Spitzenradius zu) − (Bolzenradius) festgenagelt, und bei S = 96,25°
+ * ist sin S = 0,994: der Zahn fällt praktisch um den ganzen Bolzenradius
+ * durch. Wie die Schale dazwischen gekrümmt ist, ändert daran nichts — das
+ * kürzt sich heraus.
+ *
+ * Es bleiben zwei Stellschrauben, und beide gehören zum Formvertrag, nicht zur
+ * Krümmung:
+ *
+ *   `drehpunktR`  Der Bolzen wandert nach innen. Die Summe aus `drehpunktR`
+ *                 und `versatz` bleibt 0,89 m — dem Äquator der geschlossenen
+ *                 Kugel —, damit die GESCHLOSSENE Form Punkt für Punkt
+ *                 dieselbe bleibt (Korbvolumen, Hüllkreis, Höhe unverändert).
+ *   `offen`       Der Schwenk geht über 96,25° hinaus; die Zähne stehen offen
+ *                 nicht mehr senkrecht, sondern zeigen schräg nach außen.
+ *
+ * `FORM_BOGEN` ist der heutige Stand und der Vorgabewert. Ein zweiter Satz mit
+ * flacher Unterkante steht als Studie in `tools/fuenfschalen/seitenbild.ts`;
+ * er ist NICHT abgenommen und hat einen Totpunkt (siehe dort).
+ */
+export interface Formsatz {
+  drehpunktR: number;
+  versatz: number;
+  offen: number;
+}
+
+export const FORM_BOGEN: Formsatz = {
+  drehpunktR: STEMPEL_AUGE.r,
+  versatz: DREHPUNKT.versatz,
+  offen: OFFEN,
+};
+
 export interface Schale {
   gelenk: THREE.Group;
   winkel: number;
@@ -103,24 +149,29 @@ export interface Greifer {
  * Drehpunkt am Stempel. Weil Aufnahme und Anbindung auf derselben Radialebene
  * liegen, ist das eine ebene Rechnung.
  */
-function anbindungspunkt(schwenk: number): { r: number; y: number } {
+function anbindungspunkt(
+  schwenk: number,
+  form: Formsatz = FORM_BOGEN
+): { r: number; y: number } {
   const c = Math.cos(-schwenk);
   const s = Math.sin(-schwenk);
+  /* Rueckt der Bolzen nach innen, wandert das Auge mit — der Abstand bleibt. */
+  const z = OBERE_ANBINDUNG.z + (form.versatz - DREHPUNKT.versatz);
   return {
-    r: STEMPEL_AUGE.r + (OBERE_ANBINDUNG.y * s + OBERE_ANBINDUNG.z * c),
-    y: STEMPEL_AUGE.y + (OBERE_ANBINDUNG.y * c - OBERE_ANBINDUNG.z * s),
+    r: form.drehpunktR + (OBERE_ANBINDUNG.y * s + z * c),
+    y: STEMPEL_AUGE.y + (OBERE_ANBINDUNG.y * c - z * s),
   };
 }
 
 /** Abstand zwischen oberem Zylinderanschluss und oberer Schalenanbindung (m). */
-export function zylinderLaenge(schwenk: number): number {
-  const l = anbindungspunkt(schwenk);
+export function zylinderLaenge(schwenk: number, form: Formsatz = FORM_BOGEN): number {
+  const l = anbindungspunkt(schwenk, form);
   return Math.hypot(l.r - ZYLINDER_AUFNAHME.r, l.y - ZYLINDER_AUFNAHME.y);
 }
 
 /** Neigung des Zylinders gegen die Senkrechte (rad). */
-export function zylinderNeigung(schwenk: number): number {
-  const l = anbindungspunkt(schwenk);
+export function zylinderNeigung(schwenk: number, form: Formsatz = FORM_BOGEN): number {
+  const l = anbindungspunkt(schwenk, form);
   return Math.atan2(
     Math.abs(l.r - ZYLINDER_AUFNAHME.r),
     Math.abs(l.y - ZYLINDER_AUFNAHME.y)
@@ -134,8 +185,8 @@ export function zylinderNeigung(schwenk: number): number {
  * der Schale ist Zylinderkraft mal diesem Arm; geht er gegen null, steht die
  * Schale fest, egal wie viel Druck anliegt.
  */
-export function hebelarm(schwenk: number): number {
-  const l = anbindungspunkt(schwenk);
+export function hebelarm(schwenk: number, form: Formsatz = FORM_BOGEN): number {
+  const l = anbindungspunkt(schwenk, form);
   const d = Math.max(
     Math.hypot(l.r - ZYLINDER_AUFNAHME.r, l.y - ZYLINDER_AUFNAHME.y),
     1e-6
@@ -143,7 +194,7 @@ export function hebelarm(schwenk: number): number {
   const ux = (l.r - ZYLINDER_AUFNAHME.r) / d;
   const uy = (l.y - ZYLINDER_AUFNAHME.y) / d;
   return Math.abs(
-    (STEMPEL_AUGE.r - ZYLINDER_AUFNAHME.r) * uy - (STEMPEL_AUGE.y - ZYLINDER_AUFNAHME.y) * ux
+    (form.drehpunktR - ZYLINDER_AUFNAHME.r) * uy - (STEMPEL_AUGE.y - ZYLINDER_AUFNAHME.y) * ux
   );
 }
 
@@ -152,8 +203,10 @@ function rund(x: number): number {
   return Math.round(x * 1e5) / 1e5;
 }
 
-export function baueGreifer(st: Stoffe = stoffe()): Greifer {
+export function baueGreifer(st: Stoffe = stoffe(), form: Formsatz = FORM_BOGEN): Greifer {
   nahtStoff(st);
+  /* Verschiebung der Schale gegen ihren Bolzen — null im Vorgabe-Formsatz. */
+  const schub = form.versatz - DREHPUNKT.versatz;
   const wurzel = new THREE.Group();
   wurzel.name = "GRAPPLE_ROOT";
 
@@ -189,7 +242,7 @@ export function baueGreifer(st: Stoffe = stoffe()): Greifer {
   traverse.position.y = LAGE.traverse;
   rotator.add(traverse);
 
-  const stempel = baueStempel(st);
+  const stempel = baueStempel(st, form.drehpunktR);
   stempel.position.y = LAGE.stempel;
   rotator.add(stempel);
 
@@ -205,12 +258,12 @@ export function baueGreifer(st: Stoffe = stoffe()): Greifer {
     /* --- Schale: Ursprung auf dem Stempelauge --- */
     const gelenk = new THREE.Group();
     gelenk.name = `SHELL_${nr}`;
-    gelenk.position.set(sin * STEMPEL_AUGE.r, STEMPEL_AUGE.y, cos * STEMPEL_AUGE.r);
+    gelenk.position.set(sin * form.drehpunktR, STEMPEL_AUGE.y, cos * form.drehpunktR);
     gelenk.rotation.order = "YXZ";
     gelenk.rotation.y = a; // lokales +z zeigt radial nach außen
     rotator.add(gelenk);
 
-    const schale = baueGreiferschale(st);
+    const schale = baueGreiferschale(st, form.versatz);
     schale.name = `SHELL_BODY_${nr}`;
     gelenk.add(schale);
 
@@ -223,7 +276,7 @@ export function baueGreifer(st: Stoffe = stoffe()): Greifer {
     const ende = schalenEnde();
     const spitze = baueGreiferspitze(st);
     spitze.name = `SHELL_TIP_${nr}`;
-    spitze.position.set(0, ende.y, ende.z);
+    spitze.position.set(0, ende.y, ende.z + schub);
     spitze.rotation.x = ende.th;
     gelenk.add(spitze);
 
@@ -262,11 +315,11 @@ export function baueGreifer(st: Stoffe = stoffe()): Greifer {
 
   const setOeffnung = (t: number): void => {
     stand = Math.min(1, Math.max(0, t));
-    const schwenk = schwenkFuer(stand);
+    const schwenk = ZU + (form.offen - ZU) * stand;
     for (const s of schalen) {
       s.gelenk.rotation.x = rund(-schwenk);
     }
-    const l = anbindungspunkt(schwenk);
+    const l = anbindungspunkt(schwenk, form);
     const dr = l.r - ZYLINDER_AUFNAHME.r;
     const dy = l.y - ZYLINDER_AUFNAHME.y;
     const dist = Math.max(Math.hypot(dr, dy), 0.2);

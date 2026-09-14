@@ -445,6 +445,82 @@ export function feineStationen(
 }
 
 /**
+ * Die FERSE — die Stützstellen zwischen Lagerhülse und Station 0.
+ *
+ * Befund 14.09.2026, in Patricks Worten: „Was aber wahrscheinlich der Fall ist:
+ * dass direkt an der Traverse eine Hülse ist, wo der Zahn als solches
+ * festgemacht ist. Das heißt, der Zinken und dieser Metallblock, wo auch der
+ * Hubzylinder angeht, das ist eigentlich EIN Gusselement. Das sind nicht zwei
+ * Elemente."
+ *
+ * Bis dahin lag zwischen Bolzen und Schalenanfang ein Kasten (`06_UNTERE_
+ * ANBINDUNG`, 0,43 × 0,20 m) und darauf eine zweite Kiste für das Zylinderauge
+ * (`06_OBERE_ANBINDUNG`). Zwei Quader an einer Sichel — in der Seitenansicht
+ * genau die Trennung, die das Vorbild (SENNEBOGEN MG4.1, Schalenform HO) nicht
+ * hat: Dort ist die Schale EIN Gussstück, Lagerhülse am Drehpunkt, Auge für den
+ * Zylinder am selben Körper, von dort durchgehende Krümmung bis in den Zahn.
+ *
+ * Diese Kurve ist das fehlende Stück. Sie läuft vom Bolzen (0,0) nach außen bis
+ * an Station 0 (0, `versatz`) und dreht dabei ihre Tangente von −90° — am
+ * Bolzen zeigt der Körper radial nach außen — auf `−SCHALEN_BOGEN/2`, die
+ * Tangente, mit der die Schale anfängt. Damit gibt es an der Naht keinen Knick:
+ * Ferse und Schale sind ein Zug.
+ *
+ * Kubische Bézier, weil ein Kreisbogen es nicht kann: Punkt und Tangente an
+ * beiden Enden sind vier Bedingungen, ein Kreis hat drei Freiheiten. Die
+ * Griffweite 0,55 · `versatz` ist ein Startwert (SW) — kleiner macht die Ferse
+ * eckig, größer lässt sie über dem Bolzen aufbauchen.
+ */
+export function fersenStationen(
+  je = 6,
+  versatz = DREHPUNKT.versatz
+): Array<{ y: number; z: number; th: number; t: number }> {
+  const th0 = -Math.PI / 2;
+  const th1 = -SCHALEN_BOGEN / 2;
+  const griff = versatz * 0.55; // SW 14.09.2026, siehe oben
+  // Laufrichtung an einer Station ist (−cos th, −sin th) — dieselbe Regel wie in
+  // `schalenStationen`. Die Stützpunkte liegen also auf diesen Richtungen.
+  const P = [
+    { y: 0, z: 0 },
+    { y: -griff * Math.cos(th0), z: -griff * Math.sin(th0) },
+    { y: griff * Math.cos(th1), z: versatz + griff * Math.sin(th1) },
+    { y: 0, z: versatz },
+  ];
+  const aus: Array<{ y: number; z: number; th: number; t: number }> = [];
+  /*
+   * Zwei Stationen HINTER dem Bolzen, damit die Bohrung rundherum im Werkstoff
+   * liegt. Ohne sie endete der Körper genau in der Bolzenmitte und die Hülse
+   * stand zur Hälfte frei — im Bild ein abgeschnittenes Auge. 90 mm sind der
+   * Außenradius der Hülse (85 mm) plus 5 mm Rand (SW 14.09.2026).
+   */
+  const UEBER = 0.09;
+  /*
+   * Negatives `t` heißt „hinter dem Bolzen". Der Bauteil-Code zieht den
+   * Querschnitt dort mit `sqrt(1 − t²)` zusammen, damit die Nabe rund ausläuft
+   * statt als Quader abzubrechen.
+   */
+  for (const t of [-0.95, -0.7, -0.4]) aus.push({ y: 0, z: t * UEBER, th: th0, t });
+  for (let i = 0; i <= je; i++) {
+    const t = i / je;
+    const u = 1 - t;
+    const b = [u * u * u, 3 * u * u * t, 3 * u * t * t, t * t * t];
+    const d = [-3 * u * u, 3 * u * (1 - 3 * t), 3 * t * (2 - 3 * t), 3 * t * t];
+    let y = 0;
+    let z = 0;
+    let dy = 0;
+    let dz = 0;
+    for (let j = 0; j < 4; j++) {
+      y += b[j]! * P[j]!.y;
+      z += b[j]! * P[j]!.z;
+      dy += d[j]! * P[j]!.y;
+      dz += d[j]! * P[j]!.z;
+    }
+    aus.push({ y, z, th: Math.atan2(-dz, -dy), t });
+  }
+  return aus;
+}
+
+/**
  * Das Schalenende, wie es die gebaute Schale wirklich hat.
  *
  * Nicht dasselbe wie `schalenStationen()[6]`: Deren `th` ist die Richtung der
@@ -893,7 +969,7 @@ export function baueMitteltraverse(st: Stoffe): THREE.Group {
  * Der Stempel hängt über eine Säule an der Mitteltraverse; die Säule ist das,
  * was auf der Zeichnung zwischen Traverse und Gelenkeinheit zu sehen ist.
  */
-export function baueStempel(st: Stoffe): THREE.Group {
+export function baueStempel(st: Stoffe, bolzenR = STEMPEL_AUGE.r): THREE.Group {
   const g = new THREE.Group();
   g.name = "09_STEMPEL";
   const M = MASS.stempel;
@@ -943,14 +1019,14 @@ export function baueStempel(st: Stoffe): THREE.Group {
      * mehr aus als der ganze Grundkoerper.
      */
     const arm = new THREE.Mesh(
-      new THREE.BoxGeometry(0.1, 0.12, Math.max(STEMPEL_AUGE.r - R * 0.7, 0.05)),
+      new THREE.BoxGeometry(0.1, 0.12, Math.max(bolzenR - R * 0.7, 0.05)),
       st.guss
     );
     arm.name = `10_AUSLEGER_${nr}`;
     arm.position.set(
-      Math.sin(a) * (R * 0.7 + STEMPEL_AUGE.r) * 0.5,
+      Math.sin(a) * (R * 0.7 + bolzenR) * 0.5,
       0,
-      Math.cos(a) * (R * 0.7 + STEMPEL_AUGE.r) * 0.5
+      Math.cos(a) * (R * 0.7 + bolzenR) * 0.5
     );
     arm.rotation.y = a;
     g.add(arm);
@@ -967,7 +1043,7 @@ export function baueStempel(st: Stoffe): THREE.Group {
      */
     const anbindung = gabel(st, 0.3, 0.095, 0.045, 0.12, 0.045);
     anbindung.name = `10_SCHALENANBINDUNG_${nr}`;
-    anbindung.position.set(Math.sin(a) * STEMPEL_AUGE.r, 0, Math.cos(a) * STEMPEL_AUGE.r);
+    anbindung.position.set(Math.sin(a) * bolzenR, 0, Math.cos(a) * bolzenR);
     anbindung.rotation.y = a;
     g.add(anbindung);
   }
@@ -1136,9 +1212,13 @@ const SEKTOR_AB = 0.3;
  * Tangens ist der zweite Grund, warum der Zahn zu schmal war.
  */
 const SEKTOR_SICHER = 0.9;
-/** Blechdicke der Seitenwangen (m). */
-const WANGE_DICK = 0.035;
-/** Tiefe der Randleiste (m) — nur noch eine Kante, keine Wange mehr. */
+/*
+ * `WANGE_DICK` (35 mm) ist am 14.09.2026 weggefallen. Es war das letzte
+ * Überbleibsel der Seitenwangen: Die Breite des Lagerkastens wurde als
+ * „Schalenbreite minus zweimal Wange" gerechnet, obwohl es seit dem 13.09.
+ * keine Wangen mehr gibt. Der Gusskörper nimmt jetzt die Breite des
+ * Schalenendes direkt.
+ */
 /**
  * Der Holm ist ein VIERKANTROHR, laengs gebogen — und er ist der Zahn.
  *
@@ -1187,10 +1267,30 @@ export function schalenHalbbreite(k: number): number {
   return halb;
 }
 
-export function baueGreiferschale(st: Stoffe): THREE.Group {
+/**
+ * Querschnitt des Gusskörpers am Bolzen — Breite und Höhe (m).
+ *
+ * Breite wie das Schalenende an Station 0 (2 · `schalenHalbbreite(0)` = 400 mm),
+ * damit die Lagerhülse ihre volle Länge im Werkstoff hat. Höhe 280 mm: Die
+ * Hülse misst Ø 170 mm, es bleiben 55 mm Wand oben und unten. Das ist die
+ * dickste Stelle des Zinkens, von hier nimmt er bis zum Zahn nur noch ab.
+ * SW 14.09.2026 — Maß aus der Hülse abgeleitet, nicht aus der Positionsliste.
+ */
+const FERSE_H_BOLZEN = 0.28;
+
+export function baueGreiferschale(
+  st: Stoffe,
+  versatz = DREHPUNKT.versatz
+): THREE.Group {
   const g = new THREE.Group();
   g.name = "06_GREIFERSCHALE";
   const HAUT = BLECH;
+  /*
+   * Rückt der Drehpunkt weiter nach innen, wandert die ganze Schale mit — ihre
+   * Form bleibt dieselbe, nur die Ferse wird länger. Mit dem Vorgabewert ist
+   * `schub` null und es ändert sich nichts.
+   */
+  const schub = versatz - DREHPUNKT.versatz;
 
   const pos: number[] = [];
   const uv: number[] = [];
@@ -1210,7 +1310,7 @@ export function baueGreiferschale(st: Stoffe): THREE.Group {
    * Gebaut wird auf den FEINEN Stuetzstellen — dieselbe Bahn, nur rund statt
    * facettiert. Die groben sieben bleiben der Vertrag fuer Mass und Kinematik.
    */
-  const fein = feineStationen(3);
+  const fein = feineStationen(3).map((f) => ({ ...f, z: f.z + schub }));
   const ENDE = fein.length - 1;
   const lagen: number[][][] = [];
   for (const seite of [0, 1]) {
@@ -1293,101 +1393,113 @@ export function baueGreiferschale(st: Stoffe): THREE.Group {
    * der Schale, ihre Hoehe faellt gleichmaessig von 130 auf 75 mm. Unten ist
    * sie damit schmaler als oben, aber nie duenn.
    */
-  /* Alles mit demselben Faktor — das ist die „durchgaengig proportionale" Form. */
-  const strebeBreiten = fein.map((f) => STREBE_B_OBEN * verjuengung(f.k));
-  const strebeHoehen = fein.map((f) => STREBE_H_OBEN * verjuengung(f.k));
-  for (let k = 0; k < fein.length - 1; k++) {
-    const abschnitt = new THREE.Mesh(
-      strang(
-        fein.slice(k, k + 2),
-        0,
-        strebeBreiten.slice(k, k + 2),
-        strebeHoehen.slice(k, k + 2),
-        fein.slice(k, k + 2).map((f) => woelbungBei(halbbreiteBei(f.k), f.k) + BLECH)
-      ),
-      st.guss
-    );
-    abschnitt.name = `06_STREBE_${String(k + 1).padStart(2, "0")}`;
-    g.add(abschnitt);
-  }
-
-  // Lagerkasten mit den beiden Augen — das Hülsengelenk zur Mitteltraverse
   /*
-   * Lagerkasten und Augen — schmaler, als es die Schalenbreite zuliesse.
+   * EIN Gusskörper — von der Lagerhülse bis unter den Zahn, ohne Fuge.
    *
-   * Bei fuenf Schalen hat jede 72°. Auf dem Bolzenkreis von 0,34 m sind das
-   * 43 cm Bogen. Die Augen sassen bei ±0,24 m, der Kasten war also 48 cm
-   * breit — und griff damit in den Sektor der Nachbarin. Die Pruefung hat es
-   * bei drei Vierteln geoeffnet gefangen, mit 43° von 36°.
-   */
-  /*
-   * Untere Schalenanbindung — der Drehpunkt am Stempel (Position 10). Er liegt
-   * im Ursprung der Schale, denn genau darum dreht sie sich.
-   */
-  /*
-   * Der Bolzen geht durch BEIDE Backen, nicht zwischen ihnen hindurch.
+   * Vorher standen hier zwei Sachen nebeneinander: 18 Strebenstücke auf dem
+   * Blech und, davor, zwei Quader (`06_UNTERE_ANBINDUNG` als Brücke zum Bolzen,
+   * `06_OBERE_ANBINDUNG` als Konsole für das Zylinderauge). In der
+   * Seitenansicht las sich das als Metallblock, an dem ein Zinken hängt —
+   * Patricks Befund vom 14.09.2026. Beim Vorbild (MG4.1, Schalenform HO) gibt
+   * es diese Trennung nicht.
    *
-   * Vorher war die Hülse 0,26 m lang und die Wangen standen 0,40 m auseinander
-   * — das Auge schwebte mit 7 cm Luft auf jeder Seite zwischen den Backen, und
-   * in der Seitenansicht sah die Schale aus, als hinge sie neben ihrem Lager.
-   * Länge und Kastenbreite kommen deshalb aus der Schalenbreite an Station 0.
+   * Jetzt ist es ein Zug: `fersenStationen` legt die Kurve vom Bolzen an
+   * Station 0, `feineStationen` führt sie bis zur Spitze weiter, und ein
+   * einziger `strang` läuft über beide. Der Querschnitt wandert dabei
+   * durchgehend — 400 × 280 mm am Bolzen, 220 × 130 mm an Station 0, von dort
+   * mit `verjuengung` auf die Zahnbasis. Dick am Drehpunkt, schlank zur Spitze.
+   *
+   * Die 18 Einzelstücke sind mitverschwunden: Sie waren nur nötig, solange
+   * jeder Abschnitt seine eigenen Normalen brauchte. Ein durchgehender Strang
+   * schattiert sich am Stück — und spart 17 Meshes.
    */
-  const backen = 2 * (schalenHalbbreite(0) - WANGE_DICK);
-  /*
-   * Der Gusskopf überbrückt von der Innenkante des Holms bis hinter den
-   * Bolzen. Vorher tat das die Wange, indem sie sich auf 360 mm vertiefte —
-   * und genau davon lief das Band der Seitenansicht keilförmig zu.
-   */
-  const brueckeVon = DREHPUNKT.versatz; // bis zum Bolzen
-  const kasten = new THREE.Mesh(
-    new THREE.BoxGeometry(backen, 0.2, brueckeVon + 0.13),
-    st.guss
-  );
-  kasten.name = "06_UNTERE_ANBINDUNG";
-  kasten.position.set(0, 0.02, (brueckeVon - 0.13) / 2);
-  g.add(kasten);
-  const unteresAuge = new THREE.Mesh(rohr(0.085, 0.042, backen + 2 * WANGE_DICK), st.guss);
-  unteresAuge.name = "06_UNTERES_AUGE";
-  g.add(unteresAuge);
-  /*
-   * Die Kehlnaht laeuft LAENGS der Fuge zwischen Nabe und Backe, nicht quer
-   * darueber. Quer gelegt stand sie 35 mm ueber die Schalenkante hinaus — und
-   * genau das soll die Kontur nirgends tun.
-   */
-  for (const seite of [-1, 1]) {
-    const n = naht(0.16);
-    n.rotation.y = Math.PI / 2;
-    n.position.set(seite * (backen / 2 - 0.012), 0.05, -0.02);
-    g.add(n);
+  const ferse = fersenStationen(10, versatz);
+  const anschlussB = STREBE_B_OBEN;
+  const anschlussH = STREBE_H_OBEN;
+  const anschlussV = woelbungBei(halbbreiteBei(0), 0) + BLECH;
+  const bahn: Array<{ y: number; z: number; th: number }> = [];
+  const breiten: number[] = [];
+  const hoehen: number[] = [];
+  const versaetze: number[] = [];
+  /* Ohne die letzte Fersenstation — die ist Station 0 und kommt aus `fein`. */
+  for (const f of ferse.slice(0, -1)) {
+    /* Weich überblendet, damit der Körper am Bolzen satt bleibt und erst danach abnimmt. */
+    const w = f.t <= 0 ? 0 : f.t * f.t * (3 - 2 * f.t);
+    /* Hinter dem Bolzen läuft die Nabe rund aus — Ellipse statt Stirnfläche. */
+    const nase = f.t < 0 ? Math.sqrt(1 - f.t * f.t) : 1;
+    /*
+     * Innen- und Aussenflaeche werden EINZELN ueberblendet, nicht Dicke und
+     * Versatz. Mit der Dicke gerechnet hob sich die Innenflaeche ab t = 0,67
+     * von der Mittellinie ab — bis zu 50 mm Luft zwischen Kurve und Werkstoff,
+     * eine Kerbe auf der Trogseite der Schulter. Der Wächter
+     * `test/schalenform.test.ts` hat sie gefunden; in der Seitenansicht sah man
+     * sie als Absatz zwischen Ferse und Blech.
+     *
+     * Innen läuft der Körper deshalb genau auf die Mittellinie zu — dort setzt
+     * das Blech an. Aussen läuft er auf die Oberkante von Blech plus Strebe zu.
+     */
+    const innen = (-FERSE_H_BOLZEN / 2) * (1 - w) + 0 * w;
+    const aussen = (FERSE_H_BOLZEN / 2) * (1 - w) + (anschlussV + anschlussH) * w;
+    bahn.push({ y: f.y, z: f.z, th: f.th });
+    breiten.push((2 * schalenHalbbreite(0) * (1 - w) + anschlussB * w) * nase);
+    hoehen.push((aussen - innen) * nase);
+    versaetze.push(innen * nase);
   }
+  for (const f of fein) {
+    /* Aussenflaeche der Haut — darauf sitzt die Strebe ueber die ganze Laenge. */
+    const auf = woelbungBei(halbbreiteBei(f.k), f.k) + BLECH;
+    /*
+     * An der Schulter reicht der Guss bis auf die Trogflaeche durch.
+     *
+     * Ab Station 1 sitzt die Strebe auf dem Blech, so wie bisher. Über den
+     * ersten Abschnitt läuft ihre Innenfläche aber auf die Mittellinie zu —
+     * sonst klafft zwischen Ferse (Innenfläche auf der Mittellinie) und Strebe
+     * (Innenfläche 67 mm darüber) ein Keil, und genau den hat der Wächter an
+     * der Schulter gemeldet. Die AUSSENfläche bleibt unverändert; die
+     * Seitenansicht ändert sich dadurch nicht.
+     */
+    const innen = auf * Math.min(1, f.k);
+    bahn.push({ y: f.y, z: f.z, th: f.th });
+    /* Alles mit demselben Faktor — das ist die „durchgaengig proportionale" Form. */
+    breiten.push(STREBE_B_OBEN * verjuengung(f.k));
+    hoehen.push(auf + STREBE_H_OBEN * verjuengung(f.k) - innen);
+    versaetze.push(innen);
+  }
+  const zinken = new THREE.Mesh(strang(bahn, 0, breiten, hoehen, versaetze), st.guss);
+  zinken.name = "06_ZINKEN";
+  g.add(zinken);
 
-  // Konsole mit Anlenkauge fuer die Kolbenstange
   /*
-   * Konsole mit Anlenkauge — auf dem RUECKEN der Schale, nicht im Trog.
-   * Ihre Lage ist gerechnet, nicht gegriffen: `ANLENKPUNKT` kommt aus der
-   * Abtastung der ganzen Kinematik.
+   * Die Lagerhülse am Drehpunkt — die Hülse, von der Patrick spricht.
+   *
+   * Sie steckt IM Gusskörper und steht 50 mm auf jeder Seite über ihn hinaus.
+   * Genau daran erkennt man auf einem Bild ein Lager: Man sieht die Bohrung von
+   * der Seite, und sie sitzt nicht auf einem Kasten, sondern in Material, das
+   * von dort ohne Fuge in den Zinken läuft.
    */
+  const hueltLaenge = 2 * schalenHalbbreite(0) + 0.1;
+  const lagerauge = new THREE.Mesh(rohr(0.085, 0.042, hueltLaenge), st.guss);
+  lagerauge.name = "06_LAGERAUGE";
+  g.add(lagerauge);
   /*
-   * Obere Schalenanbindung — hier greift die Kolbenstange an (Position 6 der
-   * Zeichnung, orange markiert). Sie sitzt aussen am oberen Ende der Schale.
+   * Das Zylinderauge — am SELBEN Körper, keine Konsole mehr.
+   *
+   * Vorher war es ein Rohr Ø 110 mm in einem Quader von 0,33 × 0,18 × 0,16 m.
+   * Jetzt ist es ein Nabenauge mit 150 mm Außendurchmesser: Es reicht mit
+   * seinem Rand (Normalabstand 0,085 m) bis in den Rücken des Gusskörpers
+   * (beginnt bei 0,0675 m) und nach innen bis in das Blech — der Werkstoff ist
+   * durchgehend, es steht nichts mehr davor. `OBERE_ANBINDUNG` selbst bleibt
+   * unverändert; daran hängt die ganze Zylinderkinematik.
    */
+  const zylinderauge = new THREE.Mesh(rohr(0.085, 0.032, STREBE_B_OBEN + 0.06), st.guss);
+  zylinderauge.name = "06_ZYLINDERAUGE";
+  zylinderauge.position.set(0, OBERE_ANBINDUNG.y, OBERE_ANBINDUNG.z + schub);
+  g.add(zylinderauge);
   /*
-   * Die Konsole steht ebenfalls von Backe zu Backe. Sie überträgt die
-   * Zylinderkraft in beide Wangen; als schmaler Klotz in der Mitte hätte sie
-   * nichts, woran sie sich abstützt.
+   * Keine Kehlnähte mehr an der Schale. Drei waren hier: zwei längs der Nabe,
+   * eine unter der Konsole. Eine Schweißnaht ist die Ansage „hier sind zwei
+   * Teile zusammengesetzt" — und genau das soll die Schale nicht mehr sagen.
    */
-  const konsole = new THREE.Mesh(new THREE.BoxGeometry(backen, 0.18, 0.16), st.guss);
-  konsole.name = "06_OBERE_ANBINDUNG";
-  konsole.position.set(0, OBERE_ANBINDUNG.y + 0.02, OBERE_ANBINDUNG.z * 0.75);
-  g.add(konsole);
-  const oberesAuge = new THREE.Mesh(rohr(0.055, 0.03, 0.11), st.guss);
-  oberesAuge.name = "06_OBERES_AUGE";
-  oberesAuge.position.set(0, OBERE_ANBINDUNG.y, OBERE_ANBINDUNG.z);
-  g.add(oberesAuge);
-  const nk = naht(0.12);
-  nk.rotation.z = Math.PI / 2;
-  nk.position.set(0, OBERE_ANBINDUNG.y - 0.08, OBERE_ANBINDUNG.z * 0.6);
-  g.add(nk);
 
   return g;
 }

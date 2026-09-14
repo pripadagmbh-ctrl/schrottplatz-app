@@ -15,6 +15,21 @@
  * daneben, und in der Seitenansicht klaffte die Schale in der Mitte auf.
  *
  * Der Test misst, was man sieht: die Silhouette längs der Aussennormalen.
+ *
+ * Nachtrag 14.09.2026 — der Wächter prüft eine Eigenschaft mehr.
+ *
+ * Bis dahin lag zwischen Bolzen und Schalenanfang ein Kasten
+ * (`06_UNTERE_ANBINDUNG`) und darauf eine Konsole (`06_OBERE_ANBINDUNG`) für
+ * das Zylinderauge. Beide trugen „ANBINDUNG" im Namen und wurden von der
+ * Silhouette unten AUSGENOMMEN — der Wächter hat den Kopf der Schale also gar
+ * nicht angesehen. Genau dort sass der Befund: „der Zinken und dieser
+ * Metallblock, wo auch der Hubzylinder angeht, das ist eigentlich EIN
+ * Gusselement. Das sind nicht zwei Elemente."
+ *
+ * Jetzt ist es eins (`06_ZINKEN`), und der Wächter läuft bis an den Bolzen
+ * mit: `fersenProfil` misst dieselbe Dicke längs derselben Aussennormalen über
+ * die Fersenkurve. Ausgenommen bleiben nur noch die Augen — eine Hülse ist
+ * hohl, ihr Loch ist kein Formfehler.
  */
 import { describe, it, expect } from "vitest";
 import * as THREE from "three";
@@ -23,6 +38,7 @@ import {
   baueGreiferschale,
   baueGreiferspitze,
   feineStationen,
+  fersenStationen,
   schalenEnde,
   stoffe,
 } from "../src/fuenfschalen/teile";
@@ -45,7 +61,13 @@ function silhouette(): {
   const v = new THREE.Vector3();
   g.traverse((o) => {
     const m = o as THREE.Mesh;
-    if (!m.isMesh || /AUGE|ANBINDUNG|NAHT/.test(m.name)) return;
+    /*
+     * Nur noch die Augen sind ausgenommen. `ANBINDUNG` und `NAHT` trafen die
+     * beiden Quader und die Kehlnähte am Kopf der Schale — seit dem 14.09.2026
+     * gibt es beide nicht mehr, und die Ausnahme hätte den neuen Gusskörper
+     * nur wieder unsichtbar gemacht.
+     */
+    if (!m.isMesh || /AUGE/.test(m.name)) return;
     const pos = m.geometry.getAttribute("position") as THREE.BufferAttribute;
     const idx = m.geometry.getIndex();
     const n = idx ? idx.count : pos.count;
@@ -143,6 +165,61 @@ function profil(): Array<{ k: number; dicke: number; loecher: number }> {
   return aus;
 }
 
+/**
+ * Die FERSE, vom Bolzen bis an Station 0 — Dicke um die Mittellinie herum.
+ *
+ * Gemessen wird der zusammenhängende Materialstreifen, durch den die
+ * Mittellinie läuft: Strahl längs der Aussennormalen, und gezählt nur der
+ * Abschnitt, der die Station selbst enthält. Das ist der Unterschied zu
+ * `profil`, das einfach von −60 bis +320 mm misst: Am Übergang zur Schale zeigt
+ * die Normale fast senkrecht, und ein Strahl nach unten trifft dort die
+ * GEGENÜBERLIEGENDE Seite der Sichel. Ohne diese Einschränkung meldete der
+ * Wächter 390 mm Dicke und eine Lücke, wo in Wahrheit 190 mm massiver Guss
+ * stehen — die Sichel ist nur weiter unten wieder im Weg.
+ */
+function fersenProfil(): Array<{ t: number; dicke: number; drauf: boolean }> {
+  const { drin } = silhouette();
+  const aus: Array<{ t: number; dicke: number; drauf: boolean }> = [];
+  for (const f of fersenStationen(24)) {
+    if (f.t < 0) continue; // die runde Nase hinter dem Bolzen zählt nicht mit
+    const px = -f.z;
+    const py = f.y;
+    /*
+     * In der Silhouette ist x = −z und y = y. Die Aussennormale (−sin θ, cos θ)
+     * des (y, z)-Rahmens wird damit zu (−cos θ, −sin θ) — dieselbe Umrechnung
+     * wie in `profil`.
+     */
+    const nx = -Math.cos(f.th);
+    const ny = -Math.sin(f.th);
+    const trifft = (d: number): boolean => drin(px + nx * d, py + ny * d);
+    /*
+     * Angesetzt wird 5 mm AUSSERHALB der Mittellinie, nicht auf ihr. Ab
+     * t = 0,63 liegt die Mittellinie genau auf der Innenhaut des Körpers — auf
+     * der Kante also —, und eine Maske mit 1 mm Raster zählt die Kante mal
+     * dazu und mal nicht. Fünf Millimeter tiefer im Werkstoff ist die Antwort
+     * eindeutig, und für die Dicke fällt es nicht ins Gewicht.
+     */
+    const ANSATZ = 0.005;
+    const lauf = (schritt: number): number => {
+      let d = ANSATZ;
+      let luft = 0;
+      while (Math.abs(d) < 0.32) {
+        d += schritt;
+        if (trifft(d)) luft = 0;
+        else if ((luft += Math.abs(schritt)) > 0.0035) return d - schritt * (luft / Math.abs(schritt));
+      }
+      return d;
+    };
+    const drauf = trifft(ANSATZ);
+    aus.push({
+      t: f.t,
+      dicke: drauf ? (lauf(0.001) - lauf(-0.001)) * 1000 : 0,
+      drauf,
+    });
+  }
+  return aus;
+}
+
 describe("Form der Greiferschale in der Seitenansicht", () => {
   const p = profil();
 
@@ -155,6 +232,28 @@ describe("Form der Greiferschale in der Seitenansicht", () => {
     const duennste = p.reduce((a, b) => (b.dicke < a.dicke ? b : a));
     expect(duennste.k).toBe(p[p.length - 1]!.k);
     expect(p[0]!.dicke).toBeGreaterThan(2.5 * duennste.dicke);
+  });
+
+  const f = fersenProfil();
+
+  it("läuft von der Lagerhülse ohne Fuge in die Schale", () => {
+    /*
+     * Die Eigenschaft, um die es am 14.09.2026 ging: Zinken und Anlenkklotz
+     * sind EIN Körper. Geprüft wird das an der Mittellinie — vom Bolzen bis an
+     * Station 0 darf keine Station im Leeren liegen, und nirgends darf der
+     * Körper auf weniger als 100 mm einschnüren.
+     */
+    expect(f.length).toBeGreaterThan(20);
+    expect(f.filter((s) => !s.drauf).map((s) => s.t.toFixed(2))).toEqual([]);
+    expect(f.filter((s) => s.dicke < 100).map((s) => `t=${s.t.toFixed(2)}: ${s.dicke.toFixed(0)} mm`)).toEqual([]);
+  });
+
+  it("ist am Bolzen am dicksten — der Kopf trägt, die Spitze schneidet", () => {
+    const amBolzen = f[0]!.dicke;
+    expect(amBolzen).toBeGreaterThan(Math.max(...p.map((s) => s.dicke)));
+    expect(f.filter((s) => s.dicke > amBolzen + 1).map((s) => s.t.toFixed(2))).toEqual([]);
+    /* Und er nimmt bis an die Schale spürbar ab — kein Klotz, der einfach aufhört. */
+    expect(f[f.length - 1]!.dicke).toBeLessThan(0.8 * amBolzen);
   });
 
   it("hat kein Loch im Querschnitt — die Schale ist ein Guss", () => {
