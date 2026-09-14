@@ -6,42 +6,187 @@
       name="viewport"
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
     />
-    <title>Mehrschalengreifer — Vorschau</title>
+    <title>Fünfschalengreifer — Vorschau</title>
     <style>
       /*
-       * Vorschau des exportierten Greifers.
+       * Vorschauseite des Fünfschalengreifers — getrennt vom Spiel.
        *
-       * Sie laedt bewusst die GLB-DATEI und nicht das Modell aus dem Quelltext.
-       * Nur so sieht man, was tatsaechlich in einer Engine ankommt — Hierarchie,
-       * Pivots, Materialien und Animationen so, wie sie exportiert wurden.
+       * Sie lädt bewusst die exportierte GLB-DATEI und nicht das Modell aus dem
+       * Quelltext. Nur so sieht man, was tatsächlich in einer Engine ankommt —
+       * Hierarchie, Pivots, Materialien und Animationen so, wie sie exportiert
+       * wurden.
+       *
+       * touch-action: none steht auf ALLEN Bedienflächen, nicht nur auf dem
+       * Canvas (Lehre aus v2, CLAUDE.md). Ohne das scrollt oder zoomt Safari
+       * die Seite, statt das Modell zu drehen — und ein Finger, der auf der
+       * Leiste startet, reißt das ganze Bild mit.
        */
       * { box-sizing: border-box; }
-      html, body { margin: 0; height: 100%; overflow: hidden; background: #d9dde2; }
-      canvas { display: block; touch-action: none; width: 100vw; height: 100vh; }
-      #leiste {
-        position: fixed; left: 0; right: 0; bottom: 0;
-        display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
-        padding: 12px; background: rgba(24, 28, 32, 0.88);
-        font: 13px/1 "Segoe UI", system-ui, sans-serif;
+
+      html, body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #d9dde2;
+        touch-action: none;
+        overscroll-behavior: none;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-text-size-adjust: 100%;
       }
+
+      canvas {
+        display: block;
+        touch-action: none;
+        width: 100vw;
+        height: 100vh;
+      }
+
+      /* Bedienleiste: eine Zeile Regler, darunter eine Zeile Clip-Knöpfe.
+       * env(safe-area-inset-*) hält sie auf dem iPhone von Home-Leiste und
+       * Notch frei (das <meta> steht auf viewport-fit=cover). */
+      #leiste {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 8px 10px 8px;
+        padding-bottom: calc(8px + env(safe-area-inset-bottom));
+        padding-left: calc(10px + env(safe-area-inset-left));
+        padding-right: calc(10px + env(safe-area-inset-right));
+        background: rgba(24, 28, 32, 0.9);
+        color: #cfd6dd;
+        font: 14px/1 "Segoe UI", system-ui, sans-serif;
+        touch-action: none;
+      }
+
+      #reglerzeile {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        touch-action: none;
+      }
+      #reglerzeile .marke { flex: 0 0 auto; opacity: 0.85; }
+      #gradanzeige {
+        flex: 0 0 auto;
+        min-width: 4.2em;
+        text-align: right;
+        font-family: "Consolas", monospace;
+        color: #e6eaee;
+      }
+
+      /* Treffflächen: der Regler ist 44 px hoch, auch wenn der Balken dünn
+       * aussieht — ein Finger ist kein Mauszeiger. */
+      #regler {
+        -webkit-appearance: none;
+        appearance: none;
+        flex: 1 1 auto;
+        min-width: 120px;
+        height: 44px;
+        margin: 0;
+        background: transparent;
+        touch-action: none;
+      }
+      #regler:focus { outline: none; }
+      #regler::-webkit-slider-runnable-track {
+        height: 10px;
+        border-radius: 5px;
+        background: #4a555e;
+      }
+      #regler::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 32px;
+        height: 32px;
+        margin-top: -11px;
+        border-radius: 50%;
+        background: #e6eaee;
+        border: 2px solid #6db33f;
+      }
+      #regler::-moz-range-track {
+        height: 10px;
+        border-radius: 5px;
+        background: #4a555e;
+      }
+      #regler::-moz-range-thumb {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: #e6eaee;
+        border: 2px solid #6db33f;
+      }
+
+      #clips {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        justify-content: center;
+        touch-action: none;
+      }
+
       button {
-        appearance: none; border: 1px solid #566; border-radius: 5px;
-        background: #2b3238; color: #e6eaee; padding: 9px 14px; cursor: pointer;
+        appearance: none;
+        display: inline-flex;
+        align-items: center;
+        min-height: 44px;
+        border: 1px solid #566;
+        border-radius: 5px;
+        background: #2b3238;
+        color: #e6eaee;
+        padding: 0 10px;
+        cursor: pointer;
         font: inherit;
+        touch-action: none;
       }
       button:hover { background: #3a444c; }
       button.an { background: #6db33f; border-color: #6db33f; color: #10160f; }
+
       #kopf {
-        position: fixed; left: 12px; top: 12px;
-        font: 13px/1.5 "Consolas", monospace; color: #2a3036;
-        background: rgba(255, 255, 255, 0.78); border-radius: 6px; padding: 8px 12px;
+        position: fixed;
+        left: calc(12px + env(safe-area-inset-left));
+        top: calc(12px + env(safe-area-inset-top));
+        font: 14px/1.45 "Consolas", monospace;
+        color: #2a3036;
+        background: rgba(255, 255, 255, 0.82);
+        border-radius: 6px;
+        padding: 8px 12px;
         white-space: pre;
+        pointer-events: none;
+      }
+
+      /* iPhone mini quer (812 × 375): die Leiste muss schmal bleiben, sonst
+       * frisst sie das halbe Bild. Knöpfe bleiben bei 40 px Trefffläche und
+       * 14 px Schrift (Barrierefreiheit, Briefing Kap. 20). */
+      @media (max-height: 460px) {
+        #leiste { gap: 6px; padding-top: 6px; padding-bottom: calc(6px + env(safe-area-inset-bottom)); }
+        #regler { height: 40px; }
+        #regler::-webkit-slider-thumb { width: 28px; height: 28px; margin-top: -9px; }
+        button { min-height: 40px; padding: 0 9px; }
+        #kopf { padding: 6px 9px; line-height: 1.35; }
       }
     </style>
   </head>
   <body>
     <div id="kopf">lade …</div>
-    <div id="leiste"></div>
+    <div id="leiste">
+      <div id="reglerzeile">
+        <span class="marke">zu</span>
+        <input
+          id="regler"
+          type="range"
+          min="0"
+          max="1000"
+          step="1"
+          value="500"
+          aria-label="Öffnungsgrad des Greifers, ganz links geschlossen, ganz rechts offen"
+        />
+        <span class="marke">offen</span>
+        <span id="gradanzeige">50 %</span>
+      </div>
+      <div id="clips"></div>
+    </div>
     <script type="module" src="/src/greifer/vorschau.ts"></script>
   </body>
 </html>

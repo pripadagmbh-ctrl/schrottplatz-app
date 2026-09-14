@@ -4,10 +4,12 @@
 `f3c3c52`. `prototype/` und `v2/` bleiben eingefroren und werden nie geändert — die Regeln
 stehen in `../CLAUDE.md`, die Entscheidungen in `docs/entscheidungen.md` (ab E-001).
 
-Stand: **M1 gebaut, Gerätetest offen.** Zapfen statt breiter Ring an der Spinne (E-007),
-Rückwände raus an den vier Sortiermulden (E-006), Kommentar-Regel für Messwerte (E-008).
-Prüfkette grün: `npm test` 255 Tests in 27 Dateien, `npm run build` sauber. Abgenommen ist
-M1 erst nach Patricks Gerätetest — die Handgriffe stehen bei E-006 und E-007 im Log.
+Stand: **M1 gebaut, Gerätetest offen. M2 Phase A gebaut, Gerätetest offen.** Zapfen statt
+breiter Ring an der Spinne (E-007), Rückwände raus an den vier Sortiermulden (E-006),
+Kommentar-Regel für Messwerte (E-008), der Fünfschalengreifer als Vorschaumodell (E-009).
+Prüfkette grün: `npm test` 272 Tests in 29 Dateien, `npm run build` sauber. Abgenommen ist
+nichts davon vor Patricks Gerätetest — die Handgriffe stehen bei E-006, E-007 und E-009 im
+Log.
 
 Der Spielinhalt (M0–M3 weiter unten) ist vom Prototyp geerbt und unverändert gültig; diese
 Abschnitte beschreiben, was v1 mitbringt, nicht was in v1 entstanden ist.
@@ -34,6 +36,27 @@ Wächter. Beide müssen vor jeder Übergabe grün sein (Regel 8).
 Veröffentlicht wird v1 nach einem Merge auf `main` unter
 `pripadagmbh-ctrl.github.io/schrottplatz-app/v1/` (E-005). Der Merge braucht Patricks
 Freigabe und ist nach rund 70 Sekunden live.
+
+## Die zweite Greiferform ansehen
+
+```bash
+npm run dev -- --host
+```
+
+Dann auf dem Gerät `/greifer.html` öffnen — dort liegt der Fünfschalengreifer zum Drehen und
+Öffnen, mit Schieberegler und Touch. **Der Bagger trägt ihn nicht:** Im Spiel hängt
+unverändert die Sichelkralle am Zapfen (E-007). Die Vorschau ist die Auflage aus E-009 —
+erst ansehen, dann entscheiden, ob die Form ins Spiel geht.
+
+Das Modell wird nicht von Hand gepflegt, sondern aus `src/fuenfschalen/` exportiert. Neu
+bauen nach einer Änderung an Teilen oder Rig:
+
+```bash
+npx vite-node tools/fuenfschalen/export.ts
+```
+
+Das schreibt `src/greifer/fuenfschalen.glb` neu; Maße und Befunde stehen in
+`docs/messungen/2026-09-14_fuenfschalen-vorschau.md`.
 
 ## Steuerung (M0)
 
