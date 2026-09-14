@@ -139,3 +139,25 @@ erledigt ist, bekommt den Commit dazu.
 
       Gehört in Abschnitt 1 („die Welt", E-016), aber erst nach Platz, Bagger
       und Maschinen.
+
+- [ ] **Unterschiedliche Kranfarben und -typen** — Die Händler kommen „mit
+      Aufbau, mit Ladekran" (Patrick, 14.09.2026, zum echten Betrieb). Heute
+      sehen sie alle gleich aus. Sie sollen sich in **Farbe** und **Bauart** des
+      Krans unterscheiden — und damit auch die Fahrzeuge selbst.
+
+      *Warum es zählt:* Die Kunden haben schon Namen und Eigenheiten (Manni,
+      Toni, Ewald, Kfz-Werkstatt Rehm — `delivery/customers.ts`). Wenn jeder
+      sein eigenes Fahrzeug hat, erkennt man ihn **an der Einfahrt**, bevor man
+      den Namen liest: „Der rote mit dem kurzen Kran, der bringt immer Alu."
+      Aus einer Liste von Namen werden Stammkunden. Der Punkt „Händler sehen
+      verschieden aus" steht seit dem 11.09. auf dieser Liste — das hier ist
+      die konkrete Form davon.
+
+      *Wie es gehen könnte, ohne Mehraufwand je Fahrzeug:* Farbe und Krantyp
+      **fest je Kunde**, nicht zufällig je Anlieferung — sonst kommt Manni
+      jedes Mal in einem anderen Wagen und man kann sich nichts merken.
+      Ableitbar aus dem Kundennamen mit festem Zufallsstartwert, dann braucht es
+      keine Datenpflege. Krantypen: kurzer Heckkran, langer Kran hinter dem
+      Haus, Abrollkipper ohne Kran.
+
+      Gehört zu „Maschinen" in Abschnitt 1 (E-016).
