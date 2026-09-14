@@ -1,5 +1,11 @@
 import { CONFIGS } from "../src/world/containers";
-const B = { x: -2.5, z: -19.5 };
+import { BAGGER_STAND } from "../src/world/baggerstand";
+/*
+ * Der Standplatz kommt aus `world/baggerstand.ts`, nicht als Kopie hierher.
+ * Er ist am 14.09.2026 von (−2,5 | −19,5) auf (−0,5 | −22,5) gewandert; eine
+ * Kopie waere danach still falsch gewesen.
+ */
+const B = BAGGER_STAND;
 function dist(x: number, z: number): number {
   let d = Infinity;
   for (let i = 0; i <= 20; i++) d = Math.min(d, Math.hypot(x - B.x, z - (B.z + (5 * i) / 20)));

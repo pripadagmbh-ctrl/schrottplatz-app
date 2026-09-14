@@ -14,6 +14,16 @@ import { writeFileSync } from "node:fs";
 import { CONFIGS } from "../src/world/containers";
 import { PRESS_CENTER, PRESS_INNER } from "../src/world/press";
 import {
+  routeApproach,
+  pickupApproach,
+  pickupInRev,
+  bayApproach,
+  bayInRev,
+  TIP_APPROACH,
+  TIP_IN_REV,
+  ABKIPP_ZONE,
+} from "../src/delivery/routes";
+import {
   YARD_MIN_X,
   YARD_MAX_X,
   YARD_D,
@@ -261,6 +271,37 @@ s(
   `<text x="${W - RAND - 2.5 * M}" y="${H - 26}" fill="#33383f" font-size="10" ` +
     `text-anchor="middle" font-family="system-ui,sans-serif">5 m</text>`
 );
+
+/* ------------------------------------------------ Fahrspuren und Abkippen */
+/*
+ * Die echten Strecken aus `delivery/routes.ts`, nicht gemalte. Der
+ * Konzeptplan zeichnet daneben eine Abkippzone hinter dem Bagger; gebaut ist
+ * sie VOR ihm, links neben der Maschine — hinter ihm kommt kein Fahrzeug
+ * vorbei, solange sie auf ihrem Platz steht (siehe Kommentar bei
+ * `KIPP_SPUR_X`). Wer die beiden Bilder nebeneinanderlegt, soll genau das
+ * sehen.
+ */
+for (const [name, weg] of [
+  ["Anlieferung", routeApproach()],
+  ["Kipper", TIP_APPROACH.concat(TIP_IN_REV.slice(1))],
+  ["Abholer", pickupApproach().concat(pickupInRev().slice(1))],
+  ["sortenrein", bayApproach(-13).concat(bayInRev(-13).slice(1))],
+] as Array<[string, Array<[number, number]>]>) {
+  const punkte = weg.map(([x, z]) => `${px(x).toFixed(1)},${py(z).toFixed(1)}`).join(" ");
+  s(
+    `<polyline points="${punkte}" fill="none" stroke="#c2410c" stroke-width="${(4.2 * M).toFixed(
+      1
+    )}" stroke-opacity="0.07" stroke-linejoin="round" stroke-linecap="round"/>`
+  );
+  s(
+    `<polyline points="${punkte}" fill="none" stroke="#c2410c" stroke-width="1.2" ` +
+      `stroke-dasharray="7 5" stroke-opacity="0.75" stroke-linejoin="round"/>`
+  );
+  const [ex, ez] = weg[weg.length - 1]!;
+  beschriftung(ex, ez - 1.4, name, "#c2410c", 9);
+}
+kasten(ABKIPP_ZONE[0], ABKIPP_ZONE[1], 5.4, 4.2, "none", "#b9563a", 'stroke-width="2" stroke-dasharray="8 5"');
+beschriftung(ABKIPP_ZONE[0], ABKIPP_ZONE[1], "ABKIPPEN", "#b9563a", 10);
 
 /* --------------------------------------------- Abnahmetabelle, gemessen */
 /*
