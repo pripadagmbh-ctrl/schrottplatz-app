@@ -112,3 +112,30 @@ erledigt ist, bekommt den Commit dazu.
       Südwand, wie besprochen zum Horten großer Teile. Dorthin muss gefahren
       werden; ob sich das lohnt, entscheidet sich erst, wenn es wirklich
       sperriges Buntmetall gibt (bisher nur die Schiffsschraube mit 180 kg).
+
+## Notizen 14.09.2026
+
+- [ ] **Federnde LKW beim Abladen** — Wenn der Bagger etwas Schweres in eine
+      Mulde legt oder fallen lässt, soll das Fahrzeug auf seinen Federn
+      einsacken und ausschwingen, je nach eingeleiteter Kraft. Heute passiert
+      gar nichts: Die Fahrzeugkörper sind kinematisch (`delivery/vehicles.ts`),
+      also für die Physik unendlich schwer — ein 400-kg-Maschinenblock landet
+      so weich wie eine Feder.
+
+      *Warum es zählt:* Es ist die einzige Stelle, an der man dem Spiel ansieht,
+      wie schwer das Teil war, das man gerade getragen hat. Gewicht ist sonst
+      nur eine Zahl im HUD.
+
+      *Wie es gehen könnte, ohne die Fahrzeuge dynamisch zu machen:* Die
+      Fahrzeuge müssen kinematisch bleiben, sonst laufen ihre Routen nicht mehr.
+      Ein **rein optisches Federn** reicht aber: Beim Aufschlag auf der
+      Ladefläche die eingeleitete Energie messen (Masse mal Geschwindigkeit
+      beim Kontakt), daraus einen gedämpften Höhenversatz auf das Fahrzeug-Mesh
+      legen und ausschwingen lassen. Der Kollider bleibt, wo er ist. Kostet
+      keine Physik und keinen Zeichenruf.
+
+      Sinnvoll auch am Kipper, wenn die Mulde hochgeht und die Ladung
+      abrutscht — und am Bagger selbst, wenn er mit voller Spinne absetzt.
+
+      Gehört in Abschnitt 1 („die Welt", E-016), aber erst nach Platz, Bagger
+      und Maschinen.
