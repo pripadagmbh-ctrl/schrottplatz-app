@@ -192,12 +192,12 @@
         #pause .hint { margin: 6px 0 0; font-size: 10px; line-height: 1.45; }
         /* Ankauf, Abholung und Ausbau hatten gar keine Regeln fuer flache
            Displays — dort standen 22 px Polster und 19-px-Ueberschriften. */
-        #pickup .panel, #haggle .panel, #shop .panel {
+        #pickup .panel, #haggle .panel, #shop .panel, #radio .panel {
           padding: 12px 16px; min-width: 260px; max-width: 92vw; max-height: 92vh;
         }
-        #pickup h2, #haggle h2, #shop h2 { margin: 0 0 4px; font-size: 15px; letter-spacing: 2px; }
-        #pickup .sub, #haggle .sub, #shop .sub { margin: 0 0 8px; font-size: 11px; line-height: 1.45; }
-        #pickup button, #haggle button, #shop button {
+        #pickup h2, #haggle h2, #shop h2, #radio h2 { margin: 0 0 4px; font-size: 15px; letter-spacing: 2px; }
+        #pickup .sub, #haggle .sub, #shop .sub, #radio .sub { margin: 0 0 8px; font-size: 11px; line-height: 1.45; }
+        #pickup button, #haggle button, #shop button, #radio button {
           margin: 5px 0; padding: 9px 12px; font-size: 12px;
         }
         /* Der Ausbau ist die laengste Liste — sie bekommt einen eigenen
@@ -313,31 +313,32 @@
          Ein gemeinsamer Stil für alle drei. Sie waren zuvor ohne jede Regel
          im Dokument und wurden dadurch unsichtbar hinter dem Bild gerendert:
          Der Fahrer wartete auf eine Antwort, die niemand geben konnte. */
-      #pickup, #haggle, #shop {
+      #pickup, #haggle, #shop, #radio {
         display: none; position: fixed; inset: 0; z-index: 22;
         background: rgba(12, 14, 16, 0.72);
         align-items: center; justify-content: center;
       }
-      #pickup.open, #haggle.open, #shop.open { display: flex; }
-      #pickup .panel, #haggle .panel, #shop .panel {
+      #pickup.open, #haggle.open, #shop.open, #radio.open { display: flex; }
+      #pickup .panel, #haggle .panel, #shop .panel, #radio .panel {
         background: rgba(24, 27, 30, 0.97); border: 2px solid rgba(255,255,255,0.18);
         border-radius: 14px; padding: 22px 26px; text-align: center;
         min-width: 300px; max-width: 460px; max-height: 86vh; overflow-y: auto;
         color: #e8e8e4; font-family: "Consolas", monospace;
       }
-      #pickup h2, #haggle h2, #shop h2 {
+      #pickup h2, #haggle h2, #shop h2, #radio h2 {
         margin: 0 0 6px; font-size: 19px; letter-spacing: 3px; color: #f0b429;
       }
-      #pickup .sub, #haggle .sub, #shop .sub {
+      #pickup .sub, #haggle .sub, #shop .sub, #radio .sub {
         margin: 0 0 14px; font-size: 12px; line-height: 1.6; color: #9aa2a8;
       }
-      #pickup button, #haggle button, #shop button {
+      #pickup button, #haggle button, #shop button, #radio button {
         display: block; width: 100%; margin: 7px 0; padding: 12px 16px; cursor: pointer;
         background: rgba(46,52,57,0.95); color: #e8e8e4;
         font: 600 14px "Consolas", monospace; border: 2px solid rgba(255,255,255,0.22);
         border-radius: 9px; touch-action: manipulation;
       }
       #pickup button:hover, #haggle button:hover, #shop button:hover:not(:disabled),
+      #radio button:hover, #radio button:active,
       #pickup button:active, #haggle button:active {
         background: rgba(240,180,41,0.75); color: #1a1c1e;
       }
@@ -354,6 +355,26 @@
       }
       #shop button:hover:not(:disabled) small { color: #3a3020; }
       #shop-close, #pickup-cancel { text-align: center !important; margin-top: 14px !important; }
+      /* --- Radio: Senderwahl ---
+         Gleiches Feld wie der Platzausbau, damit nichts Neues zu lernen ist.
+         Die Knoepfe stehen auf mindestens 44 px, auch auf flachen Displays:
+         Sie sind mit dem Daumen zu treffen, und es sind nur drei. */
+      #radio button {
+        text-align: left; min-height: 44px;
+      }
+      #radio button .stand {
+        float: right; color: #9aa2a8; font-weight: 400;
+      }
+      #radio button:hover .stand, #radio button:active .stand { color: #3a3020; }
+      #radio button small {
+        display: block; margin-top: 3px; font-weight: 400; font-size: 11px; color: #9aa2a8;
+      }
+      #radio button:hover small, #radio button:active small { color: #3a3020; }
+      /* Der gewaehlte Sender ist umrandet UND traegt ein Zeichen samt Wort —
+         Farbe allein waere kein Kanal. */
+      #radio button.laeuft { border-color: #f0b429; }
+      #radio-power { text-align: center !important; margin-top: 12px !important; }
+      #radio-close { text-align: center !important; margin-top: 6px !important; }
     </style>
   </head>
   <body>
@@ -424,6 +445,7 @@
         <button id="pause-controls">Steuerung</button>
         <button id="pause-shop">Platz ausbauen</button>
         <button id="pause-music">Musik an/aus</button>
+        <button id="pause-radio">Radio</button>
         <button id="pause-save">Speichern</button>
         <button id="pause-load">Stand laden</button>
         <button id="pause-new">Neues Spiel</button>
@@ -478,6 +500,15 @@
         <p class="sub" id="shop-info"></p>
         <div id="shop-list"></div>
         <button id="shop-close">Zurück</button>
+      </div>
+    </div>
+    <div id="radio">
+      <div class="panel">
+        <h2>RADIO</h2>
+        <p class="sub" id="radio-info"></p>
+        <div id="radio-list"></div>
+        <button id="radio-power">Radio ausschalten</button>
+        <button id="radio-close">Zurück</button>
       </div>
     </div>
     <div id="haggle">
