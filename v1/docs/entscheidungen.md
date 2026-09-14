@@ -581,3 +581,64 @@ Zahn — oder sieht man noch eine Trennung? Von schräg unten: Sitzt die Lagerh�
 im Material oder wirkt sie aufgesetzt? Und die beiden Bilder nebeneinander
 (`docs/f5-greifer-seite.png` gegen `docs/f5-greifer-seite-flach.png`): Ist die flache
 Unterkante den Preis wert?
+
+### E-014 — Der Tonkanal wird aus drei Richtungen geweckt, das Overlay meldet nur noch Hörbares (14.09.2026)
+
+**Entscheidung.** Der `AudioContext` wird geweckt bei jeder Nutzergeste, bei
+`visibilitychange`/`pageshow`/`focus` und über `ctx.onstatechange` am Kanal selbst
+(`src/audio/audioManager.ts:62–69`, `:202`). Nach jedem `resume()` wird nach 250 ms und
+1200 ms **nachgesehen** statt vertraut und notfalls nachgeschoben. Kommt der Kanal zurück,
+werden die Dauertöne ersetzt. Nach drei vergeblichen Weckrufen wird der Kanal beim nächsten
+Antippen neu gebaut. **Hörbar gilt ausschließlich `running`** — geprüft wird nicht gegen
+eine Liste stummer Zustände, sondern umgekehrt, damit auch ein künftiger unbekannter
+Zustand als weckbar gilt (`src/audio/tonzustand.ts:22–38`). Die Overlay-Zeile ist eine
+eigene, prüfbare Funktion (`src/core/debugOverlay.ts:12`).
+
+**Begründung.** Patrick fotografierte am 14.09.2026 auf dem iPad das Debug-Overlay:
+`Ton: interrupted · Musik an (laeuft)`. Der Kanal war unterbrochen, das Spiel meinte, es
+spiele. Drei Ursachen lagen übereinander:
+
+1. **Der `visibilitychange`-Handler für den Ton fehlte vollständig.** In v1 gab es genau
+   zwei solche Handler — einer lässt die Touch-Sticks los, einer sitzt in der
+   Greifer-Vorschau. Keiner fasste den Ton an. Die v2-Lehre aus `CLAUDE.md`
+   („`AudioContext.resume()` bei `visibilitychange`") war in v1 nie umgesetzt.
+2. **Der einzige Weckruf hing an einer Nutzergeste** und wurde nie nachgeprüft. Fällt der
+   Ton mitten im Spiel aus, gibt es keine Geste, an der man sich festhalten könnte. Und
+   `resume()` wurde einmal angestoßen, der Fehlerfall mit `.catch(() => {})` verschluckt —
+   auf iOS meldet `resume()` auch dann Erfolg, wenn der Kanal gleich wieder stumm wird.
+3. **Warum die Anzeige log:** `Music.start()` steigt bei `if (this.running) return;` sofort
+   aus. Nach der Unterbrechung stand das Flag weiter auf `true`, also half selbst die Geste
+   der Musik nicht, und die Diagnose meldete stur „laeuft".
+
+*Nebenbefund zur Vermutung im Auftrag:* `interrupted` fiel formal **nicht** durchs Raster,
+`!== "running"` deckte es mit ab. Die Lücke lag nicht im Vergleich, sondern darin, dass
+niemand ihn auslöste.
+
+**Verworfene Alternativen.** Nur auf `visibilitychange` reagieren — deckt den Ausfall mitten
+im Spiel nicht ab, weil Anruf und Kontrollzentrum die Sichtbarkeit der Seite nicht
+zuverlässig ändern. Bei jeder Unterbrechung sofort einen neuen Kanal bauen — das reißt die
+Musik jedes Mal an den Anfang zurück; der Neuaufbau ist die letzte Rettung, nicht der erste
+Griff.
+
+**Abnahmekriterium — auf dem Gerät bestanden, 14.09.2026.** Alle drei Fälle auf iPad und
+iPhone mini geprüft: Bildschirm sperren und entsperren ✓ · App wechseln und zurück ✓ ·
+**Kontrollzentrum herunterziehen, ohne die Seite zu verlassen** ✓ (der schwerste Fall, bei
+dem der Kanal sich selbst melden muss — der Ton blieb durchgehend da). Das Overlay meldete
+danach `Ton: running`, und korrekt `Musik aus`, weil Patrick die Musik selbst abgeschaltet
+hatte. Genau dort hätte der alte Stand „laeuft" behauptet. Dazu 13 Wächter in
+`test/ton.test.ts`, darunter der Kern: `brauchtWeckruf("interrupted")` muss dasselbe
+liefern wie `brauchtWeckruf("suspended")`.
+
+**Der zweite Befund desselben Tages, der nichts mit dem Code zu tun hat.** Auf dem iPhone
+mini kam **gar kein** Ton — auch nicht nach dieser Änderung. Ursache war der **physische
+Stummschalter** an der Gehäuseseite. In Safari gehorcht ein nackter `AudioContext` diesem
+Schalter; das iPad hat keinen solchen Schalter, das iPhone schon. Schalter umgelegt, Ton da.
+
+Das steht hier, damit es beim nächsten Mal niemand im Audiosystem sucht. Offen bleibt die
+Frage, ob das Spiel den Schalter **übergehen** soll — technisch geht das über ein stummes
+HTML-Audio-Element, das die Tonausgabe in eine andere Kategorie hebt. Das wäre ein Eingriff
+in eine bewusste Entscheidung des Spielers und ist deshalb keine reine Technikfrage.
+
+**Auf dem Gerät zu prüfen.** Erledigt, siehe oben. Beim nächsten Gerätetest nebenbei
+mitnehmen: Steht in der Tonzeile eine Zahl bei „Weckrufe", war `resume()` mindestens einmal
+vergeblich — dann sind die Fristen 250/1200 ms zu knapp und gehören verlängert.
