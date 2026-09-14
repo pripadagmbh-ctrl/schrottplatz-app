@@ -273,10 +273,22 @@ Geordnet nach Reihenfolge, nicht nach Größe. Wer hier weiterarbeitet — auch 
 spätere Sitzung — fängt oben an. Die Abschnitte folgen E-016: erst die Welt,
 dann der Kreislauf, dann die App.
 
-**In Arbeit, Stand 14.09.2026 abends:**
-- Fünf Baufehler am Platz: Legosteine stehen über · Wand durch Baum ·
-  Firmenschild verdeckt · Scheinwerfer einmauern · Schneemobil mit vier
-  Gummirädern
+**Stand 14.09.2026, spätabends:** Alles, was in Arbeit war, ist oben —
+Fahrpedale (E-017, seit dem Gerätetest unten links), Bildinterpolation, die
+fünf Baufehler (E-018 bis E-021), der Platzumbau auf Seitenabladung (E-022
+bis E-024) und das Baggerkonzept als Zeichnung (E-025). 496 Tests in 45
+Dateien grün.
+
+**Wartet auf Patricks Entscheidung am Bild:**
+1. **Pressengröße** — 4,20 × 4,05 m vorgeschlagen, harte Grenze 3,98 m,
+   alt 5,95. Blatt: `docs/messungen/2026-09-14_presse.svg`.
+2. **Kupfer+Messing liegt bei 12,26 m** und ist nicht erreichbar. Empfehlung:
+   mit Alu+Zink zu einer Buntmetall-Mulde zusammenlegen.
+3. **Pyramiden an den Mulden?** Heute nur zwischen den Halden. Blatt:
+   `docs/messungen/2026-09-14_pyramiden.svg`.
+4. **Firmenschild 8 × 4 statt 14 × 7** — kleiner, dafür ganz frei.
+5. **Vier Fragen zum Bagger**, alle in `docs/baggerkonzept.md`: Silhouette des
+   Unterwagens · Geländer · Kabinenhub A oder B · Aussehen des Fahrers.
 
 ### Abschnitt 1 — die Welt
 

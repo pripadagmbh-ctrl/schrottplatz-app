@@ -826,3 +826,261 @@ weiß in jedem Moment am Bild, ob er fährt oder arbeitet. Auf dem iPhone mini
 Messung — „größer / weiter oben / weiter auseinander" ist je eine Zeile CSS. Und
 falls das Umschalten sich zu leise anfühlt: Ein und Aus könnten zwei unterschiedliche
 Töne bekommen, dann hört man den Zustand, ohne hinzusehen.
+
+---
+
+### E-018 — Mauerreihen enden bündig, der letzte Stein wird gekürzt (14.09.2026)
+
+**Entscheidung.** Jede Reihe Betonlego wird von Kante zu Kante ausgelegt
+(`src/world/legoreihe.ts`, `reihenstuecke()`). Der letzte Stein ist kürzer als
+die anderen und trägt **eine** Noppe. Wird der Rest kleiner als 0,25 m, teilen
+sich die beiden letzten Steine die Strecke gleichmäßig — einen Splitter gibt es
+nicht. Bau, Kollider und Wächter lesen dieselben Zahlen aus derselben Funktion.
+
+**Begründung.** Patrick am Gerät: „Bei jeder Mulde werden immer vollständige
+Legosteine gebaut. Das führt dazu, dass die Ausländer immer abstehen." Gemessen
+am 14.09.: 0,75 m Überstand vorn an der Muldenflanke, 1,05 m hinten, 0,40 m an
+der Rückwand der Ausbuchtung — und an den Platzecken umgekehrt Lücken von 0,4
+bis 0,9 m. Ursache: Die Schleifen liefen in ganzen Steinlängen mit 0,4 m Zugabe
+und hörten erst auf, wenn die **Mitte** des nächsten Steins schon hinter der
+Kante lag.
+
+**Nebenbei behoben.** Der Flanken-Kollider der Mulden stand 0,55 m länger als
+die sichtbare Wand — vorn mitten in der Einfüllöffnung.
+
+**Preis.** 1.400 → 1.480 Steine, dafür 2.800 → 2.668 Noppen. Zeichenrufe
+unverändert, weil alle Steine einer Gruppe in einem Netz stecken.
+
+**Abnahmekriterium.** Kein Stein steht über eine Kante hinaus, keine Ecke hat
+eine Lücke, die Einfahrt misst 9,0 m und endet bündig am Pfosten.
+
+**Auf dem Gerät zu prüfen.** Sehen die Muldenwände an **beiden** Enden bündig
+aus?
+
+---
+
+### E-019 — Das Firmenschild wird kleiner und rückt ins Einfahrtsfenster (14.09.2026)
+
+**Entscheidung.** Die Tafel „Rust'n'Reibach" steht auf **(−27,9 | 6,8 | 32)** und
+misst **8,0 × 4,0 m** statt 14 × 7 (`src/world/yard.ts:226`).
+
+**Begründung.** Patrick: „Aktuell wird das Firmenschild durch Halle verdeckt",
+und davor: „das Firmenschild sollte immer zu sehen sein." Aus der Startansicht
+(Orbit, 11 m, 24° geneigt, 55°) waren von 91 abgetasteten Punkten der Tafel nur
+**69 % frei und 60 % zugleich im Bild**. Das Fenster zwischen Büro (bis x −30,6)
+und Halle 1 (ab −17,75) ist auf der Tafelebene 9,4 m breit; davon braucht der
+einfahrende LKW 1,55 m. Eine 8 m breite Tafel passt hinein — gemessen **100 %
+frei, 100 % im Bild**, auf iPad (4:3) wie iPhone mini (2,16:1).
+
+**Verworfene Alternativen, beide gemessen.** Höher hängen: höchstens 71 % im
+Bild, weil die Tafel dann über den oberen Bildrand steht. Nordostecke in voller
+Größe: 100 % frei von Bauten, aber 18 % hinter drei Bäumen.
+
+**Offen.** Wenn Patrick die Größe wichtiger ist als die freie Sicht, wandert sie
+in die Nordostecke und drei Bäume weichen.
+
+**Auf dem Gerät zu prüfen.** Steht der Schriftzug im Startbild **ganz** im Bild,
+ohne zu fahren?
+
+---
+
+### E-020 — Die Scheinwerfermasten stehen in der Mauer, nicht auf dem Platz (14.09.2026)
+
+**Entscheidung.** `einmauern()` (`src/world/daylight.ts:107`) legt jeden Masten
+auf die nächste Mauerlinie. Statt einer Fundamentplatte auf der Fahrfläche steckt
+er in einem Betonklotz in der Mauerflucht und kommt mit einem Stahlkragen heraus.
+Die Lichtstärke steigt von 380 auf **400**.
+
+**Begründung.** Patrick: „Die Scheinwerfer müssen nicht unbedingt auf dem Platz
+stehen." Fundamente mitten auf der Arbeitsfläche sind Hindernisse, die niemand
+braucht. Nachgerechnet über 14 Arbeitspunkte: Nach dem Versetzen waren noch 95 %
+ausgeleuchtet; mit 400 statt 380 sind es wieder **100 %**, ohne dass ein einziger
+Punkt heller wird als vorher (`docs/messungen/2026-09-14_flutlicht.md`). Zwei
+bisher dunkle Stellen — Waage und VA-Silo — gewinnen sogar.
+
+**Preis.** Sechs Netze mehr (Sockel und Kragen statt einer Platte).
+
+**Auf dem Gerät zu prüfen.** Abends, wenn das Flutlicht angeht: Ist die
+Arbeitsfläche so hell wie vorher, und schauen die Masten sauber aus der Mauer?
+
+---
+
+### E-021 — Schneemobile bekommen Kufen und eine Raupe (14.09.2026)
+
+**Entscheidung.** Neue Bauform `kufenRaupe` (`src/world/objektbau.ts:606`,
+Katalog `objektkatalog.ts:118`): vorn zwei Kufen auf ±0,40 · Breite mit Federbein
+und hochgezogener Spitze, hinten ein Gummiband über zwei Rollen auf der
+Mittellinie. Kein Rad.
+
+**Begründung.** Das Schneemobil lief bis heute über `kleinfahrzeug()` und kam
+deshalb mit **vier Gummirädern** an — dieselbe Familie von Fehlern wie die
+Motorräder („Motorräder kommen aktuell mit vier Reifen an", 14.09.). Ein
+Schneemobil hat weder vier Räder noch zwei; es hat Kufen und eine Raupe.
+
+**Reifen bleiben in der Zusammensetzung** — die Raupe *ist* Gummi.
+
+**Abnahmekriterium.** `test/kufenRaupe.test.ts` grün; kein Schneemobil trägt
+mehr eine Radgeometrie.
+
+**Auf dem Gerät zu prüfen.** Sieht das Schneemobil auf dem Haufen richtig aus?
+
+---
+
+### E-022 — Der LKW lädt von der Seite, an der alten Stelle der Presse (14.09.2026)
+
+**Entscheidung.** Der Abladeplatz liegt auf **(6,3 | −24,0)**; der LKW setzt von
+Norden rückwärts hinein und steht mit der **Längsseite** zum Bagger
+(`src/delivery/routes.ts:72`).
+
+**Begründung.** Patrick: „Was wichtig wäre, dass ich LKWs nicht mehr von hinten,
+sondern von der Seite ablade. … weil der Weg ist auch einfach immer viel zu lang,
+wenn ich eine hundertachtzig Grad Drehung machen muss." Nachgemessen:
+
+| | vorher, Heck zum Sitz | jetzt, Längsseite |
+|---|---|---|
+| Ecken der Ladefläche | 8,03 · 8,26 · 13,42 · 13,56 m | **5,65 · 6,70 · 8,29 · 9,04 m** |
+| im Greifband (3,0–9,5 m) | nur die vordere Hälfte | **alles** |
+| Schwenk zum Mischschrott | 149° = 10,6 s je Griff | **65° = 4,7 s** |
+
+Die hintere Ecke war vorher 13,56 m entfernt — mehr als vier Meter außerhalb der
+Reichweite. Man musste umsetzen, um den eigenen Anlieferer leerzuräumen.
+
+**Zehn Probefuhren**, alle zehn halten auf (6,30 | −24,00) mit Gierwinkel 0°,
+je 25,2 s (`test/fahrstrecke.test.ts`, `test/abladeplatz.test.ts`).
+
+**Auf dem Gerät zu prüfen.** Bekommst du das **hinterste** Teil der Ladefläche,
+ohne zu fahren?
+
+---
+
+### E-023 — Die Presse zieht an die Westflanke und wird kleiner (14.09.2026)
+
+**Entscheidung.** Die Presse steht auf **(−8,0 | −26,0)**, um 90° gedreht, mit
+einer Kammer von **4,20 × 4,05 m** statt 5,95 × 4,05 (−29 % Fläche). Abstand zum
+Sitz: **8,28 m**.
+
+**Begründung.** Zwei Gründe fielen zusammen. Erstens versperrte sie den
+Anfahrtsweg: Sie saß direkt nördlich der Mischschrott-Halde, zwischen ihr und der
+Stahlschrott-Halde blieben **2,9 m**, ein LKW ist 2,5 m breit. Zweitens braucht
+der Abladeplatz aus E-022 genau ihren alten Platz. Patrick: „Die Presse, die muss
+weg, da, wo sie grade steht. Und da kommt der LKW hin", und: „Die Presse ist,
+glaub ich, auch ’n bisschen zu groß, die kann verkleinert werden. Eher wie so ’n
+Rechteck, wie ein Quader."
+
+**Warum 90° gedreht.** Die Deckelklappe schwingt 3,85 m. Ungedreht fiele sie in
+die Südmauer; gedreht fällt sie nach Westen ins Freie.
+
+**Warum −26,0 und nicht −26,5.** Bei −26,5 hätte der Rahmen 25 cm in der Mauer
+gestanden. Gemessen, nicht geschätzt.
+
+**Die Kammergröße ist ein Vorschlag.** Die harte Grenze liegt bei **3,98 m** —
+das ist die offene Spinne plus 30 cm je Seite. Alles zwischen 3,98 und 5,95 ist
+eine Zeile in `press.ts:165`. Blatt: `docs/messungen/2026-09-14_presse.svg`.
+
+**Noch offen (aus der Warteschlange).** Die Presse steht als **voller Klotz** in
+der Hindernisliste, 2,2 m hoch über die ganze Kammer — der Greifer kommt nicht
+auf den Kammerboden. Sie muss wie die Sortiermulden gebaut werden: Wände ja,
+Deckel nein. Das ist ein eigenes Paket.
+
+**Auf dem Gerät zu prüfen.** Erreichst du die Presse vom Sitz aus, ohne
+umzusetzen? Stört die offene Klappe nach Westen irgendwo?
+
+---
+
+### E-024 — Die Ausbuchtung wird flacher, der Reifencontainer entfällt (14.09.2026)
+
+**Entscheidung.** Die Ausbuchtung hinter dem Bagger ist **6,5 statt 9,5 m** tief
+(`src/world/yard.ts:105`). Die Trennstein-Pyramide steht jetzt 1–4–4–1 über vier
+Säulen. Der Reifencontainer entfällt ersatzlos; Reifen zählen über
+`mitFraktionen` zum Müll. Die Müllmulde liegt auf **(7,0 | −27,0)** und ist 2,40
+statt 3,00 m tief — **8,75 m** vom Sitz.
+
+**Begründung.** Patrick: „Ich glaub, die Ausbuchtung ist vielleicht ’n bisschen
+zu tief noch, die vielleicht ’n bisschen verkürzen." Die Erreichbarkeit ändert
+sich dadurch **nicht** — die vordere Kante der Halden bleibt bei z −29, und
+gemessen wird an der vorderen Kante. Was sich ändert, ist der Aushub: **40,8
+statt 61,2 m² je Halde.**
+
+Der Reifencontainer stand genau in der neuen Rückfahrspur aus E-022. Patrick
+hatte ihn ohnehin freigegeben: „Das mit den Reifencontainern, die Container der
+Container kann auch weg. … dann machen wir da einfach eine Mulde mit jeglichem
+Abfall."
+
+**Warum die Müllmulde flacher wurde.** Gerechnet, nicht gegriffen: Bei 3,00 m
+Tiefe müsste der LKW 60 cm vorrücken, und dann fällt seine hintere Ecke mit 9,4 m
+aus der Reichweite.
+
+**Die vier Pflichtziele stehen im Band (5,8–9,2 m):** Mischschrott 7,91 ·
+Stahlschrott 6,96 · Presse 8,28 · Müll 8,75. Dazu der Abladeplatz mit 6,91.
+
+**Offen.** Von den drei Metallmulden ist **Kupfer+Messing mit 12,26 m nicht
+erreichbar** (Alu+Zink 7,28 ✓, Kabel 9,17 am Rand). Drei Wege: stehenlassen und
+hinfahren · Kupfer+Messing mit Alu+Zink zu einer Buntmetall-Mulde zusammenlegen ·
+eine Mulde streichen. Empfehlung: zusammenlegen, wie E-010 es zweimal getan hat.
+
+**Auf dem Gerät zu prüfen.** Erreichst du Mischschrott, Stahlschrott, Presse und
+Müll alle vier vom Sitz aus?
+
+---
+
+### E-025 — Der Bagger bekommt Detailtiefe durch Verschmelzen, nicht durch mehr Netze (14.09.2026)
+
+**Entscheidung.** Der Bagger wird nach `docs/baggerkonzept-2026-09-14.svg` und
+`docs/baggerkonzept.md` umgebaut: **157 → 309 Einzelteile**, dabei **137 → 57
+Netze** und rund 194 → 82 Zeichenrufe. Regel: **ein Netz je Starrkörper und
+Werkstoff**, zusammengeführt mit `mergeGeometries` wie in `wheelParts.ts`. Je
+Baugruppe ein eigenes Modul. Acht Pakete, einzeln auf dem iPad abgenommen, in der
+Reihenfolge Fahrer · Unterwagen/Räder · Oberwagen · Drehkranz · Zylinder ·
+Ausleger/Stiel · Kabine · Kabinenhub.
+
+**Begründung.** Patrick: „Der Bagger soll als zentrales Element auch mehr
+Detailtiefe bekommen. Jetzt aktuell ist es auch Playmobil like samt Fahrer. …
+Also die LKW sind manchmal besser detailliert als der Bagger selbst." Gemessen am
+14.09. stimmt das Gefühl, aber nicht die Ursache: Der Bagger hat mit 137 Netzen
+und 15.420 Dreiecken **mehr** als ein Kipper (79 / 2.460) — aber **51 % seiner
+Dreiecke sitzen im Fahrer samt Joysticks**, während Ausleger, Stiel, Motorhaube
+und Gegengewicht je **12** haben. Es ist falsch verteilt, nicht zu wenig.
+
+Und auf dem Gerät (1.322 Zeichenrufe, 240k Dreiecke, Bild 5,9 ms von 21,0 ms)
+sind Dreiecke praktisch gratis, Netze aber der Engpass — der Schattendurchlauf
+verdoppelt sie. Verschmelzen löst beides auf einmal: mehr zu sehen bei weniger
+Aufwand.
+
+**Verworfene Alternativen.** Detail als neue Einzelnetze anhängen (125 Teile =
+250 zusätzliche Zeichenrufe; hätte die Bildglättung von heute zunichtegemacht).
+Den Bagger als Datei laden (der ganze Rest des Spiels ist Quelltextgeometrie).
+Die Räder anfassen — sie sind am 14.09. abgenommen („räder in ordnung") und
+bleiben unverändert in Form, Größe und Material; neu wäre nur, dass sie sich
+drehen und lenken, und das kostet kein Netz.
+
+**Drei Befunde aus der Vermessung, die eigene Arbeit nach sich ziehen.**
+
+1. **Die Reifen stecken im Kasten.** Rahmen y 0,70–1,60 (`excavator.ts:667`), Rad
+   y 0,00–1,24 (`:686`) — die obersten **54 cm** des Rades sind verdeckt, in der
+   Breite 20 cm. Kein Kotflügel, keine Achsbrücke. Und **keine Zeile im
+   Quelltext dreht jemals ein Rad**: Bei 3,2 m/s rutscht die Maschine auf vier
+   Klötzen. Das ist die Antwort auf „die Reifen sind nicht so richtig
+   erkennbar" — es liegt nicht am Rad, es liegt am Einbau.
+2. **Der Kabinenhub ist mechanisch unmöglich.** Er verlangt ein Hubverhältnis von
+   **5,18 : 1** (Ankerabstand 0,650 → 3,368 m); das Rohr des Zylinders ist mit
+   1,10 m in der untersten Stellung **länger als der 0,65-m-Spalt** und steht
+   durch den Kabinenboden. Fällt heute nicht auf, weil die „Kolbenstange" per
+   `scale.y` gestreckt wird — am Hubzylinder um +128 %. Eigenes, **letztes**
+   Paket.
+3. **Der Unterwagen-Kollider war noch nie deckungsgleich** mit dem sichtbaren
+   Kasten (Kollider y 0,40–1,90, Kasten 0,70–1,60). Nicht angerührt. Wenn Schrott
+   „neben" der Maschine weggeschoben wird, ist das die Ursache.
+
+**Was der Preis des Verschmelzens ist.** Auffindbarkeit im Szenengraph: Ein
+Befund wie „das kleine Teil unten am Rad flimmert" lässt sich danach nicht mehr
+auf ein einzelnes Netz zeigen. Gegenmittel: je Baugruppe ein Modul wie
+`wheelParts.ts` mit einer benannten Funktion je Teil, dann steht die
+Positionsliste im Quelltext statt im Szenengraph.
+
+**Abnahmekriterium.** Nach jedem Paket: Die Netzzahl der Baugruppe stimmt mit dem
+Konzept überein, alle Netze tragen `NN_…`-Namen, **Reichweite, Grabtiefe und
+Kollider sind unverändert**, `npm test` grün.
+
+**Am Bild zu entscheiden** (Fragen 1–4 in `docs/baggerkonzept.md`): Silhouette
+des Unterwagens · Geländer auf dem Oberwagen · Kabinenhub als Parallelogramm oder
+Hubsäule · Aussehen des Fahrers.
