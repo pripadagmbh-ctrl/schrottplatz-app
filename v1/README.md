@@ -78,10 +78,14 @@ Das schreibt `src/greifer/fuenfschalen.glb` neu; Maße und Befunde stehen in
 | H | Hilfe ein/aus · F3 Debug-Overlay |
 
 Auf dem Touchgerät (Stand 14.09.2026): linke Bildhälfte = Armstick, rechte
-Hälfte = Auslegerstick (beide schweben, beide frei belegbar), **unten links ein
-eigenes Feld FAHREN** — hoch/runter gibt Gas, seitlich lenkt. Es ist immer
-scharf; den früheren Fahrmodus per Doppeltipp gibt es nicht mehr. Doppeltipp
-rechts wechselt die Ansicht, rechten Daumen stillhalten öffnet den
+Hälfte = Auslegerstick (beide schweben, beide frei belegbar). **Zwei Pedale
+unten in der Bildmitte** schalten das Fahren ein und aus — danach gibt derselbe
+linke Stick Gas (hoch/runter) und lenkt (seitlich), noch ein Tipp gibt ihm
+Hauptarm und Oberwagen zurück. Die Pedale sind Umschalter und Anzeige, sie
+geben selbst kein Gas; eingeschaltet leuchten sie und ihre Trittplatten stehen
+unten. Von selbst schaltet nichts zurück. Verworfen: der Fahrmodus per
+Doppeltipp mit Ablauf nach vier Sekunden und die eigene Fahrfläche unten links.
+Doppeltipp rechts wechselt die Ansicht, rechten Daumen stillhalten öffnet den
 Funktionskranz.
 
 ## Platzanordnung & Wirtschaft (Stand 2026-08-29)

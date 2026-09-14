@@ -42,6 +42,13 @@
       #help { top: 12px; left: 12px; }
       #help b { color: #f0b429; }
       #gripinfo { bottom: 12px; left: 50%; transform: translateX(-50%); font-size: 14px; }
+      /* Auf Touchgeraeten stehen die Fahrpedale unten in der Bildmitte — genau
+         dort, wo sonst Griff-Info und Ladeanzeige sitzen. Beide ruecken darum
+         darueber: 10 px Rand + 6 px Fassung + 84 px Pedal + 6 px Fassung
+         = 106 px Oberkante, plus 12 px Luft = 118 px. Die Ladeanzeige noch
+         einmal um die Hoehe der Griff-Info (39 px) plus Luft weiter hinauf. */
+      body.touch #gripinfo { bottom: 118px; }
+      body.touch #load { bottom: 163px; }
       #money { top: 12px; right: 12px; font-size: 15px; color: #f0d060; }
       #shift { top: 46px; right: 12px; font-size: 13px; color: #f0d060; }
       #load { display: none; bottom: 44px; left: 50%; transform: translateX(-50%); font-size: 14px; white-space: nowrap; }
@@ -62,45 +69,74 @@
       }
       #zone-left { left: 0; }
       #zone-right { right: 0; }
-      /* --- Fahrflaeche (Variante C, Ansage 14.09.2026) ---
-         Fahren war ein Modus: Doppeltipp links machte den Armstick zu Gas und
-         Lenkung, nach vier Sekunden fiel er von selbst zurueck. Derselbe Stick
-         tat mal das eine, mal das andere. Jetzt hat das Fahren eine eigene
-         Flaeche in der unteren linken Ecke — immer scharf, nie umgeschaltet.
+      /* --- Fahrpedale (Ansage Patrick 14.09.2026) ---
+         Zwei Pedale nebeneinander, unten in der Bildmitte. Sie sind der
+         Umschalter und die Anzeige, nicht die Steuerung: Ein Tipp macht den
+         linken Stick zu Gas und Lenkung, der naechste gibt ihm Hauptarm und
+         Oberwagen zurueck. Gefahren wird ausschliesslich mit dem Stick.
 
-         Sie liegt UEBER der linken Haelfte (z-index 1) statt daneben: So bleibt
-         kein toter Streifen, und in der Ueberlappung bekommt das Fahren den
-         Daumen. Der Stick darin schwebt wie die anderen beiden; der Rahmen ist
-         trotzdem staendig zu sehen, damit man ohne Hinsehen weiss, wo das
-         Fahren aufhoert und der Arm anfaengt.
+         Warum die Mitte geht, obwohl der Daumen nicht hinreicht: Gemessen am
+         14.09.2026 reicht er von der unteren Ecke 478 Punkte weit, die Mitte
+         des iPad quer liegt bei 590. Das Pedal wird aber einmal angetippt und
+         nicht gehalten — dafuer darf man kurz umgreifen. Halten muesste man es
+         nur, wenn es selbst das Gas gaebe; das tut der Stick.
 
-         Masse: 400 x 200 px (Skizze Variante C: 440 x 200, auf 400 gekuerzt,
-         damit das Feld vor der mittig sitzenden Griff-Info endet — die beginnt
-         auf dem iPad quer bei rund 515 px). Vom unteren Bildrand reicht der
-         Daumen 478 px weit (Messung 14.09.2026); die Feldmitte liegt 224 px
-         von der Ecke entfernt, also bequem darin. */
-      #touch #zone-drive {
-        left: 0; top: auto; bottom: 0; width: 400px; height: 200px; z-index: 1;
-        background: rgba(200,150,60,0.06);
-        border-top: 2px dashed rgba(200,150,60,0.42);
-        border-right: 2px dashed rgba(200,150,60,0.42);
-        border-top-right-radius: 16px;
+         Vorher lag hier eine eigene Fahrflaeche unten links (400 x 200 px) mit
+         einem dritten schwebenden Stick. Patrick hat sie auf dem iPad
+         abgelehnt. Davor war Fahren ein Modus mit Doppeltipp und Ablauf nach
+         vier Sekunden — der Zustand wechselte von selbst. Beides ist weg.
+
+         Masse: 72 x 84 px je Pedal. Tippziele muessen mindestens 44 px messen
+         (Briefing Kap. 20); hier deutlich darueber, weil man zum Tippen
+         umgreift und dabei ungenauer zielt. 18 px Abstand dazwischen, damit
+         der Daumen nicht zwischen beide faellt. */
+      #pedals {
+        position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%);
+        display: flex; gap: 18px; padding: 6px;
+        pointer-events: auto; touch-action: none; z-index: 2;
       }
-      #touch #zone-drive.an {
-        background: rgba(200,150,60,0.13); border-color: rgba(240,180,41,0.8);
+      #touch .pedal {
+        /* border-box, damit die 72 x 84 px wirklich das sind, was man sieht und
+           trifft: Sonst zaehlt der 2-px-Rahmen obendrauf und alle Abstaende
+           weiter unten stimmen um 4 px nicht (Befund Messung 14.09.2026). */
+        box-sizing: border-box;
+        position: relative; width: 72px; height: 84px; border-radius: 10px;
+        background: rgba(20,22,24,0.6); border: 2px solid rgba(255,255,255,0.28);
+        transition: background 0.12s, border-color 0.12s;
       }
-      #zone-drive .beschriftung {
-        position: absolute; left: 0; right: 0; top: 10px; pointer-events: none;
-        text-align: center; color: #d8a24a; font-family: "Consolas", monospace;
-        opacity: 0.66;
+      /* Die Trittplatte sitzt oben, solange gearbeitet wird, und steht unten,
+         sobald das Fahren an ist: ein durchgetretenes Pedal. Das ist der
+         zweite Kanal neben der Farbe — Farbe allein darf nie der einzige
+         sein (Briefing Kap. 20). */
+      #touch .pedal .platte {
+        box-sizing: border-box;
+        position: absolute; left: 7px; right: 7px; top: 8px; height: 26px;
+        border-radius: 5px; background: rgba(255,255,255,0.22);
+        border-top: 2px solid rgba(255,255,255,0.38);
+        transition: transform 0.12s ease-out, background 0.12s;
       }
-      #zone-drive.an .beschriftung { opacity: 1; }
-      #zone-drive .beschriftung b { display: block; font-size: 14px; letter-spacing: 2px; }
-      #zone-drive .beschriftung span { font-size: 12px; opacity: 0.85; }
-      /* Der Fahrknopf hebt sich vom Armstick ab: warmer Rand statt weissem.
-         Farbe ist dabei nicht der einzige Unterschied — Ort und Beschriftung
-         sagen dasselbe. */
-      #touch-drive { border-color: rgba(240,180,41,0.55); }
+      /* Riffelung: macht die Flaeche ohne ein einziges Wort als Pedal lesbar */
+      #touch .pedal .platte::after {
+        content: ""; position: absolute; inset: 7px 9px;
+        background: repeating-linear-gradient(
+          90deg, rgba(20,22,24,0.5) 0 3px, transparent 3px 7px);
+      }
+      /* Fahren an: Pedal leuchtet und die Platte ist durchgetreten.
+         38 px Weg = von 8 px oben auf 46 px unten (84 px Pedal - 2 x 2 px
+         Rahmen = 80 px innen, minus 26 px Platte, minus 8 px Luft unten). */
+      #touch.fahren .pedal {
+        background: rgba(240,180,41,0.75); border-color: #f0d060;
+        box-shadow: 0 0 16px rgba(240,180,41,0.45);
+      }
+      #touch.fahren .pedal .platte {
+        transform: translateY(38px); background: rgba(26,28,30,0.5);
+        border-top-color: rgba(26,28,30,0.65);
+      }
+      /* Derselbe Zustand noch einmal dort, wo der Daumen wirklich liegt: Der
+         linke Stick traegt beim Fahren einen warmen Rand statt eines weissen. */
+      #touch.fahren #touch-left {
+        border-color: rgba(240,180,41,0.85); background: rgba(200,150,60,0.22);
+      }
       /* left/top setzt die Steuerung auf den Aufsetzpunkt; margin zentriert */
       #touch .pad {
         position: absolute; width: 138px; height: 138px; margin: -69px 0 0 -69px;
@@ -174,13 +210,14 @@
       @media (max-height: 430px) {
         #touch .pad { width: 108px; height: 108px; margin: -54px 0 0 -54px; }
         #touch .knob { width: 44px; height: 44px; margin: -22px 0 0 -22px; }
-        /* iPhone mini quer sind nur 375 px hoch. 118 px fuers Fahren lassen dem
-           Armstick 257 px Aufsetzhoehe — mehr als das Doppelte eines Daumens.
-           280 px breit: endet vor der mittigen Griff-Info (ab rund 336 px). */
-        #touch #zone-drive { width: 280px; height: 118px; border-top-right-radius: 12px; }
-        #zone-drive .beschriftung { top: 6px; }
-        #zone-drive .beschriftung b { font-size: 14px; letter-spacing: 1px; }
-        #zone-drive .beschriftung span { font-size: 11px; }
+        /* iPhone mini quer ist nur 375 px hoch. Die Pedale eine Nummer
+           kleiner, aber mit 58 x 64 px immer noch klar ueber den 44 px, die
+           ein Tippziel mindestens messen muss. Plattenweg entsprechend:
+           64 - 2 x 2 - 20 - 6 Luft = 34 px unten, also 28 px Weg ab 6 px. */
+        #pedals { bottom: 6px; gap: 14px; padding: 5px; }
+        #touch .pedal { width: 58px; height: 64px; }
+        #touch .pedal .platte { top: 6px; height: 20px; left: 6px; right: 6px; }
+        #touch.fahren .pedal .platte { transform: translateY(28px); }
         #btn-menu { top: 8px; right: 8px; width: 40px; height: 40px; line-height: 40px; font-size: 18px; }
         #radial .sektor { width: 66px; height: 26px; margin: -13px 0 0 -33px; font-size: 10px; line-height: 22px; }
         /* neben den rechten Stick statt darüber — oben liegt die Tastenleiste */
@@ -196,6 +233,11 @@
         #money { top: 8px; left: 8px; right: auto; font-size: 12px; padding: 4px 8px; }
         #shift { top: 34px; left: 8px; right: auto; font-size: 11px; padding: 4px 8px; }
         #gripinfo { bottom: 6px; font-size: 12px; padding: 4px 10px; }
+        /* 6 px Rand + 5 px Fassung + 64 px Pedal + 5 px Fassung = 80 px
+           Oberkante, plus 10 px Luft; darueber die Ladeanzeige um die Hoehe der
+           flachen Griff-Info (28 px) plus Luft versetzt. */
+        body.touch #gripinfo { bottom: 90px; }
+        body.touch #load { bottom: 124px; }
         #toast { top: 60px; font-size: 12px; }
       }
       /* --- Pausenmenü --- */
@@ -451,14 +493,16 @@
     <div id="touch">
       <div class="zone" id="zone-left"></div>
       <div class="zone" id="zone-right"></div>
-      <!-- Fahren hat eine eigene Flaeche in der unteren linken Ecke. Sie liegt
-           ueber der linken Haelfte und bekommt dort den Daumen zuerst. -->
-      <div class="zone" id="zone-drive">
-        <div class="beschriftung"><b>FAHREN</b><span>Gas ↕ · Lenken ↔</span></div>
-      </div>
       <div class="pad" id="touch-left" hidden><div class="knob"></div></div>
       <div class="pad" id="touch-right" hidden><div class="knob"></div></div>
-      <div class="pad" id="touch-drive" hidden><div class="knob"></div></div>
+      <!-- Zwei Pedale unten in der Bildmitte. Sie schalten das Fahren ein und
+           aus und zeigen zugleich, welcher Zustand gilt; gefahren wird danach
+           mit dem linken Stick. Beide tun dasselbe. Kein Wort steht darauf —
+           der Zustand soll allein am Bild ablesbar sein. -->
+      <div id="pedals" role="button" aria-label="Fahren ein- und ausschalten">
+        <div class="pedal" id="pedal-l"><span class="platte"></span></div>
+        <div class="pedal" id="pedal-r"><span class="platte"></span></div>
+      </div>
       <div class="btn" id="btn-rot-l">↺</div>
       <div class="btn" id="btn-rot-r">↻</div>
       <!-- Funktionskranz: zeichnet sich selbst um den rechten Daumen -->
@@ -500,7 +544,7 @@
         <button id="pause-new">Neues Spiel</button>
         <p class="hint">
           Linker Stick: Hauptarm &amp; Oberwagen · Rechter Stick: Ausleger &amp; Spinne<br />
-          Unten links das Feld FAHREN: Gas ↕, Lenken ↔<br />
+          Pedale unten Mitte: Fahren an/aus — dann fährt der linke Stick<br />
           ↺ ↻ Spinne drehen · Doppeltipp rechts: Ansicht<br />
           Rechten Daumen stillhalten: Funktionskranz
         </p>
@@ -531,9 +575,10 @@
         <button id="ctrl-reset">Werkseinstellung</button>
         <button id="ctrl-back">Zurück</button>
         <p class="hint">
-          Gefahren wird auf dem eigenen Feld unten links: hoch und runter gibt
-          Gas, seitlich lenkt. Es ist immer scharf und nimmt keiner dieser vier
-          Achsen etwas weg. Spinne drehen zusätzlich über ↺ ↻.
+          Zum Fahren tippst du die Pedale unten in der Bildmitte an: Dann gibt
+          der linke Stick Gas (hoch und runter) und lenkt (seitlich). Noch ein
+          Tipp, und er führt wieder Hauptarm und Oberwagen. Von selbst
+          schaltet nichts zurück. Spinne drehen zusätzlich über ↺ ↻.
         </p>
       </div>
     </div>
