@@ -39,15 +39,47 @@ function hauptMaterial(item: ScrapItem): string {
   return `${eigen} · ${anteil} % ${getMaterial(groesster.materialId).name}`;
 }
 
+/**
+ * Schreibt Text und Farbe nur, wenn sie sich geaendert haben.
+ *
+ * Befund 14.09.2026: Das HUD schrieb `textContent` und `style.color` in jedem
+ * Bild neu — auch dann, wenn genau dieselbe Zeile schon dastand. Jedes
+ * Schreiben zwingt den Browser, den Textknoten zu ersetzen und den Bereich neu
+ * zu setzen. Bei 48 Bildern je Sekunde sind das rund 250 Schreibvorgaenge, von
+ * denen die allermeisten nichts aendern: Das Konto steht still, sobald der
+ * Ticker eingelaufen ist, und „Auftrag: Kupfer — Container ist leer" aendert
+ * sich minutenlang nicht.
+ *
+ * Das Lesen von `textContent` und `style.color` waere selbst nicht umsonst,
+ * darum merkt sich die Tabelle den letzten Stand, statt am Element
+ * nachzuschauen.
+ */
+const zuletztGeschrieben = new WeakMap<HTMLElement, { text: string; farbe: string }>();
+function schreib(el: HTMLElement, text: string, farbe = ""): void {
+  const alt = zuletztGeschrieben.get(el);
+  if (alt && alt.text === text && alt.farbe === farbe) return;
+  el.textContent = text;
+  if (farbe) el.style.color = farbe;
+  zuletztGeschrieben.set(el, { text, farbe });
+}
+
 export class Hud {
   private gripEl = document.getElementById("gripinfo")!;
   private moneyEl = document.getElementById("money")!;
+  /*
+   * Einmal geholt statt in jedem Bild neu gesucht (Befund 14.09.2026):
+   * `updateLoad` und `updateShift` riefen `getElementById` je Bild auf,
+   * waehrend `gripEl` und `moneyEl` seit jeher hier stehen. Beide Elemente
+   * stehen fest im `index.html` und koennen nicht verschwinden.
+   */
+  private loadEl = document.getElementById("load");
+  private shiftEl = document.getElementById("shift");
   private displayedValue = 0;
 
   /** Griff-Info bei offenem Greifer: anvisiertes Objekt. */
   showTarget(item: ScrapItem | null): void {
     if (!item) {
-      this.gripEl.textContent = "Greifer: offen";
+      schreib(this.gripEl, "Greifer: offen");
       return;
     }
     const mat = getMaterial(item.materialId);
@@ -62,8 +94,10 @@ export class Hud {
      * Name; in Klammern ist sofort klar, dass es die Stoffangabe ist.
      */
     const kopf = name ? `${name} (${hauptMaterial(item)})` : hauptMaterial(item);
-    this.gripEl.textContent =
-      `▼ ${kopf} · ${masseText(item.massKg)} · ${preisProTonne(mat)} ${euroIndicator(mat)}`;
+    schreib(
+      this.gripEl,
+      `▼ ${kopf} · ${masseText(item.massKg)} · ${preisProTonne(mat)} ${euroIndicator(mat)}`
+    );
   }
 
   /**
@@ -101,29 +135,35 @@ export class Hud {
         hover.ampel === "green" ? "✓ passt" : hover.ampel === "yellow" ? "! gemischt" : "✕ falsche Zone";
       text += `  ›  über ${hover.container}: ${verdict}`;
     }
-    this.gripEl.textContent = text;
+    schreib(this.gripEl, text);
   }
 
   showClosedEmpty(): void {
-    this.gripEl.textContent = "Greifer: geschlossen (leer)";
+    schreib(this.gripEl, "Greifer: geschlossen (leer)");
   }
 
   /** Hinweis bei offener Spinne über einer abreißbaren Baugruppe. */
   showPartHint(name: string): void {
-    this.gripEl.textContent = `▼ ${name} — greifen + halten zum Abreißen`;
+    schreib(this.gripEl, `▼ ${name} — greifen + halten zum Abreißen`);
   }
 
   /** Reiß-Fortschritt während des Abreißens. */
   showTearing(name: string, progress01: number): void {
     const blocks = Math.round(progress01 * 10);
-    this.gripEl.textContent = `${name} abreißen ${"█".repeat(blocks)}${"░".repeat(10 - blocks)} ${(progress01 * 100).toFixed(0)} %`;
+    schreib(
+      this.gripEl,
+      `${name} abreißen ${"█".repeat(blocks)}${"░".repeat(10 - blocks)} ${(progress01 * 100).toFixed(0)} %`
+    );
   }
 
   /** Konto (echtes Geld) + Haufen-Prognose, Konto mit weichem Ticker. */
   updateMoney(kontoEur: number, pilesValue: number): void {
     this.displayedValue += (kontoEur - this.displayedValue) * 0.12;
     if (Math.abs(this.displayedValue - kontoEur) < 0.5) this.displayedValue = kontoEur;
-    this.moneyEl.textContent = `Konto: ${this.displayedValue.toFixed(0)} € · Haufen ≈ ${pilesValue.toFixed(0)} €`;
+    schreib(
+      this.moneyEl,
+      `Konto: ${this.displayedValue.toFixed(0)} € · Haufen ≈ ${pilesValue.toFixed(0)} €`
+    );
   }
 
   /**
@@ -131,32 +171,33 @@ export class Hud {
    * den Erlös — deshalb steht es dauerhaft im Bild, solange einer wartet.
    */
   updateLoad(kg: number | null, purity: number, bestellt: string | null): void {
-    const el = document.getElementById("load");
+    const el = this.loadEl;
     if (!el) return;
     if (kg === null) {
-      el.style.display = "none";
+      if (el.style.display !== "none") el.style.display = "none";
       return;
     }
-    el.style.display = "block";
+    if (el.style.display !== "block") el.style.display = "block";
     const p = Math.round(purity * 100);
     const ziel = bestellt ? getMaterial(bestellt).name : "Gemischt";
     if (kg === 0) {
-      el.textContent = `Auftrag: ${ziel} — Container ist leer`;
-      el.style.color = "#9aa2a8";
+      schreib(el, `Auftrag: ${ziel} — Container ist leer`, "#9aa2a8");
       return;
     }
     const balken = "█".repeat(Math.round(p / 10)) + "░".repeat(10 - Math.round(p / 10));
-    el.textContent = `${ziel}: ${masseText(kg)} · ${balken} ${p} % sortenrein`;
     // Ab 90 % lohnt das Abfahren, darunter drückt die Reinheit den Preis
-    el.style.color = p >= 90 ? "#7ec96a" : p >= 65 ? "#f0d060" : "#e08a5a";
+    schreib(
+      el,
+      `${ziel}: ${masseText(kg)} · ${balken} ${p} % sortenrein`,
+      p >= 90 ? "#7ec96a" : p >= 65 ? "#f0d060" : "#e08a5a"
+    );
   }
 
   /** Phase des Tagesablaufs samt Fortschritt. */
   updateShift(text: string, sortierphase: boolean): void {
-    const el = document.getElementById("shift");
+    const el = this.shiftEl;
     if (!el) return;
-    el.textContent = text;
-    el.style.color = sortierphase ? "#7ec96a" : "#f0d060";
+    schreib(el, text, sortierphase ? "#7ec96a" : "#f0d060");
   }
 
   /** Kurze Einblendung (Verkauf, Speichern, Anlieferung). */

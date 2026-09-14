@@ -8,7 +8,7 @@
  *   und verschwinden beim Loslassen — kein Zielen auf feste Kreise (Vorbild
  *   Bagerana/v2). Maßgeblich ist die Zone, nicht der Ort.
  *   (die vier Stickachsen sind im Steuerungsmenü frei belegbar)
- *   Pedale         — zwei Stück unten in der Bildmitte: antippen macht den
+ *   Pedale         — zwei Stück unten links: antippen macht den
  *                    linken Stick zu Gas und Lenkung, noch ein Tipp gibt ihm
  *                    Hauptarm und Oberwagen zurück. Gefahren wird nur mit dem
  *                    Stick; die Pedale selbst geben kein Gas. Gas und Lenken
@@ -26,7 +26,9 @@
  *   Danach bekam das Fahren eine eigene Fläche unten links (400 x 200 px) mit
  *   einem dritten schwebenden Stick. Patrick hat sie auf dem iPad abgelehnt.
  * Jetzt: umgeschaltet wird wieder, aber sichtbar und nur von Hand (Ansage
- * Patrick 14.09.2026, "zwei Pedale nebeneinander unten Mitte").
+ * Patrick 14.09.2026, "zwei Pedale nebeneinander unten Mitte"; seit dem
+ * Gerätetest desselben Tages unten links, weil sie in der Mitte zu viel Sicht
+ * verdeckt haben).
  */
 import { type ControlConfig, type AxisId, loadConfig } from "./controlConfig";
 
@@ -406,7 +408,7 @@ export class TouchControls {
   }
 
   /**
-   * Die beiden Pedale unten in der Bildmitte.
+   * Die beiden Pedale unten links.
    *
    * Sie sind zusammen ein Umschalter und sonst nichts: Ein Tipp auf eines von
    * beiden macht den linken Stick zu Gas und Lenkung, der nächste gibt ihm

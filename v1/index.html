@@ -42,15 +42,30 @@
       #help { top: 12px; left: 12px; }
       #help b { color: #f0b429; }
       #gripinfo { bottom: 12px; left: 50%; transform: translateX(-50%); font-size: 14px; }
-      /* Auf Touchgeraeten stehen die Fahrpedale unten in der Bildmitte — genau
-         dort, wo sonst Griff-Info und Ladeanzeige sitzen. Beide ruecken darum
-         darueber: 10 px Rand + 6 px Fassung + 84 px Pedal + 6 px Fassung
+      /* Die Fahrpedale stehen unten links (Ansage Patrick 14.09.2026: "Pedale
+         links unten anordnen, sonst verdeckt er zu viel Sicht"). Griff-Info und
+         Ladeanzeige bleiben trotzdem angehoben: Beide sind mittig zentrierte
+         Zeilen, die bei langem Text bis in die linke Ecke reichen — auf dem
+         iPhone mini quer (812 px breit) deckt eine volle Ladungszeile den
+         Pedalbereich. Sie ruecken darum weiter darueber: 10 px Rand + 6 px Fassung + 84 px Pedal + 6 px Fassung
          = 106 px Oberkante, plus 12 px Luft = 118 px. Die Ladeanzeige noch
          einmal um die Hoehe der Griff-Info (39 px) plus Luft weiter hinauf. */
       body.touch #gripinfo { bottom: 118px; }
       body.touch #load { bottom: 163px; }
       #money { top: 12px; right: 12px; font-size: 15px; color: #f0d060; }
       #shift { top: 46px; right: 12px; font-size: 13px; color: #f0d060; }
+      /*
+       * Auf Touchgeraeten sitzt der Menueknopf oben rechts auf genau denselben
+       * 12 px — Konto und Tagesablauf lagen darunter. Auf dem iPad quer stand
+       * dadurch "Konto: 1.25(Menue) EUR" (Befund Patrick 14.09.2026).
+       *
+       * Beide ruecken darum am Knopf vorbei nach links: 12 px Rand + 46 px
+       * Knopf + 10 px Luft = 68 px. Nur oberhalb der flachen Fassung, denn
+       * dort stehen sie ohnehin schon links (Regel weiter unten).
+       */
+      @media (min-height: 431px) {
+        body.touch #money, body.touch #shift { right: 68px; }
+      }
       #load { display: none; bottom: 44px; left: 50%; transform: translateX(-50%); font-size: 14px; white-space: nowrap; }
       #debug { top: 80px; right: 12px; display: none; text-align: right; }
       #loading {
@@ -70,7 +85,7 @@
       #zone-left { left: 0; }
       #zone-right { right: 0; }
       /* --- Fahrpedale (Ansage Patrick 14.09.2026) ---
-         Zwei Pedale nebeneinander, unten in der Bildmitte. Sie sind der
+         Zwei Pedale nebeneinander, unten links. Sie sind der
          Umschalter und die Anzeige, nicht die Steuerung: Ein Tipp macht den
          linken Stick zu Gas und Lenkung, der naechste gibt ihm Hauptarm und
          Oberwagen zurueck. Gefahren wird ausschliesslich mit dem Stick.
@@ -91,7 +106,7 @@
          umgreift und dabei ungenauer zielt. 18 px Abstand dazwischen, damit
          der Daumen nicht zwischen beide faellt. */
       #pedals {
-        position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%);
+        position: absolute; left: 12px; bottom: 10px;
         display: flex; gap: 18px; padding: 6px;
         pointer-events: auto; touch-action: none; z-index: 2;
       }
@@ -214,7 +229,7 @@
            kleiner, aber mit 58 x 64 px immer noch klar ueber den 44 px, die
            ein Tippziel mindestens messen muss. Plattenweg entsprechend:
            64 - 2 x 2 - 20 - 6 Luft = 34 px unten, also 28 px Weg ab 6 px. */
-        #pedals { bottom: 6px; gap: 14px; padding: 5px; }
+        #pedals { left: 8px; bottom: 6px; gap: 14px; padding: 5px; }
         #touch .pedal { width: 58px; height: 64px; }
         #touch .pedal .platte { top: 6px; height: 20px; left: 6px; right: 6px; }
         #touch.fahren .pedal .platte { transform: translateY(28px); }
@@ -495,7 +510,7 @@
       <div class="zone" id="zone-right"></div>
       <div class="pad" id="touch-left" hidden><div class="knob"></div></div>
       <div class="pad" id="touch-right" hidden><div class="knob"></div></div>
-      <!-- Zwei Pedale unten in der Bildmitte. Sie schalten das Fahren ein und
+      <!-- Zwei Pedale unten links. Sie schalten das Fahren ein und
            aus und zeigen zugleich, welcher Zustand gilt; gefahren wird danach
            mit dem linken Stick. Beide tun dasselbe. Kein Wort steht darauf —
            der Zustand soll allein am Bild ablesbar sein. -->
@@ -544,7 +559,7 @@
         <button id="pause-new">Neues Spiel</button>
         <p class="hint">
           Linker Stick: Hauptarm &amp; Oberwagen · Rechter Stick: Ausleger &amp; Spinne<br />
-          Pedale unten Mitte: Fahren an/aus — dann fährt der linke Stick<br />
+          Pedale unten links: Fahren an/aus — dann fährt der linke Stick<br />
           ↺ ↻ Spinne drehen · Doppeltipp rechts: Ansicht<br />
           Rechten Daumen stillhalten: Funktionskranz
         </p>
@@ -575,7 +590,7 @@
         <button id="ctrl-reset">Werkseinstellung</button>
         <button id="ctrl-back">Zurück</button>
         <p class="hint">
-          Zum Fahren tippst du die Pedale unten in der Bildmitte an: Dann gibt
+          Zum Fahren tippst du die Pedale unten links an: Dann gibt
           der linke Stick Gas (hoch und runter) und lenkt (seitlich). Noch ein
           Tipp, und er führt wieder Hauptarm und Oberwagen. Von selbst
           schaltet nichts zurück. Spinne drehen zusätzlich über ↺ ↻.

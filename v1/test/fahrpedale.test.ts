@@ -6,8 +6,9 @@ import { FUNCTION_LABELS, AXIS_LABELS, defaultConfig } from "../src/core/control
 
 /*
  * Gefahren wird mit dem linken Stick, eingeschaltet mit zwei Pedalen unten in
- * der Bildmitte (Ansage Patrick 14.09.2026: "zwei Pedale nebeneinander unten
- * Mitte", Nachtrag: "die beiden Pedale sind nur visuell").
+ * der linken unteren Ecke (Ansage Patrick 14.09.2026: "zwei Pedale nebeneinander
+ * unten Mitte", Nachtrag: "die beiden Pedale sind nur visuell", nach dem
+ * Geraetetest: "Pedale links unten anordnen, sonst verdeckt er zu viel Sicht").
  *
  * Diese Datei hiess bis heute fahrflaeche.test.ts und bewachte den Vorgaenger:
  * eine eigene Fahrflaeche unten links mit einem dritten schwebenden Stick.
@@ -80,16 +81,37 @@ describe("Fahrachse", () => {
 });
 
 describe("Zwei Pedale statt Fahrflaeche", () => {
-  it("hat zwei Pedale unten in der Bildmitte", () => {
+  it("hat zwei Pedale unten links", () => {
     // Zwei, nebeneinander — so bestellt. Ein einzelnes Pedal saehe aus wie ein
     // Knopf; zwei sehen aus wie eine Maschine.
     expect(seite).toContain('id="pedals"');
     expect(seite).toContain('id="pedal-l"');
     expect(seite).toContain('id="pedal-r"');
     const halter = bloecke("#pedals")[0] ?? "";
-    expect(halter).toContain("left: 50%");
-    expect(halter).toContain("translateX(-50%)");
+    /*
+     * Sie standen den halben Tag in der Bildmitte. Patrick am Gerät,
+     * 14.09.2026: "Pedale links unten anordnen, sonst verdeckt er zu viel
+     * Sicht." Unten links ist der Rand des Blicks; die Mitte ist genau die
+     * Stelle, auf die man beim Greifen schaut.
+     */
+    expect(halter).not.toContain("left: 50%");
+    expect(halter).not.toContain("translateX");
+    expect(css(halter, "left")).toBeLessThanOrEqual(16);
     expect(halter).toContain("bottom:");
+  });
+
+  it("bleibt mit allem in der linken Bildhaelfte", () => {
+    /*
+     * Die rechte Haelfte gehoert dem Greifstick und dem Doppeltipp fuer die
+     * Ansicht. Ragte der Pedalblock hinueber, faenge er Tipps ab, die der
+     * Kamera galten. Gerechnet in der schmalsten Fassung: iPhone mini quer,
+     * 812 px breit.
+     */
+    // Zweiter Block je Bezeichner = die flache Fassung in der Medienabfrage.
+    const halter = bloecke("#pedals")[1] ?? "";
+    const pedal = bloecke("#touch .pedal")[1] ?? "";
+    const breite = 2 * css(halter, "padding") + 2 * css(pedal, "width") + css(halter, "gap");
+    expect(css(halter, "left") + breite).toBeLessThan(812 / 2);
   });
 
   it("hat die Fahrflaeche von heute frueh restlos abgeraeumt", () => {
@@ -154,8 +176,10 @@ describe("Zwei Pedale statt Fahrflaeche", () => {
   it("verspricht in keinem Hilfetext mehr einen Doppeltipp oder ein Feld zum Fahren", () => {
     expect(sichtbar).not.toContain("Doppeltipp links");
     expect(sichtbar).not.toMatch(/Feld unten links/);
-    // Dafuer steht ueberall dasselbe: Pedale antippen, dann faehrt der Stick
-    expect(sichtbar).toMatch(/Pedale unten Mitte/);
+    // Dafuer steht ueberall dasselbe: Pedale antippen, dann faehrt der Stick.
+    // "unten links" muss mitwandern — ein Hilfetext, der auf die Mitte zeigt,
+    // schickt den Spieler an die falsche Stelle.
+    expect(sichtbar).toMatch(/Pedale unten links/);
   });
 
   it("laesst den Doppeltipp fuer die Ansicht unangetastet", () => {
@@ -256,7 +280,8 @@ describe("Platz auf dem Glas", () => {
   });
 
   it("schiebt Griff-Info und Ladeanzeige ueber die Pedale", () => {
-    // Beide stehen unten mittig — genau dort, wo jetzt die Pedale liegen.
+    // Beide sind mittig zentrierte Zeilen und reichen bei langem Text bis in
+    // die linke Ecke, in der die Pedale seit dem Geraetetest stehen.
     // Die Griff-Info muss oberhalb der Pedaloberkante beginnen. Die Fassung um
     // die Pedale zaehlt doppelt mit (oben und unten); vergisst man sie, fehlen
     // genau die Pixel, die auf dem iPhone mini die Anzeige aufs Pedal

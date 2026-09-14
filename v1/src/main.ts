@@ -49,6 +49,17 @@ import { Zwischenbild } from "./core/zwischenbild";
 
 const FIXED_DT = 1 / 60;
 const MAX_STEPS_PER_FRAME = 5; // Spiral-of-death-Schutz
+/** Platzhalter, solange das F3-Overlay aus ist und niemand die Zahlen liest. */
+const LEERE_ZAEHLUNG = { bodies: 0, awake: 0, dynamic: 0, dynAwake: 0 } as const;
+/**
+ * So oft je Sekunde wird die Ladung des wartenden Abholers durchgerechnet.
+ *
+ * Befund 14.09.2026: Der Durchlauf lief in jedem Bild ueber alle Teile des
+ * Platzes und baute dabei jedes Mal eine neue Tabelle auf — fuer eine Anzeige,
+ * die sich nur aendert, wenn der Spieler etwas in den Container fallen laesst.
+ * Viermal je Sekunde ist schneller, als man ablaed.
+ */
+const LADUNG_TAKT_S = 0.25;
 const RECOUNT_INTERVAL = 10; // Container-Zählung alle 10 Steps
 
 async function main(): Promise<void> {
@@ -965,6 +976,8 @@ async function main(): Promise<void> {
   const gegriffeneNetze: THREE.Object3D[] = [];
   let lastTime = performance.now();
   let frameCount = 0;
+  /* Restzeit bis zur naechsten Ladungs-Durchrechnung, siehe LADUNG_TAKT_S. */
+  let ladungTakt = 0;
   let labelsOn = true; // Zonen-Schilder sichtbar
 
   function frame(): void {
@@ -1246,21 +1259,28 @@ async function main(): Promise<void> {
     // Daran hängt der Erlös, also gehört es laufend ins Bild.
     const abholer = vehicles.pickupTruck;
     if (abholer?.waitingForLoad) {
-      const geladen = abholer.containedItems(items);
-      const nachMaterial = new Map<string, number>();
-      let gesamt = 0;
-      for (const it of geladen) {
-        for (const c of it.composition ?? [{ materialId: it.materialId, massKg: it.massKg }]) {
-          nachMaterial.set(c.materialId, (nachMaterial.get(c.materialId) ?? 0) + c.massKg);
-          gesamt += c.massKg;
+      ladungTakt -= frameDt;
+      if (ladungTakt <= 0) {
+        ladungTakt = LADUNG_TAKT_S;
+        const geladen = abholer.containedItems(items);
+        const nachMaterial = new Map<string, number>();
+        let gesamt = 0;
+        for (const it of geladen) {
+          for (const c of it.composition ?? [{ materialId: it.materialId, massKg: it.massKg }]) {
+            nachMaterial.set(c.materialId, (nachMaterial.get(c.materialId) ?? 0) + c.massKg);
+            gesamt += c.massKg;
+          }
         }
+        const bestellt = vehicles.pickupOrder;
+        const passend = bestellt
+          ? nachMaterial.get(bestellt) ?? 0
+          : Math.max(0, ...nachMaterial.values());
+        hud.updateLoad(gesamt, gesamt > 0 ? passend / gesamt : 1, bestellt);
       }
-      const bestellt = vehicles.pickupOrder;
-      const passend = bestellt
-        ? nachMaterial.get(bestellt) ?? 0
-        : Math.max(0, ...nachMaterial.values());
-      hud.updateLoad(gesamt, gesamt > 0 ? passend / gesamt : 1, bestellt);
     } else {
+      // Faehrt gerade keiner vor, rechnet niemand — und der naechste Abholer
+      // soll sofort eine Zahl sehen, nicht erst nach einer Viertelsekunde.
+      ladungTakt = 0;
       hud.updateLoad(null, 1, null);
     }
     hud.updateMoney(account.moneyEur, containers.totalValue());
@@ -1290,7 +1310,13 @@ async function main(): Promise<void> {
      * was im Frame darueber hinaus vergeht, liegt zwischen den Bildern
      * (Bildsynchronisation, Browser, Verbund der Grafikschicht).
      */
-    const counts = physics.counts();
+    /*
+     * Zaehlen nur, wenn das Overlay auch hinschaut (Befund 14.09.2026):
+     * `physics.counts()` laeuft ueber alle Koerper der Welt, und zwar bisher in
+     * jedem Bild — obwohl die Zahlen ausschliesslich im F3-Overlay stehen, das
+     * viermal je Sekunde schreibt und im Spiel fast immer aus ist.
+     */
+    const counts = debug.visible ? physics.counts() : LEERE_ZAEHLUNG;
     msLogik = performance.now() - tLogik;
     debug.update(frameDt, {
       bodies: counts.bodies,
