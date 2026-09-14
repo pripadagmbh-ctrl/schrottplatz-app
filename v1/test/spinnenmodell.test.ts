@@ -26,6 +26,7 @@ import {
   CLAW_SEGMENTS,
   CLAW_SEG_LEN,
   clawPoint,
+  clawToothDepth,
 } from "../src/excavator/clawGeometry";
 import { LASCHE, ROHRLAENGE, ZYLINDERKREIS, ZYLINDER_OBEN_Y } from "../src/grapple/form";
 
@@ -56,6 +57,32 @@ function kette(pivot: THREE.Object3D): THREE.Object3D[] {
 function station(knoten: THREE.Object3D[], k: number, out: THREE.Vector3): THREE.Vector3 {
   if (k < knoten.length) return knoten[k]!.getWorldPosition(out);
   return knoten[knoten.length - 1]!.localToWorld(out.set(0, -CLAW_SEG_LEN, 0));
+}
+
+/**
+ * Tiefster ECKPUNKT aller Meshes unter `knoten` — in Metern unter dem Ursprung.
+ *
+ * Nicht die Segmentkette, sondern die gebaute Geometrie: Was gezeichnet wird,
+ * setzt im Spiel auf. Die Messart ist die von `tools/fuenfschalen/zahnlage.ts`.
+ */
+function tiefsterEckpunkt(knoten: THREE.Object3D): { tiefe: number; teil: string } {
+  const p = new THREE.Vector3();
+  let tiefe = -Infinity;
+  let teil = "";
+  knoten.traverse((o) => {
+    if (!(o instanceof THREE.Mesh)) return;
+    const pos = (o.geometry as THREE.BufferGeometry).getAttribute("position");
+    if (!pos) return;
+    for (let i = 0; i < pos.count; i++) {
+      p.fromBufferAttribute(pos as THREE.BufferAttribute, i);
+      o.localToWorld(p);
+      if (-p.y > tiefe) {
+        tiefe = -p.y;
+        teil = o.name || `(unbenannt: ${(o.geometry as THREE.BufferGeometry).type})`;
+      }
+    }
+  });
+  return { tiefe, teil };
 }
 
 /** Stellt die Spinne so, wie `Excavator.updateFingers` es tut. */
@@ -129,27 +156,81 @@ describe("Spielmodell der Spinne", () => {
     );
   });
 
-  it("sinkt nirgends tiefer als der Bodenanschlag CLAW_MAX_DEPTH", () => {
+  it("sinkt mit keinem GEZEICHNETEN Eckpunkt tiefer als CLAW_MAX_DEPTH", () => {
     /*
      * Aus `CLAW_MAX_DEPTH` kommt, wie tief der Arm die Spinne noch senken darf.
-     * Der Wert wird aus `clawPoint` gerechnet; hier steht, dass die gezeichnete
-     * Kralle ihn ueber den ganzen Oeffnungsweg einhaelt. Die Spitzenkappe
-     * ragt konstruktiv noch 3 cm darueber hinaus (`tineTip`) — das ist die
-     * Verschleisskappe und darf den Beton streifen.
+     *
+     * Bis zum 14.09.2026 hat dieser Waechter die STATIONEN der Segmentkette
+     * gemessen — also dasselbe Rechenmodell, aus dem `CLAW_MAX_DEPTH` selbst
+     * kommt. Er hat damit nur sich selbst geprueft und „passt" gemeldet,
+     * waehrend der gezeichnete Zahnkegel 12,4 cm tiefer hing und im Spiel im
+     * Beton verschwand (Befund am Geraet: „die kleinen aeussersten Noppen
+     * verschwinden im Boden").
+     *
+     * Jetzt werden die ECKPUNKTE der gebauten Meshes abgetastet, so wie
+     * `tools/fuenfschalen/zahnlage.ts` es beim Fuenfschalengreifer getan hat.
+     * Was gezeichnet wird, setzt auf — was gerechnet wird, nicht.
      */
     const spinne = baueSpinne();
-    const ketten = spinne.gelenke.map(kette);
-    const p = new THREE.Vector3();
     let tiefste = 0;
+    let wo = "";
     for (let s = 0; s <= STUFEN; s++) {
       stelle(spinne.gelenke, splayBei(s / STUFEN));
       spinne.gruppe.updateMatrixWorld(true);
-      for (const k of ketten)
-        for (let i = 0; i <= CLAW_SEGMENTS; i++) tiefste = Math.max(tiefste, -station(k, i, p).y);
+      for (const gelenk of spinne.gelenke) {
+        const t = tiefsterEckpunkt(gelenk);
+        if (t.tiefe > tiefste) {
+          tiefste = t.tiefe;
+          wo = `${t.teil} bei Oeffnung ${(s / STUFEN).toFixed(2)}`;
+        }
+      }
     }
-    expect(tiefste, `tiefste Station ${tiefste.toFixed(3)} m`).toBeLessThanOrEqual(
-      CLAW_MAX_DEPTH + 1e-9
-    );
+    expect(
+      tiefste,
+      `tiefster gezeichneter Punkt ${tiefste.toFixed(4)} m (${wo}), ` +
+        `Anschlag ${CLAW_MAX_DEPTH.toFixed(4)} m`
+    ).toBeLessThanOrEqual(CLAW_MAX_DEPTH + 1e-9);
+    /*
+     * Und die Gegenrichtung: Der Anschlag darf auch nicht zu grosszuegig sein,
+     * sonst schwebt die Spinne ueber dem Boden. 5 mm Toleranz, weil beide
+     * Seiten den Oeffnungsweg in 21 Stufen abtasten und das Maximum zwischen
+     * zwei Stufen liegt (`tools/zahnlage-spinne.ts`: 0,05 mm Abtastfehler).
+     */
+    expect(
+      CLAW_MAX_DEPTH - tiefste,
+      `Anschlag ${((CLAW_MAX_DEPTH - tiefste) * 1000).toFixed(1)} mm zu tief angesetzt`
+    ).toBeLessThan(0.005);
+  });
+
+  it("der tiefste gezeichnete Punkt ist der Zahn, und der heisst tineTip", () => {
+    /*
+     * Die Lehre aus `tools/fuenfschalen/zahnlage.ts`: den Zahn ueber seinen
+     * NAMEN suchen, nicht ueber „aeusserster Punkt" raten. Bei einer nach innen
+     * gekruemmten Sichel kann der tiefste Punkt auch der Schalenruecken sein —
+     * dann stimmt zwar der Anschlag, aber die Begruendung waere falsch, und der
+     * naechste Formwechsel faellt still darauf herein.
+     */
+    const spinne = baueSpinne();
+    const gelenk = spinne.gelenke[0]!;
+    const zahn = gelenk.getObjectByName("tineTip");
+    expect(zahn, "kein Knoten namens tineTip — der Zahn ist nicht mehr messbar").toBeDefined();
+    for (let s = 0; s <= STUFEN; s++) {
+      const splay = splayBei(s / STUFEN);
+      stelle(spinne.gelenke, splay);
+      spinne.gruppe.updateMatrixWorld(true);
+      const ganz = tiefsterEckpunkt(gelenk);
+      const nurZahn = tiefsterEckpunkt(zahn!);
+      expect(ganz.teil, `bei Oeffnung ${(s / STUFEN).toFixed(2)} setzt ${ganz.teil} auf`).toBe(
+        "tineTip"
+      );
+      /*
+       * Und `clawToothDepth` rechnet genau diesen gezeichneten Punkt nach —
+       * das ist die Bruecke zwischen Modell und Rechnung. Ginge sie auf,
+       * waere der Bodenanschlag wieder blind fuer den Zahn.
+       */
+      expect(clawToothDepth(splay), `Zahnrechnung bei Oeffnung ${(s / STUFEN).toFixed(2)}`)
+        .toBeCloseTo(nurZahn.tiefe, 6);
+    }
   });
 
   it("haengt die Zylinder an denselben Punkten auf wie das Exportmodell", () => {

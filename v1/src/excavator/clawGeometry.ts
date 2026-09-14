@@ -20,14 +20,21 @@ import * as THREE from "three";
  * die Zahlen kommen aus `clawSpan`, `clawWidth` und `clawTipDepth` selbst,
  * abgetastet über 2001 Stützstellen des Öffnungsweges):
  *
- *   offen (Spreizung 1,555)     Spitzenweite 3,3805 m   Spitzen 2,3413 m tief
+ *   offen (Spreizung 1,555)     Spitzenweite 3,3805 m   Segmentkette 2,3413 m tief
  *   geschlossen (Spreizung 0,5495)  Spitzen treffen sich auf der Achse
  *                                   (Restweite 0,0015 m), 2,8312 m tief
- *   tiefster Punkt über den ganzen Weg 2,8754 m, bei Spreizung 0,7702
+ *   tiefster Kettenpunkt über den ganzen Weg 2,8754 m, bei Spreizung 0,7702
  *
  * Der tiefste Punkt liegt also weder ganz offen noch ganz zu, sondern
  * dazwischen — deshalb tastet `CLAW_MAX_DEPTH` den Weg ab, statt die beiden
  * Endlagen zu vergleichen.
+ *
+ * Unter der Segmentkette haengt noch der ZAHNKEGEL (`CLAW_TIP_CONE`), und der
+ * zaehlt fuer den Bodenanschlag mit — er wird gezeichnet, also setzt er auf.
+ * Mit ihm (14.09.2026, `tools/zahnlage-spinne.ts`):
+ *
+ *   offen 2,4424 m   geschlossen 2,9488 m
+ *   tiefster Punkt über den ganzen Weg 2,9995 m, bei Spreizung 0,7775
  *
  * Wer an `CLAW_SEG_LEN` oder `CLAW_SEG_BEND` dreht, muss beides nachrechnen —
  * vor allem das Schließen auf der Achse, denn davon hängt ab, ob der Korb
@@ -63,6 +70,32 @@ export const CLAW_SEG_BEND = 0.22;
 export const CLAW_SEGMENTS = 8;
 /** Zahl der Krallen */
 export const CLAW_COUNT = 5;
+/**
+ * Der ZAHNKEGEL am Ende jeder Kralle — die Verschleisskappe.
+ *
+ * Er wird in `grappleParts.baueKralle` als Knoten `tineTip` gezeichnet und
+ * haengt UNTER der letzten Station der Segmentkette. Bis zum 14.09.2026 stand
+ * er nur dort im Modell und nirgends in der Rechnung; `CLAW_MAX_DEPTH` lief
+ * ueber `clawPoint` und kannte ihn nicht. Gemessen mit
+ * `tools/zahnlage-spinne.ts` fehlten dadurch 0,1241 m, und genau so viel sank
+ * die Spinne in den Beton (Befund am Geraet 14.09.2026: „Spinne sitzt auf, die
+ * kleinen aeussersten Noppen verschwinden im Boden").
+ *
+ * Die Zahlen sind keine neuen Werte, sondern die des gezeichneten Kegels, hier
+ * an EINE Stelle gezogen: `grappleParts.ts` baut ihn jetzt daraus.
+ *
+ *   hoehe    0,14 m   Kegelhoehe
+ *   rOben    0,03 m   Radius am Schalenende
+ *   rUnten   0,075 m  Radius an der Unterkante — der stumpfe Loeffelrand
+ *   versatz  0,03 m   Kegelmitte unter der Spitzenstation
+ *
+ * Die Unterkante liegt damit `versatz + hoehe/2` = 0,10 m unter der Station,
+ * gemessen entlang der Krallenachse. In der Senkrechten sind es je nach
+ * Neigung des letzten Segments bis zu 0,125 m, weil die Unterkante eine
+ * Scheibe von 0,075 m Radius ist und sich mitneigt.
+ */
+export const CLAW_TIP_CONE = { hoehe: 0.14, rOben: 0.03, rUnten: 0.075, versatz: 0.03 };
+
 /** Spreizung der ganz offenen Spinne (rad) */
 /*
  * Offen ist 1,555, nicht mehr 1,25.
@@ -142,13 +175,40 @@ export function clawWidth(splay: number): number {
 }
 
 /**
+ * Tiefe der Unterkante des ZAHNKEGELS unter dem Ursprung der Spinne (m).
+ *
+ * Der Kegel haengt an der letzten Segmentgruppe und neigt sich mit ihr. Seine
+ * Unterkante ist eine Scheibe von `rUnten`; je schraeger das letzte Segment
+ * steht, desto weiter reicht ihr aeusserer Rand nach unten. Beides steckt in
+ * der Rechnung:
+ *
+ *   Tiefe = Spitzenstation + (versatz + hoehe/2) · cos θ + rUnten · |sin θ|
+ *
+ * mit θ = Neigung des letzten Segments gegen die Senkrechte. Das ist derselbe
+ * Winkel, mit dem `clawPoint` von Station 7 auf Station 8 laeuft, und dieselbe
+ * Drehung, die `baueKralle` dem Segment gibt — Zeichnung und Rechnung koennen
+ * deshalb nicht auseinanderlaufen. `test/spinnenmodell.test.ts` misst das am
+ * gezeichneten Knoten nach.
+ */
+export function clawToothDepth(splay: number): number {
+  const spitze = clawPoint(0, splay, CLAW_SEGMENTS, new THREE.Vector3());
+  const th = -splay + (CLAW_SEGMENTS - 1) * CLAW_SEG_BEND;
+  const laengs = CLAW_TIP_CONE.versatz + CLAW_TIP_CONE.hoehe / 2;
+  return -spitze.y + laengs * Math.cos(th) + CLAW_TIP_CONE.rUnten * Math.abs(Math.sin(th));
+}
+
+/**
  * Tiefe des tiefsten Krallenpunktes unter dem Ursprung der Spinne. Daraus
  * ergibt sich der Bodenanschlag — der Greifer darf nie in den Beton sinken.
  *
- * Heute ist das die Spitze; die Rechnung läuft trotzdem über alle Stationen.
- * Das ist Absicht: Sobald jemand am Krümmungsprofil dreht und die Kralle am
- * Ende nach innen hakt, wandert der tiefste Punkt nach oben, und wer dann noch
- * nach der Spitze absetzt, fährt mit dem Bauch der Kralle in den Beton.
+ * Gerechnet wird über alle Stationen der Segmentkette UND über den gezeichneten
+ * Zahnkegel. Die Stationenschleife ist Absicht: Sobald jemand am Krümmungsprofil
+ * dreht und die Kralle am Ende nach innen hakt, wandert der tiefste Punkt nach
+ * oben, und wer dann noch nach der Spitze absetzt, fährt mit dem Bauch der
+ * Kralle in den Beton.
+ *
+ * Der Zahnkegel kam am 14.09.2026 dazu. Er wurde von Anfang an gezeichnet, aber
+ * nie gerechnet — 0,1241 m Modell, die es fuer den Bodenanschlag nicht gab.
  */
 export function clawTipDepth(splay: number): number {
   const p = new THREE.Vector3();
@@ -156,7 +216,7 @@ export function clawTipDepth(splay: number): number {
   for (let k = 1; k <= CLAW_SEGMENTS; k++) {
     tief = Math.max(tief, -clawPoint(0, splay, k, p).y);
   }
-  return tief;
+  return Math.max(tief, clawToothDepth(splay));
 }
 
 /**
@@ -227,7 +287,8 @@ export function naechsteSpreizung(
 }
 
 /**
- * Groesste Tiefe, die eine Krallenspitze in irgendeiner Stellung erreicht (m).
+ * Groesste Tiefe, die ein GEZEICHNETER Krallenpunkt in irgendeiner Stellung
+ * erreicht (m) — Segmentkette oder Zahnkegel, was tiefer haengt.
  *
  * Der Wert, mit dem gerechnet werden muss, wenn die Stellung offen ist oder
  * sich noch aendern kann — etwa fuer die Frage, wie hoch der Arm die Spitzen
@@ -242,6 +303,10 @@ export function naechsteSpreizung(
  * Statt die jeweils gueltige Richtung an mehreren Stellen zu pflegen, wird hier
  * schlicht das Maximum genommen. Das ist in beiden Faellen richtig und bleibt
  * es auch beim naechsten Formwechsel.
+ *
+ * 21 Stuetzstellen reichen: Gegen 2001 abgetastet liegt das grobe Maximum
+ * 0,05 mm zu niedrig (`tools/zahnlage-spinne.ts`, 14.09.2026). Das ist weniger
+ * als die 2 cm Luft, die `resolveGroundClamp` ohnehin darauf legt.
  */
 export const CLAW_MAX_DEPTH: number = (() => {
   let tief = 0;

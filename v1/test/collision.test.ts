@@ -17,6 +17,7 @@ import {
   clawSpan,
   CLAW_CLOSED_SPLAY,
   clawTipDepth,
+  clawToothDepth,
   CLAW_MAX_DEPTH,
   naechsteSpreizung,
   NACHDRUECK_RESERVE,
@@ -473,20 +474,36 @@ describe("Reichweite des Baggers", () => {
     }
   });
 
-  it("nimmt für den Bodenanschlag den tiefsten Punkt der Schale", () => {
+  it("nimmt für den Bodenanschlag den tiefsten Punkt der Schale — Kette ODER Zahn", () => {
     /*
-     * Heute ist das die Spitze. Die Rechnung geht trotzdem über alle Stationen,
-     * und das ist Absicht: Sobald jemand am Krümmungsprofil dreht und die
-     * Schale am Ende nach innen hakt, wandert der tiefste Punkt nach oben.
-     * Wer dann noch nach der Spitze absetzt, fährt mit dem Bauch der Schale in
-     * den Beton, ohne dass ein Test anschlägt.
+     * Die Rechnung geht über alle Stationen, und das ist Absicht: Sobald jemand
+     * am Krümmungsprofil dreht und die Schale am Ende nach innen hakt, wandert
+     * der tiefste Punkt nach oben. Wer dann noch nach der Spitze absetzt, fährt
+     * mit dem Bauch der Schale in den Beton, ohne dass ein Test anschlägt.
+     *
+     * Bis zum 14.09.2026 stand hier `clawTipDepth === tiefste Station` — ein
+     * Gleichheitszeichen gegen genau das Modell, aus dem `clawTipDepth` selbst
+     * kommt. Der Test hat sich damit selbst bestaetigt und den gezeichneten
+     * Zahnkegel uebersehen, der 12,4 cm tiefer haengt (Befund am Geraet: „die
+     * kleinen aeussersten Noppen verschwinden im Boden").
+     *
+     * Der Waechter ist damit nicht schwaecher, sondern breiter: Er verlangt
+     * weiterhin, dass der Kettenbauch mitgerechnet wird, und zusaetzlich, dass
+     * der Zahn mitgerechnet wird. Ob die Zahnrechnung zum GEZEICHNETEN Zahn
+     * passt, prueft `test/spinnenmodell.test.ts` am Mesh.
      */
     for (const splay of [CLAW_CLOSED_SPLAY, CLAW_OPEN_SPLAY]) {
-      let tiefste = 0;
+      let kette = 0;
       for (let k = 1; k <= CLAW_SEGMENTS; k++) {
-        tiefste = Math.max(tiefste, -clawPoint(0, splay, k, new THREE.Vector3()).y);
+        kette = Math.max(kette, -clawPoint(0, splay, k, new THREE.Vector3()).y);
       }
-      expect(clawTipDepth(splay)).toBeCloseTo(tiefste, 6);
+      expect(clawTipDepth(splay)).toBeCloseTo(Math.max(kette, clawToothDepth(splay)), 6);
+      expect(clawTipDepth(splay), "Kettenbauch faellt unter den Tisch").toBeGreaterThanOrEqual(
+        kette - 1e-9
+      );
+      expect(clawTipDepth(splay), "der Zahn faellt unter den Tisch").toBeGreaterThanOrEqual(
+        clawToothDepth(splay) - 1e-9
+      );
     }
   });
 });

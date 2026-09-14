@@ -6,6 +6,7 @@ import {
   CLAW_SEGMENTS,
   CLAW_SEG_BEND,
   CLAW_SEG_LEN,
+  CLAW_TIP_CONE,
 } from "./clawGeometry";
 
 /**
@@ -244,9 +245,22 @@ export function baueKralle(st: SpinnenStoffe, winkel: number): THREE.Group {
    * Stumpfes Schalenende statt Vierkantkegel: Sortiergreifer laufen wie ein
    * Löffelrand aus, nicht wie ein Spieß. Das erklärt nebenbei, warum Bleche
    * früher aufgespießt wurden.
+   *
+   * Die Maße stehen seit 14.09.2026 in `CLAW_TIP_CONE`, nicht mehr hier: Der
+   * Kegel haengt unter der letzten Station und bestimmt damit den
+   * Bodenanschlag mit. Solange die Zahlen nur an dieser Stelle standen, kannte
+   * `CLAW_MAX_DEPTH` sie nicht und meldete 0,1241 m zu wenig.
    */
-  const spitze = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.075, 0.14, 8), st.kante);
-  spitze.position.y = -CLAW_SEG_LEN - 0.03;
+  const spitze = new THREE.Mesh(
+    new THREE.CylinderGeometry(
+      CLAW_TIP_CONE.rOben,
+      CLAW_TIP_CONE.rUnten,
+      CLAW_TIP_CONE.hoehe,
+      8
+    ),
+    st.kante
+  );
+  spitze.position.y = -CLAW_SEG_LEN - CLAW_TIP_CONE.versatz;
   spitze.castShadow = true;
   spitze.name = "tineTip";
   eltern.add(spitze);
