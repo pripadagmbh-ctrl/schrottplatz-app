@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { YARD_D, YARD_MIN_X, YARD_MAX_X, GATE_X, TOR_HALB } from "./yard";
 
 /**
  * Tageslauf über dem Platz (Wunsch 29.08.2026).
@@ -81,10 +82,51 @@ export class Daylight {
 }
 
 /**
- * Flutlichtmasten am Rand des Platzes, alle nach innen auf die Arbeits-
- * flächen gerichtet. Sie stehen bewusst an der Umrandung, damit auf dem
- * Platz selbst nichts im Weg steht. Zuschalten passiert bei Dämmerung
- * von allein.
+ * Höhe der Umrandung, in der ein Mast steckt — drei Lagen à 0,6 m (yard.ts).
+ */
+const MAUER_H = 1.8;
+/** Kantenlänge des Betonsockels um den Mast (SW): etwas dicker als die Mauer. */
+const SOCKEL = 0.72;
+
+/**
+ * Einen Standort auf die nächstgelegene Platzmauer legen — „eingemauert".
+ *
+ * Befund 14.09.2026 (Patrick, auf dem Gerät): „Die Scheinwerfer müssen nicht
+ * unbedingt auf dem Platz stehen. Die können auch quasi eingemauert sein mit
+ * dem Legostein. Das heißt, die gucken einfach aus den Legosteinen heraus und
+ * wandern damit an die Außengrenzen."
+ *
+ * Die Liste der Standorte kommt weiterhin aus `main.ts`; sie nennt nur noch
+ * die ungefähre Stelle. Auf welcher Mauer der Mast landet, rechnet diese
+ * Funktion aus — dieselbe Regel für alle sechs, statt sechs Zahlenpaare, die
+ * beim nächsten Platzumbau einzeln nachgezogen werden müssten.
+ *
+ * Die Einfahrtslücke bleibt frei: Ein Mast mitten im Tor stünde dort, wo der
+ * LKW hereinfährt.
+ */
+export function einmauern(x: number, z: number): [number, number] {
+  const hz = YARD_D / 2;
+  const abstaende: Array<[number, [number, number]]> = [
+    [Math.abs(x - YARD_MIN_X), [YARD_MIN_X, z]],
+    [Math.abs(x - YARD_MAX_X), [YARD_MAX_X, z]],
+    [Math.abs(z + hz), [x, -hz]],
+    [Math.abs(z - hz), [x, hz]],
+  ];
+  abstaende.sort((a, b) => a[0] - b[0]);
+  const [mx, mz] = abstaende[0]![1];
+  // Nicht ins Tor: notfalls an dessen Rand ausweichen.
+  if (Math.abs(mz - hz) < 0.01 && Math.abs(mx - GATE_X) < TOR_HALB + SOCKEL) {
+    const seite = mx < GATE_X ? -1 : 1;
+    return [GATE_X + seite * (TOR_HALB + SOCKEL), mz];
+  }
+  return [mx, mz];
+}
+
+/**
+ * Flutlichtmasten in der Platzmauer, alle nach innen auf die Arbeitsflächen
+ * gerichtet. Sie stecken in der Betonlego-Umrandung und schauen oben heraus,
+ * damit auf dem Platz selbst nichts im Weg steht. Zuschalten passiert bei
+ * Dämmerung von allein.
  */
 export class Floodlights {
   private lights: THREE.SpotLight[] = [];
@@ -101,13 +143,35 @@ export class Floodlights {
     const headMat = new THREE.MeshStandardMaterial({ color: 0x3d4347, roughness: 0.7 });
     const MAST_H = 12;
 
-    for (const [x, z] of positions) {
+    // Beton wie die Umrandung, damit der Sockel als Teil der Mauer liest
+    const betonMat = new THREE.MeshStandardMaterial({ color: 0x9b9b94, roughness: 0.95 });
+
+    for (const [roh_x, roh_z] of positions) {
+      const [x, z] = einmauern(roh_x, roh_z);
       const group = new THREE.Group();
       group.position.set(x, 0, z);
-      // Fundament und Mast
-      const base = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.35, 1.2), headMat);
-      base.position.y = 0.17;
-      group.add(base);
+      /*
+       * Kein Fundament auf dem Platz mehr, sondern ein Betonklotz IN der
+       * Mauerflucht: so breit wie die Steine daneben, ein paar Zentimeter
+       * dicker, und genau so hoch wie die Umrandung. Der Mast wächst
+       * mittendurch und schaut oben heraus (Ansage 14.09.2026).
+       */
+      const sockel = new THREE.Mesh(
+        new THREE.BoxGeometry(SOCKEL, MAUER_H, SOCKEL),
+        betonMat
+      );
+      sockel.position.y = MAUER_H / 2;
+      sockel.castShadow = true;
+      sockel.receiveShadow = true;
+      group.add(sockel);
+      // Kragen aus Stahl, wo der Mast aus dem Beton kommt — daran sieht man,
+      // dass er eingelassen und nicht davorgestellt ist.
+      const kragen = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.3, 0.34, 0.22, 8),
+        headMat
+      );
+      kragen.position.y = MAUER_H;
+      group.add(kragen);
       const mast = new THREE.Mesh(
         new THREE.CylinderGeometry(0.16, 0.24, MAST_H, 8),
         mastMat
@@ -150,9 +214,18 @@ export class Floodlights {
   /** @param daylight 0..1 — unter 0,45 wird zugeschaltet */
   update(daylight: number): void {
     const an = THREE.MathUtils.clamp((0.45 - daylight) / 0.3, 0, 1);
-    // Genug, um zu arbeiten, ohne den Platz auszubrennen — Nacht soll
-    // Nacht bleiben.
-    for (const l of this.lights) l.intensity = an * 380;
+    /*
+     * Genug, um zu arbeiten, ohne den Platz auszubrennen — Nacht soll Nacht
+     * bleiben.
+     *
+     * 400 statt 380 seit 14.09.2026: Die Masten stehen seit dem Einmauern
+     * 1,5 bis 3,0 m weiter außen. Nachgerechnet über vierzehn Arbeitspunkte
+     * (Bagger, Mulden, Halden, Presse, Abkippzone, Verladeplatz) fiel die
+     * Helligkeit dadurch auf 95 % — mit 400 sind es wieder 100 %, und kein
+     * Punkt wird heller als vorher. Messung: docs/messungen/
+     * 2026-09-14_flutlicht.md.
+     */
+    for (const l of this.lights) l.intensity = an * 400;
     const mat = an > 0.15 ? this.lampOn : this.lampOff;
     for (const lamp of this.lamps) lamp.material = mat;
   }

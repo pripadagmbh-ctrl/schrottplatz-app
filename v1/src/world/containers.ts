@@ -3,6 +3,7 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import { getMaterial } from "../materials/catalog";
 import { maxSpeedFor } from "./scrapItems";
 import { computePurity, containerValue } from "../materials/purity";
+import { reihenstuecke } from "./legoreihe";
 import type { ItemManager, ScrapItem } from "./scrapItems";
 import type { EventBus } from "../core/events";
 
@@ -315,6 +316,35 @@ export function lagerMuldeFuer(fractionId: string | null): ContainerConfig | nul
   return CONFIGS.find((c) => c.lager === true && gehoertHierhin(c, fractionId)) ?? null;
 }
 
+/* ------------------------------------------------------ Muldenwände ------ */
+/** Maße eines Betonlegosteins in den Mulden (Bestand seit 27.08.2026). */
+export const MULDE_STEIN = { laenge: 1.5, hoehe: 0.5, dicke: 0.55 };
+
+/**
+ * Von wo bis wo die Steinreihen einer Mulde laufen.
+ *
+ * Steht als eigene Funktion da, damit `test/muldenwand.test.ts` dieselben
+ * Zahlen prüfen kann, die gebaut werden — der Bau selbst braucht eine Szene
+ * und eine Physikwelt und ist kopflos nicht zu messen.
+ *
+ * Die Flanken hören an der INNENkante der Rückwand auf, die Rückwand läuft
+ * dafür über die volle Breite durch (T-Stoß). Vorher überlappten sich beide
+ * an der Ecke und standen zugleich an beiden Enden über — Befund 14.09.2026.
+ */
+export function muldenWandSpannen(
+  w: number,
+  d: number,
+  hatRueckwand: boolean
+): { flanke: [number, number]; rueck: [number, number] } {
+  const T = MULDE_STEIN.dicke;
+  return {
+    // von der offenen Vorderkante bis an die Rückwand
+    flanke: [-w / 2, w / 2],
+    // quer darüber, bündig mit den Außenflächen der Flanken
+    rueck: hatRueckwand ? [-(d / 2 + T), d / 2 + T] : [0, 0],
+  };
+}
+
 /** Fangbereich über einer Haufen-Zone (Zonen-Zählung + Ampel) */
 const PILE_CATCH_HEIGHT = 2.4;
 
@@ -617,9 +647,9 @@ class GameContainer {
       // Betonlego-Box (Design-Wunsch 2026-08-27): drei Wände aus gestapelten
       // Beton-Legosteinen mit Noppen, vorn offen — wie auf echten Schrottplätzen.
       // Flachere Betonsteine, dafür eine Reihe mehr: wirkt weniger klotzig
-      const BLOCK_L = 1.5;
-      const BLOCK_H = 0.5;
-      const BLOCK_T = 0.55;
+      const BLOCK_L = MULDE_STEIN.laenge;
+      const BLOCK_H = MULDE_STEIN.hoehe;
+      const BLOCK_T = MULDE_STEIN.dicke;
       // Reihen aus der angegebenen Wandhöhe statt fest verdrahtet: Die Zahl in
       // CONFIGS hatte bisher keine Wirkung, jede Mulde bekam 5 Reihen à 0,5 m,
       // also 2,50 m Wand. Gemessen an der Armgeometrie ist das unerreichbar —
@@ -642,22 +672,46 @@ class GameContainer {
       const block = new THREE.Object3D();
       const niete = new THREE.Object3D();
       let bi = 0;
-      const placeBlock = (x: number, y: number, z: number, alongX: boolean): void => {
+      /**
+       * Einen Stein setzen. `laenge` ist die tatsächliche Länge: Ein
+       * Endstein ist kürzer als ein voller, damit die Reihe an der Wandkante
+       * aufhört und nicht darüber hinaus (Befund 14.09.2026).
+       *
+       * Gestreckt wird die Instanz, nicht die Geometrie — sonst bräuchte
+       * jede Länge ihre eigene und die Mulde wieder mehr Zeichenrufe. Die
+       * Noppen sitzen dafür auf einer ungestreckten Grundmatrix, sonst wären
+       * sie am Endstein zu Ovalen gequetscht.
+       */
+      const placeBlock = (
+        x: number,
+        y: number,
+        z: number,
+        alongX: boolean,
+        laenge = BLOCK_L
+      ): void => {
         const f = farben[bi % 5]!;
         // Jeder Block sitzt ein wenig anders — von Hand mit dem Stapler
         // gesetzt, nicht gegossen. Reiner Aufbau, keine Laufzeitkosten.
         const j = (n: number): number => (((bi * 9301 + n * 49297) % 233280) / 233280 - 0.5);
         block.position.set(x + j(1) * 0.05, y + j(2) * 0.02, z + j(3) * 0.05);
         block.rotation.set(j(4) * 0.02, (alongX ? 0 : Math.PI / 2) + j(5) * 0.035, j(6) * 0.018);
+        block.scale.set(1, 1, 1);
+        block.updateMatrix();
+        const ohneStreckung = block.matrix.clone();
+        block.scale.set(laenge / BLOCK_L, 1, 1);
         block.updateMatrix();
         bi++;
         bloecke.push({ m: block.matrix.clone(), f });
-        for (const s of [-0.4, 0.4]) {
+        // Ein kurzer Stein trägt eine Noppe in der Mitte, ein langer zwei —
+        // „quasi ein einzelner Legostein mit einem Element" (Ansage).
+        const anteil = laenge / BLOCK_L;
+        const noppen = anteil < 0.7 ? [0] : [-0.4 * anteil, 0.4 * anteil];
+        for (const s of noppen) {
           niete.position.set(alongX ? s : 0, BLOCK_H / 2 + 0.045, alongX ? 0 : s);
           niete.updateMatrix();
           // Block-Matrix mal lokale Matrix — dieselbe Rechnung wie vorher die
           // Eltern-Kind-Beziehung, also sitzt jede Niete unveraendert
-          nieten.push({ m: block.matrix.clone().multiply(niete.matrix), f });
+          nieten.push({ m: ohneStreckung.clone().multiply(niete.matrix), f });
         }
       };
       // Wände: Ostseite + Nord + Süd. Die WESTseite bleibt offen — dorthin
@@ -668,19 +722,28 @@ class GameContainer {
       // dahinter ist es verloren. Vorn ändert das nichts — dort wird
       // eingefüllt, und die Reichweite des Arms haengt an der Muldenmitte.
       const REIHEN_HINTEN = ROWS + 2;
+      /*
+       * Jede Lage wird von Wandkante zu Wandkante ausgelegt (`reihenstuecke`),
+       * mit halbem Versatz in jeder zweiten Lage. Vorher lief hier eine
+       * Schleife in ganzen Steinlängen mit 0,4 m Zugabe: An einer Mulde von
+       * 4,2 m Front stand die versetzte Lage vorn 0,75 m über die offene
+       * Kante und hinten 0,50 m über die Rückwand hinaus — „die Außenteile
+       * stehen immer ab" (Befund 14.09.2026).
+       */
+      const spannen = muldenWandSpannen(w, d, !cfg.shareEast);
       for (let r = 0; r < REIHEN_HINTEN; r++) {
         const y = BLOCK_H / 2 + r * BLOCK_H;
-        const off = (r % 2) * (BLOCK_L / 2);
+        const versatz = (r % 2) * (BLOCK_L / 2);
         if (r < ROWS) {
-          for (let x = -w / 2 + BLOCK_L / 2 - off; x < w / 2 + 0.4; x += BLOCK_L) {
-            if (!cfg.shareNorth) placeBlock(x, y, d / 2 + BLOCK_T / 2, true);
-            if (!cfg.shareSouth) placeBlock(x, y, -(d / 2 + BLOCK_T / 2), true);
+          for (const s of reihenstuecke(spannen.flanke[0], spannen.flanke[1], BLOCK_L, versatz)) {
+            if (!cfg.shareNorth) placeBlock(s.mitte, y, d / 2 + BLOCK_T / 2, true, s.laenge);
+            if (!cfg.shareSouth) placeBlock(s.mitte, y, -(d / 2 + BLOCK_T / 2), true, s.laenge);
           }
         }
         // Rückwand: entfällt, wenn die Nachbarmulde dahinter sie schon stellt
         if (!cfg.shareEast) {
-          for (let z = -d / 2 + BLOCK_L / 2 - off; z < d / 2 + 0.4; z += BLOCK_L) {
-            placeBlock(w / 2 + BLOCK_T / 2, y, z, false);
+          for (const s of reihenstuecke(spannen.rueck[0], spannen.rueck[1], BLOCK_L, versatz)) {
+            placeBlock(w / 2 + BLOCK_T / 2, y, s.mitte, false, s.laenge);
           }
         }
       }
@@ -714,8 +777,12 @@ class GameContainer {
       );
       const wallH = ROWS * BLOCK_H;
       for (const sz of [-1, 1]) {
+        // Genau so lang wie die Steine, die man sieht: von der offenen
+        // Vorderkante bis an die Rückwand. Vorher stand der Kollider 0,55 m
+        // länger als die Wand — vorn eine unsichtbare Barriere in der
+        // Einfüllöffnung, hinten eine hinter der Rückwand.
         world.createCollider(
-          RAPIER.ColliderDesc.cuboid(w / 2 + BLOCK_T, wallH / 2, BLOCK_T / 2).setTranslation(
+          RAPIER.ColliderDesc.cuboid(w / 2, wallH / 2, BLOCK_T / 2).setTranslation(
             0,
             wallH / 2,
             sz * (d / 2 + BLOCK_T / 2)
