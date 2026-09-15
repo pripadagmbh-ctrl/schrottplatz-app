@@ -267,88 +267,102 @@ erledigt ist, bekommt den Commit dazu.
       Kranfarben und -typen: Welchen Aufbau ein Händler fährt, ist ebenfalls
       eine Eigenschaft des Kunden.
 
-## Was als Nächstes ansteht (Stand 14.09.2026)
+## Was als Nächstes ansteht (Stand 15.09.2026)
 
 Geordnet nach Reihenfolge, nicht nach Größe. Wer hier weiterarbeitet — auch eine
 spätere Sitzung — fängt oben an. Die Abschnitte folgen E-016: erst die Welt,
 dann der Kreislauf, dann die App.
 
-**Stand 14.09.2026, spätabends:** Alles, was in Arbeit war, ist oben —
-Fahrpedale (E-017, seit dem Gerätetest unten links), Bildinterpolation, die
-fünf Baufehler (E-018 bis E-021), der Platzumbau auf Seitenabladung (E-022
-bis E-024) und das Baggerkonzept als Zeichnung (E-025). 496 Tests in 45
-Dateien grün.
+**Live, Stand 15.09.2026:** 534 Tests in 49 Dateien grün. Fahrpedale unten links
+(E-017), Bildinterpolation gegen das Ruckeln, die fünf Baufehler (E-018 … E-021),
+Seitenabladung (E-022 … E-024), Baggerkonzept als Zeichnung (E-025), Hallen und
+Silos umgezogen samt Tor-Fehler (E-026), Greifanzeige aus der Bildmitte (E-027).
+Alle Zeichnungen liegen unter `/v1/plaene/` und sind auf dem Telefon aufrufbar.
 
-**Wartet auf Patricks Entscheidung am Bild:**
-1. **Pressengröße** — 4,20 × 4,05 m vorgeschlagen, harte Grenze 3,98 m,
-   alt 5,95. Blatt: `docs/messungen/2026-09-14_presse.svg`.
-2. **Kupfer+Messing liegt bei 12,26 m** und ist nicht erreichbar. Empfehlung:
-   mit Alu+Zink zu einer Buntmetall-Mulde zusammenlegen.
-3. **Pyramiden an den Mulden?** Heute nur zwischen den Halden. Blatt:
-   `docs/messungen/2026-09-14_pyramiden.svg`.
-4. **Firmenschild 8 × 4 statt 14 × 7** — kleiner, dafür ganz frei.
-5. **Vier Fragen zum Bagger**, alle in `docs/baggerkonzept.md`: Silhouette des
-   Unterwagens · Geländer · Kabinenhub A oder B · Aussehen des Fahrers.
+**In Arbeit, nichts davon oben:**
+- **Platz:** eine Buntmetallmulde als Puffer statt dreier Sortiermulden · Silos
+  neben die Hallen und ums Eck über die Südseite · Janine ans Tor zu den
+  Warteplätzen · Kipper auf die Seitenabladung (E-028)
+- **Bagger:** Zylinder, Drehkranz, Ausleger; danach Fahrer, Unterwagen, Oberwagen,
+  Kabine; der Kabinenhub zuletzt und allein (E-029 ff., nach E-025)
 
 ### Abschnitt 1 — die Welt
 
-1. **Die Presse versetzen.** Der schwerste offene Fehler. Sie sitzt direkt
-   nördlich der Mischschrott-Halde; zwischen ihr und der Stahlschrott-Halde
-   bleiben **2,9 m**, ein LKW ist 2,5 m breit. Rückwärts an den Mischschrott
-   ranzusetzen ist damit praktisch unmöglich — die erste Station des Kreislaufs
-   ist unbrauchbar. Patricks Vorschlag: Ausbuchtung etwas kürzer, Presse hinein,
-   hinter den Stahlschrott. **Erst zeichnen, dann bauen** (E-016).
-2. **Hallen zu den Silos**, alles auf die Ostseite, nicht dorthin, wo Janine
-   steht. Falls der Platz nicht reicht: Silos auf beide Seiten verteilen.
-   Gehört mit 1 in dieselbe Zeichnung.
-3. **Metallmulden zum Bagger hin niedrig schließen** — ein bis zwei Lagen, bei
+1. **Presse als offener Behälter statt Vollklotz.** Der schwerste offene Fehler
+   am Platz. Sie steht als volles Rechteck in der Hindernisliste, 2,2 m hoch über
+   die ganze Kammer — **der Greifer kommt nicht auf den Kammerboden**. Wie die
+   Sortiermulden bauen: Wände ja, Deckel nein.
+2. **Pressengröße festlegen.** 4,20 × 4,05 m ist gebaut, harte Grenze 3,98 m
+   (offene Spinne + 30 cm je Seite), alt waren 5,95. Alles dazwischen ist eine
+   Zeile in `press.ts`. Am Bild zu entscheiden:
+   `docs/messungen/2026-09-14_presse.svg`.
+3. **VA hat am Bagger kein Ziel.** Edelstahl ist in keiner Mulde vorgesehen.
+   Entweder dazulegen oder bewusst „VA fährt der Spieler zum Silo". Mit der neuen
+   Buntmetallmulde neu zu bewerten.
+4. **Metallmulden zum Bagger hin niedrig schließen** — ein bis zwei Lagen, bei
    abgesenkter Kabine noch zu sehen.
-4. **Pyramidenform auch an den Mulden?** Offene Frage an Patrick; zwischen den
-   Halden ist sie gebaut (Lagen 1·2·4·4·2·1).
-5. **VA hat am Bagger kein Ziel.** Drei Mulden, Edelstahl ist nicht dabei.
-   Entweder zur Kabelmulde dazu oder bewusst „VA fährt der Spieler zum Silo".
-6. **Elektromotoren fehlen als Fraktion** — das Silo steht als leere Hülle.
-   Offen: Preis, Form, Herkunft, und ob Verbrennungs- und Elektromotor dasselbe
-   Silo teilen.
-7. **Der Starthaufen schläft nicht zuverlässig ein** — einer von vier Läufen.
-   Kein Rückschritt, auf der alten Stelle war es schlechter. Eigenes Paket:
-   Haufen erst fallen lassen, Wracks setzen, wenn er ruht.
-8. **Menüknopf über der Kontoanzeige** auf dem iPad quer — „Konto: 1.25☰ €".
-   Bestand, kein neuer Fehler, gehört ins HUD.
-9. **Federnde LKW beim Abladen**, Wrackzustände, Motorräder und Velos,
-   Kranfarben, Bordwände und Türen — die Notizen weiter oben in dieser Datei.
-10. **Der Bagger nach dem Baggerkonzept**: Unterwagen, Abstützung, Drehkranz,
-    Oberwagen, Kabine mit Fahrer, Ausleger mit Schläuchen, Kleinteile. Räder und
-    Positionsliste sind fertig. Budget: von 125 auf rund 250 Bauteile.
-11. **Presse als offener Behälter statt Vollklotz.** Sie steht als volles
-    Rechteck in der Hindernisliste, 2,2 m hoch über die ganze Kammer — der
-    Greifer kommt nicht auf den Kammerboden. Wie die Sortiermulden bauen: Wände
-    ja, Deckel nein.
-12. **Greifer:** Traverse Ø 0,70 → Ø 1,10, ja oder nein? Das ist die einzige Tür
-    zu den offenen Kennwerten aus E-009 (Zylinderneigung, Hebelarm). Entscheidung
-    am Bild, 4.567 gerechnete Lösungen liegen bereit.
+5. **Pyramidenform auch an den Mulden?** Zwischen den Halden ist sie gebaut
+   (Lagen 1·2·4·4·2·1), an den Mulden nicht. Am Bild zu entscheiden:
+   `docs/messungen/2026-09-14_pyramiden.svg`.
+6. **Firmenschild 8 × 4 statt 14 × 7?** Kleiner, dafür zu 100 % frei im Bild.
+   Größer geht nur in der Nordostecke, und dann müssen drei Bäume weichen.
+7. **Elektromotoren fehlen als Fraktion.** Das Silo ist mit E-026 entfallen, die
+   Fraktion gibt es weiter nicht. Offen: Preis, Form, Herkunft, und ob
+   Verbrennungs- und Elektromotor dasselbe Silo teilen.
+8. **Der Starthaufen schläft nicht zuverlässig ein** — einer von vier Läufen.
+   Kein Rückschritt. Eigenes Paket: Haufen erst fallen lassen, Wracks setzen,
+   wenn er ruht.
+9. **Federnde LKW beim Abladen**, Wrackzustände (fehlende Türen, Reifen,
+   ausgeschlachteter Motor), Motorräder und Velos, Kranfarben und -typen,
+   Bordwände und Türen — die Notizen weiter oben in dieser Datei.
+10. **Greifer:** Traverse Ø 0,70 → Ø 1,10, ja oder nein? Die einzige Tür zu den
+    offenen Kennwerten aus E-009 (Zylinderneigung, Hebelarm). Am Bild zu
+    entscheiden, 4.567 gerechnete Lösungen liegen bereit.
 
 ### Abschnitt 2 — der Kreislauf
 
-13. **Die Zahlen stimmen.** Container-Schild rechnet Reinheit², ausgezahlt wird
-    Reinheit³ — bei 76 % Reinheit 24 % weniger als angeschrieben. Sortierprämie
-    steht im Code und wird nirgends benutzt. Abfall wird zum Pauschalpreis
-    angekauft und mit negativem Preis verkauft.
-14. **Der Kipper kippt sauber.** Bis 141 km/h Ladung quer über den Platz.
-    Zweite Ursache gefunden: der Schlitz am Kipplager. Dazu Heckklappe und die
+11. **Die Zahlen stimmen.** Container-Schild rechnet Reinheit², ausgezahlt wird
+    Reinheit³ — bei 76 % Reinheit 24 % weniger als angeschrieben. Die
+    Sortierprämie steht im Code und wird nirgends benutzt. Abfall wird zum
+    Pauschalpreis angekauft und mit negativem Preis verkauft.
+12. **Der Kipper kippt sauber.** Bis 141 km/h Ladung quer über den Platz. Zweite
+    Ursache gefunden: der Schlitz am Kipplager. Dazu Heckklappe und die
     Aufgeben-Regel. Der Wächter prüft mit *einem* Zufallsstartwert und misst
-    andere Solver-Einstellungen als das Spiel.
-15. **Lambert auf die Schiene** — eigene Fahrspur am Westrand, die den
-    Arbeitsbereich nie kreuzt. Voraussetzung für das Hallenkonzept aus E-011.
-16. **Hallen, Einweisung per Funk, Kapazität, Abholung auf Abruf** (E-011).
-17. **Der Tag hat ein Ende** — Bilanz, Pacht, Tagesziel. Und `ALLES_FREI = false`,
+    andere Solver-Einstellungen als das Spiel. **Neu zu bewerten**, sobald der
+    Kipper seitlich leergegriffen statt gekippt wird (E-028).
+13. **Die Hallen sind leer.** Es gibt keine Route hinein, keine Funk-Einweisung,
+    keine Kapazität. Baulich steht alles: Tore zeigen auf den Platz, die Luftlinie
+    von der Waage ist frei. Was fehlt, ist der Ablauf aus E-011 — Händler fährt
+    hinein und lädt selbst ab, Lambert räumt die Halle ins Silo.
+14. **Sortieren aus der Buntmetallmulde ins Silo.** Folgt aus E-028: Die Mulde ist
+    Puffer, getrennt wird danach — vom Spieler oder von Lambert. Ob Lambert das
+    heute kann, ist offen.
+15. **Lambert auf die Schiene.** Mit Hallen links und Silos rechts fährt er quer
+    über den Platz, aber nur nördlich von z −9,0 — die Zusage aus E-011 gilt der
+    Sache nach, nicht mehr als Randspur. Neu zu bewerten.
+16. **Der Tag hat ein Ende** — Bilanz, Pacht, Tagesziel. Und `ALLES_FREI = false`,
     damit Geld einen Zweck bekommt.
 
 ### Abschnitt 3 — die Verpackung
 
-18. **Android als Probelauf** (geht ohne Mac und ohne Entwicklerkonto), dann
-    iOS. Stand und Hindernisse in E-015. Capacitor macht das Spiel **nicht**
-    schneller — dieselbe Engine.
-19. **Die 14,6 ms je Bild**, die weder Physik noch Grafik sind. Frame 21,0 ms
-    gegen 6,4 ms gemessene Arbeit. In der App lässt sich das nicht mehr dem
-    Browser zuschieben.
+17. **Android als Probelauf** (geht ohne Mac und ohne Entwicklerkonto), dann iOS.
+    Stand und Hindernisse in E-015. Capacitor macht das Spiel **nicht** schneller
+    — dieselbe Engine.
+18. **Die 14,6 ms je Bild**, die weder Physik noch Grafik sind. Frame 21,0 ms
+    gegen 6,4 ms gemessene Arbeit. Das F3-Overlay zeigt die Zahl seit E-0xx als
+    `Rest`; **sie ist noch nicht auf dem Gerät abgelesen worden.** Verdächtige in
+    der Reihenfolge des erwarteten Gewinns: sechs Scheinwerfer rund um die Uhr im
+    Shader · Auflösung `devicePixelRatio` 2 (5,6 Mio. Bildpunkte je Bild) ·
+    Schatten 2048² mit der teuersten Filterstufe.
+
+### Kleinkram, jederzeit nebenbei
+
+- **Griff-Info im Querformat steht auf 12 px**, das Briefing verlangt ≥ 14.
+  Auf 14 zu gehen kostet quer rund 40 px Bildhöhe (E-027).
+- **Konto und Tagesablauf überlappen sich um 6 px** — `#money` ist wegen
+  Zeilenabstand 1,5 tatsächlich 40,5 px hoch, `#shift` beginnt bei 46 (E-027).
+- **Sichere Ränder** (Notch, Home-Indicator) werden nirgends berücksichtigt,
+  obwohl `viewport-fit=cover` gesetzt ist. Gehört für alle unteren Elemente
+  gemeinsam gelöst, nicht für eines allein (E-027).
+- **Vier CPU-Kleinigkeiten sind erledigt** (HUD schreibt nur bei Änderung,
+  Körperzählung nur bei offenem Overlay, Ladung viermal je Sekunde).
