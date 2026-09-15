@@ -49,8 +49,33 @@ export class Daylight {
     return this.daylight < 0.35;
   }
 
+  /**
+   * Wie viele Tageswechsel es seit dem Start gab.
+   *
+   * Es gab bisher keinen Tagesanfang im Spiel — die Uhr laeuft um Mitternacht
+   * ueber, und niemand merkte es. Seit dem 15.09.2026 haengt daran etwas:
+   * Platzinventar (Kehrbesen, spaeter Muellcontainer) „erscheint am naechsten
+   * Tag wieder" (Ansage Patrick). Mehr als das Zaehlen macht diese Klasse
+   * nicht; wer etwas daran haengen will, fragt `neuerTag` ab und setzt es
+   * zurueck. Eine Tagesbilanz gehoert ausdruecklich NICHT hierher — der
+   * Wirtschaftskreislauf ist zurueckgestellt.
+   */
+  tag = 0;
+  /**
+   * Steht auf true, sobald die Uhr ueber Mitternacht gelaufen ist, und bleibt
+   * es, bis jemand es zuruecksetzt. Eine Flanke, kein Ereignis: So kann der
+   * Aufrufer sie in seinem eigenen Takt abholen, ohne dass hier ein Bus
+   * haengt.
+   */
+  neuerTag = false;
+
   update(dt: number): void {
+    const vorher = this.time;
     this.time = (this.time + dt / DAY_LENGTH_S) % 1;
+    if (this.time < vorher) {
+      this.tag++;
+      this.neuerTag = true;
+    }
 
     // Sonnenhöhe: sin über den Tagbogen, negativ heißt unter dem Horizont
     const angle = (this.time - 0.25) * Math.PI * 2;

@@ -10,6 +10,7 @@ import {
   KATALOG_SPECS,
   type PileSpec,
 } from "./objektkatalog";
+import { BESEN_PLATZ } from "./startplatz";
 
 /**
  * Schrottteile mit materialtypischen Formen (Briefing Kap. 7).
@@ -75,7 +76,72 @@ export interface ScrapShape {
    * Wo die Grenze liegt, steht in `SORTENREIN_AB`.
    */
   zusammensetzung?: Anteil[];
+  /**
+   * Platzinventar statt Ware.
+   *
+   * Eine Gattung, keine Ausnahme fuer ein einzelnes Stueck: Der Kehrbesen ist
+   * das erste, der frei aufstellbare Muellcontainer soll dasselbe tragen.
+   * Ansage Patrick, 15.09.2026: „Selbst wenn er mal aufgeladen wird, gibt es
+   * kein Geld dafuer. Auch wenn er in der Presse mal verschwindet, gaebe es
+   * kein Geld dafuer. Und er kommt jeden Tag wieder. Also wie auch der Besen
+   * ist es ein fester Bestandteil des Platzes und erscheint am naechsten Tag
+   * wieder."
+   *
+   * Drei Zusagen also — unverkaeuflich, wertlos, am Tagesanfang wieder da —
+   * und alle drei haengen an dieser einen Marke. Sie steht an der FORM und
+   * nicht am Teil, damit sie ohne Zutun im Spielstand landet.
+   *
+   * Wie daraus „wertlos" wird, steht nicht an fuenf Stellen, sondern an einer:
+   * Ein Inventarstueck bekommt beim Anlegen die **Zusammensetzung
+   * `[{ materialId, massKg: 0 }]`** — es besteht wirtschaftlich aus nichts.
+   * Jede Geldformel im Spiel liest bereits `composition`, wenn sie da ist:
+   * der Verkauf in `economy/account.ts` und das Presspaket in
+   * `world/press.ts`. Beide rechnen damit null Kilo und null Euro, ohne dass
+   * sie den Besen kennen muessten.
+   *
+   * Zusaetzlich:
+   * - `ItemManager.isCrushable` sagt Nein — die Spinne macht keinen Fladen
+   *   daraus.
+   * - `randomCargo` kennt es nicht: Es steht in keiner Ladungsliste und wird
+   *   deshalb nie angeliefert.
+   * - `ItemManager.inventarNachtragen()` legt fehlendes Inventar beim
+   *   Tageswechsel wieder hin.
+   *
+   * Der Wert ist die KENNUNG des Stuecks („besen"), kein blosses Ja. Daran
+   * erkennt `inventarNachtragen` beim Tageswechsel, welches Stueck fehlt —
+   * ueber den Namen ginge es auch, aber Namen aendert man leichtfertig.
+   */
+  inventar?: string;
 }
+
+/**
+ * Gehoert das Stueck zum Platz statt zum Umschlag?
+ *
+ * Eine Frage, eine Antwort, ein Name — damit der Muellcontainer dieselbe
+ * Fassung benutzen kann wie der Besen.
+ */
+export function istPlatzinventar(shape?: ScrapShape | null): boolean {
+  return !!shape?.inventar;
+}
+
+/**
+ * Ein Stueck Platzinventar, wie es der Tageswechsel wieder hinlegt.
+ *
+ * Die Liste ist der gemeinsame Ort fuer Besen und Muellcontainer. Wer ein
+ * weiteres Stueck baut, haengt einen Eintrag an — mehr braucht es nicht, damit
+ * es unverkaeuflich, wertlos und am naechsten Tag wieder da ist.
+ */
+export interface Inventarstueck {
+  /** Kennung, dieselbe wie in `ScrapShape.inventar`. */
+  id: string;
+  /** Wie es im Greifer heisst. */
+  name: string;
+  /** Legt es an seinen Platz. Muss idempotent sein. */
+  hinlegen: (items: ItemManager) => ScrapItem | null;
+}
+
+/** Alles, was dauerhaft zum Platz gehoert. Heute genau ein Stueck. */
+export const PLATZINVENTAR: Inventarstueck[] = [];
 
 /**
  * Aufgerolltes Kabel: ein Strang, der sich mehrfach um sich selbst windet.
@@ -367,6 +433,34 @@ export function umkugelRadius(shape: ScrapShape): number {
   return d[0];
 }
 
+/**
+ * Rauminhalt des Huellquaders einer Punktwolke.
+ *
+ * Damit werden die Massen mehrteiliger Kollider aufgeteilt. Das ist eine
+ * Naeherung — der echte Rauminhalt einer konvexen Huelle waere genauer —, aber
+ * eine ehrliche: Sie trifft die Groessenordnung und stellt sicher, dass der
+ * dicke Teil auch die Masse bekommt. Beim Besen ergibt sie 87 % Faecher zu
+ * 13 % Kopf, und damit sitzt der Schwerpunkt tief, wie bei einem Besen.
+ */
+export function quaderRaum(punkte: Float32Array): number {
+  if (punkte.length < 3) return 0;
+  let minX = Infinity;
+  let minY = Infinity;
+  let minZ = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let maxZ = -Infinity;
+  for (let i = 0; i + 2 < punkte.length; i += 3) {
+    minX = Math.min(minX, punkte[i]);
+    maxX = Math.max(maxX, punkte[i]);
+    minY = Math.min(minY, punkte[i + 1]);
+    maxY = Math.max(maxY, punkte[i + 1]);
+    minZ = Math.min(minZ, punkte[i + 2]);
+    maxZ = Math.max(maxZ, punkte[i + 2]);
+  }
+  return Math.max(maxX - minX, 1e-4) * Math.max(maxY - minY, 1e-4) * Math.max(maxZ - minZ, 1e-4);
+}
+
 export function dampLin(massKg: number): number {
   return Math.min(0.45, Math.max(0.02, 8 / Math.max(massKg, 1)));
 }
@@ -435,6 +529,92 @@ const PRESSPROFIL: Record<string, Pressprofil> = {
  */
 const FLAT_SCALE_Y = 0.55;
 
+
+/* ------------------------------------------------------------------------ */
+/* Der Kehrbesen — Platzinventar, kein Handelsgut                            */
+/* ------------------------------------------------------------------------ */
+
+/**
+ * Der Maschendraht-Besen.
+ *
+ * Wunsch Patrick, 15.09.2026: „Ich bräuchte einen Maschendrahtzaun, der quasi
+ * oben schon gequetscht ist und unten breit ist, der quasi wie ein Besen
+ * fungiert ... Damit ich quasi mit dem Maschendrahtzaun den Boden bzw. die
+ * Ladeflächen abkehren kann."
+ *
+ * Er steht mit Absicht NICHT in `SPECS`, `KATALOG_SPECS`, `BIG_SPECS` oder
+ * `HUGE_SPECS`. Alles, was dort steht, kann `randomCargo` auf einen Lkw laden;
+ * der Besen soll aber nie angeliefert werden (Entscheidung 15.09.2026: „Es
+ * gibt genau einen Besen"). Gesetzt wird er einmal beim Neuen Spiel,
+ * `ItemManager.spawnBesen()`.
+ *
+ * ## Woher die Zahlen kommen
+ *
+ * **Breite 1,20 m.** Handelsueblicher Maschendrahtzaun ist 1,25 m hoch. Wer
+ * eine Bahn aufrollt und oben zusammenquetscht, hat genau diese Bahnhoehe als
+ * Besenbreite; abgerundet auf 1,20 m. Sie passt zwischen die Bordwaende einer
+ * Pritsche (Innenbreite 2 x 1,35 m, `delivery/routes.ts`) und unter die offene
+ * Spinne (Spannweite 3,38 m).
+ *
+ * **Hoehe 1,30 m.** Bahnhoehe plus der aufgerollte Wulst oben. Wichtiger ist
+ * die Gegenprobe: Der Schalenkorb der geschlossenen Spinne ist von der
+ * Gelenkebene bis zur Spitze 1,78 m tief (`excavator/clawGeometry.ts`,
+ * gerechnet). Ein Besen von 1,30 m haengt also vollstaendig im Korb, wenn man
+ * ihn oben fasst — das ist die Bedingung dafuer, dass er sicher gegriffen wird.
+ *
+ * **Tiefe 0,38 m.** Die Dicke des aufgefaecherten Endes. Schmal genug, dass
+ * die Schleppkante eine Kante ist und keine Flaeche; breit genug, dass der
+ * Besen beim Ziehen nicht sofort nach vorn wegkippt.
+ *
+ * **Masse 52 kg.** Gerechnet, nicht geschaetzt: 2,8-mm-Draht, 50-mm-Masche
+ * ergibt rund 56,6 m Draht je Quadratmeter; 2,8-mm-Stahldraht wiegt 0,048 kg/m,
+ * also 2,73 kg/m². Eine Bahn von 1,25 m Hoehe und 15 m Laenge = 18,75 m² wiegt
+ * damit 51,2 kg. Aufgerundet 52 kg.
+ *
+ * Warum die Masse ueberhaupt zaehlt: Am Haken ist der Besen kinematisch und
+ * folgt der Spinne ohne Ruecksicht auf sein Gewicht — beim Kehren spielt sie
+ * also keine Rolle. Sie spielt eine Rolle, wenn er losgelassen am Boden liegt
+ * (bei 52 kg schiebt ihn kein Kleinteil weg) und beim Traglimit der Spinne
+ * (`MAX_TOTAL_KG` 3500 kg — 52 kg sind anderthalb Prozent, es bleibt also
+ * Platz fuer vier weitere Teile, `MAX_ITEMS` 5).
+ *
+ * **Fraktion Zink.** Verzinkter Draht laeuft im Spiel wie die „Verzinkten
+ * Gitterroste" und die „Zink-Dachrinne" im Zinkstrom (`objektkatalog.ts`).
+ * Verkauft wird er ohnehin nie; die Fraktion bestimmt nur Farbe und Name im
+ * Greifer.
+ */
+export const BESEN: PileSpec = {
+  materialId: "zinc",
+  massKg: 52,
+  kind: "box",
+  dims: [1.2, 1.3, 0.38],
+  bau: "besen",
+  name: "Maschendraht-Besen",
+};
+
+/**
+ * Der Besen als Platzinventar angemeldet.
+ *
+ * Erst hier, weil `ItemManager` weiter unten steht — der Eintrag zeigt auf
+ * dessen Methode. Wer den Muellcontainer baut, haengt seinen Eintrag daneben.
+ */
+PLATZINVENTAR.push({
+  id: "besen",
+  name: BESEN.name ?? "Besen",
+  hinlegen: (items) => items.spawnBesen(),
+});
+
+/** Die Form des Besens, so wie sie im Spielstand steht. */
+export function besenForm(): ScrapShape {
+  return {
+    kind: BESEN.kind,
+    dims: [...BESEN.dims],
+    color: getMaterial(BESEN.materialId).color,
+    bau: BESEN.bau,
+    name: BESEN.name,
+    inventar: "besen",
+  };
+}
 
 // Basis-Sortiment (SW) — Starthaufen und Zufalls-Ladungen speisen sich hieraus
 /** Die Schrottteile des Platzes. Exportiert, damit Waechter die Zuordnung von
@@ -938,6 +1118,10 @@ export class ItemManager {
     });
     let geo: THREE.BufferGeometry;
     let collider: RAPIER.ColliderDesc;
+    /** Mehrteiliger Kollider (Formen mit Taille) — leer heisst: einer reicht. */
+    let teilKollider: RAPIER.ColliderDesc[] = [];
+    /** Massenanteile der Teilkollider, in derselben Reihenfolge. */
+    let teilAnteile: number[] = [];
     if (shape.kind === "box") {
       const [w, h, d] = shape.dims;
       geo = new THREE.BoxGeometry(w, h, d);
@@ -1025,6 +1209,28 @@ export class ItemManager {
       const huelle = sauber ? RAPIER.ColliderDesc.convexHull(punkte) : null;
       if (huelle) collider = huelle;
       else if (!sauber) unsaubereBauten.add(shape.bau);
+      /*
+       * Formen mit Taille liefern mehrere Punktwolken (objektbau.ts,
+       * `Bauteil.huellen`). Eine einzige konvexe Huelle wuerde die Taille
+       * ueberbruecken; getrennt bleibt sie erhalten. Faellt eine der Wolken
+       * aus, bleibt es bei der einen Huelle von oben — lieber ein zu voller
+       * Kollider als gar keiner.
+       */
+      const wolken = bauteil.huellen;
+      if (wolken && wolken.length > 1) {
+        const stuecke: Array<{ desc: RAPIER.ColliderDesc; raum: number }> = [];
+        for (const wolke of wolken) {
+          if (wolke.length < 12 || !wolke.every((v) => Number.isFinite(v))) continue;
+          const d = RAPIER.ColliderDesc.convexHull(wolke);
+          if (!d) continue;
+          stuecke.push({ desc: d, raum: quaderRaum(wolke) });
+        }
+        if (stuecke.length === wolken.length) {
+          const summe = stuecke.reduce((a, t) => a + t.raum, 0) || 1;
+          teilKollider = stuecke.map((t) => t.desc);
+          teilAnteile = stuecke.map((t) => t.raum / summe);
+        }
+      }
     }
 
     const isWire = shape.kind === "wire";
@@ -1078,30 +1284,55 @@ export class ItemManager {
     // Restitution 0: Metall auf Beton springt nicht, es klatscht und liegt
     // Sperrig ineinander: viel Reibung, und bei zwei Teilen zählt der
     // höhere Wert. Schrott rutscht nicht auseinander, er verhakt sich.
-    this.world.createCollider(
-      collider
-        .setMass(massKg)
-        .setFriction(2.2)
-        .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Max)
-        // Nur Drahtknäuel federn — die sind elastisch. Alles andere ist
-        // Metall auf Beton: das klatscht und bleibt liegen.
-        .setRestitution(shape.kind === "wire" ? 0.55 : 0)
-        .setRestitutionCombineRule(
-          shape.kind === "wire"
-            ? RAPIER.CoefficientCombineRule.Max
-            : RAPIER.CoefficientCombineRule.Min
-        ),
-      body
-    );
+    //
+    // Meist ist es genau ein Kollider. Formen mit Taille bringen mehrere mit
+    // (siehe oben); dann bekommt jeder seinen Massenanteil, und der
+    // Schwerpunkt sitzt dort, wo das Material ist — beim Besen also unten im
+    // Faecher und nicht in der Mitte.
+    const teile = shape.flat || teilKollider.length === 0 ? [collider] : teilKollider;
+    const anteile = teile.length === 1 ? [1] : teilAnteile;
+    for (let i = 0; i < teile.length; i++) {
+      this.world.createCollider(
+        teile[i]
+          .setMass(massKg * anteile[i])
+          .setFriction(2.2)
+          .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Max)
+          // Nur Drahtknäuel federn — die sind elastisch. Alles andere ist
+          // Metall auf Beton: das klatscht und bleibt liegen.
+          .setRestitution(shape.kind === "wire" ? 0.55 : 0)
+          .setRestitutionCombineRule(
+            shape.kind === "wire"
+              ? RAPIER.CoefficientCombineRule.Max
+              : RAPIER.CoefficientCombineRule.Min
+          ),
+        body
+      );
+    }
     /*
      * Die Zusammensetzung wandert als absolute Massen ans Teil. Sie stand
      * bisher nur im Katalog, und damit wusste ein Kuehlschrott-Teil im Spiel
      * nicht, woraus es besteht — die Presse rechnete die Reinheit eines
      * Pakets aus lauter Einzelstuecken, als waere jedes sortenrein.
      */
-    const composition = shape.zusammensetzung
-      ? shape.zusammensetzung.map((a) => ({ materialId: a.materialId, massKg: a.anteil * massKg }))
-      : undefined;
+    /*
+     * Platzinventar besteht wirtschaftlich aus nichts.
+     *
+     * Das ist die EINE Stelle, an der aus der Marke „Inventar" Wertlosigkeit
+     * wird (Ansage 15.09.2026: „Selbst wenn er mal aufgeladen wird, gibt es
+     * kein Geld dafuer. Auch wenn er in der Presse mal verschwindet ...").
+     * Jede Geldformel im Spiel liest bereits die Zusammensetzung, wenn eine da
+     * ist — der Verkauf in `economy/account.ts` und das Presspaket in
+     * `world/press.ts`. Mit null Kilo rechnen beide null Euro, ohne dass sie
+     * den Besen kennen muessten.
+     *
+     * Nicht die leere Liste, sondern ein Eintrag mit null Kilo: `press.ts`
+     * ruft `reduce` ohne Startwert auf, und das wirft bei einer leeren Liste.
+     */
+    const composition = shape.inventar
+      ? [{ materialId, massKg: 0 }]
+      : shape.zusammensetzung
+        ? shape.zusammensetzung.map((a) => ({ materialId: a.materialId, massKg: a.anteil * massKg }))
+        : undefined;
     return this.register({ materialId, massKg, mesh, body, shape, composition });
   }
 
@@ -1188,6 +1419,71 @@ export class ItemManager {
         q
       );
     }
+    /*
+     * Und zuletzt das Platzinventar.
+     *
+     * Es liegt hier und nicht im Aufbau von `main.ts`, weil `spawnPile` der
+     * eine Aufruf ist, der genau einmal laeuft: beim Neuen Spiel. Wer aus
+     * einem Spielstand startet, bekommt seinen Besen aus dem Save — dort steht
+     * er als gewoehnliches Teil mit `inventar: "besen"` an der Form.
+     *
+     * NICHT in den Haufen: Unter fuenfzig Teilen begraben waere er kein
+     * Werkzeug mehr, sondern eine Suchaufgabe.
+     */
+    this.inventarNachtragen();
+  }
+
+  /**
+   * Den einen Kehrbesen auf seinen Platz legen.
+   *
+   * Idempotent: Liegt schon einer auf dem Hof, passiert nichts. So kann der
+   * Aufruf an mehreren Stellen stehen, ohne dass zwei Besen entstehen — und
+   * der Waechter „beim Start existiert genau einer" bleibt wahr.
+   */
+  spawnBesen(): ScrapItem | null {
+    if (this.items.some((it) => it.shape?.inventar === "besen")) return null;
+    /*
+     * Er liegt flach, nicht aufrecht: Ein Zaunstueck, das jemand an die Wand
+     * gelehnt hat, faellt beim ersten Anstossen um; flach liegend ist der
+     * Wulst von oben zu fassen, und genau so greift man ihn.
+     *
+     * Um die Hochachse verdreht, damit die Schleppkante quer zur Blickrichtung
+     * liegt — dann sieht man beim Start, wie breit er ist.
+     */
+    const q = new THREE.Quaternion()
+      .setFromEuler(new THREE.Euler(0, BESEN_PLATZ.gier, 0))
+      .multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0)));
+    return this.spawnScrap(
+      BESEN.materialId,
+      BESEN.massKg,
+      besenForm(),
+      // Halbe Tiefe hoch: liegend ruht er auf seiner Flanke (0,38 m dick).
+      new THREE.Vector3(BESEN_PLATZ.x, BESEN.dims[2] / 2 + 0.05, BESEN_PLATZ.z),
+      q
+    );
+  }
+
+  /**
+   * Fehlendes Platzinventar wieder hinlegen — der Tageswechsel.
+   *
+   * Ansage Patrick, 15.09.2026: „Und er kommt jeden Tag wieder. Also wie auch
+   * der Besen ist es ein fester Bestandteil des Platzes und erscheint am
+   * naechsten Tag wieder." Ein Werkzeug, das in der Presse verschwindet oder
+   * mit dem Abholer wegfaehrt, ist damit ein Aergernis bis Mitternacht und
+   * kein Verlust.
+   *
+   * Idempotent: Was noch da ist, bleibt liegen, wo es liegt. Der Spieler darf
+   * seinen Besen also dort abstellen, wo er ihn braucht.
+   *
+   * @returns die Namen der Stuecke, die nachgelegt wurden — fuer eine Meldung.
+   */
+  inventarNachtragen(): string[] {
+    const nachgelegt: string[] = [];
+    for (const stueck of PLATZINVENTAR) {
+      if (this.items.some((it) => it.shape?.inventar === stueck.id)) continue;
+      if (stueck.hinlegen(this)) nachgelegt.push(stueck.name);
+    }
+    return nachgelegt;
   }
 
   /**
@@ -1220,6 +1516,13 @@ export class ItemManager {
 
   isCrushable(item: ScrapItem): boolean {
     if (!item.shape || item.shape.flat) return false;
+    /*
+     * Ein Werkzeug wird nicht zerdrueckt. Ohne diese Zeile waere der Besen
+     * das erste Opfer seiner eigenen Bauart: Ein Drahtgeflecht ist duenn und
+     * leicht, `istPressbar` sagt also Ja — und die Spinne macht beim
+     * Festhalten nach 1,1 Sekunden einen Fladen daraus.
+     */
+    if (istPlatzinventar(item.shape)) return false;
     return istPressbar(item.massKg, item.shape.dims);
   }
 
