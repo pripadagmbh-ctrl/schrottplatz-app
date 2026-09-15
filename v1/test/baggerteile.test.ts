@@ -173,9 +173,13 @@ describe("Positionsliste des Baggers", () => {
      * Die Rechnung dahinter: Stiel 8 → 3, Ausleger 5 → 5 (bei sechsmal so viel
      * Inhalt), Auslegerschlauch 2 → 1, Logo 2 → 1, Drehkranz 1 → 2 (der Ring
      * ist bis zum Unterwagen-Paket ein eigenes Netz). Macht −4.
+     *
+     * Stand 15.09.2026 nach dem Fahrer-Paket: 119 Netze, 17 772 Dreiecke,
+     * 162 Zeichenrufe. Daniel kostete 16 Netze und 4 648 Dreiecke und kostet
+     * jetzt zwei Netze — Haut und Kleidung.
      */
     const meshes = baggerMeshes();
-    expect(meshes.length, "Bauteilzahl am Bagger").toBe(133);
+    expect(meshes.length, "Bauteilzahl am Bagger").toBe(119);
   });
 });
 
