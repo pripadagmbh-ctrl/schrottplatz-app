@@ -419,6 +419,84 @@ export const KATALOG_SPECS: PileSpec[] = [
   { materialId: "va", massKg: 18, kind: "box", dims: [0.9, 0.06, 1.2], bau: "platte", name: "VA-Lochblech (Tafel)" },
   // Plattenwaermetauscher, 0,09 m³ Huelle bei rund 9 % Feststoff: 65 kg.
   { materialId: "va", massKg: 65, kind: "box", dims: [0.3, 0.6, 0.5], bau: "stapel", name: "VA-Plattenwärmetauscher" },
+
+  /* ====================================================================== *
+   * DIE VIER ABFALLSORTEN BEKOMMEN GEGENSTAENDE (16.09.2026)
+   *
+   * Anlass, aus Patricks Geraetetest: „‚Stoerstoff' aufloesen in Holz,
+   * Baumischabfall, Reifen und Kunststoffe — Stoerstoff sagt niemandem etwas."
+   *
+   * Die Namen gab es seit dem 15.09. (E-067), die GEGENSTAENDE nicht: In der
+   * Kleinteil-Klasse — der einzigen, aus der eine gewoehnliche Anlieferung
+   * zieht — standen Reifen bei vier Sorten, Holz bei sechs und
+   * **Baumischabfall bei NULL**. Eine Fraktion ohne Gegenstaende ist ein Wort
+   * auf einem Schild. E-067 hatte das Auffuellen ausdruecklich vertagt, weil
+   * es die Mischung in `randomCargo` und damit den Verdienst verschiebt; genau
+   * das ist hier NICHT passiert (siehe `REST_LOSE` in `world/scrapItems.ts` —
+   * die Anteile stehen auf die Stelle genau, wo sie standen).
+   *
+   * Ziel ist dieselbe Zahl wie bei den Metallen: **acht Sorten je Fraktion in
+   * der Kleinteil-Klasse** (Patrick, 15.09.2026: „Auffuellen, mindestens acht
+   * je Fraktion"). `test/gewicht.test.ts` haelt sie fest.
+   *
+   * JEDE MASSE IST GERECHNET, die Rechnung steht an der Zeile. Als Dichten
+   * dienen die Feststoffdichten aus `materials/schuettdichte.ts`
+   * (Holz 900, Reifen 1300, Baumischabfall 2500, Kunststoff 1900 kg/m³) —
+   * sie sind Obergrenzen, und der Waechter in `test/gewicht.test.ts` rechnet
+   * mit denselben.
+   *
+   * Nichts davon RIESELT: Bauschutt kommt im Bigbag, als Palette, als Stapel
+   * oder als verkeilter Haufen — greifbar am Stueck (Ansage 12.09.2026, kein
+   * Schuettgut).
+   * ====================================================================== */
+
+  /* --- Baumischabfall: 0 -> 8 Kleinteile -------------------------------- */
+  // Mineralwolle im Bigbag: 0,891 m³ Huelle, lose 50 kg/m³ (Dammwolle liegt
+  // zwischen 20 und 100) = 45 kg. Das Leichteste auf dem Platz, das trotzdem
+  // einen ganzen Greifer fuellt — genau der Grund, warum Abfall Volumen frisst.
+  { materialId: "rubble", massKg: 45, kind: "box", dims: [0.9, 1.1, 0.9], bau: "haufen", name: "Dämmwolle-Bigbag" },
+  // Gipskarton 12,5 mm wiegt 9,5 kg/m². Sechs Platten 1,25 x 2,0 m = 15 m²
+  // x 9,5 = 142 kg; Stapelhoehe 6 x 12,5 mm = 75 mm.
+  { materialId: "rubble", massKg: 142, kind: "box", dims: [1.25, 0.075, 2.0], bau: "stapel", name: "Gipskarton-Platten (Stapel)" },
+  // Dachziegel 3,5 kg je Stueck, rund 51 Stueck auf dem angebrochenen Stapel
+  // = 180 kg. Eine volle Palette (240 Stueck, 840 kg) waere Grossteil-Klasse.
+  { materialId: "rubble", massKg: 180, kind: "box", dims: [0.8, 0.45, 1.0], bau: "stapel", name: "Dachziegel (Palette)" },
+  // Bordstein 15/30/100: 0,045 m³ Beton x 2350 kg/m³ = 106 kg. Der Handel
+  // nennt 105 kg fuer genau dieses Mass.
+  { materialId: "rubble", massKg: 105, kind: "box", dims: [0.15, 0.3, 1.0], bau: "beton", name: "Bordstein (Beton)" },
+  // Gehwegplatte 50 x 50 x 5 cm wiegt 30 kg; vier gestapelt = 120 kg bei
+  // 0,20 m Stapelhoehe.
+  { materialId: "rubble", massKg: 120, kind: "box", dims: [0.5, 0.2, 0.5], bau: "stapel", name: "Gehwegplatten (Stapel)" },
+  // Verkeilter Haufen Mauerwerksbrocken, Kugelhuelle r = 0,45 m = 0,382 m³.
+  // Bei 190 kg sind das 498 kg/m³ — rund ein Fuenftel Vollstein, der Rest
+  // Luft zwischen den Brocken. So liegt Abbruchmauerwerk wirklich.
+  { materialId: "rubble", massKg: 190, kind: "wire", dims: [0.45], bau: "haufen", name: "Mauerwerk-Brocken (Haufen)" },
+  // Porenbeton hat 500 kg/m³ (Rohdichteklasse 0,5). 0,32 m³ Steine auf der
+  // angebrochenen Palette = 160 kg.
+  { materialId: "rubble", massKg: 160, kind: "box", dims: [0.8, 0.5, 0.8], bau: "stapel", name: "Porenbeton-Steine (Palette)" },
+  // Badezimmer-Ausbau: WC 25 kg, Waschbecken 20, Spuelkasten 10 = 55 kg.
+  { materialId: "rubble", massKg: 55, kind: "box", dims: [0.7, 0.5, 0.6], bau: "stapel", name: "Sanitärkeramik (WC und Becken)" },
+
+  /* --- Reifen: 4 -> 8 Kleinteile ---------------------------------------- */
+  // LKW-Reifen 315/80 R22.5: Aussendurchmesser 1,08 m, Breite 0,315 m, 62 kg
+  // (Herstellerangabe fuer diese gaengige Groesse). Als Torus
+  // R = 0,52 / r = 0,14.
+  { materialId: "tires", massKg: 62, kind: "torus", dims: [0.52, 0.14], name: "LKW-Reifen" },
+  // Radladerreifen 17.5 R25: 1,45 m Aussendurchmesser, 160 kg. Der schwerste
+  // Einzelreifen, den die Spinne noch bequem traegt.
+  { materialId: "tires", massKg: 160, kind: "torus", dims: [0.65, 0.22], name: "Erdbaureifen (Radlader)" },
+  // Zehn Motorradreifen à 4 kg, zusammengebunden = 40 kg auf 0,18 m³.
+  { materialId: "tires", massKg: 40, kind: "box", dims: [0.6, 0.5, 0.6], bau: "buendel", name: "Motorradreifen (Bund)" },
+  // Vollgummireifen vom Stapler (18x7-8), 30 kg das Stueck, vier gestapelt
+  // = 120 kg; Stapelhoehe 4 x 0,18 m = 0,72 m.
+  { materialId: "tires", massKg: 120, kind: "cyl", dims: [0.28, 0.72], bau: "stapel", name: "Vollgummireifen (Stapler)" },
+
+  /* --- Holz: 6 -> 8 Kleinteile ------------------------------------------ */
+  // Europalette 1,2 x 0,8 m wiegt 25 kg; vier gestapelt = 100 kg bei 0,6 m.
+  { materialId: "wood", massKg: 100, kind: "box", dims: [1.2, 0.6, 0.8], bau: "stapel", name: "Europaletten (Stapel)" },
+  // Dachlatte 4 x 6 cm, 2,2 m: 0,00528 m³ x 500 kg/m³ (Fichte) = 2,64 kg.
+  // Vierundzwanzig im Bund = 63 kg.
+  { materialId: "wood", massKg: 63, kind: "box", dims: [0.3, 0.3, 2.2], bau: "buendel", name: "Dachlatten-Bund" },
 ];
 
 

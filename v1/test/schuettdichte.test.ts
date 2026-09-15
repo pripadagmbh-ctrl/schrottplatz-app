@@ -1,13 +1,12 @@
 import { describe, it, expect } from "vitest";
 import {
   SCHUETTDICHTE,
-  STOERSTOFFE,
+  abfallDichte,
   ladungsDichte,
   mischDichte,
   schuettdichte,
-  stoerstoffDichte,
 } from "../src/materials/schuettdichte";
-import { MATERIALS, istAbfall } from "../src/materials/catalog";
+import { ABFALLFRAKTIONEN, MATERIALS, istAbfall } from "../src/materials/catalog";
 
 /**
  * Wächter über die Schüttdichten.
@@ -52,7 +51,7 @@ describe("Schüttdichten", () => {
     expect(schuettdichte("brass")).toBeLessThan(schuettdichte("battery"));
   });
 
-  it("der Störstoff wiegt weniger als jedes Metall — er frisst Volumen, nicht Nutzlast", () => {
+  it("der Beifang wiegt weniger als jedes Metall — er frisst Volumen, nicht Nutzlast", () => {
     /*
      * Nicht jeder einzelne Abfall ist leichter als jedes Metall — loser
      * Baumischabfall (300) ist schwerer als loses Alu (250), und das stimmt
@@ -63,8 +62,8 @@ describe("Schüttdichten", () => {
     const metalle = Object.keys(MATERIALS).filter((id) => !istAbfall(id));
     const leichtestesMetall = Math.min(...metalle.map(schuettdichte));
     expect(
-      stoerstoffDichte(),
-      `Störstoff ${stoerstoffDichte()}, leichtestes Metall ${leichtestesMetall}`
+      abfallDichte(),
+      `Abfall ${abfallDichte()}, leichtestes Metall ${leichtestesMetall}`
     ).toBeLessThan(leichtestesMetall);
     // und jeder einzelne Abfall bleibt unter dem Mischschrott
     for (const id of Object.keys(MATERIALS).filter(istAbfall)) {
@@ -78,10 +77,10 @@ describe("Schüttdichten", () => {
     expect(schuettdichte("contaminant")).toBe(schuettdichte("rubble"));
   });
 
-  it("der Störstoff ist das Mittel aus Holz, Reifen, Baumisch und Kunststoff", () => {
-    const mittel = STOERSTOFFE.reduce((s, id) => s + schuettdichte(id), 0) / STOERSTOFFE.length;
-    expect(stoerstoffDichte()).toBeCloseTo(mittel, 10);
-    expect(stoerstoffDichte()).toBeLessThan(schuettdichte("mixed") / 2);
+  it("die Beifang-Dichte ist das Mittel aus Holz, Baumisch, Reifen und Kunststoff", () => {
+    const mittel = ABFALLFRAKTIONEN.reduce((s, id) => s + schuettdichte(id), 0) / ABFALLFRAKTIONEN.length;
+    expect(abfallDichte()).toBeCloseTo(mittel, 10);
+    expect(abfallDichte()).toBeLessThan(schuettdichte("mixed") / 2);
   });
 });
 

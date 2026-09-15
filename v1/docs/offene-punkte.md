@@ -55,8 +55,18 @@ erledigt ist, bekommt den Commit dazu.
 
 ## Abfall
 
-- [ ] **"Störstoff" auflösen** in Holz, Baumischabfall, Reifen und
-      Kunststoffe — Störstoff sagt niemandem etwas.
+- [x] **"Störstoff" auflösen** in Holz, Baumischabfall, Reifen und
+      Kunststoffe — Störstoff sagt niemandem etwas. **Erledigt 16.09.2026
+      (E-077).** Die vier Namen gab es seit E-067; was fehlte, war alles
+      andere. Jetzt hat jede eine eigene Schüttdichte, eine eigene Farbe, die
+      man am Gegenstand auch **sieht**, und acht eigene Gegenstände in der
+      Größenklasse, aus der eine Anlieferung zieht — Baumischabfall hatte dort
+      **null**. Reifen konnten bis dahin gar nicht angeliefert werden: Sie
+      fehlten im Fraktionsmix. Der Verdienst hat sich dabei nicht verschoben
+      (Abfallanteil weiter 6,7 %, gemessen).
+      **Offen und bewusst nicht entschieden:** ob die vier weiter zusammen in
+      den Müllcontainer gehören oder ob z. B. Reifen wieder einen eigenen
+      bekommen. Das Blatt dazu liegt vor: `docs/abfallmulde-2026-09-16.svg`.
 - [ ] **Abfall-Anlieferung** — ein LKW kommt nur mit Abfällen, fährt von
       hinten an die Mulde bzw. auf deren Vorplatz und kippt dort ab.
 - [ ] **Lambert sortiert den Abfall** mit dem Radlader in die Mulden.

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="732" height="686" viewBox="0 0 732 686">
+<rect width="732" height="686" fill="#f6f4ef"/>
+<circle cx="377.5" cy="354.5" r="211.6" fill="#dfe7d8" stroke="#7d9a6a" stroke-width="1.5"/>
+<circle cx="377.5" cy="354.5" r="133.4" fill="#f6f4ef" stroke="#7d9a6a" stroke-width="1.5" stroke-dasharray="5 4"/>
+<rect x="498.25" y="44" width="71.3" height="598" fill="#e6ddc9" stroke="#b9a87e" stroke-width="1"/>
+<text x="533.9000000000001" y="113" text-anchor="middle" font-size="11" font-family="sans-serif" fill="#8a7648">LKW-SPUR x 6,3</text>
+<rect x="150.4" y="378.6" width="109.3" height="112.7" fill="#cfd4dc" stroke="#333" stroke-width="1.2"/><text x="205.0" y="433.0" text-anchor="middle" font-size="12" font-family="sans-serif" font-weight="bold">PRESSE</text><text x="205.0" y="447.0" text-anchor="middle" font-size="10" font-family="sans-serif" fill="#333">8.28 m</text>
+<rect x="402.8" y="504.0" width="156.4" height="138.0" fill="#d8cfc2" stroke="#333" stroke-width="1.2"/><text x="481.0" y="571.0" text-anchor="middle" font-size="12" font-family="sans-serif" font-weight="bold">MISCHSCHROTT</text><text x="481.0" y="585.0" text-anchor="middle" font-size="10" font-family="sans-serif" fill="#333">10.51 m · Peilung 155°</text>
+<rect x="241.8" y="504.0" width="156.4" height="138.0" fill="#d8cfc2" stroke="#333" stroke-width="1.2"/><text x="320.0" y="571.0" text-anchor="middle" font-size="12" font-family="sans-serif" font-weight="bold">STAHLSCHROTT</text><text x="320.0" y="585.0" text-anchor="middle" font-size="10" font-family="sans-serif" fill="#333">9.82 m · Peilung -165°</text>
+<rect x="165.9" y="223.4" width="96.6" height="138.0" fill="#c7d3c0" stroke="#333" stroke-width="1.2"/><text x="214.2" y="290.4" text-anchor="middle" font-size="12" font-family="sans-serif" font-weight="bold">BUNT + VA</text><text x="214.2" y="304.4" text-anchor="middle" font-size="10" font-family="sans-serif" fill="#333">7.60 m · Peilung -69°</text>
+<rect x="260.4" y="112.1" width="82.8" height="98.9" fill="#b7b0a2" stroke="#333" stroke-width="1.2"/><text x="301.8" y="159.5" text-anchor="middle" font-size="12" font-family="sans-serif" font-weight="bold">MUELL</text><text x="301.8" y="173.5" text-anchor="middle" font-size="10" font-family="sans-serif" fill="#333">9.01 m · 53 % im Band</text>
+<circle cx="533.9000000000001" cy="435" r="36.800000000000004" fill="#eadfc4" stroke="#b9a87e" stroke-width="1"/><text x="533.9000000000001" y="435" text-anchor="middle" font-size="10" font-family="sans-serif">ABKIPP</text>
+<circle cx="533.9000000000001" cy="366" r="4" fill="#8a7648"/><text x="541.9000000000001" y="370" font-size="10" font-family="sans-serif">Halt z -23</text>
+<circle cx="469.5" cy="205" r="6" fill="#9a8055"/><text x="478.5" y="209" font-size="10" font-family="sans-serif">Besen</text>
+<rect x="412.00000000000006" y="153.25000000000003" width="82.8" height="98.89999999999999" fill="none" stroke="#c0392b" stroke-width="2" stroke-dasharray="7 5"/>
+<text x="453.40000000000003" y="186.70000000000002" text-anchor="middle" font-size="12" font-weight="bold" font-family="sans-serif" fill="#c0392b">PLATZ FÜR</text><text x="453.40000000000003" y="200.70000000000002" text-anchor="middle" font-size="12" font-weight="bold" font-family="sans-serif" fill="#c0392b">EINE ZWEITE MULDE</text>
+<text x="453.40000000000003" y="214.70000000000002" text-anchor="middle" font-size="10" font-family="sans-serif" fill="#c0392b">7.38 m · 83 % im Band</text>
+<text x="453.40000000000003" y="227.70000000000002" text-anchor="middle" font-size="10" font-family="sans-serif" fill="#c0392b">0,35 m Luft zur LKW-Spur</text>
+<circle cx="377.5" cy="354.5" r="8" fill="#2c3e50"/><line x1="377.5" y1="354.5" x2="377.5" y2="324.5" stroke="#2c3e50" stroke-width="3"/><text x="388.5" y="370.5" font-size="11" font-family="sans-serif" font-weight="bold">BAGGER (-0.5 | -22.5), Blick nach Norden</text>
+<text x="44" y="26" font-size="16" font-weight="bold" font-family="sans-serif">Bleiben Holz, Baumischabfall, Reifen und Kunststoff in EINER Mulde? (16.09.2026)</text>
+<text x="44" y="652" font-size="11" font-family="sans-serif" fill="#444">Grundriss, Norden oben. Grün = Schwenkband 5,80–9,20 m; innen gestrichelt die 5,80 m, darunter bekommt der Arm den Ausleger nicht mehr zusammen.</text>
+<text x="44" y="668" font-size="11" font-family="sans-serif" fill="#444">Im Band stehen heute zwei Sortierziele: BUNT + VA und MUELL. Die rot gestrichelte Tasche ist der einzige Platz, an dem eine gleich große zweite Mulde noch stünde.</text>
+</svg>

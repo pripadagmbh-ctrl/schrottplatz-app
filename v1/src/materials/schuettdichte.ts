@@ -17,7 +17,7 @@
  * Herkunft je Zahl steht am Eintrag. Wo keine belastbare Quelle vorlag, steht
  * `SW` (Startwert zum Austesten, Projektregel 3) mit der Überlegung dahinter.
  */
-import { normalizeMaterialId } from "./catalog";
+import { ABFALLFRAKTIONEN, normalizeMaterialId } from "./catalog";
 
 /**
  * Schüttdichte in kg/m³, so wie das Material lose auf der Ladefläche liegt —
@@ -129,14 +129,20 @@ export function schuettdichte(id: string): number {
 }
 
 /**
- * Störstoff ist kein Material, sondern ein Gemisch: Holz, Reifen,
- * Baumischabfall, Kunststoff. Als Schüttdichte zählt ihr Mittel — und das ist
- * der Grund, warum eine verunreinigte Fuhre voller aussieht, als sie wiegt.
+ * Der Beifang einer Fuhre ist kein Material, sondern ein Gemisch aus den vier
+ * Abfallfraktionen: Holz, Baumischabfall, Reifen, Kunststoff. Als Schüttdichte
+ * zählt ihr Mittel — und das ist der Grund, warum eine verunreinigte Fuhre
+ * voller aussieht, als sie wiegt.
+ *
+ * Die Liste stand hier bis zum 16.09.2026 ein zweites Mal im Quelltext
+ * (`STOERSTOFFE`), neben `ABFALL` in `catalog.ts`. Jetzt wird sie geholt, nicht
+ * wiederholt — wer eine fünfte Abfallsorte einträgt, bekommt sie hier von
+ * selbst.
  */
-export const STOERSTOFFE = ["wood", "tires", "rubble", "plastic"] as const;
-
-export function stoerstoffDichte(): number {
-  return STOERSTOFFE.reduce((s, id) => s + schuettdichte(id), 0) / STOERSTOFFE.length;
+export function abfallDichte(): number {
+  return (
+    ABFALLFRAKTIONEN.reduce((s, id) => s + schuettdichte(id), 0) / ABFALLFRAKTIONEN.length
+  );
 }
 
 /**
@@ -159,21 +165,21 @@ export function mischDichte(anteile: Record<string, number>): number {
 }
 
 /**
- * Dichte einer Anlieferung aus Hauptfraktion und Störstoffanteil.
+ * Dichte einer Anlieferung aus Hauptfraktion und Abfallanteil.
  *
  * @param hauptfraktion Fraktions-ID, oder null für eine gemischte Fuhre
- * @param stoerstoffAnteil Volumenanteil Holz/Reifen/Kunststoff/Baumisch (0–1)
+ * @param abfallAnteil Volumenanteil Holz/Baumisch/Reifen/Kunststoff (0–1)
  */
 export function ladungsDichte(
   hauptfraktion: string | null,
-  stoerstoffAnteil: number
+  abfallAnteil: number
 ): number {
   // NaN käme aus einem halb gefüllten Profil und würde sich durch die ganze
   // Rechenkette ziehen, ohne dass ein Vergleich je fehlschlägt (Lehre
   // 15.09.2026). Deshalb hier abfangen, nicht weiterreichen.
-  const stoer = Number.isFinite(stoerstoffAnteil)
-    ? Math.min(1, Math.max(0, stoerstoffAnteil))
+  const abfall = Number.isFinite(abfallAnteil)
+    ? Math.min(1, Math.max(0, abfallAnteil))
     : 0;
   const haupt = schuettdichte(hauptfraktion ?? "mixed");
-  return haupt * (1 - stoer) + stoerstoffDichte() * stoer;
+  return haupt * (1 - abfall) + abfallDichte() * abfall;
 }

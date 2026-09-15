@@ -827,3 +827,36 @@ das, was im Spiel gilt — nicht das `materialId`, das im Quelltext steht.
 | Werkstattcontainer | Mischschrott | Stahlschrott 74 %, Kunststoff 12 %, Holz 10 %, Aluminium 4 % | 2500 | 160 | MISCHSCHROTT | Bau `container` (Zweckfarbe) |
 | Schiffsmotor (Diesel) | Mischschrott | Stahlschrott 84 %, Aluminium 10 %, Kupfer 6 % | 2600 | 160 | MISCHSCHROTT | Bau `motor` (Zweckfarbe) |
 
+
+---
+
+## Nachtrag 16.09.2026 — „Störstoff" ist aufgelöst (E-077)
+
+Diese Bestandsaufnahme ist vom 15.09.2026. Drei ihrer Zahlen sind seither
+absichtlich überholt; sie stehen hier nachgetragen, damit niemand aus der
+Tabelle oben einen falschen Schluss zieht.
+
+1. **Der Katalog ist von 313 auf 327 Einträge gewachsen.** Vierzehn neue
+   Gegenstände: acht Baumischabfall, vier Reifen, zwei Holz — alle in der
+   **Kleinteil-Klasse**, weil nur aus ihr eine gewöhnliche Anlieferung zieht.
+   Baumischabfall hatte dort **null** Gegenstände, obwohl die Tabelle sieben
+   Betonteile zeigt: die stehen alle in den Groß- und Riesenklassen.
+
+2. **Die Farbe trägt die Fraktion jetzt auch bei Abfall.** Abschnitt „Die Farbe
+   trägt die Fraktion nicht" gilt weiter für Stahl und Mischschrott (ΔE 8,8
+   und 6,0 zum Bauton — dieselbe Farbe). Für Holz (14,2), Baumischabfall
+   (15,2), Kunststoff (20,0) und Reifen (21,5) gilt er nicht mehr: `metallton`
+   führt die vier seit dem 16.09. Ein Lattenrost-Stapel ist braun, ein
+   Reifenstapel schwarz.
+
+3. **Reifen konnten bis dahin nicht angeliefert werden.** Der Fraktionsmix in
+   `randomCargo` kannte nur `wood`, `plastic` und `rubble`. Das war eine dritte
+   getippte Fassung derselben Vierergruppe, die es auch in `catalog.ts` und in
+   `schuettdichte.ts` gab — genau die Fehlerklasse aus Abschnitt W. Jetzt gibt
+   es **eine** Liste (`ABFALLFRAKTIONEN` in `catalog.ts`), und
+   `test/abfall.test.ts` hält sie mit allen anderen Stellen zusammen.
+
+**Nicht angefasst:** Die Befunde W-1 bis W-10 (Schild und Kasse rechnen
+verschieden), insbesondere **W-9** — gemischter Abfall kostet weiter weniger
+Gebühr als sortenreiner. Das ist Geldrechnung, und die steht in
+`docs/offene-punkte.md` als eigener, noch nicht freigegebener Punkt.

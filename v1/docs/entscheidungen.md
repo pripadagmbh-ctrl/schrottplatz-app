@@ -5765,3 +5765,121 @@ Stellen: der Bau der Figur, der Gehschritt und der Hund im Fahrerhaus.
    der Rückbau vier Netze je Figur, und das sagen wir dann bewusst.
 4. **Rudi Hardwig bringt seinen Schäferhund mit.** Ist der Hund durch die
    Seitenscheibe zu erkennen, und sitzt er richtig (nicht im Armaturenbrett)?
+### E-079 — „Störstoff" ist aufgelöst: vier Namen, vier Farben, vierzehn neue Gegenstände — und Reifen kommen zum ersten Mal an (16.09.2026)
+
+**Entscheidung.** Der Punkt aus Patricks Gerätetest — *„‚Störstoff' auflösen in
+Holz, Baumischabfall, Reifen und Kunststoffe — Störstoff sagt niemandem etwas"* —
+ist umgesetzt. Die Arbeit war eine andere, als der Satz vermuten lässt: **Die
+vier Namen gab es schon** (E-067 hat sie am 15.09. in den Katalog geschrieben).
+Was fehlte, war alles, was einen Namen zu einer Fraktion macht.
+
+*1 — Eine Liste statt dreier.* Die Vierergruppe stand an **drei** Stellen
+getippt: `ABFALL` in `materials/catalog.ts`, `STOERSTOFFE` in
+`materials/schuettdichte.ts` und — mit nur **drei** von vier — im Fraktionsmix
+von `world/scrapItems.ts`. Genau die Fehlerklasse, an der am 15.09. fünf
+Wächter hingen: zwei Stellen, die dasselbe wissen sollen, und sie wissen es
+verschieden. Jetzt gibt es `ABFALLFRAKTIONEN`, und alles andere holt sie dort.
+
+*2 — Reifen konnten nie angeliefert werden.* `tires` fehlte im Lostopf. Die
+Fraktion hatte Namen, Preis, Dichte, Farbe und eine Mulde — und kam nur als
+Bestandteil eines Fahrzeugs auf den Platz. **Der Verdienst hat sich beim
+Beheben nicht verschoben**, und das ist gerechnet, nicht gehofft: Die sechs
+Metalle behalten je vier von 36 Losen (= 1/9 wie vorher), die vier
+Abfallsorten teilen sich die drei Lose, die vorher drei von ihnen hatten. Der
+Abfallanteil einer Anlieferung liegt unverändert bei **6,7 %**; hätte man
+`tires` einfach als zehnten Namen angehängt, wären es 8,0 % geworden.
+
+*3 — Vierzehn neue Gegenstände.* Gezählt wird in der **Kleinteil-Klasse**, weil
+nur aus ihr eine gewöhnliche Anlieferung zieht. Dort stand Baumischabfall bei
+**null**, Reifen bei vier, Holz bei sechs. Jetzt haben alle vier acht — dieselbe
+Zielgröße wie die Metalle („mindestens acht je Fraktion", 15.09.2026). Acht
+Baumischabfall (Dämmwolle-Bigbag, Gipskarton, Dachziegel, Bordstein,
+Gehwegplatten, Mauerwerk-Brocken, Porenbeton, Sanitärkeramik), vier Reifen
+(LKW-Reifen, Erdbaureifen, Motorradreifen-Bund, Vollgummireifen), zwei Holz
+(Europaletten, Dachlatten-Bund). Jede Masse ist aus Volumen × Feststoffdichte
+gerechnet, die Rechnung steht an der Zeile, und alle vierzehn gehen durch den
+Gewichts-Wächter aus E-067.
+
+*4 — Man sieht jetzt, was man in der Hand hält.* `metallton()` kannte nur
+Buntmetall; ein Lattenrost-Stapel, ein Bohlenbund, ein Reifenstapel und eine
+Kunststoffplatte standen im selben Stahlgrau da wie ein Blechstapel. Die vier
+Abfallsorten sind dazugekommen — gemessen liegen ihre Fraktionsfarben ΔE2000 =
+**14,2 · 15,2 · 20,0 · 21,5** vom Bauton weg und untereinander 17 bis 37
+auseinander. Stahl (8,8) und Mischschrott (6,0) bleiben, wo sie waren: unter 10
+ist dieselbe Farbe, und sie mitzunehmen wäre Unruhe an zweihundert Einträgen.
+
+**Begründung.** „Störstoff" ist ein Fachwort aus der Schrottbewertung und meint
+alles, was nicht zum bezahlten Material gehört. Im Spiel stand es als Fraktion
+und begegnete dem Spieler beim Sortieren — er hielt ein Teil im Greifer und
+wusste nicht, ob es ein Brett, ein Reifen oder ein Eimer ist. Alle drei hießen
+gleich.
+
+E-067 hat den Namen geteilt und das Auffüllen ausdrücklich vertagt („niemand
+bestellt eine sortenreine Reifenfuhre, und jede Änderung an der Mischung in
+`randomCargo` verschiebt den Verdienst"). Die Sorge war berechtigt und ist hier
+beantwortet statt umgangen: Die Mischung hängt an einem Lostopf mit festen
+Anteilen, nicht an der Zahl der Katalogeinträge. Das Auffüllen kostet also
+nichts — und ohne es bleibt eine Fraktion, die nie erscheint, ein Wort auf
+einem Schild.
+
+**Verworfene Alternativen.**
+
+1. *`tires` als zehnten Namen anhängen.* Einen Tastendruck kürzer und eine
+   Wirtschaftsänderung: Der Abfallanteil wäre von 6,67 auf 8,0 % gestiegen, der
+   Verdienst entsprechend gesunken. Preise und Erlöse sind in diesem Paket
+   ausdrücklich nicht angefasst.
+2. *Die Vierergruppe in `schuettdichte.ts` stehen lassen und nur den Mix
+   nachziehen.* Hätte den Fehler von drei auf zwei Stellen verkleinert statt
+   ihn zu beseitigen. Die nächste fünfte Abfallsorte hätte ihn wiederhergestellt.
+3. *Auch Stahl und Mischschrott auf ihre Fraktionsfarbe umstellen, damit die
+   Regel einfacher ist.* Gemessen 8,8 und 6,0 ΔE — ein Unterschied, den man
+   kaum sieht, an rund zweihundert Gegenständen. Dieselbe Begründung wie in
+   E-067, und sie gilt weiter.
+4. *Vier eigene Mulden für die vier Sorten.* Das baut den Platz um und ist
+   Patricks Entscheidung (siehe „Offen" unten).
+
+**Abnahmekriterium.**
+
+- `test/abfall.test.ts` (neu, 24 Prüfungen, **fünf Gegenproben**): eine Liste
+  und alle folgen ihr; jede der vier hat eine eigene Schütt- und
+  Feststoffdichte und acht eigene Gegenstände; alle vier werden angeliefert;
+  der Abfallanteil bleibt zwischen 5,8 und 7,5 % — und dieselbe Schranke meldet
+  den nachgebauten Sprung auf 8,0 %.
+- `test/gewicht.test.ts`: Der BEFUND „Reifen (4), Holz (6), Baumischabfall (0)"
+  ist bewusst rot geworden und steht jetzt als Soll-Eigenschaft: vier mal acht.
+- `test/bauart.test.ts`: Der BEFUND „die feste Fraktionstabelle liefert
+  Baumischabfall nicht aus" ebenso — gemessen 1,7 % statt 0,0 %.
+- `test/fraktionen.test.ts`: 327 Einträge (vorher 313), davon weiterhin 55 mit
+  Stückliste; 23 ohne Bauzweig (vorher 21).
+- **1142 Prüfungen in 99 Dateien grün**, `npm run build` grün.
+- Kein neuer Körper, keine neue Physik, kein neuer Zeichenruf: Die vierzehn
+  Gegenstände benutzen vorhandene Bauzweige (`stapel`, `buendel`, `haufen`,
+  `beton`) und nackte Ringe wie der Traktorreifen. `test/federungAmWagen.ts`
+  („zehn Fuhren in Folge") läuft unverändert durch.
+
+**Offen — und ausdrücklich nicht von mir entschieden.**
+
+Ob die vier weiter **zusammen** in den Müllcontainer gehören. Heute nehmen ihn
+und das Abfall-Silo alle vier; der Reifencontainer ist am 14.09. ersatzlos
+entfallen. Das Blatt dazu liegt vor: `docs/abfallmulde-2026-09-16.svg`
+(erzeugt mit `npx vite-node tools/abfallmulde-blatt.ts`). Es zeigt gemessen:
+
+- Im Schwenkband stehen heute **zwei** Sortierziele, BUNT + VA (7,60 m) und
+  MUELL (9,01 m, davon 53 % der Grundfläche im Band).
+- Es gibt **genau eine** Tasche für eine gleich große zweite Mulde: (2,80 |
+  −15,90), 7,38 m vom Sitz, **83 % im Band** — mehr als der Müllcontainer
+  heute hat. Null Treffer in der Hindernisliste, 0,35 m Luft zur LKW-Spur,
+  5,60 m zur Ostmauer. Der Besen stünde darin und müsste umziehen.
+
+**Auf dem Gerät zu prüfen.**
+
+1. **Eine Anlieferung kommen lassen und in den Müllcontainer sortieren.**
+   Liegen dort jetzt unterscheidbare Dinge — braune Bretter, schwarze Reifen,
+   graubeiger Bauschutt, blauer Kunststoff — statt vier Grautönen? Und nennt
+   die Griff-Info sie beim Namen (Holz, Baumischabfall, Reifen, Kunststoff)?
+2. **Auf einen Reifen warten.** Bis gestern kam keiner einzeln an. Ein
+   LKW-Reifen oder ein Erdbaureifen muss sich greifen und rollen lassen wie der
+   Traktorreifen — er ist deutlich größer (1,45 m Außendurchmesser).
+3. **Den Verdienst über einen Tag vergleichen.** Er soll sich nicht anders
+   anfühlen als gestern: Der Abfallanteil einer Fuhre ist unverändert. Fällt
+   dir das Gegenteil auf, ist die Messung falsch und nicht dein Gefühl.
