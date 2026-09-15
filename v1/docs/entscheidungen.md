@@ -4768,3 +4768,152 @@ werden, falls die Säule doch fällt.
 3. Antwort auf die eine Frage: Bolzen hinauf zur Traverse (dann muss die ganze
    Anlenkung neu gerechnet werden) oder **Traverse herunter zum Bolzen** (dann
    bleibt die Anlenkung und der Kopf wandert in den Korb)?
+
+---
+
+### E-073 — Passt der Zylinder? Drei Wege, gezeichnet — und keiner der beiden Umbauten ist baubar (15.09.2026)
+
+**Entscheidung.** Ein Blatt statt einer Frage in Worten:
+`docs/f5-anlenkung-2026-09-15.svg`. Vier Spalten nebeneinander, die drei
+gerechneten im **selben Maßstab**, mit eingezeichnetem Zylinder — Rohr, Stange,
+beide Augen — und dem Vorbild als ausdrücklich schematischer Skizze daneben.
+**Am Spielcode ist keine Zeile geändert**; `src/` ist unberührt.
+
+**Anlass, wörtlich.** Patrick, 15.09.2026, auf die Schlussfrage von E-072:
+„Das kann ich so nicht beurteilen. Also ich hab dir ein Bild geschickt von den
+Originalteilen, und ich kann nicht sagen, ob dann der Zylinder falsch ist. Also
+ich bräuchte schon irgendwie ne Zeichnung, ob das passt."
+
+**Der Fehler lag bei uns.** E-072 hat eine Hydraulikfrage als Textfrage gestellt
+(„Bolzen hinauf oder Traverse herunter?"). Patrick entscheidet am Bild. Eine
+Anlenkung ist genau das, was man nicht beschreiben, sondern nur zeichnen kann.
+
+---
+
+#### Das Ergebnis in einer Zeile: 2 und 3 sind dieselbe Rechnung
+
+**Die Anlenkung kennt nur den ABSTAND zwischen Zylinderaufnahme und
+Schalenbolzen — nicht, wer von beiden sich bewegt.** In `zylinderLaenge`,
+`zylinderNeigung` und `hebelarm` stehen ausschließlich Differenzen der beiden
+Höhen. Ob der Bolzen 66,9 cm steigt oder die Traverse 66,9 cm fällt, ist für den
+Zylinder dasselbe.
+
+Gemessen, nicht behauptet: Der größte Unterschied zwischen Variante 2 und 3 über
+alle vier Kennwerte ist **2,8e−14** (Rundungsrest des Rechners; bei den Längen
+5,6e−17 m).
+
+| | 1 HEUTE | 2 BOLZEN HINAUF | 3 TRAVERSE HERUNTER |
+|---|---|---|---|
+| Zylinderaufnahme | −0,6350 m | −0,6350 m | −1,3035 m |
+| Schalenbolzen | −1,5335 m | −0,8650 m | −1,5335 m |
+| **Abstand** | **0,8985 m** | **0,2300 m** | **0,2300 m** |
+| Rohrlänge (fest) | 0,420 m | 0,420 m | 0,420 m |
+| Augenabstand geschlossen | 1,046 m | 0,483 m | 0,483 m |
+| Augenabstand offen | 0,670 m | **0,179 m** | **0,179 m** |
+| Hub | 376 mm | 303 mm | 303 mm |
+| Stange schaut aus dem Rohr | +250 mm | **−241 mm** | **−241 mm** |
+| Neigung größte (Wächter < 25°) | 24,4° | **89,7°** | **89,7°** |
+| Hebelarm kleinster (> 115 mm) | 118 mm | **96 mm** | **96 mm** |
+| **Urteil** | **baubar** | **NICHT baubar** | **NICHT baubar** |
+
+**„−241 mm" ist die ganze Antwort auf „ob das passt":** Bei voll geöffnetem
+Greifer läge das Auge der Kolbenstange **24,1 cm INNERHALB des Rohrs**. Auf dem
+Blatt ist genau das gezeichnet — das Rohr in seiner vollen Länge, das Auge rot
+eingekreist mittendrin. *Der erste Entwurf hat das Rohr auf den Augenabstand
+gekürzt und damit versteckt, worum es geht. Ein Rohr wird nicht kürzer, weil die
+Anlenkung es gern hätte.*
+
+**Die Wächter sind nicht nachgezogen worden.** „Neigung unter 25°" und
+„Hebelarm über 0,115 m" stehen unverändert; sie sind der Grund, warum wir
+überhaupt etwas wissen.
+
+---
+
+#### Was Variante 3 zusätzlich anrichtet (am gebauten Netz gemessen)
+
+- Die Mitteltraverse wandert von −0,865 auf **−1,534 m**, der Rotator von −0,510
+  auf **−1,179 m**.
+- Der tiefste Punkt des Kopfes liegt dann auf −1,684 m, also **15,0 cm unter der
+  Bolzenebene — mitten im Korb**.
+- Der Kopf versperrt **6.106 cm²** vom Schlund (heute 3.822, mit dem Bolzen oben
+  5.265).
+- Er kommt den Schalen auf **6 mm** nahe.
+- Und oben klafft eine **Lücke von 66,9 cm zwischen Adapter und Rotator**:
+  **Die Säule ist nicht verschwunden, sie ist nur umgezogen.**
+
+---
+
+#### Was das Vorbild anders macht — Spalte 4
+
+Quelle: `docs/f5-vorbild-aufnahme-patrick-2026-09-15.jpg`, rechte Bildhälfte, ein
+Mehrschalengreifer in Kinshofer-Bauart.
+
+**Aus dem Foto ablesbar:** Der Kopf ist ein kurzer, nach unten auslaufender Guss.
+Die Schalenbolzen sitzen unmittelbar an seinem unteren Rand — **keine sichtbare
+Säule**. Zwischen Kopf und Schale läuft eine **kurze, zweiseitig verbolzte
+Lasche**. Ein Hydraulikzylinder ist **außen nicht zu sehen**.
+
+**Gedeutet, und als Deutung gekennzeichnet (auf dem Blatt rot gestrichelt):** Bei
+dieser Bauart sitzt **ein** Zylinder senkrecht **im Kopf** und zieht eine
+bewegliche Traverse; von ihr laufen fünf kurze Laschen zu den Schalen. Anders
+ließe sich ein Greifer ohne äußere Zylinder nicht schließen.
+
+**Deshalb darf dort der Bolzen dicht unter dem Kopf sitzen: Es gibt keinen langen
+Zylinder, der dazwischen Platz braucht.** Unsere Anlenkung ist eine andere
+Maschine, nicht eine schlechter gebaute — fünf schräg stehende Außenzylinder
+brauchen den Abstand, den Patrick zu Recht als hässlich empfindet.
+
+**Die Skizze ist keine Maßzeichnung.** Aus einer Fotografie lassen sich keine
+Maße nehmen; es geht allein um die Anordnung, damit die drei gerechneten
+Varianten etwas haben, woneben man sie halten kann. Das steht so auch auf dem
+Blatt.
+
+---
+
+**Verworfene Alternative.** Die Frage noch einmal in Worten stellen, diesmal
+ausführlicher. Sie ist schon einmal unbeantwortbar gewesen, und zwar nicht, weil
+sie zu kurz war.
+
+**Werkzeuge.** `tools/fuenfschalen/saeulenrechnung.ts` ist aus `mittelsaeule.ts`
+**herausgelöst** (Rechnung und Messung getrennt vom Blatt), weil ein Werkzeug,
+das beim Importieren sein eigenes Blatt schreibt, sich nicht wiederverwenden
+lässt — beim ersten Versuch hat das Anlenkungsblatt das Säulenblatt mitgezogen.
+Dasselbe Muster wie `zahnformen.ts` neben `zahnknick.ts`. Gegenprobe: Beide
+Blätter kommen unverändert wieder heraus, und `probe()` hält die Rechnung
+weiterhin auf **5,6e−17** gegen `rig.ts`.
+
+**Abnahmekriterium.** `test/mittelsaeule.test.ts`, jetzt **10 Prüfungen**; die
+drei neuen mit Gegenprobe, die melden muss:
+
+- 2 und 3 liefern dieselbe Anlenkung (auf 1e−12). Gegenprobe: ein **halb**
+  geschlossener Abstand liefert nachweislich etwas anderes — sonst prüfte der
+  Block nur, dass die Funktion konstant ist. Und ausdrücklich `toBeCloseTo`
+  statt `toBe`: Bitgenau gleich ist es nicht, und ein `toBe` wäre hier eine Lüge.
+- Heute schaut die Stange 250 mm aus dem Rohr; bei beiden Umbauten liegt ihr Auge
+  über 200 mm **im** Rohr.
+- Variante 3 legt den Kopf über 10 cm unter die Bolzenebene und auf 20 mm an die
+  Schalen. Gegenprobe: unverschoben steht der Kopf **über** der Bolzenebene und
+  hat über 50 mm Luft.
+
+1.099 bestehende Prüfungen bleiben grün (jetzt **1.102 in 98 Dateien**).
+`npm run build` sauber.
+
+**Unangetastet.** `src/` vollständig. Sichelkralle und Fünfschalengreifer,
+Griff-Kern, Pendel, Rotator, Kamera, Bodenanschlag. Die Mittelsäule steht. Die
+beiden Wächter aus E-039 stehen auf ihren alten Zahlen.
+
+**Offen — und jetzt am Bild zu entscheiden.** Wenn beide naheliegenden Umbauten
+an derselben Wand enden, bleiben drei Wege: (a) alles lassen, wie es ist; (b) den
+Abstand auf die gemessenen 2,0 cm Spielraum verkleinern, was fast nichts bringt;
+(c) die Anlenkung auf die Bauart des Vorbilds umstellen — ein Zylinder im Kopf,
+fünf kurze Laschen. (c) ist ein großer Umbau und eine eigene Rechnung.
+
+**Auf dem Gerät zu prüfen.**
+
+1. `docs/f5-anlenkung-2026-09-15.svg` aufrufen und die **Spalten 2 und 3**
+   ansehen: Erkennst du, dass die Kolbenstange dort in ihrem eigenen Rohr
+   steckt — und dass der Zylinder fast waagerecht liegt statt zu ziehen?
+2. **Spalte 4 neben Spalte 1** halten: Ist das der Unterschied, den du auf dem
+   Foto gesehen hast — kurze Lasche statt langem Zylinder?
+3. Die Entscheidung: bleibt es, wie es ist, oder soll die Anlenkung auf die
+   Bauart des Vorbilds umgerechnet werden (ein Zylinder im Kopf, fünf Laschen)?
