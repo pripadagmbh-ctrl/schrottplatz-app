@@ -17,6 +17,14 @@
  * Geschäft — nie aus Herkunft. Keine Gruppe wird als kriminell markiert.
  */
 
+import {
+  baueFuhre,
+  rollAufbau,
+  rollFuellgrad,
+  type Aufbau,
+  type Fahrzeugart,
+} from "./fuellgrad";
+
 export type CustomerGroup = "privat" | "haendler" | "gewerbe";
 
 export interface CustomerProfile {
@@ -25,8 +33,16 @@ export interface CustomerProfile {
   name: string;
   /** Untertitel: Familie, Branche oder Herkunftsort */
   subtitle: string;
-  /** Liefermenge in kg */
+  /** Liefermenge in kg — folgt aus Füllgrad × Laderaum × Schüttdichte */
   massKg: number;
+  /** Fahrzeug, mit dem er kommt — steht vor der Menge fest, denn es bestimmt sie */
+  vehicle: Fahrzeugart;
+  /** Aufbau der Ladefläche (nur Händler fahren Rungen oder Koffer) */
+  aufbau: Aufbau;
+  /** Wie voll die Ladefläche ist (0–1) — das, was der Spieler sieht */
+  fuellgrad: number;
+  /** Schüttdichte der Ladung in kg/m³ */
+  dichte: number;
   /** Fraktion, wenn sortenrein geliefert wird; sonst null für Mischladung */
   sortedMaterial: string | null;
   /** Anteil Störstoff an der Ladung */
@@ -229,6 +245,73 @@ const PRIVAT_SPRUECHE = [
 const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 
 /**
+ * Unter dieser Menge fährt niemand vor.
+ *
+ * Bis 15.09.2026 stand hier 600 kg — als gewürfelte Untergrenze (E-030). Seit
+ * die Masse aus dem Füllgrad folgt, ist sie keine Regel mehr, sondern ein
+ * Ergebnis: Ein viertelvoller PKW-Anhänger mit viel Holz und Kunststoff wiegt
+ * rechnerisch 280 kg, und das ist richtig so — der Füllgrad gewinnt
+ * (Ansage Patrick 15.09.2026). Geblieben ist nur die Notbremse: Wer für eine
+ * Handvoll Blech den Weg auf sich nimmt, ist kein Kunde.
+ *
+ * SW. Betroffen ist allein der Privatmann im Viertel-Fall; jeder LKW liegt
+ * um Größenordnungen darüber.
+ */
+export const MINDEST_FUHRE_KG = 300;
+
+/**
+ * Fahrzeug zur Kundschaft würfeln. Steht vor der Menge, weil es sie bestimmt:
+ * Ein PKW-Anhänger fasst 2,4 m³, ein Kipper mit Rungen 20 m³.
+ */
+function rollFahrzeug(group: CustomerGroup): Fahrzeugart {
+  if (group === "privat") {
+    // PKW mit Anhänger oder Kastenwagen. Gelegentlich schleppt jemand ein
+    // Altauto an — dann kommt der Abschleppwagen.
+    return Math.random() < 0.15 ? "wrack" : "pkw";
+  }
+  if (group === "gewerbe") return Math.random() < 0.65 ? "kipper" : "pritsche";
+  // Händler: alles unterwegs, was Räder hat
+  const r = Math.random();
+  return r < 0.5 ? "kipper" : r < 0.85 ? "pritsche" : "wrack";
+}
+
+/**
+ * Die Ladung eines Kunden bestimmen — Füllgrad zuerst, Masse zuletzt.
+ *
+ * Reihenfolge (Ansage Patrick 15.09.2026): Wie voll ist die Ladefläche? Wie
+ * groß ist sie bei diesem Wagen? Was wiegt das Material, das darin liegt?
+ * Erst daraus kommen die Kilogramm.
+ */
+function fuhreFuer(
+  group: CustomerGroup,
+  sortedMaterial: string | null,
+  contaminantShare: number
+): {
+  vehicle: Fahrzeugart;
+  aufbau: Aufbau;
+  fuellgrad: number;
+  massKg: number;
+  dichte: number;
+} {
+  const vehicle = rollFahrzeug(group);
+  const aufbau = rollAufbau(group);
+  const fuhre = baueFuhre({
+    kind: vehicle,
+    aufbau,
+    fuellgrad: rollFuellgrad(group),
+    hauptfraktion: sortedMaterial,
+    stoerstoffAnteil: contaminantShare,
+  });
+  return {
+    vehicle,
+    aufbau,
+    fuellgrad: fuhre.fuellgrad,
+    massKg: Math.max(MINDEST_FUHRE_KG, fuhre.massKg),
+    dichte: fuhre.dichte,
+  };
+}
+
+/**
  * Nächsten Kunden würfeln.
  *
  * Die Mischung ist bewusst ungleich: Händler bringen die großen Mengen und
@@ -248,31 +331,33 @@ export function rollCustomer(): CustomerProfile {
 }
 
 function rollPrivat(): CustomerProfile {
+  // Haushaltsauflösung ist immer gemischt, und Privatleute bringen
+  // unwissentlich Störstoff mit: Holz, Kunststoff, Reifen. Der Störstoff frisst
+  // Volumen und wiegt fast nichts — ihr Anhänger sieht voller aus, als er wiegt.
+  const contaminantShare = 0.15 + Math.random() * 0.2;
+  const fuhre = fuhreFuer("privat", null, contaminantShare);
   return {
     group: "privat",
     name: pick(PRIVAT_NAMEN),
     subtitle: pick(PRIVAT_ORTE),
     /*
-     * 0,65 bis 1,8 t statt 0,05 bis 0,8 t (Ansage Patrick 15.09.2026).
+     * Die Menge wird nicht mehr gewürfelt, sie wird gerechnet (Ansage Patrick
+     * 15.09.2026): „Es ist halt bei Händlern halt auch nicht immer das
+     * Gewicht, sondern eher das Volumen auf der Ladefläche."
      *
-     * Sein Befund am Gerät: „Eigentlich kommen Händler erst, wenn ihre LKWs
-     * randvoll sind. … mindestens mal über 600, 700 Kilo Minimum. … Ich sehe
-     * ja, dass die zwischen 1 und 10 Tonnen alles haben, aber drunter ist eher
-     * selten."
-     *
-     * Nachgemessen war der Händler nie das Problem (2,5–9,0 t) und das Gewerbe
-     * auch nicht (1,2–6,5 t) — beide lagen längst im Band. Es war der
-     * Privatmann, der mit 50 kg vorfuhr: eine Fuhre, für die niemand den Weg
-     * auf sich nimmt.
-     *
-     * Die Untergrenze ist damit eine Aussage über die Welt, nicht über den
-     * Zufall: Wer herfährt, hat einen Anhänger voll. Die Obergrenze steigt
-     * mit, sonst wäre die Spanne nur noch ein Strich.
+     * Ein PKW-Anhänger fasst 2,4 m³ (1,74 m innen × 2,0 m nutzbar × 0,69 m
+     * Ladehöhe, Maße aus `vehicleModel.buildCarAndTrailer`). Voll mit
+     * gemischtem Haushaltsschrott sind das rund 1,3 t, ein Viertel voll rund
+     * 350 kg. Der Privatmann bleibt damit das untere Ende der Spanne, ohne
+     * dass eine Zahl das anordnet.
      */
-    massKg: 650 + Math.random() * 1150,
-    sortedMaterial: null, // Haushaltsauflösung ist immer gemischt
-    // Privatleute bringen unwissentlich Störstoff mit: Holz, Kunststoff, Reifen
-    contaminantShare: 0.15 + Math.random() * 0.2,
+    massKg: fuhre.massKg,
+    vehicle: fuhre.vehicle,
+    aufbau: fuhre.aufbau,
+    fuellgrad: fuhre.fuellgrad,
+    dichte: fuhre.dichte,
+    sortedMaterial: null,
+    contaminantShare,
     hardness: 1,
     greeting: pick(PRIVAT_SPRUECHE),
   };
@@ -280,15 +365,28 @@ function rollPrivat(): CustomerProfile {
 
 function rollHaendler(): CustomerProfile {
   const f = pick(FAMILIES);
+  // Auch wenn er eine Vorliebe hat: der Händler nimmt mit, was er kriegt
+  const sortedMaterial = f.typical && Math.random() < 0.45 ? f.typical : null;
+  const contaminantShare = 0.05 + Math.random() * 0.08;
+  const fuhre = fuhreFuer("haendler", sortedMaterial, contaminantShare);
   return {
     group: "haendler",
     name: f.firstName,
     subtitle: f.family,
-    // Was auf einen Kipper passt: rund 10-15 Kubikmeter Schrott
-    massKg: 2500 + Math.random() * 6500,
-    // Auch wenn er eine Vorliebe hat: der Händler nimmt mit, was er kriegt
-    sortedMaterial: f.typical && Math.random() < 0.45 ? f.typical : null,
-    contaminantShare: 0.05 + Math.random() * 0.08,
+    /*
+     * „Eigentlich kommen Händler erst, wenn ihre LKWs randvoll sind."
+     * Zwei von drei Fuhren sind deshalb randvoll (siehe `FUELL_GEWICHTE`).
+     * Was das wiegt, hängt am Aufbau und am Material: ein flacher Kipper voll
+     * Mischschrott rund 8 t, derselbe Wagen mit Rungen wäre über 12 t — da
+     * geht vorher die Nutzlast aus, und dann liegt die Ladung flacher.
+     */
+    massKg: fuhre.massKg,
+    vehicle: fuhre.vehicle,
+    aufbau: fuhre.aufbau,
+    fuellgrad: fuhre.fuellgrad,
+    dichte: fuhre.dichte,
+    sortedMaterial,
+    contaminantShare,
     hardness: f.hardness,
     greeting: pick(f.greetings),
   };
@@ -296,11 +394,18 @@ function rollHaendler(): CustomerProfile {
 
 function rollGewerbe(): CustomerProfile {
   const t = pick(TRADES);
+  // Der Betrieb ruft, wenn sein Container voll ist — nicht, wenn der LKW voll
+  // ist. Deshalb streut sein Füllgrad breiter als der des Händlers.
+  const fuhre = fuhreFuer("gewerbe", t.material, t.beifang);
   return {
     group: "gewerbe",
     name: t.name,
     subtitle: "Gewerbe",
-    massKg: 1200 + Math.random() * 5300,
+    massKg: fuhre.massKg,
+    vehicle: fuhre.vehicle,
+    aufbau: fuhre.aufbau,
+    fuellgrad: fuhre.fuellgrad,
+    dichte: fuhre.dichte,
     sortedMaterial: t.material,
     contaminantShare: t.beifang,
     hardness: 2, // sachlich, wenig Spielraum
@@ -308,17 +413,14 @@ function rollGewerbe(): CustomerProfile {
   };
 }
 
-/** Fahrzeugart, die zu dieser Kundschaft passt. */
-export function vehicleForCustomer(
-  c: CustomerProfile
-): "kipper" | "pritsche" | "wrack" | "pkw" {
-  if (c.group === "privat") {
-    // PKW mit Anhänger oder Kastenwagen. Gelegentlich schleppt jemand ein
-    // Altauto an — dann kommt der Abschleppwagen.
-    return Math.random() < 0.15 ? "wrack" : "pkw";
-  }
-  if (c.group === "gewerbe") return Math.random() < 0.65 ? "kipper" : "pritsche";
-  // Händler: alles unterwegs, was Räder hat
-  const r = Math.random();
-  return r < 0.5 ? "kipper" : r < 0.85 ? "pritsche" : "wrack";
+/**
+ * Fahrzeugart, die zu dieser Kundschaft passt.
+ *
+ * Seit 15.09.2026 steht sie schon im Profil: Das Fahrzeug bestimmt den
+ * Laderaum und damit die Menge, es muss also vor der Menge feststehen. Für
+ * von Hand gebaute Profile (Tutorial, Tests) bleibt der alte Wurf als
+ * Rückfallebene stehen.
+ */
+export function vehicleForCustomer(c: CustomerProfile): Fahrzeugart {
+  return c.vehicle ?? rollFahrzeug(c.group);
 }
