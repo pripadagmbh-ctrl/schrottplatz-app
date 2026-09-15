@@ -18,7 +18,7 @@ import {
   type FuellKlasse,
 } from "../src/delivery/fuellgrad";
 import { wandHoehe } from "../src/delivery/vehicleModel";
-import { BED_HALF_W } from "../src/delivery/routes";
+import { BED_HALF_W, bedLenFor } from "../src/delivery/routes";
 import { ladungsDichte, schuettdichte } from "../src/materials/schuettdichte";
 
 /**
@@ -153,16 +153,25 @@ describe("Herkunft der Ladeflächenmaße", () => {
     expect(quelle("vehicles.ts")).toContain("const halbBreite = BED_HALF_W - 0.08;");
   });
 
-  it("die Ladeflächenlängen sind die aus `vehicles.ts`", () => {
-    const zeile = quelle("vehicles.ts").match(
-      /this\.bedLen\s*=\s*kind === "pkw" \? ([\d.]+) : kind === "wrack" \? ([\d.]+) : kind === "kipper" \? ([\d.]+) : ([\d.]+);/
-    );
-    expect(zeile, "Zeile `this.bedLen = …` in vehicles.ts nicht gefunden").toBeTruthy();
-    const [, pkw, wrack, kipper, rest] = zeile!;
-    expect(BED_LEN.pkw).toBe(Number(pkw));
-    expect(BED_LEN.wrack).toBe(Number(wrack));
-    expect(BED_LEN.kipper).toBe(Number(kipper));
-    expect(BED_LEN.pritsche).toBe(Number(rest));
+  it("die Ladeflächenlängen kommen aus der gemeinsamen Quelle, nicht aus einer Abschrift", () => {
+    /*
+     * Bis zum Zusammenführen am 15.09.2026 las dieser Test die Zeile
+     * `this.bedLen = kind === "pkw" ? …` aus `vehicles.ts` und verglich sie mit
+     * einer Tabelle hier. Das war richtig gedacht und trotzdem die falsche
+     * Prüfung: Zwei Pakete desselben Tages haben dieselbe Zahlenreihe angelegt
+     * — dieses als Abschrift, das Kipper-Paket (E-029) als **gemeinsame
+     * Quelle** in `routes.ts`, die seither auch `vehicles.ts` liest.
+     *
+     * Der Test wurde beim Zusammenführen rot, und das war die richtige
+     * Meldung. Bewacht wird jetzt nicht mehr, dass zwei Abschriften
+     * übereinstimmen, sondern dass es **keine zweite Abschrift gibt**.
+     */
+    for (const kind of ["pkw", "wrack", "kipper", "pritsche"] as const) {
+      expect(BED_LEN[kind], kind).toBe(bedLenFor(kind));
+    }
+    // Und in vehicles.ts steht keine eigene Zahlenreihe mehr.
+    expect(quelle("vehicles.ts")).not.toMatch(/this\.bedLen\s*=\s*kind === "pkw" \?/);
+    expect(quelle("vehicles.ts")).toContain("bedLenFor");
   });
 
   it("Rand und Überstand sind die aus `vehicles.ts`", () => {

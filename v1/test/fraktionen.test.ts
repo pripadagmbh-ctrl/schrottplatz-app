@@ -148,20 +148,29 @@ describe("Jede Fraktion hat ein Ziel — und eine hat keins in Reichweite", () =
     }
   });
 
-  it("BEFUND V-6: Batterien haben am Bagger kein Ziel, nur im Lager", () => {
+  it("jede Fraktion hat auch am Bagger ein Ziel — seit dem 15.09.2026 lückenlos", () => {
     /*
-     * Am Bagger stehen nur die Behälter ohne `lager`. Wer eine Starterbatterie
-     * aus einem Wrack fischt, bekommt dort überall „falsche Zone" — derselbe
-     * offene Punkt, den VA bis zum 15.09.2026 hatte.
+     * BEFUND V-6, behoben noch am selben Tag. Die ursprüngliche Fassung dieses
+     * Wächters hielt den Mangel fest: Am Bagger stehen nur die Behälter ohne
+     * `lager`, und wer eine Starterbatterie aus einem Wrack fischte, bekam dort
+     * überall „falsche Zone" — derselbe offene Punkt, den VA bis zum Vormittag
+     * desselben Tages hatte. Sie erwartete ausdrücklich `["battery"]` und trug
+     * den Satz „wird das behoben, wird dieser Test rot, und dann gehört er
+     * umgeschrieben, und zwar bewusst".
      *
-     * Wird das behoben, wird dieser Test rot. Das ist beabsichtigt: dann
-     * gehört er umgeschrieben, und zwar bewusst.
+     * Genau das ist passiert: E-029 hat Batterien in „BUNT + VA" gelegt
+     * (Patricks Entscheidung, gegen die Empfehlung einer eigenen Mulde — die
+     * Folgen lagen ihm vor). Beim Zusammenführen der beiden Pakete wurde dieser
+     * Test rot, und das war die Meldung „der Mangel ist weg".
+     *
+     * Er bewacht jetzt die Lückenlosigkeit statt der Lücke. Fällt künftig eine
+     * Fraktion am Bagger heraus, nennt er sie beim Namen.
      */
     const amBagger = CONFIGS.filter((c) => !c.lager);
     const ohneZiel = Object.keys(MATERIALS).filter(
       (id) => !amBagger.some((c) => gehoertHierhin(c, id))
     );
-    expect(ohneZiel).toEqual(["battery"]);
+    expect(ohneZiel, `ohne Ziel am Bagger: ${ohneZiel.join(", ")}`).toEqual([]);
   });
 });
 

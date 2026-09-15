@@ -20,6 +20,7 @@
  * zuerst ausgeht — Platz oder Nutzlast.
  */
 import { ladungsDichte } from "../materials/schuettdichte";
+import { bedLenFor } from "./routes";
 
 /** Aufbau der Ladefläche (Quelle: `vehicleModel.VehicleModelContext.bodyStyle`). */
 export type Aufbau = "flach" | "rungen" | "koffer";
@@ -109,15 +110,22 @@ export function rollFuellgrad(gruppe: LadeGruppe, rnd: () => number = Math.rando
 
 /**
  * Länge der Ladefläche je Fahrzeugart, in Metern.
- * Quelle: `vehicles.ts` (`this.bedLen = kind === "pkw" ? 2.4 : …`).
- * `test/fuellgrad.test.ts` liest die Zeile und vergleicht sie mit dieser
- * Tabelle — läuft sie auseinander, wird der Test rot.
+ *
+ * Keine eigene Tabelle mehr: Am 15.09.2026 haben zwei Pakete am selben Tag
+ * dieselbe Zahlenreihe angelegt — dieses hier als Abschrift aus `vehicles.ts`,
+ * das Kipper-Paket (E-029) als **gemeinsame Quelle** in `routes.ts`. Beim
+ * Zusammenführen wurde daraus ein roter Wächter, und das war die richtige
+ * Meldung: Vier Abschriften derselben Länge sind drei zu viel.
+ *
+ * Es gilt die Quelle aus `routes.ts`. Hier steht nur die engere Typangabe:
+ * Dort ist es ein `Record<string, number>` (es kennt auch den Abholer), hier
+ * sind es genau die vier Fahrzeugarten, die eine Ladung bekommen.
  */
 export const BED_LEN: Record<Fahrzeugart, number> = {
-  pkw: 2.4,
-  wrack: 5.4,
-  kipper: 6.0,
-  pritsche: 5.4,
+  pkw: bedLenFor("pkw"),
+  wrack: bedLenFor("wrack"),
+  kipper: bedLenFor("kipper"),
+  pritsche: bedLenFor("pritsche"),
 };
 
 /** Halbe Innenbreite der LKW-Ladefläche. Quelle: `routes.BED_HALF_W` 1,35 − 0,08 Wandstärke (`vehicles.ts`). */
