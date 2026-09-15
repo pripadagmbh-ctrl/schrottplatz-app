@@ -30,10 +30,24 @@ erledigt ist, bekommt den Commit dazu.
 
 ## Presse und Schere
 
-- [ ] **Gelbes Anbauteil der Presse** verdeckt die Ballen und stört beim
-      Greifen — weg, schmaler oder nur bei Bedarf.
-- [ ] **Ballen sehen zu sauber aus** — Fransen, Reste der Ursprungsform,
-      unterschiedliche Farben.
+- [x] **Gelbes Anbauteil der Presse** verdeckt die Ballen und stört beim
+      Greifen — weg, schmaler oder nur bei Bedarf. **Nachgemessen 15.09.2026
+      (E-071):** Gelb war an der Maschine nichts mehr — die drei gelben Stücke
+      sind am 12.09. auf deine Ansage hin entfernt worden, der Punkt stand nur
+      noch aus Versehen hier. Im Weg stand etwas anderes, und zwar etwas, das
+      man **gar nicht sehen konnte**: die zweite Deckelklappe. Ihre Netze waren
+      unsichtbar gestellt, ihr Kollider aber blieb 4,45 × 2,16 m gross und
+      stand 0,905 m weit in der Kammermündung — auf genau der Seite, von der
+      die Spinne kommt. Sie ist weg. Dazu vier Versteifungsriegel, die frei in
+      der Luft hinter der Presse schwebten (bis 2,00 m neben der Platte).
+- [x] **Ballen sehen zu sauber aus** — Fransen, Reste der Ursprungsform,
+      unterschiedliche Farben. **Stand 15.09.2026 (E-071):** Fransen und Farben
+      waren am 12.09. gebaut worden; ein Kupferballen ist kupfern, ein
+      gemischter trägt die Farben seiner Zusammensetzung. Gefehlt hat die
+      **Ursprungsform** — jetzt zeigt jede Fraktion mit mindestens einem
+      Sechstel der Masse ein Stück von sich: Blech, Rohr, Felge oder
+      Kantstück, in derselben verschmolzenen Geometrie, also weiter ein
+      Zeichenruf je Ballen.
 - [ ] **Schere trennt nicht sortenrein** — was in die Presse geht, kommt als
       Mischschrott heraus.
 - [ ] **Misch- und Stahlschrott unterscheiden** — getrennt verkaufen, Stahl

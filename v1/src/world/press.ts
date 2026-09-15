@@ -315,8 +315,19 @@ export class PressManager {
   /** Faktor aus der größeren Presse — von main gesetzt (1 = Grundausbau) */
   getBaleBonus: (() => number) | null = null;
 
-  private lidLeft = new THREE.Group();
-  private lidRight = new THREE.Group();
+  /**
+   * DIE Deckelklappe — eine, nicht zwei.
+   *
+   * Bis zum 15.09.2026 gab es hier ein zweites Paar (`lidRight`), das seit dem
+   * 12.09. nichts mehr zeigte: Seine vier Netze standen auf `visible = false`,
+   * seine Platte war auf 1 mm zusammengeschrumpft. Der KOLLIDER blieb dabei in
+   * voller Groesse stehen — 4,45 x 2,16 m, und im Ruhezustand hing er auf
+   * x −6,88 bis −4,83, also 0,905 m weit in die Kammermuendung hinein
+   * (gemessen, E-071). Das war die unsichtbare Wand, an der die Spinne beim
+   * Ausraeumen der Presse haengenblieb. Jetzt ist die zweite Klappe ganz weg:
+   * kein Koerper, kein Kollider, keine unsichtbaren Netze.
+   */
+  private lid: THREE.Group;
   /** Hubzylinder der Deckelplatten (Winkelhebel-Antrieb) */
   private linkages: Array<{
     a: THREE.Object3D;
@@ -325,8 +336,7 @@ export class PressManager {
     rod: THREE.Mesh;
     barrelLen: number;
   }> = [];
-  private lidLeftBody: RAPIER.RigidBody;
-  private lidRightBody: RAPIER.RigidBody;
+  private lidBody: RAPIER.RigidBody;
   private ram: THREE.Mesh;
   private ramBody: RAPIER.RigidBody;
   private group!: THREE.Group;
@@ -422,15 +432,18 @@ export class PressManager {
     });
 
     /*
-     * `voll` baut die einzige echte Deckelplatte: Sie spannt jetzt ueber die
-     * ganze Kammerbreite, weil es keine Gegenklappe mehr gibt. Die andere
-     * Seite bleibt als leere Gruppe bestehen, damit der Bewegungsablauf
-     * unveraendert weiterlaeuft — sie zeigt nur nichts mehr.
+     * EINE Klappe, und sie wird auch nur einmal gebaut (E-071, 15.09.2026).
+     *
+     * Bis hierher nahm `makeLid` ein Flag `voll` und wurde zweimal gerufen:
+     * einmal echt, einmal als Attrappe mit `visible = false` und einer auf
+     * 1 mm geschrumpften Platte. Die Attrappe kostete vier Netze, einen
+     * kinematischen Koerper — und einen Kollider in VOLLER Groesse, der
+     * quer in der Kammermuendung stand. Ein Bauteil, das man nicht sieht und
+     * das trotzdem im Weg steht, ist schlimmer als ein haessliches: Man kann
+     * es nicht einmal beschreiben. Deshalb gibt es die zweite Seite jetzt
+     * ueberhaupt nicht mehr.
      */
-    const makeLid = (
-      side: -1 | 1,
-      voll: boolean
-    ): { pivot: THREE.Group; body: RAPIER.RigidBody } => {
+    const makeLid = (side: -1 | 1): { pivot: THREE.Group; body: RAPIER.RigidBody } => {
       const pivot = new THREE.Group();
       pivot.position.set(0, LID_HINGE_Y + 0.3, side * (INNER_D / 2 + 0.12));
       /*
@@ -442,12 +455,11 @@ export class PressManager {
        * lang ist. Gefaltet legt sich die aeussere Haelfte auf die innere — die
        * Maschine kommt mit der halben Ausladung aus.
        */
-      const spann = voll ? INNER_D + 0.28 : 0.001;
+      const spann = INNER_D + 0.28;
       const halbSpann = spann / 2;
       const plate = new THREE.Mesh(new THREE.BoxGeometry(lidLen, PLATE_T, halbSpann), heavy);
       plate.position.z = -side * (halbSpann / 2);
       plate.castShadow = true;
-      plate.visible = voll;
       pivot.add(plate);
       // Zweites Gelenk am Ende der inneren Haelfte
       const falte = new THREE.Group();
@@ -457,17 +469,31 @@ export class PressManager {
       const plate2 = new THREE.Mesh(new THREE.BoxGeometry(lidLen, PLATE_T, halbSpann), heavy);
       plate2.position.z = -side * (halbSpann / 2);
       plate2.castShadow = true;
-      plate2.visible = voll;
       falte.add(plate2);
       // Fuehrungsschiene statt Scharnier: die Haelfte faehrt aus, sie klappt
       // nicht mehr (Ansage 12.09.2026).
       const schiene = new THREE.Mesh(new THREE.BoxGeometry(lidLen, 0.12, 0.2), heavy);
       schiene.position.z = -side * (halbSpann - 0.1);
-      schiene.visible = voll;
       falte.add(schiene);
-      if (voll) this.falten.push({ gruppe: falte, seite: side, weg: halbSpann });
-      // Quer-Versteifungen auf der Platte
-      for (const rx of voll ? [-4.2, -2.5, -0.8, 0.8, 2.5, 4.2] : []) {
+      this.falten.push({ gruppe: falte, seite: side, weg: halbSpann });
+      /*
+       * Quer-Versteifungen auf der Platte — gerechnet, nicht abgeschrieben
+       * (E-071, 15.09.2026).
+       *
+       * Hier stand die feste Liste [−4,2 … 4,2]. Die stammt aus der Zeit, als
+       * die Klappe 10 m lang war; seit dem 14.09. misst sie `lidLen` = 4,45 m,
+       * halbe Laenge also 2,225. Vier der sechs Riegel standen damit NEBEN der
+       * Platte in der Luft — gemessen auf z −21,80 und −30,20 (2,00 m
+       * daneben) sowie −23,50 und −28,50 (0,28 m daneben), alle auf 1,94 bis
+       * 2,93 m Hoehe. Zwei dunkle Balken schwebten frei hinter der Presse.
+       *
+       * Jetzt sitzen sie gleichmaessig auf der Platte: sechs Riegel auf den
+       * Mitten von sechs gleich breiten Feldern, also auf ±0,371, ±1,113 und
+       * ±1,854 m. Der aeusserste liegt 0,371 m vor der Plattenkante.
+       */
+      const RIEGEL = 6;
+      for (let i = 0; i < RIEGEL; i++) {
+        const rx = lidLen * ((i + 0.5) / RIEGEL - 0.5);
         const rib = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.1, halbSpann - 0.25), heavy);
         rib.position.set(rx, PLATE_T / 2 + 0.05, -side * (halbSpann / 2));
         pivot.add(rib);
@@ -484,10 +510,9 @@ export class PressManager {
         heavy
       );
       hinge.rotation.z = Math.PI / 2;
-      hinge.visible = voll;
       pivot.add(hinge);
       // Winkelhebel: stehen nach außen-oben ab und werden von den Zylindern gezogen
-      for (const lx of voll ? leverX : []) {
+      for (const lx of leverX) {
         const lever = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.86, 0.26), heavy);
         lever.position.set(lx, 0.34, side * 0.2);
         lever.rotation.x = -side * 0.42;
@@ -515,19 +540,31 @@ export class PressManager {
         this.linkages.push({ a: base, b: anchor, barrel, rod, barrelLen: 1.1 });
       }
       group.add(pivot);
-      const lidBody = world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased());
+      /*
+       * Der Koerper entsteht AN DER STARTPOSE, nicht im Ursprung (v2 E-058).
+       * Dafuer wird die Ruhestellung — Klappe offen — vorher gesetzt und die
+       * Weltmatrix einmal durchgerechnet; `syncTools` fuehrt sie danach nur
+       * noch nach. Vorher lag der Kollider einen Schritt lang auf (0|0|0),
+       * also mitten unter dem Bagger.
+       */
+      pivot.rotation.x = -side * LID_OPEN_ANGLE;
+      plate.updateWorldMatrix(true, false);
+      const startP = plate.getWorldPosition(new THREE.Vector3());
+      const startQ = plate.getWorldQuaternion(new THREE.Quaternion());
+      const lidBody = world.createRigidBody(
+        RAPIER.RigidBodyDesc.kinematicPositionBased()
+          .setTranslation(startP.x, startP.y, startP.z)
+          .setRotation({ x: startQ.x, y: startQ.y, z: startQ.z, w: startQ.w })
+      );
       world.createCollider(
         RAPIER.ColliderDesc.cuboid(lidLen / 2, PLATE_T / 2, lidReach / 2),
         lidBody
       );
       return { pivot, body: lidBody };
     };
-    const south = makeLid(-1, true);
-    const north = makeLid(1, false);
-    this.lidLeft = south.pivot;
-    this.lidLeftBody = south.body;
-    this.lidRight = north.pivot;
-    this.lidRightBody = north.body;
+    const klappe = makeLid(-1);
+    this.lid = klappe.pivot;
+    this.lidBody = klappe.body;
 
     // --- Pressstempel: fährt längs durch die Mulde ---
     this.ram = new THREE.Mesh(new THREE.BoxGeometry(PLATE_T * 1.4, WALL_H - 0.1, INNER_D - 0.1), heavy);
@@ -685,9 +722,8 @@ export class PressManager {
 
   /** Klappen- und Stempelpose auf Meshes + kinematische Körper übertragen. */
   private syncTools(): void {
-    // Klappen schwenken um die Längsachse (X): Süd negativ, Nord positiv
-    this.lidLeft.rotation.x = -this.lidAngle;
-    this.lidRight.rotation.x = this.lidAngle;
+    // Die Klappe schwenkt um die Längsachse (X); sie hängt lokal im Süden.
+    this.lid.rotation.x = -this.lidAngle;
     /*
      * Die zweite Haelfte FAEHRT AUS, statt zu klappen (Ansage 12.09.2026:
      * „die zweite Haelfte, um die Mulde zu bedecken, soll ausfahrbar sein,
@@ -703,17 +739,12 @@ export class PressManager {
     }
     const wp = new THREE.Vector3();
     const wq = new THREE.Quaternion();
-    for (const [pivot, lidBody] of [
-      [this.lidLeft, this.lidLeftBody],
-      [this.lidRight, this.lidRightBody],
-    ] as const) {
-      const plate = pivot.children[0];
-      plate.updateWorldMatrix(true, false);
-      plate.getWorldPosition(wp);
-      plate.getWorldQuaternion(wq);
-      lidBody.setNextKinematicTranslation({ x: wp.x, y: wp.y, z: wp.z });
-      lidBody.setNextKinematicRotation({ x: wq.x, y: wq.y, z: wq.z, w: wq.w });
-    }
+    const plate = this.lid.children[0];
+    plate.updateWorldMatrix(true, false);
+    plate.getWorldPosition(wp);
+    plate.getWorldQuaternion(wq);
+    this.lidBody.setNextKinematicTranslation({ x: wp.x, y: wp.y, z: wp.z });
+    this.lidBody.setNextKinematicRotation({ x: wq.x, y: wq.y, z: wq.z, w: wq.w });
     this.ram.position.x = this.ramX;
     this.ram.updateWorldMatrix(true, false);
     this.ram.getWorldPosition(wp);

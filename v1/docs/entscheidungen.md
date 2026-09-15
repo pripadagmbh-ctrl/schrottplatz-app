@@ -4418,3 +4418,200 @@ Zeile im HUD (`shift.statusText`), für die Zahlungsunfähigkeit nichts;
 3. Ob ein Anlieferer, der nie abgeladen wird, nach einer Standzeit selbst
    abfährt. `waitUnload` hat keine Frist; im kopflosen Lauf stand eine Pritsche
    10 Minuten und hielt eine vorgemerkte Abholung auf.
+
+---
+
+### E-071 — Das gelbe Anbauteil war nicht gelb und nicht sichtbar; und Ballen zeigen jetzt, was in ihnen steckt (15.09.2026)
+
+**Auftrag.** Zwei Punkte aus Patricks Gerätetests (`docs/offene-punkte.md`):
+„Gelbes Anbauteil der Presse verdeckt die Ballen und stört beim Greifen" und
+„Ballen sehen zu sauber aus — Fransen, Reste der Ursprungsform,
+unterschiedliche Farben." Erst messen, dann entscheiden.
+
+#### Teil A — was das gelbe Teil ist
+
+**Es gibt es nicht mehr.** Die Presse hatte drei grosse gelbe Stücke: den
+Warnbalken auf der Muldenkante, das durchgehende Scharnierrohr und den
+Stempelbock am Kammerende. Alle drei sind am **12.09.2026** auf Patricks
+eigene Ansage hin entfernt worden („der gelbe Balken da, der kann sowieso
+weg"); die Kommentare dazu stehen in `press.ts`. Der Eintrag in
+`offene-punkte.md` stammt vom **11.09.** und ist beim Anlegen von `v1/` am
+14.09. unverändert mitkopiert worden — niemand hat ihn abgehakt. Nachgesehen:
+Auch im eingefrorenen `prototype/` ist kein gelbes Teil mehr an der Maschine.
+An der ganzen Presse ist heute kein Farbwert gelb.
+
+**Im Weg stand trotzdem etwas — und zwar etwas Unsichtbares.** Kopflos
+gemessen (Presse aufgebaut, alle Netze und alle Rapier-Kollider ausgelesen):
+
+| | Netze | Kollider |
+|---|---|---|
+| vorher | 32, davon **4 unsichtbar** | 8 |
+| nachher | 28 | 7 |
+
+Der eine Kollider zu viel war die **zweite Deckelklappe**. Seit dem 12.09.
+baute `makeLid` sie als Attrappe: Platte auf 1 mm geschrumpft, alle vier Netze
+auf `visible = false`. Der **Kollider** aber wurde unverändert in voller Grösse
+angelegt — 4,45 × 0,30 × 2,16 m. Im Ruhezustand (Klappe offen, also genau
+dann, wenn der Spieler das Paket herausholen will) hing er auf
+
+    x −6,88 … −4,83 · y 1,46 … 2,74 · z −28,23 … −23,77
+
+und ragte damit **0,905 m weit in die Kammermündung** (die reicht von x −10,025
+bis −5,975), auf der Seite, von der die Spinne kommt, und **0,74 m unter die
+Wandkrone** hinab. Ein Hindernis, das man nicht sieht, kann der Spieler nicht
+einmal beschreiben — er merkt nur, dass „irgendwas stört".
+
+**Wie sehr es störte, in einer Zahl.** Die grösste freie Quadratkante in der
+Kammermündung, gemessen am geparkten Stempel vorbei:
+
+| | freie Kante | offene Sichelkralle 3,381 m | Freigang je Seite |
+|---|---|---|---|
+| vorher | **3,14 m** | passt nicht | **−0,12 m** |
+| nachher | **3,62 m** | passt | **+0,12 m** |
+
+Die offene Kralle kam also nicht in die Kammer, ohne die Geisterklappe zu
+berühren; sie fehlte um 24 cm. Ohne den geparkten Stempel gerechnet sind es
+4,04 m, also 0,33 m je Seite.
+
+**Was es NICHT war.** Die Sicht auf die Ballen nimmt nicht das Anbauteil,
+sondern die Wand. Vom Sitz (−0,5 | −22,5) mit abgesenkter Kabine
+(Augpunkt 3,28 m, `containers.ts`) sind vom Kammerboden **0,0 %** zu sehen,
+auf 0,90 m Höhe **0,0 %**, auf 1,50 m **6,4 %**, erst auf Höhe der Wandkrone
+97,5 %. Nimmt man **alles** weg, was über die Wandkrone ragt — Klappe, Hebel,
+Zylinder —, ändern sich die unteren drei Zahlen um **keinen Punkt**; nur auf
+Kronenhöhe geht es von 97,5 auf 100 %. Das Anbauteil verdeckt also 2,5 % der
+Mündung, die 1,90 m hohe Kammerwand verdeckt den Rest. Wer die Ballen sehen
+will, muss die Kabine heben oder die Kammer niedriger bauen — das ist eine
+Gestaltungsfrage, keine Reparatur, und sie gehört Patrick.
+
+**Zweiter Befund derselben Messung: vier schwebende Riegel.** Die
+Quer-Versteifungen der Klappe standen als feste Liste `[−4,2 … 4,2]` im Code —
+aus der Zeit, als die Klappe 10 m lang war. Seit dem 14.09. misst sie 4,45 m.
+Vier der sechs Riegel standen deshalb **neben** der Platte in der Luft: auf
+z −21,80 und −30,20 (2,00 m daneben) und auf z −23,50 und −28,50 (0,28 m
+daneben), alle auf 1,94 bis 2,93 m Höhe. Zwei dunkle Balken schwebten frei
+hinter der Presse. Sie sitzen jetzt gerechnet auf der Platte (±0,371, ±1,113,
+±1,854 m).
+
+**Gebaut, in der verlangten Rangfolge.** Schmaler machen ging nicht — das Teil
+hatte keine Breite, die man hätte kürzen können, es hatte gar kein Aussehen.
+Versetzen ging nicht — es gehörte zu einer Klappe, die es seit dem 12.09. nicht
+mehr gibt. Also **ganz weg**: kein Körper, kein Kollider, keine unsichtbaren
+Netze. „Nur bei Bedarf einblenden" kam damit nicht in Frage.
+
+**Nebenbei mitgenommen:** Der Klappenkörper entsteht jetzt an seiner Startpose
+statt im Ursprung (v2 E-058) — vorher lag sein Kollider einen Rechenschritt
+lang auf (0|0|0), also mitten unter dem Bagger.
+
+**Nicht angerührt** (gemessen, gemeldet, nicht entschieden): Die drei
+Winkelhebel der echten Klappe ragen bei offener Klappe 0,315 m über die
+Kammerkante, das Scharnierrohr 0,075 m — beide auf der **baggerabgewandten**
+Westseite und **ohne Kollider**, sie halten also nichts auf. Zusammen sind das
+die erwähnten 2,5 %.
+
+#### Teil B — wie Ballen jetzt gebaut werden
+
+**Farben und Fransen waren schon da** (12.09.). Nachgeprüft und mit Wächtern
+festgenagelt: Ein Kupferballen trägt genau `0xc7622b` aus
+`materials/catalog.ts`, ein Alupaket `0x928d85` — dieselben Werte, die
+`metallton()` in `objektbau.ts` benutzt (E-067), es gibt hier also keine zweite
+Wahrheit. Ein gemischt gepresstes Paket wird **nicht** einfarbig: Seine Flecken
+kommen aus `composition`, nach Masse gewichtet, nicht aus dem Zufall.
+
+**Gefehlt hat die Ursprungsform.** Neu: Jede Fraktion mit mindestens **einem
+Sechstel** der Paketmasse zeigt ein Stück von sich, höchstens zwei Fraktionen
+je Paket (`resteFuerPaket`). Vier Formen decken alles ab, was der Platz kennt:
+
+- `blech` — Karosserie- oder Gehäuseblech, einmal geknickt (32 Ecken)
+- `rohr` — Rohrstummel, offener Achtkant (18 Ecken)
+- `felge` — Ring: Felge, Trommel, Riemenscheibe (18 Ecken)
+- `profil` — Kantstück: Winkel, Vierkantrohr, Latte (24 Ecken)
+
+Welche Form eine Fraktion zeigt, steht datengetrieben in ihrem `Pressprofil`:
+Kupfer zeigt Rohre, Stahl Bleche und Winkel, Alu Felgen. Kabel, Reifen,
+Batterien und Bauschutt zeigen **nichts** — an einem Kabelknäuel oder einem
+Reifenballen ist keine Form mehr zu erkennen, und eine zu behaupten wäre
+gelogen. Die Farbe des Rests ist die Farbe seiner Fraktion, nicht die des
+Pakets: Ein Mischpaket aus Stahl und Kupfer zeigt ein graues Blech **und** ein
+kupfernes Rohr.
+
+**Der Preis, gemessen.** Alles wandert in dieselbe verschmolzene Geometrie wie
+Körper und Fransen (E-025) — Fransen und Reste als eigene Körper wären
+verboten, und sie sind auch keine.
+
+| je Ballen | vorher | nachher |
+|---|---|---|
+| Netze (= Zeichenrufe) | **1** | **1** |
+| Eckpunkte, Schnitt über 6 Fraktionen × 40 Würfe | 384 | **408** |
+| Dreiecke | 287 | **304** |
+| Überstand über den Kollider-Quader | nur Fransen | 10 bis 22 % der längsten Kante |
+
+Zehn Ballen auf dem Platz: **10 Zeichenrufe** (unverändert), 3 830 → 4 081
+Eckpunkte, 2 870 → 3 044 Dreiecke. Gegen die gemessenen 1 322 Zeichenrufe und
+240 000 Dreiecke je Bild sind das 0,8 % der Zeichenrufe und 1,3 % der Dreiecke;
+der Zuwachs beträgt 174 Dreiecke, also **0,07 % eines Bildes**. A/B am selben
+Code-Pfad gemessen (sieben gleich starke Anteile liegen je bei 14,3 % und damit
+unter der Schwelle — dasselbe Paket, nur ohne Reste): +21 bis +30 Ecken je
+Paket, bei einem Mischpaket mit zwei Resten +50.
+
+**Verworfene Alternative.** Die Reste als eigene Meshes an die Ballen zu
+hängen wäre einfacher gewesen und hätte aus einem Zeichenruf drei gemacht —
+bei zehn Ballen dreissig. Netze sind der Engpass, nicht Dreiecke.
+
+#### Wächter, jeder mit Gegenprobe
+
+`test/presseKammer.test.ts` (4 Prüfungen)
+- Kein Kollider ragt unsichtbar in die Kammermündung.
+  **Gegenprobe:** derselbe Prüfcode bekommt die gemessene Geisterklappe von
+  vorher vorgelegt und meldet sie.
+- Die offene Sichelkralle passt am geparkten Stempel vorbei in die Kammer.
+  **Gegenprobe:** mit der Geisterklappe fällt die freie Kante unter die
+  Krallenspanne, der Wächter schlägt an.
+
+`test/ballen.test.ts` (8 Prüfungen)
+- Ein Paket ist EIN Netz und bleibt unter 750 Eckpunkten (gemessen höchstens
+  658 über 200 Würfe). **Gegenprobe:** der Zähler meldet ein Paket aus zwei
+  Netzen und ein Netz mit 3 362 Ecken.
+- Ein sortenreines Paket trägt genau die Katalogfarbe seiner Fraktion; ein
+  gemischtes trägt die Farben seiner Zusammensetzung und ist nicht einfarbig.
+  **Gegenprobe:** der Farbprüfer meldet Einfarbigkeit, eine fremde Farbe und
+  ein farbloses Netz.
+- Welche Reste erscheinen, folgt der Masse. **Gegenprobe:** die Schwelle greift
+  genau am Sechstel — 17,0 % zeigt sich, 16,0 % nicht; vier gleich starke
+  Fraktionen ergeben zwei Reste, nicht vier.
+- Der Rest ragt sichtbar heraus, aber bleibt am Paket (gemessen 10 bis 22 %
+  der längsten Kante).
+
+#### Zahlen und ihre Herkunft
+
+- Kammermündung x −10,025 … −5,975, z −28,10 … −23,90, Wandkrone 2,20 m —
+  gerechnet aus `PRESS_CENTER`, `PRESS_KAMMER`, `WALL_H` in `press.ts`.
+- Augpunkt 3,28 m bei abgesenkter Kabine — `AUGPUNKT_UNTEN`, `containers.ts`
+  (Quelle: `excavator.ts`, `cabGroup.y` 1,60 + Augpunkt lokal 1,68).
+- Offene Sichelkralle 3,381 m — `clawSpan(CLAW_OPEN_SPLAY)`.
+- Riegelabstände ±0,371, ±1,113, ±1,854 m — `lidLen` 4,45 m in sechs gleiche
+  Felder geteilt, Riegel auf den Feldmitten.
+- Rest-Schwelle ein Sechstel und höchstens zwei Reste je Paket — **SW,
+  15.09.2026**; begründet im Quelltext: Bei sechs gleich starken Fraktionen
+  liegt jede bei 16,7 %, die Schwelle markiert also die Stelle, an der eine
+  Fraktion aufhört, Beimischung zu sein.
+- Rest-Maße (Rohr Ø 0,20 × 0,62 der Würfelkante, Felge Ø 0,54 × 0,13, Profil
+  0,11 × 0,11 × 0,72, Blech 0,52 × 0,035 × 0,40 mit 0,14 Knick) — **SW,
+  15.09.2026**, am Netz nachgemessen in `test/ballen.test.ts`.
+- Eckendeckel 750 je Paket — gemessen 658 im teuersten Fall (Kabelpaket),
+  15 % Luft darüber.
+
+#### Abnahmekriterium
+
+`npm test` 1 092 Prüfungen in 97 Dateien grün, `npm run build` grün.
+
+#### Auf dem Gerät zu prüfen
+
+1. **Presse leerräumen.** Eine Fuhre pressen, dann mit offener Spinne von oben
+   in die Kammer und das Paket herausholen — von der Baggerseite her. Bleibt
+   die Kralle noch irgendwo an etwas hängen, das man nicht sieht?
+2. **Hinter die Presse schauen** (Ansicht mit C auf Orbit, um die Maschine
+   herum): Schweben dort noch dunkle Balken frei in der Luft?
+3. **Zwei Ballen vergleichen** — einen sortenreinen Kupferballen und einen aus
+   gemischter Fuhre. Sieht man dem gemischten an, was drin war? Sind die Reste
+   zu gross, zu klein, zu viele?

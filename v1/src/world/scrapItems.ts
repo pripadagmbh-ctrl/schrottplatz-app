@@ -542,6 +542,28 @@ function flatColliderDesc(shape: ScrapShape): RAPIER.ColliderDesc {
  * gegebener Masse. `fransen` ist die Spanne, `lang` und `dick` sind Anteile
  * der Paketkante, `beule` die Unruhe der Oberflaeche.
  */
+/**
+ * Was man dem Paket noch ansieht — die Reste der Ursprungsform.
+ *
+ * Wunsch Patrick (`docs/offene-punkte.md`, Gerätetest): „Ballen sehen zu
+ * sauber aus — Fransen, **Reste der Ursprungsform**, unterschiedliche Farben."
+ * Fransen und Farben waren am 12.09. gebaut worden, die Ursprungsform nicht:
+ * Ein Paket war ein gebeulter Quader mit Zipfeln, und man sah ihm nicht an,
+ * was hineingegangen war.
+ *
+ * Vier Formen reichen für alles, was der Platz kennt — ein Schrottballen
+ * zeigt nie mehr als das:
+ *
+ *  - `blech`  ein Stück Karosserie- oder Gehäuseblech, gefaltet
+ *  - `rohr`   ein Rohrstummel, achtkantig (Regel: Rundes als Achtkant)
+ *  - `felge`  ein Ring — Felge, Trommel, Riemenscheibe
+ *  - `profil` ein Kantstück: Winkel, Vierkantrohr, Latte
+ *
+ * Alles davon wandert in DIESELBE Geometrie wie Körper und Fransen und kostet
+ * deshalb keinen einzigen Zeichenruf (E-025).
+ */
+type RestArt = "blech" | "rohr" | "felge" | "profil";
+
 interface Pressprofil {
   dichte: number;
   fransen: [number, number];
@@ -550,15 +572,21 @@ interface Pressprofil {
   beule: number;
   rauheit: number;
   glanz: number;
+  /**
+   * Woran man die Fraktion im Paket wiedererkennt. Leer heisst: an nichts —
+   * ein Akkupaket, ein Kabelknäuel oder ein Reifenballen hat keine Form mehr,
+   * die man benennen könnte.
+   */
+  reste: RestArt[];
 }
 
 const PRESSPROFIL: Record<string, Pressprofil> = {
   // Stahl federt zurueck: mittlere Dichte, viele Blechfetzen, kraeftig gebeult
-  steel: { dichte: 1250, fransen: [7, 13], lang: 0.45, dick: 0.05, beule: 0.11, rauheit: 0.9, glanz: 0.3 },
+  steel: { dichte: 1250, fransen: [7, 13], lang: 0.45, dick: 0.05, beule: 0.11, rauheit: 0.9, glanz: 0.3, reste: ["blech", "profil", "felge"] },
   // Mischschrott ist das Unruhigste, was aus der Kammer kommt
-  mixed: { dichte: 1050, fransen: [10, 17], lang: 0.55, dick: 0.06, beule: 0.15, rauheit: 0.95, glanz: 0.25 },
+  mixed: { dichte: 1050, fransen: [10, 17], lang: 0.55, dick: 0.06, beule: 0.15, rauheit: 0.95, glanz: 0.25, reste: ["blech", "rohr", "felge", "profil"] },
   // Edelstahl ist stur: bleibt sperrig, spreizt lange Zipfel ab
-  va: { dichte: 1150, fransen: [9, 15], lang: 0.6, dick: 0.04, beule: 0.12, rauheit: 0.55, glanz: 0.7 },
+  va: { dichte: 1150, fransen: [9, 15], lang: 0.6, dick: 0.04, beule: 0.12, rauheit: 0.55, glanz: 0.7, reste: ["rohr", "blech"] },
   /*
    * Alu geht weich zusammen — aber es bleibt Alu (E-061, 15.09.2026).
    *
@@ -587,20 +615,98 @@ const PRESSPROFIL: Record<string, Pressprofil> = {
    * Die Masse aendert sich dabei nicht, nur das Volumen: am Verkaufserloes und
    * am Ankauf aendert dieser Wert **null Euro**.
    */
-  alu: { dichte: 430, fransen: [3, 6], lang: 0.3, dick: 0.045, beule: 0.07, rauheit: 0.5, glanz: 0.55 },
+  alu: { dichte: 430, fransen: [3, 6], lang: 0.3, dick: 0.045, beule: 0.07, rauheit: 0.5, glanz: 0.55, reste: ["felge", "profil", "blech"] },
   // Kupfer noch dichter — das schwerste Paket bei gleichem Volumen
-  copper: { dichte: 1900, fransen: [3, 7], lang: 0.28, dick: 0.05, beule: 0.06, rauheit: 0.45, glanz: 0.65 },
-  brass: { dichte: 1800, fransen: [3, 6], lang: 0.26, dick: 0.055, beule: 0.05, rauheit: 0.4, glanz: 0.7 },
-  zinc: { dichte: 1450, fransen: [4, 8], lang: 0.34, dick: 0.035, beule: 0.09, rauheit: 0.55, glanz: 0.4 },
-  battery: { dichte: 1600, fransen: [2, 4], lang: 0.18, dick: 0.09, beule: 0.03, rauheit: 0.7, glanz: 0.1 },
+  copper: { dichte: 1900, fransen: [3, 7], lang: 0.28, dick: 0.05, beule: 0.06, rauheit: 0.45, glanz: 0.65, reste: ["rohr"] },
+  brass: { dichte: 1800, fransen: [3, 6], lang: 0.26, dick: 0.055, beule: 0.05, rauheit: 0.4, glanz: 0.7, reste: ["rohr", "profil"] },
+  zinc: { dichte: 1450, fransen: [4, 8], lang: 0.34, dick: 0.035, beule: 0.09, rauheit: 0.55, glanz: 0.4, reste: ["blech"] },
+  battery: { dichte: 1600, fransen: [2, 4], lang: 0.18, dick: 0.09, beule: 0.03, rauheit: 0.7, glanz: 0.1, reste: [] },
   // Kabel bleibt ein Knaeuel: locker, ueberall Schwaenze
-  cable: { dichte: 800, fransen: [14, 22], lang: 0.75, dick: 0.035, beule: 0.16, rauheit: 0.95, glanz: 0.1 },
+  cable: { dichte: 800, fransen: [14, 22], lang: 0.75, dick: 0.035, beule: 0.16, rauheit: 0.95, glanz: 0.1, reste: [] },
   // Nichtmetalle pressen sich schlecht und sehen zerfetzt aus
-  wood: { dichte: 620, fransen: [12, 18], lang: 0.6, dick: 0.07, beule: 0.17, rauheit: 1.0, glanz: 0 },
-  plastic: { dichte: 540, fransen: [10, 16], lang: 0.5, dick: 0.06, beule: 0.15, rauheit: 0.85, glanz: 0.05 },
-  tires: { dichte: 700, fransen: [8, 14], lang: 0.4, dick: 0.09, beule: 0.13, rauheit: 1.0, glanz: 0 },
-  rubble: { dichte: 1400, fransen: [6, 11], lang: 0.3, dick: 0.08, beule: 0.14, rauheit: 1.0, glanz: 0 },
+  wood: { dichte: 620, fransen: [12, 18], lang: 0.6, dick: 0.07, beule: 0.17, rauheit: 1.0, glanz: 0, reste: ["profil"] },
+  plastic: { dichte: 540, fransen: [10, 16], lang: 0.5, dick: 0.06, beule: 0.15, rauheit: 0.85, glanz: 0.05, reste: ["blech"] },
+  tires: { dichte: 700, fransen: [8, 14], lang: 0.4, dick: 0.09, beule: 0.13, rauheit: 1.0, glanz: 0, reste: [] },
+  rubble: { dichte: 1400, fransen: [6, 11], lang: 0.3, dick: 0.08, beule: 0.14, rauheit: 1.0, glanz: 0, reste: [] },
 };
+
+/**
+ * Ein Sechstel: ab diesem Massenanteil darf eine Fraktion ein Stück von sich
+ * im Paket zeigen.
+ *
+ * Darunter wäre das Stück eine Behauptung — bei 5 % Kupfer in einem
+ * Stahlpaket sieht man kein Kupferrohr, man sieht Stahl. Bei zwei gleich
+ * starken Fraktionen sind es je 50 %, bei sechs gleich starken je 16,7 %; die
+ * Schwelle liegt also genau dort, wo eine Fraktion aufhört, Beimischung zu
+ * sein. (SW, 15.09.2026)
+ */
+export const REST_SCHWELLE = 1 / 6;
+/** Mehr als zwei erkennbare Stücke machen aus dem Paket ein Mobile. (SW) */
+export const REST_HOECHSTENS = 2;
+
+/**
+ * Welche Fraktionen eines Pakets ein Stück ihrer Ursprungsform zeigen.
+ *
+ * Steht als eigene Funktion da, damit `test/ballen.test.ts` dieselbe Regel
+ * prüfen kann, die gebaut wird — die Geometrie selbst braucht eine Szene und
+ * ist kopflos nicht zu messen.
+ *
+ * @returns Fraktions-IDs, die stärkste zuerst; leer heisst „nichts zu erkennen"
+ */
+export function resteFuerPaket(anteile: Array<{ materialId: string; massKg: number }>): string[] {
+  const echte = anteile.filter((c) => c.massKg > 0);
+  const summe = echte.reduce((a, c) => a + c.massKg, 0);
+  if (summe <= 0) return [];
+  return echte
+    .map((c) => ({ id: c.materialId, anteil: c.massKg / summe }))
+    .filter(
+      (f) => f.anteil >= REST_SCHWELLE && (PRESSPROFIL[f.id] ?? PRESSPROFIL.steel).reste.length > 0
+    )
+    .sort((a, b) => b.anteil - a.anteil)
+    .slice(0, REST_HOECHSTENS)
+    .map((f) => f.id);
+}
+
+/**
+ * Ein Rest der Ursprungsform, roh und ungefärbt — der Aufrufer setzt Farbe,
+ * Drehung und Sitz.
+ *
+ * `kante` ist die Würfelkante des Pakets (die dritte Wurzel seines Volumens);
+ * alle Maße hängen daran, damit ein kleines Kupferpaket ein kleines Rohr
+ * zeigt und ein großes Stahlpaket ein großes Blech. Die Anteile sind
+ * Startwerte (SW, 15.09.2026), am Netz nachgemessen in `test/ballen.test.ts`.
+ *
+ * Rundes wird achtkantig gebaut — dieselbe Regel wie bei den Rollkörpern
+ * (v2 E-011). Acht Segmente sind der Punkt, an dem ein Rohr als Rohr lesbar
+ * wird und trotzdem nur achtzehn Eckpunkte kostet.
+ */
+function baueRest(art: RestArt, kante: number): THREE.BufferGeometry {
+  if (art === "rohr") {
+    // Rohrstummel: offener Achtkant, damit man in ihn hineinsieht
+    return new THREE.CylinderGeometry(kante * 0.1, kante * 0.1, kante * 0.62, 8, 1, true);
+  }
+  if (art === "felge") {
+    // Ring: Felge, Bremstrommel, Riemenscheibe — flach und weit
+    return new THREE.CylinderGeometry(kante * 0.27, kante * 0.27, kante * 0.13, 8, 1, true);
+  }
+  if (art === "profil") {
+    // Kantstück: Winkeleisen, Vierkantrohr, Dachlatte
+    return new THREE.BoxGeometry(kante * 0.11, kante * 0.11, kante * 0.72);
+  }
+  /*
+   * Blech: eine Platte, die einmal geknickt ist. Der Knick entsteht, indem
+   * die eine Hälfte der Eckpunkte angehoben wird — ein flaches Blech sähe
+   * aus wie ein Bierdeckel, und genau das soll es nicht.
+   */
+  const blech = new THREE.BoxGeometry(kante * 0.52, kante * 0.035, kante * 0.4, 2, 1, 1);
+  const pos = blech.getAttribute("position") as THREE.BufferAttribute;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    if (x > kante * 0.13) pos.setY(i, pos.getY(i) + kante * 0.14);
+  }
+  blech.computeVertexNormals();
+  return blech;
+}
 
 /**
  * Wie stark ein Teil beim Quetschen zusammengeht. 0,18 hat die Ursprungsform
@@ -1858,6 +1964,53 @@ export class ItemManager {
       zipfel.translate(px * 0.92, py * 0.92, pz * 0.92);
       const farbe = waehleFarbe(Math.random());
       faerbe(zipfel, () => farbe);
+    }
+
+    /*
+     * Reste der Ursprungsform — man sieht dem Paket an, was hineingegangen ist.
+     *
+     * Wunsch Patrick (Gerätetest, `docs/offene-punkte.md`): „Ballen sehen zu
+     * sauber aus — Fransen, **Reste der Ursprungsform**, unterschiedliche
+     * Farben." Fransen und Farben standen seit dem 12.09.; die Ursprungsform
+     * fehlte ganz.
+     *
+     * Welche Reste erscheinen, wird NICHT gewürfelt, sondern aus der
+     * Zusammensetzung gelesen: Jede Fraktion mit mindestens einem Sechstel der
+     * Masse darf ein Stück von sich zeigen, höchstens zwei Fraktionen je
+     * Paket. Ein Kupferballen zeigt damit ein Kupferrohr, ein Paket aus Stahl
+     * und Kupfer zeigt ein Stahlblech UND ein Kupferrohr — und ein Paket, in
+     * dem nur Kabel oder nur Reifen waren, zeigt gar nichts, weil daran keine
+     * Form mehr zu erkennen ist.
+     *
+     * Die Schwelle und die Auswahl stehen in `resteFuerPaket` — dieselbe
+     * Regel, die `test/ballen.test.ts` prüft.
+     */
+    for (const fraktionId of resteFuerPaket(anteile)) {
+      const eigen = PRESSPROFIL[fraktionId] ?? PRESSPROFIL.steel;
+      const art = eigen.reste[Math.floor(Math.random() * eigen.reste.length)];
+      const rest = baueRest(art, w);
+      // Frei im Raum drehen, aber flach genug, dass die Form lesbar bleibt
+      rest.rotateY(Math.random() * Math.PI * 2);
+      rest.rotateX(rand(0.9));
+      rest.rotateZ(rand(0.9));
+      /*
+       * Sitz: auf einer der sechs Flächen, drei Viertel draussen.
+       * Bei 0,75 der halben Kante steht das Stück je nach Form 8 bis 14 % der
+       * Paketkante über — sichtbar, aber es bleibt ein Paket und wird kein
+       * Mobile. (SW, am Netz nachgemessen: `test/ballen.test.ts`)
+       */
+      const sitz: Array<[number, number, number]> = [
+        [hx, rand(dims[1] * 0.7), rand(dims[2] * 0.7)],
+        [-hx, rand(dims[1] * 0.7), rand(dims[2] * 0.7)],
+        [rand(dims[0] * 0.7), hy, rand(dims[2] * 0.7)],
+        [rand(dims[0] * 0.7), -hy, rand(dims[2] * 0.7)],
+        [rand(dims[0] * 0.7), rand(dims[1] * 0.7), hz],
+        [rand(dims[0] * 0.7), rand(dims[1] * 0.7), -hz],
+      ];
+      const [px, py, pz] = sitz[Math.floor(Math.random() * 6)];
+      rest.translate(px * 0.75, py * 0.75, pz * 0.75);
+      const farbe = getMaterial(fraktionId).color;
+      faerbe(rest, () => farbe);
     }
 
     const gesamt = mergeGeometries(stuecke, false) ?? geo;
