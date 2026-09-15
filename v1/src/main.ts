@@ -1208,6 +1208,26 @@ async function main(): Promise<void> {
       looseTimer = 0;
     }
     daylight.update(frameDt);
+    /*
+     * Platzinventar kommt am naechsten Tag wieder (E-031, Ansage Patrick
+     * 15.09.2026: „wie auch der Besen ist es ein fester Bestandteil des
+     * Platzes und erscheint am naechsten Tag wieder").
+     *
+     * Die Gattung, das Nachlegen und der Tageszaehler sind in `scrapItems.ts`
+     * und `daylight.ts` gebaut; hier haengen sie zusammen. Ohne diese drei
+     * Zeilen kommt nichts zurueck — der Besen waere nach dem ersten
+     * Missgeschick fuer immer weg.
+     *
+     * Einen anderen sauberen Tagesanfang gibt es nicht: `Shift` kennt kein
+     * Tageskonzept, der einzige echte Wechsel ist der Umlauf der Uhr um
+     * Mitternacht. Solange der Wirtschaftskreislauf zurueckgestellt ist
+     * (Ansage 15.09.), bleibt es dabei.
+     */
+    if (daylight.neuerTag) {
+      daylight.neuerTag = false;
+      const nachgelegt = items.inventarNachtragen();
+      if (nachgelegt.length) hud.toast(`${nachgelegt.join(", ")} liegt wieder auf dem Platz`);
+    }
     floodlights.update(daylight.daylight);
     // Kleinkram zusammenfassen, bevor die Teilezahl die Bildrate drückt
     verdichtungsTimer += frameDt;
