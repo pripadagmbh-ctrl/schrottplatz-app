@@ -434,50 +434,163 @@ function rollGewerbe(): CustomerProfile {
  * gerettet. Das Feld ist pflichtig, der Typlauf über `test/` (E-038) setzt es
  * durch, und wer es mit einer Umtypung umgeht, bekommt es gesagt.
  */
-/* ------------------------------------------- Funkspruch des Abholers ----- */
+/* ------------------------------------------------- Der Abholfahrer ------- */
 
 /**
- * Was der Abholer durchgibt, wenn er steht.
+ * ACHIM KURTENBACH — der Fahrer, der den Container holt.
  *
- * Seit E-056 haelt er nicht mehr immer an derselben Stelle: Stahlschrott und
- * Mischschrott holt er beim Bagger ab, sortenreines Metall am Silo seiner
- * Fraktion. Damit ist „wo ist er?" eine echte Frage — und Patrick hat
- * entschieden, wie sie beantwortet wird (15.09.2026): Er funkt es an, wie ein
- * Fahrer. Verworfen hat er einen Zeiger am Bildrand (steht dauernd im Bild
- * und nimmt die Ruhe) und „gar nichts" (man dreht sich beim ersten Mal im
- * Kreis).
+ * Entscheidung Patrick, 15.09.2026: Der Abholer wird **ein wiederkehrender
+ * Fahrer mit Namen** statt einer Rolle. Ausdruecklich verworfen: „mehrere,
+ * wechselnd" — auf diesem Hof steht jeden Tag derselbe Wagen mit demselben
+ * Mann darin, und man erkennt ihn an der Stimme, nicht am Schriftzug.
+ *
+ * Gebaut ist er wie die Haendlerfamilien weiter oben in dieser Datei: ein
+ * Datensatz mit Namen, Milieu und Spruechen, aus dem `pick()` zieht. Keine
+ * zweite Bauweise daneben.
+ *
+ * WER ER IST. Achim Kurtenbach, 54, faehrt den Abrollkipper fuer die
+ * Spedition seines Schwagers in Wickrath (Ortsliste dieser Datei). Kommt
+ * jeden Tag auf denselben Hof, kennt die Wege, redet wenig und nie umsonst.
+ * Kaffeebecher in der Tuerablage, Tochter Lena macht naechstes Jahr Abitur
+ * und uebt gerade Fahrstunden, und zur Dauerbaustelle auf der A61 hat er eine
+ * Meinung.
+ *
+ * TON-LEITPLANKE (Projektregel 7, hier woertlich genommen): Das Milieu
+ * entsteht aus BERUF, FAMILIE und GESCHAEFT — Standzeit, Lieferschein,
+ * Fahrstunde, Stau. Nie aus Herkunft. Er ist Dienstleister und Bekannter
+ * zugleich: knapp, routiniert, freundlich, nicht geschwaetzig. Kein Spruch
+ * von ihm bewertet den Spieler, keiner deutet etwas an.
+ *
+ * WAS ER NICHT HAT (Ansage Patrick, mehrfach: „Kreislaufsachen noch nicht"):
+ * keinen Preis, keinen Ruf-Wert, keine Verhandlung, kein Konto. Er hat eine
+ * Stimme — mehr nicht. In diesem Abschnitt steht kein Eurozeichen.
+ */
+export interface Abholfahrer {
+  /** Wie er sich am Funk meldet — das steht vor dem Spruch im HUD. */
+  funkname: string;
+  /** Vollstaendig, fuer Papiere und spaetere Verwendung am Wagen. */
+  name: string;
+  /** Milieu: Beruf, Familie, Geschaeft. */
+  subtitle: string;
+  /**
+   * Ankunft AN EINEM SILO. Der Ort kommt aus dem Schild des Behaelters und
+   * aus keiner zweiten Liste (E-056) — deshalb Vorlagen, keine festen Saetze.
+   */
+  amSchild: Array<(schild: string) => string>;
+  /** Alles andere: feste Saetze je Lage. */
+  sprueche: Record<Fahrerlage, string[]>;
+}
+
+/**
+ * Die Lagen, in denen er etwas sagt — und nur die, die es wirklich gibt.
+ *
+ *   angekommen        er steht am Halteplatz und meldet, wo (E-056)
+ *   wartet            es wird beladen, er hat Standzeit
+ *   abfahrtVoll       beladen vom Hof
+ *   abfahrtLeer       leer vom Hof — seit E-064 sichtbar als „0 kg abgeholt"
+ *   containerZurueck  er hatte Platzinventar auf der Flaeche und setzt es
+ *                     leer wieder ab (E-034)
+ */
+export type Fahrerlage =
+  | "angekommen"
+  | "wartet"
+  | "abfahrtVoll"
+  | "abfahrtLeer"
+  | "containerZurueck";
+
+export const ABHOLFAHRER: Abholfahrer = {
+  funkname: "Achim",
+  name: "Achim Kurtenbach",
+  subtitle: "Abrollkipper, Spedition aus Wickrath",
+  /*
+   * Diese drei Vorlagen stehen seit E-056 im Spiel und sind am Geraet
+   * abgenommen — sie bleiben Wort fuer Wort, wie sie sind. Neu ist nur, wer
+   * sie sagt.
+   */
+  amSchild: [
+    (s) => `Bin am ${s}.`,
+    (s) => `Steh am ${s}, kannst kommen.`,
+    (s) => `${s}, ich warte.`,
+  ],
+  sprueche: {
+    // Ankunft ohne Schild: vorn beim Bagger, wo kein Silo steht. Ebenfalls
+    // seit E-056 unveraendert.
+    angekommen: [
+      "Bin vorn bei dir, Motor laeuft.",
+      "Steh am Abladeplatz, lad auf.",
+      "Bin da, laengsseits wie immer.",
+    ],
+    // Standzeit. Er draengelt nicht — Draengeln waere eine Aufforderung, und
+    // der Spieler soll hier in Ruhe arbeiten koennen.
+    wartet: [
+      "Lass dir Zeit, ich hab noch Standzeit.",
+      "Kaffee ist noch warm, mach in Ruhe.",
+      "Pack ruhig voll, die Achsen halten das.",
+      "Ich warte. Die A61 ist eh wieder dicht.",
+    ],
+    abfahrtVoll: [
+      "Passt so. Bis morgen, selbe Zeit.",
+      "Ist gesichert, ich fahr raus.",
+      "Gute Fuhre. Ich melde mich.",
+      "Muss los, Lena hat gleich Fahrstunde.",
+    ],
+    // Leer wieder raus (E-064). Kein Vorwurf: Eine Leerfahrt ist sein
+    // Berufsrisiko, nicht das Versagen des Spielers.
+    abfahrtLeer: [
+      "Leer wieder raus. Kommt vor.",
+      "Nichts drin. Ruf an, wenn was liegt.",
+      "Dann schreib ich Standzeit auf.",
+      "Kein Gramm drauf. Bis morgen.",
+    ],
+    // Platzinventar (E-034): Der Muellcontainer faehrt nicht mit. Er kippt
+    // ihn aus und setzt die leere Wanne wieder ab.
+    containerZurueck: [
+      "Wanne ist leer, steht wieder bei dir.",
+      "Abfall ist runter, Wanne steht vorn.",
+      "Ausgekippt. Die Wanne steht wieder da.",
+    ],
+  },
+};
+
+/**
+ * Was Achim in dieser Lage durchgibt.
  *
  * Man darf es UEBERHOEREN. Eine Zeile im Durchlauf, nichts zum Wegklicken,
  * nichts, was stehen bleibt — wer nicht hinhoert, sucht halt.
  *
- * DER ORT KOMMT AUS DEM SCHILD, nicht aus einer zweiten Liste. Uebergeben
- * wird das `label` des Behaelters, also genau das, was an der Mulde steht;
- * ein neues Silo bekommt seinen Spruch damit von selbst richtig. Bei einer
- * Abholung ohne Lagersilo (Stahlschrott, Mischschrott, „Gemischt") ist es
- * `null` — dann steht er vorn beim Bagger.
+ * DER ORT KOMMT AUS DEM SCHILD, nicht aus einer zweiten Liste (E-056).
+ * Uebergeben wird das `label` des Behaelters, also genau das, was an der
+ * Mulde steht; ein neues Silo bekommt seinen Spruch damit von selbst richtig.
+ * Bei einer Abholung ohne Lagersilo (Stahlschrott, Mischschrott, „Gemischt")
+ * ist es `null` — dann steht er vorn beim Bagger. Das Schild zaehlt nur bei
+ * der Ankunft: Wo er steht, ist beim Losfahren keine Frage mehr.
  *
  * Ton: Funkverkehr auf einem Platz, kein Ansagetext. Kurz, gesprochen, aus
  * dem Mund eines Fahrers, der seit dreissig Jahren Container faehrt.
  */
-export function abholerFunk(schild: string | null): string {
-  if (!schild) {
-    return pick([
-      "Bin vorn bei dir, Motor laeuft.",
-      "Steh am Abladeplatz, lad auf.",
-      "Bin da, laengsseits wie immer.",
-    ]);
-  }
-  return pick([`Bin am ${schild}.`, `Steh am ${schild}, kannst kommen.`, `${schild}, ich warte.`]);
+export function fahrerfunk(lage: Fahrerlage, schild: string | null = null): string {
+  if (lage === "angekommen" && schild) return pick(ABHOLFAHRER.amSchild)(schild);
+  return pick(ABHOLFAHRER.sprueche[lage]);
 }
 
 /**
- * Wer da funkt.
+ * Die Ankunftsmeldung — der Fall, den es seit E-056 gibt.
  *
- * Der Abholer hat kein Kundenprofil — er kauft nichts, er holt. Bis es eine
- * Stammfigur dafuer gibt, spricht er unter seiner Rolle, wie es am Funk
- * ueblich ist.
+ * Bleibt als eigener Name stehen, weil genau an ihm die Kopplung an das
+ * Schild haengt und `test/abholplatz.test.ts` sie dort prueft.
  */
-export const ABHOLER_FUNKNAME = "Abholer";
+export function abholerFunk(schild: string | null): string {
+  return fahrerfunk("angekommen", schild);
+}
+
+/*
+ * HIER STAND `ABHOLER_FUNKNAME = "Abholer"` — eine Rolle, kein Mensch.
+ *
+ * Ersatzlos gestrichen und nicht etwa auf „Achim" umgebogen: Wer da funkt,
+ * steht seit dem 15.09.2026 in `ABHOLFAHRER.funkname`, und zwei Namen fuer
+ * denselben Mann sind genau die zweite Liste, die beim naechsten Umbau
+ * zurueckbleibt.
+ */
 
 export function vehicleForCustomer(c: CustomerProfile): Fahrzeugart {
   if (!c.vehicle) {

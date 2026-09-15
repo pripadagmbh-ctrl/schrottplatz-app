@@ -3752,3 +3752,94 @@ nachweislich nicht (er meldet schon bei 0° eine Berührung, die es nicht gibt).
 3. Mit dem Fünfschalengreifer in einen **Haufen** greifen statt auf den Beton:
    Fühlt er sich dort auch zäh an, oder nur auf der flachen Fläche? Die Antwort
    sagt, ob die 25 cm die ganze Beanstandung erklären.
+
+---
+
+### E-066 — Der Abholer bekommt einen Namen: Achim Kurtenbach (15.09.2026)
+
+**Entscheidung.** Aus der Rolle „Abholer" wird **ein wiederkehrender Fahrer mit
+Namen**: **Achim Kurtenbach**, 54, Abrollkipper einer Spedition aus Wickrath.
+Er meldet sich am Funk mit „Achim" und hat eigene Sätze für die fünf Lagen, die
+es auf diesem Hof wirklich gibt: ankommen und melden wo (E-056), warten während
+beladen wird, beladen losfahren, **leer** losfahren (E-064) und die
+Müllcontainer-Wanne leer zurückgeben (E-034).
+
+**Begründung.** Patrick, 15.09.2026, auf die Frage nach der Besetzung: ein
+wiederkehrender Fahrer. Ausdrücklich verworfen: „mehrere, wechselnd". Auf einem
+Hof, der jeden Tag denselben Container abholen lässt, kommt auch jeden Tag
+derselbe Mann — und eine Rolle, die spricht, ist keine Figur. Lambert und
+Janine haben Namen und Familien; der Abholer war der letzte, der seine Stimme
+von einem Funktionsnamen geliehen hatte.
+
+**Woher der Name kommt.** Aus der Nachbarschaft, die schon im Quelltext steht:
+Die Ortsliste dieser Datei ist Mönchengladbach (Neuwerk, Odenkirchen, Lürrip,
+Wickrath, …). Achim ist der Jahrgang der übrigen Stammfiguren (Willi, Kurt,
+Heiner, Rudi, Ewald, Fritz), Kurtenbach ein niederrheinischer Name ohne
+Beiklang. **Ton-Leitplanke (Projektregel 7):** Sein Milieu kommt aus **Beruf,
+Familie, Geschäft** — Standzeit, Lieferschein, Kaffeebecher, Tochter Lena, die
+Abitur macht und Fahrstunden nimmt, Dauerbaustelle auf der A61 (nicht A1: die
+liegt 100 km weg, die A61 führt an Mönchengladbach vorbei). Nie aus Herkunft,
+nie eine Andeutung übers Geschäftsgebaren. Er drängelt auch nicht: Seine
+Wartezeile ist eine Entwarnung („Lass dir Zeit, ich hab noch Standzeit."),
+keine Aufforderung, und eine Leerfahrt ist ihm Berufsrisiko, kein Vorwurf.
+
+**Was ausdrücklich NICHT passiert ist.** Kein Geld, kein Kreislauf: kein Preis,
+kein Ruf-Wert, keine Verhandlung, kein Konto. „Kreislaufsachen noch nicht."
+Der Abschnitt in `customers.ts` enthält kein Eurozeichen. Ebenso wenig gibt es
+eine **Figur am Steuer** — sichtbar wird er nicht, das ist Gestaltung und
+gehört ans Bild.
+
+**Die Kopplung an das Schild bleibt (E-056).** Der Ort im Ankunftsspruch kommt
+weiter aus dem `label` des Behälters, an dem er hält — derselben Quelle, aus
+der auch sein Halteplatz gerechnet wird. Deshalb stehen seine drei
+Ankunftssätze als **Vorlagen** (`amSchild`) im Datensatz und nicht als fertige
+Zeilen. Die drei Sätze von E-056 sind Wort für Wort geblieben; sie sind am
+Gerät abgenommen, neu ist nur, wer sie sagt.
+
+**Gebaut wie die Händlerfamilien, nicht daneben.** Ein Datensatz `ABHOLFAHRER`
+(Name, Funkname, Milieu, Sprüche je Lage), aus dem `pick()` zieht — dieselbe
+Bauweise wie `FAMILIES` in derselben Datei. Am Fahrzeug steht nur noch die
+**Lage**: `onAngekommen` (kannte nur die Ankunft) ist zu `onFahrerlage(lage)`
+geworden, ein Kanal statt fünf Rückrufe. Was gesagt wird, entscheidet
+`customers.ts`; wo es erscheint, das HUD (`onPickupFunk`, unverändert
+verdrahtet).
+
+**Neue Zahl.** `WARTE_FUNK_S = 25` (SW): Standzeit bis zur ersten Wartezeile,
+einmal je Fuhre. Kürzer wirkt es wie Drängeln, länger hört man es nie — die
+Standzeit des Wagens läuft erst nach 240 s ab. Die Schranke „voll oder leer"
+beim Losfahren ist **1 kg** und stammt aus derselben Quelle wie das Brutto der
+Ausfahrtswiegung (`ladeflaecheKg()`, E-064); so können Fahrer und Waage nicht
+Verschiedenes sagen.
+
+**Verworfene Alternative.** Eine eigene Datei `delivery/abholfahrer.ts`.
+Verworfen: Die Stimmen des Platzes stehen in `customers.ts`, dort stand auch
+schon der Funkspruch, und eine zweite Wohnung für dieselbe Bauweise wäre genau
+der Bruch, der beim nächsten Umbau vergessen wird.
+
+**Wächter.** `test/abholfahrer.test.ts` (neu, 14 Fälle) in drei Teilen: die
+Figur (ein Name statt einer Rolle, Funkname im vollen Namen enthalten, ≥ 3
+Sätze je Lage, keine Dopplung, keine Zeile ≥ 45 Zeichen — dieselbe Schranke,
+die `abholplatz.test.ts` seit E-056 hält), die **Ton-Leitplanke** (Wortliste
+gegen Herkunft und Halbseidenes, dazu „er drängelt nicht") und der
+**Verdrahtungs-Wächter**: Eine ganze Abholung wird gefahren und der Funkverkehr
+mitgeschrieben — ankommen, warten (genau einmal), beladen losfahren. Jede
+Schranke hat ihre **Gegenprobe**: ein absichtlich kaputter Fahrer (doppelter,
+zu langer, fehlender Satz) muss gemeldet werden; ein Spruch über Herkunft muss
+auffallen; die Leerfahrt muss „abfahrtLeer" ergeben **und** dieselbe 0 kg wie
+die Waage; eine Wanne, die 12 m neben dem Wagen steht, darf keine Rückgabe
+melden.
+
+**Offen.** Ob die Wanne, wie E-034 sie beschreibt, „am nächsten Tag" statt
+sofort zurückkommt, ist unverändert: Gebaut ist weiter das sofortige Absetzen
+am Abladeplatz. Achims Satz passt auf beides.
+
+**Auf dem Gerät zu prüfen.**
+
+1. Abholung rufen und hinhören: Steht jetzt **„Achim: …"** in der Einblendung
+   statt „Abholer: …", und stimmt der genannte Ort noch mit dem Schild überein,
+   an dem er hält?
+2. Ihn nach der Ankunft eine halbe Minute stehen lassen, ohne etwas zu laden:
+   Kommt **eine** Wartezeile — und bleibt es danach still?
+3. Ihn einmal **beladen** und einmal **leer** mit **V** losschicken: Sagt er
+   beide Male etwas anderes, und passt sein Abschied zu dem, was die Waage zwei
+   Meter weiter meldet („… kg abgeholt")?

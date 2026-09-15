@@ -60,8 +60,9 @@ import { lagerMuldeFuer, type ContainerConfig } from "../world/containers";
 import {
   rollCustomer,
   vehicleForCustomer,
-  abholerFunk,
-  ABHOLER_FUNKNAME,
+  fahrerfunk,
+  ABHOLFAHRER,
+  type Fahrerlage,
   type CustomerProfile,
 } from "./customers";
 import { buildVehicleModel, wandHoehe, type Rad } from "./vehicleModel";
@@ -607,13 +608,29 @@ class DeliveryVehicle {
   bestellung: string | null = null;
 
   /**
-   * Meldung des Abholers, sobald er an seinem Platz steht.
+   * Die Lage, in der der Abholfahrer etwas sagt.
    *
    * Gesetzt vom `VehicleManager`, der daraus den Funkspruch baut. Am Fahrzeug
-   * steht nur der Zeitpunkt — WAS gesagt wird, ist Sache der Stimmen in
-   * `customers.ts`, und WO es erscheint, ist Sache des HUD.
+   * steht nur der ZEITPUNKT und die LAGE — WAS Achim sagt, ist Sache der
+   * Stimmen in `customers.ts`, und WO es erscheint, ist Sache des HUD.
+   *
+   * EIN KANAL FUER ALLE LAGEN, nicht fuenf Rueckrufe. Hiess bis zum
+   * 15.09.2026 `onAngekommen` und kannte nur die Ankunft; seit der Abholer
+   * ein Fahrer mit Namen ist, hat er auch fuers Warten, fuers Losfahren und
+   * fuer die zurueckgegebene Wanne einen Satz.
    */
-  onAngekommen: (() => void) | null = null;
+  onFahrerlage: ((lage: Fahrerlage) => void) | null = null;
+
+  /**
+   * Standzeit bis zum ersten „lass dir Zeit" — einmal je Fuhre.
+   *
+   * SW: 25 s. Kuerzer wirkt es wie Draengeln (der Spieler hat den Greifer
+   * gerade erst am Haufen), laenger hoert man es nie: Eine Fuhre in Ruhe zu
+   * laden dauert Minuten, und die Standzeit des Wagens laeuft nach 240 s ab.
+   */
+  private static readonly WARTE_FUNK_S = 25;
+  /** Schon gesagt? Sonst redet er in jedem Bild. */
+  private warteFunkGehabt = false;
 
   /**
    * Die beiden Wiegungen des Abholers (E-064) — reine Meldungen.
@@ -1788,7 +1805,7 @@ class DeliveryVehicle {
           this.phase = this.isPickup ? "waitLoad" : this.kind === "kipper" ? "tipping" : "waitUnload";
           // Der Abholer funkt, sobald er steht — hier und nirgends sonst
           // (E-056). Einmal je Fuhre, danach ist der Kanal wieder still.
-          if (this.isPickup) this.onAngekommen?.();
+          if (this.isPickup) this.onFahrerlage?.("angekommen");
           this.phaseT = 0;
           this.routeS = 0;
         }
@@ -1803,13 +1820,40 @@ class DeliveryVehicle {
         break;
       }
       case "waitLoad":
+        /*
+         * Achim hat Standzeit und sagt das einmal (15.09.2026). Nicht als
+         * Aufforderung, sondern als Entwarnung: Der Wagen steht hier bis zu
+         * vier Minuten, und wer das weiss, laedt in Ruhe.
+         */
+        if (
+          this.isPickup &&
+          !this.warteFunkGehabt &&
+          this.phaseT > DeliveryVehicle.WARTE_FUNK_S
+        ) {
+          this.warteFunkGehabt = true;
+          this.onFahrerlage?.("wartet");
+        }
         // Abhol-LKW wartet, bis der Spieler den Container beladen hat und
         // die Abfahrt freigibt (Taste V) — oder bis die Standzeit abläuft.
         if (this.releaseRequested || this.phaseT > 240) {
           this.justDeparted = true; // Container wird jetzt abgerechnet
           // Zuerst das Platzinventar: Es faehrt nicht mit und wird nie bezahlt
+          const vorher = this.letzteRueckgabe;
           this.gibPlatzinventarZurueck();
+          if (this.letzteRueckgabe !== vorher) this.onFahrerlage?.("containerZurueck");
           this.verriegeleLadeflaeche();
+          /*
+           * Und dann sagt er, womit er faehrt. Gefragt wird DIESELBE QUELLE,
+           * aus der die Ausfahrtswiegung ihr Brutto nimmt (`ladeflaecheKg`,
+           * E-064) — sonst verabschiedet er sich mit einer vollen Fuhre, und
+           * die Waage meldet zwei Meter weiter „0 kg abgeholt".
+           *
+           * Die Schranke ist 1 kg und keine Null: Jedes einzelne Teil des
+           * Spiels wiegt mehr, und gegen Null zu vergleichen hiesse, sich auf
+           * Fliesskomma zu verlassen.
+           */
+          const aufDerFlaeche = this.ladeflaecheKg();
+          this.onFahrerlage?.(aufDerFlaeche > 1 ? "abfahrtVoll" : "abfahrtLeer");
           this.phase = "out";
           this.routeS = 0;
         }
@@ -2112,11 +2156,12 @@ export class VehicleManager {
   /** Abhol-LKW fährt los → Containerinhalt abrechnen */
   onPickupDepart: ((truck: DeliveryVehicle) => void) | null = null;
   /**
-   * Der Abholer steht und funkt durch, wo (E-056).
+   * Achim funkt durch — wo er steht (E-056) und was sonst gerade ist.
    *
-   * Eine Zeile, einmal je Fuhre, zum Ueberhoeren gedacht. Sie geht denselben
-   * Weg wie die Begruessung eines Haendlers (`onCustomerArrived`): Das
-   * Fahrzeugmodul sagt, WER was sagt — wo es steht, entscheidet das HUD.
+   * Eine Zeile je Lage, zum Ueberhoeren gedacht. Sie geht denselben Weg wie
+   * die Begruessung eines Haendlers (`onCustomerArrived`): Das Fahrzeugmodul
+   * sagt, WER was sagt — wo es steht, entscheidet das HUD. Der Name reist
+   * mit, damit das HUD keine zweite Liste von Sprechern fuehren muss.
    */
   onPickupFunk: ((wer: string, spruch: string) => void) | null = null;
   /**
@@ -2201,13 +2246,14 @@ export class VehicleManager {
      * kommt aus dem Schild des Behaelters, an dem er haelt — dieselbe Quelle,
      * aus der auch der Halteplatz gerechnet wird. Zwei Listen, eine fuer die
      * Fahrt und eine fuer den Text, wuerden beim naechsten Umzug der Reihe
-     * auseinanderlaufen.
+     * auseinanderlaufen. DIESE KOPPLUNG BLEIBT, auch jetzt, wo ein Fahrer mit
+     * Namen spricht: Der Name kommt aus der Figur, der Ort aus dem Schild.
      */
     if (k === "abholer") {
       const wagen = this.active;
-      wagen.onAngekommen = () => {
+      wagen.onFahrerlage = (lage) => {
         const ziel = abholPlatzFuer(wagen.bestellung).ziel;
-        this.onPickupFunk?.(ABHOLER_FUNKNAME, abholerFunk(ziel?.label ?? null));
+        this.onPickupFunk?.(ABHOLFAHRER.funkname, fahrerfunk(lage, ziel?.label ?? null));
       };
       // Die beiden Wiegungen (E-064) — leer herein, voll hinaus.
       wagen.onTara = (tara) => this.onAbholerTara?.(tara);
