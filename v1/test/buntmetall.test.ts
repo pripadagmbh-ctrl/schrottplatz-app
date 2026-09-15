@@ -27,6 +27,7 @@ import { MATERIALS } from "../src/materials/catalog";
 import { containerValue, containerValueGemischt } from "../src/materials/purity";
 import {
   CONFIGS,
+  bayHalb,
   gehoertHierhin,
   lagerMuldeFuer,
   totenStreifen,
@@ -34,6 +35,7 @@ import {
   MULDE_STEIN,
 } from "../src/world/containers";
 import { STATIC_OBSTACLES } from "../src/world/obstacles";
+import { PRESS_CENTER, PRESS_FUSS, KLAPPE_WEG, KLAPPE_RICHTUNG } from "../src/world/press";
 import { BAGGER_STAND, abstandVomStand } from "../src/world/baggerstand";
 
 const FUHRE: Array<[string, number]> = [
@@ -221,54 +223,113 @@ describe("Die Buntmetall-Mulde ist ein Puffer und kostet kein Geld", () => {
     expect(dreckig / sauber).toBeCloseTo(0.64, 6);
   });
 
-  it("die Schwelle vorn ist so hoch wie möglich, ohne den Blick zu nehmen", () => {
+  it("die Schwelle vorn ist zwei Lagen hoch — Entscheidung über Rechnung", () => {
     /*
-     * Wunsch Patrick 14.09.2026, bestätigt am 15.09.: „vorn niedrig zumauern,
-     * damit nichts zurückrollt — aber bei abgesenkter Kabine muss man noch
-     * hineinsehen können."
+     * HIER STEHEN ZWEI DINGE NEBENEINANDER, UND KEINES ERSETZT DAS ANDERE.
      *
-     * Die Grenze ist gerechnet, nicht gegriffen. Augpunkt bei abgesenkter
-     * Kabine: 3,28 m (`excavator.ts`: cabGroup y 1,60 + Augpunkt lokal 1,68;
-     * dieselbe Zahl in `docs/baggerkonzept.md`). Der Blick streift die
-     * Wandkrone und trifft den Boden erst dahinter:
+     * 1. WAS VON DER ALTEN REGEL GILT: die Rechnung. Der Augpunkt bei
+     *    abgesenkter Kabine liegt auf 3,28 m (`excavator.ts`: cabGroup y 1,60
+     *    + Augpunkt lokal 1,68; dieselbe Zahl in `docs/baggerkonzept.md`), der
+     *    Blick streift die Wandkrone und trifft den Boden erst dahinter:
      *
-     *     blind = h × D / (H − h)
+     *        blind = h × D / (H − h)
      *
-     * Die Baggerseite der Mulde läuft von (−5,5 | −22,2) bis (−5,5 | −16,2),
-     * also 5,01 bis 8,04 m vom Sitz. Gefordert: Vom UNGÜNSTIGSTEN Punkt aus
-     * bleiben mindestens 60 % des 6,0 m langen, 4,2 m tiefen Bodens sichtbar.
+     *    Sie ist unverändert richtig und wird hier weiter nachgerechnet — an
+     *    der NEUEN Stelle, denn der tote Streifen wächst mit dem Abstand.
      *
-     *   0,50 m (eine Lage):  blind 0,90 bis 1,45 m  →  65 bis 79 % sichtbar
-     *   1,00 m (zwei Lagen): blind 2,20 bis 3,53 m  →  16 bis 48 % sichtbar
+     * 2. WAS PATRICK ÜBERSTIMMT HAT: die Höhe. Am 15.09.2026 stand aufgrund
+     *    dieser Rechnung EINE Lage (0,50 m, 68–79 % Boden sichtbar); zwei
+     *    Lagen waren ausdrücklich verworfen, weil sie den Blick nehmen.
+     *    Patrick hat die eine Lage am Gerät gesehen und entschieden: „da kommt
+     *    einfach noch 'ne Lage drüber, damit die Anhäufung etwas höher ist."
+     *    Gebaut werden zwei. Der Wächter hält ab jetzt die ENTSCHEIDUNG fest
+     *    (zwei ganze Lagen) und die MESSUNG daneben (wieviel man noch sieht),
+     *    statt die alte Schranke zu verteidigen.
+     *
+     * Was er weiterhin verhindert: dass die Schwelle unbemerkt zur Mauer wird.
+     * Ab 1,17 m sieht man vom hinteren Ende der Mulde überhaupt keinen Boden
+     * mehr — diese Grenze bleibt hart.
      */
     const bunt = CONFIGS.find((c) => c.id === "r_bunt")!;
     const h = bunt.niedrigeStirn;
     expect(h, "die Schwelle fehlt").toBeDefined();
-    // Sie ist ein ganzes Vielfaches einer Betonlego-Lage — nichts wird gesägt.
+    // Die Entscheidung: zwei Betonlego-Lagen, nichts wird gesägt.
     expect((h! / MULDE_STEIN.hoehe) % 1, `${h} m sind keine ganzen Lagen`).toBeCloseTo(0, 6);
+    expect(h! / MULDE_STEIN.hoehe, "es sind nicht zwei Lagen").toBe(2);
 
     const [w, d] = bunt.size;
     const wandX = bunt.x + w / 2;
     const tiefe = w; // von der Schwelle bis zur gegenüberliegenden Kante
-    let schlechtester = 1;
-    for (const z of [bunt.z - d / 2, bunt.z, bunt.z + d / 2]) {
-      const D = abstandVomStand(wandX, z);
-      const sichtbar = Math.max(0, tiefe - totenStreifen(h!, D)) / tiefe;
-      schlechtester = Math.min(schlechtester, sichtbar);
-    }
-    expect(
-      schlechtester,
-      `nur ${(schlechtester * 100).toFixed(0)} % des Muldenbodens sichtbar`
-    ).toBeGreaterThan(0.6);
+    const sicht = (hoehe: number, z: number): number =>
+      Math.max(0, tiefe - totenStreifen(hoehe, abstandVomStand(wandX, z))) / tiefe;
 
-    // Und eine Lage mehr wäre zu viel — das ist die Zahl, an der es hängt.
-    const zweiLagen = Math.max(
-      0,
-      tiefe - totenStreifen(h! + MULDE_STEIN.hoehe, abstandVomStand(wandX, bunt.z + d / 2))
-    ) / tiefe;
-    expect(zweiLagen, "eine Lage mehr ginge auch noch").toBeLessThan(0.6);
+    /*
+     * DIE MESSUNG am neuen Standort (Mitte −7,6 | −19,8, Schwelle auf x −5,5,
+     * also 5,01 m vom Sitz am vorderen und 7,58 m am hinteren Ende):
+     *
+     *              vorn    Mitte   hinten
+     *   0,50 m     79 %    76 %    68 %
+     *   1,00 m     48 %    41 %    21 %   ← gebaut
+     */
+    expect(sicht(1.0, bunt.z - d / 2), "vorderes Ende").toBeCloseTo(0.48, 2);
+    expect(sicht(1.0, bunt.z), "Mitte").toBeCloseTo(0.41, 2);
+    expect(sicht(1.0, bunt.z + d / 2), "hinteres Ende").toBeCloseTo(0.21, 2);
+    // Und was eine Lage gebracht hätte — damit die Zahl nicht verlorengeht.
+    expect(sicht(0.5, bunt.z + d / 2), "eine Lage, hinteres Ende").toBeCloseTo(0.68, 2);
+
+    /*
+     * DIE HARTE SCHRANKE: Vom hintersten Punkt muss ein Streifen Boden zu
+     * sehen bleiben. Ab 1,17 m ist es an dieser Stelle vorbei — eine dritte
+     * Lage (1,50 m) fiele hier durch.
+     */
+    expect(sicht(h!, bunt.z + d / 2), "die Schwelle nimmt den Boden ganz").toBeGreaterThan(0.15);
+    expect(
+      sicht(h! + MULDE_STEIN.hoehe, bunt.z + d / 2),
+      "eine dritte Lage ginge auch noch — dann stimmt die Grenze nicht"
+    ).toBe(0);
+
     expect(AUGPUNKT_UNTEN, "Augpunkt aus excavator.ts").toBeCloseTo(3.28, 6);
     expect(BAGGER_STAND).toEqual({ x: -0.5, z: -22.5 });
+  });
+
+  it("die Mulde steht neben der Presse und ganz im Schwenkband", () => {
+    /*
+     * Ansage Patrick 15.09.2026: „direkt eine Mulde neben der Presse
+     * platzieren". „Neben" ist hier eine Zahl: Die Presse steht auf
+     * (−8,0 | −26,0), ihr Rahmen endet nach Norden auf z −23,55, und ihre
+     * Deckelklappe schwingt 3,85 m nach WESTEN — nach Norden schwingt nichts.
+     * Geprüft wird beides: dass die Mulde dicht danebensteht (höchstens 1,5 m
+     * Lücke) und dass sie den Rahmen nicht berührt.
+     */
+    const bunt = CONFIGS.find((c) => c.id === "r_bunt")!;
+    const { hd } = bayHalb(bunt);
+    const suedkante = bunt.z - hd - 0.35; // 0,35 = halbe Wanddicke der Hindernisliste
+    const pressenRahmen = PRESS_CENTER.z + PRESS_FUSS.hd;
+    const luecke = suedkante - pressenRahmen;
+    expect(luecke, `${luecke.toFixed(2)} m — die Mulde steht im Pressenrahmen`).toBeGreaterThan(0);
+    expect(luecke, `${luecke.toFixed(2)} m — das ist nicht „direkt neben"`).toBeLessThan(1.5);
+
+    // Die Klappe schwingt nach Westen, nicht nach Norden — sonst stünde die
+    // Mulde in ihrem Weg.
+    expect(Math.abs(KLAPPE_RICHTUNG.z), "die Klappe schwingt in z").toBeLessThan(0.01);
+    const klappeX = PRESS_CENTER.x + KLAPPE_RICHTUNG.x * KLAPPE_WEG;
+    expect(klappeX, "die Klappe schwingt zur Mulde hin").toBeLessThan(bunt.x - bunt.size[0] / 2);
+
+    /*
+     * Und der Grund, warum sie 0,60 m nach Süden gerückt ist: Jetzt liegt die
+     * GANZE Muldenachse im Schwenkband (vorher 93 %).
+     */
+    const laenge = bunt.size[1];
+    for (let i = 0; i <= 50; i++) {
+      const z = bunt.z - laenge / 2 + (laenge * i) / 50;
+      const dist = abstandVomStand(bunt.x, z);
+      expect(dist, `Muldenachse bei z ${z.toFixed(1)}: ${dist.toFixed(2)} m`).toBeGreaterThanOrEqual(
+        5.8
+      );
+      expect(dist, `Muldenachse bei z ${z.toFixed(1)}: ${dist.toFixed(2)} m`).toBeLessThanOrEqual(
+        9.2
+      );
+    }
   });
 
   it("und sie steht in der Hindernisliste — niedrig, nicht als volle Wand", () => {

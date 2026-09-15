@@ -96,6 +96,14 @@ function zielpunkt(c: ContainerConfig): [number, number] {
  * („die ueberlegen wir uns noch"). Der Waechter prueft deshalb ZWEI Dinge
  * getrennt: die Pflicht hart, die Mulden als Bestandsaufnahme.
  */
+/*
+ * Nachtrag 15.09.2026 abends (E-034): Der MUELL ist kein fester Behaelter
+ * mehr, sondern ein Absetzcontainer, den der Spieler versetzt. Geprueft wird
+ * hier deshalb sein STARTPLATZ — der Ort, an dem er am Morgen steht. Wohin er
+ * danach wandert, entscheidet der Spieler; ein Waechter, der ihm folgte,
+ * verboete genau das (Ansage: „Der Container soll erstmal frei bleiben, damit
+ * ich auch testen kann, wo der am besten steht").
+ */
 describe("Die vier Pflichtziele liegen im Schwenkband", () => {
   const ziele: Array<[string, number, number]> = [
     ...["c_mixed", "c_steel", "r_rubble"].map((id) => {
