@@ -428,3 +428,42 @@ Alle Zeichnungen liegen unter `/v1/plaene/` und sind auf dem Telefon aufrufbar.
   gemeinsam gelöst, nicht für eines allein (E-027).
 - **Vier CPU-Kleinigkeiten sind erledigt** (HUD schreibt nur bei Änderung,
   Körperzählung nur bei offenem Overlay, Ladung viermal je Sekunde).
+
+## Aus Patricks Gerätetests — laufend nachgehalten (ab 15.09.2026)
+
+Angelegt, nachdem ein Befund von ihm verlorenging: Er hatte in einer Skizze die
+Mittelsäule des Greifers durchgekreuzt und *danach* über den Zahn gesprochen;
+gebaut wurde nur der Zahn. Seine Ansage: „es wäre schon gut, wenn wir nicht
+einfach Punkte fallen lassen."
+
+Regel: Jede seiner Meldungen kommt hier hinein, bevor irgendein Agent losläuft.
+Ein Satz von ihm enthält oft mehrere Punkte — jeder bekommt eine eigene Zeile.
+Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live ist.
+
+### Offen
+
+- [ ] **Mittelsäule raus, Zacken direkt an die Traverse** — gemessen sitzen
+      zwischen `TRAVERSE_Y` (−0,865) und `STEMPEL_AUGE.y` (−1,5335) **66,9 cm
+      Säule**. In seiner Skizze durchgekreuzt, von mir übersehen.
+      *Stand: wird skizziert, nicht gebaut — auf seinen Blick am Bild.*
+- [ ] **Zahn hängt offen 12° nach innen** — der Preis von E-069. Stört das beim
+      Einstechen in den Haufen? *Wartet auf sein Urteil am Gerät.*
+- [ ] **Kran fährt durch die Ladefläche** — gemeldet am 13.09., seitdem
+      unangetastet. Eigenes Paket, noch nicht begonnen.
+- [ ] **Greifer komplett zur Seite kippen** — zum Kehren und Schleudern.
+      Vorgemessen (E-065), zurückgestellt bis die Säulenfrage entschieden ist,
+      weil die Kollisionsrechnung sonst zweimal gemacht werden müsste.
+- [ ] **Edelstahl-Halt, 16 cm Heckabstand zur Südwand des Kupferlagers** —
+      gemessen, keine Durchdringung. *Wartet auf sein Urteil: Rangieren oder
+      Unfall?*
+- [ ] **Abholer brachte kein Geld** (15.09.) — die Ursache mit den drei
+      verschiedenen Ladeflächen-Fenstern ist behoben (E-070), sein
+      **Totalausfall aber nicht reproduziert**. Bleibt offen, bis er es
+      wiedersieht oder nicht mehr wiedersieht.
+- [ ] **Anlieferer ohne Frist blockiert den Hof** — wer nie abgeladen wird,
+      steht unbegrenzt; im kopflosen Lauf zehn Minuten, und eine vorgemerkte
+      Abholung kam nicht durch. Gefunden beim Nachstellen, nicht von ihm
+      gemeldet — gehört trotzdem hierher.
+- [ ] **Keine stehende Anzeige für Zahlungsunfähigkeit** — „Konto leer" ist ein
+      Toast und verschwindet, der Zustand bleibt. Für „Platz dicht" gibt es eine
+      Dauerzeile. `Account.lowOnCash` ist gebaut und wird nirgends benutzt.
