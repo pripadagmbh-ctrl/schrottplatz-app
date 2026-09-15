@@ -289,6 +289,33 @@ export const CONFIGS: ContainerConfig[] = [
    * ist gewollt (Ansage 15.09.2026: „erstmal alles rausfischen in die Mulde
    * tun und dann spaeter entweder ich oder Lambert das sortieren").
    *
+   * BATTERIEN LIEGEN MIT DRIN (Entscheidung Patrick, 15.09.2026, E-029).
+   *
+   * Sie hatten dasselbe Problem wie VA: ein Lagersilo, aber am Bagger kein
+   * Ziel — wer einen Akku aus einem Wrack fischte, bekam ueberall „falsche
+   * Zone". Vorgeschlagen war eine eigene kleine Batteriemulde (Gefahrgut, und
+   * Blei im Kupfer drueckt die Reinheit); Patrick hat sich fuer die
+   * gemeinsame Mulde entschieden, beide Folgen lagen ihm vor.
+   *
+   * WAS DAS KOSTET — gerechnet, nicht behauptet (`test/blei.test.ts`):
+   *
+   *  - In der MULDE: null Euro. Verdient wird beim Verkauf aus dem Container
+   *    des Abholers, je Stueck nach seiner eigenen Fraktion, und Lambert
+   *    traegt jeden Akku in das BATTERIEN-Silo (`people.ts`, `muldeFuer`
+   *    liest `item.materialId`). Das Silo bleibt getrennt — sortiert wird auf
+   *    dem Weg dorthin, nicht in der Mulde (E-028).
+   *  - Wenn das Blei doch MITGEHT, also in demselben Container verkauft wird:
+   *    Eine Kupferfuhre von 200 kg bringt 180,00 €; dieselbe Fuhre mit
+   *    100 kg Akku dazwischen bringt 80,00 € — 100,00 € weniger, obwohl
+   *    100 kg mehr drin sind (Reinheit hoch drei, `sellContainer`). Getrennt
+   *    verkauft haetten die Akkus selbst 55,00 € gebracht: 235,00 € statt
+   *    80,00 €, also 155,00 € Unterschied je 100 kg Blei.
+   *  - Am SCHILD der Mulde: Vorher zaehlte ein Akku als Fremdstoff und drueckte
+   *    500 kg Buntmetall von 1602,00 € auf 1112,50 € (Reinheit²). Jetzt steht
+   *    1657,00 € da. Die Ampel warnt also nicht mehr vor Blei — das ist der
+   *    Preis der Entscheidung, und er ist kein Geldbetrag, sondern ein
+   *    fehlendes Signal.
+   *
    * EDELSTAHL LIEGT MIT DRIN (Entscheidung Patrick, 15.09.2026). VA hatte am
    * Bagger bis heute ueberhaupt kein Ziel: Wer ihn aus einem Wrack fischte,
    * bekam ueberall „falsche Zone" — offener Punkt seit dem 14.09. Fachlich
@@ -313,7 +340,7 @@ export const CONFIGS: ContainerConfig[] = [
    * oben ein, Lambert faehrt mit dem Radlader von Westen hinein.
    */
   { id: "r_bunt", fractionId: "copper",
-    mitFraktionen: ["brass", "alu", "zinc", "cable", "va"],
+    mitFraktionen: ["brass", "alu", "zinc", "cable", "va", "battery"],
     label: "BUNT + VA", kind: "bay", x: -7.6, z: -19.2, size: [4.2, 6.0, 2.0],
     sortierbox: true, shareEast: true, niedrigeStirn: 0.5 },
 
@@ -342,8 +369,16 @@ export const CONFIGS: ContainerConfig[] = [
    *                              1,69 m Halbmass — „ich greife in die Wand".
    *
    * DIE NEUE STELLE ist gesucht, nicht gegriffen. Frei im Schwenkband 5,8 bis
-   * 9,2 m ist nach dem Umbau nur noch der Streifen zwischen der Kabel-Mulde
-   * (Ostkante x −5,5) und der Kipperspur (x 2,0, Wagenflanke x 0,45):
+   * 9,2 m war am Vormittag des 15.09.2026 nur noch der Streifen zwischen der
+   * Kabel-Mulde (Ostkante x −5,5) und der Kipperspur (x 2,0, Wagenflanke
+   * x 0,45).
+   *
+   * NACHTRAG E-029, denselben Tag: Die Kipperspur gibt es nicht mehr — der
+   * Kipper faehrt an den Abladeplatz. Oestlich der Muellmulde ist damit bis
+   * zur Abladespur (x 6,3, Wagenflanke 4,75) alles frei. Die Mulde bleibt
+   * stehen, wo sie steht; die Zahlen unten sind die Rechnung, mit der sie
+   * dorthin kam, und die Schranke zur Spur ist seitdem nur groesser
+   * geworden.
    *
    *   Mitte (−3,2 | −14,6)   8,35 m vom Sitz — im Band
    *   Westkante x −5,0       0,50 m bis zur Kabel-Mulde
@@ -361,7 +396,8 @@ export const CONFIGS: ContainerConfig[] = [
    * Oeffnung schaute 0,5 m weit auf die Flanke des Nachbarn.
    *
    * Sie liegt damit WESTLICH der Rueckfahrspur zum Abladeplatz (x 6,3) und
-   * ausserhalb jeder Wagenflaeche. Vierte Pflichtstation (Ansage: „vor allem
+   * ausserhalb jeder Wagenflaeche — seit E-029 ist das die einzige Spur, die
+   * hier noch laeuft. Vierte Pflichtstation (Ansage: „vor allem
    * an Mischschrott drankommen, an die Presse, an Stahlschrott und an den
    * Muell") — geprueft in `test/platz.test.ts`.
    */

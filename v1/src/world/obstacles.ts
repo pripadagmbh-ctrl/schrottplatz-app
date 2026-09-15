@@ -1,4 +1,4 @@
-import { PRESS_CENTER, PRESS_FUSS } from "./press";
+import { pressWaende } from "./press";
 import {
   YARD_D,
   YARD_MIN_X,
@@ -342,26 +342,39 @@ export const STATIC_OBSTACLES: Obstacle[] = [
   ...CONFIGS.flatMap(bayObstacles),
 
   /*
-   * Presse — Lage und Mass kommen aus press.ts, nicht aus einer Zahl hier.
+   * PRESSE — WAENDE JA, DECKEL NEIN (15.09.2026, E-029).
+   *
+   * Befund Patrick: „Es war auch nicht moeglich, ein zusammengepresstes Auto
+   * wieder aus der Presse zu holen." Hier stand die Maschine als EIN volles
+   * Rechteck von 4,75 x 4,90 m auf 2,20 m Hoehe. `hitsObstacle` laesst alles
+   * ueber `top` hinweg und nichts darunter hindurch — der Greifer galt damit
+   * als „im Bauwerk steckend", sobald er unter die Wandkrone kam, und das
+   * fertige Paket lag unerreichbar in der eigenen Kammer.
+   *
+   * Jetzt genau wie bei den Sortiermulden: nur der Wandring sperrt, der
+   * Innenraum ist offen. Die Eintraege kommen aus `pressWaende()` und damit
+   * aus derselben Rechnung wie die Rapier-Kollider — physisch war die Kammer
+   * die ganze Zeit richtig gebaut (Boden plus vier Waende, oben offen), nur
+   * diese Liste sagte etwas anderes.
+   *
+   * FUER FAHRZEUGE BLEIBT SIE ZU: Der Ring ist lueckenlos, und die lichte
+   * Kammer ist 4,05 x 4,20 m — ein LKW ist 3,10 m breit und 8,04 m lang, er
+   * bekommt seinen Umriss dort nicht hinein, ohne eine Wand zu schneiden
+   * (`test/presse.test.ts`, `test/fahrumriss.test.ts`).
    *
    * Bis 13.09.2026 stand hier fest (−3,0 | −26,0) mit 7,8 x 5,0 m. Als die
-   * Presse morgens in die Ecke auf (6,6 | −26,0) gezogen ist, blieb dieser
-   * Eintrag stehen: eine unsichtbare Wand mitten auf dem Platz, genau hinter
-   * dem Bagger — und an der Presse selbst gar kein Hindernis. Gefunden hat
-   * das nicht das Auge, sondern der Anordnungstest in `test/collision.test.ts`,
-   * als der Platz umgebaut wurde.
+   * Presse morgens in die Ecke gezogen ist, blieb dieser Eintrag stehen: eine
+   * unsichtbare Wand mitten auf dem Platz. Seitdem kommen Lage und Mass aus
+   * press.ts.
    */
-  {
-    x: PRESS_CENTER.x,
-    z: PRESS_CENTER.z,
-    // Weltachsen, nicht Kammerachsen: Seit dem 14.09.2026 steht die Maschine
-    // quer (`PRESS_ROT`), und ein um 90 Grad verdrehter Eintrag waere wieder
-    // eine unsichtbare Wand neben der sichtbaren.
-    hw: PRESS_FUSS.hw,
-    hd: PRESS_FUSS.hd,
-    top: 2.2,
-    label: "Presse",
-  },
+  ...pressWaende().map((w) => ({
+    x: w.x,
+    z: w.z,
+    hw: w.hw,
+    hd: w.hd,
+    top: w.top,
+    label: `Presse ${w.teil}`,
+  })),
 
 
   // --- Betriebsgebäude: Büro und Halle, hinten rechts an der Wand ---

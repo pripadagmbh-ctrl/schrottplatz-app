@@ -26,7 +26,6 @@ import {
   ROUTE_IN_FWD,
   routeApproach,
   pickupApproach,
-  TIP_APPROACH,
   WAAGE_HALT,
 } from "../src/delivery/routes";
 import { imBaggerrevier } from "../src/world/people";
@@ -132,7 +131,6 @@ describe("Janine steht an der Außengrenze neben dem Tor", () => {
       ["Einfahrt", ROUTE_IN_FWD],
       ["Anlieferung", routeApproach()],
       ["Abholer", pickupApproach()],
-      ["Kipper", TIP_APPROACH],
     ];
     for (const [name, route] of routen) {
       for (let i = 0; i < route.length - 1; i++) {

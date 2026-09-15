@@ -207,6 +207,87 @@ export const PRESS_FUSS = {
   hd: (Math.abs(Math.sin(ROT)) * (INNER_W + 0.7) + Math.abs(Math.cos(ROT)) * (INNER_D + 0.7)) / 2,
 };
 /**
+ * Die vier Waende der Kammer in WELTachsen — fuer die Hindernisliste.
+ *
+ * WARUM DAS NOETIG WAR (Befund Patrick, 15.09.2026): „Es war auch nicht
+ * moeglich, ein zusammengepresstes Auto wieder aus der Presse zu holen."
+ *
+ * Die Presse stand in `STATIC_OBSTACLES` als EIN volles Rechteck von
+ * 4,75 x 4,90 m und 2,20 m Hoehe. `hitsObstacle` laesst alles ueber `top`
+ * hinweg, aber nichts darunter hindurch — der Greifer galt also als „in der
+ * Presse steckend", sobald er unter die Wandkrone kam, und das fertige Paket
+ * lag unerreichbar in der eigenen Maschine. Genau derselbe Fehler wie die
+ * Muldenreihe im August: ein Behaelter, den man befuellen, aber nicht
+ * ausraeumen kann.
+ *
+ * PHYSISCH war die Kammer die ganze Zeit richtig gebaut: Boden plus vier
+ * Waende, oben offen (siehe `PressManager`, `walls`). Nur die Hindernisliste
+ * sagte etwas anderes. Zwei Wahrheiten ueber dieselbe Sache halten nie —
+ * deshalb kommen die Eintraege ab jetzt aus DERSELBEN Rechnung wie die
+ * Kollider, so wie `hallenWaende()` es fuer die Hallen macht.
+ *
+ * Die Kammer misst lichte 4,20 m (Pressweg) x 4,05 m (Tiefe), der Rahmen
+ * ist rundum 0,35 m stark. Bei `ROT` = 90 Grad liegt der Pressweg in z:
+ *
+ *   Nord  x −8,000 ± 2,025   z −23,725 ± 0,175
+ *   Sued  x −8,000 ± 2,025   z −28,275 ± 0,175
+ *   West  x −10,200 ± 0,175  z −26,000 ± 2,450
+ *   Ost   x  −5,800 ± 0,175  z −26,000 ± 2,450
+ *
+ * Aussen ergibt das genau `PRESS_FUSS` (2,375 x 2,450), innen bleiben
+ * 4,05 x 4,20 m frei. Der Ring ist lueckenlos: Die Stirnwaende stossen mit
+ * ihrer Aussenkante auf die Innenkante der Laengswaende.
+ */
+export function pressWaende(): Array<{
+  x: number;
+  z: number;
+  hw: number;
+  hd: number;
+  top: number;
+  teil: string;
+}> {
+  // Lokale Wandmitten und -masse, wie sie `PressManager` baut.
+  const lokal: Array<[number, number, number, number, string]> = [
+    [0, -(INNER_D / 2 + 0.175), INNER_W + 0.7, 0.35, "Sued"],
+    [0, INNER_D / 2 + 0.175, INNER_W + 0.7, 0.35, "Nord"],
+    [-(INNER_W / 2 + 0.175), 0, 0.35, INNER_D, "West"],
+    [INNER_W / 2 + 0.175, 0, 0.35, INNER_D, "Ost"],
+  ];
+  const c = Math.cos(ROT);
+  const si = Math.sin(ROT);
+  return lokal.map(([lx, lz, sx, sz, name]) => {
+    // three.js: Welt = R_y(ROT) * lokal
+    const wx = CENTER.x + c * lx + si * lz;
+    const wz = CENTER.z - si * lx + c * lz;
+    // Halbmasse drehen sich mit: aus (sx, sz) wird bei 90 Grad (sz, sx).
+    const hw = (Math.abs(c) * sx + Math.abs(si) * sz) / 2;
+    const hd = (Math.abs(si) * sx + Math.abs(c) * sz) / 2;
+    /*
+     * Namen nach WELTrichtung, nicht nach Kammerachse: Bei ROT = 90 Grad
+     * liegt die lokale Suedwand im Westen. Wer den lokalen Namen weitergibt,
+     * baut dieselbe Verwechslung ein wie die um 90 Grad verdrehte
+     * Hindernisliste vom 12.09.2026.
+     */
+    const richtung =
+      Math.abs(hw) < Math.abs(hd) ? (wx < CENTER.x ? "West" : "Ost") : wz < CENTER.z ? "Sued" : "Nord";
+    void name;
+    return { x: wx, z: wz, hw, hd, top: 0.3 + WALL_H, teil: richtung };
+  });
+}
+
+/**
+ * Lichte Weite der Kammer in WELTachsen — was zwischen den Waenden frei ist.
+ *
+ * Steht hier, damit Waechter und Reichweitenrechnung dieselbe Zahl lesen wie
+ * der Bau. Die offene Sichelkralle misst 3,38 m; mehr als diese Weite minus
+ * Greiferbreite bleibt nicht.
+ */
+export const PRESS_KAMMER = {
+  hw: (Math.abs(Math.cos(ROT)) * INNER_W + Math.abs(Math.sin(ROT)) * INNER_D) / 2,
+  hd: (Math.abs(Math.sin(ROT)) * INNER_W + Math.abs(Math.cos(ROT)) * INNER_D) / 2,
+};
+
+/**
  * Wie weit die offene Deckelklappe ueber die Mitte hinausschwingt und wohin.
  *
  * Gemessen an der offenen Maschine: 3,85 m zur Klappenseite. Die Klappe

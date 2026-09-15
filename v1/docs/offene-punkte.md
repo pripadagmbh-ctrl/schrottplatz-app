@@ -288,17 +288,31 @@ Alle Zeichnungen liegen unter `/v1/plaene/` und sind auf dem Telefon aufrufbar.
 
 ### Abschnitt 1 — die Welt
 
-1. **Presse als offener Behälter statt Vollklotz.** Der schwerste offene Fehler
-   am Platz. Sie steht als volles Rechteck in der Hindernisliste, 2,2 m hoch über
-   die ganze Kammer — **der Greifer kommt nicht auf den Kammerboden**. Wie die
-   Sortiermulden bauen: Wände ja, Deckel nein.
+1. ~~**Presse als offener Behälter statt Vollklotz.**~~ **ERLEDIGT 15.09.2026
+   (E-029).** Sie stand als volles Rechteck in der Hindernisliste, 2,2 m hoch
+   über die ganze Kammer — der Greifer kam nicht auf den Kammerboden, das
+   fertige Paket lag unerreichbar darin (Befund Patrick: „Es war auch nicht
+   möglich, ein zusammengepresstes Auto wieder aus der Presse zu holen").
+   Jetzt ein Wandring aus `pressWaende()`, derselben Quelle wie die
+   Rapier-Kollider. Lichte Kammer 4,05 × 4,20 m, Tastfenster der Spinne innen
+   3,55 × 3,70 m, das Paket liegt 7,40 bis 9,15 m vom Sitz (Boden erreichbar
+   von 3,0 bis 9,5 m). Für Fahrzeuge bleibt sie zu. `test/presse.test.ts`.
+   **Bleibt offen:** Während die Deckelklappe geschlossen ist, hält die
+   Hindernisliste den Greifer nicht mehr davon ab, in die Kammer zu greifen —
+   die Klappe ist ein kinematischer Körper und steht in keiner Liste. Physisch
+   stoßen die Krallen an sie; die Warnlogik sieht sie nicht.
 2. **Pressengröße festlegen.** 4,20 × 4,05 m ist gebaut, harte Grenze 3,98 m
    (offene Spinne + 30 cm je Seite), alt waren 5,95. Alles dazwischen ist eine
    Zeile in `press.ts`. Am Bild zu entscheiden:
    `docs/messungen/2026-09-14_presse.svg`.
-3. **VA hat am Bagger kein Ziel.** Edelstahl ist in keiner Mulde vorgesehen.
-   Entweder dazulegen oder bewusst „VA fährt der Spieler zum Silo". Mit der neuen
-   Buntmetallmulde neu zu bewerten.
+3. ~~**VA hat am Bagger kein Ziel.**~~ **ERLEDIGT** (E-028: Edelstahl liegt in
+   „BUNT + VA"). Dasselbe galt für **Batterien** und ist mit E-029 erledigt:
+   Patrick hat entschieden, sie in dieselbe Mulde zu legen, statt eine eigene
+   Batteriemulde zu bauen. Das Lagersilo bleibt getrennt. **Offen bleibt der
+   Preis dieser Entscheidung:** Das Schild warnt nicht mehr vor Blei. Geht ein
+   Akku in derselben Fuhre mit, kostet er 155,00 € je 100 kg
+   (`test/blei.test.ts`). Ob die Aufschrift „BUNT + VA" das Gefahrgut nennen
+   soll, ist Patricks Entscheidung.
 4. **Metallmulden zum Bagger hin niedrig schließen** — ein bis zwei Lagen, bei
    abgesenkter Kabine noch zu sehen.
 5. **Pyramidenform auch an den Mulden?** Zwischen den Halden ist sie gebaut
@@ -325,11 +339,27 @@ Alle Zeichnungen liegen unter `/v1/plaene/` und sind auf dem Telefon aufrufbar.
     Reinheit³ — bei 76 % Reinheit 24 % weniger als angeschrieben. Die
     Sortierprämie steht im Code und wird nirgends benutzt. Abfall wird zum
     Pauschalpreis angekauft und mit negativem Preis verkauft.
-12. **Der Kipper kippt sauber.** Bis 141 km/h Ladung quer über den Platz. Zweite
-    Ursache gefunden: der Schlitz am Kipplager. Dazu Heckklappe und die
-    Aufgeben-Regel. Der Wächter prüft mit *einem* Zufallsstartwert und misst
-    andere Solver-Einstellungen als das Spiel. **Neu zu bewerten**, sobald der
-    Kipper seitlich leergegriffen statt gekippt wird (E-028).
+12. **Der Kipper kippt sauber.** Der Schlitz am Kipplager ist die Ursache: Ein
+    eingeklemmtes Teil wird vom Löser mit einem einzigen sehr großen Stoß
+    befreit. Neu gemessen am 15.09.2026 über **sechzehn** Ladungen statt einer
+    (E-029) — der alte Wächter prüfte *einen* Zufallsstartwert und war grün,
+    weil er einen ruhigen Wurf erwischt hatte:
+
+    | Rückweg zum Halt | Mittel | Höchstwert | über 130 km/h |
+    |---|---|---|---|
+    | 13,0 m | 154 | 424 km/h | 8 von 16 |
+    | 9,5 m | 146 | 298 km/h | 7 von 16 |
+    | **5,5 m (gebaut)** | **109** | **255 km/h** | **3 von 16** |
+    | alte Kipperspur | 117 | 305 km/h | 6 von 16 |
+
+    Während des Rückwärtssetzens ist die Fuhre verriegelt; je länger der Weg,
+    desto tiefer arbeiten sich Stücke in den Schlitz. Der Rangierpunkt steht
+    deshalb auf z −17,5. Der Katapult selbst ist damit **nicht behoben**, nur
+    nicht mehr gefüttert. Dazu weiter offen: Heckklappe, Aufgeben-Regel, und
+    dass der Wächter andere Solver-Einstellungen misst als das Spiel.
+    Patrick hat am 15.09.2026 entschieden, dass der Kipper **weiter kippt**
+    (statt seitlich leergegriffen zu werden) — das Kippen ist der einzige Weg,
+    auf dem Material ohne Spielerarbeit auf den Platz kommt.
 13. **Die Hallen sind leer.** Es gibt keine Route hinein, keine Funk-Einweisung,
     keine Kapazität. Baulich steht alles: Tore zeigen auf den Platz, die Luftlinie
     von der Waage ist frei. Was fehlt, ist der Ablauf aus E-011 — Händler fährt

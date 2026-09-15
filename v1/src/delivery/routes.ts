@@ -93,8 +93,38 @@ export const ABLADE_SPUR_X = 6.3;
  * (5,88 · 8,44 · 6,32 · 8,76 m) und schafft zugleich die Luft zur Suedmauer.
  */
 export const ABLADE_HALT_Z = -23.0;
-/** Nordende der Abladespur — von hier setzt der Wagen zurueck. */
-const ABLADE_RANGIER: [number, number] = [ABLADE_SPUR_X, -10.0];
+/**
+ * Nordende der Abladespur — von hier setzt der Wagen zurueck.
+ *
+ * VON z −10,0 AUF −17,5 (15.09.2026, E-029). GEMESSEN, und zwar am
+ * Ladungs-Katapult: Waehrend des Rueckwaertssetzens ist die Fuhre auf der
+ * Flaeche VERRIEGELT. Je laenger der Weg, desto tiefer arbeiten sich einzelne
+ * Stuecke in den Schlitz am Kipplager — und der Loeser befreit ein
+ * eingeklemmtes Teil mit einem einzigen sehr grossen Stoss.
+ *
+ * Nachgemessen ueber 16 Ladungen mit festen Zufallssaaten, jeweils die
+ * hoechste Geschwindigkeit eines Stuecks zwischen Kippbeginn und Abfahrt
+ * (`test/kipper.test.ts`, „schleudert die Ladung nicht davon"):
+ *
+ *   Rueckweg   Mittel   Hoechstwert   ueber 130 km/h
+ *   13,0 m     154        424 km/h    8 von 16
+ *    9,5 m     146        298 km/h    7 von 16
+ *    5,5 m     109        255 km/h    3 von 16
+ *
+ * Zum Vergleich die ALTE Kipperspur (x 2,0, Halt −12,5), die ebenfalls 5,5 m
+ * Rueckweg hatte: Mittel 117, Hoechstwert 305, 6 von 16. Der Umzug an den
+ * Abladeplatz macht den Katapult mit kurzem Rueckweg also nicht schlimmer,
+ * sondern etwas besser — mit dem alten 13-m-Rueckweg waere er deutlich
+ * schlimmer geworden.
+ *
+ * Der Katapult selbst bleibt ein offener Punkt (`docs/offene-punkte.md`); hier
+ * wird er nur nicht gefuettert.
+ *
+ * Was die Verlegung sonst noch aendert: Der letzte Knick vor der Spur wird
+ * flacher (11 statt 30 Grad aus der Suedrichtung), der Wagen kommt der
+ * Ostmauer also WENIGER nahe als vorher.
+ */
+const ABLADE_RANGIER: [number, number] = [ABLADE_SPUR_X, -17.5];
 
 let abladeStelle: [number, number] = [ABLADE_SPUR_X, ABLADE_HALT_Z];
 let baggerOrt: (() => { x: number; z: number }) | null = null;
@@ -133,8 +163,12 @@ export function abladestelle(): [number, number] {
 /*
  * Nach dem Wiegen quer ueber den Platz zum Rangierpunkt noerdlich der
  * Abladespur. Der Weg laeuft noerdlich an der Muldenreihe vorbei (deren
- * noerdlichste Mulde bei z −12,5 endet) und oestlich an der Kipperspur
- * (x 2,0) — beide bleiben frei.
+ * noerdlichste Mulde bei z −12,5 endet).
+ *
+ * Seit E-029 faehrt hier JEDER Anlieferer, auch der Kipper — seine eigene
+ * Spur auf x 2,0 ist weg. Die Strecke ist damit einspurig; zwei Fahrzeuge
+ * gleichzeitig auf dem Platz halten sich gegenseitig auf, statt sich zu
+ * kreuzen (`test/einspurig.test.ts`).
  */
 export function routeApproach(): Array<[number, number]> {
   /*
@@ -261,90 +295,96 @@ export function pickupOut(): Array<[number, number]> {
 /* ------------------------------------------- KIPPER: gemischte Ladung ---- */
 
 /*
- * Wer selbst abkippen kann, faehrt an den Mischschrott — aber NICHT in die
- * Ausbuchtung hinein.
+ * SEIT DEM 15.09.2026 KIPPT AUCH DER KIPPER AM ABLADEPLATZ (E-029).
  *
- * Das ist beim Nachrechnen des neuen Platzes die eine Stelle, an der Plan und
- * Geometrie auseinandergehen, und deshalb steht hier, warum:
+ * Ansage Patrick: „Kipper fahren die falsche Spur. Die sollen auch, wie die
+ * anderen LKWs, seitlich von mir abgeladen werden."
  *
- * Der Konzeptplan zeichnet die Abkippzone auf (1,6 | −25,2), also hinter dem
- * Bagger, zwischen ihm und den beiden Halden. Ein Kipper, dessen Ladeflaeche
- * darueber steht, hat seine Wagenmitte bei z ≈ −22,2 — 2,1 m vom Bagger, der
- * auf (−0,5 | −22,5) steht. Das ist nicht knapp, das ist ineinander: Die
- * Blockadepruefung haelt jeden LKW ab 5,5 m Abstand an (`BLOCK_RADIUS`), und
- * der Oberwagen schwenkt ueber diese Flaeche.
+ * Vorher hatte er eine EIGENE Spur mitten im Arbeitsbereich: x 2,0, Halt auf
+ * z −12,5, Abkippfleck (2,0 | −15,5). Sie lag 7,0 bis 7,4 m vom Sitz — beste
+ * Lage, aber quer durch das Feld, in dem der Spieler schwenkt. Diese Spur
+ * ist ersatzlos weg; rund 3 x 9 m mitten im Schwenkband sind frei geworden.
  *
- * Nachgerechnet ist die Oeffnung der Ausbuchtung 14 m breit (x −6,5 bis 7,5),
- * und der Bagger steht in ihrer Mitte. Links von ihm bleiben bis zu den
- * Mulden 2,4 m, rechts bis zur Presse 0,8 m — durch beides passt kein
- * 2,7-m-Wagen. Anders gesagt: Solange die Maschine auf ihrem Platz steht,
- * kommt kein Fahrzeug an den Halden vorbei. Genau so ist die Ausbuchtung auch
- * gemeint (E-011: „Grossteile und Mischschrott — immer beim Bagger").
+ * Er faehrt jetzt dieselbe Strecke wie die Pritschen (`routeApproach`,
+ * `routeInRev`, `routeOut`) und haelt an derselben Stelle: (6,3 | −23,0),
+ * Laengsseite zum Bagger. Was bleibt, ist das Kippen — es ist der einzige
+ * Weg, auf dem Material ohne Spielerarbeit auf den Platz kommt, und der
+ * Spieler sortiert danach nach.
  *
- * Der Konzeptplan schreibt es selbst dazu: „Abgeladen wird vor dem Bagger
- * oder links daneben." Also kippt der Wagen vorne links ab, und der Spieler
- * raeumt von dort in die Halde hinter sich. Gesucht sind zwei Zahlen:
+ * WO DIE FUHRE LANDET — gerechnet, nicht geschaetzt. Der Wagen steht mit der
+ * Kabine nach NORDEN (er ist von Norden nach Sueden zurueckgesetzt), die
+ * Mulde kippt ueber ihre HINTERE Kante aus, und die liegt bei
+ * Halt − bedLen/2. Danach zieht er `TIP_CREEP_M` gekippt nach vorn, der Rest
+ * rutscht nach:
  *
- *   Spur x 2,0   — die Ladeflaeche liegt dann zwischen 0,65 und 3,35; der
- *                  Reifencontainer beginnt bei 2,8, seine Flankensteine bei
- *                  2,75 — aber erst ab z −16,4, also suedlich des Halts.
- *   Halt z −13,0 — die Ladeflaeche steht von −16,0 bis −10,0, die Fuhre
- *                  rutscht hinten heraus und liegt um (2,0 | −16,0). Das sind
- *                  7,0 m vom Sitz, mitten im Schwenkband 5,8 bis 9,2 m.
+ *   Abwurfkante   (6,3 | −26,0)   7,65 m vom Sitz (−0,5 | −22,5)
+ *   nach Anziehen (6,3 | −24,6)   7,12 m
+ *
+ * Beides mitten im Schwenkband 5,8 bis 9,2 m und weit innerhalb der 9,5 m,
+ * auf die der Arm ueberhaupt noch den Boden erreicht (`test/reach.test.ts`).
+ * Nach Sueden bleiben bis zur Suedmauer (innen −28,7) noch 2,56 m Auslauf,
+ * nach Norden liegt der Haufen hinter dem Wagen und nicht in seiner
+ * Ausfahrt. Gezeichnet in `docs/messungen/2026-09-15_kipper.svg`.
  */
-/** Spur, auf der der Kipper vor dem Bagger zurueckstoesst. */
-export const KIPP_SPUR_X = 2.0;
-/**
- * Wo seine Wagenmitte beim Kippen steht.
- *
- * Gemessen ueber sieben Halteplaetze von −11 bis −17 (14.09.2026): Bei −13,0
- * schoss ein eingeklemmtes Teil mit 167 km/h heraus, an allen anderen blieb es
- * unter 130. Das ist keine Eigenschaft des Platzes, sondern der bekannte
- * Schlitz am Kipplager — der Waechter misst mit EINEM Zufallsstartwert und
- * trifft mal einen Zacken, mal nicht. −12,5 ist gewaehlt, weil dort der
- * Abkippfleck 7,4 m vom Sitz liegt (mitten im Schwenkband) und die Ladeflaeche
- * 0,9 m vor dem Reifencontainer endet.
- */
-export const KIPP_HALT_Z = -12.5;
-/** Wo die Fuhre danach liegt — Ziel der Arbeitszonen und der Wegweiser. */
-export const ABKIPP_ZONE: [number, number] = [KIPP_SPUR_X, KIPP_HALT_Z - 3.0];
 
-/*
- * Der Wendepunkt der Kipperspur ist am 15.09.2026 von z +2 auf −4 gerueckt.
+/**
+ * Laenge der Ladeflaeche je Fahrzeugart (m).
  *
- * Gemessen, nicht verlegt: Die Silo-Reihe steht jetzt auf x +6,5 und reicht
- * mit ihren Flanken bis x +3,5, die suedlichste Flanke bis z +0,825. Ein
- * Kipper, der bei (2 | 2) aus der Kurve kommt, steht dort quer und liegt mit
- * seiner Standflaeche mitten in der Flanke des suedlichsten Silos.
- *
- * Bei (2 | −7) steht er laengs zur Spur: Seine Flaeche reicht dann von
- * z −11,14 bis −3,10 und bleibt 1,18 m suedlich der Silo-Flanke (die endet auf
- * z −1,925). Zwischenstand (2 | −4) war nachgemessen 0,05 m zu weit noerdlich
- * — genau die Groessenordnung, in der solche Fehler bisher durchgerutscht
- * sind.
+ * EINE Quelle fuer Bau (`vehicles.ts`), Abwurfrechnung und Waechter. Bis zum
+ * 15.09.2026 stand dieselbe Tabelle dreimal abgeschrieben da — in
+ * `vehicles.ts`, in `test/fahrumriss.test.ts` und in `test/vehicleModel.test.ts`.
+ * Der Kipper ist der laengste Wagen; wer seine Zahl an einer Stelle aendert
+ * und an der anderen nicht, prueft einen Umriss, den niemand faehrt.
  */
-const TIP_EINFAHRT: [number, number] = [KIPP_SPUR_X, -7];
-export const TIP_APPROACH: Array<[number, number]> = [
-  WAAGE_HALT,
-  VERTEILER,
-  [-14, 9],
-  [-6, 1],
-  TIP_EINFAHRT,
+export const BED_LEN: Record<string, number> = {
+  // Der PKW-Anhaenger ist kurz — ein Kofferraum voll, keine Fuhre
+  pkw: 2.4,
+  wrack: 5.4,
+  pritsche: 5.4,
+  abholer: 5.4,
+  kipper: 6.0,
+};
+
+/** Ladeflaechenlaenge eines Fahrzeugs; Unbekanntes faehrt wie eine Pritsche. */
+export function bedLenFor(kind: string): number {
+  return BED_LEN[kind] ?? BED_LEN.pritsche!;
+}
+
+/**
+ * Wo die gekippte Fuhre liegen bleibt — Ziel der Arbeitszonen und der
+ * Wegpruefung von Lambert.
+ *
+ * Die hintere Muldenkante des Kippers im Halt. Frueher eine gegriffene Zahl
+ * („Halt − 3,0"), jetzt aus derselben Ladeflaechenlaenge gerechnet, aus der
+ * der Wagen gebaut wird.
+ */
+export const ABKIPP_ZONE: [number, number] = [
+  ABLADE_SPUR_X,
+  ABLADE_HALT_Z - BED_LEN.kipper! / 2,
 ];
-export const TIP_IN_REV: Array<[number, number]> = [
-  TIP_EINFAHRT,
-  [KIPP_SPUR_X, KIPP_HALT_Z],
-];
-export const TIP_OUT: Array<[number, number]> = [
-  [KIPP_SPUR_X, KIPP_HALT_Z],
-  TIP_EINFAHRT,
-  [-6, 1],
-  [-14, 9],
-  VERTEILER,
-  WAAGE_HALT,
-  [GATE_X, 28],
-  [GATE_X, 40],
-];
+
+/**
+ * Faehrt diese Fuhre ins Lagersilo — oder auf den Abladeplatz?
+ *
+ * DIE ZWEITEILUNG, die seit E-028 im Code steht und die Patrick am
+ * 15.09.2026 bestaetigt hat („sortenreine Kipper fahren weiterhin zu den
+ * Silos"):
+ *
+ *   sortenrein UND es gibt ein Lagersilo  →  die Gasse hinunter ins Silo
+ *   alles andere                          →  Abladeplatz, Laengsseite
+ *                                            zum Bagger
+ *
+ * Nur wer SELBST kippen kann, faehrt ins Silo: Eine Pritsche wird vom Bagger
+ * ausgeraeumt und muss dafuer in Reichweite stehen, auch wenn ihre Ladung
+ * sortenrein ist.
+ *
+ * Steht hier und nicht in `vehicles.ts`, weil es die eine Regel ist, an der
+ * der ganze Verkehr haengt — und weil sie so kopflos zu pruefen ist.
+ */
+export function faehrtInsSilo(kind: string, lagerMulde: ContainerConfig | null): boolean {
+  if (kind !== "kipper") return false;
+  return lagerMulde !== null;
+}
 
 /* ------------------------------------------ Sortenrein: die Silo-Reihe ---- */
 
@@ -497,8 +537,10 @@ export const BED_HALF_W = 1.35;
  */
 export const WORK_ZONES: Array<[number, number, number]> = [
   /*
-   * Der Vorplatz vor dem Bagger: Hier kippt der Selbstabkipper seine
-   * gemischte Fuhre ab (`ABKIPP_ZONE`).
+   * Der Vorplatz vor dem Bagger. Hier kippte bis zum 15.09.2026 der
+   * Selbstabkipper ab; seit E-029 faehrt er an den Abladeplatz. Der Kreis
+   * bleibt, weil hier weiterhin liegt, was dem Spieler aus der Spinne
+   * faellt — ohne ihn haelt der naechste Wagen davor an und hupt.
    */
   [0, -13, 11],
   /*
@@ -536,13 +578,12 @@ export const TIP_ANGLE = THREE.MathUtils.degToRad(58); // (SW) steil genug für 
  * Wie weit der Kipper mit oben stehender Mulde anzieht, bevor er sie senkt.
  * Senkt er im Stand, bleibt Schrott auf der Fläche liegen, sobald unten schon
  * etwas im Weg liegt — und das wird mit jeder Fuhre wahrscheinlicher.
- */
-/**
- * Kurz gehalten mit Absicht. Der Bagger erreicht den Boden nur zwischen 3,0 und
- * 9,5 m (gemessen aus der Armgeometrie). Der Kipper dockt bei z = 7 an, also
- * 8 m vom Bagger — zieht er gekippt 3,2 m weiter weg, landet der Rest der Fuhre
- * bei ueber 11 m und ist nicht mehr wegzubaggern. 1,4 m reichen, damit der
- * Wagen unter dem Haufen hervorkommt und der Rest ueber die Kante nachrutscht.
+ *
+ * Kurz gehalten mit Absicht. Der Bagger erreicht den Boden nur zwischen 3,0
+ * und 9,5 m (gemessen aus der Armgeometrie). Seit E-029 zieht der Wagen am
+ * Abladeplatz nach NORDEN an, also auf den Bagger zu: Die Abwurfkante wandert
+ * von 7,65 auf 7,12 m. Weiter anziehen hiesse, den Rest der Fuhre unter die
+ * 5,8-m-Grenze zu schieben, wo der Arm nicht mehr eng genug zusammenkommt.
  */
 export const TIP_CREEP_M = 1.4;
 export const TIP_CREEP_SPEED = 1.1; // m/s — Schritttempo, damit man das Abrutschen sieht

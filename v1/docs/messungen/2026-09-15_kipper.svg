@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="633" height="1000" viewBox="0 0 633 1000">
+<rect width="100%" height="100%" fill="#f7f5f0"/>
+<defs><pattern id="frei" width="9" height="9" patternTransform="rotate(45)" patternUnits="userSpaceOnUse"><line x1="0" y1="0" x2="0" y2="9" stroke="#3f8f5c" stroke-width="2.2"/></pattern></defs>
+<text x="30.0" y="27.0" font-family="Segoe UI,Arial" font-size="18" fill="#111" text-anchor="start">Rust&#8217;n&#8217;Reibach &#8212; der Kipper l&#228;dt seitlich ab, 15.09.2026 (E-029)</text>
+<text x="30.0" y="48.0" font-family="Segoe UI,Arial" font-size="12" fill="#555" text-anchor="start">Er f&#228;hrt jetzt dieselbe Strecke wie die Pritschen und kippt am Abladeplatz &#8212; quer vor dem Sitz.</text>
+<text x="30.0" y="64.0" font-family="Segoe UI,Arial" font-size="12" fill="#555" text-anchor="start">Seine eigene Spur mitten im Schwenkband f&#228;llt weg. Sortenreine Fuhren fahren weiter zu den Silos.</text>
+<text x="30.0" y="82.0" font-family="Segoe UI,Arial" font-size="10.5" fill="#888" text-anchor="start">Ma&#223;e in Metern &#183; Norden oben &#183; rot gestrichelt = Stand bis heute &#183; gr&#252;n schraffiert = frei geworden</text>
+<polyline points="76.8,206.0 556.5,206.0 556.5,757.0 528.0,757.0 528.0,818.8 395.1,818.8 395.1,757.0 76.8,757.0 76.8,206.0" fill="#efece4" stroke="#7d7466" stroke-width="2.4"/>
+<polyline points="205.1,206.0 290.6,206.0" fill="none" stroke="#f7f5f0" stroke-width="5"/>
+<text x="247.8" y="198.0" font-family="Segoe UI,Arial" font-size="9" fill="#777" text-anchor="middle">EINFAHRT</text>
+<circle cx="452.1" cy="695.2" r="55.1" fill="none" stroke="#c07b2a" stroke-width="1.1" stroke-dasharray="5 4"/>
+<circle cx="452.1" cy="695.2" r="87.4" fill="none" stroke="#c07b2a" stroke-width="1.1" stroke-dasharray="5 4"/>
+<circle cx="452.1" cy="695.2" r="4.5" fill="#c07b2a"/>
+<text x="448.1" y="685.2" font-family="Segoe UI,Arial" font-size="8.5" fill="#c07b2a" text-anchor="middle">SITZ</text>
+<text x="371.3" y="610.7" font-family="Segoe UI,Arial" font-size="8" fill="#c07b2a" text-anchor="middle">Schwenkband 5,8&#8211;9,2 m</text>
+<rect x="86.3" y="485.3" width="57.0" height="57.0" fill="#e6e2d6" stroke="#8a8172" stroke-width="1.2"/>
+<text x="114.8" y="516.8" font-family="Segoe UI,Arial" font-size="7.5" fill="#6b6257" text-anchor="middle">KUPFER</text>
+<rect x="86.3" y="529.0" width="57.0" height="57.0" fill="#e6e2d6" stroke="#8a8172" stroke-width="1.2"/>
+<text x="114.8" y="560.5" font-family="Segoe UI,Arial" font-size="7.5" fill="#6b6257" text-anchor="middle">KABEL</text>
+<rect x="86.3" y="572.7" width="57.0" height="57.0" fill="#e6e2d6" stroke="#8a8172" stroke-width="1.2"/>
+<text x="114.8" y="604.2" font-family="Segoe UI,Arial" font-size="7.5" fill="#6b6257" text-anchor="middle">ALU</text>
+<rect x="143.3" y="690.5" width="57.0" height="57.0" fill="#e6e2d6" stroke="#8a8172" stroke-width="1.2"/>
+<text x="171.8" y="722.0" font-family="Segoe UI,Arial" font-size="7.5" fill="#6b6257" text-anchor="middle">VA</text>
+<rect x="187.0" y="690.5" width="57.0" height="57.0" fill="#e6e2d6" stroke="#8a8172" stroke-width="1.2"/>
+<text x="215.5" y="722.0" font-family="Segoe UI,Arial" font-size="7.5" fill="#6b6257" text-anchor="middle">BATT</text>
+<rect x="230.7" y="690.5" width="57.0" height="57.0" fill="#e6e2d6" stroke="#8a8172" stroke-width="1.2"/>
+<text x="259.2" y="722.0" font-family="Segoe UI,Arial" font-size="7.5" fill="#6b6257" text-anchor="middle">ABFALL</text>
+<rect x="364.7" y="635.4" width="39.9" height="57.0" fill="#e2dcc8" stroke="#8a8172" stroke-width="1.2"/>
+<text x="384.6" y="666.9" font-family="Segoe UI,Arial" font-size="7.5" fill="#6b6257" text-anchor="middle">BUNT+VA</text>
+<rect x="409.3" y="608.8" width="34.2" height="22.8" fill="#e2dcc8" stroke="#8a8172" stroke-width="1.2"/>
+<text x="426.4" y="623.2" font-family="Segoe UI,Arial" font-size="7" fill="#6b6257" text-anchor="middle">M&#220;LL</text>
+<rect x="358.2" y="705.2" width="45.1" height="46.6" fill="#d6cfe2" stroke="#5d4f77" stroke-width="1.2"/>
+<text x="380.8" y="731.5" font-family="Segoe UI,Arial" font-size="8" fill="#41365a" text-anchor="middle">PRESSE</text>
+<rect x="462.5" y="757.0" width="64.6" height="57.0" fill="#ded7c6" stroke="#8a8172" stroke-width="1.2"/>
+<text x="494.8" y="790.2" font-family="Segoe UI,Arial" font-size="7.5" fill="#6b6257" text-anchor="middle">MISCH-</text>
+<text x="494.8" y="799.8" font-family="Segoe UI,Arial" font-size="7.5" fill="#6b6257" text-anchor="middle">SCHROTT</text>
+<rect x="396.0" y="757.0" width="64.6" height="57.0" fill="#ded7c6" stroke="#8a8172" stroke-width="1.2"/>
+<text x="428.3" y="795.0" font-family="Segoe UI,Arial" font-size="7.5" fill="#6b6257" text-anchor="middle">STAHL</text>
+<rect x="461.1" y="543.2" width="29.4" height="95.0" fill="url(#frei)" stroke="none" stroke-width="0" opacity="0.3"/>
+<rect x="461.1" y="543.2" width="29.4" height="95.0" fill="none" stroke="#3f8f5c" stroke-width="1.1" stroke-dasharray="5 4"/>
+<rect x="461.1" y="553.7" width="29.4" height="76.4" fill="none" stroke="#b44" stroke-width="1.2" stroke-dasharray="4 3"/>
+<polyline points="475.8,548.0 475.8,600.2" fill="none" stroke="#b44" stroke-width="2.0" stroke-dasharray="5 4"/>
+<circle cx="475.8" cy="628.8" r="13.3" fill="none" stroke="#b44" stroke-width="1.2" stroke-dasharray="4 3"/>
+<text x="347.6" y="505.2" font-family="Segoe UI,Arial" font-size="10" fill="#b44" text-anchor="middle">VORHER</text>
+<text x="347.6" y="518.5" font-family="Segoe UI,Arial" font-size="8" fill="#b44" text-anchor="middle">eigene Kipperspur x 2,0</text>
+<text x="347.6" y="530.0" font-family="Segoe UI,Arial" font-size="8" fill="#b44" text-anchor="middle">Halt z &#8722;12,5 &#8212; 10,3 m vom Sitz</text>
+<text x="347.6" y="541.3" font-family="Segoe UI,Arial" font-size="8" fill="#b44" text-anchor="middle">Abkippfleck &#8722;15,5 &#8212; 7,4 m</text>
+<polyline points="390.3,524.2 459.6,586.0" fill="none" stroke="#b44" stroke-width="1.0" stroke-dasharray="3 3"/>
+<text x="338.1" y="662.0" font-family="Segoe UI,Arial" font-size="9" fill="#2f6b45" text-anchor="middle">FREI GEWORDEN</text>
+<text x="338.1" y="674.3" font-family="Segoe UI,Arial" font-size="8" fill="#2f6b45" text-anchor="middle">3 &#215; 9 m, davon 3,6 m</text>
+<text x="338.1" y="684.8" font-family="Segoe UI,Arial" font-size="8" fill="#2f6b45" text-anchor="middle">im Schwenkband</text>
+<polyline points="380.8,671.5 459.6,628.8" fill="none" stroke="#3f8f5c" stroke-width="1.0" stroke-dasharray="3 3"/>
+<polyline points="516.6,519.5 516.6,647.8" fill="none" stroke="#2f6b45" stroke-width="2.2"/>
+<polyline points="516.6,647.8 516.6,700.0" fill="none" stroke="#2f6b45" stroke-width="2.8" stroke-dasharray="6 3"/>
+<circle cx="516.6" cy="647.8" r="3.4" fill="#2f6b45"/>
+<text x="542.3" y="639.2" font-family="Segoe UI,Arial" font-size="7.5" fill="#2f6b45" text-anchor="middle">Rangier&#8722;</text>
+<text x="542.3" y="647.8" font-family="Segoe UI,Arial" font-size="7.5" fill="#2f6b45" text-anchor="middle">punkt &#8722;17,5</text>
+<rect x="501.9" y="653.5" width="29.4" height="76.4" fill="#eef5f0" stroke="#2f6b45" stroke-width="1.7"/>
+<rect x="503.8" y="671.5" width="25.6" height="57.0" fill="#cfe3d5" stroke="#2f6b45" stroke-width="1.0"/>
+<text x="516.6" y="661.0" font-family="Segoe UI,Arial" font-size="6.5" fill="#2f6b45" text-anchor="middle">KABINE</text>
+<text x="516.6" y="694.3" font-family="Segoe UI,Arial" font-size="7.5" fill="#1f4a30" text-anchor="middle">KIPPER 6,0 m</text>
+<text x="516.6" y="703.8" font-family="Segoe UI,Arial" font-size="7" fill="#1f4a30" text-anchor="middle">Halt 6,3 | &#8722;23,0</text>
+<ellipse cx="516.6" cy="722.8" rx="14.2" ry="13.3" fill="#c8b48a" stroke="#8a7440" stroke-width="1.3"/>
+<text x="516.6" y="724.7" font-family="Segoe UI,Arial" font-size="7.5" fill="#5c4a20" text-anchor="middle">FUHRE</text>
+<polyline points="516.6,728.5 452.1,695.2" fill="none" stroke="#8a7440" stroke-width="1.1" stroke-dasharray="3 3"/>
+<polyline points="516.6,715.2 452.1,695.2" fill="none" stroke="#8a7440" stroke-width="1.1" stroke-dasharray="3 3"/>
+<text x="481.5" y="722.8" font-family="Segoe UI,Arial" font-size="7.5" fill="#8a7440" text-anchor="middle">7,65 m</text>
+<text x="481.5" y="694.3" font-family="Segoe UI,Arial" font-size="7.5" fill="#8a7440" text-anchor="middle">7,12 m</text>
+<polyline points="534.7,729.8 549.9,729.8" fill="none" stroke="#b44" stroke-width="1.0"/>
+<polyline points="534.7,757.0 549.9,757.0" fill="none" stroke="#b44" stroke-width="1.0"/>
+<polyline points="542.3,729.8 542.3,757.0" fill="none" stroke="#b44" stroke-width="1.0"/>
+<text x="542.3" y="741.8" font-family="Segoe UI,Arial" font-size="6.5" fill="#b44" text-anchor="middle">2,56 m</text>
+<text x="30" y="852" font-family="Segoe UI,Arial" font-size="12.5" fill="#222">WAS SICH &#196;NDERT</text>
+<text x="30" y="874" font-family="Segoe UI,Arial" font-size="10.5" fill="#555">Kipper h&#228;lt jetzt am Abladeplatz (6,3 | &#8722;23,0), mit der L&#228;ngsseite zum Sitz &#8212; wie die Pritschen.</text>
+<text x="30" y="891" font-family="Segoe UI,Arial" font-size="10.5" fill="#555">Er kippt r&#252;ckw&#228;rts aus: Abwurfkante z &#8722;26,0 = 7,65 m vom Sitz, nach 1,4 m Anziehen &#8722;24,6 = 7,12 m.</text>
+<text x="30" y="908" font-family="Segoe UI,Arial" font-size="10.5" fill="#555">Beides mitten im Schwenkband 5,8&#8211;9,2 m. Der Haufen liegt hinter dem Wagen, nicht in seiner Ausfahrt.</text>
+<text x="30" y="925" font-family="Segoe UI,Arial" font-size="10.5" fill="#555">Rangierpunkt von z &#8722;10,0 auf &#8722;17,5 gezogen: kurzer R&#252;ckweg, weniger Ladungs-Katapult</text>
+<text x="30" y="942" font-family="Segoe UI,Arial" font-size="10.5" fill="#555">(Mittel 154 &#8594; 109 km/h, gemessen &#252;ber 16 Ladungen mit festen Zufallssaaten).</text>
+<text x="30" y="959" font-family="Segoe UI,Arial" font-size="10.5" fill="#555">Sortenreine Fuhren mit Lagersilo fahren unver&#228;ndert die Gasse an der Westwand zu den Silos.</text>
+</svg>

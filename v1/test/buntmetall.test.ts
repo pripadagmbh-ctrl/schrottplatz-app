@@ -43,8 +43,12 @@ const FUHRE: Array<[string, number]> = [
   ["brass", 100],
   ["cable", 100],
 ];
-/** Edelstahl liegt seit dem 15.09.2026 mit in der Mulde (Entscheidung Patrick). */
-const AUCH_DRIN = ["va"];
+/**
+ * Edelstahl UND Batterien liegen seit dem 15.09.2026 mit in der Mulde
+ * (Entscheidungen Patrick, E-028 und E-029). Was das Blei kostet, steht in
+ * `test/blei.test.ts` — hier zaehlt nur, dass es dazugehoert.
+ */
+const AUCH_DRIN = ["va", "battery"];
 const preis = (id: string): number => MATERIALS[id]!.sellPricePerKg;
 
 /**
@@ -83,7 +87,7 @@ describe("Die Buntmetall-Mulde ist ein Puffer und kostet kein Geld", () => {
     expect(bunt.label).toBe("BUNT + VA");
     // Und was wirklich nicht hineingehört, gilt weiterhin als Fremdstoff —
     // sonst wäre die Ampel wertlos.
-    for (const id of ["steel", "mixed", "rubble", "tires", "battery"]) {
+    for (const id of ["steel", "mixed", "rubble", "tires", "wood"]) {
       expect(gehoertHierhin(bunt, id), `${id} gilt als richtig`).toBe(false);
     }
   });

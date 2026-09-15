@@ -28,9 +28,6 @@ import {
   pickupApproach,
   pickupInRev,
   pickupOut,
-  TIP_APPROACH,
-  TIP_IN_REV,
-  TIP_OUT,
   bayApproach,
   bayInRev,
   bayOut,
@@ -40,12 +37,10 @@ import {
   PARK_ANFAHRT_M,
   neueAbladestelle,
   neueAbholstelle,
+  bedLenFor,
 } from "../src/delivery/routes";
 
 const BED_HALF = 1.55;
-function bedLenFor(k: string): number {
-  return k === "kipper" ? 6.0 : 5.4;
-}
 
 type R = { cx: number; cz: number; hw: number; hd: number; rot: number };
 function ecken(r: R): Array<[number, number]> {
@@ -128,9 +123,18 @@ describe("Kein Fahrzeugumriss schneidet ein festes Bauwerk", () => {
       ["Anfahrt", routeApproach(), "pritsche", false],
       ["Rangieren", routeInRev(), "pritsche", true],
       ["Ausfahrt", routeOut(), "pritsche", false],
-      ["Kipper-Anfahrt", TIP_APPROACH, "kipper", false],
-      ["Kipper-Rangieren", TIP_IN_REV, "kipper", true],
-      ["Kipper-Ausfahrt", TIP_OUT, "kipper", false],
+      /*
+       * DIESELBEN DREI STRECKEN NOCH EINMAL MIT DEM KIPPER (E-029).
+       *
+       * Er faehrt seit dem 15.09.2026 den Abladeplatz an wie alle anderen,
+       * ist aber mit 6,00 m Ladeflaeche der LAENGSTE Wagen auf dem Platz —
+       * 0,60 m mehr als die Pritsche, also 0,30 m mehr nach jeder Seite. Wer
+       * nur die Pritsche abfaehrt, prueft die Strecke, auf der nichts
+       * passiert.
+       */
+      ["Kipper-Anfahrt", routeApproach(), "kipper", false],
+      ["Kipper-Rangieren", routeInRev(), "kipper", true],
+      ["Kipper-Ausfahrt", routeOut(), "kipper", false],
       ["Abholer-Einfahrt", PICKUP_IN_FWD, "abholer", false],
       ["Abholer-Anfahrt", pickupApproach(), "abholer", false],
       ["Abholer-Rangieren", pickupInRev(), "abholer", true],

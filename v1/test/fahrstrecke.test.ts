@@ -21,9 +21,6 @@ import {
   pickupApproach,
   pickupInRev,
   pickupOut,
-  TIP_APPROACH,
-  TIP_IN_REV,
-  TIP_OUT,
   bayApproach,
   bayInRev,
   bayOut,
@@ -63,10 +60,12 @@ describe("Jede Fahrstrecke ist auf ganzer Länge frei", () => {
     ["Abholer-Anfahrt", pickupApproach()],
     ["Abholer-Rückwärts", pickupInRev()],
     ["Abholer-Ausfahrt", pickupOut()],
-    ["Kipper-Anfahrt", TIP_APPROACH],
-    ["Kipper-Rückwärts", TIP_IN_REV],
-    ["Kipper-Ausfahrt", TIP_OUT],
   ];
+  /*
+   * Der Kipper faehrt seit E-029 DIESELBEN drei Strecken wie die Pritsche —
+   * eine eigene Spur hat er nicht mehr. Sie stehen deshalb nur noch einmal in
+   * der Liste; ein zweiter Eintrag pruefte dieselben Punkte ein zweites Mal.
+   */
 
   for (const [name, punkte] of routen) {
     it(`${name}`, () => strecke(name, punkte));
@@ -78,12 +77,22 @@ describe("Jede Fahrstrecke ist auf ganzer Länge frei", () => {
    */
   for (const c of silos) {
     it(`Silo-Gasse vor ${c.label}`, () => {
-      const an = bayApproach(c.z);
+      /*
+       * MIT DEM DATENSATZ, nicht mit `c.z`. Hier stand bis zum 15.09.2026
+       * `bayApproach(c.z)` — seit E-028 nimmt die Funktion den ganzen
+       * Container. Eine Zahl hat kein `.facing` und kein `.z`, also kamen
+       * Strecken mit `undefined`/`NaN` heraus, und jeder Vergleich mit NaN ist
+       * falsch: Der Wächter hat monatelang nichts geprüft. Die Tests laufen
+       * ohne `tsc` (tsconfig sammelt nur `src`), deshalb fängt das kein Typ ab.
+       */
+      const an = bayApproach(c);
+      for (const [x, z] of an) expect(Number.isFinite(x) && Number.isFinite(z)).toBe(true);
       strecke(`Anfahrt ${c.label}`, an.slice(0, an.length - 1));
-      const aus = bayOut(c.z);
+      const aus = bayOut(c);
+      for (const [x, z] of aus) expect(Number.isFinite(x) && Number.isFinite(z)).toBe(true);
       strecke(`Ausfahrt ${c.label}`, aus.slice(1));
       // Und das letzte Stück in die Mulde hinein steht wenigstens in der Spur
-      expect(bayInRev(c.z).length).toBe(2);
+      expect(bayInRev(c).length).toBe(2);
     });
   }
 });
