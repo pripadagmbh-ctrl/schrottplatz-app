@@ -26,7 +26,12 @@ import { leinwandAttrappe } from "../tools/leinwand-attrappe";
 import { Excavator } from "../src/excavator/excavator";
 import { initPhysics } from "../src/physics/physicsWorld";
 import { baueZylinder, rohrLaenge, stangeLaenge } from "../src/excavator/zylinderParts";
-import { DREHKRANZ_D, DREHKRANZ_Y_OBEN, DREHKRANZ_Y_UNTEN } from "../src/excavator/drehkranzParts";
+import {
+  drehkranzRing,
+  DREHKRANZ_D,
+  DREHKRANZ_Y_OBEN,
+  DREHKRANZ_Y_UNTEN,
+} from "../src/excavator/drehkranzParts";
 
 /** Achsgrenzen — wie in `tools/zylinderhub.ts`, Kopien aus `excavator.ts`. */
 const BOOM_MIN = THREE.MathUtils.degToRad(5);
@@ -254,35 +259,66 @@ describe("Hydraulikzylinder — Stange schiebt, Rohr dehnt sich nicht", () => {
 });
 
 describe("Drehkranz — die Taille, an der man das Schwenken sieht", () => {
-  it("Ring und Deckel stehen zwischen Unterwagen und Oberwagen", () => {
-    const ring = finde("04_DREHKRANZ_RING") as THREE.Mesh;
-    ring.updateWorldMatrix(true, false);
-    const geo = ring.geometry as THREE.BufferGeometry;
-    geo.computeBoundingBox();
-    const bb = geo.boundingBox!.clone();
-    // Der Ring hängt an `root` — seine Höhe über Grund ist direkt ablesbar
-    expect(ring.position.y, "Ringfuß auf der Unterwagenoberkante").toBeCloseTo(
-      DREHKRANZ_Y_UNTEN,
-      6
-    );
-    expect(ring.position.y + bb.max.y, "Ringoberkante").toBeCloseTo(DREHKRANZ_Y_OBEN, 2);
-    // Zahnkranz und Flansch dürfen nicht über den Unterwagenkasten (2,40 m) ragen
-    expect(Math.max(bb.max.x, bb.max.z) * 2, "Außendurchmesser mit Flansch").toBeLessThan(2.4);
-    expect(Math.max(bb.max.x, bb.max.z) * 2, "Außendurchmesser").toBeGreaterThan(DREHKRANZ_D);
+  it("der Ring steht zwischen Unterwagen und Oberwagen", () => {
+    /*
+     * Seit dem Unterwagen-Paket liegt der Ring im Netz `01_UNTERWAGEN_STAHL`
+     * (Konzept Abschnitt 04: „0 eigene Netze"). Gemessen wird er deshalb nicht
+     * mehr über seinen Namen, sondern über seine LAGE: Was steht im Band
+     * zwischen Rahmenoberkante (1,60) und Ringoberkante (1,78), und wie weit
+     * reicht es vom Drehmittelpunkt?
+     */
+    const stahl = finde("01_UNTERWAGEN_STAHL") as THREE.Mesh;
+    const pos = (stahl.geometry as THREE.BufferGeometry).getAttribute(
+      "position"
+    ) as THREE.BufferAttribute;
+    let rMax = 0;
+    let treffer = 0;
+    let hoechstes = 0;
+    for (let i = 0; i < pos.count; i++) {
+      const y = pos.getY(i);
+      if (y < DREHKRANZ_Y_UNTEN + 0.01 || y > DREHKRANZ_Y_OBEN + 0.01) continue;
+      treffer++;
+      rMax = Math.max(rMax, Math.hypot(pos.getX(i), pos.getZ(i)));
+      hoechstes = Math.max(hoechstes, y);
+    }
+    expect(treffer, "im Drehkranzband steht gar nichts").toBeGreaterThan(200);
+    expect(hoechstes, "Ringoberkante").toBeCloseTo(DREHKRANZ_Y_OBEN, 2);
+    expect(rMax * 2, "Außendurchmesser").toBeGreaterThan(DREHKRANZ_D);
+
+    /*
+     * Der Ring selbst wird am Bauteil gemessen, nicht im verschmolzenen Netz:
+     * Dort steht im selben Höhenband auch der Handlauf des Aufstiegs (r 1,82),
+     * und der hat mit dem Drehkranz nichts zu tun. Erst am Bauteil lässt sich
+     * sagen, wie dick die Taille wirklich ist.
+     */
+    const ring = drehkranzRing();
+    ring.computeBoundingBox();
+    const bb = ring.boundingBox!;
+    const d = Math.max(bb.max.x, bb.max.z) * 2;
+    expect(d, "Ringdurchmesser mit Flansch").toBeGreaterThan(DREHKRANZ_D);
+    // Er darf nicht über den Unterwagenkasten (2,40 m breit) hinausragen
+    expect(d, "Ringdurchmesser mit Flansch").toBeLessThan(2.4);
+    expect(bb.max.y, "Bauhöhe des Rings").toBeCloseTo(DREHKRANZ_Y_OBEN - DREHKRANZ_Y_UNTEN, 2);
   });
 
   it("der Ring dreht NICHT mit — er gehört zum Unterwagen", () => {
     /*
      * Genau das ist der Sinn der Sache: Der Oberwagen dreht sich gegen den
-     * Ring. Hinge der Ring am Oberwagen, drehte sich die Taille mit und man
-     * sähe von der Drehung nichts.
+     * Ring. Läge der Ring im Netz des Oberwagens, drehte sich die Taille mit
+     * und man sähe von der Drehung nichts.
      */
-    const ring = finde("04_DREHKRANZ_RING");
+    const stahl = finde("01_UNTERWAGEN_STAHL");
     let amOberwagen = false;
-    for (let p: THREE.Object3D | null = ring; p; p = p.parent) {
+    for (let p: THREE.Object3D | null = stahl; p; p = p.parent) {
       if (p.name === "05_OBERWAGEN") amOberwagen = true;
     }
     expect(amOberwagen, "der Drehkranzring hängt am Oberwagen").toBe(false);
+    // ... und der Deckel dreht mit, er gehört zum Oberwagen
+    let deckelAmOberwagen = false;
+    for (let p: THREE.Object3D | null = finde("04_DREHKRANZ"); p; p = p.parent) {
+      if (p.name === "05_OBERWAGEN") deckelAmOberwagen = true;
+    }
+    expect(deckelAmOberwagen, "der Drehkranzdeckel dreht nicht mit").toBe(true);
   });
 
   it("die Deckplatte des Oberwagens behält ihre Oberkante bei y 1,955", () => {

@@ -18,7 +18,8 @@ import {
   stielSchlauch,
   stielStahl,
 } from "./armParts";
-import { drehkranzDeckel, drehkranzRing, DREHKRANZ_Y_UNTEN, PLATTE_UNTEN } from "./drehkranzParts";
+import { drehkranzDeckel, PLATTE_UNTEN } from "./drehkranzParts";
+import { unterwagenLack, unterwagenStahl } from "./unterwagenParts";
 import { BAGGER_STAND } from "../world/baggerstand";
 import {
   CLAW_COUNT,
@@ -210,6 +211,21 @@ const DRIVE_RAMP_TIME = 0.7; // s bis Endtempo (= 4,6 m/s², wie vor E-010)
  * 0,35 * 0,7 = 0,245 rad/s = 14 °/s auf der Stelle. Das ist unveraendert.
  */
 const STEER_RATE = 0.7; // rad/s
+
+/** Radstand (m) — Abstand Vorder- zu Hinterachse, aus `RAD_ECKEN`. */
+const RADSTAND = 3.0;
+/**
+ * Größter Lenkeinschlag der Vorderräder (rad).
+ *
+ * Nicht gesetzt, sondern GERECHNET: Bei Vollgas und vollem Ausschlag fährt die
+ * Maschine einen Kreis mit `wenderadius()` = 3,2 / 0,7 = 4,57 m. Eine gelenkte
+ * Vorderachse mit 3,00 m Radstand braucht dafür atan(3,00 / 4,57) = 33,3°.
+ * Stünde hier eine eigene Zahl, liefe das Rad irgendwann anders als die
+ * Maschine — man sähe es sofort, weil das Rad dann quer zur Bahn stünde.
+ */
+const LENK_MAX = Math.atan(RADSTAND / (DRIVE_MAX / STEER_RATE));
+/** Zeit, in der die Lenkung von Anschlag zu Anschlag läuft (s). SW. */
+const LENK_ZEIT = 0.35;
 /*
  * Drehwerk.
  *
@@ -772,26 +788,26 @@ export class Excavator {
     // Greifer-Farbgebung nach Vorbild: dunkle Hardox-Schalen, fast schwarze Kanten
     const glass = new THREE.MeshStandardMaterial({ color: 0x9fc4d8, roughness: 0.2 });
 
-    // Chassis + 4 Räder
-    const chassis = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.9, 4.4), machineBlue);
-    chassis.position.y = 1.15;
-    chassis.castShadow = true;
-    chassis.name = "01_UNTERWAGEN";
-    this.root.add(chassis);
     /*
-     * Der Drehkranz — die Taille zwischen Fahrwerk und Oberwagen (Paket 4 aus
-     * E-025). Der RING steht still und gehört deshalb zum Unterwagen; er hängt
-     * an `root` und nicht an `cabGroup`. Genau daran sieht man beim Schwenken,
-     * dass sich der Oberwagen gegen das Fahrwerk dreht und nicht die ganze
-     * Maschine mitgeht. Aufbau Teil für Teil in `drehkranzParts.ts`.
+     * UNTERWAGEN (Paket 2 aus E-025, Frage 1 von Patrick bejaht).
      *
-     * Er wird mit Paket 2 (Unterwagen) in `01_UNTERWAGEN_STAHL` eingeschmolzen
-     * und ist bis dahin ein eigenes Netz.
+     * Bis zum 15.09.2026 war das EIN Quader 2,40 × 0,90 × 4,40 bei y 1,15 —
+     * und in ihm steckten die obersten 54 cm jedes Rades. Jetzt: schmaler
+     * Mittelträger, Seitenwangen ab der Radoberkante (1,24 m), sichtbare
+     * Achsbrücken darunter, Kotflügel darüber. Teil für Teil in
+     * `unterwagenParts.ts`; der Drehkranzring liegt jetzt im Stahl-Netz.
+     *
+     * Der KOLLIDER bleibt unverändert (Quader 2,4 × 1,5 × 4,4, Mitte y 1,15).
+     * Er war noch nie deckungsgleich mit dem sichtbaren Kasten.
      */
-    const kranzRing = new THREE.Mesh(drehkranzRing(), dark);
-    kranzRing.position.y = DREHKRANZ_Y_UNTEN;
-    kranzRing.name = "04_DREHKRANZ_RING";
-    this.root.add(kranzRing);
+    const chassis = new THREE.Mesh(unterwagenLack(), machineBlue);
+    chassis.castShadow = true;
+    chassis.name = "01_UNTERWAGEN_LACK";
+    this.root.add(chassis);
+    const chassisStahl = new THREE.Mesh(unterwagenStahl(), dark);
+    chassisStahl.castShadow = true;
+    chassisStahl.name = "01_UNTERWAGEN_STAHL";
+    this.root.add(chassisStahl);
     /*
      * Räder: Reifen, Felge, Nabe — drei Bauteile je Rad statt eines Zylinders
      * mit 20 Ecken. Die Form steht in `wheelParts.ts`, samt Begründung für
@@ -801,13 +817,26 @@ export class Excavator {
      * und welche Seite außen ist. Die Geometrie wird EINMAL gebaut und von
      * allen vier Rädern geteilt; nur die Drehung unterscheidet links von
      * rechts, damit Felgenscheibe und Nabenkappe nach außen zeigen.
+     *
+     * NEU AM 15.09.2026, und es kostet kein einziges Netz: Die Räder DREHEN
+     * sich beim Fahren, und die vorderen LENKEN mit. Vorher rutschte die
+     * Maschine bei 3,2 m/s auf vier stillstehenden Klötzen über den Platz —
+     * im ganzen Quelltext gab es keine Zeile, die je eine Radgruppe drehte.
+     *
+     * Die Drehreihenfolge `YXZ` ist dafür der ganze Trick: Three rechnet dann
+     * R = RY · RX · RZ. RZ stellt das Rad auf seine Seite (wie bisher), RX
+     * dreht es um die Achse (das Rollen), RY schwenkt den Achsschenkel (das
+     * Lenken). In der voreingestellten Reihenfolge XYZ säße das Lenken INNEN
+     * und drehte das Rad um seine eigene Achse statt um die Hochachse.
      */
     const radGeo = radGeometrien();
     const radSt = radStoffe(machineBlue);
     for (const [x, z, ecke] of RAD_ECKEN) {
       const rad = baueRad(radGeo, radSt, ecke, x > 0);
       rad.position.set(x, RAD_R, z);
+      rad.rotation.order = "YXZ";
       this.root.add(rad);
+      this.wheelGroups.push({ gruppe: rad, vorn: z > 0, seite: x > 0 ? 1 : -1 });
     }
 
     // Oberwagen: verglaste Hochkabine + Gegengewicht
@@ -994,6 +1023,19 @@ export class Excavator {
   setFirstPerson(active: boolean): void {
     for (const o of this.driverBody) o.visible = !active;
   }
+  /**
+   * Die vier Radgruppen — sie rollen beim Fahren, die vorderen lenken mit.
+   *
+   * Bis zum 15.09.2026 gab es diese Liste nicht, und im ganzen Quelltext auch
+   * keine Zeile, die je ein Rad gedreht hätte: Bei 3,2 m/s rutschte die
+   * Maschine auf vier stillstehenden Klötzen über den Platz (E-025, Befund 1).
+   */
+  private wheelGroups: Array<{ gruppe: THREE.Group; vorn: boolean; seite: number }> = [];
+  /** Aufgelaufener Rollwinkel der Räder (rad) = Fahrstrecke / Radhalbmesser. */
+  private wheelSpin = 0;
+  /** Lenkeinschlag der Vorderräder (rad), geglättet gegen `LENK_MAX`. */
+  private steerAngle = 0;
+
   /** Abstützpratzen: eingefahren (0) bis ausgefahren (1), Taste O */
   private outriggerGroups: THREE.Group[] = [];
   /*
@@ -1295,17 +1337,14 @@ export class Excavator {
        * ueber die Kante, und sie folgen der Laengsachse statt ins Kreuz zu
        * gehen.
        */
-      const from = new THREE.Vector3(sx * 1.05, 0.85, sz * 1.35);
+      /*
+       * Der AUSLEGER der Pratze steht seit dem 15.09.2026 nicht mehr hier: Er
+       * bewegt sich nicht und liegt deshalb im Netz des Unterwagens
+       * (`unterwagenParts.ts`, Funktion `pratzenausleger`). Das sparte vier
+       * Netze und acht Zeichenrufe. Nur der FUSS fährt aus — der bleibt.
+       */
       const to = new THREE.Vector3(sx * 1.8, 0.7, sz * 1.35);
-      const dir = to.clone().sub(from);
-      const len = dir.length();
       const e = ecke(sx, sz);
-      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.34, len + 0.3), darkMat);
-      arm.position.copy(from).addScaledVector(dir.clone().normalize(), len / 2);
-      arm.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir.clone().normalize());
-      arm.castShadow = true;
-      arm.name = `03_PRATZE_${e}_AUSLEGER`;
-      this.root.add(arm);
       // Stempel + Tellerfuß in einer Gruppe — fahren gemeinsam ein und aus
       const foot = new THREE.Group();
       foot.position.set(to.x, 0, to.z);
@@ -1628,6 +1667,15 @@ export class Excavator {
       const speedFactor = THREE.MathUtils.clamp(Math.abs(this.driveVel) / DRIVE_MAX, 0.35, 1);
       this.heading -= steer * STEER_RATE * speedFactor * dir * dt;
     }
+    /*
+     * Lenkung (E-025, Befund 1): Der Ausschlag folgt der Lenkeingabe mit einer
+     * eigenen kleinen Rampe — eine Achse schlägt nicht in einem Bild ein.
+     * Das Rollen steht weiter unten, es hängt an der wirklich gefahrenen
+     * Strecke.
+     */
+    const lenkZiel = locked ? 0 : -steer * LENK_MAX;
+    this.steerAngle = ramp(this.steerAngle, lenkZiel, (LENK_MAX / LENK_ZEIT) * dt);
+
     const naechstesX = this.position.x + Math.sin(this.heading) * this.driveVel * dt;
     const naechstesZ = this.position.z + Math.cos(this.heading) * this.driveVel * dt;
     /*
@@ -1804,6 +1852,24 @@ export class Excavator {
       this.armBlocked = false;
       col.armFree = true;
     }
+
+    /*
+     * Räder rollen — nach der Kollisionsprüfung, und aus der WIRKLICH
+     * gefahrenen Strecke: Winkel = Strecke / Radhalbmesser.
+     *
+     * Der erste Versuch am 15.09.2026 rechnete mit `driveVel · dt`. Das ist
+     * fast immer dasselbe, aber eben nicht immer: Stösst das Fahrwerk an, wird
+     * `position` oben auf den Stand vor dem Schritt zurückgenommen — die Räder
+     * hätten sich dann weitergedreht, obwohl die Maschine steht. Gemessen war
+     * das über zwei Sekunden Fahrt ein Fehler von 5,8 cm; an einer Wand wäre
+     * daraus ein durchdrehendes Rad geworden.
+     *
+     * Gestutzt auf einen Umlauf, damit der Wert in einer langen Schicht nicht
+     * ins Grobe wächst und die Drehung anfängt zu springen.
+     */
+    const gefahren = Math.hypot(this.position.x - prevPos.x, this.position.z - prevPos.z);
+    this.wheelSpin =
+      (this.wheelSpin + (Math.sign(this.driveVel) * gefahren) / RAD_R) % (Math.PI * 2);
 
     this.integratePendulum(dt);
     this.syncBodies();
@@ -2288,6 +2354,15 @@ export class Excavator {
     // Kabine fährt am Ausleger nach oben UND ein Stück nach vorn
     this.cabLiftGroup.position.y = this.cabLift;
     this.cabLiftGroup.position.z = this.cabLift * 0.34;
+    /*
+     * Räder: rollen (X) und lenken (Y). Die Seitenlage (Z) steht seit dem Bau
+     * fest. Die Drehreihenfolge `YXZ` ist dafür Voraussetzung — sie wird beim
+     * Anlegen gesetzt, siehe `buildMeshes`.
+     */
+    for (const w of this.wheelGroups) {
+      w.gruppe.rotation.x = this.wheelSpin;
+      w.gruppe.rotation.y = w.vorn ? this.steerAngle : 0;
+    }
     for (const g of this.outriggerGroups) {
       g.position.y = (1 - this.outriggerDown) * 0.72; // eingefahren = angehoben
     }

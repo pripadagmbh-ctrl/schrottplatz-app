@@ -123,7 +123,8 @@ describe("Positionsliste des Baggers", () => {
      * muessen deshalb da sein — an ihnen haengen Kollider, Kamera und Kinematik.
      */
     for (const name of [
-      "01_UNTERWAGEN",
+      "01_UNTERWAGEN_LACK",
+      "01_UNTERWAGEN_STAHL",
       "01_RAEUMSCHILD_BLATT",
       "02_RAD_VL",
       "02_RAD_VR",
@@ -131,7 +132,6 @@ describe("Positionsliste des Baggers", () => {
       "02_RAD_HR",
       "03_PRATZE_VL_TELLER",
       "04_DREHKRANZ",
-      "04_DREHKRANZ_RING",
       "05_MOTORHAUBE",
       "05_GEGENGEWICHT",
       "06_SITZ",
@@ -177,9 +177,14 @@ describe("Positionsliste des Baggers", () => {
      * Stand 15.09.2026 nach dem Fahrer-Paket: 119 Netze, 17 772 Dreiecke,
      * 162 Zeichenrufe. Daniel kostete 16 Netze und 4 648 Dreiecke und kostet
      * jetzt zwei Netze — Haut und Kleidung.
+     *
+     * Stand 15.09.2026 nach dem Unterwagen-Paket: 115 Netze, 19 236 Dreiecke,
+     * 155 Zeichenrufe. Der Unterwagen wurde von 1 auf 2 Netze (Lack, Stahl);
+     * dafuer sind der Drehkranzring und die vier Pratzenausleger darin
+     * aufgegangen.
      */
     const meshes = baggerMeshes();
-    expect(meshes.length, "Bauteilzahl am Bagger").toBe(119);
+    expect(meshes.length, "Bauteilzahl am Bagger").toBe(115);
   });
 });
 

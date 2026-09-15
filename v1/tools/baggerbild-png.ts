@@ -128,7 +128,7 @@ feld(b2, nur(HUB), SEITE, 20 + ZB, 10, ZB, ZH);
  */
 feld(
   b2,
-  nur(["01_UNTERWAGEN", "04_DREHKRANZ_RING", "04_DREHKRANZ"]),
+  nur(["01_UNTERWAGEN_LACK", "01_UNTERWAGEN_STAHL", "04_DREHKRANZ"]),
   new THREE.Vector3(0.75, 0.08, 1),
   10,
   20 + ZH,
@@ -152,3 +152,33 @@ feld(
   ZH
 );
 b2.schreibe("docs/messungen/2026-09-15-bagger/02-bauteile.png");
+
+/*
+ * Blatt 3 — das FAHRWERK gross.
+ *
+ * Auf dem Uebersichtsblatt ist die Maschine 60 Pixel hoch; ob ein Rad im
+ * Kasten steckt, sieht man dort nicht. Genau das war aber der Befund
+ * (E-025, Befund 1: die obersten 54 cm des Rades waren verdeckt), also
+ * bekommt es ein eigenes Blatt.
+ */
+const b3 = new Blatt(BREITE, 640);
+const FAHRWERK = [
+  "01_UNTERWAGEN_LACK",
+  "01_UNTERWAGEN_STAHL",
+  "02_RAD_VL_REIFEN",
+  "02_RAD_VL_FELGE",
+  "02_RAD_VL_NABE",
+  "02_RAD_VR_REIFEN",
+  "02_RAD_VR_FELGE",
+  "02_RAD_VR_NABE",
+  "02_RAD_HL_REIFEN",
+  "02_RAD_HL_FELGE",
+  "02_RAD_HL_NABE",
+  "02_RAD_HR_REIFEN",
+  "02_RAD_HR_FELGE",
+  "02_RAD_HR_NABE",
+  "04_DREHKRANZ",
+];
+feld(b3, nur(FAHRWERK), SEITE, 10, 10, ZB, 620);
+feld(b3, nur(FAHRWERK), new THREE.Vector3(0.45, 0.22, 1), 20 + ZB, 10, ZB, 620);
+b3.schreibe("docs/messungen/2026-09-15-bagger/04-fahrwerk.png");
