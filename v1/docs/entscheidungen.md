@@ -1087,6 +1087,146 @@ Hubsäule · Aussehen des Fahrers.
 
 ---
 
+### E-026 — Hallen zurück ans Büro, Silo-Reihe an die Ostwand, der Müll aus der Rückfahrspur (15.09.2026)
+
+**Entscheidung.** Drei Umzüge in einem Paket, weil sie sich gegenseitig schieben.
+
+1. Die **Silo-Reihe** zieht von der Wand bei x −36 an die Wand bei x +10,5
+   (Mitte x +6,5) und wird von neun auf **sechs** gekürzt: Abfall, Batterien, VA,
+   Alu+Zink, Kupfer+Messing, Kabel — Mitten z 23,8 bis 0,8.
+2. Die **drei Hallen** gehen zurück an die Wand neben das Büro, bündig südlich
+   angebaut, **Tor nach Osten**. Sie sperren nur ihre Wände, nicht ihre
+   Grundfläche.
+3. Die **Müllmulde** wird auf (7,0 | −27,0) abgebaut und auf **(−3,2 | −14,6)**
+   neu gesetzt.
+
+Dazu wandert der **Verladeplatz** auf (−4,0 | 5,4) und der **Abladeplatz** von
+z −24,0 auf **−23,0**.
+
+**Begründung.** Patrick: „Die Hallen sind falsch gebaut. Die dürfen nicht bei
+Janin stehen. Die müssen wieder zur Ostwand, da wo die Silos sind" und „Die
+Müllmulde muss weg. Die LKWs fahren in die Müllmulde und ich kann noch nicht mal
+die LKWs vollständig abladen, weil ich in die Wand greife."
+
+Der Grund, der die Hallen mit E-010 an die Nordwand geschickt hatte, war allein
+die Überschneidung mit der Silo-Reihe — die zieht ja gerade weg. Zur Zufahrt, auf
+meinen Einwand hin: „Erstmal ist ja ein super großer Mittelplatz da. … Die können
+ja von der Waage rechts abbiegen und dann sind sie ja auch in der Halle." Der
+Einwand war hinfällig, die eigene Fahrspur entfällt.
+
+**Was die Messung ergeben hat — Patricks Befund war wörtlich richtig.**
+
+| gemessen am alten Abladeplatz (6,3 \| −24,0) | Wert |
+|---|---|
+| Ladefläche **in** der Nordwand der Müllmulde | **2,45 × 0,70 m** |
+| Standfläche **über** der ganzen Mulde | **2,65 × 2,85 m** |
+| äußerste Ladeflächenecke → Stirnwand der Mulde | **0,80 m** (offene Spinne braucht 1,69 m) |
+| **nächste** Ladeflächenecke → Sitz | **5,58 m** — unter der inneren Grenze 5,80 |
+
+„Durch die Wand, halb durch die Mulde" und „ich greife in die Wand" — beides
+nachgemessen bestätigt.
+
+**Warum drei grüne Tests das nicht gesehen haben.** Sie nahmen an, die Ladefläche
+liege **nördlich** des Haltepunkts. Tatsächlich liegt der Ursprung eines
+Fahrzeugs in der **Mitte** der Ladefläche (`vehicleModel.ts`). `platz.test.ts`,
+`reach.test.ts` und `abladeplatz.test.ts` haben also die falsche Stelle vermessen
+und dabei grün gemeldet. Sie sind korrigiert.
+
+**Der Abladeplatz war nicht falsch, nur einen Meter zu weit südlich.** Bei z −23,0
+liegen alle vier Ladeflächenecken im Band (5,88 · 6,32 · 8,44 · 8,76 m), bis zur
+Südmauer sind es 3,00 m statt 2,00, und die Standfläche des längsten Wagens
+bleibt 1,10 m vor der Mauer statt 0,10.
+
+**Der zweite Befund: die Hallentore zeigten nach außen.** Patrick am Bild: „Die
+Halleneingänge sind ja falsch rum. Die sind ja zu den Außengrenzen gedreht."
+Nachgerechnet: Das Tor war lokal auf +x gebaut und die Gruppe mit
+`rotation.y = −π/2` gedreht; bei θ = −π/2 gilt `welt_z = +lokal_x`. Das Tor lag
+also in der Nordmauer.
+
+**Schlimmer war der Kollider.** Er und die Hindernisliste setzten die Rückwand im
+**Norden** an — genau dort, wo das sichtbare Tor stand. Im Ergebnis stand eine
+unsichtbare Wand im Tor, und durch die sichtbare Rückwand konnte man hindurch.
+Dieselbe Fehlerklasse wie die „unsichtbare Barriere" vom 12.09. Dazu war die
+Halle in `STATIC_OBSTACLES` ein **Vollrechteck**: Selbst mit richtig herum
+zeigendem Tor wäre kein LKW hineingekommen, weil er 1,40 m vor jedem Hindernis
+hält.
+
+Die Richtung steht jetzt als **`TOR_RICHTUNG`** im Quelltext, und Bau, Kollider,
+Hindernisliste und Wächter lesen diese **eine** Angabe — statt sie je für sich aus
+einer Drehung abzuleiten.
+
+**Welche Silos entfallen und wohin ihre Fraktion geht.**
+
+| Silo | Grund | geht nach |
+|---|---|---|
+| E-MOTOREN | leere Hülle, die Fraktion gibt es nicht (E-011) | — |
+| HOLZ | zusammengelegt | ABFALL |
+| KUNSTSTOFF | zusammengelegt | ABFALL |
+| BAUMISCH | heißt jetzt ABFALL | ABFALL |
+
+Alle vier Abfallsätze sind negativ (−0,02 bis −0,06 €/kg): Sie werden entsorgt,
+nie bestellt, und die Abfallsortierung ist mit E-024 ausdrücklich vertagt.
+Abgerechnet wird nach `rubble` — dieselbe Vereinfachung wie bei Kupfer+Messing.
+Die Müllmulde am Bagger führt jetzt genau dieselben vier Fraktionen, damit Lambert
+eins zu eins weitertragen kann. `test/silos.test.ts` prüft für **jede** Fraktion
+im Katalog, dass sie ein Lagerziel findet; erlaubt sind nur zwei Ausnahmen, Stahl
+und Mischschrott, die an der Halde verladen werden.
+
+**Wo der Müll jetzt steht und warum genau dort.** (−3,2 | −14,6), Öffnung nach
+Osten, 8,35 m vom Sitz. Das Schwenkband wurde sektorweise abgesucht; frei ist
+**genau ein** Streifen — zwischen Kabelmulde (Ostkante x −5,5) und Kipperspur
+(Wagenflanke x 0,45), 5,95 m breit. Ost sperrt die Rückfahrspur, Südost die
+Ostmauer, Süd die Öffnung der Ausbuchtung, Südwest die 0,65 m zwischen
+Pressenrahmen und Alu-Mulde, West die beiden Mulden. Auch das z ist gerechnet:
+Bei −14,6 stehen die Flanken vor **keiner** der beiden Muldenöffnungen.
+
+**Fünf weitere Durchdringungen gefunden und behoben**, alle vorher unbemerkt:
+Silo-Rangieren in die Stirnwand (0,70 m), Silo-Ausfahrt in die Platzmauer
+(0,50 m), nördlichstes Silo in die Nordmauer (0,60 m), Anlieferung in die
+Ostmauer (0,49 m), Kipper-Einfahrt in eine Silo-Flanke (0,05 m).
+
+**Verworfene Alternativen.** Müll in der Südostecke lassen und den Abladeplatz
+nach Westen ziehen (dann fällt die Mitte der Ladefläche auf 5,63 m). Müll an die
+Ostmauer (schon in x allein 9,6 m). Neun Silos auf zwei Wände verteilen (es
+bräuchte zwei Verladeplätze oder einer erreichte die halbe Reihe nicht). Die
+Abfallfraktionen getrennt lassen.
+
+**Abnahmekriterium.** Die vier Pflichtziele im Band: Mischschrott 7,91 ·
+Stahlschrott 6,96 · Presse 8,28 · Müll 8,35, dazu der Abladeplatz mit 6,82. Jede
+Fraktion findet ein Lagersilo. **Kein Fahrzeugumriss schneidet auf seinen Routen
+ein festes Bauwerk** — vorher 28 Paare, jetzt null (`test/fahrumriss.test.ts`,
+27 Strecken × 6 Fahrzeuglagen gegen 60 Bauwerke). Diese Prüfung gab es bisher
+nicht: Getestet wurde, **dass** ein LKW ankommt, nie **wo er durchfährt**.
+
+**Offen.**
+
+1. **Kupfer+Messing liegt weiter bei 12,26 m**, außerhalb des Bandes — der offene
+   Punkt aus E-024. Empfehlung: mit Alu+Zink zu einer Buntmetall-Mulde
+   zusammenlegen, dann sind alle Sortiermulden im Band und eine wird frei.
+2. **Janine sitzt auf (−9,5 | 15,5)** und ist nach dem Umzug der engste Punkt der
+   vorderen Hälfte. Sie hat die Abholer-Spur gedreht und einen Warteplatz
+   vertrieben. Sie vor die Hallen zu ziehen liegt nahe — aber nur auf Patricks
+   Wort; sie ist gestalterisch und hat eine Messgeschichte.
+3. **Die Hallen sind leer.** Es gibt keine Route hinein und keine Funk-Einweisung
+   aus E-011. Eigenes Paket, zusammen mit „Lambert räumt die Halle ins Silo".
+4. **Zehn Fuhren in Folge sind nicht simuliert** — heute läuft **eine**
+   vollständige Fuhre in der echten Physik, der Rest ist geometrisch geprüft.
+
+**Auf dem Gerät zu prüfen.**
+
+1. Aus dem Sitz nach vorn schauen: Stehen die drei Hallen links an der Wand
+   hinter Büro und Waage, und zeigen ihre Tore auf den Platz — nicht in die Mauer?
+2. Mit dem Bagger in eine Halle hineinfahren: Kommst du durch das Tor, oder hält
+   dich etwas Unsichtbares auf?
+3. Einen Anlieferer ganz leerräumen: Bekommst du die hinterste Ecke, ohne
+   umzusetzen — und fasst die Spinne dabei irgendwo in eine Wand?
+4. Abfall in die Müllmulde kippen, die jetzt links vorn neben der Kabelmulde
+   steht: Reicht der Arm bequem hinein?
+5. Mit V den Abholer rufen und zum Verladeplatz fahren (rechts vorn, vor der
+   Silo-Reihe): Erreichst du Silo und Container, ohne den Bagger zu versetzen?
+
+---
+
 ### E-027 — Griff-Info und Ladeanzeige stehen als Stapel am freien Rand (15.09.2026)
 
 **Entscheidung.** Beide Zeilen stehen in einem gemeinsamen Halter `#hudunten`
