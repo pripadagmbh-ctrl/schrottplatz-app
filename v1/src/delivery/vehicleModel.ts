@@ -13,6 +13,133 @@ import { BED_HALF_W } from "./routes";
 export const FLAECHE_KOLLIDER_OBEN = 0.04;
 
 /**
+ * DIE TRAGENDEN TEILE HABEN NAMEN (15.09.2026).
+ *
+ * Bis heute hiess kein einziges Netz am LKW irgendwie. Wer messen wollte, ob
+ * zwei Teile ineinanderstecken, musste sie an ihren Massen wiedererkennen —
+ * und genau deshalb hat zwei Tage lang niemand gemessen, dass der Ladekran im
+ * Muldenboden steht (Befund Patrick, 13.09.2026).
+ *
+ * Ein `name` kostet im Bild nichts: Er belegt kein Dreieck, keinen Zeichenruf
+ * und keine Rechenzeit. Er kostet nur eine Zeichenkette je Netz. Dafuer kann
+ * `tools/fahrzeug-durchdringung.ts` und der Waechter dazu jedes Paar
+ * benennen, statt Zahlen zu vergleichen.
+ *
+ * Die Gruppe steht am Netz ODER an einem seiner Vaeter: Verriegelungsbuegel
+ * und Rungen haengen an der Bordwand und erben so deren Gruppe.
+ */
+export const BAUGRUPPE = {
+  rahmen: "rahmen",
+  fahrerhaus: "fahrerhaus",
+  flaeche: "flaeche",
+  bordwand: "bordwand",
+  stirnwand: "stirnwand",
+  heckklappe: "heckklappe",
+  kranbock: "kranbock",
+  kransaeule: "kransaeule",
+  rad: "rad",
+  kotfluegel: "kotfluegel",
+  auspuff: "auspuff",
+} as const;
+
+/** Alle Gruppennamen, die `sammleTeile` kennt. */
+export const BAUGRUPPEN: ReadonlySet<string> = new Set(Object.values(BAUGRUPPE));
+
+/* ------------------------------------------------------------------ *
+ *  DER LADEKRAN UND DAS FAHRERHAUS — wo beide hinpassen (E-076)
+ * ------------------------------------------------------------------ */
+
+/**
+ * DER KRAN STAND IN DER MULDE, UND ZWAR ÜBERALL.
+ *
+ * Befund Patrick, 13.09.2026: „dass die Ladefläche durch den Kran läuft, wenn
+ * es einen Kran gibt." Gemessen mit `tools/fahrzeug-durchdringung.ts`, an
+ * jedem Händler-LKW, in jeder Stellung:
+ *
+ *   Fahrerhaus × Kransäule   25,5 cm   (Säule schwenkt in die Kabine)
+ *   Fahrerhaus × Kranbock    25,0 cm   (Bockplatte steckt in der Kabine)
+ *   Ladefläche × Kranbock    12,0 cm   (Bockplatte im Muldenboden)
+ *   Ladefläche × Kransäule   12,0 cm   (nur Kipper: Boden fährt beim Kippen
+ *                                       durch die Säule, ab 6° Kippwinkel)
+ *   Bordwand   × Kransäule   10,0 cm
+ *   Stirnwand  × Kranbock     8,0 cm
+ *
+ * DIE URSACHE IST EINE ZAHL: `sockelZ = bedLen / 2 + 0,05`. Die Ladefläche
+ * reicht bis `bedLen / 2`, der Bock ist 0,70 m tief — er beginnt also 0,30 m
+ * VOR dem Muldenende und steht 12 cm tief im 12 cm dicken Bodenblech. Für den
+ * Kran war schlicht kein Platz vorgesehen: Zwischen Muldenstirn
+ * (`bedLen/2 + 0,04`) und Kabinenrückwand (`bedLen/2 + 0,15`) lagen genau
+ * 11 Zentimeter.
+ *
+ * DIE LÖSUNG IST DIE, DIE ECHTE KRANWAGEN AUCH HABEN: ein kurzes
+ * Nahverkehrshaus. Die Kabine wird nach HINTEN kürzer — die Schnauze bleibt,
+ * wo sie ist, und damit bleibt auch der Umriss (`umriss.UMRISS_VORN` 1,90 m)
+ * unverändert; keine Strecke, kein Halteplatz, keine Wegprüfung ändert sich.
+ * In die gewonnene Lücke stellt sich der Kran.
+ *
+ * Die Zahlen sind gerechnet, nicht gegriffen. Maßgeblich ist das OBERE Haus:
+ * Es steht 3 cm weiter nach hinten als das untere (so war es schon immer).
+ *
+ *   Bockplatte 0,50 m tief + 2 × 0,04 m Luft        =  0,58 m Lückenbedarf
+ *   Lücke      = (Kabine hinten − 0,03) − 0,04      =  Kabine hinten − 0,07
+ *   Kabine hinten ≥ 0,65  →  Kabinentiefe ≤ 1,65 − 0,65 = 1,00 m
+ *
+ * Die Bockmitte liegt dann in der Mitte dieser Lücke, auf `bedLen/2 + 0,33`.
+ */
+export const KABINE_VORN = 1.65;
+/** Tiefe des Fernverkehrshauses (m) — unverändert, so stand es seit dem 12.09. */
+export const KABINE_TIEFE = 1.5;
+/** Tiefe des Nahverkehrshauses am Kranwagen (m) — siehe Rechnung oben. */
+export const KABINE_TIEFE_KRAN = 1.0;
+/** Wie weit das obere Haus hinter dem unteren zurücksteht (m). */
+export const OBERHAUS_HINTEN = 0.03;
+/** Wie weit das obere Haus hinter der Schnauze zurücksteht (m). */
+export const OBERHAUS_VORN = 0.13;
+/** Mitte des Kranbocks, gemessen ab Mitte der Ladefläche (m). */
+export const KRAN_Z = 0.33;
+/** Tiefe der Bockplatte (m) — von 0,70 gekürzt, damit sie in die Lücke passt. */
+export const KRAN_BOCK_TIEFE = 0.5;
+/**
+ * Durchmesser der Kransäule (m).
+ *
+ * Sie war ein Quader von 0,46 m Kantenlänge. Ein Quader, der sich dreht,
+ * braucht seine DIAGONALE an Platz (0,65 m) — ein Rundturm braucht immer nur
+ * seinen Durchmesser. Deshalb ist die Säule jetzt ein Achtkant: Das spart
+ * 19 cm Lücke, und ein Kranturm ist in Wirklichkeit auch rund.
+ */
+export const KRAN_SAEULE_D = 0.46;
+
+/** Tiefe des Fahrerhauses, je nachdem ob ein Kran dahinter steht (m). */
+export function kabinenTiefe(mitKran: boolean): number {
+  return mitKran ? KABINE_TIEFE_KRAN : KABINE_TIEFE;
+}
+
+/** Mitte des Fahrerhauses in Fahrzeugkoordinaten (m). */
+export function kabinenMitte(bedLen: number, mitKran: boolean): number {
+  return bedLen / 2 + KABINE_VORN - kabinenTiefe(mitKran) / 2;
+}
+
+/**
+ * Höhe des Auslegergelenks über dem Boden (m) — und damit die Höhe der Säule.
+ *
+ * Der Ausleger liegt im Transportzustand über der Ladefläche. Er muss die
+ * LADUNG überfahren, nicht nur die Bordwand: Gepackt wird bis
+ * `1,05 (Flächenhöhe) + 0,10 (LADE_BODEN) + Bordwand + 0,35 (LADUNG_UEBERSTAND)`
+ * (`vehicles.ts`). Darüber kommen 10 cm Luft.
+ *
+ * Vorher war es eine feste Zahl (2,27 m). Für den flachen Aufbau reichte das
+ * knapp; bei Rungen lag der Ausleger 41 cm IN der Ladung.
+ *
+ * Die 0,20 m Reserve sind gemessen und nicht gegriffen: Der Ausleger steigt
+ * nach hinten an, kreuzt die Muldenstirn aber schon 0,33 m hinter dem Gelenk
+ * und liegt dort mit seiner halben Dicke (0,15 / cos 0,42 = 0,164 m) noch
+ * 0,02 m UNTER dem Gelenk. Ohne Reserve stünde er also genau in der Ladung.
+ */
+export function auslegerHoehe(kind: string, bodyStyle?: string): number {
+  return 1.05 + 0.1 + wandHoehe(kind, bodyStyle) + 0.35 + 0.2;
+}
+
+/**
  * DIE KIPPBRÜCKE IST EIN KEIL, KEIN QUADER (E-071).
  *
  * Bis zum 15.09.2026 war der Kollider der Ladefläche ein Quader von 0,60 m
@@ -210,6 +337,7 @@ function baueRad(
   const plaetze = zwilling ? [x, x - seite * (breite + 0.03)] : [x];
   for (const px of plaetze) {
     const rad = new THREE.Mesh(reifen, gummi);
+    rad.name = BAUGRUPPE.rad;
     rad.position.set(px, y, z);
     rad.castShadow = true;
     ziel.add(rad);
@@ -217,10 +345,12 @@ function baueRad(
   }
   // Felge und Nabe nur aussen: innen sieht sie ohnehin niemand
   const rim = new THREE.Mesh(scheibe, felge);
+  rim.name = BAUGRUPPE.rad;
   rim.position.set(x + seite * breite * 0.36, y, z);
   ziel.add(rim);
   raeder?.push({ mesh: rim, y0: y, z });
   const hub = new THREE.Mesh(nabe, felge);
+  hub.name = BAUGRUPPE.rad;
   hub.position.set(x + seite * breite * 0.45, y, z);
   ziel.add(hub);
   raeder?.push({ mesh: hub, y0: y, z });
@@ -255,8 +385,16 @@ function baueFahrerhaus(
     roughness: 0.4,
     emissive: 0x3a2205,
   });
-  const cz = v.bedLen / 2 + 0.9; // Mitte des Fahrerhauses
-  const front = cz + 0.76; // Vorderkante
+  /*
+   * Alles am Gesicht haengt an ZWEI Zahlen: der Mitte des Fahrerhauses und
+   * seiner Vorderkante. Beide kommen jetzt aus `kabinenMitte` und
+   * `KABINE_VORN` statt aus abgeschriebenen Summanden — sonst bliebe der
+   * Auspuff stehen, wo er stand, wenn die Kabine kuerzer wird (E-076).
+   */
+  const mitKran = v.withCrane === true;
+  const kabTiefe = kabinenTiefe(mitKran);
+  const cz = kabinenMitte(v.bedLen, mitKran); // Mitte des Fahrerhauses
+  const front = v.bedLen / 2 + KABINE_VORN + 0.01; // Vorderkante
   const add = (
     geo: THREE.BufferGeometry,
     mat: THREE.Material,
@@ -284,9 +422,16 @@ function baueFahrerhaus(
     add(new THREE.BoxGeometry(0.34, 0.2, 0.05), klar, sx * 0.86, 1.18, front + 0.03);
     add(new THREE.BoxGeometry(0.16, 0.1, 0.05), bernstein, sx * 0.86, 0.99, front + 0.05);
   }
-  // Dachspoiler: vorn niedrig, hinten hoch — damit der Aufbau nicht anströmt
-  const spoiler = add(new THREE.BoxGeometry(1.95, 0.42, 0.7), lack, 0, 2.28, cz - 0.3, true);
-  spoiler.rotation.x = -0.18;
+  /*
+   * Dachspoiler: vorn niedrig, hinten hoch — damit der Aufbau nicht anströmt.
+   * Der Kranwagen hat keinen: Hinter seinem kurzen Haus steht der Kranturm,
+   * und der Spoiler waere genau dort (gemessen 0,54 m Ueberschneidung). Echte
+   * Kranwagen fahren auch keinen — die Luft ist nicht ihr Problem.
+   */
+  if (!mitKran) {
+    const spoiler = add(new THREE.BoxGeometry(1.95, 0.42, 0.7), lack, 0, 2.28, cz - 0.3, true);
+    spoiler.rotation.x = -0.18;
+  }
   // Sonnenblende über der Frontscheibe
   const blende = add(new THREE.BoxGeometry(2.0, 0.1, 0.3), lack, 0, 2.12, front - 0.08, true);
   blende.rotation.x = 0.3;
@@ -298,16 +443,42 @@ function baueFahrerhaus(
   }
   // Türfuge und Griff — ohne sie ist die Seite eine Wand
   for (const sx of [-1, 1]) {
-    add(new THREE.BoxGeometry(0.02, 1.1, 0.03), dark, sx * 1.06, 1.48, cz + 0.42);
-    add(new THREE.BoxGeometry(0.03, 0.06, 0.22), chrom, sx * 1.07, 1.45, cz + 0.1);
+    // Anteilig statt fest: Beim kurzen Haus rutschte die Fuge sonst aus dem Blech
+    add(new THREE.BoxGeometry(0.02, 1.1, 0.03), dark, sx * 1.06, 1.48, cz + kabTiefe * 0.28);
+    add(new THREE.BoxGeometry(0.03, 0.06, 0.22), chrom, sx * 1.07, 1.45, cz + kabTiefe * 0.07);
     // Einstieg: zwei Tritte unter der Tür
     for (let i = 0; i < 2; i++) {
-      add(new THREE.BoxGeometry(0.1, 0.04, 0.42), dark, sx * 0.98, 0.62 + i * 0.24, cz + 0.15);
+      add(
+        new THREE.BoxGeometry(0.1, 0.04, 0.42),
+        dark,
+        sx * 0.98,
+        0.62 + i * 0.24,
+        cz + kabTiefe * 0.1
+      );
     }
   }
-  // Auspuffrohr hinter dem Fahrerhaus, rechts — steht senkrecht hoch
-  const rohr = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.085, 1.7, 8), chrom);
-  rohr.position.set(1.02, 1.6, cz - 0.82);
+  /*
+   * AUSPUFFROHR AN DER HINTEREN KABINENECKE, AUSSEN (E-076).
+   *
+   * Es stand auf x 1,02 und damit ZWISCHEN Kabine und Muldenstirn — in einer
+   * Lücke von 11 cm, in die es nicht passt. Gemessen steckte es 4,5 cm im
+   * oberen Haus und 4,3 cm in der Stirnwand der Mulde.
+   *
+   * Beides löst dieselbe Verschiebung nach aussen: Das obere Haus ist 2,16 m
+   * breit (x ±1,08), das Rohr misst 0,085 m im Halbmesser — ab x 1,175 ist es
+   * frei. Auf 1,18 gesetzt steht es neben dem Haus statt darin, und in der
+   * Länge an dessen Hinterkante. Das gilt für beide Kabinenlängen, der
+   * Kranwagen braucht keine Sonderlage.
+   *
+   * ZWEITE ÄNDERUNG: Es beginnt jetzt auf y 1,10 statt auf 0,75. Draussen
+   * neben dem Haus steht es nämlich im Vorderrad (Scheitel 0,96 m) und im
+   * Rahmen (Oberkante 0,90 m) — gemessen 4,2 bzw. 0,5 cm. Über beiden ist es
+   * frei, und ein Auspuffstapel, der hinter dem Haus aus dem Rahmen kommt,
+   * sieht auch so aus.
+   */
+  const rohr = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.085, 1.35, 8), chrom);
+  rohr.name = BAUGRUPPE.auspuff;
+  rohr.position.set(1.18, 1.775, cz - kabTiefe / 2 + 0.05);
   rohr.castShadow = true;
   v.group.add(rohr);
   // Dachleuchten als Reihe
@@ -353,6 +524,7 @@ function baueFahrgestell(
   // Kotflügel über den beiden hinteren Achsen
   for (const sx of [-1, 1]) {
     const kotfluegel = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.07, 2.3), dark);
+    kotfluegel.name = BAUGRUPPE.kotfluegel;
     kotfluegel.position.set(sx * 1.02, 1.0, -v.bedLen / 2 + 1.45);
     v.group.add(kotfluegel);
     // Spritzlappen hinter der letzten Achse
@@ -386,43 +558,89 @@ function baueFahrgestell(
 function buildCrane(v: VehicleModelContext, dark: THREE.MeshStandardMaterial): THREE.Group {
   const stahl = new THREE.MeshStandardMaterial({ color: 0x6d7276, roughness: 0.7, metalness: 0.5 });
   const gelb = new THREE.MeshStandardMaterial({ color: 0xc9a227, roughness: 0.6, metalness: 0.3 });
-  // Sockel: sitzt fest auf dem Rahmen, direkt hinter der Kabine
-  const sockelZ = v.bedLen / 2 + 0.05;
-  const sockel = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.34, 0.7), dark);
+  /*
+   * DER BOCK STEHT VOR DER MULDE, NICHT IN IHR (E-076).
+   *
+   * Bis zum 15.09.2026 sass er auf `bedLen/2 + 0,05` und war 0,70 m tief —
+   * also 0,30 m innerhalb der Ladefläche und 12 cm tief im Bodenblech.
+   * Jetzt liegt seine Mitte in der Lücke zwischen Muldenstirn und dem
+   * verkürzten Fahrerhaus (`KRAN_Z`), und er ist nur noch `KRAN_BOCK_TIEFE`
+   * tief. Beide Zahlen sind oben vorgerechnet.
+   */
+  const sockelZ = v.bedLen / 2 + KRAN_Z;
+  const bock = new THREE.Group();
+  bock.name = BAUGRUPPE.kranbock;
+  v.group.add(bock);
+  const sockel = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.34, KRAN_BOCK_TIEFE), dark);
   sockel.position.set(0, 1.05, sockelZ);
   sockel.castShadow = true;
-  v.group.add(sockel);
+  bock.add(sockel);
   // Zwei Abstützungen seitlich — ohne die steht kein Kran auf einem LKW
   for (const sx of [-1, 1]) {
     const stuetze = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.5, 0.22), stahl);
     stuetze.position.set(sx * 1.05, 0.95, sockelZ);
-    v.group.add(stuetze);
+    bock.add(stuetze);
     const fuss = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.2, 0.1, 8), dark);
     fuss.position.set(sx * 1.05, 0.72, sockelZ);
-    v.group.add(fuss);
+    bock.add(fuss);
   }
 
   const saeule = new THREE.Group();
+  saeule.name = BAUGRUPPE.kransaeule;
   saeule.position.set(0, 1.22, sockelZ);
   v.group.add(saeule);
-  const turm = new THREE.Mesh(new THREE.BoxGeometry(0.46, 1.15, 0.46), gelb);
-  turm.position.y = 0.58;
+  /*
+   * DIE SÄULE IST EIN ACHTKANT, KEIN QUADER.
+   *
+   * Ein Quader von 0,46 m Kante braucht beim Drehen seine Diagonale — 0,65 m.
+   * Genau daran scheiterte die Lücke: Der Schwenk beim Andocken hätte die
+   * Ecken in Stirnwand und Kabine getrieben (gemessen 8,0 bzw. 25,5 cm). Ein
+   * Rundturm braucht immer nur seinen Durchmesser, und ein Kranturm ist in
+   * Wirklichkeit auch rund.
+   */
+  const auslegerY = auslegerHoehe(v.kind, v.bodyStyle) - 1.22;
+  const turmH = auslegerY + 0.1;
+  const turm = new THREE.Mesh(
+    new THREE.CylinderGeometry(KRAN_SAEULE_D / 2, KRAN_SAEULE_D / 2, turmH, 8),
+    gelb
+  );
+  turm.position.y = turmH / 2;
   turm.castShadow = true;
   saeule.add(turm);
 
-  // Hauptausleger: schräg nach hinten über die Ladefläche, wie im Transportzustand
+  /*
+   * Hauptausleger: schräg nach hinten über die Ladefläche, wie im
+   * Transportzustand. Seine Höhe richtet sich nach der LADUNG und nicht nach
+   * einer festen Zahl — bei Rungenaufbau lag er vorher 41 cm in der Fuhre
+   * (`auslegerHoehe`).
+   */
   const ausleger = new THREE.Group();
-  ausleger.position.y = 1.05;
+  ausleger.position.y = auslegerY;
   ausleger.rotation.x = 0.42;
   saeule.add(ausleger);
   const arm1 = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 2.5), gelb);
   arm1.position.z = -1.15;
   arm1.castShadow = true;
   ausleger.add(arm1);
-  // Knickarm: eingeklappt, zeigt wieder nach unten — so fahren die Dinger herum
+  /*
+   * KNICKARM: DER Z-KNICK, NICHT DER HÄNGENDE ARM (E-076).
+   *
+   * Er zeigte mit −1,15 rad nach unten und hinten — und hing damit 0,70 m
+   * unter dem Auslegergelenk, also MITTEN IN DER FUHRE (gemessen: tiefster
+   * Kranpunkt über der Fläche 1,54 m, Ladung bis 2,14 m). Die Rechnung dagegen
+   * wäre eine um 0,70 m höhere Säule gewesen, und damit ein Kran von 4,4 m
+   * Bauhöhe auf einem 2,5-m-Lastwagen.
+   *
+   * Jetzt klappt der Arm zurück nach VORN, so wie ein Knickarmkran im
+   * Transportzustand wirklich steht: Er liegt auf dem Hauptarm auf und zeigt
+   * zur Säule zurück. Gerechnet: Die Richtung des eingeklappten Arms soll
+   * (0 | −0,25 | +0,97) sein — nach vorn und leicht abwärts. Mit der Neigung
+   * des Hauptarms (0,42 rad) ergibt das einen Knickwinkel von
+   * atan2(−0,25 ; −0,97) − 0,42 = −3,31 rad.
+   */
   const knick = new THREE.Group();
   knick.position.z = -2.3;
-  knick.rotation.x = -1.15;
+  knick.rotation.x = -3.31;
   ausleger.add(knick);
   const arm2 = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.24, 1.9), gelb);
   arm2.position.z = -0.9;
@@ -683,19 +901,39 @@ export function buildVehicleModel(v: VehicleModelContext): VehicleModelParts {
     return teile;
   }
   const chassis = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.5, v.bedLen + 1.6), dark);
+  chassis.name = BAUGRUPPE.rahmen;
   chassis.position.set(0, 0.65, 0.8);
   v.group.add(chassis);
-  // Fahrerhaus in zwei Höhen: unten schmaler als oben, so wie ein Fernfahrer-
-  // haus über dem Rahmen auskragt. Ein einzelner Quader sieht aus wie ein
-  // Container mit Fenstern.
-  const cab = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.72, 1.5), paint);
-  cab.position.set(0, 1.28, v.bedLen / 2 + 0.9);
+  /*
+   * Fahrerhaus in zwei Höhen: unten schmaler als oben, so wie ein Fernfahrer-
+   * haus über dem Rahmen auskragt. Ein einzelner Quader sieht aus wie ein
+   * Container mit Fenstern.
+   *
+   * MIT KRAN WIRD ES EIN NAHVERKEHRSHAUS (E-076): Die Schnauze bleibt, wo sie
+   * ist (`KABINE_VORN`), die Rückwand rückt nach vorn. Der Umriss des Wagens
+   * ändert sich dadurch nicht — nur der Kran bekommt seinen Platz.
+   */
+  const kabTiefe = kabinenTiefe(v.withCrane === true);
+  const cz = kabinenMitte(v.bedLen, v.withCrane === true);
+  const kabHinten = cz - kabTiefe / 2;
+  /*
+   * Die Kabine sass mit ihrer Unterkante auf 0,92 m, der Scheitel des
+   * Vorderrads liegt auf 0,96 m — gemessen 2,8 cm Reifen im Blech
+   * (`tools/fahrzeug-durchdringung.ts`, 15.09.2026). Ein Radhaus hat dieser
+   * Quader nicht, also wird er um 4 cm angehoben statt ausgeschnitten.
+   */
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.72, kabTiefe), paint);
+  cab.name = BAUGRUPPE.fahrerhaus;
+  cab.position.set(0, 1.32, cz);
   cab.castShadow = true;
   v.group.add(cab);
   // Das obere Haus steht hinter der Frontscheibe zurück, damit die Scheibe
   // eine Fläche für sich ist und nicht mit dem Blech in einer Ebene liegt.
-  const cabOben = new THREE.Mesh(new THREE.BoxGeometry(2.16, 0.62, 1.4), paint);
-  cabOben.position.set(0, 1.92, v.bedLen / 2 + 0.82);
+  const obenVorn = v.bedLen / 2 + KABINE_VORN - OBERHAUS_VORN;
+  const obenTiefe = obenVorn - (kabHinten - OBERHAUS_HINTEN);
+  const cabOben = new THREE.Mesh(new THREE.BoxGeometry(2.16, 0.62, obenTiefe), paint);
+  cabOben.name = BAUGRUPPE.fahrerhaus;
+  cabOben.position.set(0, 1.92, obenVorn - obenTiefe / 2);
   cabOben.castShadow = true;
   v.group.add(cabOben);
   // Verglasung: Frontscheibe und zwei Seitenfenster
@@ -717,18 +955,22 @@ export function buildVehicleModel(v: VehicleModelContext): VehicleModelParts {
    * hingehoert — in dessen oberer Haelfte, nicht auf halber Kabinenhoehe.
    */
   const windshield = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.56, 0.06), windowMat);
-  windshield.position.set(0, 1.94, v.bedLen / 2 + 1.7);
+  windshield.position.set(0, 1.94, v.bedLen / 2 + KABINE_VORN + 0.05);
   v.group.add(windshield);
   for (const sx of [-1, 1]) {
-    const sideWin = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.46, 1.1), windowMat);
-    sideWin.position.set(sx * 1.11, 1.92, v.bedLen / 2 + 0.92);
+    // Seitenfenster: so lang wie das obere Haus es zulässt, mittig darin
+    const sideWin = new THREE.Mesh(
+      new THREE.BoxGeometry(0.06, 0.46, Math.min(1.1, obenTiefe - 0.3)),
+      windowMat
+    );
+    sideWin.position.set(sx * 1.11, 1.92, obenVorn - obenTiefe / 2 + 0.1);
     v.group.add(sideWin);
   }
   // Fahrer hinterm Steuer
   const driverSkin = new THREE.MeshStandardMaterial({ color: 0xe3b18c, roughness: 0.8 });
   const driverShirt = new THREE.MeshStandardMaterial({ color: 0x35506b, roughness: 0.85 });
   const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.15, 0.28, 4, 10), driverShirt);
-  torso.position.set(-0.45, 1.62, v.bedLen / 2 + 0.75);
+  torso.position.set(-0.45, 1.62, cz - 0.15);
   v.group.add(torso);
   const dHead = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 10), driverSkin);
   dHead.position.set(-0.45, 1.92, v.bedLen / 2 + 0.75);
@@ -770,6 +1012,7 @@ export function buildVehicleModel(v: VehicleModelContext): VehicleModelParts {
    * hat den Kipper-Katapult messbar verschlechtert (Mittel 122 → 160 km/h ueber
    * 24 Saaten), weil seine Rueckwand am Kipplager hoeher wird.
    */
+  floor.name = BAUGRUPPE.flaeche;
   floor.position.set(0, FLAECHE_KOLLIDER_OBEN - 0.06, v.bedLen / 2);
   floor.castShadow = true;
   v.bedGroup.add(floor);
@@ -785,6 +1028,7 @@ export function buildVehicleModel(v: VehicleModelContext): VehicleModelParts {
   // außen). Beim Abladen fallen sie zur Seite — der Schrott darf herunter.
   for (const dir of [-1, 1] as const) {
     const hinge = new THREE.Group();
+    hinge.name = BAUGRUPPE.bordwand;
     hinge.position.set(dir * (BED_HALF_W + 0.05), 0.02, v.bedLen / 2);
     const side = new THREE.Mesh(new THREE.BoxGeometry(0.08, wallH, v.bedLen), sideMat);
     side.position.y = wallH / 2;
@@ -820,11 +1064,13 @@ export function buildVehicleModel(v: VehicleModelContext): VehicleModelParts {
     v.sideWalls.push({ hinge, mesh: side, body: wallBody, dir });
   }
   const front = new THREE.Mesh(new THREE.BoxGeometry(bedW, wallH, 0.08), sideMat);
+  front.name = BAUGRUPPE.stirnwand;
   front.position.set(0, wallH / 2, v.bedLen);
   v.bedGroup.add(front);
   if (v.kind !== "kipper") {
     // Heckklappe sitzt ganz am hinteren Rand und klappt nach unten weg
     const hinge = new THREE.Group();
+    hinge.name = BAUGRUPPE.heckklappe;
     hinge.position.set(0, 0.02, -0.04);
     const rear = new THREE.Mesh(new THREE.BoxGeometry(bedW, wallH, 0.08), sideMat);
     rear.position.y = wallH / 2;
