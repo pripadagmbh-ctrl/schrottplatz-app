@@ -360,8 +360,35 @@ Alle Zeichnungen liegen unter `/v1/plaene/` und sind auf dem Telefon aufrufbar.
     Während des Rückwärtssetzens ist die Fuhre verriegelt; je länger der Weg,
     desto tiefer arbeiten sich Stücke in den Schlitz. Der Rangierpunkt steht
     deshalb auf z −17,5. Der Katapult selbst ist damit **nicht behoben**, nur
-    nicht mehr gefüttert. Dazu weiter offen: Heckklappe, Aufgeben-Regel, und
-    dass der Wächter andere Solver-Einstellungen misst als das Spiel.
+    nicht mehr gefüttert. Dazu weiter offen: Heckklappe und Aufgeben-Regel.
+
+    **Neu gemessen am 15.09.2026 (E-062), mit einem Gerät statt zweien.** Die
+    Tabelle darüber stammt aus einer Zeit, in der zwei Messgeräte sich über
+    denselben Vorgang um den Faktor zwei widersprachen; die Ursache war eine
+    erfundene Fuhre, nicht das Verfahren. Drei Punkte sind damit erledigt oder
+    anders zu sehen:
+
+    - Dass der Wächter **andere Solver-Einstellungen** misst als das Spiel,
+      stand hier als Verdacht. Nachgemessen ändert das die Bahn, nicht die
+      Höhe (Mittel 147 → 138, Höchst 328 → 358 über dieselben acht Saaten).
+      Kein Blocker, aber weiter eine Abschrift: `tools/kipper-messreihe.ts`
+      kann die Werte aus `PhysicsWorld` setzen, der Wächter tut es nicht.
+    - **Die Bodendicke ist ein echter Hebel.** Der Muldenboden-Kollider ist
+      0,60 m dick (`vehicles.ts`, Oberkante +0,04). Mit 0,16 m, gleicher
+      Oberkante und gleicher Ladung Stück für Stück: Mittel 149 → 94, Höchst
+      463 → 226, paarweise −55 ± 19 km/h, besser in 18 von 24 Ladungen.
+      **Warum** ein dickerer Quader schlechter ist, ist nicht verstanden — der
+      Rahmen darunter endet 4 cm unter dem Muldenboden, da wäre Platz. Vor
+      einer Änderung gehört die Ursache gefunden, nicht die Zahl kopiert.
+    - **Der Wächter misst eine mildere Fuhre als das Spiel.**
+      `test/kipper.test.ts` fährt 5.000 kg bei Füllgrad 0,60. Der Händler des
+      Spiels kommt im Mittel mit 0,74 und 6.229 kg, und derselbe Apparat misst
+      damit Mittel 159 / Höchst **585** km/h — über der Schranke von 500, die
+      der Wächter hält. Er hält also einen Rückschritt an einer festen Fuhre
+      fest und sagt **nicht**, dass im Spiel nichts fliegt. Ob er umgestellt
+      wird (und die Schranken damit auf einen schlechteren, aber wahren Stand),
+      gehört in dieses Paket.
+
     Patrick hat am 15.09.2026 entschieden, dass der Kipper **weiter kippt**
     (statt seitlich leergegriffen zu werden) — das Kippen ist der einzige Weg,
     auf dem Material ohne Spielerarbeit auf den Platz kommt.
