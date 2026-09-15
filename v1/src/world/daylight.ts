@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { YARD_D, YARD_MIN_X, YARD_MAX_X, GATE_X, TOR_HALB } from "./yard";
+import { platzwache } from "./platzinventar";
 
 /**
  * Tageslauf über dem Platz (Wunsch 29.08.2026).
@@ -72,10 +73,40 @@ export class Daylight {
   update(dt: number): void {
     const vorher = this.time;
     this.time = (this.time + dt / DAY_LENGTH_S) % 1;
+    /*
+     * MITTERNACHT — der einzige Tageswechsel, den das Spiel hat.
+     *
+     * `economy/shift.ts` fuehrt keinen Tagesablauf und keine Phasen. Ein
+     * „Morgen" gibt es nur hier: wenn die Uhr ueber 24:00 laeuft.
+     *
+     * Hier haengen ZWEI Fassungen derselben Gattung „Platzinventar", die am
+     * 15.09.2026 unabhaengig voneinander entstanden sind — eine fuer den Besen
+     * (E-031, Merker `neuerTag`, abgefragt in `main.ts`), eine fuer den
+     * Muellcontainer (E-034, `platzwache`, die sich jeder selbst abholt).
+     * Beide sind fuer sich richtig und gepruefft; sie zusammenzulegen ist ein
+     * eigenes Paket und nicht die Arbeit eines Zusammenfuehrens.
+     *
+     * Bis dahin laufen beide. Sie stoeren einander nicht: Der Merker traegt
+     * den Besen, die Platzwache den Container.
+     */
     if (this.time < vorher) {
       this.tag++;
       this.neuerTag = true;
     }
+    /*
+     * MITTERNACHT — der einzige Tageswechsel, den das Spiel hat.
+     *
+     * `economy/shift.ts` fuehrt keinen Tagesablauf und keine Phasen (es zaehlt
+     * Umschlag und macht die Einfahrt zu, wenn der Platz zusteht). Ein
+     * „Morgen" gibt es nur hier: wenn die Uhr ueber 24:00 laeuft. Daran haengt
+     * das Platzinventar — der Muellcontainer wird nachts geleert, sein Inhalt
+     * liegt morgens im Abfall-Silo (`world/platzinventar.ts`).
+     *
+     * Gemeldet wird ueber die Platzwache und nicht per Rueckruf: So braucht es
+     * keine Verdrahtung in `main.ts`, und wer den Wechsel braucht, holt ihn
+     * sich in seiner eigenen Runde ab.
+     */
+    if (this.time < vorher) platzwache.neuerTag();
 
     // Sonnenhöhe: sin über den Tagbogen, negativ heißt unter dem Horizont
     const angle = (this.time - 0.25) * Math.PI * 2;

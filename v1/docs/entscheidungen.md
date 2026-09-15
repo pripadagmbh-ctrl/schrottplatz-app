@@ -1537,6 +1537,7 @@ Grundriss vorher/nachher: `docs/messungen/2026-09-15_silos-l-form.svg`.
    Warteplätzen, und laufen die wartenden Fahrer zu ihr, ohne über den
    Arbeitsbereich zu müssen?
 
+<<<<<<< HEAD
 
 ---
 
@@ -1946,3 +1947,212 @@ der Ladung, und bei Gleichstand die zuerst geladene.
 3. **`docs/fraktionen-2026-09-15.svg` auf dem iPhone** unter `/v1/plaene/`
    öffnen: ohne Zoom lesbar? Und stimmt, was daraufsteht, mit dem überein, was
    du im Spiel erlebst?
+=======
+### E-034 — Eine Mulde neben der Presse, der Müll wird ein versetzbarer Container (15.09.2026)
+
+**Entscheidung.** Rechts vom Bagger (−x) steht nur noch **ein** Behälter: die
+Buntmetall-Mulde, gerückt an die Presse auf **(−7,6 | −19,8)**, mit einem
+**Sockel aus zwei Lagen Betonlego (1,00 m)** auf der Baggerseite. Die
+Müllmulde ist abgerissen; der Müll geht ab jetzt in einen **frei platzierbaren
+Absetzcontainer**, der morgens auf (−2,8 | −15,4) steht und dem Spieler
+gehört, sobald er ihn einmal angefasst hat.
+
+Ansage Patrick: „Ich würde die Mulden da rechts vom Bagger nochmal alle
+abreißen und dann direkt eine Mulde neben der Presse platzieren, eben mit
+Sockel, aber aus zwei Elementen und zur Ostseite offen. Und den Rest erstmal
+wegmachen." Und: „Nein, den Müll nehmen wir in einen frei platzierbaren
+Container."
+
+---
+
+**Wo die Mulde steht, und warum genau dort.** „Neben der Presse" ist eine
+Rechnung, kein Gefühl. Die Presse sitzt auf (−8,0 | −26,0); ihr Rahmen endet
+nach Norden auf z −23,55, und ihre Deckelklappe schwingt 3,85 m nach **Westen**
+— nach Norden schwingt nichts. Der Streifen nördlich der Maschine ist damit der
+einzige, der zugleich frei ist und im Schwenkband liegt.
+
+| | |
+|---|---|
+| Mitte (−7,6 \| −19,8) | **7,60 m** vom Sitz (−0,5 \| −22,5) |
+| Muldenachse z −22,8 … −16,8 | 7,11 … 8,98 m — **100 %** im Band 5,8–9,2 (vorher 93 %) |
+| Südflanke (Hindernisliste) bis z −23,15 | **0,40 m** vor dem Pressenrahmen |
+| Ostkante der Schwelle x −4,95 | 0,35 m bis zum Müllcontainer |
+
+Die 0,60 m nach Süden sind der ganze Gewinn: Vorher lagen 7 % der Mulde
+außerhalb der Reichweite, jetzt keiner.
+
+**Der Sockel wird zwei Lagen hoch — und die Rechnung von heute Vormittag
+bleibt trotzdem stehen.** Am Vormittag wurde eine Lage gebaut, und zwar
+begründet: Bei Augpunkt 3,28 m (abgesenkte Kabine) streift der Blick die
+Wandkrone, `blind = h × D / (H − h)`. **Am neuen Standort** (Schwelle auf
+x −5,5, also 5,01 m vom Sitz am vorderen und 7,58 m am hinteren Ende) sieht das
+so aus:
+
+| Sockel | vorderes Ende | Mitte | hinteres Ende |
+|---|---|---|---|
+| 0,50 m (eine Lage) | 79 % | 76 % | 68 % |
+| **1,00 m (zwei Lagen, gebaut)** | **48 %** | **41 %** | **21 %** |
+
+Patrick hat die eine Lage am Gerät gesehen und entschieden: „da kommt einfach
+noch 'ne Lage drüber, damit die Anhäufung etwas höher ist." Das gilt. Die Zahl
+steht hier als **Messung**, nicht als Einwand — und sie ist am neuen Standort
+besser als am alten (dort wären es 16–48 % gewesen), weil die Mulde näher am
+Sitz liegt und der tote Streifen mit dem Abstand wächst. Die harte Grenze liegt
+bei **1,17 m**: Darüber sieht man vom hinteren Ende überhaupt keinen Boden
+mehr. Eine dritte Lage geht also nicht, und der Wächter in
+`test/buntmetall.test.ts` sagt das jetzt genau so — er hält die Entscheidung
+fest (zwei ganze Lagen) und die Messung daneben, statt die alte Schranke zu
+verteidigen.
+
+**Warum `facing` weiter „west" heißt, obwohl die Mulde nach Osten offen ist.**
+Sie IST zum Bagger hin offen: Dort steht nur die Schwelle, keine Wand
+(`shareEast`, E-006). Das Feld `facing` sagt aber nicht, wo eine Mulde steht,
+sondern wo **Lambert und ein sortenreiner Kipper anfahren** und wo das Schild
+hängt. Auf „east" gedreht wanderte Lamberts Halteplatz von (−11,9 | −19,8) auf
+(−3,3 | −19,8) — mitten in den Arbeitsbereich des Baggers (`imBaggerrevier`),
+und das Schild stünde dem Fahrer im Bild. Gebaut ist, was Patrick beschreibt;
+der Bezeichner behält seine eigene Bedeutung. **Im Zweifel die Koordinaten
+lesen, nie die Namen.**
+
+---
+
+**Der Müllcontainer.** Er ist ein `rolloff` — die Bauform stand seit dem
+12.09. im Quelltext und wurde seit dem Umbau auf Trennsteine von keinem
+Behälter mehr benutzt. Sein Maß ist an zwei Schranken gerechnet, nicht
+gewählt:
+
+- **3,60 m quer** — das Breiteste, was zwischen die Schwelle der
+  Buntmetall-Mulde (x −4,95) und die Kipperspur (Wagenflanke x 0,45, Tastrand
+  1,40 m) passt. Es bleiben 3,70 m, der Container nimmt 3,60. Lichte Weite
+  3,42 m, die offene Sichelkralle misst 3,38 — man kommt hinein.
+- **4,30 m längs** — **einen Dezimeter länger als die Presskammer** (licht
+  4,20 × 4,05 m). Er passt in keiner Lage hinein. Das ist die Sperre gegen
+  „Container in der Presse", und sie ist Geometrie statt Abfrage. Ansage
+  Patrick: „Der Container kann nicht gepresst werden. Dann gibt es die
+  Fehlermeldung der Presse." Die Fehlermeldung selbst gehört in `press.ts`
+  (fremdes Paket); `ContainerManager.platzinventarIn()` steht dafür bereit.
+- **0,80 m Wandhöhe** (SW) — bei 6,72 m Abstand zur Vorderkante bleiben 40 %
+  des Bodens sichtbar. Bei 1,00 m wären es 18 %, bei 1,20 m gar nichts.
+
+**Leer wiegt er 1781 kg** (Bodenplatte 3,60 × 0,31 × 4,30 m und vier Wände auf
+Dichte 300 kg/m³, Bestand seit dem 12.09.). Der Greifer trägt 3500 kg — leer
+geht er also hoch, ab rund 1,7 t Müll darin nicht mehr. Dafür braucht es keine
+Abfrage: Das Ladegewicht hängt als Zusatzmasse am Körper. Kippen kann er nicht,
+nur die Hochachse ist freigegeben.
+
+**Er hat kein Zuhause.** Ansage: „Der Container soll erstmal frei bleiben,
+damit ich auch testen kann, wo der am besten steht." Also: kein Zurückschnappen,
+keine Sollposition, kein Wächter, der ihm folgt. Die Koordinate im Datensatz
+ist sein **Startplatz**, und der ist begründet — im Band (7,46 m), 1,45 m neben
+der Kipperspur, 0,35 m neben der Schwelle, 82 % seiner Grundfläche in
+Reichweite. Mehr geht nicht: Der Ring ist 3,40 m breit, der Container 3,60 m.
+
+**Platzinventar — eine Gattung, kein Sonderfall.** „Also wie auch der Besen ist
+es ein fester Bestandteil des Platzes." Das Kennzeichen `platzinventar` steht
+deshalb im Datensatz, die gemeinsamen Regeln in `world/platzinventar.ts` —
+der Besen aus dem Nachbarpaket kann dieselbe Fassung tragen. Es sagt zwei
+Dinge: **unverkäuflich** und **sein Inhalt ist nicht seine Sache**.
+
+Unverkäuflich ist er an **einer** Stelle, nicht an fünf: Die Hülle ist kein
+`ScrapItem`, und `Account.sellContainer` rechnet ausschließlich über die Liste
+des `ItemManager`. Es gibt gar keinen Weg in eine Geldformel — weder leer noch
+voll, weder über den Abholer noch über die Presse. Was auf seinem Schild steht,
+ist der **Inhalt**, wie bei jeder anderen Mulde.
+
+**Nachts wandert der Inhalt ins ABFALL-Silo, die leere Hülle bleibt stehen.**
+Ansage: „Wenn mal Müll verschwindet, dann verschwindet er über Nacht nicht,
+sondern landet in dem Müllsilo. Da wird er dann gelagert. Und der Container
+stünde wieder bei mir." Dieselbe Regel gilt, wenn ein Abholer den Container
+mitnimmt — „Mit ohne Müll in dem Fall" —, und deshalb ist es **eine** Funktion
+mit zwei Auslösern (`inhaltInsLager`), nicht zweimal dasselbe. Es ist kein
+Verkauf: Kein Euro wechselt den Besitzer, nichts wird gelöscht, die Stücke
+werden **versetzt** und liegen danach dort, wo Lambert sie hingetragen hätte.
+Der Müll hat damit zum ersten Mal einen ganzen Weg: Wrack → Container → Silo.
+
+**Woran der Tageswechsel hängt.** `economy/shift.ts` führt **keinen**
+Tagesablauf und keine Phasen — es zählt Sekunden, Umschlag und Fuhren und macht
+die Einfahrt zu, wenn der Platz zusteht. Einen Morgen gibt es dort nicht. Der
+einzige Tageswechsel des Spiels ist die Uhr in `world/daylight.ts`: `time`
+läuft modulo 1, ein Tag dauert 900 s. Daran hängt die Nachtschicht und an
+nichts sonst; ein zweiter, erfundener Tagesanfang wäre eine zweite Wahrheit
+über dieselbe Sache. Gemeldet wird er nicht per Rückruf, sondern **abgeholt**
+(`platzwache.tagGewechselt("…")`) — so braucht es keine Verdrahtung in
+`main.ts` und keine feste Reihenfolge.
+
+**Lamberts Sperrgebiet hing am Müll und hängt jetzt am Bagger.** Die Nordgrenze
+seines Reviers stand als `max(z + Länge/2)` über die Sortierbox **und die
+Müllmulde**. Mit einem versetzbaren Container wäre das Sperrgebiet mit ihm
+gewandert: Wer ihn in die Ecke schiebt, gäbe die Fläche vor dem Bagger frei.
+Ein Sperrgebiet, das man wegtragen kann, ist keines. Jetzt: 9,2 m Reichweite
+plus 1,4 m, damit der Halteplatz des Kippers (z −12,5) mit drin liegt — das
+ergibt −11,9, genau den Wert, der vorher zufällig herauskam.
+
+**Verworfene Alternativen.**
+
+- **`facing: "east"` für die Mulde** (wörtlich „zur Ostseite offen"): stellt
+  Lambert in den Arbeitsbereich des Baggers und das Schild ins Bild. Gebaut ist
+  dasselbe, nur ohne den Nebenschaden.
+- **Der Container 4,2 m breit** (das Maß aller anderen Behälter): Zwischen
+  Schwelle und Kipperspur bleiben 3,70 m. Er hätte entweder in der Fahrspur
+  gestanden oder an der Muldenwand geklemmt.
+- **Der Container kürzer als 4,20 m**: dann passt er in die Presskammer, und
+  „kann nicht gepresst werden" bräuchte eine Abfrage in fremdem Quelltext.
+- **„Erscheint am nächsten Tag wieder, falls er weg ist"**: hinfällig, seit die
+  beiden Verlustwege zugemauert sind (Presse zu klein, Abholer bringt ihn
+  zurück). Eine Rettung für einen Fall, den es nicht gibt, wäre Ballast.
+- **Eine Standardstelle „in der Stahlschrott-Fraktion an der Wand"**: von
+  Patrick ausdrücklich zurückgezogen — er will die beste Stelle selbst finden.
+
+**Abnahmekriterium.** 564 Prüfungen in 53 Dateien grün, darunter:
+
+- `test/buntmetall.test.ts`: zwei ganze Lagen, die Sichtbarkeit am neuen
+  Standort auf zwei Stellen (48 · 41 · 21 %), die harte Grenze bei der dritten
+  Lage, und die Lücke zur Presse zwischen 0 und 1,5 m.
+- `test/platzinventar.test.ts` (neu, 11 Prüfungen): Leergewicht 1781 kg unter
+  der Greifgrenze, lichte Weite über der offenen Spinne, Startplatz im Band und
+  1,45 m neben der Kipperspur, jedes Kilo kommt im Silo an, nichts wird
+  ineinander abgesetzt, der Tageswechsel meldet sich genau einmal je Frager.
+- `test/silos.test.ts`: der Container passt nicht in die Presskammer, steht auf
+  keinem festen Bauwerk und nicht in der Schwelle der Mulde.
+- `test/fahrumriss.test.ts`: 27 Strecken × 6 Fahrzeuglagen gegen die
+  Bauwerksliste, **null Durchdringungen**.
+
+Grundriss vorher/nachher: `docs/messungen/2026-09-15_eine-mulde.svg`.
+
+**Offen.**
+
+1. **Die Fehlermeldung der Presse gibt es noch nicht.** Der Container kann
+   nicht hinein (Geometrie), aber wer es versucht, bekommt kein Wort. Dafür
+   braucht es drei Zeilen in fremdem Quelltext: ein Ereignis in
+   `core/events.ts`, eine Abfrage in `press.start()` und einen Zuhörer im HUD.
+2. **Der Abholer weiß noch nichts vom Container.** `leereBehaelter()` steht
+   bereit; die Zustandsmaschine in `delivery/vehicles.ts` (fremdes Paket) muss
+   sie beim Losfahren rufen und die Hülle beim Bagger abkippen.
+3. **Batterien haben weiter kein Ziel am Bagger.** Sie liegen ausdrücklich
+   nicht in „BUNT + VA" (Gefahrgut, und der Bleiakku drückt die Reinheit) —
+   offener Punkt seit E-028, unverändert.
+4. **Das Silo kennt keine Kapazität in Kilogramm, nur in Plätzen.** Die
+   Nachtschicht setzt rasterweise ab: 4 × 5 Plätze je Lage, drei Lagen, also
+   60 Stück im ABFALL-Silo. Was darüber hinausgeht, **bleibt im Container
+   liegen** und wird gemeldet (`LagerBericht.rest`) — keine erfundene Regel,
+   aber auch noch keine Anzeige dafür.
+5. **Bodies, Physik-ms und Haufenruhe sind ungemessen.** Zählbar: zwei
+   Betonlego-Mulden weniger, ein Absetzcontainer mehr — unter dem Strich vier
+   InstancedMesh und ein Schild weniger, dafür ein dynamischer Körper mehr.
+
+**Auf dem Gerät zu prüfen.**
+
+1. **Kabine ganz runter, nach vorn rechts schauen:** Steht dort nur noch die
+   eine Mulde, direkt an der Presse — und siehst du über den doppelten Sockel
+   noch genug vom Boden, um zu sehen, was drinliegt? Gerechnet sind 48 % vorn
+   und 21 % hinten.
+2. **Presse einmal ganz durchlaufen lassen:** Schlägt die Deckelklappe irgendwo
+   an die neue Mulde? Zwischen beiden liegen 0,40 m, und die Klappe schwingt
+   nach der anderen Seite.
+3. **Den Müllcontainer greifen und umsetzen:** Bekommt die Spinne ihn leer
+   hoch, oder schleift sie ihn nur? Und bleibt er dort stehen, wo du ihn
+   absetzt?
+4. **Etwas Müll hineinwerfen und eine Nacht abwarten** (ein Tag dauert
+   15 Minuten): Steht der Container morgens leer da, und liegt der Müll im
+   ABFALL-Silo an der Südmauer?
+>>>>>>> worktree-agent-a7711447ab574db2a

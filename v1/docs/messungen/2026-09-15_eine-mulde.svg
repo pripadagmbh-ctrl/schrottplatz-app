@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="630" height="779" viewBox="0 0 630 779">
+<defs><marker id="pf" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0,0 8,4 0,8" fill="#3f6b3a"/></marker></defs>
+<rect width="100%" height="100%" fill="#f7f5f0"/>
+<text x="26.0" y="28.0" font-family="Segoe UI,Arial" font-size="17" fill="#111" text-anchor="start">Rust'n'Reibach — eine Mulde neben der Presse, 15.09.2026 (E-034)</text>
+<text x="26.0" y="50.0" font-family="Segoe UI,Arial" font-size="11.5" fill="#555" text-anchor="start">1  Alle Mulden rechts vom Bagger abgerissen — übrig bleibt EINE</text>
+<text x="26.0" y="66.0" font-family="Segoe UI,Arial" font-size="11.5" fill="#555" text-anchor="start">2  Sie rückt an die Presse, ihr Sockel wird zwei Lagen hoch (1,00 m)</text>
+<text x="26.0" y="82.0" font-family="Segoe UI,Arial" font-size="11.5" fill="#555" text-anchor="start">3  Der Müll wird ein Container, den der Spieler hinstellt, wo er will</text>
+<text x="26.0" y="101.0" font-family="Segoe UI,Arial" font-size="10.5" fill="#888" text-anchor="start">Maße in Metern · Norden oben · rot gestrichelt = Stand vom Vormittag</text>
+<rect x="407.3" y="116.0" width="77.5" height="121.3" fill="#e9e5da" stroke="none" stroke-width="0"/>
+<text x="446.0" y="141.0" font-family="Segoe UI,Arial" font-size="9" fill="#9a917f" text-anchor="middle">KIPPERSPUR</text>
+<rect x="514.8" y="351.0" width="77.5" height="135.0" fill="#e9e5da" stroke="none" stroke-width="0"/>
+<text x="553.5" y="401.0" font-family="Segoe UI,Arial" font-size="9" fill="#9a917f" text-anchor="middle">ABLADE-</text>
+<text x="553.5" y="421.0" font-family="Segoe UI,Arial" font-size="9" fill="#9a917f" text-anchor="middle">PLATZ</text>
+<rect x="99.8" y="474.8" width="96.2" height="122.5" fill="#efe6cd" stroke="#c0ac74" stroke-width="1.2" stroke-dasharray="4 3"/>
+<text x="148.5" y="608.5" font-family="Segoe UI,Arial" font-size="9" fill="#a2915f" text-anchor="middle">Deckelklappe 3,85 m</text>
+<rect x="136.6" y="474.8" width="118.8" height="122.5" fill="#ddd7c7" stroke="#6b6357" stroke-width="1.8"/>
+<text x="196.0" y="533.5" font-family="Segoe UI,Arial" font-size="12" fill="#3b362e" text-anchor="middle" font-weight="bold">PRESSE</text>
+<polyline points="26.0,611.0 231.0,611.0" fill="none" stroke="#7d7466" stroke-width="3"/>
+<polyline points="581.0,611.0 616.0,611.0" fill="none" stroke="#7d7466" stroke-width="3"/>
+<polyline points="231.0,611.0 231.0,661.0" fill="none" stroke="#7d7466" stroke-width="3"/>
+<polyline points="581.0,611.0 581.0,661.0" fill="none" stroke="#7d7466" stroke-width="3"/>
+<text x="91.0" y="628.5" font-family="Segoe UI,Arial" font-size="9" fill="#9a917f" text-anchor="middle">SÜDMAUER</text>
+<text x="406.0" y="646.0" font-family="Segoe UI,Arial" font-size="9" fill="#9a917f" text-anchor="middle">AUSBUCHTUNG: MISCHSCHROTT · STAHLSCHROTT</text>
+<circle cx="383.5" cy="448.5" r="145.0" fill="none" stroke="#c07b2a" stroke-width="1.2" stroke-dasharray="5 4"/>
+<circle cx="383.5" cy="448.5" r="230.0" fill="none" stroke="#c07b2a" stroke-width="1.2" stroke-dasharray="5 4"/>
+<text x="521.0" y="296.0" font-family="Segoe UI,Arial" font-size="9.5" fill="#c07b2a" text-anchor="middle">SCHWENKBAND</text>
+<text x="521.0" y="313.5" font-family="Segoe UI,Arial" font-size="9.5" fill="#c07b2a" text-anchor="middle">5,8 – 9,2 m</text>
+<rect x="153.5" y="306.0" width="105.0" height="150.0" fill="#e6efe2" stroke="#3f6b3a" stroke-width="2"/>
+<rect x="153.5" y="299.1" width="105.0" height="13.8" fill="#8d8371"/>
+<rect x="153.5" y="449.1" width="105.0" height="13.8" fill="#8d8371"/>
+<rect x="258.5" y="299.1" width="13.8" height="163.8" fill="#c07b2a"/>
+<text x="206.0" y="368.5" font-family="Segoe UI,Arial" font-size="13" fill="#24401f" text-anchor="middle" font-weight="bold">BUNT + VA</text>
+<text x="206.0" y="388.5" font-family="Segoe UI,Arial" font-size="9.5" fill="#3f6b3a" text-anchor="middle">4,2 × 6,0 m</text>
+<text x="206.0" y="406.0" font-family="Segoe UI,Arial" font-size="9.5" fill="#3f6b3a" text-anchor="middle">7,60 m</text>
+<polyline points="286.0,346.0 231.0,346.0" fill="none" stroke="#3f6b3a" stroke-width="1.8" marker-end="url(#pf)"/>
+<rect x="281.0" y="217.3" width="90.0" height="107.5" fill="#e2ebf2" stroke="#2e5f86" stroke-width="2"/>
+<text x="326.0" y="261.0" font-family="Segoe UI,Arial" font-size="13" fill="#17364e" text-anchor="middle" font-weight="bold">MUELL</text>
+<text x="326.0" y="281.0" font-family="Segoe UI,Arial" font-size="9.5" fill="#2e5f86" text-anchor="middle">3,6 × 4,3 m</text>
+<text x="326.0" y="298.5" font-family="Segoe UI,Arial" font-size="9.5" fill="#2e5f86" text-anchor="middle">7,46 m</text>
+<rect x="153.5" y="291.0" width="105.0" height="150.0" fill="none" stroke="#c0392b" stroke-width="1.4" stroke-dasharray="7 5"/>
+<text x="206.0" y="297.3" font-family="Segoe UI,Arial" font-size="9" fill="#c0392b" text-anchor="middle">alt</text>
+<rect x="271.0" y="221.0" width="90.0" height="60.0" fill="none" stroke="#c0392b" stroke-width="1.4" stroke-dasharray="7 5"/>
+<text x="282.3" y="229.8" font-family="Segoe UI,Arial" font-size="9" fill="#c0392b" text-anchor="middle">alt</text>
+<polyline points="206.0,464.8 206.0,474.8" fill="none" stroke="#b03a2e" stroke-width="2.2"/>
+<text x="231.0" y="486.0" font-family="Segoe UI,Arial" font-size="9.5" fill="#b03a2e" text-anchor="middle">0,40 m zur Presse</text>
+<polyline points="272.3,376.0 281.0,376.0" fill="none" stroke="#b03a2e" stroke-width="2.2"/>
+<text x="288.5" y="384.8" font-family="Segoe UI,Arial" font-size="9.5" fill="#b03a2e" text-anchor="start">0,35 m</text>
+<polyline points="371.0,204.8 407.3,204.8" fill="none" stroke="#b03a2e" stroke-width="2.2"/>
+<text x="388.5" y="191.0" font-family="Segoe UI,Arial" font-size="9.5" fill="#b03a2e" text-anchor="middle">1,45 m</text>
+<text x="288.5" y="359.8" font-family="Segoe UI,Arial" font-size="9.5" fill="#8a5310" text-anchor="start">← Sockel, 2 Lagen = 1,00 m</text>
+<text x="288.5" y="342.3" font-family="Segoe UI,Arial" font-size="9.5" fill="#3f6b3a" text-anchor="start">offen zum Bagger</text>
+<circle cx="383.5" cy="448.5" r="9" fill="#c07b2a"/>
+<polyline points="383.5,448.5 383.5,383.5" fill="none" stroke="#c07b2a" stroke-width="3"/>
+<text x="397.5" y="452.5" font-family="Segoe UI,Arial" font-size="10" fill="#8a5310" text-anchor="start">BAGGER (−0,5 | −22,5)</text>
+<text x="397.5" y="465.5" font-family="Segoe UI,Arial" font-size="10" fill="#8a5310" text-anchor="start">Blick nach Norden</text>
+<text x="26.0" y="685.0" font-family="Segoe UI,Arial" font-size="10.5" fill="#444" text-anchor="start">SOCKEL: zwei Lagen Betonlego = 1,00 m. Vom Fahrersitz bleiben dann 48 % (vorn) bis 21 % (hinten) des Muldenbodens sichtbar;</text>
+<text x="26.0" y="702.0" font-family="Segoe UI,Arial" font-size="10.5" fill="#444" text-anchor="start">über einer Lage waren es 79 bis 68 %. Die Mulde ist zum Bagger hin offen — über dem Sockel steht nichts.</text>
+<text x="26.0" y="719.0" font-family="Segoe UI,Arial" font-size="10.5" fill="#444" text-anchor="start">MUELL-CONTAINER: kein fester Behälter mehr. Er steht morgens hier und danach dort, wo der Spieler ihn absetzt. Leer 1781 kg,</text>
+<text x="26.0" y="736.0" font-family="Segoe UI,Arial" font-size="10.5" fill="#444" text-anchor="start">also gerade noch zu heben. Nachts wandert sein Inhalt ins ABFALL-Silo, die leere Hülle bleibt stehen. Er ist nichts wert.</text>
+<text x="26.0" y="753.0" font-family="Segoe UI,Arial" font-size="10.5" fill="#444" text-anchor="start">Er ist 4,30 m lang — einen Dezimeter länger als die Presskammer (4,20 m). In die Presse passt er nicht.</text>
+<text x="26.0" y="774.0" font-family="Segoe UI,Arial" font-size="9.5" fill="#999" text-anchor="start">Im Plan ist +x rechts; aus dem Fahrersitz ist das LINKS. Der Bagger schaut nach oben ins Bild.</text>
+</svg>

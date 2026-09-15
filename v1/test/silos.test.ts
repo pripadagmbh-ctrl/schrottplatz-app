@@ -31,6 +31,7 @@ import {
   MULDEN_GASSE_Z,
 } from "../src/delivery/routes";
 import { StaffManager, imBaggerrevier } from "../src/world/people";
+import { PRESS_INNER } from "../src/world/press";
 
 const LAGER = CONFIGS.filter((c) => c.lager === true);
 
@@ -225,10 +226,18 @@ describe("Die Reihe steht als L an Westwand und Suedwand (E-028)", () => {
   });
 });
 
-describe("Der Müll steht nicht mehr in der Rückfahrspur", () => {
+/**
+ * Der MUELL ist seit E-034 ein frei versetzbarer Absetzcontainer.
+ *
+ * Geprüft wird deshalb sein STARTPLATZ und nichts weiter: Wohin der Spieler
+ * ihn danach stellt, ist seine Sache („Der Container soll erstmal frei
+ * bleiben, damit ich auch testen kann, wo der am besten steht"). Ein Wächter,
+ * der ihm hinterherliefe, würde genau das verbieten, was gewollt ist.
+ */
+describe("Der Müllcontainer steht morgens richtig", () => {
   const muell = CONFIGS.find((c) => c.id === "r_rubble")!;
 
-  it("er liegt im Schwenkband — vierte Pflichtstation", () => {
+  it("sein Startplatz liegt im Schwenkband — vierte Pflichtstation", () => {
     const d = abstandVomStand(muell.x, muell.z);
     expect(d, `MUELL ${d.toFixed(2)} m vom Sitz`).toBeGreaterThanOrEqual(SCHWENK_INNEN);
     expect(d).toBeLessThanOrEqual(SCHWENK_AUSSEN);
@@ -254,33 +263,67 @@ describe("Der Müll steht nicht mehr in der Rückfahrspur", () => {
     ).toBeLessThan(ABLADE_SPUR_X - spurHalb);
   });
 
-  it("und der Greifer kommt hinein, ohne in eine Wand zu fassen", () => {
+  it("er ist oben offen und von allen Seiten frei zugänglich", () => {
     /*
-     * Die offene Spinne misst 3,38 m. Die Mulde ist nach OSTEN offen — zum
-     * Sitz und zur Kipperspur hin, von wo das Material kommt. Geprüft wird,
-     * dass dort auf 1,0 m nichts steht.
+     * Seit E-034 ist der MUELL ein Absetzcontainer, keine Betonlego-Mulde
+     * mehr: oben offen, überall gleich hoch, und er steht in KEINER
+     * Hindernisliste — bewegliche Behälter melden ihren Umriss jedes Bild neu
+     * (`ContainerManager.hindernisse`), weil eine feste Liste keinen Kasten
+     * führen kann, der wandert.
+     *
+     * Geprüft wird deshalb die Kehrseite: An seinem Startplatz steht nichts
+     * Festes, weder in ihm noch dicht daneben. Ein Container, der beim
+     * Spielstart in einer Wand klemmt, drückt sich beim ersten Schritt heraus.
      */
-    const auf = muell.facing === "east" ? 1 : -1;
-    expect(
-      hitsObstacle(muell.x + auf * (muell.size[0] / 2 + 1.0), muell.z, 0),
-      "die Öffnung des MUELL ist zugestellt"
-    ).toBeNull();
-    // Und auf der anderen Seite steht die Stirnwand — sonst läuft der Müll in
-    // die Kabel-Mulde.
-    expect(
-      hitsObstacle(muell.x - auf * (muell.size[0] / 2), muell.z, 0),
-      "die Stirnwand des MUELL fehlt"
-    ).not.toBeNull();
+    expect(muell.kind, "der MUELL ist wieder eine feste Mulde").toBe("rolloff");
+    const [w, d] = muell.size;
+    for (const dx of [-w / 2 - 0.5, 0, w / 2 + 0.5]) {
+      for (const dz of [-d / 2 - 0.5, 0, d / 2 + 0.5]) {
+        expect(
+          hitsObstacle(muell.x + dx, muell.z + dz, 0),
+          `am Startplatz des MUELL steht etwas bei (${(muell.x + dx).toFixed(2)} | ${(
+            muell.z + dz
+          ).toFixed(2)})`
+        ).toBeNull();
+      }
+    }
   });
 
-  it("er steht auch nicht vor der Öffnung einer Metallmulde", () => {
+  it("und er steht nicht vor der Öffnung der Metallmulde", () => {
+    /*
+     * Die Schwelle der Buntmetall-Mulde ist die einzige Kante, die ihm nah
+     * kommt. Gerechnet gegen die STEINE (Aussenkante x −4,95), nicht gegen die
+     * Muldenmitte: Die Steinreihe steht 0,55 m dick vor der Mulde.
+     */
     for (const c of CONFIGS.filter((x) => x.sortierbox === true)) {
-      const probe = c.x + c.size[0] / 2 + 0.8;
+      const schwelleAussen = c.x + c.size[0] / 2 + 0.55;
+      const luft = muell.x - muell.size[0] / 2 - schwelleAussen;
       expect(
-        hitsObstacle(probe, c.z, 0),
-        `${c.label}: der MUELL steht vor der Öffnung`
-      ).toBeNull();
+        luft,
+        `${c.label}: der MUELL steht ${(-luft).toFixed(2)} m in der Schwelle`
+      ).toBeGreaterThan(0.2);
     }
+  });
+
+  it("und er passt nicht in die Presse — das ist die Sperre, nicht eine Abfrage", () => {
+    /*
+     * Ansage Patrick 15.09.2026: „Der Container kann nicht gepresst werden.
+     * Dann gibt es die Fehlermeldung der Presse."
+     *
+     * Zugemauert ist das zuerst geometrisch: Die Kammer misst licht 4,20 x
+     * 4,05 m (`PRESS_INNER`), der Container 3,60 x 4,30 m. In keiner der
+     * beiden achsparallelen Lagen passt er hinein — 4,30 ist länger als die
+     * längste Kammerseite. Wer den Container größer macht, darf ihn gern
+     * größer machen; wer ihn KLEINER macht als 4,20 m in der langen Richtung,
+     * macht ihn pressbar und muss sich etwas anderes überlegen.
+     */
+    const [w, d] = muell.size;
+    const lang = Math.max(w, d);
+    const kammerLang = Math.max(PRESS_INNER.laenge, PRESS_INNER.tiefe);
+    expect(
+      lang,
+      `${lang.toFixed(2)} m passen in die ${kammerLang.toFixed(2)} m lange Kammer`
+    ).toBeGreaterThan(kammerLang);
   });
 
   it("und der Abladeplatz selbst ist auf ganzer Wagenlänge frei", () => {

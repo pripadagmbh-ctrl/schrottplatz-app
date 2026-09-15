@@ -4,6 +4,12 @@ import { getMaterial } from "../materials/catalog";
 import { maxSpeedFor } from "./scrapItems";
 import { computePurity, containerValueGemischt } from "../materials/purity";
 import { reihenstuecke } from "./legoreihe";
+import {
+  inhaltInsLager,
+  istPlatzinventar,
+  platzwache,
+  type LagerBericht,
+} from "./platzinventar";
 import type { ItemManager, ScrapItem } from "./scrapItems";
 import type { EventBus } from "../core/events";
 
@@ -113,14 +119,45 @@ export interface ContainerConfig {
    *
    * Wunsch Patrick 14.09.2026, bestaetigt am 15.09.: „vorn niedrig zumauern,
    * damit nichts zurueckrollt — aber bei abgesenkter Kabine muss man noch
-   * hineinsehen koennen." Das ist keine Geschmacksfrage, sondern eine
-   * Sichtlinie, und sie ist gerechnet (`AUGPUNKT_UNTEN`, siehe unten).
+   * hineinsehen koennen."
+   *
+   * ZWEI LAGEN SEIT DEM 15.09.2026 ABENDS, also 1,00 m (E-034). Ansage: „Die
+   * Buntmetallmulde hat ja quasi so 'n kleinen Sockel zu mir hin, und wenn ich
+   * das richtig sehe, ist das ein Element hoch — und da kommt einfach noch
+   * 'ne Lage drueber, damit die Anhaeufung etwas hoeher ist." Patrick hat die
+   * eine Lage am Geraet gesehen und entschieden.
+   *
+   * Was die Rechnung dazu sagt, steht weiter unten bei `totenStreifen` und
+   * gilt unveraendert: Ueber 1,00 m bleiben vom 4,20 m tiefen Muldenboden
+   * 48 % (vorderes Ende) bis 21 % (hinteres Ende) sichtbar; ueber 0,50 m
+   * waren es 79 bis 68 %. Die Sichtlinie ist die Messung, die Hoehe ist
+   * Patricks Entscheidung — beides steht nebeneinander, keines ersetzt das
+   * andere.
    *
    * Sie ersetzt NICHT die volle Stirnwand: `shareEast` bleibt gesetzt, der
    * Greifer faehrt weiter frei von der Baggerseite hinein. Was dazukommt, ist
    * eine Bordkante.
    */
   niedrigeStirn?: number;
+  /**
+   * PLATZINVENTAR: gehoert zum Platz, nicht zur Ware.
+   *
+   * Ansage Patrick 15.09.2026 zum Muellcontainer: „Selbst wenn er mal
+   * aufgeladen wird, gibt es kein Geld dafuer. Auch wenn er in der Presse mal
+   * verschwindet, gaebe es kein Geld dafuer. … Also wie auch der Besen ist es
+   * ein fester Bestandteil des Platzes."
+   *
+   * Das Kennzeichen sagt genau zwei Dinge, und beide gelten auch fuer den
+   * Besen im Nachbarpaket (`world/platzinventar.ts`):
+   *
+   *  1. UNVERKAEUFLICH. Die Huelle taucht in keiner Geldformel auf. Sie ist
+   *     kein `ScrapItem`, und `Account.sellContainer` rechnet ausschliesslich
+   *     ueber die Liste des `ItemManager` — es gibt also gar keinen Weg
+   *     hinein, und dieser Satz haelt ihn zu.
+   *  2. SEIN INHALT IST NICHT SEINE SACHE. Was drinliegt, gehoert dem Platz
+   *     und geht seinen normalen Weg ins Lagersilo (`inhaltInsLager`).
+   */
+  platzinventar?: boolean;
   /**
    * Lagermulde in der Silo-Reihe: das ENDE des Materialwegs.
    *
@@ -329,90 +366,126 @@ export const CONFIGS: ContainerConfig[] = [
    * (`containerValueGemischt`) — sonst staende derselbe Inhalt je nach
    * gewaehlter Leitfraktion zwischen 410 € (Zink) und 3600 € (Kupfer) da.
    *
-   * LAGE. x −7,6 bleibt (das ist die Flucht neben der Presse, die schon
-   * stand). 6,0 m lang statt 4,0 — sie fasst jetzt, was vorher auf drei
-   * Mulden lag. Die Mitte liegt auf z −19,2, also 7,83 m vom Sitz, mitten im
-   * Band; ihre Suedwand endet auf −22,55 und laesst dem Pressenrahmen 1,00 m.
-   * Auf der Muldenachse sind 5,56 der 6,00 m vom Sitz aus erreichbar.
+   * LAGE — NEU GERECHNET AM 15.09.2026 ABENDS (E-034).
+   *
+   * Ansage Patrick: „Ich wuerde die Mulden da rechts vom Bagger nochmal alle
+   * abreissen und dann direkt eine Mulde neben der Presse platzieren, eben mit
+   * Sockel, aber aus zwei Elementen und zur Ostseite offen. Und den Rest
+   * erstmal wegmachen." Die zweite Mulde rechts (MUELL) ist damit weg — sie
+   * ist ein frei versetzbarer Container geworden, siehe unten.
+   *
+   * „Neben der Presse" heisst NOERDLICH von ihr, in derselben Flucht: Die
+   * Maschine steht auf (−8,0 | −26,0), ihr Rahmen endet nach Norden auf
+   * z −23,55 (`PRESS_FUSS.hd` = 2,45), und ihre Deckelklappe schwingt 3,85 m
+   * nach WESTEN (`KLAPPE_WEG`, `KLAPPE_RICHTUNG`) — nach Norden schwingt
+   * nichts. Der Streifen noerdlich der Presse ist also der einzige, der
+   * zugleich frei ist und im Schwenkband liegt.
+   *
+   * x −7,6 bleibt (die Flucht, die schon stand). Die Mitte rueckt von z −19,2
+   * auf −19,8, also 0,60 m naeher an die Presse:
+   *
+   *   Mitte (−7,6 | −19,8)       7,60 m vom Sitz (−0,5 | −22,5), mitten im
+   *                              Band 5,8 … 9,2
+   *   Muldenachse z −22,8 … −16,8  Abstand 7,11 … 8,98 m — **100 %** der
+   *                              Achse erreichbar (vorher 93 %)
+   *   Suedflanke (Hindernis) bis z −23,15   0,40 m vor dem Pressenrahmen
+   *   Nordflanke (Hindernis) bis z −16,45   frei bis zur Kipperspur
    *
    * Sie hat wie ihre Vorgaenger keine Rueckwand (`shareEast`, E-006, Ansage
-   * 13.09.2026: „Rueckwaende raus, nur Seitenwaende"): Der Greifer setzt von
-   * oben ein, Lambert faehrt mit dem Radlader von Westen hinein.
+   * 13.09.2026: „Rueckwaende raus, nur Seitenwaende"): Zum Bagger hin steht
+   * nur die Schwelle, sonst nichts — DAS ist „zur Ostseite offen". Nach Westen
+   * faehrt Lambert mit dem Radlader hinein.
+   *
+   * WARUM `facing` WEITER „west" HEISST, obwohl die Mulde nach Osten offen
+   * ist: Das Feld sagt nicht, wo die Mulde steht, sondern wo LAMBERT und ein
+   * sortenreiner Kipper anfahren (`bayVorderkante` → `anlieferPunkt`), und wo
+   * das Schild haengt. Auf „east" gedreht wanderte Lamberts Halteplatz von
+   * (−11,9 | −19,8) auf (−3,3 | −19,8) — mitten in den Arbeitsbereich des
+   * Baggers (`imBaggerrevier`), und das Schild staende dem Fahrer im Bild.
+   * Gebaut ist, was Patrick beschreibt; der Bezeichner bleibt bei seiner
+   * eigenen Bedeutung. Im Zweifel die Koordinaten lesen, nie die Namen.
    */
   { id: "r_bunt", fractionId: "copper",
+    /*
+     * `battery` steht hier, weil Patrick es am 15.09.2026 ausdruecklich
+     * gewaehlt hat — gegen die Empfehlung einer eigenen Batteriemulde, mit
+     * beiden Folgen vor Augen (Gefahrgut; Blei drueckt die Reinheit). Gebaut
+     * in E-029, gemessen: eine Kupferfuhre mit 100 kg Akku bringt 80 statt
+     * 180 Euro, getrennt waeren es 235. In der MULDE kostet es null, solange
+     * Lambert sie raeumt — er liest die Fraktion des Stuecks, nicht die der
+     * Mulde.
+     *
+     * Beim Zusammenfuehren zweier Pakete am selben Abend war der Eintrag
+     * einmal weg: Das zweite Paket war vor E-029 abgezweigt und kannte die
+     * Entscheidung nicht. Darum steht sie hier.
+     */
     mitFraktionen: ["brass", "alu", "zinc", "cable", "va", "battery"],
-    label: "BUNT + VA", kind: "bay", x: -7.6, z: -19.2, size: [4.2, 6.0, 2.0],
-    sortierbox: true, shareEast: true, niedrigeStirn: 0.5 },
+    label: "BUNT + VA", kind: "bay", x: -7.6, z: -19.8, size: [4.2, 6.0, 2.0],
+    sortierbox: true, shareEast: true, niedrigeStirn: 1.0 },
 
   /*
-   * MUELL — nicht mehr in der Suedostecke, sondern in der Luecke zwischen
-   * Kabel-Mulde und Kipperspur (15.09.2026).
+   * MUELL — ab dem 15.09.2026 abends kein Behaelter mehr, sondern ein
+   * ABSETZCONTAINER, den der Spieler hinstellt, wo er will (E-034).
    *
-   * Ansage Patrick: „Die Muellmulde muss weg. Die LKWs fahren in die
-   * Muellmulde und ich kann noch nicht mal die LKWs vollstaendig abladen, weil
-   * ich in die Wand greife. … Sie stehen mitten im Arbeitsweg des LKWs und
-   * Arbeitsbereich des Baggers."
+   * Ansage Patrick: „Nein, den Muell nehmen wir in einen frei platzierbaren
+   * Container." Und auf die Frage nach einer Standardstelle: „Der Container
+   * soll erstmal frei bleiben, damit ich auch testen kann, wo der am besten
+   * steht." Die Koordinate unten ist deshalb sein START, nicht sein Zuhause:
+   * Es gibt kein Zurueckschnappen, kein „an die Sollposition". Wo der Spieler
+   * ihn absetzt, bleibt er.
    *
-   * NACHGEMESSEN an der alten Stelle (7,0 | −27,0), gegen den echten Umriss
-   * des LKW (`vehicles.ts`: Ursprung = Muldenmitte, Ladeflaeche ± bedLen/2,
-   * Standflaeche ± (bedLen/2 + 1,6)):
+   * WO ER MORGENS STEHT — gesucht, nicht gegriffen. Frei im Schwenkband
+   * 5,8 bis 9,2 m ist nach dem Abriss der Streifen zwischen der Schwelle der
+   * Buntmetall-Mulde und der Kipperspur:
    *
-   *   Ladeflaeche im Halt        z −26,70 … −21,30 auf x 4,95 … 7,65
-   *   Nordwand der Muellmulde    z −26,15 … −25,45 auf x 5,20 … 8,80
-   *   → Ueberschneidung          2,45 m x 0,70 m — die Pritsche steckt in der
-   *                              Wand, genau so, wie es zu sehen war.
-   *   Standflaeche des Wagens    z −28,30 … −19,70
-   *   → ueberdeckt die Mulde     2,65 m x 2,85 m, also fast ganz.
-   *   Greifen an der SO-Ecke     Abstand Ladeflaechenecke (7,65 | −26,70) zur
-   *                              Stirnwand der Mulde (x 8,45): 0,80 m. Die
-   *                              offene Spinne misst 3,38 m, braucht also
-   *                              1,69 m Halbmass — „ich greife in die Wand".
+   *   Schwelle BUNT + VA, Aussenkante   x −4,95  (Steinreihe, 0,55 m dick)
+   *   Kipperspur x 2,0, Wagenflanke     x  0,45  (halbe Breite 1,55 m)
+   *   Blockadepruefung tastet mit       1,40 m   (`routes.ts`, BED/Schranke)
+   *   → nutzbar bleiben 3,70 m Breite; der Container misst 3,60 m.
    *
-   * DIE NEUE STELLE ist gesucht, nicht gegriffen. Frei im Schwenkband 5,8 bis
-   * 9,2 m war am Vormittag des 15.09.2026 nur noch der Streifen zwischen der
-   * Kabel-Mulde (Ostkante x −5,5) und der Kipperspur (x 2,0, Wagenflanke
-   * x 0,45).
+   *   Mitte (−2,8 | −15,4)   7,46 m vom Sitz — mitten im Band
+   *   Grundflaeche           x −4,60 … −1,00, z −17,55 … −13,25
+   *   Abstand zur Schwelle   0,35 m      Abstand zur Kipperflanke 1,45 m
+   *   82 % seiner Grundflaeche liegen im Schwenkband (mehr geht nicht: der
+   *   Ring ist 3,40 m breit, der Container 3,60 x 4,30 m).
    *
-   * NACHTRAG E-029, denselben Tag: Die Kipperspur gibt es nicht mehr — der
-   * Kipper faehrt an den Abladeplatz. Oestlich der Muellmulde ist damit bis
-   * zur Abladespur (x 6,3, Wagenflanke 4,75) alles frei. Die Mulde bleibt
-   * stehen, wo sie steht; die Zahlen unten sind die Rechnung, mit der sie
-   * dorthin kam, und die Schranke zur Spur ist seitdem nur groesser
-   * geworden.
+   * MASSE — beide aus einer Schranke, nicht gewaehlt:
    *
-   *   Mitte (−3,2 | −14,6)   8,35 m vom Sitz — im Band
-   *   Westkante x −5,0       0,50 m bis zur Kabel-Mulde
-   *   Stirnwand bis x −1,05  1,50 m bis zur Flanke des Kippers (Schranke 1,40)
+   *  - 3,60 m quer: das Breiteste, was zwischen Schwelle und Kipperspur passt.
+   *    Lichte Weite 3,42 m, die offene Sichelkralle misst 3,38 m
+   *    (`spinnenmass`) — man kommt hinein, aber knapp.
+   *  - 4,30 m laengs: EIN DEZIMETER LAENGER ALS DIE PRESSKAMMER. Sie misst
+   *    licht 4,20 x 4,05 m (`press.ts`, PRESS_INNER). 4,30 passt in keiner
+   *    Lage hinein — der Container kann nicht gepresst werden, und zwar aus
+   *    Geometrie statt aus einer Abfrage (Ansage 15.09.2026: „Der Container
+   *    kann nicht gepresst werden. Dann gibt es die Fehlermeldung der
+   *    Presse.").
+   *  - 0,80 m Wandhoehe (SW): Bei 6,72 m Abstand zur Vorderkante bleiben aus
+   *    der abgesenkten Kabine 40 % des Bodens sichtbar (`totenStreifen`). Bei
+   *    1,00 m waeren es 18 %, bei 1,20 m gar nichts mehr.
    *
-   * z −14,6 ist dabei nicht frei gewaehlt: Die Mulde steht zwischen den
-   * Oeffnungen von KABEL (Mitte z −16,7) und KUPFER + MESSING (−12,5), und
-   * ihre Flanken duerfen vor keiner der beiden stehen. Bei −14,6 liegen sie
-   * auf z −16,15 … −15,45 und −13,75 … −13,05 — beide Oeffnungen bleiben frei
-   * (`test/platz.test.ts` tastet sie ab).
+   * GEWICHT. Die Kollider stehen auf Dichte 300 kg/m³ (Bestand): Boden und
+   * Kufen 3,60 x 0,31 x 4,30 m = 4,80 m³ → 1440 kg, vier Waende 1,14 m³ →
+   * 341 kg, zusammen **1781 kg leer**. Der Greifer traegt 3500 kg
+   * (`MAX_TOTAL_KG`) — leer geht er also hoch, und ab rund 1,7 t Muell darin
+   * nicht mehr. Kippen kann er nicht: nur die Hochachse ist freigegeben.
    *
-   * `facing: "east"` — die geschlossene Stirnwand steht nach WESTEN, zur
-   * Kabel-Mulde hin, die Oeffnung nach Osten zum Bagger und zur Kipperspur.
-   * Andersherum staende eine 2,2 m hohe Wand zwischen Sitz und Mulde, und die
-   * Oeffnung schaute 0,5 m weit auf die Flanke des Nachbarn.
+   * ER IST NICHTS WERT, NIE (`platzinventar`). Ansage Patrick: „Selbst wenn er
+   * mal aufgeladen wird, gibt es kein Geld dafuer. … Also wie auch der Besen
+   * ist es ein fester Bestandteil des Platzes." Die Huelle ist kein
+   * `ScrapItem` und kommt in keiner Geldformel vor — `sellContainer` rechnet
+   * ausschliesslich ueber die Liste des `ItemManager`. Was auf dem Schild
+   * steht, ist der INHALT, wie bei jeder anderen Mulde auch.
    *
-   * Sie liegt damit WESTLICH der Rueckfahrspur zum Abladeplatz (x 6,3) und
-   * ausserhalb jeder Wagenflaeche — seit E-029 ist das die einzige Spur, die
-   * hier noch laeuft. Vierte Pflichtstation (Ansage: „vor allem
-   * an Mischschrott drankommen, an die Presse, an Stahlschrott und an den
-   * Muell") — geprueft in `test/platz.test.ts`.
-   */
-  /*
-   * Reifen gehoeren seit dem 14.09.2026 abends hierhin, Holz und Kunststoff
-   * seit dem 15.09. (`mitFraktionen`): Ohne diese Eintraege zaehlte jedes
-   * solche Stueck als Verunreinigung und druecke die Reinheit des ganzen
-   * Behaelters (Briefing Kap. 7, Reinheit²). Abgerechnet wird nach
-   * `fractionId`, also zum Baumisch-Satz (−0,04 €/kg) — dieselbe bewusste
-   * Vereinfachung wie bei Kupfer + Messing. Der Muell am Bagger und das
-   * ABFALL-Silo fassen damit genau dieselben vier Fraktionen; was der Spieler
-   * hier hineinwirft, darf Lambert eins zu eins weitertragen.
+   * SEIN INHALT GEHT NACHTS INS ABFALL-SILO (`inhaltInsLager`, siehe
+   * `world/platzinventar.ts`). Ansage: „Wenn mal Muell verschwindet, dann
+   * verschwindet er ueber Nacht nicht, sondern landet in dem Muellsilo. Da
+   * wird er dann gelagert. Und der Container stuende wieder bei mir." Damit hat
+   * der Muell zum ersten Mal einen ganzen Weg: Wrack → Container → Silo.
    */
   { id: "r_rubble", fractionId: "rubble", mitFraktionen: ["tires", "wood", "plastic"],
-    label: "MUELL", kind: "bay", x: -3.2, z: -14.6, size: [3.6, 2.4, 2.2], facing: "east" },
+    label: "MUELL", kind: "rolloff", x: -2.8, z: -15.4, size: [3.6, 4.3, 0.8],
+    platzinventar: true },
 
   /*
    * REIFEN ist ersatzlos weg (Ansage 14.09.2026 abends: „Der Reifencontainer
@@ -544,15 +617,20 @@ export const AUGPUNKT_UNTEN = 3.28;
  * Strahlensatz: `blind = h × D / (H − h)`, mit H = Augenhoehe, h = Wandhoehe,
  * D = waagerechter Abstand vom Auge zur Wand.
  *
- * Beispiel Buntmetall-Mulde (E-028): Ihre Baggerseite laeuft von (−5,5 |
- * −22,2) bis (−5,5 | −16,2), also 5,01 bis 8,04 m vom Sitz.
+ * Buntmetall-Mulde AM NEUEN STANDORT (E-034): Ihre Baggerseite laeuft von
+ * (−5,5 | −22,8) bis (−5,5 | −16,8), also 5,01 bis 7,58 m vom Sitz.
  *
- *   Wandhoehe 0,50 m (EINE Lage):  blind 0,90 bis 1,45 m  →  65–79 % des
- *                                  4,20 m tiefen Bodens bleiben sichtbar
- *   Wandhoehe 1,00 m (ZWEI Lagen): blind 2,20 bis 3,53 m  →  16–48 %
+ *              vorderes Ende   Mitte      hinteres Ende
+ *   0,50 m     blind 0,90      1,02       1,36   →  79 · 76 · 68 % sichtbar
+ *   1,00 m     blind 2,20      2,49       3,33   →  48 · 41 · 21 % sichtbar
  *
- * Deshalb steht dort EINE Lage und nicht zwei. Ab 1,13 m sieht man vom
- * hinteren Ende der Mulde ueberhaupt keinen Boden mehr.
+ * Gebaut sind seit dem 15.09.2026 abends ZWEI Lagen (1,00 m) — Entscheidung
+ * Patrick am Geraet, nachdem er die eine Lage gesehen hatte. Die Rechnung
+ * bleibt als Messung stehen, nicht als Einwand.
+ *
+ * Die Grenze, ab der vom hinteren Ende gar kein Boden mehr zu sehen ist, liegt
+ * am neuen Standort bei 1,17 m (am alten waren es 1,13 m): Er ist naeher am
+ * Sitz, der tote Streifen waechst mit dem Abstand.
  */
 export function totenStreifen(wandHoehe: number, abstand: number, augHoehe = AUGPUNKT_UNTEN): number {
   if (wandHoehe >= augHoehe) return Infinity;
@@ -1577,6 +1655,15 @@ export class ContainerManager {
      * eines vollen Containers wandert die Zone dann eine Fuhre hinterher.
      */
     for (const c of this.containers) c.syncBeweglich();
+    /*
+     * DIE NACHTSCHICHT — vor dem Zählen, nicht danach.
+     *
+     * Ist die Uhr über Mitternacht gelaufen (`world/daylight.ts`), wandert der
+     * Inhalt des Platzinventars in sein Lagersilo. Danach zählt die Zählung
+     * unten die versetzten Stücke gleich an ihrem neuen Ort — andersherum
+     * stünde eine Runde lang die alte Füllung auf dem Schild.
+     */
+    if (platzwache.tagGewechselt("platzinventar")) this.nachtschicht(itemManager);
     const changes: Array<{ item: ScrapItem; from: string | null; to: string | null }> = [];
     for (const item of itemManager.items) {
       let to: string | null = null;
@@ -1674,6 +1761,67 @@ export class ContainerManager {
       if (h) out.push({ ...h, label: c.cfg.label });
     }
     return out;
+  }
+
+  /* ------------------------------------------------- Platzinventar ------- */
+
+  /**
+   * Alles Platzinventar leeren: Inhalt ins Lagersilo, Hülle bleibt stehen.
+   *
+   * Ausgelöst vom Tageswechsel (siehe `recount`). Denselben Weg nimmt der
+   * Container, wenn ein Abholer ihn mitnimmt — dafür gibt es `leereBehaelter`,
+   * damit es nicht zwei Vorgänge werden, die auseinanderlaufen.
+   */
+  nachtschicht(itemManager: ItemManager): LagerBericht {
+    const summe: LagerBericht = { kg: 0, stueck: 0, rest: 0 };
+    for (const c of this.containers) {
+      if (!istPlatzinventar(c.cfg)) continue;
+      const b = this.leereBehaelter(c.cfg.id, itemManager);
+      summe.kg += b.kg;
+      summe.stueck += b.stueck;
+      summe.rest += b.rest;
+    }
+    return summe;
+  }
+
+  /**
+   * Einen Behälter ins Lager ausräumen — die Kilogramm kommen dort an, nichts
+   * verschwindet und nichts wird verkauft.
+   *
+   * Der zweite Auslöser neben dem Tageswechsel: Nimmt ein Abholer den
+   * Müllcontainer mit, bringt er ihn leer zurück (Ansage Patrick 15.09.2026:
+   * „Mit ohne Müll in dem Fall. Und der Müll landet natürlich bei uns im
+   * Silo."). Die Zustandsmaschine des Abholers ruft dafür genau diese
+   * Methode auf, bevor der Wagen losfährt.
+   */
+  leereBehaelter(id: string, itemManager: ItemManager): LagerBericht {
+    const c = this.containers.find((k) => k.cfg.id === id);
+    if (!c) return { kg: 0, stueck: 0, rest: 0 };
+    c.syncBeweglich();
+    const bericht = inhaltInsLager(itemManager, (p) => c.containsPoint(p));
+    c.clearAfterSale();
+    c.wiegeLadung();
+    return bericht;
+  }
+
+  /**
+   * Steht Platzinventar in diesem Rechteck?
+   *
+   * Die Presse fragt das, bevor sie die Klappen schließt: Der Container darf
+   * nicht gepresst werden, sie meldet stattdessen einen Fehler (Ansage
+   * 15.09.2026). Gebaut ist die Sperre zuerst geometrisch — der Container ist
+   * mit 4,30 m einen Dezimeter länger als die lichte Kammer und passt in
+   * keiner Lage hinein. Diese Abfrage ist der Gurt zum Hosenträger, für den
+   * Fall, dass er halb auf dem Rahmen liegt.
+   */
+  platzinventarIn(x: number, z: number, hw: number, hd: number): GameContainer | null {
+    for (const c of this.containers) {
+      if (!istPlatzinventar(c.cfg)) continue;
+      const [w, d] = c.cfg.size;
+      const gross = Math.max(w, d) / 2; // gedreht abgesetzt: Hüllkreis
+      if (Math.abs(c.ort.x - x) < hw + gross && Math.abs(c.ort.z - z) < hd + gross) return c;
+    }
+    return null;
   }
 
   /** Aktuelle Stellung eines Behälters, oder null wenn es ihn nicht gibt. */

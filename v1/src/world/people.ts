@@ -10,6 +10,7 @@ import {
   type ContainerConfig,
 } from "./containers";
 import { KAFFEE_ROT, BUCHT_Z } from "./yard";
+import { BAGGER_STAND, SCHWENK_AUSSEN } from "./baggerstand";
 import { findeBox, ausBox, type Box } from "./boxen";
 import {
   wegFrei,
@@ -1918,9 +1919,18 @@ export function imBaggerrevier(x: number, z: number): boolean {
 }
 const REVIER_X =
   Math.max(...CONFIGS.filter((c) => c.sortierbox).map((c) => c.x + c.size[0] / 2)) + 0.5;
-const REVIER_Z =
-  Math.max(
-    ...CONFIGS.filter((c) => c.sortierbox === true || c.id === "r_rubble").map(
-      (c) => c.z + c.size[1] / 2
-    )
-  ) + 1.5;
+/**
+ * Nordgrenze des Reviers.
+ *
+ * Bis zum 15.09.2026 abends stand hier `max(z + Laenge/2)` ueber die
+ * Sortierbox UND die Muellmulde. Seit der Muell ein frei versetzbarer
+ * Container ist (E-034), waere Lamberts Sperrgebiet mit ihm gewandert: Wer
+ * den Container in die Ecke schiebt, gibt den Bereich vor dem Bagger frei —
+ * ein Sperrgebiet, das man wegtragen kann, ist keines.
+ *
+ * Jetzt haengt die Grenze an der Maschine selbst: so weit, wie der Arm reicht
+ * (`SCHWENK_AUSSEN` = 9,2 m vor dem Sitz, also z −13,3), plus 1,4 m, damit
+ * auch der Halteplatz des Kippers (z −12,5, `routes.ts`) drin liegt. Das ergibt
+ * −11,9 — genau den Wert, der vorher zufaellig herauskam.
+ */
+const REVIER_Z = BAGGER_STAND.z + SCHWENK_AUSSEN + 1.4;
