@@ -2291,6 +2291,133 @@ Grundriss nachgezogen: `docs/messungen/2026-09-15_eine-mulde.svg`.
 
 ---
 
+### E-036 — Der Bagger ist gebaut: sieben Pakete, 137 → 59 Netze (15.09.2026)
+
+**Entscheidung.** E-025 ist umgesetzt, Paket für Paket und Commit für Commit:
+Zylinder · Drehkranz · Ausleger/Stiel · Fahrer · Fahrwerk · Oberwagen ·
+Räumschild/Pratzen · Kabine. Je Baugruppe ein eigenes Modul nach dem Muster von
+`wheelParts.ts`; neu ist `bauteile.ts`, das mehrere Farben über Eckfarben in
+**ein** Netz legt — so kostet der Fahrer mit fünf Farben zwei Netze statt fünf.
+
+| | vorher | nachher |
+|---|---|---|
+| Einzelteile | 157 | **rund 330** |
+| Netze | 137 | **59** |
+| Zeichenrufe | 194 | **89** |
+| Dreiecke | 15.420 | 20.144 |
+
+**Doppelt so viele Teile bei 105 Zeichenrufen weniger.** Dreiecke sind auf dem
+Gerät fast gratis, Netze sind der Engpass — das ist der ganze Kern von E-025.
+
+**Drei Zahlen, an denen man es sieht.**
+
+1. **Die Kolbenstange wurde um +128 % gedehnt** (0,97 → 2,21 m) und wird jetzt
+   geschoben: Das Rohr behält seine 2,298 m, nur die Stange fährt aus. Von außen
+   erkennt man es am Führungskopf, der immer an derselben Stelle des Rohrs
+   sitzt, und am Gabelkopf, der seine Größe behält.
+2. **Die obersten 54 cm jedes Rades steckten im Rahmenkasten**, 20 cm in der
+   Breite. Die Wange setzt jetzt auf 1,24 m auf, also auf der Radoberkante.
+3. **Kein Rad hat sich je gedreht.** Sie rollen jetzt aus der wirklich
+   gefahrenen Strecke, die vorderen lenken bis 33,3° — gerechnet aus Radstand
+   und Wenderadius, nicht gesetzt.
+
+**Fünf Stellen, an denen das Konzept nicht aufging** und die der Bau korrigiert
+hat: Der Achsschenkel kann nicht „beweglich" sein, ohne zwei Netze zu kosten
+(fest ins Stahlnetz gelegt, sichtbar lenkt das Rad trotzdem). Das Geländer passt
+nicht an die Deckkante — zwischen Haube und Kante bleiben 20 cm, darauf geht
+niemand; es steht jetzt auf der Schulter der gestuften Haube, und erst dadurch
+bekommt die Stufe einen Sinn. Spur ist 2,50 m, nicht 3,00 wie im Konzept
+genannt. Und die Schätzung der Dreiecke war zu großzügig: +4.700 statt +18.600.
+
+**Unangetastet:** Reichweite (`BOOM_LEN` 5,20 / `STICK_LEN` 4,00), `BOOM_PIVOT`,
+Grabtiefe, **alle Kollider** — `test/fahrwerk.test.ts` misst den
+Unterwagen-Kollider direkt in der Rapier-Welt nach. Spinne, Greifen, Pendel,
+Kameramodi, `gripSystem.ts`, `clawGeometry.ts`, `collision.ts`, `orbitCamera.ts`.
+Die Räder bleiben in Form, Größe und Material genau so, wie Patrick sie am
+14.09. abgenommen hat.
+
+**Offen.** Der **Kabinenhub** ist das achte Paket und kommt allein (E-040) — er
+ist die einzige Änderung, die den Augpunkt der Kabinenkamera berührt. Und der
+**Pratzenausleger läuft durch das Vorderrad**: Er liegt bei z ±1,35, das Rad
+füllt dort y 0,02…1,22, der Ausleger y 0,50…0,90. Das ist seit dem 12.09. so und
+fällt erst jetzt auf, weil das Rad frei steht.
+
+**Auf dem Gerät zu prüfen.**
+
+1. Hauptarm langsam heben und senken: Bleibt das Rohr gleich lang und nur die
+   Stange wächst heraus?
+2. Oberwagen herumdrehen: Wandert das Zahnmuster des Drehkranzes, während die
+   Räder stehen?
+3. Geradeaus fahren, dann voll einlenken: Drehen sich alle vier Räder, schlagen
+   die vorderen ein, stehen sie frei unter der Maschine?
+4. In die Kabine wechseln: Sitzt alles noch da, wo es war?
+
+---
+
+### E-037 — Aus dem Kehrbesen wird ein getretener Ballen (15.09.2026)
+
+**Entscheidung.** Der Trichter von E-031 wird durch einen **Ballen** ersetzt:
+unten am breitesten und platt (die Schleppkante, Superellipse mit Exponent 4 —
+lange gerade Flanken), nach oben in eine gedrückte, beulige Kuppe auslaufend
+(Exponent 2,2), mit drei Dellen dort, wo die Schalen aufgesessen haben.
+**2,40 × 1,10 × 1,30 m, 680 kg, 1,98 m³**, eine konvexe Hülle statt zweier. Er
+wird nicht mehr auf die Flanke gekippt, weil seine Bauform schon die Liegelage
+ist. Neuer Platz: **(3,5 | −16,0)**.
+
+**Begründung.** Patrick am Gerät: „Der ist viel zu klein. Er soll fast so breit
+sein wie eine Pritsche und viel voluminöser. Die Proportionen passen auch nicht
+— das Breite ist eigentlich das am meisten Volumen einnehmende. Stell dir vor,
+da werden sehr viele Maschendrähte zusammengepresst, und oben ist das durch das
+Greifergewicht wie eine Kugel geformt, aber auch nicht so sauber. Vor allem wird
+der Maschendraht immer wieder zwischen Spinne, Birne und Boden gedrückt, und so
+würde es die Form annehmen. Also ein bisschen wie ein Tee-Ei."
+
+**Jede Zahl aus dieser Geschichte gerechnet, nicht gewählt:** Die Breite aus der
+Ladefläche (2 × `BED_HALF_W` = 2,70 m, minus 0,15 m Luft je Seite). Die Tiefe aus
+`clawWidth(CLAW_CLOSED_SPLAY)` = 1,297 m — **der Spur, die die geschlossene
+Spinne hinterlässt**. Die Masse aus acht Rollen Maschendraht (250 m² × 2,72
+kg/m²). Die Höhe aus dem Rauminhalt, den diese Drahtmenge braucht.
+
+Alt zu neu: **doppelte Breite, 3,4-fache Tiefe, 9,7-facher Rauminhalt,
+13-fache Masse.**
+
+**Die Spinne umfasst ihn nicht — sie drückt ihn.** Offen spannt sie 3,38 m gegen
+2,40 m Breite, kommt also von oben über ihn. Im Greiffenster ist der Korb nur
+noch 1,46 m weit. Gemessen in der echten Rapier-Welt: **gefasst bei Schließgrad
+0,60 mit fünf Schalen, 2,96 m angehoben.** Genau das Bild, aus dem die Form
+kommt.
+
+**Er kehrt besser**: in keiner Zelle der Tabelle schlechter als der Trichter, in
+fünf deutlich besser. Auf der Ladefläche fallen **vier von sechs Teilen in der
+ersten Bahn** herunter; der Trichter brauchte drei Bahnen für fünf.
+
+**Zwei Befunde nebenbei.** Der alte Fleck (5,0 | −27,0) war seit E-029 keiner
+mehr: Der Selbstabkipper kippt seitdem auf (6,3 | −26,0) ab — **1,64 m
+daneben**, und der Wächter vom Vormittag hat die Abkippstelle nicht geprüft. Und
+bei 680 kg wird der Ballen erstmals zum **Hindernis** für Fahrer
+(`BLOCKING_MASS_KG` 120 kg); er muss deshalb in einer Arbeitszone liegen.
+
+**Verworfene Alternativen.** Breite 2,70 m wie die Ladefläche — dann passt er
+nicht mehr hinein und kann sie nicht kehren. Eckigere Ecken (Exponent 6) — räumt
+die Bordwandecke auch nicht und sieht nicht mehr nach Draht aus. Zwei Hüllen
+beibehalten — gemessen unnötig, ein Ballen hat keine Taille (Hülle steht 0,16 m
+vom Draht ab, bei einer Sanduhrform wären es 0,49 m).
+
+**Offen.** Ein Teil im 15-cm-Streifen zwischen Ballenflanke und Bordwand wird
+nicht erwischt — die gerundeten Ecken schieben es dorthin. Der alte Besen konnte
+es auch nicht; wer es lösen will, braucht ein Werkzeug mit eckiger Kante.
+
+**Auf dem Gerät zu prüfen.**
+
+1. Sieht er aus, als hätte jemand hundertmal draufgetreten — oder wie ein
+   sauberer Ballen? Und ist er groß genug?
+2. Greif ihn von oben auf der Kuppe und heb ihn an. Setz ihn ab: bleibt er
+   liegen oder zittert er?
+3. Zieh ihn quer über den Vorplatz und dann über eine Ladefläche. Passt er
+   zwischen die Bordwände? (0,15 m Luft je Seite — knapp.)
+
+---
+
 ### E-038 — `tsc` sieht ab jetzt auch `test/` und `tools/` an (15.09.2026)
 
 **Entscheidung.** Drei Dinge, alle in `test/`, `tools/`, `docs/` und den
