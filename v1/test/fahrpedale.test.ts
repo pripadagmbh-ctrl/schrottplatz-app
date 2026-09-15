@@ -33,11 +33,25 @@ const seite = readFileSync(resolve(wurzel, "index.html"), "utf8");
  */
 const sichtbar = seite.replace(/<!--[\s\S]*?-->/g, "").replace(/\/\*[\s\S]*?\*\//g, "");
 
-/** Zahl hinter einer CSS-Eigenschaft in einem Regelblock herausziehen. */
+/**
+ * Zahl hinter einer CSS-Eigenschaft in einem Regelblock herausziehen.
+ *
+ * GEAENDERT am 15.09.2026 (E-032): Die Abstaende stehen seither als
+ * `max(8px, calc(var(--sa-l) + 8px))` da — sichere Raender fuer Notch und
+ * Home-Indicator. Hier interessiert der GRUNDABSTAND, also das erste
+ * Pixelmass im Ausdruck; das ist zugleich der Wert, den ein Geraet ohne Notch
+ * (das iPad) wirklich bekommt. Dass auf dem iPhone nichts in den Rand ragt,
+ * prueft `test/sichererand.test.ts` mit den echten Randbreiten.
+ *
+ * Wichtig: Es wird weiter geworfen, wenn gar nichts dasteht. Ein Waechter, der
+ * bei fehlender Angabe stillschweigend NaN weiterreicht, ist gruen und wertlos.
+ */
 function css(block: string, eigenschaft: string): number {
-  const m = new RegExp(`(?:^|[;{\\s])${eigenschaft}:\\s*(\\d+)px`).exec(block);
+  const m = new RegExp(`(?:^|[;{\\s])${eigenschaft}:\\s*([^;]+)`).exec(block);
   expect(m, `${eigenschaft} fehlt`).not.toBeNull();
-  return Number(m![1]);
+  const zahl = /(\d+)px/.exec(m![1]);
+  expect(zahl, `${eigenschaft} ohne Pixelmass: ${m![1]}`).not.toBeNull();
+  return Number(zahl![1]);
 }
 
 /** Alle Regelbloecke zu einem Selektor, in der Reihenfolge des Dokuments. */
@@ -306,8 +320,10 @@ describe("Platz auf dem Glas", () => {
      * Hochformat, das hier nie geprueft wurde.
      */
     const zahl = (block: string, feld: string): number | null => {
-      const m = new RegExp(`(?:^|[;{\\s])${feld}:\\s*(\\d+)px`).exec(block);
-      return m ? Number(m[1]) : null;
+      const m = new RegExp(`(?:^|[;{\\s])${feld}:\\s*([^;]+)`).exec(block);
+      if (!m) return null;
+      const p = /(\d+)px/.exec(m[1]);
+      return p ? Number(p[1]) : null;
     };
     const frei = (block: string, pHalter: string, pedal: string): boolean => {
       const links = zahl(block, "left");

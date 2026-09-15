@@ -1536,3 +1536,161 @@ Grundriss vorher/nachher: `docs/messungen/2026-09-15_silos-l-form.svg`.
 5. **Zum Tor schauen:** Steht Janines Wagen an der Nordmauer neben den
    Warteplätzen, und laufen die wartenden Fahrer zu ihr, ohne über den
    Arbeitsbereich zu müssen?
+
+---
+
+### E-032 — HUD in zwei Stapeln, sichere Ränder überall, die Ruhezeile fällt weg (15.09.2026)
+
+**Entscheidung.** Vier Dinge in einem Paket, weil sie alle dieselbe Ursache
+haben: HUD-Kästen, die einzeln an einer geschätzten Zahl am Bildrand hängen.
+
+1. **Oben ein Stapel.** `#money`, `#shift` **und** `#debug` liegen in
+   `#hudoben` (Flex-Spalte, 6 px, flach 4 px). Keiner trägt mehr einen eigenen
+   Abstand zum Rand.
+2. **Sichere Ränder.** `env(safe-area-inset-*)` wird erstmals benutzt — vier
+   Variablen in `:root`, überall nach der Regel
+   `max(Grundabstand, Rand + 8 px)`; nur wo ein Element auf einem anderen
+   aufsitzt, steht `calc(Rand + Grundabstand)`.
+3. **14 px im Querformat** für Griff-Info und Ladeanzeige (vorher 12).
+4. **„Greifer: offen" verschwindet ganz** — mit 400 ms Nachlauf, damit es beim
+   Schwenken nicht flackert. „Greifer: geschlossen (leer)" bleibt.
+
+Dazu zwei Reihenfolgen getauscht: Im unteren Stapel steht die **Griff-Info
+oben** und die Ladeanzeige unten, und die Einblendung (`#toast`) hat ihre Werte
+aus dem Stilattribut ins CSS bekommen.
+
+**Begründung.**
+
+*Zu 1.* `#money` stand auf `top: 12` und ist mit 15 px Schrift, Zeilenabstand
+1,5, 8 px Innenrand und 1 px Rahmen **41 px** hoch — es reichte bis 53, während
+`#shift` bei 46 begann: **7 px Überlappung**, sichtbar seit dem 14.09. Die
+Zahlen 12 / 46 / 80 waren geschätzte Kastenhöhen, und eine geschätzte
+Kastenhöhe ist genau das, was nie stimmt. Der Debugblock bei 80 wäre der
+nächste Fall gewesen, sobald der Tagesablauf zweizeilig wird — er ist deshalb
+mit im Stapel. Ausgeblendet nimmt ein Flex-Kind keinen Platz ein; mit F3
+erscheint er unter dem Tagesablauf, ohne dass irgendwo eine Zahl nachgezogen
+werden muss.
+
+*Zu 2.* `viewport-fit=cover` stand seit jeher im Dokument, `env()` wurde
+**nirgends** benutzt. Nachgerechnet lagen im Querformat **sieben** Elemente
+teilweise im Rand (Pedale, beide Drehtasten, Menüknopf, Ladeanzeige, Konto,
+Tagesablauf), im Hochformat vier. Die Ladeanzeige saß 6 px über der Unterkante,
+also auf dem weißen Balken.
+
+Die Regel `max(Grundabstand, Rand + 8 px)` statt `Rand + Grundabstand` ist der
+Kern: Eine Drehtaste, die ohnehin 132 px vom Bildrand weg sitzt, steht längst
+außerhalb der 50 px breiten Notch-Zone. Hätte sie noch einmal 50 px eingerückt,
+wäre der freie Streifen für den unteren Block um 50 px schmaler geworden —
+ohne dass eine einzige Taste besser erreichbar würde. **Auf dem iPad, wo env()
+null liefert, fällt jedes max() auf den alten Wert zurück: Die Fassung ist dort
+Pixel für Pixel dieselbe wie vorher** (`test/sichererand.test.ts`).
+
+*Zu 3.* Briefing Kap. 20 verlangt mindestens 14 px. Was es kostet, steht unten.
+
+*Zu 4.* Patrick: „Ich weiß nicht, wofür wir ‚Greifer offen' überhaupt brauchen.
+Also kann ganz verschwinden." Der Vorgänger hatte den blassen Kasten behalten,
+weil der Greiferzustand ablesbar bleiben müsse — aber der Greifer selbst ist im
+Bild zu sehen. `display: none` und nicht `opacity: 0`: Ein durchsichtiger
+Kasten hält seine Fläche und schöbe die Ladeanzeige weiter nach oben.
+
+**„Greifer: geschlossen (leer)" bleibt** — das ist keine Zustandsmeldung,
+sondern die Antwort auf einen Handgriff. Wer zupackt und nichts bekommt, sieht
+sonst nur eine geschlossene Spinne und weiß nicht, ob sie leer ist oder ob das
+Teil hinter der Schale steckt. Patrick hat nur „offen" genannt, und er hat
+gerade gemeldet, dass sich mittlere Teile schwer fassen lassen.
+
+*Zur getauschten Reihenfolge.* Der Halter hängt am unteren Bildrand und wächst
+nach oben: Was unten steht, liegt fest. Die Griff-Info wechselt mehrmals je
+Sekunde ihre Zeilenzahl und verschwindet jetzt ganz — stünde sie unten, spränge
+die Ladeanzeige bei jedem Griff auf und ab.
+
+**Was 14 px kosten und wo sie herkommen.** Unterer Block, iPhone mini quer,
+gemessen ab Bildunterkante:
+
+| Fall | 12 px (alt) | 12 px + sichere Ränder | 14 px + sichere Ränder |
+|---|---|---|---|
+| Ruhe | 33 px (8,8 %) | 33 px | **0 px** |
+| Alltag (ein Stück anvisiert) | 33 px (8,8 %) | 52 px (13,9 %) | 73 px (19,5 %) |
+| schlimmster Fall | 83 px (22,1 %) | 126 px (33,6 %) | 141 px (37,6 %) |
+
+Der große Sprung kommt **nicht von der Schrift**, sondern von den sicheren
+Rändern: Sie nehmen im Querformat 100 px Bildbreite weg, derselbe Text braucht
+dadurch eine Umbruchzeile mehr — **+43 px**. Die Schrift kostet **15 px**.
+
+Zurückgeholt: Zeilenabstand 1,25 statt 1,35 (5 px), Innenrand 4/8 statt 4/10
+(4 px, dazu 4 px mehr Textbreite), Zwischenraum 4 statt 6 (2 px) — zusammen
+11 px. Und im Ruhezustand, also fast immer, die vollen 33 px.
+
+**Verworfene Alternativen.**
+
+- **`#touch` selbst einrücken** statt jedes Element einzeln. Wäre die kürzeste
+  Fassung — alle Knöpfe darin sind absolut positioniert und wanderten mit. Sie
+  ist falsch: Die schwebenden Sticks bekommen ihre Lage aus `clientX/clientY`,
+  und die zählen ab dem Polsterkasten von `#touch`. Eingerückt läge **jeder
+  Stick um die Randbreite neben dem Daumen**.
+- **`Rand + Grundabstand`** statt `max(...)`. Hätte im Querformat 100 px
+  Bildbreite gekostet, ohne dass ein einziges Element dadurch besser stünde.
+- **Bei 12 px bleiben** und die Ausnahme ins Log schreiben. Spart 15 px im
+  seltenen schlimmsten Fall und 21 px im Alltag; kostet die Lesbarkeit genau
+  der Zeile, nach der man den Abwurf entscheidet. Das Bild dazu liegt bereit
+  (`alternative-12px-iphone-mini-quer-voll.png`) — es ist **eine Zahl im CSS**,
+  falls Patrick am Gerät anders entscheidet.
+- **Die Aufzählung im Querformat ganz ausblenden.** Hätte nichts gebracht: Der
+  schlimmste Fall ist nicht die volle Spinne, sondern das **anvisierte** Stück
+  mit langem Namen und Materialangabe — und das hat gar keine Aufzählung.
+- **Die Drehtasten im Querformat verschieben**, um den freien Streifen zu
+  verbreitern. Das ist Steuerung, nicht Anzeige; nur auf Patricks Wort.
+
+**Abnahmekriterium.** `test/sichererand.test.ts` (neu) prüft in allen drei
+Fassungen, dass **kein** Bedienelement und keine Anzeige in einen sicheren Rand
+ragt, dass jedes `env()` einen Ersatzwert `0px` hat (ältere Safari-Fassungen
+verwerfen sonst die ganze Deklaration), dass `#touch` selbst nicht eingerückt
+ist — und dass die iPad-Fassung Pixel für Pixel dieselbe bleibt.
+`test/hudplatz.test.ts` prüft den oberen Stapel in allen drei Fassungen, mit
+und ohne F3-Zahlen. `test/greifanzeige.test.ts` hat einen zweiten, engeren
+Deckel für den **Alltagsfall** bekommen (27 %), und der Deckel für den
+schlimmsten Fall ist von 35 auf 40 % gestiegen — mit der Begründung im Test.
+Die gemeinsame Rechnung steht jetzt einmal in `test/cssmass.ts` statt zweimal.
+
+Jeder der neuen Wächter wurde **einmal absichtlich zum Fallen gebracht**, bevor
+ihm geglaubt wurde (Lehre vom 15.09.: ein Wächter war zwei Stunden grün, weil
+seine Eingaben NaN waren). `loese()` wirft deshalb bei jedem Wert, den es nicht
+versteht, statt NaN weiterzureichen.
+
+**Nebenbefund, mit behoben.** Die Einblendung `#toast` trug ihre Werte im
+Stilattribut (`style="top: 56px; …"`). Ein Stilattribut schlägt jeden Selektor
+— die Regel `#toast { top: 60px; font-size: 12px; }` in der flachen Fassung hat
+**nie gewirkt**. Alles Ruhende steht jetzt im CSS; das Skript setzt nur noch
+`opacity`.
+
+**Offen.**
+
+1. **Konto (12 px), Tagesablauf (11 px), Tutorialtext (11 px) und Einblendung
+   (12 px) liegen im Querformat weiter unter 14 px.** Sie waren nicht Teil des
+   Auftrags. Konto und Tagesablauf auf 14 zu heben kostet oben links rund
+   14 px und schiebt die Tutorialkarte entsprechend nach unten — beides
+   unkritisch, weil dort Himmel steht. Empfehlung: im nächsten kleinen Paket
+   nachziehen, zusammen mit einer Sichtung des Tutorialtexts.
+2. **Der Nachlauf von 400 ms ist ein Startwert.** Am Gerät zu bestätigen: Wenn
+   die Zeile beim Schwenken über eine Halde noch flackert, muss er hoch; wenn
+   sie zu lange etwas Falsches zeigt, runter.
+3. **Die 50 px Seitenrand im Querformat sind der ungünstigste angenommene
+   Wert.** Meldet Safari auf Patricks iPhone weniger, wird alles nur
+   großzügiger — nie enger.
+
+**Auf dem Gerät zu prüfen.**
+
+1. **iPhone mini quer:** Spinne offen über nichts — steht unten links wirklich
+   **nichts** mehr, kein blasser Kasten? Und danach über eine Halde schwenken:
+   Flackert die Zeile beim Überstreichen, oder erscheint sie ruhig?
+2. **iPhone mini quer:** Ein großes Teil greifen und über die falsche Mulde
+   halten. Ist die Schrift jetzt bequem lesbar — und verdeckt der Block dabei
+   zu viel? Wenn er zu viel verdeckt, sag es: 12 px sind eine Zahl im CSS.
+3. **iPhone mini hoch:** Oben rechts schauen — stehen Konto und Tagesablauf
+   **unter** der Notch und **neben** dem Menüknopf, ohne dass eine Ziffer
+   angeschnitten ist?
+4. **Beide Geräte, quer und hoch:** Sind die Fahrpedale unten links und die
+   Drehtasten rechts **über** dem weißen Balken erreichbar, ohne dass ein Tipp
+   ins Leere geht oder iOS nach Hause wischt?
+5. **iPad quer:** Sieht das HUD aus wie gestern? Dort soll sich **nichts**
+   geändert haben außer der verschwundenen Ruhezeile.

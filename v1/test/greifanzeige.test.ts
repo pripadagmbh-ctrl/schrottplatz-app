@@ -2,157 +2,35 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { griffLadung, griffZiel, type GriffStueck } from "../src/ui/hud";
+import {
+  FASSUNGEN,
+  css,
+  hudHoehe,
+  knopfKasten,
+  luft,
+  pedalKasten,
+  px,
+  seite,
+  ueberlappt,
+  wert,
+  wurzel,
+  type Fassung,
+  type Kasten,
+} from "./cssmass";
 
 /*
- * Waechter fuer den unteren HUD-Block (Ladeanzeige + Griff-Info).
+ * Waechter fuer den unteren HUD-Block (Griff-Info + Ladeanzeige).
  *
  * Anlass (Patrick, 15.09.2026, iPhone mini): "Bei iPhone Mini wird auch durch
  * die Greifanzeige, also was gegriffen worden ist, die Sicht verdeckt."
  *
- * Geprueft werden DREI Fassungen, nicht zwei — das war der Denkfehler bis
- * gestern: Die Abfrage "max-height: 430px" fasst nur das Querformat der
- * Telefone. Ein iPhone mini im HOCHFORMAT ist 812 px hoch und lief bisher mit
- * den Tablet-Regeln, obwohl es nur 375 px breit ist. Genau diese Fassung stand
- * auf Patricks Bildschirmfoto.
- *
- * Gerechnet wird aus dem CSS, weil es hier keinen Browser gibt. Die Rechnung
- * nimmt darum ausdruecklich RAHMEN UND FASSUNG mit: Die Drehtasten stehen auf
- * content-box, ihre 54 px Breite sind ohne den 2-px-Rahmen gemessen. Eine
- * fruehere Fassung lag um genau diese 4 px daneben (Messung 14.09.2026).
+ * Geprueft werden DREI Fassungen, und seit dem 15.09.2026 (E-032) mit den
+ * sicheren Raendern des jeweiligen Geraets. Die Rechnung selbst steht in
+ * `test/cssmass.ts`; sie nimmt Rahmen und Fassung ausdruecklich mit.
  */
 
-const wurzel = resolve(__dirname, "..");
-const seite = readFileSync(resolve(wurzel, "index.html"), "utf8");
-/** CSS ohne Kommentare — in den Kommentaren stehen Beispielwerte. */
-const css = seite.slice(seite.indexOf("<style>"), seite.indexOf("</style>")).replace(/\/\*[\s\S]*?\*\//g, "");
-
-// ---------------------------------------------------------------------------
-// Ein sehr kleines Stueck CSS-Kaskade: genug fuer Medienabfragen und Gewichte.
-// ---------------------------------------------------------------------------
-
-interface Regel {
-  media: string | null;
-  selektoren: string[];
-  decls: string;
-  reihenfolge: number;
-}
-
-function parse(quelle: string): Regel[] {
-  const out: Regel[] = [];
-  let media: string | null = null;
-  let n = 0;
-  const re = /([^{}]+)\{|\}/g;
-  for (let m = re.exec(quelle); m; m = re.exec(quelle)) {
-    if (m[0] === "}") {
-      media = null; // Ende einer Medienabfrage
-      continue;
-    }
-    const kopf = m[1].trim();
-    if (kopf.startsWith("@media")) {
-      media = kopf.slice("@media".length).trim();
-      continue;
-    }
-    const zu = quelle.indexOf("}", re.lastIndex);
-    out.push({
-      media,
-      selektoren: kopf.split(",").map((s) => s.trim()),
-      decls: quelle.slice(re.lastIndex, zu),
-      reihenfolge: n++,
-    });
-    re.lastIndex = zu + 1;
-  }
-  return out;
-}
-
-const regeln = parse(css);
-
-function mediaPasst(media: string | null, w: number, h: number): boolean {
-  if (!media) return true;
-  return media.split(" and ").every((teil) => {
-    const m = /\((max|min)-(width|height):\s*(\d+)px\)/.exec(teil);
-    expect(m, `unbekannte Medienabfrage: ${teil}`).not.toBeNull();
-    const ist = m![2] === "width" ? w : h;
-    return m![1] === "max" ? ist <= Number(m![3]) : ist >= Number(m![3]);
-  });
-}
-
-/** Grobes Selektorgewicht: Bezeichner vor Klassen vor allem anderen. */
-function gewicht(sel: string): number {
-  return (sel.match(/#/g) ?? []).length * 100 + (sel.match(/\.[a-zA-Z]/g) ?? []).length * 10;
-}
-
-/**
- * Wert einer Eigenschaft, so wie ihn der Browser fuer ein Element mit diesen
- * Selektoren in diesem Bildformat nehmen wuerde: das schwerste, bei gleichem
- * Gewicht das spaeteste.
- */
-function wert(selektoren: string[], prop: string, w: number, h: number): string | null {
-  const treffer = regeln
-    .filter((r) => mediaPasst(r.media, w, h) && r.selektoren.some((s) => selektoren.includes(s)))
-    .map((r) => ({
-      r,
-      g: Math.max(...r.selektoren.filter((s) => selektoren.includes(s)).map(gewicht)),
-    }))
-    .sort((a, b) => a.g - b.g || a.r.reihenfolge - b.r.reihenfolge);
-  let gefunden: string | null = null;
-  for (const t of treffer) {
-    const m = new RegExp(`(?:^|[;{\\s])${prop}:\\s*([^;]+)`).exec(t.r.decls);
-    if (m) gefunden = m[1].trim();
-  }
-  return gefunden;
-}
-
-function px(selektoren: string[], prop: string, w: number, h: number): number {
-  const v = wert(selektoren, prop, w, h);
-  expect(v, `${prop} fehlt fuer ${selektoren[0]} bei ${w}x${h}`).not.toBeNull();
-  const m = /^(\d+)px/.exec(v!);
-  expect(m, `${prop} ist keine Pixelangabe: ${v}`).not.toBeNull();
-  return Number(m![1]);
-}
-
-/** Innenrand als [oben/unten, links/rechts]. */
-function fassung(selektoren: string[], w: number, h: number): [number, number] {
-  const v = wert(selektoren, "padding", w, h)!;
-  // "0" steht ohne Einheit da — darum ist "px" hier freigestellt.
-  const zahlen = [...v.matchAll(/(\d+)(?:px)?/g)].map((m) => Number(m[1]));
-  return zahlen.length > 1 ? [zahlen[0], zahlen[1]] : [zahlen[0], zahlen[0]];
-}
-
-// ---------------------------------------------------------------------------
-// Schriftmass
-// ---------------------------------------------------------------------------
-
-/*
- * Consolas ist eine Festbreitenschrift: Jede Figur ist 1126 von 2048
- * Einheiten breit, also 0,5498 em. Bei 14 px sind das 7,70 px je Zeichen.
- * Damit laesst sich der Umbruch ohne Browser ausrechnen.
- */
-const EM_BREITE = 0.55;
-
-/** Zeilen, die ein Text bei dieser Breite braucht — gierig an Leerzeichen umgebrochen. */
-function zeilen(text: string, breitePx: number, schriftPx: number): number {
-  const proZeile = Math.floor(breitePx / (schriftPx * EM_BREITE));
-  expect(proZeile, "Streifen zu schmal fuer auch nur ein Zeichen").toBeGreaterThan(0);
-  let n = 1;
-  let voll = 0;
-  for (const wort of text.split(" ")) {
-    const laenge = wort.length;
-    if (voll === 0) {
-      voll = laenge;
-    } else if (voll + 1 + laenge <= proZeile) {
-      voll += 1 + laenge;
-    } else {
-      n++;
-      voll = laenge;
-    }
-    // Ein einzelnes Wort, das laenger ist als die Zeile, bricht hart um.
-    while (voll > proZeile) {
-      n++;
-      voll -= proZeile;
-    }
-  }
-  return n;
-}
+/** Die Seite mit Kommentaren — fuer Suchen nach Markup. */
+const dokument = seite;
 
 // ---------------------------------------------------------------------------
 // Die laengsten Texte, die das Spiel erzeugen kann
@@ -164,7 +42,7 @@ function zeilen(text: string, breitePx: number, schriftPx: number): number {
  * "die Annahmen ueber die laengsten Texte stimmen noch" weiter unten.
  */
 const LANGER_NAME = "Unfallfahrzeug (Front eingedrückt)";
-const LANGE_MULDE = "KUPFER + MESSING";
+const LANGE_MULDE = "MISCHSCHROTT";
 
 const stueck = (
   name: string,
@@ -197,103 +75,77 @@ const langesZiel = griffZiel(
     { materialId: "rubble", massKg: 700 },
   ])
 );
+/**
+ * Der Alltag: ein ganz normales Stueck anvisiert, kein Abholer da.
+ *
+ * NEU am 15.09.2026 (E-032). Bis dahin wurde nur der schlimmste Fall geprueft
+ * — und der ist selten. Was der Spieler stundenlang sieht, ist DIESE Zeile,
+ * und sie hat einen eigenen, engeren Deckel verdient.
+ */
+const alltagsZiel = griffZiel(stueck("Kühlschrank", 84));
 /** Laengste Ladeanzeige: Fraktionsname, Masse, Balken, Prozent (vgl. hud.ts). */
 const LANGE_LADEZEILE = "Baumischabfall: 12.4 t · ██████████ 100 % sortenrein";
 
 // ---------------------------------------------------------------------------
-// Die drei Fassungen
+// Der untere Stapel als Kaesten
 // ---------------------------------------------------------------------------
 
-interface Fassung {
-  name: string;
-  w: number;
-  h: number;
+interface Stapel {
+  griff: Kasten;
+  ladung: Kasten | null;
+  /** Oberkante des ganzen Blocks ueber der Bildunterkante; 0 = nichts im Bild. */
+  oben: number;
 }
 
-const FASSUNGEN: Fassung[] = [
-  // iPad quer, schmalste gebraeuchliche Fassung (iPad 9. Gen. in Safari).
-  { name: "iPad quer", w: 1024, h: 768 },
-  // iPhone mini quer — die flache Fassung.
-  { name: "iPhone mini quer", w: 812, h: 375 },
-  // iPhone mini hoch — Patricks Bildschirmfoto vom 15.09.2026.
-  { name: "iPhone mini hoch", w: 375, h: 812 },
-];
-
-interface Kasten {
-  name: string;
-  x0: number;
-  x1: number;
-  /** Abstand zur Unterkante des Bildes; y1 ist die Oberkante. */
-  y0: number;
-  y1: number;
-}
-
-/** Die Fahrpedale samt Fassung. */
-function pedalKasten(f: Fassung): Kasten {
-  const halter = ["#pedals"];
-  const pedal = ["#touch .pedal"];
-  const [pad] = fassung(halter, f.w, f.h);
-  const breite =
-    2 * pad + 2 * px(pedal, "width", f.w, f.h) + px(halter, "gap", f.w, f.h);
-  // .pedal steht auf border-box — width/height sind schon das Sichtbare.
-  const hoehe = 2 * pad + px(pedal, "height", f.w, f.h);
-  const links = px(halter, "left", f.w, f.h);
-  const unten = px(halter, "bottom", f.w, f.h);
-  return { name: "Pedale", x0: links, x1: links + breite, y0: unten, y1: unten + hoehe };
-}
-
-/** Eine Drehtaste. Content-box: Der 2-px-Rahmen kommt auf width/height obendrauf. */
-function drehKasten(id: string, f: Fassung): Kasten {
-  const sel = ["#touch .btn", `#touch #${id}`];
-  const rahmen = 2;
-  // Ohne padding: 0 waeren die Tasten 22 px hoeher als ihre Angabe — dann
-  // stimmt die ganze Rechnung nicht mehr (Kommentar in index.html).
-  expect(fassung(sel, f.w, f.h)).toEqual([0, 0]);
-  const breite = px(sel, "width", f.w, f.h) + 2 * rahmen;
-  const hoehe = px(sel, "height", f.w, f.h) + 2 * rahmen;
-  const rechts = px(sel, "right", f.w, f.h);
-  const unten = px(sel, "bottom", f.w, f.h);
-  return { name: id, x0: f.w - rechts - breite, x1: f.w - rechts, y0: unten, y1: unten + hoehe };
-}
+const GRIP_SEL = ["#gripinfo", "#hudunten .hud", ".hud"];
+const LOAD_SEL = ["#load", "#hudunten .hud", ".hud"];
+const HALTER_SEL = ["#hudunten", "body.touch #hudunten"];
 
 /**
- * Der untere HUD-Block mit dem laengsten Text, den das Spiel erzeugen kann:
- * Ladeanzeige (wartender Abholer) UND Griff-Info (volle Spinne ueber der
- * falschen Mulde) gleichzeitig.
+ * Rechnet den unteren Stapel aus.
+ *
+ * `kopf === null` heisst Ruhezustand: Seit dem 15.09.2026 verschwindet die
+ * Griff-Info ganz, wenn sie nichts zu sagen hat (Patrick: "Ich weiss nicht,
+ * wofuer wir 'Greifer offen' ueberhaupt brauchen"). Dann steht dort nichts —
+ * und das muss die Rechnung genauso sehen.
  */
-function blockKasten(f: Fassung, kopf: string, liste: string): Kasten {
-  const halter = ["#hudunten", "body.touch #hudunten"];
-  const links = px(halter, "left", f.w, f.h);
-  const rechts = px(halter, "right", f.w, f.h);
-  const unten = px(halter, "bottom", f.w, f.h);
-  const luecke = px(halter, "gap", f.w, f.h);
+function stapel(f: Fassung, kopf: string | null, liste: string, mitAbholer: boolean): Stapel {
+  const links = px(HALTER_SEL, "left", f);
+  const rechts = px(HALTER_SEL, "right", f);
+  const unten = px(HALTER_SEL, "bottom", f);
+  const luecke = px(HALTER_SEL, "gap", f);
   const breite = f.w - links - rechts;
 
-  const rahmen = 1; // .hud: 1px Rand
-  /** Hoehe eines Kastens aus einer gegebenen Zeilenzahl. */
-  const hoehe = (selektoren: string[], anzahlZeilen: number): number => {
-    const schrift = px(selektoren, "font-size", f.w, f.h);
-    const [padY] = fassung(selektoren, f.w, f.h);
-    const zeilenHoehe = Math.ceil(schrift * 1.35); // line-height 1.35 (index.html)
-    return anzahlZeilen * zeilenHoehe + 2 * padY + 2 * rahmen;
-  };
-  /** Wie viele Zeilen ein Text in diesem Kasten braucht. */
-  const umbruch = (selektoren: string[], text: string): number => {
-    const schrift = px(selektoren, "font-size", f.w, f.h);
-    const [, padX] = fassung(selektoren, f.w, f.h);
-    return zeilen(text, breite - 2 * padX - 2 * rahmen, schrift);
-  };
+  const g =
+    kopf === null
+      ? { hoehe: 0, zeilen: 0 }
+      : hudHoehe(GRIP_SEL, f, breite, [
+          { text: kopf },
+          ...(liste ? [{ text: liste, eineZeile: true }] : []),
+        ]);
+  const l = mitAbholer
+    ? hudHoehe(LOAD_SEL, f, breite, [{ text: LANGE_LADEZEILE }])
+    : { hoehe: 0, zeilen: 0 };
+  const zwischen = g.hoehe > 0 && l.hoehe > 0 ? luecke : 0;
 
-  const grip = ["#gripinfo", "#hudunten .hud", ".hud"];
-  const load = ["#load", "#hudunten .hud", ".hud"];
-  // Kopf darf umbrechen, die Liste steht immer auf genau einer Zeile.
-  const gripHoehe = hoehe(grip, umbruch(grip, kopf) + (liste ? 1 : 0));
-  const gesamt = gripHoehe + luecke + hoehe(load, umbruch(load, LANGE_LADEZEILE));
-  return { name: "HUD unten", x0: links, x1: f.w - rechts, y0: unten, y1: unten + gesamt };
-}
-
-function ueberlappt(a: Kasten, b: Kasten): boolean {
-  return a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+  // Reihenfolge im Markup: Griff-Info oben, Ladeanzeige unten. Der Halter
+  // haengt am unteren Rand — was unten steht, liegt fest.
+  const ladung: Kasten | null =
+    l.hoehe > 0
+      ? { name: "Ladeanzeige", x0: links, x1: f.w - rechts, y0: unten, y1: unten + l.hoehe }
+      : null;
+  const griffUnten = unten + l.hoehe + zwischen;
+  return {
+    griff: {
+      name: "Griff-Info",
+      x0: links,
+      x1: f.w - rechts,
+      y0: griffUnten,
+      y1: griffUnten + g.hoehe,
+    },
+    ladung,
+    oben: g.hoehe + l.hoehe === 0 ? 0 : unten + g.hoehe + l.hoehe + zwischen,
+  };
 }
 
 describe("Unterer HUD-Block: Griff-Info und Ladeanzeige", () => {
@@ -320,8 +172,10 @@ describe("Unterer HUD-Block: Griff-Info und Ladeanzeige", () => {
       .join("\n");
     const namen = [...quellen.matchAll(/name: "([^"]*)"/g)].map((m) => m[1]);
     const labels = [...quellen.matchAll(/label: "([^"]*)"/g)].map((m) => m[1]);
-    for (const n of namen) expect(n.length, `laengerer Name: ${n}`).toBeLessThanOrEqual(LANGER_NAME.length);
-    for (const l of labels) expect(l.length, `laengere Aufschrift: ${l}`).toBeLessThanOrEqual(LANGE_MULDE.length);
+    for (const n of namen)
+      expect(n.length, `laengerer Name: ${n}`).toBeLessThanOrEqual(LANGER_NAME.length);
+    for (const l of labels)
+      expect(l.length, `laengere Aufschrift: ${l}`).toBeLessThanOrEqual(LANGE_MULDE.length);
   });
 
   it("stapelt beide Zeilen, statt sie einzeln an den Rand zu haengen", () => {
@@ -332,12 +186,32 @@ describe("Unterer HUD-Block: Griff-Info und Ladeanzeige", () => {
      * darum wird hier die Bauform bewacht und nicht nur das Ergebnis.
      */
     const halter = ["#hudunten"];
-    expect(wert(halter, "display", 1024, 768)).toBe("flex");
-    expect(wert(halter, "flex-direction", 1024, 768)).toBe("column");
-    expect(px(halter, "gap", 1024, 768)).toBeGreaterThanOrEqual(4);
+    const iPad = FASSUNGEN[0];
+    expect(wert(halter, "display", iPad)).toBe("flex");
+    expect(wert(halter, "flex-direction", iPad)).toBe("column");
+    expect(px(halter, "gap", iPad)).toBeGreaterThanOrEqual(4);
     // Und keine der beiden Zeilen haengt noch selbst am Rand.
     expect(css).not.toMatch(/body\.touch #gripinfo\s*\{/);
     expect(css).not.toMatch(/body\.touch #load\s*\{/);
+  });
+
+  it("stellt die veraenderliche Zeile nach oben und die ruhende nach unten", () => {
+    /*
+     * NEU am 15.09.2026 (E-032). Der Halter haengt am unteren Bildrand und
+     * waechst nach oben: Was unten steht, liegt fest; was oben steht, darf
+     * seine Hoehe aendern, ohne den Rest zu verschieben.
+     *
+     * Die Griff-Info wechselt mehrmals je Sekunde ihre Zeilenzahl und
+     * verschwindet seit heute ganz, wenn sie nichts zu sagen hat. Stuende sie
+     * unten, spraenge die Ladeanzeige bei jedem Griff auf und ab — genau das
+     * Zappeln, das schlimmer waere als ein ruhiger Kasten.
+     */
+    const block = dokument.slice(
+      dokument.indexOf('<div id="hudunten">'),
+      dokument.indexOf("</div>", dokument.indexOf('id="load"'))
+    );
+    expect(block.indexOf('id="gripinfo"')).toBeGreaterThan(0);
+    expect(block.indexOf('id="gripinfo"')).toBeLessThan(block.indexOf('id="load"'));
   });
 
   it("waechst nicht mehr nach beiden Seiten aus der Bildmitte", () => {
@@ -347,19 +221,21 @@ describe("Unterer HUD-Block: Griff-Info und Ladeanzeige", () => {
      * Saeule mitten im Bild. Auf Touchgeraeten haengt der Block jetzt links im
      * freien Streifen; ohne Touch bleibt die Mitte, dort steht nichts im Weg.
      */
-    expect(wert(["#gripinfo"], "transform", 1024, 768)).toBeNull();
-    expect(wert(["#load"], "transform", 1024, 768)).toBeNull();
-    expect(wert(["#hudunten", "body.touch #hudunten"], "align-items", 1024, 768)).toBe("flex-start");
+    const iPad = FASSUNGEN[0];
+    expect(wert(["#gripinfo"], "transform", iPad)).toBeNull();
+    expect(wert(["#load"], "transform", iPad)).toBeNull();
+    expect(wert(HALTER_SEL, "align-items", iPad)).toBe("flex-start");
   });
 
   it("schneidet nur die Aufzaehlung ab, nie Gewicht, Preis oder Ampel", () => {
     // Die Liste ist die einzige Zeile mit Ellipse. Alles, was der Spieler zum
     // Entscheiden braucht, steht im Kopf und darf statt dessen umbrechen.
+    const iPad = FASSUNGEN[0];
     const liste = ["#grip-liste"];
-    expect(wert(liste, "white-space", 1024, 768)).toBe("nowrap");
-    expect(wert(liste, "text-overflow", 1024, 768)).toBe("ellipsis");
-    expect(wert(liste, "overflow", 1024, 768)).toBe("hidden");
-    expect(wert(["#grip-kopf"], "white-space", 1024, 768)).toBeNull();
+    expect(wert(liste, "white-space", iPad)).toBe("nowrap");
+    expect(wert(liste, "text-overflow", iPad)).toBe("ellipsis");
+    expect(wert(liste, "overflow", iPad)).toBe("hidden");
+    expect(wert(["#grip-kopf"], "white-space", iPad)).toBeNull();
 
     expect(langeLadung.kopf).toContain("1.5 t");
     expect(langeLadung.kopf).toContain(LANGE_MULDE);
@@ -372,40 +248,131 @@ describe("Unterer HUD-Block: Griff-Info und Ladeanzeige", () => {
   });
 
   it("blendet die zweite Zeile aus, wenn nichts in der Spinne liegt", () => {
-    // "Greifer: offen" braucht keine Aufzaehlung — und eine leere Zeile im Bild
-    // waere genau das, was Patrick stoert.
-    expect(griffZiel(stueck("Kühlschrank", 84)).liste).toBe("");
+    // "Kühlschrank anvisiert" braucht keine Aufzaehlung — und eine leere Zeile
+    // im Bild waere genau das, was Patrick stoert.
+    expect(alltagsZiel.liste).toBe("");
     expect(css).toContain("#grip-liste:empty { display: none; }");
+  });
+
+  it("ist im Ruhezustand ganz weg — ohne Flaeche, nicht nur durchsichtig", () => {
+    /*
+     * NEU am 15.09.2026 (E-032). Patrick: "Ich weiss nicht, wofuer wir
+     * 'Greifer offen' ueberhaupt brauchen. Also kann ganz verschwinden."
+     *
+     * `display: none` und nicht `opacity: 0` ist der Kern: Ein durchsichtiger
+     * Kasten haelt seine Flaeche und schiebt die Ladeanzeige weiter nach oben.
+     * Sichtbar waere nichts, verdeckt trotzdem etwas.
+     */
+    expect(css).toContain("#gripinfo.weg { display: none; }");
+    expect(wert(["#gripinfo.weg"], "display", FASSUNGEN[0])).toBe("none");
+    // Das Markup startet im Ruhezustand: Beim Laden steht dort noch nichts.
+    expect(dokument).toMatch(/<div id="gripinfo" class="hud weg">/);
+    expect(dokument).toMatch(/<span id="grip-kopf"><\/span>/);
+
+    const hud = readFileSync(resolve(wurzel, "src/ui/hud.ts"), "utf8");
+    // Kein Text mehr fuer "nichts anvisiert" — die Zeile wird verborgen.
+    expect(hud).not.toContain('kopf: "Greifer: offen"');
+    expect(hud).toMatch(/showTarget\([\s\S]{0,120}this\.verbergeGriff\(\)/);
+    // ... aber "geschlossen (leer)" bleibt: Das ist die Antwort auf einen
+    // Fehlgriff, keine Zustandsmeldung (Empfehlung an Patrick, E-032).
+    expect(hud).toContain('kopf: "Greifer: geschlossen (leer)"');
+  });
+
+  it("laesst die Zeile nicht bei jedem Ueberstreichen auf- und zuklappen", () => {
+    /*
+     * Ein Kasten, der beim Schwenken ueber eine Halde flackert, waere
+     * schlimmer als ein ruhiger Kasten. Darum ein Nachlauf, bevor er faellt —
+     * und Zeit nehmen statt Zeitgeber stellen: `verbergeGriff` laeuft in jedem
+     * Bild, ein `setTimeout` wuerde beim naechsten Ziel ins Leere feuern.
+     */
+    const hud = readFileSync(resolve(wurzel, "src/ui/hud.ts"), "utf8");
+    const m = /const GRIFF_NACHLAUF_MS = (\d+);/.exec(hud);
+    expect(m, "Nachlauf fehlt").not.toBeNull();
+    const ms = Number(m![1]);
+    expect(ms, "Nachlauf zu kurz — die Zeile wuerde flackern").toBeGreaterThanOrEqual(250);
+    expect(ms, "Nachlauf zu lang — es stuende zu lange etwas Falsches da").toBeLessThanOrEqual(900);
+    expect(hud).not.toContain("setTimeout(() => this.verbergeGriff");
   });
 
   for (const f of FASSUNGEN) {
     describe(f.name, () => {
-      const block = blockKasten(f, langeLadung.kopf, langeLadung.liste);
-      const zielBlock = blockKasten(f, langesZiel.kopf, langesZiel.liste);
-      const nachbarn = [pedalKasten(f), drehKasten("btn-rot-l", f), drehKasten("btn-rot-r", f)];
+      const voll = stapel(f, langeLadung.kopf, langeLadung.liste, true);
+      const ziel = stapel(f, langesZiel.kopf, langesZiel.liste, true);
+      const alltag = stapel(f, alltagsZiel.kopf, alltagsZiel.liste, false);
+      const ruhe = stapel(f, null, "", false);
+      const nachbarn = [
+        pedalKasten(f),
+        knopfKasten("btn-rot-l", f),
+        knopfKasten("btn-rot-r", f),
+      ];
+      const kaesten = [voll, ziel, alltag].flatMap((s) =>
+        s.ladung ? [s.griff, s.ladung] : [s.griff]
+      );
 
       it("ueberlappt weder Pedale noch Drehtasten", () => {
-        for (const n of nachbarn) {
-          expect(ueberlappt(block, n), `${block.name} auf ${n.name}: ${JSON.stringify([block, n])}`).toBe(false);
-          expect(ueberlappt(zielBlock, n), `Zielzeile auf ${n.name}`).toBe(false);
-        }
+        for (const n of nachbarn)
+          for (const k of kaesten)
+            expect(
+              ueberlappt(k, n),
+              `${k.name} auf ${n.name}: ${JSON.stringify([k, n])}`
+            ).toBe(false);
       });
 
       it("haelt mindestens 8 px Luft zum naechsten Bedienelement", () => {
         // Beruehren reicht nicht: Ein Daumen, der die Zeile streift, soll nicht
         // das Gefuehl haben, er tippe daneben.
-        for (const n of nachbarn) {
-          const luft = Math.max(n.x0 - block.x1, block.x0 - n.x1, n.y0 - block.y1, block.y0 - n.y1);
-          expect(luft, `zu dicht an ${n.name}`).toBeGreaterThanOrEqual(8);
-        }
+        for (const n of nachbarn)
+          for (const k of kaesten)
+            expect(luft(k, n), `${k.name} zu dicht an ${n.name}`).toBeGreaterThanOrEqual(8);
       });
 
-      it("bleibt mit dem laengsten Text im unteren Drittel des Bildes", () => {
-        // Das ist die eigentliche Beschwerde: Der Block darf nicht ins Bild
-        // wachsen. Gemessen mit voller Spinne UND wartendem Abholer, also
-        // beide Zeilen gleichzeitig und beide am laengsten.
-        const hoechste = Math.max(block.y1, zielBlock.y1);
-        expect(hoechste / f.h, `Block reicht bis ${hoechste} px von ${f.h}`).toBeLessThan(0.35);
+      it("steht im Ruhezustand gar nicht im Bild", () => {
+        expect(ruhe.oben, "im Ruhezustand darf dort nichts stehen").toBe(0);
+      });
+
+      it("bleibt im Alltag im unteren Viertel bis Drittel", () => {
+        /*
+         * Der Alltagsfall: ein Stueck anvisiert, kein Abholer. So sieht das
+         * Bild die allermeiste Zeit aus, und hier ist der Deckel eng.
+         * Gemessen: iPad 5,5 % · iPhone quer 19,5 % · iPhone hoch 24,9 %.
+         * Im Hochformat sitzt der Block ueber den Pedalen, darum die 27 %.
+         */
+        expect(alltag.oben / f.h, `Alltag reicht bis ${alltag.oben} px von ${f.h}`).toBeLessThan(
+          0.27
+        );
+      });
+
+      it("bleibt mit dem laengsten Text unter zwei Fuenfteln des Bildes", () => {
+        /*
+         * GEAENDERT am 15.09.2026 (E-032): vorher 0,35, jetzt 0,40 — mit
+         * Begruendung, nicht aus Bequemlichkeit.
+         *
+         * Zwei Dinge sind seither dazugekommen, beide unverzichtbar:
+         *  1. Sichere Raender. Im Querformat nimmt der Notch-Rand 100 px
+         *     Bildbreite weg. Derselbe Text braucht dadurch eine Zeile mehr,
+         *     und unten kommen 21 px Home-Indicator dazu: allein das sind
+         *     +43 px (83 -> 126 px).
+         *  2. 14 px Schrift statt 12 im Querformat (Briefing Kap. 20):
+         *     +15 px (126 -> 141 px).
+         * Zurueckgeholt wurden 11 px (Zeilenabstand 1,25 statt 1,35,
+         * Innenrand 4/8 statt 4/10, Zwischenraum 4 statt 6) — und im
+         * Ruhezustand die ganzen 27 px, die dort bisher immer standen.
+         *
+         * Der schlimmste Fall ist selten: laengster Stuecknamen samt
+         * Materialangabe UND wartender Abholer. Was der Spieler staendig
+         * sieht, deckelt der Test darueber auf 27 %.
+         *
+         * Gemessen: iPad 12,5 % · iPhone quer 37,6 % · iPhone hoch 36,0 %.
+         */
+        const hoechste = Math.max(voll.oben, ziel.oben);
+        expect(hoechste / f.h, `Block reicht bis ${hoechste} px von ${f.h}`).toBeLessThan(0.4);
+      });
+
+      it("erreicht die Bildmitte nie", () => {
+        // Die harte Grenze: Gegriffen wird in der Bildmitte. Was dort steht,
+        // steht im Weg — unabhaengig von jeder Prozentzahl.
+        const hoechste = Math.max(voll.oben, ziel.oben);
+        expect(hoechste).toBeLessThan(f.h / 2);
       });
     });
   }

@@ -32,6 +32,42 @@
         -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
       }
       ::selection { background: transparent; }
+      /* --- Sichere Ränder: Notch, abgerundete Ecken, Home-Indicator ---------
+         `viewport-fit=cover` stand seit jeher im Dokument — benutzt wurde
+         `env(safe-area-inset-*)` bis heute NIRGENDS. Im Querformat sass der
+         untere HUD-Block dadurch 6 px über der Unterkante, also genau auf dem
+         weissen Balken; im Hochformat lag die Kontozeile unter der Notch.
+
+         Drei Regeln, die hier überall gelten:
+
+         1. **env() immer mit Ersatzwert 0px.** Auf dem iPad und am Rechner
+            liefert env() null. Ohne den zweiten Wert verwerfen ältere
+            Safari-Fassungen die ganze Deklaration — dann stünde das Element
+            gar nicht mehr, wo es soll. Mit 0px ändert sich dort nichts.
+         2. **max(Grundabstand, Rand + Mindestluft) statt Rand + Grundabstand.**
+            Ein Element, das ohnehin 132 px vom Bildrand weg sitzt, steht längst
+            ausserhalb der 50 px breiten Notch-Zone; es soll nicht noch einmal
+            50 px wandern und dabei die halbe Bildbreite auffressen. Nur was am
+            Rand klebt, rückt nach. Auf dem iPad (alle Ränder 0) fällt jedes
+            max() auf den alten Wert zurück — die Fassung wird dort nicht
+            schlechter, sondern bleibt Pixel für Pixel dieselbe.
+         3. **Wer auf einem anderen aufsitzt, erbt dessen Rand.** Der untere
+            HUD-Block steht rechts neben den Pedalen; rücken die Pedale um den
+            linken Rand ein, rückt er mit. Darum steht dort `calc()` und nicht
+            `max()`.
+
+         NICHT gemacht: `#touch` selbst einrücken. Das wäre die kürzeste
+         Fassung — alle Knöpfe darin sind absolut positioniert und würden
+         mitwandern. Aber die schwebenden Sticks werden mit `clientX/clientY`
+         gesetzt (`core/touch.ts`), und die zählen ab dem Polsterkasten von
+         `#touch`. Eingerückt läge jeder Stick um die Randbreite neben dem
+         Daumen. */
+      :root {
+        --sa-l: env(safe-area-inset-left, 0px);
+        --sa-r: env(safe-area-inset-right, 0px);
+        --sa-t: env(safe-area-inset-top, 0px);
+        --sa-b: env(safe-area-inset-bottom, 0px);
+      }
       #app { position: fixed; inset: 0; }
       canvas { display: block; }
       .hud {
@@ -39,7 +75,7 @@
         background: rgba(20, 22, 24, 0.72); border: 1px solid rgba(255,255,255,0.12);
         border-radius: 6px; padding: 8px 12px; pointer-events: none; user-select: none;
       }
-      #help { top: 12px; left: 12px; }
+      #help { top: max(12px, calc(var(--sa-t) + 8px)); left: max(12px, calc(var(--sa-l) + 8px)); }
       #help b { color: #f0b429; }
       /* --- Unterer HUD-Block: Ladeanzeige und Griff-Info ---
          Anlass (Patrick, 15.09.2026, iPhone mini): "Bei iPhone Mini wird auch
@@ -65,20 +101,34 @@
          Ohne Touch (Maus/Tastatur) bleibt alles wie gehabt: mittig am unteren
          Rand, dort steht nichts im Weg. */
       #hudunten {
-        position: fixed; left: 0; right: 0; bottom: 12px;
-        display: flex; flex-direction: column; align-items: center; gap: 6px;
+        position: fixed; left: 0; right: 0; bottom: max(12px, calc(var(--sa-b) + 6px));
+        display: flex; flex-direction: column; align-items: center; gap: 4px;
         pointer-events: none;
       }
       /* Im Stapel positioniert der Halter, nicht das Element selbst.
          max-width haelt die Zeile im Streifen: Ohne sie waere der Kasten so
          breit wie sein laengster unumbrechbarer Inhalt (die Liste) und liefe
          ueber die Drehtasten hinaus.
-         Zeilenabstand 1,35 statt der 1,5 aus `.hud`: Das hier ist kein
+         Zeilenabstand 1,25 statt der 1,5 aus `.hud`: Das hier ist kein
          Fliesstext, sondern ein Datenblock aus zwei Zeilen. Enger gesetzt
-         spart er auf dem iPhone mini hoch bei drei Zeilen 18 px Bildhoehe und
-         liest sich als ein Block statt als drei Meldungen. */
-      #hudunten .hud { position: static; max-width: 100%; line-height: 1.35; }
+         spart er je Zeile 1 px (bei 14 px Schrift: 18 statt 19) und liest sich
+         als ein Block statt als mehrere Meldungen. 1,25 ist bei einer
+         Festbreitenschrift ohne Unterlaengenhaeufung noch bequem lesbar; unter
+         1,2 kleben Klammern und Pfeile aneinander.
+         Innenrand 6/10 statt 8/12 aus `.hud`: Die 4 px Breite je Seite sind
+         hier wertvoller als die Luft — der Streifen ist so schmal, dass jede
+         gesparte Zeichenbreite eine Umbruchzeile verhindern kann. */
+      #hudunten .hud {
+        position: static; max-width: 100%; line-height: 1.25; padding: 6px 10px;
+      }
       #gripinfo { font-size: 14px; }
+      /* Nichts zu melden = nichts im Bild.
+         Patrick am 15.09.2026: „Ich weiss nicht, wofuer wir ‚Greifer offen'
+         ueberhaupt brauchen. Also kann ganz verschwinden."
+         `display: none` und nicht `opacity: 0`: Ein durchsichtiger Kasten
+         haelt seine Flaeche und schoebe die Ladeanzeige weiter nach oben —
+         sichtbar waere nichts, verdeckt trotzdem etwas. */
+      #gripinfo.weg { display: none; }
       /* Kopf: Zustand, Gewicht, Preis, Ampel. Darf umbrechen, nie abschneiden. */
       #grip-kopf { display: block; }
       /* Liste: was in der Spinne liegt. Genau eine Zeile; passt sie nicht,
@@ -96,19 +146,48 @@
         background: rgba(20,22,24,0.45); border-color: rgba(255,255,255,0.06);
         color: #c2c8cc;
       }
-      #money { top: 12px; right: 12px; font-size: 15px; color: #f0d060; }
-      #shift { top: 46px; right: 12px; font-size: 13px; color: #f0d060; }
+      /* --- Oberer HUD-Block: Konto, Tagesablauf, Debugzahlen ---------------
+         Derselbe Stapel wie unten, aus demselben Grund. Vorher hing jeder
+         Kasten einzeln am Rand: `#money` auf top 12, `#shift` auf top 46,
+         `#debug` auf top 80. Die Zahlen stammten aus einer Schaetzung der
+         Kastenhoehe — und die stimmte nicht: `#money` ist mit 15 px Schrift,
+         Zeilenabstand 1,5 aus `.hud`, 8 px Innenrand oben und unten und 1 px
+         Rand **40,5 px** hoch und reichte damit rund 6 px in den Tagesablauf
+         hinein. Der Debugblock stand als naechster Fall schon bereit: zwei
+         Zeilen im Tagesablauf, und er waere ebenfalls getroffen worden.
+
+         Im Stapel kennt niemand mehr eine Kastenhoehe. Der Halter setzt die
+         Reihenfolge und den Zwischenraum, die Kaesten sind so hoch, wie ihr
+         Text sie macht. Wird der Tagesablauf zweizeilig, rutscht der
+         Debugblock mit — ohne dass irgendwo eine Zahl nachgezogen werden muss.
+
+         Der Debugblock ist mit im Halter, obwohl er meistens `display: none`
+         traegt: Ein ausgeblendetes Flex-Kind nimmt keinen Platz ein. Mit F3
+         erscheint es genau unter dem Tagesablauf, ohne eigene Rechnung. */
+      #hudoben {
+        position: fixed;
+        top: max(12px, calc(var(--sa-t) + 8px));
+        right: max(12px, calc(var(--sa-r) + 8px));
+        display: flex; flex-direction: column; align-items: flex-end; gap: 6px;
+        pointer-events: none;
+      }
+      #hudoben .hud { position: static; }
+      #money { font-size: 15px; color: #f0d060; }
+      #shift { font-size: 13px; color: #f0d060; }
       /*
        * Auf Touchgeraeten sitzt der Menueknopf oben rechts auf genau denselben
        * 12 px — Konto und Tagesablauf lagen darunter. Auf dem iPad quer stand
        * dadurch "Konto: 1.25(Menue) EUR" (Befund Patrick 14.09.2026).
        *
-       * Beide ruecken darum am Knopf vorbei nach links: 12 px Rand + 46 px
-       * Knopf + 10 px Luft = 68 px. Nur oberhalb der flachen Fassung, denn
-       * dort stehen sie ohnehin schon links (Regel weiter unten).
+       * Der ganze Stapel rueckt darum am Knopf vorbei nach links: 12 px Rand +
+       * 46 px Knopf + 10 px Luft = 68 px. Nur oberhalb der flachen Fassung,
+       * denn dort steht er ohnehin schon links (Regel weiter unten). Der Knopf
+       * selbst haelt sich ebenfalls vom sicheren Rand fern, darum hier
+       * dasselbe max(): Auf dem iPhone hoch bleibt es bei 68, im Querformat
+       * schiebt der 50-px-Rand den Stapel auf 58 — und dort steht er links.
        */
       @media (min-height: 431px) {
-        body.touch #money, body.touch #shift { right: 68px; }
+        body.touch #hudoben { right: max(68px, calc(var(--sa-r) + 8px)); }
       }
       /* Touch: Der untere Block steht im freien Streifen zwischen den
          Fahrpedalen (unten links) und den Drehtasten (rechts), linksbuendig.
@@ -122,7 +201,13 @@
                  auf content-box, ohne ihn faehlten genau 4 px (Lehre aus der
                  Messung 14.09.2026). */
       body.touch #hudunten {
-        left: 198px; right: 82px; bottom: 10px; align-items: flex-start;
+        /* Der Block sitzt rechts NEBEN den Pedalen — rueckt deren linke Kante
+           um den sicheren Rand ein, muss er mitrücken. Darum calc() statt
+           max(): Hier wird ein Rand geerbt, nicht einer eingehalten. */
+        left: calc(var(--sa-l) + 198px);
+        right: max(82px, calc(var(--sa-r) + 8px));
+        bottom: max(10px, calc(var(--sa-b) + 8px));
+        align-items: flex-start;
       }
       /* Telefon hoch (iPhone mini 375 x 812): Neben den Pedalen bleiben nur
          189 px — zu wenig fuer eine Textzeile. Der Block geht darum ueber die
@@ -135,13 +220,31 @@
          Telefone fasst: Im Hochformat ist ein iPhone 812 px hoch und laeuft
          sonst mit den Tablet-Regeln (Befund 15.09.2026). */
       @media (max-width: 500px) and (min-height: 431px) {
-        body.touch #hudunten { left: 12px; bottom: 118px; }
+        body.touch #hudunten {
+          left: max(12px, calc(var(--sa-l) + 8px));
+          /* Oberkante der Pedale plus 12 px Luft. Die Pedale stehen selbst auf
+             max(10px, Rand + 8px) — steigen sie wegen des Home-Indicators, muss
+             der Block mitsteigen, sonst liegt er auf ihnen. 34 px Balken + 8 px
+             Luft + 96 px Pedal + 12 px = 150; die Formel gibt 152. */
+          bottom: calc(var(--sa-b) + 118px);
+        }
       }
       /* Kein white-space: nowrap mehr — in der Ladeanzeige ist jede Angabe
          wichtig (Fraktion, Masse, Reinheit). Sie darf umbrechen, aber nichts
          abschneiden. */
       #load { display: none; font-size: 14px; }
-      #debug { top: 80px; right: 12px; display: none; text-align: right; }
+      #debug { display: none; text-align: right; }
+      /* Die Einblendung stand bis heute mit ihren Werten IM Markup
+         (`style="top: 56px; …"`). Ein Stilattribut schlaegt jeden Selektor —
+         die Regel `#toast { top: 60px; font-size: 12px; }` in der flachen
+         Fassung hat deshalb nie gewirkt, und ein sicherer Rand haette dort
+         ebensowenig gewirkt. Alles Ruhende steht jetzt hier; das Skript setzt
+         nur noch `opacity`. */
+      #toast {
+        top: max(56px, calc(var(--sa-t) + 8px));
+        left: 50%; transform: translateX(-50%);
+        opacity: 0; transition: opacity 0.4s; color: #f0d060;
+      }
       #loading {
         position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
         color: #e8e8e4; font: 16px "Consolas", monospace; background: #1a1c1e;
@@ -180,7 +283,9 @@
          umgreift und dabei ungenauer zielt. 18 px Abstand dazwischen, damit
          der Daumen nicht zwischen beide faellt. */
       #pedals {
-        position: absolute; left: 12px; bottom: 10px;
+        position: absolute;
+        left: max(12px, calc(var(--sa-l) + 8px));
+        bottom: max(10px, calc(var(--sa-b) + 8px));
         display: flex; gap: 18px; padding: 6px;
         pointer-events: auto; touch-action: none; z-index: 2;
       }
@@ -249,7 +354,9 @@
       /* Menueknopf oben rechts — weit weg von beiden Daumen. Er oeffnet die
          Pause, in der Speichern, Steuerung und Neues Spiel liegen. */
       #btn-menu {
-        top: 12px; right: 12px; width: 46px; height: 46px; padding: 0;
+        top: max(12px, calc(var(--sa-t) + 8px));
+        right: max(12px, calc(var(--sa-r) + 8px));
+        width: 46px; height: 46px; padding: 0;
         line-height: 46px; font-size: 20px; z-index: 3;
       }
       /* Rotator: zwei Tasten am rechten Bildrand in Daumenhoehe.
@@ -261,11 +368,15 @@
       /* Mit "#touch" davor, sonst gewinnt "#touch .btn" mit seinem Innenrand
          und die Tasten werden 22 px hoeher als gedacht — dann ueberlappen sie. */
       #touch #btn-rot-l, #touch #btn-rot-r {
-        right: 12px; width: 54px; height: 50px; line-height: 46px;
+        right: max(12px, calc(var(--sa-r) + 8px));
+        width: 54px; height: 50px; line-height: 46px;
         padding: 0; font-size: 20px;
       }
-      #touch #btn-rot-l { bottom: 238px; }
-      #touch #btn-rot-r { bottom: 180px; }
+      /* 238 und 180 liegen weit ueber jedem Home-Indicator; das max() steht
+         trotzdem da, damit die Regel ueberall dieselbe ist und niemand beim
+         Aendern der Zahl den Rand vergisst. */
+      #touch #btn-rot-l { bottom: max(238px, calc(var(--sa-b) + 8px)); }
+      #touch #btn-rot-r { bottom: max(180px, calc(var(--sa-b) + 8px)); }
 
       /* Die Funktions-Elemente tragen nur noch ihre Tastencodes; sichtbar wird
          davon nichts. Der Kranz zeichnet sich selbst. */
@@ -303,25 +414,56 @@
            kleiner, aber mit 58 x 64 px immer noch klar ueber den 44 px, die
            ein Tippziel mindestens messen muss. Plattenweg entsprechend:
            64 - 2 x 2 - 20 - 6 Luft = 34 px unten, also 28 px Weg ab 6 px. */
-        #pedals { left: 8px; bottom: 6px; gap: 14px; padding: 5px; }
+        #pedals {
+          left: max(8px, calc(var(--sa-l) + 8px));
+          bottom: max(6px, calc(var(--sa-b) + 6px));
+          gap: 14px; padding: 5px;
+        }
         #touch .pedal { width: 58px; height: 64px; }
         #touch .pedal .platte { top: 6px; height: 20px; left: 6px; right: 6px; }
         #touch.fahren .pedal .platte { transform: translateY(28px); }
-        #btn-menu { top: 8px; right: 8px; width: 40px; height: 40px; line-height: 40px; font-size: 18px; }
+        #btn-menu {
+          top: max(8px, calc(var(--sa-t) + 8px));
+          right: max(8px, calc(var(--sa-r) + 8px));
+          width: 40px; height: 40px; line-height: 40px; font-size: 18px;
+        }
         #radial .sektor { width: 66px; height: 26px; margin: -13px 0 0 -33px; font-size: 10px; line-height: 22px; }
         /* neben den rechten Stick statt darüber — oben liegt die Tastenleiste */
         #touch #btn-rot-l, #touch #btn-rot-r {
-          bottom: 14px; width: 46px; height: 40px; line-height: 36px; font-size: 17px;
+          bottom: max(14px, calc(var(--sa-b) + 8px));
+          width: 46px; height: 40px; line-height: 36px; font-size: 17px;
         }
-        #touch #btn-rot-l { right: 190px; }
-        #touch #btn-rot-r { right: 132px; }
+        /* 132 und 190 liegen schon weit innerhalb der 50 px breiten
+           Notch-Zone des Querformats — die Tasten bleiben stehen, wo sie
+           sind. Genau dafuer steht hier max() und nicht calc(): Ein
+           zusaetzliches Einruecken haette den freien Streifen fuer den
+           unteren HUD-Block um 50 px verschmaelert, ohne dass eine einzige
+           Taste dadurch besser erreichbar wuerde. */
+        #touch #btn-rot-l { right: max(190px, calc(var(--sa-r) + 8px)); }
+        #touch #btn-rot-r { right: max(132px, calc(var(--sa-r) + 8px)); }
         /* endet über dem rechten Stick, sonst legen sich die Tasten darauf */
         #help { display: none; }
         /* Konto und Tagesablauf nach links: rechts oben braucht die
-           Tastenleiste den Platz, sobald sie zweispaltig umbricht */
-        #money { top: 8px; left: 8px; right: auto; font-size: 12px; padding: 4px 8px; }
-        #shift { top: 34px; left: 8px; right: auto; font-size: 11px; padding: 4px 8px; }
-        #gripinfo, #load { font-size: 12px; padding: 4px 10px; }
+           Tastenleiste den Platz, sobald sie zweispaltig umbricht. Der Halter
+           zieht um, nicht die einzelnen Kaesten — sonst stuenden sie wieder
+           jeder fuer sich am Rand, und das war der Fehler. */
+        #hudoben {
+          top: max(8px, calc(var(--sa-t) + 8px));
+          left: max(8px, calc(var(--sa-l) + 8px));
+          right: auto; align-items: flex-start; gap: 4px;
+        }
+        #money { font-size: 12px; padding: 4px 8px; }
+        #shift { font-size: 11px; padding: 4px 8px; }
+        /* 14 px statt der bisherigen 12 — Briefing Kap. 20 verlangt fuer
+           lesbaren Text mindestens 14 px, und die Griff-Info ist die Zeile,
+           nach der man den Abwurf entscheidet.
+           Was das kostet und wo es wieder hereingeholt wird, steht in E-032;
+           die Zahlen rechnet `test/greifanzeige.test.ts` nach. Kurz: engerer
+           Zeilenabstand (1,25 statt 1,35), schmalerer Innenrand (6/10 statt
+           8/12), kleinerer Zwischenraum (4 statt 6) — und vor allem: Im
+           Ruhezustand steht dort jetzt gar nichts mehr. */
+        #gripinfo, #load { font-size: 14px; }
+        #hudunten .hud { padding: 4px 8px; }
         /* Telefon quer: Hier ist das Bild flach, aber breit — neben den Pedalen
            ist Platz genug, der Block muss nicht darueber.
            Links:  8 px Rand + 5 px Fassung + 58 px + 14 px Luecke + 58 px
@@ -331,14 +473,24 @@
            Damit sitzt der Block am unteren Rand statt wie bisher 90 px
            darueber — er verdeckt genau das Stueck Boden vor der Maschine und
            nicht mehr die Maschine selbst. */
-        body.touch #hudunten { left: 156px; right: 252px; bottom: 6px; }
-        #toast { top: 60px; font-size: 12px; }
+        body.touch #hudunten {
+          left: calc(var(--sa-l) + 156px);
+          right: max(252px, calc(var(--sa-r) + 8px));
+          bottom: max(6px, calc(var(--sa-b) + 6px));
+        }
+        #toast { top: max(60px, calc(var(--sa-t) + 8px)); font-size: 12px; }
       }
       /* --- Pausenmenü --- */
+      /* Der Ueberzug deckt das ganze Glas ab (inset: 0, sonst blitzt am Rand
+         das Spiel durch), die Tafel darin haelt den sicheren Rand ueber das
+         Polster ein. So bleibt der Schliessen-Knopf im Hochformat unter der
+         Notch und ueber dem Home-Indicator. */
       #pause {
         display: none; position: fixed; inset: 0; z-index: 20;
         background: rgba(12,14,16,0.72); backdrop-filter: blur(3px);
         align-items: center; justify-content: center;
+        padding: var(--sa-t) var(--sa-r) var(--sa-b) var(--sa-l);
+        box-sizing: border-box;
       }
       #pause.open { display: flex; }
       #pause .panel {
@@ -439,7 +591,9 @@
 
       /* --- Geführter Einstieg --- */
       #tutorial {
-        display: none; position: fixed; left: 12px; bottom: 12px; z-index: 12;
+        display: none; position: fixed; z-index: 12;
+        left: max(12px, calc(var(--sa-l) + 8px));
+        bottom: max(12px, calc(var(--sa-b) + 8px));
         max-width: 320px; pointer-events: none;
       }
       #tutorial.open { display: block; }
@@ -448,18 +602,25 @@
          Armstick auf. Oben links steht nichts im Weg, die Tastenliste ist auf
          Touchgeraeten ausgeblendet. Die Karte selbst nimmt ohnehin keine
          Beruehrung an (pointer-events: none). */
-      body.touch #tutorial { top: 12px; bottom: auto; }
+      body.touch #tutorial { top: max(12px, calc(var(--sa-t) + 8px)); bottom: auto; }
       /* Im flachen Layout stehen Konto und Tagesablauf oben links — Karte darunter.
-         Muss hinter der Grundregel stehen: gleiche Spezifitaet, es zaehlt die Reihenfolge. */
+         Muss hinter der Grundregel stehen: gleiche Spezifitaet, es zaehlt die Reihenfolge.
+         8 px Rand + 28 px Konto + 4 px Luecke + 27 px Tagesablauf + 8 px Luft
+         = 75; aufgerundet 76. (Konto: 12 px Schrift x 1,5 = 18, dazu 2 x 4 px
+         Innenrand und 2 x 1 px Rahmen.) */
       @media (max-height: 430px) {
-        body.touch #tutorial { top: 66px; }
+        body.touch #tutorial { top: max(76px, calc(var(--sa-t) + 76px)); }
       }
       /* Telefon hoch: Oben rechts stehen Konto und Tagesablauf — auf 375 px
          Breite reicht die Kontozeile mit rund 280 px fast ueber das ganze Bild
-         und lag bisher unter der Karte. Die Karte darum darunter
-         (12 px Rand + 41 px Konto + 31 px Tagesablauf = 84 px). */
+         und lag bisher unter der Karte. Die Karte darum darunter:
+         12 px Rand + 41 px Konto + 6 px Luecke + 38 px Tagesablauf + 8 px Luft
+         = 105. Die 84 px von gestern waren um 21 px zu klein — sie rechneten
+         mit 41 + 31 statt mit den wirklichen Kastenhoehen und ohne die Luecke.
+         Der sichere Rand kommt oben drauf, weil die Karte unter dem Stapel
+         haengt und der Stapel unter der Notch beginnt. */
       @media (max-width: 500px) and (min-height: 431px) {
-        body.touch #tutorial { top: 84px; }
+        body.touch #tutorial { top: calc(var(--sa-t) + 105px); }
       }
       /* Die Karte selbst schluckt keine Beruehrung mehr: ein Daumen darauf
          setzt den Stick, nur der Ueberspringen-Knopf faengt seinen Tipp ab. */
@@ -492,7 +653,11 @@
       }
       #tutorial p { margin: 0; font-size: 12.5px; line-height: 1.55; color: #c8ced2; }
       @media (max-height: 430px) {
-        #tutorial { max-width: 260px; bottom: 8px; left: 8px; }
+        #tutorial {
+          max-width: 260px;
+          bottom: max(8px, calc(var(--sa-b) + 8px));
+          left: max(8px, calc(var(--sa-l) + 8px));
+        }
         #tutorial p { font-size: 11px; }
       }
       /* --- Dialoge: Abholung bestellen, Verhandeln, Platz ausbauen ---
@@ -503,6 +668,9 @@
         display: none; position: fixed; inset: 0; z-index: 22;
         background: rgba(12, 14, 16, 0.72);
         align-items: center; justify-content: center;
+        /* wie beim Pausenfeld: Ueberzug voll, Tafel innerhalb der Raender */
+        padding: var(--sa-t) var(--sa-r) var(--sa-b) var(--sa-l);
+        box-sizing: border-box;
       }
       #pickup.open, #haggle.open, #shop.open, #radio.open { display: flex; }
       #pickup .panel, #haggle .panel, #shop .panel, #radio .panel {
@@ -585,26 +753,42 @@
       Z&nbsp;&nbsp;Platz ausbauen (Maschinen kaufen)<br />
       L&nbsp;&nbsp;Stand laden &nbsp;·&nbsp; N&nbsp;&nbsp;Neues Spiel
     </div>
-    <div id="money" class="hud">Konto: 0 €</div>
-    <div id="shift" class="hud">Annahme</div>
     <!--
-      Der untere HUD-Block. Ladeanzeige oben, Griff-Info darunter — beide in
+      Der obere HUD-Block. Konto, Tagesablauf, Debugzahlen — gestapelt, nicht
+      einzeln am Rand aufgehaengt. Vorher stand jeder auf einer geschaetzten
+      Hoehe (12 / 46 / 80 px); die Schaetzung lag um 6 px daneben, und der
+      Tagesablauf stand im Konto. Im Stapel gibt es keine Schaetzung mehr.
+      Der Debugblock ist meistens ausgeblendet und nimmt dann keinen Platz ein.
+    -->
+    <div id="hudoben">
+      <div id="money" class="hud">Konto: 0 €</div>
+      <div id="shift" class="hud">Annahme</div>
+      <div id="debug" class="hud"></div>
+    </div>
+    <!--
+      Der untere HUD-Block. Griff-Info oben, Ladeanzeige darunter — beide in
       einem Halter, der sie stapelt. Vorher hing jede einzeln mit eigenem
       Abstand am Bildrand; wuchs die Griff-Info auf zwei Zeilen, schob sie sich
       unter die Ladeanzeige (Befund 15.09.2026). Ein Stapel kann das nicht.
+
+      Die Reihenfolge wurde am 15.09.2026 getauscht: Der Halter haengt am
+      unteren Rand und waechst nach oben. Was unten steht, liegt fest; was
+      oben steht, darf sich aendern, ohne den Rest zu verschieben. Die
+      Griff-Info wechselt mehrmals je Sekunde Hoehe und verschwindet seit
+      heute ganz, wenn sie nichts zu sagen hat — sie gehoert nach oben. Die
+      Ladeanzeige steht minutenlang still und haelt den Block unten fest.
 
       Die Griff-Info hat zwei Zeilen: Der Kopf traegt Zustand, Gewicht, Preis
       und Ampel und darf umbrechen; die Liste zaehlt auf, was in der Spinne
       liegt, bleibt auf einer Zeile und wird am Ende abgeschnitten.
     -->
     <div id="hudunten">
-      <div id="load" class="hud"></div>
-      <div id="gripinfo" class="hud ruhig">
-        <span id="grip-kopf">Greifer: offen</span><span id="grip-liste"></span>
+      <div id="gripinfo" class="hud weg">
+        <span id="grip-kopf"></span><span id="grip-liste"></span>
       </div>
+      <div id="load" class="hud"></div>
     </div>
-    <div id="toast" class="hud" style="top: 56px; left: 50%; transform: translateX(-50%); opacity: 0; transition: opacity 0.4s; color: #f0d060;"></div>
-    <div id="debug" class="hud"></div>
+    <div id="toast" class="hud"></div>
     <div id="touch">
       <div class="zone" id="zone-left"></div>
       <div class="zone" id="zone-right"></div>

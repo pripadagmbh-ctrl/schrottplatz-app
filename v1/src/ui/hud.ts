@@ -162,6 +162,18 @@ function schreib(el: HTMLElement, text: string, farbe = ""): void {
   zuletztGeschrieben.set(el, { text, farbe });
 }
 
+/**
+ * Nachlauf, bevor die Griff-Info verschwindet.
+ *
+ * Ohne ihn klappt der Kasten bei jedem Ueberstreichen eines Teils auf und zu —
+ * beim Schwenken ueber eine Halde waere das ein Flackern, und das ist
+ * schlimmer als ein ruhiger Kasten. 400 ms ueberbruecken einen Schwenk,
+ * bleiben aber kurz genug, dass dort nie lange etwas steht, was nicht mehr
+ * stimmt.
+ */
+// SW: am Geraet zu bestaetigen (Schwenktempo des Oberwagens)
+const GRIFF_NACHLAUF_MS = 400;
+
 export class Hud {
   private gripEl = document.getElementById("gripinfo")!;
   /*
@@ -171,8 +183,12 @@ export class Hud {
    */
   private gripKopfEl = document.getElementById("grip-kopf")!;
   private gripListeEl = document.getElementById("grip-liste")!;
-  /** Startwert passend zum Markup: Dort traegt die Griff-Info schon `ruhig`. */
-  private ruhig = true;
+  /** Startwert passend zum Markup: Dort traegt die Griff-Info noch kein `ruhig`. */
+  private ruhig = false;
+  /** Startwert passend zum Markup: Dort traegt die Griff-Info schon `weg`. */
+  private weg = true;
+  /** Zeitpunkt, seit dem der Greifer nichts zu melden hat; 0 = hat etwas. */
+  private stillSeitMs = 0;
   private moneyEl = document.getElementById("money")!;
   /*
    * Einmal geholt statt in jedem Bild neu gesucht (Befund 14.09.2026):
@@ -193,6 +209,11 @@ export class Hud {
    * aus demselben Grund, aus dem `schreib()` existiert: kein Schreiben je Bild.
    */
   private setzeGriff(z: GriffZeilen, ruhig: boolean): void {
+    this.stillSeitMs = 0;
+    if (this.weg) {
+      this.weg = false;
+      this.gripEl.classList.remove("weg");
+    }
     schreib(this.gripKopfEl, z.kopf);
     schreib(this.gripListeEl, z.liste);
     if (ruhig !== this.ruhig) {
@@ -201,10 +222,34 @@ export class Hud {
     }
   }
 
+  /**
+   * Der Greifer hat nichts zu melden: offen, leer, nichts in Reichweite.
+   *
+   * Patrick am 15.09.2026: „Ich weiss nicht, wofuer wir ‚Greifer offen'
+   * ueberhaupt brauchen. Also kann ganz verschwinden." Also steht dort nichts
+   * mehr — kein blasser Kasten, kein Platzhalter. Der Zustand des Greifers ist
+   * am Greifer selbst zu sehen; ein Kasten, der nur sagt, dass nichts los ist,
+   * verdeckt Platz, ohne etwas zu sagen.
+   *
+   * Der Aufruf kommt aus jedem Bild, darum wird hier die Zeit genommen statt
+   * ein Zeitgeber gestellt: Erst nach dem Nachlauf faellt der Kasten weg.
+   */
+  private verbergeGriff(): void {
+    if (this.weg) return;
+    const jetzt = performance.now();
+    if (this.stillSeitMs === 0) {
+      this.stillSeitMs = jetzt;
+      return;
+    }
+    if (jetzt - this.stillSeitMs < GRIFF_NACHLAUF_MS) return;
+    this.weg = true;
+    this.gripEl.classList.add("weg");
+  }
+
   /** Griff-Info bei offenem Greifer: anvisiertes Objekt. */
   showTarget(item: ScrapItem | null): void {
     if (!item) {
-      this.setzeGriff({ kopf: "Greifer: offen", liste: "" }, true);
+      this.verbergeGriff();
       return;
     }
     this.setzeGriff(griffZiel(item), false);
@@ -215,6 +260,17 @@ export class Hud {
     this.setzeGriff(griffLadung(items, hover), false);
   }
 
+  /**
+   * Greifer zu und leer — daneben gegriffen.
+   *
+   * Das bleibt stehen, obwohl „Greifer: offen" verschwunden ist: Es ist keine
+   * Zustandsmeldung, sondern die Antwort auf einen Handgriff. Wer zupackt und
+   * nichts bekommt, soll das erfahren; ohne die Zeile sieht man nur eine
+   * geschlossene Spinne und weiss nicht, ob sie leer ist oder ob das Teil
+   * hinter der Schale steckt. Patrick hat am 15.09.2026 ausdruecklich nur
+   * „offen" genannt — und gerade gemeldet, dass mittlere Teile schwer zu
+   * fassen sind.
+   */
   showClosedEmpty(): void {
     this.setzeGriff({ kopf: "Greifer: geschlossen (leer)", liste: "" }, true);
   }
