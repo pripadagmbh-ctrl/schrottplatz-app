@@ -59,6 +59,8 @@ import {
   routeOut,
   PICKUP_IN_FWD,
   neueAbholstelle,
+  abholPlatzFuer,
+  type AbholPlatz,
   pickupApproach,
   pickupInRev,
   pickupOut,
@@ -572,6 +574,16 @@ class DeliveryVehicle {
   private get isPickup(): boolean {
     return this.kind === "abholer";
   }
+
+  /**
+   * Fuer welche Fraktion dieser Abholer bestellt wurde (null = gemischt).
+   *
+   * Steht am FAHRZEUG und nicht nur am Fuhrpark: Der Halteplatz wird beim
+   * Losfahren von der Waage festgelegt, und bis dahin kann der Spieler laengst
+   * eine neue Abholung vorgemerkt haben. Der Wagen, der schon faehrt, faehrt
+   * zu dem Platz, fuer den er gerufen wurde.
+   */
+  bestellung: string | null = null;
   /**
    * Kippt selbst ab — der Einzige, der Material ohne Spielerarbeit auf den
    * Platz bringt. Seit E-029 sagt das nichts mehr ueber seinen WEG (er faehrt
@@ -626,7 +638,15 @@ class DeliveryVehicle {
    */
   private legeAbladestelleFest(): void {
     if (this.isPickup) {
-      neueAbholstelle();
+      /*
+       * WO DER ABHOLER HAELT, HAENGT AN DER BESTELLUNG (E-056).
+       *
+       * Stahlschrott und Mischschrott haben kein Lagersilo — sie werden an
+       * der Halde verladen, also kommt der Wagen zum Bagger. Alles mit
+       * Lagersilo faehrt an den Verladeplatz vor dem Schenkel dieses Silos.
+       * Die Rechnung steht in `routes.ts`, damit sie kopflos zu pruefen ist.
+       */
+      neueAbholstelle(this.bestellung);
       this.meineAnfahrt = pickupApproach();
       this.meinRueckweg = pickupInRev();
       this.meineAusfahrt = pickupOut();
@@ -2026,6 +2046,8 @@ export class VehicleManager {
     );
     this.active.itemQuelle = this.items;
     this.active.platzinventar = this.platzinventar;
+    // Die Bestellung reist mit dem Wagen mit — daran haengt sein Halteplatz.
+    this.active.bestellung = k === "abholer" ? this.pickupOrder : null;
     if (c) this.onCustomerArrived?.(c);
     // Händler bleiben gern noch auf einen Kaffee; Gewerbe hat es eilig.
     // Nur freie Plätze vergeben, sonst stünde einer im anderen.
@@ -2050,6 +2072,24 @@ export class VehicleManager {
    * bekommt den vollen Preis.
    */
   pickupOrder: string | null = null;
+
+  /**
+   * Wo ein Abholer fuer diese Bestellung halten wuerde.
+   *
+   * Fuers HUD: Seit E-056 steht er nicht mehr immer an derselben Stelle, und
+   * „wo ist er?" ist damit eine echte Frage. Gerechnet wird sie hier einmal,
+   * damit Anzeige und Fahrt nicht zweierlei sagen.
+   */
+  abholPlatz(order: string | null = this.pickupOrder): AbholPlatz {
+    return abholPlatzFuer(order);
+  }
+
+  /** Der Platz, an dem der Abholer gerade wirklich steht bzw. hinfaehrt. */
+  get aktuellerAbholPlatz(): AbholPlatz | null {
+    const a = this.active;
+    if (!a || a.kind !== "abholer") return null;
+    return abholPlatzFuer(a.bestellung);
+  }
 
   /**
    * Eine bestellte Abholung, die noch nicht fahren konnte.

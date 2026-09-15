@@ -16,9 +16,10 @@ import { describe, it, expect } from "vitest";
 // Typpruefung fuer `test/` (E-038). Wer das Fahrtempo wachen will, braucht
 // einen eigenen Waechter, keinen ungenutzten Import.
 import { hoechsteKrallenspitze } from "../src/excavator/excavator";
-import { CONFIGS } from "../src/world/containers";
+import { CONFIGS, bayVorderkante } from "../src/world/containers";
 import {
   neueAbholstelle,
+  alleAbholPlaetze,
   setBaggerOrt,
   ABKIPP_ZONE,
   ABLADE_SPUR_X,
@@ -27,11 +28,13 @@ import {
   TIP_CREEP_M,
 } from "../src/delivery/routes";
 import { baleYard, PRESS_CENTER as PRESSE } from "../src/world/press";
-import { BAGGER_STAND, VERLADE_STAND } from "../src/world/baggerstand";
-/** Vorderkante der Silo-Reihe — die Seite, auf der der Bagger das Silo hat. */
-const SILO_KANTE_X = Math.min(
-  ...CONFIGS.filter((c) => c.lager === true).map((c) => c.x - c.size[0] / 2)
-);
+import { BAGGER_STAND } from "../src/world/baggerstand";
+/*
+ * `VERLADE_STAND` und `SILO_KANTE_X` standen hier, solange der Abholer an
+ * genau EINEM Ort hielt. Seit E-056 haengt sein Standplatz an der Bestellung
+ * und kommt mit `alleAbholPlaetze()` mit — eine Kopie der Silokante hier
+ * waere wieder eine zweite Wahrheit.
+ */
 
 /*
  * Standplatz des Baggers — aus `world/baggerstand.ts`, nicht abgeschrieben.
@@ -212,36 +215,48 @@ describe("Reichweite des Arms", () => {
    * waeren dann eine Sackgasse: Was man nicht greifen kann, kann man weder
    * verladen noch verkaufen.
    */
-  it("der Abholer haelt im Greifring des Verladeplatzes", () => {
+  it("der Abholer haelt im Greifring SEINES Standplatzes — an jedem Halteplatz", () => {
     /*
      * Bis zum 14.09.2026 hielt der Abholer dort, wo der Bagger gerade stand —
      * der Test prüfte deshalb vier Baggerstellungen durch. Mit E-010 ist das
      * umgedreht: Der Verladeplatz ist ein ORT, und wer laden will, fährt hin
      * („Silo zu Abholer — der Spieler mit dem Bagger am Verladeplatz", E-011).
-     * Die alte Rechnung ginge hier gar nicht mehr auf; vom Hauptstandplatz
-     * sind es 26 m bis zur Silo-Reihe.
      *
-     * Geprüft wird jetzt die Eigenschaft, die davon übrig bleibt und auf die
-     * es ankommt: Steht der Bagger auf seinem zweiten Standplatz, liegt der
-     * Container im Greifring, und der Arm kommt über die Bordwand.
+     * SEIT E-056 SIND ES MEHRERE ORTE. Der Halteplatz haengt an der
+     * bestellten Fraktion: Stahlschrott und Mischschrott an den Abladeplatz
+     * beim Bagger, alles mit Lagersilo an den Verladeplatz vor dem Schenkel
+     * dieses Silos. Der Test prueft deshalb nicht mehr EINEN Abstand, sondern
+     * die Eigenschaft an JEDEM Platz: Steht der Bagger auf dem Stand, der zu
+     * diesem Platz gehoert, liegt der Container im Greifring und der Arm
+     * kommt über die Bordwand.
      */
     setBaggerOrt(() => BAGGER_STAND);
-    const [x, z] = neueAbholstelle();
-    const d = Math.hypot(x - VERLADE_STAND.x, z - VERLADE_STAND.z);
-    expect(d, `Abholer ${d.toFixed(1)} m vom Verladeplatz`).toBeGreaterThanOrEqual(4.0);
-    expect(d, `Abholer ${d.toFixed(1)} m vom Verladeplatz`).toBeLessThanOrEqual(9.5);
-    expect(hoechsteKrallenspitze(d), `Hubhoehe bei ${d.toFixed(1)} m`).toBeGreaterThan(2.5);
-    /*
-     * Und er steht auf der dem Silo ABGEWANDTEN Seite des Baggers — sonst
-     * stuende er in der Reihe. Seit dem 15.09.2026 liegen die Silos oestlich
-     * des Verladeplatzes, der Abholer also westlich davon; bis dahin war es
-     * umgekehrt. Geprueft wird die Eigenschaft, nicht die Himmelsrichtung.
-     */
-    const siloSeite = Math.sign(SILO_KANTE_X - VERLADE_STAND.x);
-    expect(
-      Math.sign(x - VERLADE_STAND.x),
-      "der Abholer steht auf derselben Seite wie die Silo-Reihe"
-    ).toBe(-siloSeite);
+    for (const p of alleAbholPlaetze()) {
+      const [x, z] = p.halt;
+      const d = Math.hypot(x - p.stand.x, z - p.stand.z);
+      const wo = `${p.name} (${p.order ?? "gemischt"})`;
+      expect(d, `${wo}: Abholer ${d.toFixed(1)} m vom Stand`).toBeGreaterThanOrEqual(4.0);
+      expect(d, `${wo}: Abholer ${d.toFixed(1)} m vom Stand`).toBeLessThanOrEqual(9.5);
+      expect(hoechsteKrallenspitze(d), `${wo}: Hubhoehe bei ${d.toFixed(1)} m`).toBeGreaterThan(
+        2.5
+      );
+      if (!p.ziel) continue;
+      /*
+       * Und er steht auf der dem Silo ABGEWANDTEN Seite des Baggers — sonst
+       * stuende er in der Reihe. Geprueft wird die Eigenschaft, nicht die
+       * Himmelsrichtung: Der Suedschenkel oeffnet sich nach Norden, sein
+       * Abholer haelt also noerdlich des Stands, der Westschenkel nach Osten
+       * und seiner oestlich.
+       */
+      const k = bayVorderkante(p.ziel);
+      const zumSilo = Math.hypot(k.x - p.stand.x, k.z - p.stand.z);
+      const skalar =
+        (k.x - p.stand.x) * (x - p.stand.x) + (k.z - p.stand.z) * (z - p.stand.z);
+      expect(skalar, `${wo}: Silo und Abholer auf derselben Seite`).toBeLessThan(0);
+      expect(zumSilo, `${wo}: Silo ${zumSilo.toFixed(1)} m vom Stand`).toBeLessThanOrEqual(9.5);
+    }
+    // Der Ausgangszustand fuer alles, was danach laeuft.
+    neueAbholstelle();
   });
 
   it("das Presspaket bleibt in der Kammer", () => {
