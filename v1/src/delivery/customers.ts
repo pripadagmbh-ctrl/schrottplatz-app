@@ -252,7 +252,24 @@ function rollPrivat(): CustomerProfile {
     group: "privat",
     name: pick(PRIVAT_NAMEN),
     subtitle: pick(PRIVAT_ORTE),
-    massKg: 50 + Math.random() * 750,
+    /*
+     * 0,65 bis 1,8 t statt 0,05 bis 0,8 t (Ansage Patrick 15.09.2026).
+     *
+     * Sein Befund am Gerät: „Eigentlich kommen Händler erst, wenn ihre LKWs
+     * randvoll sind. … mindestens mal über 600, 700 Kilo Minimum. … Ich sehe
+     * ja, dass die zwischen 1 und 10 Tonnen alles haben, aber drunter ist eher
+     * selten."
+     *
+     * Nachgemessen war der Händler nie das Problem (2,5–9,0 t) und das Gewerbe
+     * auch nicht (1,2–6,5 t) — beide lagen längst im Band. Es war der
+     * Privatmann, der mit 50 kg vorfuhr: eine Fuhre, für die niemand den Weg
+     * auf sich nimmt.
+     *
+     * Die Untergrenze ist damit eine Aussage über die Welt, nicht über den
+     * Zufall: Wer herfährt, hat einen Anhänger voll. Die Obergrenze steigt
+     * mit, sonst wäre die Spanne nur noch ein Strich.
+     */
+    massKg: 650 + Math.random() * 1150,
     sortedMaterial: null, // Haushaltsauflösung ist immer gemischt
     // Privatleute bringen unwissentlich Störstoff mit: Holz, Kunststoff, Reifen
     contaminantShare: 0.15 + Math.random() * 0.2,

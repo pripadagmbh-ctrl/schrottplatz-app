@@ -25,8 +25,22 @@ describe("Kundschaft", () => {
   it("hält die Mengen je Gruppe auseinander", () => {
     for (const c of ziehe(500)) {
       if (c.group === "privat") {
-        expect(c.massKg, "Privat bringt Kofferraummengen").toBeLessThan(800);
-        expect(c.massKg).toBeGreaterThanOrEqual(50);
+        /*
+         * Bis zum 15.09.2026 stand hier `toBeLessThan(800)` mit der Begründung
+         * „Privat bringt Kofferraummengen", und darunter `>= 50`. Beides ist
+         * überstimmt: Patrick am Gerät — „eigentlich kommen Händler erst, wenn
+         * ihre LKWs randvoll sind … mindestens mal über 600, 700 Kilo Minimum".
+         *
+         * Was von der alten Prüfung gilt: Der Privatmann bleibt das untere Ende
+         * der Spanne — das prüft die Zeile weiter unten gegen die 1000 kg der
+         * gewerblichen Gruppen. Was nicht mehr gilt: dass er mit einem
+         * Kofferraum voll vorfährt. Für eine Fuhre von 50 kg fährt niemand los.
+         *
+         * Die Untergrenze selbst bewacht `test/lademenge.test.ts` über alle
+         * Gruppen zugleich.
+         */
+        expect(c.massKg, "Privat lohnt die Fahrt").toBeGreaterThanOrEqual(600);
+        expect(c.massKg, "Privat bleibt unter einer Händlerfuhre").toBeLessThan(2000);
       } else {
         // Was auf eine Ladefläche passt — nicht mehr
         expect(c.massKg, `${c.group} bringt Fuhren`).toBeGreaterThanOrEqual(1000);
