@@ -268,3 +268,72 @@ export function risszeichnen(w: Werkzeug, r: Riss): void {
   /* Bolzen zuletzt, er liegt obenauf */
   kreis(w, w.P(r.rUnten, r.By), 0.062 * w.px, "#ffffff", FARBE.bolzen, 3);
 }
+
+/**
+ * Die VERKLEIDUNG — Blech, kein Guss.
+ *
+ * Patrick, 15.09.2026, zu den Vorbildbildern: „Das, was du als Guss … verortet
+ * hat, das ist im Grunde genommen nur eine Abblendung. Das ist ein
+ * Zylinderschutz. Also es ist kein Gusskörper."
+ *
+ * Deshalb wird sie GESTRICHELT gezeichnet und nie gefüllt: Sie trägt nichts,
+ * sie deckt die fünf Zylinder ab. Ihr Umriss läuft von der Deckplatte (oben,
+ * so weit außen wie die Zylinderaugen plus halbe Zylinderbreite) schräg
+ * hinunter zur Nabe.
+ */
+export function verkleidung(
+  w: Werkzeug,
+  rOben: number,
+  yOben: number,
+  rUnten: number,
+  yUnten: number
+): void {
+  const pts = [
+    w.P(-rOben, yOben),
+    w.P(rOben, yOben),
+    w.P(rUnten, yUnten),
+    w.P(-rUnten, yUnten),
+  ];
+  w.teile.push(
+    `<polygon points="${pts.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ")}" ` +
+      `fill="none" stroke="${FARBE.gelb}" stroke-width="2.5" stroke-dasharray="9 6"/>`
+  );
+}
+
+/**
+ * Wie viel vom Ring der Schalenspitzen der Kopf dem Fahrer verdeckt (0..1).
+ *
+ * Strahlensatz in drei Dimensionen: Das Auge steht auf `augHoehe` über Grund,
+ * der Greifer haengt in `abstand` Metern, seine Aufhaengung auf `aufhaengung`.
+ * Der Kopf ist eine Scheibe vom Halbmesser `R` auf `kopfY` unter der
+ * Aufhaengung; die Spitzen liegen auf `tiefe` unter ihr, auf einem Kreis vom
+ * Halbmesser `maul/2`. Gezaehlt wird, welcher Anteil dieses Kreises hinter der
+ * Scheibe verschwindet.
+ *
+ * Dieselbe Rechenart wie `totenStreifen` in `world/containers.ts` (E-034), nur
+ * mit einer runden Blende statt einer Wand.
+ */
+export function verdeckung(
+  R: number,
+  augHoehe: number,
+  abstand: number,
+  aufhaengung: number,
+  kopfUnterAufhaengung: number,
+  tiefe: number,
+  maul: number
+): number {
+  const K = aufhaengung - kopfUnterAufhaengung;
+  const T = aufhaengung - tiefe;
+  if (K >= augHoehe || T >= K) return 0; // Auge unter dem Kopf: nichts verdeckt
+  const f = (augHoehe - K) / (augHoehe - T);
+  const rho = maul / 2;
+  let verdeckt = 0;
+  const N = 720;
+  for (let i = 0; i < N; i++) {
+    const phi = (i / N) * Math.PI * 2;
+    const x = f * (abstand + rho * Math.cos(phi)) - abstand;
+    const z = f * (rho * Math.sin(phi));
+    if (x * x + z * z < R * R) verdeckt++;
+  }
+  return verdeckt / N;
+}
