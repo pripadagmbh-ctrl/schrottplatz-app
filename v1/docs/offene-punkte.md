@@ -533,6 +533,14 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
       eigene Messgröße mitgemessen (Endlage statt Geschwindigkeit) und dient
       zugleich als Gegenprobe — passen die Endlagen nicht zum Tempo, gibt es
       einen zweiten Fehler.
+- [ ] **Es fallen noch Teile durch die Ladefläche** — Patrick am Gerät nach
+      E-073: „Es ist auf jeden Fall besser, nicht alles fällt durch, aber immer
+      noch ein paar Teile, aber ich beobachte es noch." Gemessen wurde 86 % → 0 %
+      Durchfall. Sein Fall wird also vom Messgerät nicht erfasst. Zwei
+      Kandidaten: (a) die Reparatur ist unvollständig, (b) er sieht den
+      Lenk-Sprung beim Rangieren (168,7° in einem Schritt, 6.596 km/h, E-073,
+      nicht behoben). Trennende Beobachtung: **beim Kippen oder beim
+      Rangieren?**
 - [ ] **Keine stehende Anzeige für Zahlungsunfähigkeit** — „Konto leer" ist ein
       Toast und verschwindet, der Zustand bleibt. Für „Platz dicht" gibt es eine
       Dauerzeile. `Account.lowOnCash` ist gebaut und wird nirgends benutzt.
