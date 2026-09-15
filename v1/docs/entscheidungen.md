@@ -1537,6 +1537,187 @@ Grundriss vorher/nachher: `docs/messungen/2026-09-15_silos-l-form.svg`.
    Warteplätzen, und laufen die wartenden Fahrer zu ihr, ohne über den
    Arbeitsbereich zu müssen?
 
+
+---
+
+### E-029 — Der Kipper verliert seine eigene Spur, Batterien bekommen ein Ziel, die Presse einen Deckel weniger (15.09.2026)
+
+**Entscheidung.** Drei Dinge:
+
+1. **Kipper mit gemischter oder lagerloser Ladung** fahren die Strecke der
+   Pritschen und kippen am Abladeplatz **(6,3 | −23,0)** quer aus.
+   **Sortenreine** Fuhren mit Lagersilo fahren unverändert die Gasse zum Silo.
+   Der Rangierpunkt wandert von z −10,0 auf **−17,5**.
+2. **Batterien liegen in „BUNT + VA".** Ihr Lagersilo bleibt getrennt.
+3. **Die Presse steht als Wandring in der Hindernisliste**, nicht mehr als
+   Vollklotz.
+
+**Begründung.** Patrick am Gerät: „Kipper fahren die falsche Spur. Die sollen
+auch, wie die anderen LKWs, seitlich von mir abgeladen werden." Und: „Es war
+auch nicht möglich, ein zusammengepresstes Auto wieder aus der Presse zu holen."
+
+**Es waren drei Wege, nicht zwei.** Im Quelltext stand: sortenrein **mit**
+Lagersilo → Gasse · Kipper **ohne** Lagerziel → eigene Spur auf x 2,0 mitten im
+Schwenkband · alles andere → Abladeplatz. Patricks Klage galt dem zweiten Weg,
+seine zweite Antwort („sortenreine Kipper fahren weiter zum Silo") schützt den
+ersten. Gebaut wurde also **kein Umbau der Zuordnung, sondern ein Zweig
+weniger.** Die Regel steht jetzt als `faehrtInsSilo()` in `routes.ts` und ist
+kopflos prüfbar.
+
+**Der Befund, der das Paket fast gekippt hätte.** Mit dem Umzug wurde der
+Rückwärtsweg von 5,5 auf 13,0 m länger — und der **Ladungs-Katapult messbar
+schlimmer**. Während des Rückwärtssetzens ist die Fuhre verriegelt; je länger der
+Weg, desto tiefer arbeiten sich Stücke in den Schlitz am Kipplager. 16 Ladungen
+je Variante, feste Zufallssaaten:
+
+| Rückweg | Mittel | Höchstwert | über 130 km/h |
+|---|---|---|---|
+| 13,0 m (naiver Umzug) | 154 | 424 km/h | 8 von 16 |
+| 9,5 m | 146 | 298 km/h | 7 von 16 |
+| **5,5 m (gebaut)** | **109** | **255 km/h** | **3 von 16** |
+| alte Kipperspur | 117 | 305 km/h | 6 von 16 |
+
+Der Rangierpunkt auf −17,5 macht den offenen Punkt damit **besser** als vorher,
+statt ihn zu verschlimmern — und zwar ohne die Kippmechanik anzufassen.
+
+**Dabei aufgefallen:** Der Wächter „schleudert die Ladung nicht davon" maß
+**eine** Zufallssaat und war grün, weil er einen ruhigen Wurf erwischt hatte.
+Dieselbe Klasse Selbsttäuschung wie die NaN-Routen vom selben Tag. Er misst jetzt
+acht.
+
+**Wo die gekippte Ladung landet.** Abwurfkante (6,3 | −26,0) = **7,65 m** vom
+Sitz, nach dem Anziehen 7,12 m — beides mitten im Band. Nach Süden bleiben
+2,56 m bis zur Mauer: genug Auslauf, zu wenig, um in die Ausbuchtung zu rollen.
+Alle vier Ecken der Ladefläche im Band (5,88 · 6,32 · 8,44 · 8,76 m).
+
+**Die Presse war physisch die ganze Zeit richtig gebaut — nur die Hindernisliste
+log.** `pressWaende()` rechnet die vier Wände aus denselben Zahlen wie die
+Rapier-Kollider. Lichte Kammer 4,05 × 4,20 m, offene Spinne 3,38 m: **34 bzw.
+41 cm Luft je Seite.** Das Paket liegt 7,40 bis 9,15 m vom Sitz, der Arm erreicht
+den Boden von 3,0 bis 9,5 m. **Es reicht — knapp, aber gerechnet.** Für
+Fahrzeuge bleibt sie dicht: Der Ring ist lückenlos, ein 8,04-m-Wagen ragt in
+jeder Lage über mindestens eine Wand.
+
+**Der Preis der Batterien in der Mulde.** Gemessen: Eine Kupferfuhre von 200 kg
+bringt 180,00 €; dieselbe Fuhre mit 100 kg Akku dabei nur **80,00 €** — 100 kg
+*mehr* in der Fuhre, 100 € *weniger* heraus, weil die Kasse Reinheit hoch drei
+rechnet. Getrennt verkauft wären es 235,00 €. **In der Mulde kostet es null
+Euro**, solange Lambert sie räumt; er liest die Fraktion des Stücks, nicht die
+der Mulde.
+
+**Der eigentliche Preis ist kein Geldbetrag: Das Schild warnt nicht mehr.**
+Vorher drückte ein Akku 500 kg Buntmetall von 1602,00 € auf 1112,50 €; jetzt
+stehen 1657,00 € da. Der Spieler bekommt kein Signal mehr, dass Gefahrgut
+zwischen dem Kupfer liegt.
+
+**Verworfene Alternativen.** Kipper leergreifen lassen statt kippen (Patrick: das
+Kippen bleibt, es ist der einzige Weg, auf dem Material ohne Spielerarbeit auf
+den Platz kommt). Eigene kleine Batteriemulde (empfohlen, Patrick entschied
+dagegen — beide Folgen lagen ihm vor). Naiver Umzug mit 13 m Rückweg.
+
+**Abnahmekriterium.** 566 Prüfungen in 54 Dateien grün · `fahrumriss` null
+Durchdringungen auf allen Routen **auch mit dem 6,00-m-Kipper** · beide neuen
+Wächter beim Rückbau des Fehlers nachweislich rot (`ABLADE_HALT_Z` auf −26,0 →
+Kipper wird früher gefangen als die Pritsche; altes Presserechteck → 3 von 7 rot).
+
+**Was frei geworden ist.** Die alte Kipperspur, x 2,0 von z −6,5 bis −16,5, rund
+3 × 10 m. Im Schwenkband liegt davon der Streifen z −17,27 bis −13,65, also
+**3,62 m** — die beste freie Fläche, die der Hof hat.
+
+**Offen.** Der Ladungs-Katapult ist nicht behoben, nur nicht mehr gefüttert: 3
+von 16 Ladungen gehen weiter über 130 km/h, Spitze 255. Ursache bleibt der
+Schlitz am Kipplager. Und bei **geschlossener** Deckelklappe hält die
+Hindernisliste den Greifer nicht mehr auf — die Klappe ist kinematisch und steht
+in keiner Liste.
+
+**Auf dem Gerät zu prüfen.**
+
+1. Kommt ein gemischter Kipper rechts an dir vorbei zum Abladeplatz — und
+   bekommst du **jedes** Stück des Haufens, ohne umzusetzen?
+2. Fährt ein sortenreiner Kipper weiter die Gasse hinunter ins Silo? Er soll es.
+3. Akku aus einem Wrack fischen und über „BUNT + VA" halten: **grün?**
+4. **Ein Auto pressen und das Paket wieder herausholen.** Fühlen sich 34 bis
+   41 cm Luft je Seite eng an oder passt es?
+5. Die alte Kipperspur links vom Sitz ist jetzt leer — gehört dort etwas hin?
+
+---
+
+### E-033 — Eine Anlieferung entsteht aus dem Füllgrad der Ladefläche, nicht aus einer gewürfelten Tonnage (15.09.2026)
+
+**Entscheidung.** Die Menge wird nicht mehr gewürfelt, sondern gerechnet:
+
+> **Masse = Füllgrad × Laderaum × Schüttdichte**
+
+Zuerst steht das Fahrzeug fest, dann der Aufbau, dann der Füllgrad — und daraus
+folgt das Gewicht. Reicht die Nutzlast nicht, **sinkt der Füllgrad**, statt nur
+die Zahl auf der Waage zu kappen.
+
+**Begründung.** Patrick: „Es ist halt bei Händlern halt auch nicht immer das
+Gewicht, sondern eher das Volumen auf der Ladefläche. Und da sollte in der Regel
+immer ein vollgepackter LKW ankommen. Halb voll, mittelvoll, dreiviertel voll,
+voll voll. Aber so ein Viertel voll ist schon eher selten bis schwierig."
+
+Im ganzen Projekt gab es **keine Schüttdichte** — weder im Katalog noch in der
+Anlieferung. Die Folge: 2,5 t Aluminium und 2,5 t Stahlguss sahen gleich aus,
+obwohl das Alu sich in Wirklichkeit über die Bordwände türmt und der Guss als
+flacher Fleck auf dem Boden liegt.
+
+**Die vier Füllklassen sind Patricks Worte**, die Gewichte schief nach oben.
+Gemessen an 60.000 Würfen, **nach** Nutzlastkappung:
+
+| Klasse | gesamt | Händler | Gewerbe | Privat |
+|---|---|---|---|---|
+| viertel | **3,0 %** | 0,8 % | 3,1 % | 10,0 % |
+| halb | 14,0 % | 11,2 % | 13,4 % | 23,8 % |
+| dreiviertel | 34,9 % | 37,1 % | 33,6 % | 29,3 % |
+| randvoll | **48,2 %** | 50,9 % | 50,0 % | 36,9 % |
+
+Gewürfelt ist der Händler zu 68 % randvoll; übrig bleiben 50,9 %, weil bei
+schwerem Material die Nutzlast vor dem Platz ausgeht (28 % aller Fuhren). Das
+ist kein Fehler, sondern genau der Effekt: **Der Stahlguss liegt flach.**
+
+**Die 600-kg-Regel von heute Vormittag (E-030) gilt nur noch für LKW.** Für
+jeden Kipper und jede Pritsche hält sie — in 60.000 Würfen keine Fuhre darunter,
+leichteste 680 kg. Für den **Privatmann mit Anhänger** hält sie nicht: Sein
+Anhänger fasst 2,40 m³; ein Viertel davon voll Haushaltsschrott mit 35 % Holz und
+Kunststoff sind rechnerisch 280 kg. **Der Füllgrad gewinnt** — das ist Patricks
+Ansage. Betroffen sind 4,15 % aller Anlieferungen. Eine Notbremse bei 300 kg
+greift in 0,28 % der Fälle.
+
+Der Wächter ist **nicht heimlich gelockert**: `test/lademenge.test.ts` trägt
+beide Fassungen im Kopf und bewacht jetzt drei Dinge — kein LKW unter 600 kg ·
+niemand unter der Notbremse · der leichte Fall bleibt selten (unter 8 %) und
+bleibt beim Privatmann mit höchstens halb vollem Anhänger.
+
+**Was sich am Umschlag ändert: 4.503 → 5.544 kg je Fuhre, also +23 %.** Bei
+0,16 €/kg Ankauf sind das im Mittel 887 € statt 720 € je Fuhre. Einkauf wie Erlös
+steigen um knapp ein Viertel; der Kreislauf selbst ist unberührt (Patrick hat ihn
+zurückgestellt).
+
+**Verworfene Alternativen.** Schüttdichte als Korrekturfaktor auf die alte
+Zufallsmasse — hätte das Bild nicht verändert. Eine stetige Schiefverteilung —
+nicht erzählbar und nicht abnehmbar; die vier Klassen sind es.
+
+**Abnahmekriterium.** 588 Prüfungen in 54 Dateien grün. Vier Mutationen gesehen:
+Feststoff- statt Schüttdichte (4 Prüfungen rot) · Händlerverteilung gleichverteilt
+(4 rot) · Ladeflächenlänge gegen `vehicles.ts` verschoben (2 rot) · Nutzlast kappt
+nur die Masse statt auch den Füllgrad (2 rot).
+
+**Der Prüfstein fehlt noch: Man sieht den Füllgrad nicht.** `vehicles.ts` würfelt
+seine eigene Zielfüllung und weiß nichts vom gerechneten Füllgrad. Das ist **eine
+Zeile**, die in diesem Paket nicht gesetzt werden durfte, weil dieselbe Datei
+gerade für E-029 umgebaut wurde. Bis sie gesetzt ist, ist die Wirkung nur auf der
+Waage zu sehen, nicht auf der Ladefläche.
+
+**Auf dem Gerät zu prüfen.**
+
+1. Sechs Fuhren nacheinander, nur auf die Waage schauen: Ist die Streuung größer
+   als vorher — mal 1,2 t, mal 9 t, obwohl beide Wagen gleich aussehen?
+2. Auf einen Privatmann mit Anhänger warten: Steht gelegentlich eine Zahl unter
+   600 kg da — und **stört sie dich?**
+3. Zwei Gewerbefuhren vergleichen, eine mit Alu, eine mit Stahl: Der Alu-Wagen
+   muss deutlich leichter sein, obwohl beide dieselbe Pritsche fahren.
+
 ---
 
 ### E-032 — HUD in zwei Stapeln, sichere Ränder überall, die Ruhezeile fällt weg (15.09.2026)
@@ -1694,3 +1875,74 @@ Stilattribut (`style="top: 56px; …"`). Ein Stilattribut schlägt jeden Selekto
    ins Leere geht oder iOS nach Hause wischt?
 5. **iPad quer:** Sieht das HUD aus wie gestern? Dort soll sich **nichts**
    geändert haben außer der verschwundenen Ruhezeile.
+
+---
+### E-035 — Die Sortierregel bekommt einen Wächter; der Abstand zwischen Schild und Kasse wird gemessen, nicht geschlossen (15.09.2026)
+
+**Entscheidung.** Drei Dinge, alle in `test/`, `tools/` und `docs/` — **kein
+Produktivcode angefasst**:
+
+1. `test/fraktionen.test.ts` (22 Prüfungen) wacht ab sofort über
+   `fraktionAus`/`SORTENREIN_AB`, über die abgeleiteten Fraktionen aller 271
+   erreichbaren Katalogeinträge und über die Frage, ob jede Fraktion ein Ziel
+   hat.
+2. `tools/farbabstand.ts` misst Farbabstände in ΔE2000 statt in RGB und prüft
+   sich dabei selbst gegen die Prüfdaten von Sharma/Wu/Dalal (2005).
+   `tools/fraktionsblatt.ts` zeichnet daraus `docs/fraktionen-2026-09-15.svg`.
+3. Der Abstand zwischen **Muldenschild** und **Kasse** wird als Befund
+   festgehalten (W-1 bis W-10 in `docs/fraktionen.md`), **nicht behoben**. Die
+   Wächter dazu sind grün und im Text mit „BEFUND" gekennzeichnet.
+
+**Begründung.** Patrick, 15.09.2026 nach dem Gerätetest: „Es ist nicht wirklich
+erkennbar, was Stahlschrott ist und was Mischschrott ist. Auch die
+Kategorisierung ist mir nicht ganz bewusst." Die Bestandsaufnahme dazu hat zwei
+Löcher gefunden:
+
+- `fraktionAus` entscheidet für **jedes** Teil im Spiel über die Fraktion und
+  hatte **keinen einzigen Test**. Gesucht am 15.09.2026 in allen 51
+  Testdateien: null Treffer für `fraktionAus`, `SORTENREIN_AB`, `istPressbar`.
+- Schild und Kasse rechnen verschieden, gemessen um Faktor **87** bei der Mulde
+  „BUNT + VA" (Schild 1742 €, Kasse 20 €) und um Faktor **6** bei KUPFER-LAGER
+  und ALU-LAGER. Das beantwortet zugleich Prüfpunkt 3 aus E-028 („stimmt der
+  Betrag am Container mit dem Schild am Silo überein?") — nein, und nicht knapp.
+
+Warum nicht behoben: Es gibt zwei Wege (die Kasse lernt `mitFraktionen`, oder
+das Schild zeigt den echten Erlös), und beide verändern das Spiel verschieden
+stark. Der eine nimmt die Entscheidung Kupfer/Messing aus dem Spiel, der andere
+lässt die HUD-Zahl „Sortierwert" deutlich fallen. Das ist Patricks Entscheidung,
+nicht meine (V-2 in `docs/fraktionen.md`).
+
+**Verworfene Alternative.** (a) Die Kasse gleich auf die Schild-Rechnung
+umstellen — die naheliegende Reparatur; sie nimmt zugleich den Anreiz, Kupfer von
+Messing zu trennen, und genau dieser Anreiz ist laut `materials/catalog.ts:19-23`
+der Sinn der eigenen Mulde. (b) Die Befunde nur in den Bericht schreiben und
+nicht in Tests gießen — dann wandern die Zahlen beim nächsten Umbau
+stillschweigend, und in vier Wochen misst sie jemand neu. (c) Die Farben in RGB
+vergleichen — RGB lügt: Stahl und Misch liegen dort in Grün 0 und in Blau 4
+Einheiten auseinander, und genau dort sieht das Auge am schärfsten.
+
+**Abnahmekriterium.** `npm test` grün: 570 Tests in 52 Dateien (vorher 548 in
+51), darunter `test/fraktionen.test.ts`. `npm run build` grün. Das Werkzeug
+prüft sich selbst: `pruefeDeltaE()` meldet größte Abweichung 0,000042 bei 16
+Prüfpaaren. Die Wächter `collision`, `customers`, `haggle`, `purity`, `save`,
+`shift`, `tutorial`, `upgradeEffects`, `upgrades` bleiben grün.
+
+**Widerspruch zu älteren Einträgen, benannt und nicht aufgelöst.** Der Kopf
+dieses Logs sagt „Neueste oben"; tatsächlich steht die neueste Entscheidung seit
+E-006 unten. Dieser Eintrag folgt der gelebten Reihenfolge, nicht dem Kopf.
+Zweitens: `src/world/containers.ts:96-99` beschreibt eine Abrechnungsregel
+(„wer Kupfer und Messing zusammen abgibt, bekommt für alles den Kupferpreis"),
+die `src/economy/account.ts` nicht hat — dort gewinnt die schwerste Fraktion in
+der Ladung, und bei Gleichstand die zuerst geladene.
+
+**Auf dem Gerät zu prüfen.**
+
+1. **Zwei weiße Geräte nebeneinander greifen** — Elektroherd und Waschmaschine:
+   Siehst du ohne die Greifanzeige einen Unterschied? Gemessen ΔE 0,18, also
+   nach der Farbmetrik keinen.
+2. **Vor die Trennsteine zwischen den beiden Halden fahren:** Weißt du ohne
+   Schild, auf welcher Seite du stehst? Das Schild blendet sich unter 4,5 m
+   Kameraabstand vollständig aus.
+3. **`docs/fraktionen-2026-09-15.svg` auf dem iPhone** unter `/v1/plaene/`
+   öffnen: ohne Zoom lesbar? Und stimmt, was daraufsteht, mit dem überein, was
+   du im Spiel erlebst?
