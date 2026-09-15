@@ -69,36 +69,53 @@ export const START_AUTOS: Array<{ x: number; z: number }> = [
 export const START_STREU = { x: 4.0, z: -32.0, radius: 2.9, teile: 10 };
 
 /**
- * Wo der eine Kehrbesen liegt (E-031, 15.09.2026).
+ * Wo der eine Kehrbesen liegt (E-031, neu gerechnet in E-037 am 15.09.2026).
  *
  * Entscheidung Patrick: „Es gibt genau einen Besen, und der liegt dauerhaft
  * auf dem Platz." Er wird also gesetzt, nicht angeliefert — und dann muss der
  * Ort begruendet sein, nicht gewaehlt.
  *
+ * **Warum er umzieht — zwei Gruende, beide gemessen.**
+ *
+ * 1. Er ist ein Ballen geworden: 2,40 x 1,30 m statt 1,20 x 0,38 m, Umkreis
+ *    1,36 statt 0,63 m. Der alte Fleck war auf ein halb so grosses Ding
+ *    gerechnet.
+ * 2. **Der alte Fleck war schon vorher keiner mehr.** Seit E-029 kippt der
+ *    Selbstabkipper nicht mehr auf den Vorplatz, sondern am Abladeplatz ab;
+ *    die Fuhre landet auf `ABKIPP_ZONE` = (6,3 | −26,0). Von (5,0 | −27,0)
+ *    sind das **1,64 m** — der Besen lag ab dem naechsten Kipper unter der
+ *    Fuhre. Gefunden beim Nachrechnen fuer dieses Paket; der Waechter von
+ *    heute vormittag hat die Abkippstelle nicht geprueft.
+ *
  * **Gesucht, nicht gegriffen.** Das Schwenkband um den Sitz (−0,5 | −22,5)
- * wurde in Halbmeterschritten abgesucht und jeder Punkt gegen alles gerechnet,
- * was ihn verbieten wuerde: jede Mulde und Halde aus `containers.ts`, die
- * Presskammer, den Starthaufen samt Streuung, die Abladespur und die
- * Hindernisliste. Es bleiben genau zwei freie Flecken uebrig — der Vorplatz
- * um (1,5 | −15,5) und die Schuerze um (5,0 | −27,0).
+ * wurde in 0,25-m-Schritten abgesucht (`tools/` Suchlauf, in
+ * `test/besen.test.ts` als Waechter nachgebaut) und jeder Punkt gegen alles
+ * gerechnet, was ihn verbietet: jede Mulde und Halde aus `containers.ts`, die
+ * Presskammer, den Starthaufen samt Streuung, die beiden Altfahrzeuge, die
+ * Abkippstelle, die Abladespur und die Hindernisliste. Verlangt wird der
+ * Umkreis des Ballen plus 0,5 m Luft. Es bleiben 223 Punkte uebrig, und sie
+ * liegen ALLE im selben Gebiet: auf dem Vorplatz vor dem Bagger, zwischen
+ * x 2,5 und 6,0 und z −13,5 und −17,5. Anderswo ist kein Platz mehr.
  *
- * Der Vorplatz faellt aus, obwohl er der freieste ist: Dort kippt der
- * Selbstabkipper ab (`routes.ts`, `ABKIPP_ZONE` = (2,0 | −15,5)). Ein Werkzeug
- * unter einer frisch gekippten Fuhre waere genau das, was es nicht sein soll.
+ * Genommen ist **(3,5 | −16,0)**:
+ * - **7,63 m vom Sitz** — mitten im Schwenkband 5,8 bis 9,2 m.
+ * - **2,82 m Luft** zum Naechsten (der Abladespur samt 1,5 m Tastrand), also
+ *   mehr als der doppelte Umkreis des Ballen.
+ * - **4,50 m** zum Muellcontainer auf (−2,8 | −15,4), **10,4 m** zur
+ *   Abkippstelle, **13,2 m** zum Starthaufen.
+ * - in keiner Mulde und keiner Halde: Er wird nie als sortiertes Material
+ *   gezaehlt, und niemand bekommt eine Sortierpraemie fuer seinen eigenen
+ *   Besen.
+ * - **in einer Arbeitszone** (`WORK_ZONES`, der Kreis um den Vorplatz). Das
+ *   ist neu wichtig: Der Ballen wiegt 680 kg und liegt damit weit ueber
+ *   `BLOCKING_MASS_KG` (120 kg). Ausserhalb einer Arbeitszone haetten die
+ *   Fahrer davor angehalten und gehupt — beim 52-kg-Besen war das egal, beim
+ *   Ballen nicht.
  *
- * Bleibt **(5,0 | −27,0)**: die freie Schuerze zwischen Baggerstand und
- * Mischschrotthalde, oestlich. Nachgerechnet in `test/besen.test.ts`:
- * - 7,11 m vom Sitz — mitten im Schwenkband 5,8 bis 9,2 m.
- * - 2,0 m Abstand zur naechsten Mulden- oder Haldenkante, also liegt er in
- *   keiner Zone und wird nie als sortiertes Material gezaehlt.
- * - 7,00 m von der Starthaufenmitte bei 2,9 m Streuung.
- * - ausserhalb der Presskammer und ausserhalb jeder Fahrspur: Der suedlichste
- *   Halt eines Fahrzeugs ist der Abladeplatz auf (6,3 | −23,0), vier Meter
- *   noerdlich davon.
- *
- * `gier` ist die Drehung um die Hochachse, nachdem der Besen flach auf seine
- * Flanke gelegt wurde: 0 heisst, die Schleppkante liegt quer (Ost–West) und
- * der Wulst zeigt nach Norden, also zum Bagger. Wer ihn holen will, greift das
- * naechstliegende Ende — und das ist der Griff.
+ * `gier` ist die Drehung um die Hochachse. Der Ballen wird NICHT mehr gekippt
+ * (seine Bauform ist schon die Liegelage, siehe `spawnBesen`); 0 heisst, die
+ * 2,40 m breite Schleppkante liegt quer (Ost–West). Der Bagger schaut nach
+ * Norden und sieht damit beim Start die breite Seite — man sieht sofort, was
+ * das Ding kann.
  */
-export const BESEN_PLATZ = { x: 5.0, z: -27.0, gier: 0 };
+export const BESEN_PLATZ = { x: 3.5, z: -16.0, gier: 0 };

@@ -191,9 +191,11 @@ export interface Bauteil {
    * `scrapItems.ts` baut den Kollider sonst als EINE konvexe Huelle um alle
    * Eckpunkte. Das trifft die meisten Objekte gut, versagt aber bei allem, was
    * eingeschnuert ist: Eine konvexe Huelle kennt keine Taille, sie ueberbrueckt
-   * sie. Beim Kehrbesen waere der schmale Hals dadurch 0,61 m dick statt
-   * 0,22 m, und die Schalen der Spinne wuerden sichtbar neben dem Draht
-   * schliessen.
+   * sie. Beim Kehrbesen in seiner Trichterform war der schmale Hals dadurch
+   * 0,61 m dick statt 0,22 m, und die Schalen der Spinne schlossen sichtbar
+   * neben dem Draht. Seit er ein Ballen ist (E-037), hat er keine Taille mehr
+   * und braucht das nicht; das Feld bleibt fuer den naechsten Gegenstand mit
+   * Hals.
    *
    * Wer hier mehrere Punktwolken liefert, bekommt mehrere Kollider an einem
    * Koerper. Die Masse wird nach dem Rauminhalt ihrer Huellquader aufgeteilt —
@@ -772,226 +774,337 @@ function fensterflaeche(w: number, h: number, d: number): THREE.BufferGeometry |
 }
 
 /* ------------------------------------------------------------------------ */
-/* Der Kehrbesen aus Maschendraht                                             */
+/* Der Kehrbesen: ein Ballen aus zusammengetretenem Maschendraht              */
 /* ------------------------------------------------------------------------ */
 
 /**
- * Wie der Besen aufgeteilt ist — Anteile der Gesamthoehe.
+ * Die Form des Ballens — eine Tabelle, keine verstreuten Zahlen.
  *
- * Steht als Tabelle und nicht verstreut im Code, weil `test/besen.test.ts`
- * dieselben Zahlen braucht: Der Waechter rechnet nach, dass die Huelle des
- * Kolliders unten breit und oben schmal ist, und muss dafuer wissen, wo
- * „unten" aufhoert.
+ * `test/besen.test.ts` und `tools/plan-2026-09-15-besen-2.ts` rechnen mit
+ * denselben Werten; wer hier dreht, dreht Blatt und Waechter mit.
+ *
+ * ## Warum der Ballen so aussieht, wie er aussieht
+ *
+ * Befund Patrick am Geraet, 15.09.2026: „Der Maschendrahtzaun ist viel zu
+ * klein. Er soll fast so breit sein wie eine Pritsche und viel voluminoeser.
+ * Das Breite ist eigentlich das am meisten Volumen einnehmende. Stell dir
+ * einfach vor, da werden sehr viele Maschendraehte zusammengepresst worden,
+ * und oben natuerlich durch das Greifergewicht ist das alles wie eine Kugel
+ * geformt, aber auch nicht so sauber. Und vor allem wird quasi immer wieder
+ * der Maschendraht zwischen Spinne, Birne und Boden gedrueckt, und so wuerde
+ * es halt auch die Form annehmen. Also es ist halt ein bisschen wie ein
+ * Tee-Ei."
+ *
+ * Das Ding ist also nicht GEFERTIGT, sondern ENTSTANDEN. Aus dieser Geschichte
+ * folgt jede Kante:
+ *
+ * - **Unten platt** — er hat hundertmal auf dem Beton gelegen, waehrend von
+ *   oben gedrueckt wurde. Die breiteste Stelle liegt deshalb AUF dem Boden,
+ *   nicht auf halber Hoehe: Teig, den man niederdrueckt, quillt unten heraus.
+ *   Das ist zugleich die Schleppkante, und sie ist der Grund fuer den
+ *   Superellipsen-Exponenten 4 (`pUnten`): lange gerade Flanken mit
+ *   gerundeten Ecken. Eine Ellipse waere vorn gewoelbt und schoebe Kleinteile
+ *   nach aussen weg, statt sie zusammenzukehren.
+ * - **Oben kugelig** — die Spinne und die Birne formen die Kuppe. Darum
+ *   laeuft der Umriss nach oben in eine gedrueckte Halbkugel aus
+ *   (`steil`/`rund`), und der Querschnitt geht vom Rechteckigen ins Runde
+ *   (`pUnten` nach `pOben`).
+ * - **Aber nicht sauber** — eine gepresste Kugel hat Dellen dort, wo die
+ *   Schalen aufgesetzt haben, und Beulen dazwischen. Beides steht in
+ *   `beule` und `dellen`, beides ist FEST an Winkel und Hoehe geknuepft und
+ *   nicht gewuerfelt: Derselbe Ballen sieht nach dem Laden eines Spielstands
+ *   wieder gleich aus.
  */
-export const BESEN_TEILUNG = {
-  /** Anteil der Hoehe, den Hals und Wulst oben einnehmen. */
-  kopf: 0.36,
-  /** Mitte der runden Ausbuchtung, gemessen von oben als Anteil der Hoehe. */
-  wulstVonOben: 0.11,
-  /** Hoehe der Ausbuchtung als Anteil der Gesamthoehe. */
-  wulstHoehe: 0.185,
-  /** Halbmesser der Ausbuchtung quer/laengs, als Anteil von Breite/Tiefe. */
-  wulstBreit: 0.146,
-  wulstTief: 0.395,
-  /** Halbmesser des zusammengequetschten Halses, als Anteil von Breite/Tiefe. */
-  halsBreit: 0.092,
-  halsTief: 0.224,
-  /** Drahtstaerke (m). */
-  draht: 0.022,
+export const BESEN_FORM = {
+  /**
+   * Schlankheit ueber die Hoehe: `f(v) = (1 - v^steil)^rund`, v = 0 am Boden.
+   *
+   * `steil` 2,2 haelt die Flanke unten fast senkrecht (auf den ersten 30 % der
+   * Hoehe verliert sie 4 % Breite) und laesst sie erst oben einbiegen.
+   * `rund` 0,5 ist der Kugelschnitt — das ist die Kuppe.
+   */
+  steil: 2.2,
+  rund: 0.5,
+  /** Superellipsen-Exponent unten (gerade Flanke) und an der Kuppe (rund). */
+  pUnten: 4.0,
+  pOben: 2.2,
+  /** Kleinster Halbmesser an der Kuppe, als Anteil der halben Breite. */
+  kuppe: 0.16,
+  /** Ausschlag der gleichmaessigen Beulen, als Anteil des Halbmessers. */
+  beule: 0.075,
+  /**
+   * Die Dellen der Schalen: Winkel (rad), Hoehe (0..1), Tiefe (Anteil).
+   *
+   * Drei Stellen, an denen die Spinne beim Niederdruecken aufgesessen hat —
+   * unterschiedlich tief, unterschiedlich hoch, absichtlich unregelmaessig
+   * verteilt. Mehr als drei liest sich aus der Kabine als Rauschen.
+   */
+  dellen: [
+    [0.8, 0.86, 0.13],
+    [2.95, 0.6, 0.1],
+    [4.85, 0.92, 0.09],
+  ] as ReadonlyArray<readonly [number, number, number]>,
+  /**
+   * Staerke eines gezeichneten Strangs (m).
+   *
+   * Das ist KEIN Einzeldraht — echter Zaundraht misst 2,8 mm, und 56 m davon
+   * je Quadratmeter kann niemand zeichnen. Ein Strang steht fuer ein Buendel
+   * aus rund zehn Draehten; 26 mm ist die Staerke, bei der das Geflecht auf
+   * dem iPhone mini noch als Geflecht und nicht als Gitterrost liest
+   * (Blattprobe 15.09.2026, vorher 22 mm bei halb so grossem Ballen).
+   */
+  draht: 0.026,
+  /** Straenge je Schar der Rautenmasche, Teilstuecke je Strang, Drall (rad). */
+  straenge: 18,
+  stufen: 7,
+  drall: 0.75,
+  /** Hoehen der Maschenreihen (Anteil der Hoehe) und Ecken je Reihe. */
+  ringe: [0, 0.16, 0.33, 0.52, 0.72, 0.88] as ReadonlyArray<number>,
+  ringEcken: 20,
 } as const;
 
 /**
- * Der Kehrbesen: ein Stueck Maschendrahtzaun, oben zusammengequetscht, unten
- * breit aufgefaechert.
+ * Der Kehrbesen als Ballen.
  *
- * Beschreibung Patrick, 15.09.2026: „ein Maschendrahtzaun, der quasi oben
- * schon gequetscht ist und unten breit ist, der quasi wie ein Besen fungiert
- * ... da ist quasi aus dem Maschendrahtzaun wie so eine runde Ausbuchtung.
- * Und unten ist es flach, auch ründlich, aber halt breit."
- *
- * ## Die Form als Rechnung
- *
- * Der Koerper ist ein Trichter: Bei jeder Hoehe `v` (0 = Schleppkante,
- * 1 = Hals) liegt der Umriss auf einer **Superellipse**
- *
- *     |x/rx|^p + |z/rz|^p = 1
- *
- * mit `p = 4` ganz unten und `p = 2` oben. p = 2 ist der Kreis — das ist die
- * runde Ausbuchtung. p = 4 ist die „Squircle": lange gerade Flanken mit
- * gerundeten Ecken, also genau „flach, auch ründlich, aber halt breit". Der
- * praktische Unterschied liegt in der Schleppkante: Eine Ellipse waere vorn
- * gewoelbt und wuerde Kleinteile nach aussen wegschieben, statt sie
- * zusammenzukehren. Die gerade Flanke sammelt.
- *
- * Die Halbmesser laufen mit `(1 - v)^1.6` auf: unten schnell breit, oben lange
- * schmal. Die Vorderflaeche steht damit fast senkrecht (rund 6 Grad nach
- * hinten geneigt) — sie schiebt, statt aufzusteigen und ueber ein Teil
- * hinwegzugleiten.
+ * Unten eine breite, flache Platte mit fast senkrechter Schleppkante, oben
+ * eine verbeulte Kuppe — ein Tee-Ei, auf das jemand getreten ist.
  *
  * ## Das Geflecht
  *
- * Zwei Scharen schraeger Draehte laufen gegenlaeufig um den Trichter und
- * kreuzen sich — das ist die Rautenmasche eines Maschendrahtzauns. Dazu
- * Ringe, die den Umriss halten, und unten ein doppelt dicker Saum: die
- * Schleppkante. Alles sind Quader und verschmilzt zu **einer** Geometrie mit
- * Farbe in den Eckpunkten, also ein Zeichenruf.
+ * Zwei Scharen schraeger Straenge laufen gegenlaeufig um den Ballen und
+ * kreuzen sich — die Rautenmasche eines Maschendrahtzauns. Dazu Maschenreihen,
+ * die den Umriss halten, ein doppelt gelegter Saum unten (die Schleppkante),
+ * ein Boden aus Ringen und Speichen und ein paar lose Enden, die sich um den
+ * Ballen legen. Alles sind Quader, alles verschmilzt zu EINER Geometrie mit
+ * Farbe in den Eckpunkten — ein Zeichenruf.
+ *
+ * ## Warum EINE konvexe Huelle genuegt
+ *
+ * Der Vorgaenger war ein Trichter mit Hals und Wulst und brauchte zwei
+ * Huellen, weil eine einzige die Taille ueberbrueckt haette (0,61 m statt
+ * 0,22 m am Hals). Der Ballen hat keine Taille: `f(v)` faellt von unten nach
+ * oben streng monoton. Die einzige Abweichung von der Konvexitaet sind die
+ * Dellen, und die sind hoechstens 13 % tief. Gemessen wird das in
+ * `test/besen.test.ts` — die Huelle folgt dem gezeichneten Umriss auf jeder
+ * Hoehe; die Gegenprobe mit einer Sanduhr faellt durch.
  */
 function besen(w: number, h: number, d: number): Bauteil {
-  const T = BESEN_TEILUNG;
-  const DICK = T.draht;
+  const F = BESEN_FORM;
+  const DICK = F.draht;
   /** Saum unten, doppelt gelegt — der Teil, der ueber den Boden schleift. */
-  const SAUM = DICK * 2.0;
-  const yOben = h / 2;
-  const yUnten = -h / 2;
-  /** Oberkante des Faechers = Unterkante des Halses. */
-  const yHals = yOben - h * T.kopf;
+  const SAUM = DICK * 2.2;
   /** Mittellinie der Schleppkante: der Saum soll genau auf -h/2 aufliegen. */
-  const ySaum = yUnten + SAUM / 2;
-  const halsRx = w * T.halsBreit;
-  const halsRz = d * T.halsTief;
-  const wulstRx = w * T.wulstBreit;
-  const wulstRz = d * T.wulstTief;
+  const ySaum = -h / 2 + SAUM / 2;
+  /** Mittellinie der obersten Masche: die Kuppe endet genau auf +h/2. */
+  const yKuppe = h / 2 - DICK / 2;
+  const hoehe = yKuppe - ySaum;
+
+  /** Schlankheit auf Hoehe v (0 = Schleppkante, 1 = Kuppe). */
+  const flanke = (v: number): number =>
+    Math.max(Math.pow(Math.max(1 - Math.pow(v, F.steil), 0), F.rund), F.kuppe);
 
   /**
-   * Halbmesser des Faechers auf Hoehe v (0 = Saum, 1 = Hals).
+   * Beulen und Dellen — fest an Winkel und Hoehe, nie gewuerfelt.
    *
-   * Gerechnet wird auf die MITTELLINIE des Drahts, darum unten `w/2 - DICK`:
-   * Der Saum ist doppelt gelegt und steht mit seiner halben Staerke (= DICK)
-   * nach aussen. So misst der fertige Besen unten genau `w` und nicht `w`
-   * plus Drahtstaerke — die Kollider-Huelle soll den Katalogmassen
-   * entsprechen, und `test/besen.test.ts` rechnet das nach.
+   * Drei ueberlagerte Wellen geben die allgemeine Unruhe (ein getretener
+   * Ballen ist nirgends rund), die drei Dellen die Abdruecke der Schalen.
    */
-  const rxBei = (v: number): number => halsRx + (w / 2 - DICK - halsRx) * Math.pow(1 - v, 1.6);
-  const rzBei = (v: number): number => halsRz + (d / 2 - DICK - halsRz) * Math.pow(1 - v, 1.6);
-  /** Superellipsen-Exponent: unten 4 (flach-breit), oben 2 (rund). */
-  const pBei = (v: number): number => 4 - 2 * v;
+  const beule = (theta: number, v: number): number => {
+    let f =
+      1 +
+      F.beule *
+        (0.55 * Math.sin(3 * theta + 0.7) +
+          0.3 * Math.sin(5 * theta - 1.9) * (0.35 + 0.65 * v) +
+          0.35 * Math.cos(2 * theta + 2.4) * Math.sin(Math.PI * v));
+    for (const [t0, v0, tief] of F.dellen) {
+      let dt = theta - t0;
+      while (dt > Math.PI) dt -= Math.PI * 2;
+      while (dt < -Math.PI) dt += Math.PI * 2;
+      f *= 1 - tief * Math.exp(-((dt / 0.75) ** 2 + ((v - v0) / 0.24) ** 2));
+    }
+    return f;
+  };
 
-  const pkt = (theta: number, v: number, out = new THREE.Vector3()): THREE.Vector3 => {
+  /** Superellipsen-Exponent: unten 4 (gerade Flanke), oben 2,2 (rund). */
+  const pBei = (v: number): number => F.pUnten + (F.pOben - F.pUnten) * Math.pow(v, 0.8);
+
+  /** Roher Umriss, Halbmesser noch in Einheiten von 1. */
+  const roh = (theta: number, v: number, out: THREE.Vector3): THREE.Vector3 => {
+    const r = flanke(v) * beule(theta, v);
     const e = 2 / pBei(v);
     const c = Math.cos(theta);
     const s = Math.sin(theta);
     return out.set(
-      rxBei(v) * Math.sign(c) * Math.pow(Math.abs(c), e),
-      ySaum + v * (yHals - ySaum),
-      rzBei(v) * Math.sign(s) * Math.pow(Math.abs(s), e)
+      r * Math.sign(c) * Math.pow(Math.abs(c), e),
+      ySaum + v * hoehe,
+      r * Math.sign(s) * Math.pow(Math.abs(s), e)
     );
+  };
+
+  /*
+   * Massstab abtasten statt rechnen.
+   *
+   * Die Beulen schieben die breiteste Stelle vom Winkel 0 weg — wer stumpf mit
+   * `w/2` skaliert, bekommt einen Ballen, der breiter ist als sein
+   * Katalogmass, und damit einen Kollider, der nicht mehr zu den Zahlen passt,
+   * mit denen der Platz gerechnet wurde. Also: Umriss abtasten, groessten
+   * Ausschlag suchen, darauf normieren.
+   */
+  const probe = new THREE.Vector3();
+  let maxX = 1e-6;
+  let maxZ = 1e-6;
+  for (let i = 0; i < 144; i++) {
+    const th = (i / 144) * Math.PI * 2;
+    for (let k = 0; k <= 48; k++) {
+      roh(th, k / 48, probe);
+      maxX = Math.max(maxX, Math.abs(probe.x));
+      maxZ = Math.max(maxZ, Math.abs(probe.z));
+    }
+  }
+  const skaX = (w / 2 - DICK) / maxX;
+  const skaZ = (d / 2 - DICK) / maxZ;
+
+  const pkt = (theta: number, v: number, out = new THREE.Vector3()): THREE.Vector3 => {
+    roh(theta, v, out);
+    out.x *= skaX;
+    out.z *= skaZ;
+    return out;
   };
 
   /** Draehte altern unregelmaessig — fest an der Nummer, nicht zufaellig. */
   const ton = (i: number): number => ((i * 7) % 5 === 0 ? VERZINKT_ALT : VERZINKT);
 
-  /* --- Rautenmasche: zwei Scharen gegenlaeufig um den Trichter ------------ */
-  /*
-   * 13 Straenge je Schar, 5 Stufen je Strang — 130 Draehte je Richtung.
-   *
-   * Weniger las sich aus der Kabine wie ein Gestaenge, nicht wie ein Geflecht
-   * (Blattprobe 15.09.2026). Mehr waere Rauschen: Ein Besen von 1,30 m ist auf
-   * dem Schirm kaum handhoch. Dreiecke sind billig, Netze nicht — und alles
-   * hier bleibt EIN Netz.
-   */
-  const STRAENGE = 13; // je Schar
-  const STUFEN = 5; // Teilstuecke je Strang
-  /** Wie weit ein Strang ueber die volle Hoehe um den Trichter wandert (rad). */
-  const DRALL = 0.62;
   const a = new THREE.Vector3();
   const b = new THREE.Vector3();
-  for (let s = 0; s < STRAENGE; s++) {
-    const theta0 = (s / STRAENGE) * Math.PI * 2;
+
+  /* --- Rautenmasche: zwei Scharen gegenlaeufig um den Ballen -------------- */
+  for (let s = 0; s < F.straenge; s++) {
+    const theta0 = (s / F.straenge) * Math.PI * 2;
     for (const richtung of [1, -1]) {
-      for (let k = 0; k < STUFEN; k++) {
-        const v0 = k / STUFEN;
-        const v1 = (k + 1) / STUFEN;
-        pkt(theta0 + richtung * DRALL * v0, v0, a);
-        pkt(theta0 + richtung * DRALL * v1, v1, b);
+      for (let k = 0; k < F.stufen; k++) {
+        const v0 = k / F.stufen;
+        const v1 = (k + 1) / F.stufen;
+        pkt(theta0 + richtung * F.drall * v0, v0, a);
+        pkt(theta0 + richtung * F.drall * v1, v1, b);
         draht(a, b, DICK, ton(s + k + (richtung > 0 ? 0 : 3)));
       }
     }
   }
 
-  /* --- Ringe: sie halten den Umriss und lesen sich als Maschenreihen ------ */
-  const RING_ECKEN = 14;
-  for (const [i, v] of [0, 0.34, 0.68].entries()) {
+  /* --- Maschenreihen: sie halten den Umriss ------------------------------- */
+  for (const [i, v] of F.ringe.entries()) {
     const dickRing = v === 0 ? SAUM : DICK;
-    for (let e = 0; e < RING_ECKEN; e++) {
-      pkt((e / RING_ECKEN) * Math.PI * 2, v, a);
-      pkt(((e + 1) / RING_ECKEN) * Math.PI * 2, v, b);
+    for (let e = 0; e < F.ringEcken; e++) {
+      pkt((e / F.ringEcken) * Math.PI * 2, v, a);
+      pkt(((e + 1) / F.ringEcken) * Math.PI * 2, v, b);
       draht(a, b, dickRing, v === 0 ? VERZINKT : ton(e + i));
     }
   }
 
-  /* --- Hals: das zusammengequetschte Stueck zwischen Faecher und Wulst ---- */
-  const yWulst = yOben - h * T.wulstVonOben;
-  const wulstH = h * T.wulstHoehe;
-  const yWulstUnten = yWulst - wulstH / 2;
-  const HALS_DRAEHTE = 8;
-  for (let s = 0; s < HALS_DRAEHTE; s++) {
-    const th = (s / HALS_DRAEHTE) * Math.PI * 2;
-    a.set(halsRx * Math.cos(th), yHals, halsRz * Math.sin(th));
-    b.set(halsRx * 0.8 * Math.cos(th), yWulstUnten, halsRz * 0.8 * Math.sin(th));
-    draht(a, b, DICK, ton(s));
-  }
-  for (const yr of [yHals + (yWulstUnten - yHals) * 0.35, yHals + (yWulstUnten - yHals) * 0.75]) {
-    for (let e = 0; e < 8; e++) {
-      const t0 = (e / 8) * Math.PI * 2;
-      const t1 = ((e + 1) / 8) * Math.PI * 2;
-      a.set(halsRx * 0.9 * Math.cos(t0), yr, halsRz * 0.9 * Math.sin(t0));
-      b.set(halsRx * 0.9 * Math.cos(t1), yr, halsRz * 0.9 * Math.sin(t1));
-      draht(a, b, DICK * 1.3, VERZINKT_ALT);
+  /* --- Der Boden: platt vom vielen Draufdruecken -------------------------- */
+  /*
+   * Zwei innere Ringe und acht Speichen auf der Hoehe der Schleppkante. Ohne
+   * sie waere der Ballen unten hohl — und genau das ist er nicht: Was da liegt,
+   * ist plattgetretener Draht, keine Haube.
+   */
+  const boden = (theta: number, f: number, out: THREE.Vector3): THREE.Vector3 => {
+    pkt(theta, 0, out);
+    out.x *= f;
+    out.z *= f;
+    return out;
+  };
+  for (const f of [0.72, 0.42]) {
+    for (let e = 0; e < 12; e++) {
+      boden((e / 12) * Math.PI * 2, f, a);
+      boden(((e + 1) / 12) * Math.PI * 2, f, b);
+      draht(a, b, DICK, ton(e + Math.round(f * 10)));
     }
   }
-
-  /* --- Die runde Ausbuchtung: der aufgerollte Wulst ganz oben ------------- */
-  /*
-   * Fuenf Ringe uebereinander, deren Halbmesser einem Kugelschnitt folgen —
-   * das liest sich als zusammengerollter Draht und nicht als Kugel. Der
-   * oberste und der unterste Ring sind eng, der mittlere steht am weitesten
-   * heraus: Genau diese Kante ist es, unter die die Schalen der Spinne
-   * greifen, damit der Besen beim Ziehen nicht durchrutscht.
-   */
-  const WULST_RINGE = 5;
-  const WULST_ECKEN = 10;
-  for (let j = 0; j < WULST_RINGE; j++) {
-    const t = (j - (WULST_RINGE - 1) / 2) / ((WULST_RINGE - 1) / 2); // -1 .. 1
-    const f = Math.sqrt(Math.max(1 - t * t * 0.86, 0.04));
-    const yr = yWulst + (t * wulstH) / 2;
-    for (let e = 0; e < WULST_ECKEN; e++) {
-      const t0 = (e / WULST_ECKEN) * Math.PI * 2;
-      const t1 = ((e + 1) / WULST_ECKEN) * Math.PI * 2;
-      a.set(wulstRx * f * Math.cos(t0), yr, wulstRz * f * Math.sin(t0));
-      b.set(wulstRx * f * Math.cos(t1), yr, wulstRz * f * Math.sin(t1));
-      draht(a, b, DICK * 1.15, ton(j + e));
-    }
+  for (let e = 0; e < 8; e++) {
+    const th = (e / 8) * Math.PI * 2 + 0.2;
+    boden(th, 0.12, a);
+    boden(th, 0.96, b);
+    draht(a, b, DICK, ton(e + 2));
   }
-  // Der Draht, der den Wulst zusammenhaelt: ein paar Windungen laengs darueber
-  for (let s = 0; s < 6; s++) {
-    const th = (s / 6) * Math.PI * 2;
-    a.set(wulstRx * 0.5 * Math.cos(th), yWulst - wulstH / 2, wulstRz * 0.5 * Math.sin(th));
-    b.set(wulstRx * 0.5 * Math.cos(th + 0.5), yWulst + wulstH / 2, wulstRz * 0.5 * Math.sin(th + 0.5));
-    draht(a, b, DICK, VERZINKT_ALT);
-  }
-  // Scheitel: damit die Huelle oben wirklich bei +h/2 endet und nicht darueber
-  q(wulstRx * 0.7, DICK, wulstRz * 0.7, VERZINKT, 0, yOben - DICK / 2, 0);
 
-  const fertigesTeil = fertig();
+  /* --- Die Kuppe: gedrueckt, nicht gedreht -------------------------------- */
   /*
-   * Zwei Huellen statt einer: Faecher und Kopf.
-   *
-   * Eine einzige konvexe Huelle um den ganzen Besen waere ein Kegel von der
-   * Schleppkante bis zum Wulst — gemessen 0,61 m breit auf Halshoehe, wo der
-   * Draht nur 0,22 m misst. Die Taille verschwaende, und die Spinne griffe ins
-   * Leere neben dem Geflecht. Getrennt an der Halsunterkante bleibt die Taille
-   * erhalten, und der Wulst wird zu dem, was er sein soll: eine Kante, unter
-   * die die Schalen fassen.
-   *
-   * Die beiden Wolken ueberlappen um zwei Zentimeter, sonst klaffte zwischen
-   * den Huellen ein Spalt.
+   * Ueber den Scheitel gelegte Straenge schliessen den Ballen oben. Sie laufen
+   * nicht durch die Mitte, sondern versetzt aneinander vorbei — so entsteht
+   * die unsaubere Kuppe statt einer sauberen Rosette.
    */
-  const UEBERLAPP = 0.02;
-  fertigesTeil.huellen = [
-    punkteBis(fertigesTeil.koerper, -Infinity, yHals + UEBERLAPP),
-    punkteBis(fertigesTeil.koerper, yHals - UEBERLAPP, Infinity),
-  ];
-  return fertigesTeil;
+  for (let e = 0; e < 5; e++) {
+    const th = (e / 5) * Math.PI;
+    pkt(th, 0.93, a);
+    pkt(th + Math.PI, 0.93, b);
+    const m = pkt(th + 0.35, 1, new THREE.Vector3());
+    draht(a, m, DICK * 1.15, ton(e));
+    draht(m, b, DICK * 1.15, ton(e + 1));
+  }
+
+  /* --- Lose Enden: der Draht ist gerissen, nicht geschnitten -------------- */
+  /*
+   * Sie legen sich um den Ballen, statt abzustehen: Ein abstehendes Ende
+   * machte den Kollider groesser als das Katalogmass, und daran haengt der
+   * ganze Platz (passt er zwischen die Bordwaende, passt er auf seinen Fleck).
+   */
+  for (let e = 0; e < 7; e++) {
+    const th = (e / 7) * Math.PI * 2 + 1.1;
+    const v = 0.1 + (e % 4) * 0.18;
+    pkt(th, v, a);
+    pkt(th + 0.55, v + 0.09, b);
+    draht(a, b, DICK * 0.8, VERZINKT_ALT);
+  }
+
+  const teil = fertig();
+
+  /*
+   * Zum Schluss auf das Katalogmass ziehen.
+   *
+   * Das Abtasten oben normiert den GEDACHTEN Umriss, gezeichnet werden aber
+   * Sehnen zwischen 20 Ringecken — die breiteste Stelle des Umrisses liegt
+   * selten genau auf einer Ecke. Gemessen fehlten dadurch 5 cm in der Breite
+   * und 3,5 cm in der Tiefe, waehrend die dickeren Kuppenstraenge 7,6 mm nach
+   * oben ueberstanden.
+   *
+   * Das ist kein Schoenheitsfehler: Der Kollider kommt aus genau diesen
+   * Eckpunkten, und mit ihm ist gerechnet worden, ob der Ballen zwischen die
+   * Bordwaende einer Pritsche passt (2,40 gegen 2,70 m) und auf seinen Fleck.
+   * Ein Bau, der 2,35 m breit ist, obwohl im Katalog 2,40 steht, macht jede
+   * dieser Rechnungen zur Vermutung. Also: fertig zeichnen, messen, auf Mass
+   * ziehen. Die Korrektur liegt bei rund 2 % und ist am Draht nicht zu sehen.
+   */
+  const geo = teil.koerper;
+  geo.computeBoundingBox();
+  const bb = geo.boundingBox!;
+  geo.translate(
+    -(bb.max.x + bb.min.x) / 2,
+    -(bb.max.y + bb.min.y) / 2,
+    -(bb.max.z + bb.min.z) / 2
+  );
+  geo.scale(
+    w / Math.max(bb.max.x - bb.min.x, 1e-6),
+    h / Math.max(bb.max.y - bb.min.y, 1e-6),
+    d / Math.max(bb.max.z - bb.min.z, 1e-6)
+  );
+  // Ungleichmaessiges Skalieren verdreht die Normalen — neu rechnen.
+  geo.computeVertexNormals();
+  geo.computeBoundingBox();
+  geo.computeBoundingSphere();
+
+  /*
+   * EINE Huelle, gemessen statt uebernommen: siehe Kopfkommentar. `huellen`
+   * bleibt leer, und `scrapItems.ts` baut die konvexe Huelle ueber alle
+   * Eckpunkte — genau den Umriss, den man sieht.
+   *
+   * Das rohe Eckpunktfeld auszuduennen (10 104 Punkte, davon zwei Drittel
+   * Doppelte) waere naheliegend, ist aber gemessen ein Nullsummenspiel:
+   * `createCollider` faellt damit von 10,8 auf 4,6 ms, das Ausduennen selbst
+   * kostet 4,6 ms. Der teure Teil ist ein ganz anderer — das Verschmelzen der
+   * rund 450 Quader, 49 ms. Einmal beim Neuen Spiel, einmal um Mitternacht,
+   * falls der Besen fehlt.
+   */
+  return teil;
 }
 
 /**
@@ -999,12 +1112,20 @@ function besen(w: number, h: number, d: number): Bauteil {
  *
  * Doppelte werden auf den Millimeter genau aussortiert. Das ist kein
  * Schoenheitsfehler, sondern Rechenzeit: Ein `BoxGeometry` bringt 24
- * Eckpunkte fuer 8 Ecken mit (je Flaeche eigene, wegen der Normalen), und der
- * Besen besteht aus rund 200 solchen Quadern. Gemessen 15.09.2026 sank der
- * Bau des Kolliders dadurch von 54 auf 20 ms — einmalig beim Setzen, aber
- * einmalig an der Stelle, an der das Spiel startet.
+ * Eckpunkte fuer 8 Ecken mit (je Flaeche eigene, wegen der Normalen), und ein
+ * Geflecht besteht aus einigen hundert solchen Quadern. Gemessen 15.09.2026
+ * sank der Bau des Kolliders dadurch von 54 auf 20 ms — einmalig beim Setzen,
+ * aber einmalig an der Stelle, an der das Spiel startet.
+ *
+ * **Derzeit nutzt kein Bau das Werkzeug.** Bis zum 15.09.2026 abends war der
+ * Kehrbesen ein Trichter mit Taille und brauchte zwei Huellen; als Ballen
+ * braucht er nur noch eine (E-037, gemessen). Die Maschinerie bleibt trotzdem
+ * stehen — sie ist die einzige Antwort auf „konvexe Huelle ueberbrueckt die
+ * Einschnuerung", und der naechste Gegenstand mit Hals braucht sie wieder.
+ * Damit sie nicht verrottet, prueft `test/besen.test.ts` sie an einer
+ * Sanduhr-Attrappe nach.
  */
-function punkteBis(geo: THREE.BufferGeometry, y0: number, y1: number): Float32Array {
+export function punkteBis(geo: THREE.BufferGeometry, y0: number, y1: number): Float32Array {
   const pos = geo.getAttribute("position") as THREE.BufferAttribute;
   const out: number[] = [];
   const gesehen = new Set<string>();

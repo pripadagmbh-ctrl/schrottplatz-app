@@ -1,25 +1,31 @@
 /**
- * Waechter fuer den Kehrbesen aus Maschendraht (E-031, 15.09.2026).
+ * Waechter fuer den Kehrbesen (E-031, neu gerechnet in E-037 am 15.09.2026).
  *
- * Wunsch Patrick: „Ich bräuchte einen Maschendrahtzaun, der quasi oben schon
- * gequetscht ist und unten breit ist, der quasi wie ein Besen fungiert ...
- * Damit ich quasi mit dem Maschendrahtzaun den Boden bzw. die Ladeflächen
- * abkehren kann."
+ * Wunsch Patrick vormittags: „Ich bräuchte einen Maschendrahtzaun, der quasi
+ * oben schon gequetscht ist und unten breit ist, der quasi wie ein Besen
+ * fungiert ... Damit ich quasi mit dem Maschendrahtzaun den Boden bzw. die
+ * Ladeflächen abkehren kann."
  *
- * Das ist ein WERKZEUG, kein Deko-Stueck. Ein Aussehen allein nuetzt nichts —
- * darum misst dieser Test in der echten Rapier-Welt, welche Teilegroessen die
- * Schleppkante mitnimmt und welche darunter durchrutschen, und er misst es bei
- * mehreren Bodenabstaenden. Die Tabelle steht im Bericht und in
- * `docs/messungen/2026-09-15_besen.svg`.
+ * Befund am Geraet abends: „Der ist viel zu klein. Er soll fast so breit sein
+ * wie eine Pritsche und viel voluminöser. Das Breite ist eigentlich das am
+ * meisten Volumen einnehmende ... oben ist das alles wie eine Kugel geformt,
+ * aber auch nicht so sauber ... es ist halt ein bisschen wie ein Tee-Ei."
  *
- * Drei Dinge haelt dieser Test fest:
+ * Aus dem Trichter ist damit ein Ballen geworden. Das ist ein WERKZEUG, kein
+ * Deko-Stueck — ein Aussehen allein nuetzt nichts. Darum misst dieser Test in
+ * der echten Rapier-Welt:
  *
- * 1. **Form und Kollider stimmen ueberein** — unten breit und flach, oben
- *    schmal. Ein einzelner Quader ueber das ganze Teil taete es nicht; die
- *    Gegenprobe zeigt, dass der Waechter das auch merkt.
- * 2. **Die Schleppkante erfasst, was sie laut Tabelle erfassen soll.**
- * 3. **Es ist ein Werkzeug**: genau eines, greifbar am Kopf, nicht pressbar,
- *    nicht verkaeuflich.
+ * 1. **Die Form ist ein Ballen**: unten am breitesten, Flanke praktisch
+ *    senkrecht, nach oben rund zulaufend, keine Taille — und die EINE konvexe
+ *    Huelle folgt dem, was man sieht. Die Gegenprobe mit einer Sanduhr faellt
+ *    durch.
+ * 2. **Masse und Rauminhalt sind gerechnet**, nicht gesetzt: Drahtmenge mal
+ *    Drahtgewicht, und die Packung liegt zwischen „lose" und „flach gestapelt".
+ * 3. **Er kehrt**: Teilegroesse gegen mitgenommene Strecke, gemessen.
+ * 4. **Die Spinne bekommt ihn**: vom Bodenanschlag aus zugefahren.
+ * 5. **Er ist Platzinventar**: genau einer, wertlos, kommt wieder.
+ * 6. **Sein Fleck ist gesucht, nicht gewaehlt** — und er liegt nicht dort, wo
+ *    der Kipper abkippt.
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import * as THREE from "three";
@@ -30,14 +36,17 @@ import {
   BESEN,
   ItemManager,
   besenForm,
+  dampAng,
+  dampLin,
   istPlatzinventar,
+  quaderRaum,
   PLATZINVENTAR,
   SPECS,
   type ScrapItem,
 } from "../src/world/scrapItems";
 import { KATALOG_SPECS, KATALOG_BIG, KATALOG_HUGE } from "../src/world/objektkatalog";
-import { baueGeometrie, BESEN_TEILUNG } from "../src/world/objektbau";
-import { BESEN_PLATZ, START_HAUFEN, START_STREU } from "../src/world/startplatz";
+import { baueGeometrie, punkteBis, BESEN_FORM } from "../src/world/objektbau";
+import { BESEN_PLATZ, START_HAUFEN, START_STREU, START_AUTOS } from "../src/world/startplatz";
 import {
   BAGGER_STAND,
   SCHWENK_AUSSEN,
@@ -46,9 +55,19 @@ import {
 } from "../src/world/baggerstand";
 import { PRESS_CENTER, PRESS_INNER } from "../src/world/press";
 import { CONFIGS } from "../src/world/containers";
+import { hitsObstacle } from "../src/world/obstacles";
 import { Daylight, DAY_LENGTH_S } from "../src/world/daylight";
 import { Account } from "../src/economy/account";
 import type { CompositeManager } from "../src/dismantle/composites";
+import {
+  ABKIPP_ZONE,
+  ABLADE_HALT_Z,
+  ABLADE_SPUR_X,
+  BED_HALF_W,
+  BED_LEN,
+  BLOCKING_MASS_KG,
+  WORK_ZONES,
+} from "../src/delivery/routes";
 import {
   CLAW_CLOSED_SPLAY,
   CLAW_COUNT,
@@ -57,6 +76,9 @@ import {
   CLAW_RING_Y,
   CLAW_SEGMENTS,
   clawPoint,
+  clawSpan,
+  clawTipDepth,
+  clawWidth,
 } from "../src/excavator/clawGeometry";
 
 beforeAll(async () => {
@@ -79,40 +101,43 @@ function platz(): { physics: PhysicsWorld; items: ItemManager } {
   return { physics, items: new ItemManager(new THREE.Scene(), physics.world) };
 }
 
+/** Liegt der Punkt in irgendeinem Kollider des Koerpers? */
+function innen(body: RAPIER.RigidBody, x: number, y: number, z: number): boolean {
+  for (let i = 0; i < body.numColliders(); i++) {
+    const p = body.collider(i).projectPoint({ x, y, z }, true);
+    if (p && p.isInside) return true;
+  }
+  return false;
+}
+
 /**
- * Breite und Tiefe des KOLLIDERS auf einer Hoehe.
+ * Halbmesser des Kolliders auf Hoehe `y` in Richtung `theta`.
  *
  * Nicht die rohen Eckpunkte des Netzes messen: Zwischen zwei Drahtknoten
  * liegen Baender ganz ohne Eckpunkte, und was die Physik sieht, ist der
  * Kollider. Abgetastet wird mit `projectPoint(solid = true)`, das meldet, ob
  * ein Punkt IN einer Form liegt; die Kante wird dann eingeschachtelt.
- *
- * Gemessen wird gegen ALLE Kollider des Koerpers — der Besen hat zwei.
  */
-function kolliderBei(
-  body: RAPIER.RigidBody,
-  y: number
-): { breite: number; tiefe: number } {
-  const innen = (x: number, z: number): boolean => {
-    for (let i = 0; i < body.numColliders(); i++) {
-      const p = body.collider(i).projectPoint({ x, y, z }, true);
-      if (p && p.isInside) return true;
-    }
-    return false;
+function kolliderR(body: RAPIER.RigidBody, y: number, theta: number): number {
+  const c = Math.cos(theta);
+  const s = Math.sin(theta);
+  if (!innen(body, 0, y, 0)) return 0;
+  let lo = 0;
+  let hi = 2.5;
+  for (let i = 0; i < 40; i++) {
+    const m = (lo + hi) / 2;
+    if (innen(body, m * c, y, m * s)) lo = m;
+    else hi = m;
+  }
+  return lo;
+}
+
+/** Breite und Tiefe des Kolliders auf einer Hoehe. */
+function kolliderBei(body: RAPIER.RigidBody, y: number): { breite: number; tiefe: number } {
+  return {
+    breite: kolliderR(body, y, 0) + kolliderR(body, y, Math.PI),
+    tiefe: kolliderR(body, y, Math.PI / 2) + kolliderR(body, y, -Math.PI / 2),
   };
-  const suche = (achse: "x" | "z"): number => {
-    let lo = 0;
-    let hi = 2.0;
-    const drin = (v: number): boolean => (achse === "x" ? innen(v, 0) : innen(0, v));
-    if (!drin(0)) return 0;
-    for (let i = 0; i < 40; i++) {
-      const m = (lo + hi) / 2;
-      if (drin(m)) lo = m;
-      else hi = m;
-    }
-    return lo * 2;
-  };
-  return { breite: suche("x"), tiefe: suche("z") };
 }
 
 /** Der Besen als fester Koerper im Ursprung — so, wie das Spiel ihn baut. */
@@ -129,8 +154,96 @@ function besenKoerper(): { physics: PhysicsWorld; body: RAPIER.RigidBody } {
   return { physics, body: it.body };
 }
 
+/**
+ * Wie weit steht die konvexe Huelle vom gezeichneten Draht ab?
+ *
+ * DAS ist die Frage hinter „braucht er eine oder zwei Huellen". Eine konvexe
+ * Huelle kennt keine Einschnuerung; sie spannt sich ueber sie hinweg. Gemessen
+ * wird darum parameterfrei: Auf der Oberflaeche der Huelle werden Punkte
+ * abgetastet, und zu jedem wird der naechste Eckpunkt des Netzes gesucht.
+ * Liegt die Huelle auf dem Draht, sind das ein paar Zentimeter — die halbe
+ * Maschenweite. Ueberbrueckt sie eine Taille, wird der Abstand so gross wie
+ * die Einschnuerung tief ist.
+ *
+ * @returns groesster Abstand in Metern
+ */
+function huelleUeberDraht(
+  body: RAPIER.RigidBody,
+  ecken: Float32Array,
+  hoehe: number
+): number {
+  let schlimmster = 0;
+  for (let i = 0; i <= 14; i++) {
+    const y = -hoehe / 2 + 0.02 + (hoehe - 0.06) * (i / 14);
+    for (let k = 0; k < 24; k++) {
+      const theta = (k / 24) * Math.PI * 2;
+      const r = kolliderR(body, y, theta);
+      if (r <= 0) continue;
+      const px = r * Math.cos(theta);
+      const pz = r * Math.sin(theta);
+      let naechster = Infinity;
+      for (let e = 0; e + 2 < ecken.length; e += 3) {
+        const d = (ecken[e] - px) ** 2 + (ecken[e + 1] - y) ** 2 + (ecken[e + 2] - pz) ** 2;
+        if (d < naechster) naechster = d;
+      }
+      schlimmster = Math.max(schlimmster, Math.sqrt(naechster));
+    }
+  }
+  return schlimmster;
+}
+
+/** Rauminhalt eines Koerpers, per Raster abgetastet. */
+function rauminhalt(body: RAPIER.RigidBody, w: number, h: number, d: number, n = 48): number {
+  let drin = 0;
+  for (let i = 0; i < n; i++)
+    for (let j = 0; j < n; j++)
+      for (let k = 0; k < n; k++)
+        if (
+          innen(
+            body,
+            -w / 2 + (w * (i + 0.5)) / n,
+            -h / 2 + (h * (j + 0.5)) / n,
+            -d / 2 + (d * (k + 0.5)) / n
+          )
+        )
+          drin++;
+  return (drin / (n * n * n)) * w * h * d;
+}
+
+/**
+ * Eine Sanduhr als Attrappe — die Form, fuer die EINE Huelle nicht reicht.
+ *
+ * Zwei Scheiben, dazwischen ein duenner Hals. Sie dient zweimal: als
+ * Gegenprobe zu `huelleUeberDraht` und als Nachweis, dass die Maschinerie fuer
+ * mehrteilige Kollider (`Bauteil.huellen`, `punkteBis`, `quaderRaum`) noch
+ * funktioniert, obwohl sie seit E-037 von keinem Bau mehr benutzt wird.
+ */
+function sanduhr(): THREE.BufferGeometry {
+  const teile: THREE.BufferGeometry[] = [];
+  const scheibe = (y: number, r: number, h: number): void => {
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2;
+      const g = new THREE.BoxGeometry(0.05, h, 0.05);
+      g.translate(r * Math.cos(a), y, r * Math.sin(a));
+      teile.push(g);
+    }
+  };
+  scheibe(-0.6, 0.6, 0.2);
+  scheibe(0.6, 0.6, 0.2);
+  scheibe(0, 0.08, 0.9);
+  const geo = new THREE.BufferGeometry();
+  const alle: number[] = [];
+  for (const t of teile) {
+    const p = t.getAttribute("position") as THREE.BufferAttribute;
+    for (let i = 0; i < p.count; i++) alle.push(p.getX(i), p.getY(i), p.getZ(i));
+    t.dispose();
+  }
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(alle, 3));
+  return geo;
+}
+
 /* ======================================================================== */
-/* 1 — Form und Kollider                                                     */
+/* 1 — Die Form ist ein Ballen                                               */
 /* ======================================================================== */
 
 describe("Besen: Form und Kollider", () => {
@@ -145,84 +258,198 @@ describe("Besen: Form und Kollider", () => {
     // Modul beim Bau der Huelle (siehe scrapItems.ts, `sauber`).
     expect(arr.every((v) => Number.isFinite(v)), "NaN in der Geometrie").toBe(true);
     // Dreiecke sind billig, Netze nicht. Zur Einordnung fuer spaeter:
-    expect(pos.count / 3, "Dreiecke").toBeGreaterThan(800);
-    expect(pos.count / 3, "unnoetig viele Dreiecke").toBeLessThan(4000);
+    // eslint-disable-next-line no-console
+    console.log(`Netz: ${pos.count / 3} Dreiecke, ${pos.count} Eckpunkte`);
+    expect(pos.count / 3, "Dreiecke").toBeGreaterThan(2000);
+    expect(pos.count / 3, "unnoetig viele Dreiecke").toBeLessThan(6000);
   });
 
   it("misst aussen genau die Katalogmasse", () => {
     const bau = baueGeometrie("besen", BESEN.dims, "box");
     bau.koerper.computeBoundingBox();
     const b = bau.koerper.boundingBox!;
-    expect(b.max.x - b.min.x, "Breite").toBeCloseTo(BREITE, 2);
-    expect(b.max.y - b.min.y, "Hoehe").toBeCloseTo(HOEHE, 2);
-    expect(b.max.z - b.min.z, "Tiefe").toBeCloseTo(TIEFE, 2);
+    expect(b.max.x - b.min.x, "Breite").toBeCloseTo(BREITE, 3);
+    expect(b.max.y - b.min.y, "Hoehe").toBeCloseTo(HOEHE, 3);
+    expect(b.max.z - b.min.z, "Tiefe").toBeCloseTo(TIEFE, 3);
   });
 
-  it("der Kollider ist unten breit und flach und oben schmal", () => {
+  it("ist unten am breitesten und laeuft nach oben rund zu — ohne Taille", () => {
     const { body } = besenKoerper();
-    // Zwei Kollider: Faecher und Kopf. Eine einzige konvexe Huelle wuerde die
-    // Taille ueberbruecken (gemessen: 0,61 statt 0,22 m am Hals).
-    expect(body.numColliders(), "der Besen hat nicht zwei Kollider").toBe(2);
+    /*
+     * EINE Huelle, gemessen statt uebernommen. Der Trichter von heute
+     * vormittag brauchte zwei, weil eine einzige seine Taille ueberbrueckt
+     * haette. Der Ballen hat keine.
+     */
+    expect(body.numColliders(), "der Ballen braucht keine zweite Huelle").toBe(1);
 
-    const T = BESEN_TEILUNG;
-    const yHals = HOEHE / 2 - HOEHE * T.kopf;
-    const unten = kolliderBei(body, -HOEHE / 2 + 0.03);
-    const mitte = kolliderBei(body, 0);
-    const hals = kolliderBei(body, yHals + 0.06);
-    const wulst = kolliderBei(body, HOEHE / 2 - HOEHE * T.wulstVonOben);
-
+    const stufen: Array<{ y: number; breite: number; tiefe: number }> = [];
+    for (let i = 0; i <= 10; i++) {
+      const y = -HOEHE / 2 + 0.03 + (HOEHE - 0.08) * (i / 10);
+      stufen.push({ y, ...kolliderBei(body, y) });
+    }
     // eslint-disable-next-line no-console
     console.log(
-      `Kollider  unten ${unten.breite.toFixed(2)} x ${unten.tiefe.toFixed(2)} m` +
-        ` · mitte ${mitte.breite.toFixed(2)} x ${mitte.tiefe.toFixed(2)}` +
-        ` · Hals ${hals.breite.toFixed(2)} x ${hals.tiefe.toFixed(2)}` +
-        ` · Wulst ${wulst.breite.toFixed(2)} x ${wulst.tiefe.toFixed(2)}`
+      "Kollider ueber die Hoehe:\n" +
+        stufen
+          .map((s) => `  y ${s.y.toFixed(2).padStart(5)}  ${s.breite.toFixed(2)} x ${s.tiefe.toFixed(2)} m`)
+          .join("\n")
     );
 
     // Unten die volle Breite — das ist die Schleppkante.
-    expect(unten.breite, "unten nicht breit").toBeGreaterThan(BREITE * 0.85);
-    // Und flach: deutlich breiter als tief.
-    expect(unten.breite / unten.tiefe, "unten nicht flach").toBeGreaterThan(2.5);
-    // Nach oben laeuft es zusammen — sonst waere es ein Quader.
-    expect(mitte.breite, "die Mitte verjuengt sich nicht").toBeLessThan(unten.breite * 0.7);
-    expect(hals.breite, "der Hals ist nicht schmal").toBeLessThan(unten.breite * 0.3);
-    // Und der Wulst steht wieder heraus: die Kante, unter die die Schalen fassen.
-    expect(wulst.breite, "die Ausbuchtung ist kein Wulst").toBeGreaterThan(hals.breite * 1.3);
-    // Er bleibt aber schmal genug fuer den Schalenkorb (Halbmesser rund 0,44 m
-    // auf Sensorhoehe, siehe Greif-Abschnitt weiter unten).
-    expect(wulst.breite, "die Ausbuchtung ist zu dick zum Greifen").toBeLessThan(0.6);
+    expect(stufen[0].breite, "unten nicht breit").toBeGreaterThan(BREITE * 0.95);
+    // Und flach: deutlich breiter als tief, sonst waere es eine Kugel.
+    expect(stufen[0].breite / stufen[0].tiefe, "unten nicht flach").toBeGreaterThan(1.6);
+    // Keine Taille: von unten nach oben wird er nie wieder breiter.
+    for (let i = 1; i < stufen.length; i++) {
+      expect(
+        stufen[i].breite,
+        `zwischen y ${stufen[i - 1].y.toFixed(2)} und ${stufen[i].y.toFixed(2)} wird er wieder breiter`
+      ).toBeLessThanOrEqual(stufen[i - 1].breite + 0.01);
+    }
+    // Oben laeuft er zu — sonst waere es ein Quader.
+    expect(stufen[stufen.length - 1].breite, "oben nicht rund zulaufend").toBeLessThan(
+      stufen[0].breite * 0.55
+    );
   });
 
-  it("Gegenprobe: ein Quader derselben Masse faellt durch", () => {
+  /**
+   * Neigung der Flanke ueber die untersten `hoch` Meter (Grad).
+   *
+   * Positiv heisst „nach hinten geneigt" — die Front springt nach oben zurueck.
+   * Negativ heisst Ueberhang: Die breiteste Stelle liegt dann NICHT am Boden,
+   * und alles, was der Besen vor sich hertreibt, wird unter den Bauch gedrueckt.
+   */
+  function flankenwinkel(body: RAPIER.RigidBody, unten: number, hoch: number): number {
+    const r0 = kolliderR(body, unten + 0.02, 0);
+    const r1 = kolliderR(body, unten + hoch, 0);
+    return (Math.atan2(r0 - r1, hoch - 0.02) * 180) / Math.PI;
+  }
+
+  it("die Schleppkante steht praktisch senkrecht", () => {
     /*
-     * Ein Waechter, den man nie hat scheitern sehen, ist keiner (Lehre vom
-     * 15.09.2026: zwei Stunden gruen, weil die Eingaben NaN waren). Hier laeuft
-     * dieselbe Messung ueber einen glatten Quader mit genau den Massen des
-     * Besens — und die Bedingung „oben schmal" muss dann verletzt sein.
+     * Eine gewoelbte Front schoebe Kleinteile nach aussen weg, statt sie vor
+     * sich herzuschieben. Gemessen wird die Flanke auf den unteren 18 cm —
+     * das ist genau der Bereich, in dem die Teile aus der Kehr-Tabelle liegen
+     * (5 bis 18 cm Kantenlaenge). Weiter oben darf er rund werden, dort
+     * beruehrt er nichts mehr.
+     */
+    const { body } = besenKoerper();
+    const nah = flankenwinkel(body, -HOEHE / 2, 0.18);
+    const weit = flankenwinkel(body, -HOEHE / 2, 0.3 * HOEHE);
+    // eslint-disable-next-line no-console
+    console.log(
+      `Flanke: ${nah.toFixed(1)} Grad auf den unteren 18 cm, ` +
+        `${weit.toFixed(1)} Grad auf den unteren 30 % der Hoehe`
+    );
+    /*
+     * Die Grenze ist nicht der Winkel, sondern die Breite: Auf den unteren
+     * 18 cm darf der Ballen hoechstens 5 % seiner Breite verlieren — dann ist
+     * die Schleppkante wirklich die breiteste Stelle und nicht nur ein Rand.
+     * Gemessen sind es 3 %. Ein Ueberhang (Wert ueber 1) ist verboten: Dann
+     * laege die breiteste Stelle hoeher, und alles Gekehrte kaeme unter den
+     * Bauch.
+     */
+    const r0 = kolliderR(body, -HOEHE / 2 + 0.02, 0);
+    const r1 = kolliderR(body, -HOEHE / 2 + 0.18, 0);
+    // eslint-disable-next-line no-console
+    console.log(`Schleppkante ${r0.toFixed(3)} m, auf 18 cm Hoehe ${r1.toFixed(3)} m`);
+    expect(r1 / r0, "die Flanke zieht sich zu schnell ein").toBeGreaterThan(0.95);
+    expect(r1 / r0, "Ueberhang: die breiteste Stelle liegt nicht am Boden").toBeLessThanOrEqual(1);
+    expect(nah, "die Front haengt zu weit zurueck").toBeLessThan(15);
+  });
+
+  it("Gegenprobe: eine Kugel derselben Breite haengt ueber", () => {
+    /*
+     * Ohne diese Probe misst der Test oben nur, dass irgendein Koerper da ist.
+     * Eine Kugel ist auf halber Hoehe am breitesten; unten haengt sie ueber,
+     * und der Winkel wird negativ. Genau deshalb ist der Ballen unten platt
+     * und nicht rund.
      */
     const { physics } = platz();
-    const body = physics.world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
-    physics.world.createCollider(
-      RAPIER.ColliderDesc.cuboid(BREITE / 2, HOEHE / 2, TIEFE / 2),
-      body
+    const body = physics.world.createRigidBody(
+      RAPIER.RigidBodyDesc.fixed().setTranslation(0, 0, 0)
     );
-    const yHals = HOEHE / 2 - HOEHE * BESEN_TEILUNG.kopf;
-    const unten = kolliderBei(body, -HOEHE / 2 + 0.03);
-    const hals = kolliderBei(body, yHals + 0.06);
-    expect(unten.breite, "Aufbau: der Quader ist unten breit").toBeGreaterThan(BREITE * 0.85);
-    expect(
-      hals.breite < unten.breite * 0.3,
-      "ein Quader duerfte die Bedingung 'oben schmal' NICHT erfuellen"
-    ).toBe(false);
+    physics.world.createCollider(RAPIER.ColliderDesc.ball(BREITE / 2), body);
+    const winkel = flankenwinkel(body, -BREITE / 2, 0.18);
+    const r0 = kolliderR(body, -BREITE / 2 + 0.02, 0);
+    const r1 = kolliderR(body, -BREITE / 2 + 0.18, 0);
+    // eslint-disable-next-line no-console
+    console.log(
+      `Kugel: unten ${r0.toFixed(3)} m, auf 18 cm ${r1.toFixed(3)} m — ` +
+        `${winkel.toFixed(1)} Grad, also Ueberhang statt Schleppkante`
+    );
+    expect(r1 / r0, "eine Kugel duerfte die Bedingung NICHT erfuellen").toBeGreaterThan(1);
   });
 
-  it("der Schwerpunkt liegt tief — wie bei einem Besen", () => {
+  it("eine Huelle genuegt: sie liegt auf dem Draht, statt ihn zu ueberbruecken", () => {
+    const { body } = besenKoerper();
+    const bau = baueGeometrie("besen", BESEN.dims, "box");
+    const ecken = punkteBis(bau.koerper, -Infinity, Infinity);
+    const ab = huelleUeberDraht(body, ecken, HOEHE);
+    // eslint-disable-next-line no-console
+    console.log(
+      `Huelle steht hoechstens ${ab.toFixed(3)} m vom naechsten Drahtknoten ab ` +
+        `(${ecken.length / 3} Knoten)`
+    );
+    // Eine halbe Maschenweite ist normal, mehr waere eine ueberbrueckte Delle.
+    expect(ab, "die Huelle haengt frei ueber dem Draht").toBeLessThan(0.2);
+  });
+
+  it("Gegenprobe: bei einer Sanduhr faellt genau diese Messung durch", () => {
     /*
-     * Die Masse wird auf die beiden Kollider nach dem Rauminhalt ihrer
-     * Huellquader verteilt. Damit liegt der Schwerpunkt im Faecher und nicht in
-     * der Mitte — genau das, was bei einem Besen den Kopf leicht und das
-     * Kehrende schwer macht. Fuer das Greifen ist es zugleich die bekannte
-     * Falle (siehe Bericht): Wer oben fasst, hat den Schwerpunkt weit weg.
+     * Ein Waechter, den man nie hat scheitern sehen, ist keiner. Dieselbe
+     * Messung ueber eine Form MIT Taille — sie muss die Grenze reissen, sonst
+     * misst der Test oben etwas anderes als das, was er zu messen glaubt.
+     */
+    const { physics } = platz();
+    const geo = sanduhr();
+    const punkte = (geo.getAttribute("position") as THREE.BufferAttribute).array as Float32Array;
+    const body = physics.world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
+    physics.world.createCollider(RAPIER.ColliderDesc.convexHull(punkte)!, body);
+    const ab = huelleUeberDraht(body, punkte, 1.1);
+    // eslint-disable-next-line no-console
+    console.log(`Sanduhr: Huelle steht ${ab.toFixed(3)} m vom naechsten Knoten ab`);
+    expect(ab, "eine Sanduhr duerfte die Bedingung NICHT erfuellen").toBeGreaterThan(0.2);
+  });
+
+  it("die Maschinerie fuer Formen mit Taille lebt noch", () => {
+    /*
+     * Seit E-037 nutzt kein Bau mehr `Bauteil.huellen`. Weil der naechste
+     * Gegenstand mit Hals sie wieder braucht, wird sie hier an der Sanduhr
+     * durchgespielt: Punktwolken trennen, zwei Huellen bauen, Masse nach
+     * Rauminhalt aufteilen.
+     */
+    const { physics } = platz();
+    const geo = sanduhr();
+    const oben = punkteBis(geo, 0.48, Infinity);
+    const unten = punkteBis(geo, -Infinity, -0.48);
+    expect(oben.length, "obere Wolke leer").toBeGreaterThan(12);
+    expect(unten.length, "untere Wolke leer").toBeGreaterThan(12);
+    const body = physics.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic());
+    const raeume = [quaderRaum(unten), quaderRaum(oben)];
+    const summe = raeume[0] + raeume[1];
+    for (const [i, wolke] of [unten, oben].entries()) {
+      physics.world.createCollider(
+        RAPIER.ColliderDesc.convexHull(wolke)!.setMass((100 * raeume[i]) / summe),
+        body
+      );
+    }
+    expect(body.numColliders(), "zwei Huellen an einem Koerper").toBe(2);
+    expect(body.mass(), "die Masse verteilt sich nicht auf 100 kg").toBeCloseTo(100, 4);
+    // Beide Scheiben sind gleich gross, also sitzt der Schwerpunkt in der Mitte.
+    expect(Math.abs(body.localCom().y), "der Schwerpunkt haengt schief").toBeLessThan(0.05);
+    // Und die Taille bleibt erhalten: in der Mitte ist NICHTS.
+    const mitte = kolliderBei(body, 0);
+    // eslint-disable-next-line no-console
+    console.log(`Sanduhr mit zwei Huellen: Taille ${mitte.breite.toFixed(2)} m`);
+    expect(mitte.breite, "die Taille ist doch ueberbrueckt").toBeLessThan(0.1);
+  });
+
+  it("der Schwerpunkt liegt tief", () => {
+    /*
+     * Der Ballen ist unten breit und oben rund — schon die Huelle allein legt
+     * den Schwerpunkt damit unter die Mitte. Beim Trichter war dafuer eine
+     * Massenaufteilung auf zwei Kollider noetig; hier faellt es von selbst an.
      */
     const { body } = besenKoerper();
     const cm = body.localCom();
@@ -230,13 +457,85 @@ describe("Besen: Form und Kollider", () => {
     console.log(
       `Schwerpunkt lokal y = ${cm.y.toFixed(3)} m (Mitte 0, Schleppkante ${(-HOEHE / 2).toFixed(2)})`
     );
-    expect(cm.y, "der Schwerpunkt sitzt nicht unten").toBeLessThan(-0.1);
+    expect(cm.y, "der Schwerpunkt sitzt nicht unten").toBeLessThan(-0.08);
     expect(body.mass(), "die Gesamtmasse stimmt nicht").toBeCloseTo(BESEN.massKg, 1);
   });
 });
 
 /* ======================================================================== */
-/* 2 — Kehren: die Messung in der echten Physik                              */
+/* 2 — Masse und Rauminhalt sind gerechnet                                   */
+/* ======================================================================== */
+
+describe("Besen: woher Masse und Rauminhalt kommen", () => {
+  /** Draht je Quadratmeter Maschendraht: 2,8 mm Draht, 50 mm Masche. */
+  const DRAHT_M_JE_M2 = 56.6;
+  /** Gewicht von 2,8-mm-Stahldraht (kg/m). */
+  const KG_JE_M = 0.048;
+  /** Handelsuebliche Rolle: 1,25 m hoch, 25 m lang. */
+  const ROLLE_M2 = 1.25 * 25;
+  /** „Sehr viele Maschendraehte" — acht Rollen. */
+  const ROLLEN = 8;
+
+  it("die Masse ist die Drahtmenge, nicht eine Zahl", () => {
+    const flaeche = ROLLEN * ROLLE_M2;
+    const kgJeM2 = DRAHT_M_JE_M2 * KG_JE_M;
+    const kg = flaeche * kgJeM2;
+    // eslint-disable-next-line no-console
+    console.log(
+      `${ROLLEN} Rollen = ${flaeche} m² x ${kgJeM2.toFixed(2)} kg/m² = ${kg.toFixed(1)} kg ` +
+        `(im Katalog ${BESEN.massKg} kg)`
+    );
+    expect(BESEN.massKg, "die Masse passt nicht zur Drahtmenge").toBe(Math.ceil(kg));
+  });
+
+  it("der Rauminhalt passt zu einem getretenen Ballen, nicht zu einer Rolle", () => {
+    const { body } = besenKoerper();
+    const raum = rauminhalt(body, BREITE, HOEHE, TIEFE);
+    const packung = BESEN.massKg / raum;
+    /** Dichteste flache Lage: zwei Drahtdurchmesser je Maschenlage. */
+    const flach = ROLLEN * ROLLE_M2 * (2 * 0.0028);
+    // eslint-disable-next-line no-console
+    console.log(
+      `Rauminhalt ${raum.toFixed(3)} m³ · Packung ${packung.toFixed(0)} kg/m³ · ` +
+        `flach gestapelt waeren es ${flach.toFixed(2)} m³ (${(BESEN.massKg / flach).toFixed(0)} kg/m³)`
+    );
+    // Locker genug, dass noch Luft zwischen den Lagen ist ...
+    expect(raum, "der Ballen ist dichter als flach gestapelter Draht").toBeGreaterThan(flach);
+    // ... aber nicht so locker, dass er nur noch Luft waere.
+    expect(raum / flach, "der Ballen ist zu luftig").toBeLessThan(2.0);
+    expect(packung, "Packung zu gering").toBeGreaterThan(150);
+    expect(packung, "dichter als eine stramme Rolle (rund 700 kg/m³)").toBeLessThan(700);
+  });
+
+  it("Gegenprobe: ein voller Quader derselben Masse waere viel dichter", () => {
+    /*
+     * Wenn die Rastermessung nicht misst, was sie zu messen glaubt, faellt es
+     * hier auf: Ein massiver Quader mit denselben Aussenmassen hat den vollen
+     * Huellquader als Rauminhalt, und die Packung liegt dann deutlich unter
+     * der des Ballen — nicht darueber.
+     */
+    const { physics } = platz();
+    const body = physics.world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
+    physics.world.createCollider(
+      RAPIER.ColliderDesc.cuboid(BREITE / 2, HOEHE / 2, TIEFE / 2),
+      body
+    );
+    const raum = rauminhalt(body, BREITE, HOEHE, TIEFE);
+    // eslint-disable-next-line no-console
+    console.log(`Quader: ${raum.toFixed(3)} m³ (Huellquader ${(BREITE * HOEHE * TIEFE).toFixed(3)})`);
+    expect(raum, "Aufbau: der Quader fuellt seinen Huellquader").toBeCloseTo(
+      BREITE * HOEHE * TIEFE,
+      1
+    );
+    const ballen = rauminhalt(besenKoerper().body, BREITE, HOEHE, TIEFE);
+    expect(ballen, "der Ballen fuellt seinen Huellquader genauso — dann misst hier nichts").toBeLessThan(
+      raum * 0.75
+    );
+  });
+});
+
+/* ======================================================================== */
+/* 3 — Kehren: die Messung in der echten Physik                              */
 /* ======================================================================== */
 
 /**
@@ -302,20 +601,32 @@ function kehrzug(kantenlaenge: number, abstand: number): number {
  * Der Besen zieht 3,73 m weit; ein Teil, das auf halber Strecke liegt, kann
  * also hoechstens rund 2,1 m mitkommen. 1,2 m ist gut die Haelfte davon und
  * damit eindeutig „mitgenommen" — die Teile, die nicht erfasst werden, bleiben
- * gemessen unter 0,9 m, meist bei null. Der Abstand zwischen beiden Gruppen
- * ist der Grund, warum diese Grenze nicht gefeilscht ist.
+ * gemessen bei null. Der Abstand zwischen beiden Gruppen ist der Grund, warum
+ * diese Grenze nicht gefeilscht ist.
  */
 const MITGEKEHRT_AB = 1.2;
 
 describe("Besen: was die Schleppkante erfasst", () => {
   /*
    * Die Kehr-Tabelle. Zeilen = Kantenlaenge des Teils, Spalten = Bodenabstand
-   * der Schleppkante. Gemessen, nicht geschaetzt.
+   * der Schleppkante. Gemessen, nicht geschaetzt. Die Werte der alten
+   * Trichterform stehen zum Vergleich daneben — sie sind mit demselben Zug in
+   * derselben Welt gemessen worden (Blatt `2026-09-15_besen-2.svg`).
    */
   const GROESSEN = [0.05, 0.08, 0.12, 0.18, 0.25, 0.35, 0.5];
   const ABSTAENDE = [0.0, 0.05, 0.1];
+  /** Weg in Metern mit der Trichterform vom 15.09.2026 vormittags. */
+  const ALT: Record<string, number[]> = {
+    "0.05": [2.35, 0.0, 0.0],
+    "0.08": [2.36, 0.62, 0.0],
+    "0.12": [2.38, 0.66, 0.53],
+    "0.18": [2.41, 0.38, 0.74],
+    "0.25": [2.45, 2.45, 0.74],
+    "0.35": [2.5, 2.5, 2.5],
+    "0.5": [2.57, 2.57, 2.57],
+  };
 
-  it("nimmt bei aufliegender Kante alles ab 5 cm mit", () => {
+  it("nimmt bei aufliegender Kante alles ab 5 cm mit — und ist nirgends schlechter als vorher", () => {
     const zeilen: string[] = [];
     const erfasst = new Map<string, number>();
     for (const s of GROESSEN) {
@@ -324,7 +635,10 @@ describe("Besen: was die Schleppkante erfasst", () => {
       zeilen.push(
         `  ${(s * 100).toFixed(0).padStart(3)} cm : ` +
           weg
-            .map((w, i) => `${(ABSTAENDE[i] * 100).toFixed(0)} cm → ${w.toFixed(2)} m`)
+            .map(
+              (w, i) =>
+                `${(ABSTAENDE[i] * 100).toFixed(0)} cm → ${w.toFixed(2)} m (alt ${ALT[String(s)][i].toFixed(2)})`
+            )
             .join("  ·  ")
       );
     }
@@ -337,11 +651,25 @@ describe("Besen: was die Schleppkante erfasst", () => {
         MITGEKEHRT_AB
       );
     }
+    /*
+     * Und der Ballen darf nichts verlieren, was der Trichter konnte: Ein Teil,
+     * das vorher mitkam, muss auch jetzt mitkommen. Auftrag 15.09.2026: „Der
+     * bestehende Stand darf nicht schlechter werden."
+     */
+    for (const s of GROESSEN) {
+      for (const [i, a] of ABSTAENDE.entries()) {
+        if (ALT[String(s)][i] < MITGEKEHRT_AB) continue;
+        expect(
+          erfasst.get(`${s}|${a}`)!,
+          `${s} m bei ${a} m Spalt kam frueher mit und jetzt nicht mehr`
+        ).toBeGreaterThan(MITGEKEHRT_AB);
+      }
+    }
   });
 
   it("Gegenprobe: was flacher ist als der Spalt, bleibt liegen", () => {
     /*
-     * Der Waechter oben muss auch scheitern koennen. Ein 3-cm-Stueck bei 10 cm
+     * Der Waechter oben muss auch scheitern koennen. Ein 3-cm-Stueck bei 12 cm
      * Bodenabstand darf NICHT mitkommen — sonst misst der Test etwas anderes
      * als das, was er zu messen glaubt (z. B. einen Sog oder einen Fehler in
      * der Wegmessung).
@@ -352,22 +680,26 @@ describe("Besen: was die Schleppkante erfasst", () => {
     expect(weg, "ein flaches Teil rutscht unter der Kante durch").toBeLessThan(MITGEKEHRT_AB);
   });
 
-  it("kehrt eine Ladeflaeche ueber die Bordwand hinweg leer", () => {
+  it("kehrt eine Ladeflaeche leer — die Mitte in einer Bahn", () => {
     /*
      * Der zweite Anwendungsfall aus Patricks Beschreibung: „den Boden bzw. die
      * Ladeflächen abkehren". Eine Pritsche hat Bordwaende von 0,64 m
      * (`delivery/vehicleModel.ts`, `wandHoehe`) und eine Innenbreite von
-     * 2 x 1,35 m (`delivery/routes.ts`, `BED_HALF_W`). Nachgebaut wird genau
-     * das: Flaeche, zwei Bordwaende, vorn eine Stirnwand, hinten offen.
+     * 2 x `BED_HALF_W` = 2,70 m. Nachgebaut wird genau das: Flaeche, zwei
+     * Bordwaende, vorn eine Stirnwand, hinten offen.
      *
-     * Der Besen ist 1,20 m breit, die Flaeche 2,70 m — eine Bahn reicht also
-     * nicht. Gekehrt wird in DREI Bahnen, wie man es auch von Hand taete.
+     * DAS IST DER GEWINN DER NEUEN BREITE: Der Trichter war 1,20 m breit und
+     * liess nach DREI Bahnen immer noch eines von sechs Teilen liegen. Der
+     * Ballen ist 2,40 m breit und raeumt die Mitte in einer Bahn; die 0,15 m
+     * Luft je Seite holt ein Versatz nach links und rechts.
      */
     const { physics, items } = platz();
-    const BED_HALF_W = 1.35;
     const WAND_H = 0.64;
     const FLAECHE_Y = 1.1; // Ladehoehe einer Pritsche (SW, aus dem Modell)
-    const LAENGE = 5.0;
+    const LAENGE = BED_LEN.pritsche!;
+    expect(BREITE, "der Ballen passt nicht mehr zwischen die Bordwaende").toBeLessThan(
+      BED_HALF_W * 2 - 0.2
+    );
     const fest = physics.world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
     physics.world.createCollider(
       RAPIER.ColliderDesc.cuboid(BED_HALF_W, 0.05, LAENGE / 2).setTranslation(
@@ -396,7 +728,13 @@ describe("Besen: was die Schleppkante erfasst", () => {
       fest
     );
 
-    // Sechs Kleinteile ueber die ganze Breite, vorn an der Stirnwand.
+    /*
+     * Der Besen wird direkt hinter der Stirnwand abgesetzt: Seine Vorderkante
+     * steht dann an der Wand, und alles, was weiter hinten liegt, ist vor ihm.
+     */
+    const zStart = -LAENGE / 2 + TIEFE / 2 + 0.04;
+
+    // Sechs Kleinteile ueber die ganze Breite, dicht vor dem Besen.
     const reste: ScrapItem[] = [];
     for (let i = 0; i < 6; i++) {
       reste.push(
@@ -404,57 +742,84 @@ describe("Besen: was die Schleppkante erfasst", () => {
           "steel",
           6,
           { kind: "box", dims: [0.14, 0.12, 0.14], color: 0x808080 },
-          new THREE.Vector3(-1.05 + i * 0.42, FLAECHE_Y + 0.2, -1.7),
+          new THREE.Vector3(-1.05 + i * 0.42, FLAECHE_Y + 0.2, zStart + TIEFE / 2 + 0.35),
           new THREE.Quaternion()
         )
       );
     }
     for (let i = 0; i < 90; i++) physics.step();
 
+    const yOben = FLAECHE_Y + WAND_H + HOEHE / 2 + 0.3;
+    const yUnten = FLAECHE_Y + HOEHE / 2 + 0.01;
     const besen = items.spawnScrap(
       BESEN.materialId,
       BESEN.massKg,
       besenForm(),
-      new THREE.Vector3(0, FLAECHE_Y + WAND_H + HOEHE / 2 + 0.3, -2.2),
+      new THREE.Vector3(0, yOben, zStart),
       new THREE.Quaternion()
     );
     besen.body.setBodyType(RAPIER.RigidBodyType.KinematicPositionBased, true);
-    const yOben = FLAECHE_Y + WAND_H + HOEHE / 2 + 0.3;
-    const yUnten = FLAECHE_Y + HOEHE / 2 + 0.01;
     const setz = (x: number, y: number, z: number): void => {
       besen.body.setNextKinematicTranslation({ x, y, z });
       physics.step();
     };
-    for (const bahn of [-0.75, 0.0, 0.75]) {
-      // ueber die Bordwand herein und absenken
-      for (let i = 0; i < 40; i++) setz(bahn, yOben, -2.2);
-      for (let i = 0; i < 72; i++) setz(bahn, yOben + ((yUnten - yOben) * (i + 1)) / 72, -2.2);
+    const runter = (): number =>
+      reste.filter((r) => r.body.translation().y < FLAECHE_Y - 0.2).length;
+
+    expect(runter(), "Aufbau: vor dem Kehren liegt noch nichts unten").toBe(0);
+
+    /*
+     * DREI BAHNEN WAREN ES MIT DEM TRICHTER (1,20 m breit), und auch dann
+     * blieb eines von sechs liegen. Der Ballen holt die Mitte in EINER Bahn;
+     * die beiden aeusseren Teile landen im 15-cm-Streifen zwischen seiner
+     * Flanke und der Bordwand, weil die Ecken der Schleppkante gerundet sind
+     * und sie dorthin schieben. Ein Versatz nach links und rechts (mehr geht
+     * nicht, dann steht er an der Wand) holt eines davon; das letzte bleibt.
+     *
+     * Das ist eine gemessene Grenze der Form, kein Versehen: Eine Bordwand-Ecke
+     * raeumt nur ein Werkzeug mit eckiger Kante leer. Steht als offener Punkt
+     * im Bericht zu E-037.
+     */
+    const BAHNEN = [0, -(BED_HALF_W - BREITE / 2), BED_HALF_W - BREITE / 2];
+    const nachBahn: number[] = [];
+    for (const bahn of BAHNEN) {
+      for (let i = 0; i < 30; i++) setz(bahn, yOben, zStart);
+      for (let i = 0; i < 60; i++) setz(bahn, yOben + ((yUnten - yOben) * (i + 1)) / 60, zStart);
       /*
        * Nach hinten zur offenen Seite ziehen — und ueber die Kante hinaus.
-       * Die Flaeche endet auf z +2,5; wer dort aufhoert, schiebt den Schrott
-       * nur ans Heck statt herunter.
+       * Wer an der Heckkante aufhoert, schiebt den Schrott nur ans Heck statt
+       * herunter.
        */
-      for (let i = 0; i < 470; i++) setz(bahn, yUnten, -2.2 + (0.7 * (i + 1)) / 60);
+      const weg = LAENGE + 1.2;
+      const schritte = Math.round((weg / 0.7) * 60);
+      for (let i = 0; i < schritte; i++) setz(bahn, yUnten, zStart + (weg * (i + 1)) / schritte);
+      for (let i = 0; i < 60; i++) physics.step();
+      nachBahn.push(runter());
       // wieder anheben und zurueck, ohne dabei etwas mitzunehmen
-      for (let i = 0; i < 40; i++) setz(bahn, yOben, -2.2 + (0.7 * 470) / 60);
-      for (let i = 0; i < 40; i++) setz(bahn, yOben, -2.2);
+      for (let i = 0; i < 30; i++) setz(bahn, yOben, zStart + weg);
+      for (let i = 0; i < 40; i++) setz(bahn, yOben, zStart + weg - ((weg + 0.2) * (i + 1)) / 40);
     }
     for (let i = 0; i < 120; i++) physics.step();
 
-    const runter = reste.filter((r) => r.body.translation().y < FLAECHE_Y - 0.2).length;
     // eslint-disable-next-line no-console
-    console.log(`Ladeflaeche: ${runter} von ${reste.length} Teilen heruntergekehrt`);
-    expect(runter, "die Flaeche wurde nicht leer gekehrt").toBeGreaterThanOrEqual(5);
+    console.log(
+      `Ladeflaeche (${(BED_HALF_W * 2).toFixed(2)} m innen, Ballen ${BREITE.toFixed(2)} m): ` +
+        nachBahn.map((n, i) => `nach Bahn ${i + 1}: ${n}/${reste.length}`).join(" · ")
+    );
+    // Der Gewinn: was frueher drei Bahnen brauchte, faellt jetzt in der ersten.
+    expect(nachBahn[0], "die erste Bahn raeumt nicht einmal die Mitte").toBeGreaterThanOrEqual(4);
+    // Und am Ende nicht schlechter als der Trichter nach drei Bahnen (5 von 6).
+    expect(runter(), "schlechter als die alte Form").toBeGreaterThanOrEqual(5);
   });
 });
 
 /* ======================================================================== */
-/* 3 — Greifen am Kopf                                                       */
+/* 4 — Greifen: die Spinne holt ihn vom Boden                                */
 /* ======================================================================== */
 
 /**
- * Der Schalenkorb, wie ihn `excavator.ts` (`isInsideGrapple`, Zeile 2492)
- * rechnet — hier nachgebaut, weil der Bagger sich kopflos nicht bauen laesst.
+ * Der Schalenkorb, wie ihn `excavator.ts` (`isInsideGrapple`) rechnet — hier
+ * nachgebaut, weil der Bagger sich kopflos nicht bauen laesst.
  *
  * Die Zahlen kommen aus `clawGeometry.ts`; nur die drei Zugaben (+0,22 oben,
  * −0,18 unten, +0,14 im Halbmesser) sind abgeschrieben. Wer sie dort aendert,
@@ -477,11 +842,7 @@ function korbTest(splay: number): (p: THREE.Vector3) => boolean {
 }
 
 /** Wie viele Krallen liegen an? Nachbau von `excavator.krallenKontakte`. */
-function krallen(
-  body: RAPIER.RigidBody,
-  splay: number,
-  greiferPos: THREE.Vector3
-): number {
+function krallen(body: RAPIER.RigidBody, splay: number, greiferPos: THREE.Vector3): number {
   const col = body.collider(0);
   if (!col) return 0;
   const KONTAKT_NAH = 0.14; // excavator.ts
@@ -489,189 +850,177 @@ function krallen(
   const p = new THREE.Vector3();
   for (let c = 0; c < CLAW_COUNT; c++) {
     const a = (c / CLAW_COUNT) * Math.PI * 2;
-    let nah = false;
     for (const seg of [CLAW_SEGMENTS, Math.round(CLAW_SEGMENTS * 0.6)]) {
       clawPoint(a, splay, seg, p).add(greiferPos);
       const pr = col.projectPoint({ x: p.x, y: p.y, z: p.z }, false);
       if (!pr) continue;
       const d = Math.hypot(pr.point.x - p.x, pr.point.y - p.y, pr.point.z - p.z);
       if (pr.isInside || d <= KONTAKT_NAH) {
-        nah = true;
+        treffer++;
         break;
       }
     }
-    if (nah) treffer++;
   }
   return treffer;
 }
 
-describe("Besen: greifbar am Kopf", () => {
+/** Sensormitte unter dem Spinnenursprung (`excavator.ts`). */
+const SENSOR_LOKAL = -(0.55 + 0.2 + 0.75);
+
+describe("Besen: die Spinne bekommt ihn", () => {
   /**
-   * Der Besen liegt flach auf dem Boden, die Spinne kommt von oben ueber den
-   * Wulst. Das ist der Griff, den Patrick beschreibt: „ich würde quasi immer
-   * oben greifen."
+   * So, wie der Spieler es tut: Spinne offen ueber den Ballen, bis zum
+   * Bodenanschlag herunter, dann zufahren. Der Arm steigt dabei mit, weil die
+   * Schalen im Zufahren tiefer reichen (`clawTipDepth`).
    */
-  function aufbau(closure: number): {
+  function zufahren(versatzX = 0): {
     gefasst: number;
-    mittig: boolean;
-    krallenZahl: number;
+    beiClosure: number | null;
+    krallenDann: number;
+    gehoben: number;
   } {
     const { physics, items } = platz();
-    // flach hingelegt: um X gekippt, der Wulst zeigt dann nach +z
-    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0));
-    const besen = items.spawnScrap(
+    const ballen = items.spawnScrap(
       BESEN.materialId,
       BESEN.massKg,
       besenForm(),
-      new THREE.Vector3(0, TIEFE / 2 + 0.02, 0),
-      q
+      new THREE.Vector3(0, HOEHE / 2 + 0.05, 0),
+      new THREE.Quaternion()
     );
     for (let i = 0; i < 90; i++) physics.step();
+    const vorher = ballen.body.translation().y;
 
-    const p = besen.body.translation();
-    const rot = besen.body.rotation();
-    // Weltlage des Wulstes: lokal (0, +h/2, 0)
-    const kopf = new THREE.Vector3(0, HOEHE / 2 - 0.1, 0)
-      .applyQuaternion(new THREE.Quaternion(rot.x, rot.y, rot.z, rot.w))
-      .add(new THREE.Vector3(p.x, p.y, p.z));
-
-    // Die Spinne so setzen, dass ihr Sensor knapp ueber dem Wulst steht.
-    const SENSOR_LOKAL = -(0.55 + 0.2 + 0.75); // excavator.ts: GRAPPLE_LINK + 0,2 + PALM_TO_SENSOR
-    const greiferPos = new THREE.Vector3(kopf.x, kopf.y + 0.12 - SENSOR_LOKAL, kopf.z);
+    const gp = new THREE.Vector3(versatzX, clawTipDepth(CLAW_OPEN_SPLAY), 0);
     const greifer = physics.world.createRigidBody(
-      RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(
-        greiferPos.x,
-        greiferPos.y,
-        greiferPos.z
-      )
-    );
-    const grip = new GripSystem(physics.world, greifer);
-    const splay = THREE.MathUtils.lerp(CLAW_OPEN_SPLAY, CLAW_CLOSED_SPLAY, closure);
-    const imKorb = korbTest(splay);
-    const lokal = new THREE.Vector3();
-    grip.insideGrapple = (welt) => imKorb(lokal.copy(welt).sub(greiferPos));
-    grip.krallenKontakte = (b) => krallen(b, splay, greiferPos);
-
-    const sensor = new THREE.Vector3(greiferPos.x, greiferPos.y + SENSOR_LOKAL, greiferPos.z);
-    grip.update(closure, true, sensor, 1 / 60);
-
-    const mitte = besen.body.translation();
-    return {
-      gefasst: grip.grippedCount,
-      mittig: imKorb(lokal.set(mitte.x, mitte.y, mitte.z).sub(greiferPos)),
-      krallenZahl: krallen(besen.body, splay, greiferPos),
-    };
-  }
-
-  /** Die Spinne faehrt zu, waehrend der Spieler haelt — wie im Spiel. */
-  function zufahren(): { gefasst: number; beiClosure: number | null } {
-    const { physics, items } = platz();
-    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0));
-    const besen = items.spawnScrap(
-      BESEN.materialId,
-      BESEN.massKg,
-      besenForm(),
-      new THREE.Vector3(0, TIEFE / 2 + 0.02, 0),
-      q
-    );
-    for (let i = 0; i < 90; i++) physics.step();
-    const p = besen.body.translation();
-    const rot = besen.body.rotation();
-    const kopf = new THREE.Vector3(0, HOEHE / 2 - 0.1, 0)
-      .applyQuaternion(new THREE.Quaternion(rot.x, rot.y, rot.z, rot.w))
-      .add(new THREE.Vector3(p.x, p.y, p.z));
-    const SENSOR_LOKAL = -(0.55 + 0.2 + 0.75);
-    const greiferPos = new THREE.Vector3(kopf.x, kopf.y + 0.12 - SENSOR_LOKAL, kopf.z);
-    const greifer = physics.world.createRigidBody(
-      RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(
-        greiferPos.x,
-        greiferPos.y,
-        greiferPos.z
-      )
+      RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(gp.x, gp.y, gp.z)
     );
     const grip = new GripSystem(physics.world, greifer);
     let splay = CLAW_OPEN_SPLAY;
     const lokal = new THREE.Vector3();
-    grip.insideGrapple = (welt) => korbTest(splay)(lokal.copy(welt).sub(greiferPos));
-    grip.krallenKontakte = (b) => krallen(b, splay, greiferPos);
-    const sensor = new THREE.Vector3(greiferPos.x, greiferPos.y + SENSOR_LOKAL, greiferPos.z);
-    // 0 auf 1 in 0,8 s — das Tempo, mit dem die Spinne zufaehrt
+    grip.insideGrapple = (welt) => korbTest(splay)(lokal.copy(welt).sub(gp));
+    grip.krallenKontakte = (b) => krallen(b, splay, gp);
+
     let beiClosure: number | null = null;
+    let krallenDann = 0;
     for (let i = 0; i <= 48; i++) {
       const closure = Math.min(i / 48, 1);
       splay = THREE.MathUtils.lerp(CLAW_OPEN_SPLAY, CLAW_CLOSED_SPLAY, closure);
-      grip.update(closure, true, sensor, 1 / 60);
-      if (grip.grippedCount > 0 && beiClosure === null) beiClosure = closure;
+      gp.set(versatzX, clawTipDepth(splay), 0);
+      greifer.setNextKinematicTranslation({ x: gp.x, y: gp.y, z: gp.z });
+      grip.update(closure, true, new THREE.Vector3(gp.x, gp.y + SENSOR_LOKAL, gp.z), 1 / 60);
+      if (grip.grippedCount > 0 && beiClosure === null) {
+        beiClosure = closure;
+        krallenDann = krallen(ballen.body, splay, gp);
+      }
       physics.step();
     }
-    return { gefasst: grip.grippedCount, beiClosure };
+    // Anheben — was gefasst ist, muss auch mitkommen.
+    for (let i = 0; i < 120; i++) {
+      const y = clawTipDepth(CLAW_CLOSED_SPLAY) + (3.0 * (i + 1)) / 120;
+      gp.set(versatzX, y, 0);
+      greifer.setNextKinematicTranslation({ x: gp.x, y, z: gp.z });
+      grip.update(1, true, new THREE.Vector3(gp.x, y + SENSOR_LOKAL, gp.z), 1 / 60);
+      physics.step();
+    }
+    return {
+      gefasst: grip.grippedCount,
+      beiClosure,
+      krallenDann,
+      gehoben: ballen.body.translation().y - vorher,
+    };
   }
 
-  it("wird beim Zufahren der Spinne am Wulst gefasst", () => {
+  it("passt er ueberhaupt unter die Spinne? Die Zahlen dazu", () => {
     /*
-     * So, wie es im Spiel laeuft: Der Spieler haelt die Greiftaste, die
-     * Spinne faehrt zu, und das Greifsystem probiert in jedem Schritt des
-     * Fensters 0,60 bis 0,98 (`gripSystem.ts`). Es zaehlt also, ob es
-     * IRGENDWANN in diesem Fenster zupackt — nicht, ob es bei jedem einzelnen
-     * Schliessgrad zupackt.
-     */
-    const r = zufahren();
-    // eslint-disable-next-line no-console
-    console.log(`Greifen beim Zufahren: gefasst ab Schliessgrad ${r.beiClosure?.toFixed(2)}`);
-    expect(r.gefasst, "der Besen wird beim Zufahren nicht gefasst").toBe(1);
-  });
-
-  it("Befund: ab etwa 0,8 zu ist der Kopfgriff allein nicht mehr genug", () => {
-    /*
-     * Das ist der Fall, an dem Karossen frueher gescheitert sind, und er
-     * betrifft den Besen genauso: Wer oben fasst, hat den Schwerpunkt weit
-     * unten — bei diesem Objekt 0,55 m vom Griff entfernt. Solange die Spinne
-     * noch weit offen ist, liegt er trotzdem im Korb; je enger sie zugeht,
-     * desto schmaler wird der Korb, und irgendwann faellt er heraus.
+     * Die Frage, an der das Paket haette scheitern koennen. Drei Masse:
      *
-     * Praktisch macht das nichts, weil das Greiffenster bei 0,60 beginnt und
-     * dort zupackt (Test darueber). Der Wert steht hier trotzdem fest, damit
-     * er auffaellt, falls jemand das Fenster verschiebt.
+     *  - OFFEN spannt die Spinne 3,38 m. Der Ballen ist 2,40 m breit, sie kann
+     *    also von oben ueber ihn kommen, ohne anzustossen.
+     *  - IM GREIFFENSTER (Schliessgrad 0,60 bis 0,98) ist der Korb hoechstens
+     *    1,46 m weit. UMFASSEN kann sie ihn damit NICHT — sie drueckt auf die
+     *    Kuppe und haelt ihn mit fuenf Schalen, wie ein Klauenautomat einen
+     *    Ball. Genau so ist der Ballen ja entstanden.
+     *  - GESCHLOSSEN misst sie aussen 1,30 m — und das ist die Tiefe des
+     *    Ballen, kein Zufall (siehe `BESEN`).
      */
-    const weit = aufbau(0.65);
-    const eng = aufbau(0.95);
+    const offen = clawSpan(CLAW_OPEN_SPLAY);
+    const beiGriff = clawSpan(THREE.MathUtils.lerp(CLAW_OPEN_SPLAY, CLAW_CLOSED_SPLAY, 0.6));
+    const zu = clawWidth(CLAW_CLOSED_SPLAY);
     // eslint-disable-next-line no-console
     console.log(
-      `Einzelbild: 0,65 → gefasst=${weit.gefasst}, Schwerpunkt im Korb=${weit.mittig}, Krallen=${weit.krallenZahl}` +
-        ` · 0,95 → gefasst=${eng.gefasst}, Schwerpunkt im Korb=${eng.mittig}, Krallen=${eng.krallenZahl}`
+      `Spinne offen ${offen.toFixed(2)} m · im Greiffenster ${beiGriff.toFixed(2)} m · ` +
+        `geschlossen aussen ${zu.toFixed(2)} m · Ballen ${BREITE.toFixed(2)} x ${TIEFE.toFixed(2)} m`
     );
-    expect(weit.gefasst, "weit offen muss der Kopfgriff reichen").toBe(1);
-    expect(eng.mittig, "eng zu liegt der Schwerpunkt noch im Korb").toBe(false);
+    expect(BREITE, "die offene Spinne kommt nicht mehr ueber ihn").toBeLessThan(offen - 0.5);
+    expect(TIEFE, "die Tiefe ist nicht die Spur der geschlossenen Spinne").toBeCloseTo(zu, 1);
   });
 
-  it("Gegenprobe: neben der Spinne wird nichts gefasst", () => {
+  it("wird vom Bodenanschlag aus gefasst und kommt hoch", () => {
+    const r = zufahren();
+    // eslint-disable-next-line no-console
+    console.log(
+      `Greifen vom Bodenanschlag: gefasst ab Schliessgrad ${r.beiClosure?.toFixed(2)} ` +
+        `mit ${r.krallenDann} Schalen am Ballen, ${r.gehoben.toFixed(2)} m angehoben`
+    );
+    expect(r.gefasst, "der Ballen wird nicht gefasst").toBe(1);
+    expect(r.krallenDann, "er haengt an weniger als zwei Schalen").toBeGreaterThanOrEqual(2);
+    expect(r.gehoben, "er kommt nicht mit hoch").toBeGreaterThan(2.0);
+  });
+
+  it("Gegenprobe: eineinhalb Ballenbreiten daneben bekommt sie ihn nicht", () => {
+    /*
+     * Sonst misst der Test oben nur, dass irgendwo ein Koerper liegt. Drei
+     * Meter neben der Mitte hat die Spinne weder den Ballen im Korb noch eine
+     * Schale an ihm.
+     */
+    const r = zufahren(3.6);
+    // eslint-disable-next-line no-console
+    console.log(`Gegenprobe 3,6 m daneben: gefasst ${r.gefasst}`);
+    expect(r.gefasst, "drei Meter daneben darf nichts gefasst werden").toBe(0);
+  });
+
+  it("er ist tragbar — die Spinne nimmt ihn ans Gelenk", () => {
+    /*
+     * `MAX_TOTAL_KG` steht in `gripSystem.ts` und ist nicht ausgefuehrt. Statt
+     * die Zahl abzuschreiben, wird gefragt: Nimmt die Spinne ihn an? 683 kg
+     * sind knapp ein Fuenftel ihrer Traglast.
+     */
     const { physics, items } = platz();
-    const besen = items.spawnScrap(
+    const ballen = items.spawnScrap(
       BESEN.materialId,
       BESEN.massKg,
       besenForm(),
-      new THREE.Vector3(4, TIEFE / 2 + 0.02, 0),
-      new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0))
+      new THREE.Vector3(0, HOEHE / 2 + 0.05, 0),
+      new THREE.Quaternion()
     );
-    for (let i = 0; i < 60; i++) physics.step();
-    const greiferPos = new THREE.Vector3(0, 3, 0);
+    for (let i = 0; i < 30; i++) physics.step();
     const greifer = physics.world.createRigidBody(
       RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(0, 3, 0)
     );
     const grip = new GripSystem(physics.world, greifer);
-    const splay = THREE.MathUtils.lerp(CLAW_OPEN_SPLAY, CLAW_CLOSED_SPLAY, 0.85);
-    const imKorb = korbTest(splay);
-    const lokal = new THREE.Vector3();
-    grip.insideGrapple = (welt) => imKorb(lokal.copy(welt).sub(greiferPos));
-    grip.krallenKontakte = (b) => krallen(b, splay, greiferPos);
-    grip.update(0.85, true, new THREE.Vector3(0, 1.5, 0), 1 / 60);
-    expect(grip.grippedCount, "vier Meter daneben darf nichts gefasst werden").toBe(0);
-    expect(besen.body.isValid()).toBe(true);
+    expect(grip.attachBody(ballen.body), "die Spinne verweigert den Ballen").toBe(true);
+
+    // Gegenprobe: ein Wrack von vier Tonnen wird abgelehnt — die Grenze gibt es.
+    const { physics: p2, items: i2 } = platz();
+    const brocken = i2.spawnScrap(
+      "steel",
+      4000,
+      { kind: "box", dims: [2, 1, 3], color: 0x808080 },
+      new THREE.Vector3(0, 2, 0),
+      new THREE.Quaternion()
+    );
+    const g2 = p2.world.createRigidBody(
+      RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(0, 3, 0)
+    );
+    expect(
+      new GripSystem(p2.world, g2).attachBody(brocken.body),
+      "Aufbau: vier Tonnen muessten zu schwer sein"
+    ).toBe(false);
   });
 });
 
 /* ======================================================================== */
-/* 4 — Platzinventar: einer, wertlos, kommt wieder                           */
+/* 5 — Platzinventar: einer, wertlos, kommt wieder                           */
 /* ======================================================================== */
 
 /**
@@ -691,12 +1040,99 @@ describe("Besen: Platzinventar, kein Handelsgut", () => {
   it("wird beim Neuen Spiel genau einmal gesetzt", () => {
     const { items } = platz();
     expect(items.inventarNachtragen(), "der erste Aufruf legt ihn hin").toEqual([
-      "Maschendraht-Besen",
+      BESEN.name,
     ]);
     expect(items.inventarNachtragen(), "der zweite legt keinen zweiten an").toEqual([]);
     const inventar = items.items.filter((it) => istPlatzinventar(it.shape));
     expect(inventar.length, "es liegt nicht genau ein Besen auf dem Platz").toBe(1);
     expect(inventar[0].shape?.inventar).toBe("besen");
+  });
+
+  it("bleibt liegen, wo er hingelegt wird — und kommt dabei zur Ruhe", () => {
+    /*
+     * BEFUND 15.09.2026, E-037: Der Ballen kam auf dem gebauten Platz nicht
+     * zur Ruhe. Er wanderte nur 5 mm in 30 Sekunden, blieb aber WACH — und ein
+     * wacher Koerper rechnet in jedem Bild mit. Ursache waren die weichen
+     * Kontakte zusammen mit der sehr niedrigen Daempfung, die `dampLin`
+     * schweren Koerpern gibt (0,02). Platzinventar bekommt seitdem eine
+     * Mindestdaempfung; im gebauten Platz schlaeft der Ballen damit nach
+     * 3,4 Sekunden ein (gemessen mit `tools/platzlast.ts`).
+     *
+     * Hier wird die Eigenschaft geprueft, die der Spieler merkt: Er bleibt
+     * liegen. Und die Ursache gleich mit — sonst faellt beim naechsten Umbau
+     * nur auf, DASS es klemmt, nicht warum.
+     */
+    const { physics, items } = platz();
+    const besen = items.spawnBesen()!;
+    expect(
+      besen.body.linearDamping(),
+      "Platzinventar bekommt keine Mindestdaempfung"
+    ).toBeGreaterThan(dampLin(BESEN.massKg));
+    expect(besen.body.angularDamping(), "dasselbe fuer die Drehung").toBeGreaterThan(
+      dampAng(BESEN.massKg)
+    );
+
+    // Gegenprobe: dasselbe Stueck OHNE die Inventarmarke behaelt die niedrige
+    // Daempfung — „Schweres behaelt seinen Schwung" gilt weiter fuer Ware.
+    const ware = items.spawnScrap(
+      BESEN.materialId,
+      BESEN.massKg,
+      { ...besenForm(), inventar: undefined },
+      new THREE.Vector3(12, 2, 12),
+      new THREE.Quaternion()
+    );
+    expect(ware.body.linearDamping(), "Aufbau: Ware wird auch gebremst").toBeCloseTo(
+      dampLin(BESEN.massKg),
+      6
+    );
+
+    // Erst aufsetzen und einschlafen lassen: Das Rutschen beim Aufkommen aus
+    // 5 cm Hoehe ist kein Wandern. Im gebauten Platz dauert es 3,4 s.
+    let einschlafen = -1;
+    for (let i = 0; i < 1800 && einschlafen < 0; i++) {
+      physics.step();
+      if (besen.body.isSleeping()) einschlafen = i;
+    }
+    // eslint-disable-next-line no-console
+    console.log(`eingeschlafen nach ${(einschlafen / 60).toFixed(1)} s`);
+    expect(einschlafen, "er schlaeft in dreissig Sekunden nicht ein").toBeGreaterThanOrEqual(0);
+    const p0 = besen.body.translation();
+    const start = { x: p0.x, z: p0.z };
+    for (let i = 0; i < 1800; i++) physics.step(); // 30 Sekunden Spielzeit
+    const p1 = besen.body.translation();
+    const v = besen.body.linvel();
+    const gewandert = Math.hypot(p1.x - start.x, p1.z - start.z);
+    // eslint-disable-next-line no-console
+    console.log(
+      `nach 30 s: ${gewandert * 1000 >= 1 ? (gewandert * 100).toFixed(1) + " cm" : "unter 1 mm"} ` +
+        `gewandert, v ${Math.hypot(v.x, v.y, v.z).toFixed(4)} m/s, schlaeft ${besen.body.isSleeping()}`
+    );
+    expect(gewandert, "er wandert vom Fleck").toBeLessThan(0.005);
+    expect(besen.body.isSleeping(), "er kommt nicht zur Ruhe").toBe(true);
+    expect(Math.hypot(v.x, v.y, v.z), "er zappelt noch").toBeLessThan(1e-6);
+  });
+
+  it("liegt in seiner Gebrauchslage, nicht auf der Flanke", () => {
+    /*
+     * Seit E-037 ist die Bauform schon die Liegelage: unten platt, oben rund.
+     * Der Trichter musste noch gekippt werden. Gemessen wird am Ergebnis —
+     * nach dem Hinlegen darf er sich nicht mehr umlegen.
+     */
+    const { physics, items } = platz();
+    const besen = items.spawnBesen()!;
+    const y0 = besen.body.translation().y;
+    for (let i = 0; i < 240; i++) physics.step();
+    const rot = besen.body.rotation();
+    const hoch = new THREE.Vector3(0, 1, 0).applyQuaternion(
+      new THREE.Quaternion(rot.x, rot.y, rot.z, rot.w)
+    );
+    // eslint-disable-next-line no-console
+    console.log(
+      `nach 4 s: y ${besen.body.translation().y.toFixed(3)} (gesetzt ${y0.toFixed(3)}), ` +
+        `Neigung ${((Math.acos(Math.min(1, hoch.y)) * 180) / Math.PI).toFixed(1)} Grad`
+    );
+    expect(hoch.y, "er ist umgekippt").toBeGreaterThan(0.97);
+    expect(besen.body.translation().y, "er ist eingesunken").toBeGreaterThan(HOEHE / 2 - 0.06);
   });
 
   it("steht als Gattung in der Inventarliste, nicht als Sonderfall", () => {
@@ -736,7 +1172,7 @@ describe("Besen: Platzinventar, kein Handelsgut", () => {
       BESEN.materialId,
       BESEN.massKg,
       { ...besenForm(), inventar: undefined },
-      new THREE.Vector3(6, 2, 6)
+      new THREE.Vector3(9, 2, 9)
     );
     expect(items.isCrushable(ware), "Aufbau: ohne Marke waere es pressbar").toBe(true);
   });
@@ -787,7 +1223,7 @@ describe("Besen: Platzinventar, kein Handelsgut", () => {
 
     // eslint-disable-next-line no-console
     console.log(
-      `Verkauf ohne Besen ${a.eur.toFixed(2)} EUR / ${a.massKg} kg \u00b7 ` +
+      `Verkauf ohne Besen ${a.eur.toFixed(2)} EUR / ${a.massKg} kg · ` +
         `mit Besen ${b.eur.toFixed(2)} EUR / ${b.massKg} kg`
     );
     expect(b.eur, "der Besen aendert den Erloes").toBeCloseTo(a.eur, 6);
@@ -871,71 +1307,178 @@ describe("Besen: Platzinventar, kein Handelsgut", () => {
 });
 
 /* ======================================================================== */
-/* 5 — Sein Platz auf dem Hof                                                */
+/* 6 — Sein Fleck auf dem Hof                                                */
 /* ======================================================================== */
 
+/** Abstand eines Punktes zum Rand eines achsparallelen Rechtecks (negativ = drin). */
+function zuRechteck(
+  x: number,
+  z: number,
+  cx: number,
+  cz: number,
+  sx: number,
+  sz: number
+): number {
+  const dx = Math.abs(x - cx) - sx / 2;
+  const dz = Math.abs(z - cz) - sz / 2;
+  return dx < 0 && dz < 0 ? Math.max(dx, dz) : Math.hypot(Math.max(dx, 0), Math.max(dz, 0));
+}
+
+/**
+ * Wie viel Luft hat ein Fleck? Alles, was ihn verbieten wuerde, in EINER
+ * Rechnung — damit der Waechter dieselbe Suche fahren kann wie der Bau.
+ */
+function luftAm(x: number, z: number): { frei: number; grund: string } {
+  let frei = Infinity;
+  let grund = "";
+  const merke = (ab: number, was: string): void => {
+    if (ab < frei) {
+      frei = ab;
+      grund = was;
+    }
+  };
+  for (const c of CONFIGS) merke(zuRechteck(x, z, c.x, c.z, c.size[0], c.size[1]), c.label);
+  merke(
+    zuRechteck(
+      x,
+      z,
+      PRESS_CENTER.x,
+      PRESS_CENTER.z,
+      PRESS_INNER.laenge + 0.7,
+      PRESS_INNER.tiefe + 0.7
+    ),
+    "Presskammer"
+  );
+  merke(Math.hypot(x - START_HAUFEN.x, z - START_HAUFEN.z) - START_HAUFEN.streuung, "Starthaufen");
+  merke(Math.hypot(x - START_STREU.x, z - START_STREU.z) - START_STREU.radius, "Streuschrott");
+  for (const a of START_AUTOS) merke(Math.hypot(x - a.x, z - a.z) - 2.5, "Altfahrzeug");
+  merke(Math.hypot(x - ABKIPP_ZONE[0], z - ABKIPP_ZONE[1]) - 3.0, "Abkippstelle");
+  merke(
+    zuRechteck(x, z, ABLADE_SPUR_X, ABLADE_HALT_Z, 3.0, BED_LEN.kipper! + 3.0),
+    "Abladespur"
+  );
+  return { frei, grund };
+}
+
 describe("Besen: wo er liegt", () => {
+  /** Der Umkreis des Ballen — im schlimmsten Fall steht er verdreht. */
+  const UMKREIS = Math.hypot(BREITE / 2, TIEFE / 2);
   const d = abstandVomStand(BESEN_PLATZ.x, BESEN_PLATZ.z);
 
   it("liegt im Schwenkband des Baggers", () => {
     // eslint-disable-next-line no-console
     console.log(
       `Besenplatz (${BESEN_PLATZ.x} | ${BESEN_PLATZ.z}) — ${d.toFixed(2)} m vom Sitz ` +
-        `(${BAGGER_STAND.x} | ${BAGGER_STAND.z})`
+        `(${BAGGER_STAND.x} | ${BAGGER_STAND.z}), Umkreis ${UMKREIS.toFixed(2)} m`
     );
     expect(d, "zu nah am Sitz").toBeGreaterThanOrEqual(SCHWENK_INNEN);
     expect(d, "ausser Reichweite").toBeLessThanOrEqual(SCHWENK_AUSSEN);
   });
 
-  it("liegt nicht im Starthaufen und nicht im Streuschrott", () => {
-    const zumHaufen = Math.hypot(BESEN_PLATZ.x - START_HAUFEN.x, BESEN_PLATZ.z - START_HAUFEN.z);
-    expect(zumHaufen, "er waere unter dem Haufen begraben").toBeGreaterThan(
-      START_HAUFEN.streuung + 0.5
+  it("hat rundum Luft — Mulden, Halden, Presse, Haufen, Fahrspur", () => {
+    const { frei, grund } = luftAm(BESEN_PLATZ.x, BESEN_PLATZ.z);
+    // eslint-disable-next-line no-console
+    console.log(`naechstes Hindernis: ${grund}, ${frei.toFixed(2)} m entfernt`);
+    expect(frei, `zu nah an ${grund}`).toBeGreaterThan(UMKREIS + 0.5);
+    expect(hitsObstacle(BESEN_PLATZ.x, BESEN_PLATZ.z, UMKREIS), "er steckt in einem Bauwerk").toBe(
+      null
     );
-    for (let i = 0; i < START_STREU.teile; i++) {
-      const a = (i / START_STREU.teile) * Math.PI * 2;
-      const x = START_STREU.x + Math.cos(a) * START_STREU.radius;
-      const z = START_STREU.z + Math.sin(a) * START_STREU.radius;
-      expect(
-        Math.hypot(BESEN_PLATZ.x - x, BESEN_PLATZ.z - z),
-        `Streuteil ${i} faellt auf den Besen`
-      ).toBeGreaterThan(1.0);
-    }
   });
 
-  it("liegt nicht in der Presskammer", () => {
-    const x0 = PRESS_CENTER.x - (PRESS_INNER.laenge + 0.7) / 2;
-    const x1 = PRESS_CENTER.x + (PRESS_INNER.laenge + 0.7) / 2;
-    const z0 = PRESS_CENTER.z - (PRESS_INNER.tiefe + 0.7) / 2;
-    const z1 = PRESS_CENTER.z + (PRESS_INNER.tiefe + 0.7) / 2;
-    const dx = Math.max(x0 - BESEN_PLATZ.x, 0, BESEN_PLATZ.x - x1);
-    const dz = Math.max(z0 - BESEN_PLATZ.z, 0, BESEN_PLATZ.z - z1);
-    expect(Math.hypot(dx, dz), "der Besen liegt in der Presse").toBeGreaterThan(1.5);
-  });
-
-  it("liegt in keiner Halde und in keiner Mulde — mit Abstand", () => {
+  it("liegt nicht dort, wo der Kipper abkippt — und der alte Fleck tat es", () => {
     /*
-     * Sonst zaehlte das Werkzeug als sortiertes Material — und der Spieler
-     * bekaeme eine Sortierpraemie fuer seinen eigenen Besen. Die Zone wird
-     * gegen den Mittelpunkt des Koerpers geprueft (`containers.containsPoint`
-     * gegen `body.translation()`), darum reicht der Mittelpunkt als Mass. Ein
-     * Meter Abstand verlangt der Test trotzdem: Ein Besen, der auf der Kante
-     * liegt, rutscht beim ersten Anstossen hinein.
+     * DER BEFUND DES ABENDS. Seit E-029 kippt der Selbstabkipper am
+     * Abladeplatz ab; die Fuhre landet auf `ABKIPP_ZONE`. Der alte Besenplatz
+     * (5,0 | −27,0) lag 1,64 m daneben — das Werkzeug waere unter der naechsten
+     * Fuhre verschwunden. Der Waechter von heute vormittag hat die
+     * Abkippstelle nicht geprueft; dieser tut es, und die Gegenprobe zeigt,
+     * dass er es merkt.
      */
-    let naechste = Infinity;
-    let name = "";
-    for (const c of CONFIGS) {
-      const dx = Math.abs(BESEN_PLATZ.x - c.x) - c.size[0] / 2;
-      const dz = Math.abs(BESEN_PLATZ.z - c.z) - c.size[1] / 2;
-      const ab =
-        dx < 0 && dz < 0 ? Math.max(dx, dz) : Math.hypot(Math.max(dx, 0), Math.max(dz, 0));
-      if (ab < naechste) {
-        naechste = ab;
-        name = c.label;
+    const neu = Math.hypot(
+      BESEN_PLATZ.x - ABKIPP_ZONE[0],
+      BESEN_PLATZ.z - ABKIPP_ZONE[1]
+    );
+    const alt = Math.hypot(5.0 - ABKIPP_ZONE[0], -27.0 - ABKIPP_ZONE[1]);
+    // eslint-disable-next-line no-console
+    console.log(
+      `Abkippstelle (${ABKIPP_ZONE[0]} | ${ABKIPP_ZONE[1]}): neuer Fleck ${neu.toFixed(2)} m, ` +
+        `alter Fleck ${alt.toFixed(2)} m`
+    );
+    expect(neu, "er liegt wieder unter der Abkippstelle").toBeGreaterThan(4.0);
+    expect(alt, "Aufbau: der alte Fleck lag nicht an der Abkippstelle").toBeLessThan(2.0);
+  });
+
+  it("liegt in einer Arbeitszone — sonst huepen die Fahrer davor", () => {
+    /*
+     * Neu wichtig, weil der Ballen 683 kg wiegt: Ab `BLOCKING_MASS_KG`
+     * (120 kg) gilt ein liegendes Teil als Hindernis, ausser es liegt in einer
+     * Arbeitszone (`routes.ts`, `WORK_ZONES`). Beim 52-kg-Besen war das egal.
+     */
+    expect(BESEN.massKg, "unter der Blockadegrenze — dann ist dieser Test unnoetig").toBeGreaterThan(
+      BLOCKING_MASS_KG
+    );
+    const zone = WORK_ZONES.find(
+      ([wx, wz, wr]) => Math.hypot(BESEN_PLATZ.x - wx, BESEN_PLATZ.z - wz) <= wr
+    );
+    // eslint-disable-next-line no-console
+    console.log(
+      `Arbeitszone: ${zone ? `(${zone[0]} | ${zone[1]}) r ${zone[2]}` : "KEINE"} bei ${BESEN.massKg} kg`
+    );
+    expect(zone, "der Ballen liegt ausserhalb jeder Arbeitszone").toBeDefined();
+  });
+
+  it("und es gibt ueberhaupt keinen besseren Fleck — die Suche als Waechter", () => {
+    /*
+     * Der Fleck ist gesucht, nicht gegriffen: Das Schwenkband wird in
+     * 0,25-m-Schritten abgesucht, jeder Punkt gegen alles gerechnet, was ihn
+     * verbietet. Uebrig bleibt nur der Vorplatz — und dort liegt er.
+     */
+    const frei: Array<{ x: number; z: number; luft: number }> = [];
+    for (let x = -14; x <= 14; x += 0.25) {
+      for (let z = -34; z <= -8; z += 0.25) {
+        const ab = abstandVomStand(x, z);
+        if (ab < SCHWENK_INNEN || ab > SCHWENK_AUSSEN) continue;
+        if (hitsObstacle(x, z, UMKREIS)) continue;
+        const { frei: luft } = luftAm(x, z);
+        if (luft > UMKREIS + 0.5) frei.push({ x, z, luft });
       }
     }
+    const xs = frei.map((f) => f.x);
+    const zs = frei.map((f) => f.z);
     // eslint-disable-next-line no-console
-    console.log(`naechste Zone: ${name}, ${naechste.toFixed(2)} m entfernt`);
-    expect(naechste, `zu nah an ${name}`).toBeGreaterThan(1.0);
+    console.log(
+      `${frei.length} freie Punkte, alle zwischen x ${Math.min(...xs).toFixed(2)} und ` +
+        `${Math.max(...xs).toFixed(2)}, z ${Math.min(...zs).toFixed(2)} und ${Math.max(...zs).toFixed(2)}`
+    );
+    expect(frei.length, "es gibt gar keinen freien Fleck mehr").toBeGreaterThan(20);
+    // Der gewaehlte Punkt ist einer davon.
+    expect(
+      frei.some(
+        (f) => Math.abs(f.x - BESEN_PLATZ.x) < 0.13 && Math.abs(f.z - BESEN_PLATZ.z) < 0.13
+      ),
+      "der Besenplatz kommt in der eigenen Suche nicht vor"
+    ).toBe(true);
+    // Und der alte Fleck ist keiner mehr — die Gegenprobe zur Suche.
+    expect(
+      frei.some((f) => Math.abs(f.x - 5.0) < 0.13 && Math.abs(f.z + 27.0) < 0.13),
+      "Aufbau: der alte Fleck muesste durchgefallen sein"
+    ).toBe(false);
+  });
+
+  it("die Form beschreibt einen Ballen, keinen Trichter — die Tabelle sagt es", () => {
+    /*
+     * `BESEN_FORM` ist die Tabelle, aus der die Form entsteht. Wer an ihr
+     * dreht, soll hier merken, ob er die Geschichte noch erzaehlt: unten am
+     * breitesten (Exponenten so, dass `f(0) = 1`), unten eckig und oben rund,
+     * und mit Dellen.
+     */
+    const f = (v: number): number =>
+      Math.max(Math.pow(Math.max(1 - Math.pow(v, BESEN_FORM.steil), 0), BESEN_FORM.rund), BESEN_FORM.kuppe);
+    expect(f(0), "unten nicht die volle Breite").toBeCloseTo(1, 6);
+    expect(f(0.3), "die Flanke faellt zu schnell ein").toBeGreaterThan(0.94);
+    expect(f(1), "oben laeuft er nicht zu").toBeCloseTo(BESEN_FORM.kuppe, 6);
+    expect(BESEN_FORM.pUnten, "unten muss die Flanke gerade sein").toBeGreaterThanOrEqual(4);
+    expect(BESEN_FORM.pOben, "oben muss es rund werden").toBeLessThan(2.5);
+    expect(BESEN_FORM.dellen.length, "ohne Dellen waere es sauber").toBeGreaterThanOrEqual(3);
   });
 });
