@@ -1607,14 +1607,36 @@ class ContainerLabel {
   }
 
   /**
+   * Traegt das Schild gerade ein Ampelurteil? (E-061, 15.09.2026)
+   *
+   * Solange es das tut, ist es keine Aufschrift mehr, sondern eine Antwort auf
+   * einen Handgriff — und darf nicht ausgeblendet werden, egal wie nah die
+   * Kamera steht. Siehe `updateDistance`.
+   */
+  private zeigtAmpel = false;
+
+  /**
    * Sichtbarkeit nach Entfernung. Aus der Nähe wächst ein Sprite ins Bild,
    * bis es alles verdeckt — dort wird ausgeblendet, denn wer davorsteht,
    * braucht die Aufschrift nicht mehr. Von weit weg ist sie ohnehin nicht
    * zu lesen.
+   *
+   * **Ausser das Schild zeigt gerade die Ampel** (E-061, 15.09.2026). Patrick
+   * hat an diesem Tag den Zielhinweis aus dem HUD streichen lassen: „Die Info
+   * brauche ich nicht, weil ich sehe es ja quasi, weil es grün aufleuchtet auf
+   * dem Feld." Damit ist der Ampelrahmen der EINZIGE verbliebene Kanal — und
+   * genau er war unter 4,5 m Kameraabstand vollständig ausgeblendet. Man
+   * schwenkt die Spinne über die Mulde, steht dabei naturgemäß nah dran, und
+   * bekam gar keine Antwort mehr.
+   *
+   * Die Nahausblendung bleibt für den Ruhezustand: Ein Schild, das nur seinen
+   * Namen trägt, soll aus der Nähe nicht die Sicht nehmen. Die Fernausblendung
+   * bleibt in jedem Fall — was 50 m weg ist, kann man ohnehin nicht lesen, und
+   * ein Sprite, das nie verschwindet, kostet in jedem Bild Zeichenzeit.
    */
   updateDistance(camPos: THREE.Vector3): void {
     const d = this.sprite.position.distanceTo(camPos);
-    const nah = THREE.MathUtils.smoothstep(d, 4.5, 9);
+    const nah = this.zeigtAmpel ? 1 : THREE.MathUtils.smoothstep(d, 4.5, 9);
     const fern = 1 - THREE.MathUtils.smoothstep(d, 38, 52);
     const a = Math.min(nah, fern);
     (this.sprite.material as THREE.SpriteMaterial).opacity = a;
@@ -1622,6 +1644,7 @@ class ContainerLabel {
   }
 
   draw(lines: string[], ampel: AmpelState | null): void {
+    this.zeigtAmpel = ampel !== null;
     const ctx = this.canvas.getContext("2d")!;
     ctx.clearRect(0, 0, 256, 128);
     const kurz = lines.length === 1;

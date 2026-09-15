@@ -624,6 +624,21 @@ describe("Greifen im echten Starthaufen — es kommt kein halber Haufen mit", ()
        * die Groesse: Echter Schrott ist groesser als ein 25-cm-Wuerfel, es
        * passt schlicht weniger in den Korb.
        *
+       * NACHGEMESSEN am 15.09.2026 nach E-061: 2 bis 5 Koerper erfuellen die
+       * Bedingung, 4 bis 7 kommen mit, 480 bis 740 kg, aus 124 bis 142 Teilen.
+       *
+       * Der Grund ist NICHT die Greifbedingung — an ihr wurde nichts geaendert.
+       * Es sind andere Wuerfel: Die Saat steht fest, der Katalog aber nicht.
+       * E-061 hat die Couch von Mischschrott nach Kunststoff verschoben, und
+       * damit verschieben sich alle Listenplaetze innerhalb dieser beiden
+       * Fraktionen. `randomCargo` zieht mit derselben Zahlenfolge ab da andere
+       * Stuecke — ein schwereres Sortiment, dieselbe Mechanik.
+       *
+       * Das ist die Schwaeche dieses Waechters: Seine Zahlen haengen am
+       * Katalog, obwohl er die Greifbedingung bewachen soll. Der Deckel auf der
+       * STUECKZAHL (8) ist der belastbare Teil und bleibt, wo er war — er sass
+       * beim Nachmessen mit 7 von 8 knapp, und das ist ein ehrliches Signal.
+       *
        * Die Schwellen liegen beim Doppelten des Gemessenen. Wer sie reissen
        * sieht, sucht den Fehler nicht hier, sondern in der Greifbedingung:
        * Sensorkugel, `insideGrapple`, `noetigeKrallen`.
@@ -641,8 +656,8 @@ describe("Greifen im echten Starthaufen — es kommt kein halber Haufen mit", ()
         ).toBeLessThanOrEqual(8);
         expect(
           r.kg,
-          `${r.kg.toFixed(0)} kg an einem Griff — gemessen sind 160 bis 250`
-        ).toBeLessThan(600);
+          `${r.kg.toFixed(0)} kg an einem Griff — gemessen sind 480 bis 740 (E-061)`
+        ).toBeLessThan(1500);
         expect(r.unterBoden, "ein Teil ist durch den Beton gesackt").toBe(0);
       }
     },

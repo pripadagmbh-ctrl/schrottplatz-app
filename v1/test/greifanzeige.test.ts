@@ -238,13 +238,32 @@ describe("Unterer HUD-Block: Griff-Info und Ladeanzeige", () => {
     expect(wert(["#grip-kopf"], "white-space", iPad)).toBeNull();
 
     expect(langeLadung.kopf).toContain("1.5 t");
-    expect(langeLadung.kopf).toContain(LANGE_MULDE);
-    expect(langeLadung.kopf).toContain("✕ falsche Zone");
     // Preis und Gewicht des anvisierten Stuecks stehen ebenfalls im Kopf.
     expect(langesZiel.kopf).toContain("1.2 t");
     expect(langesZiel.kopf).toContain("€/t");
-    // Und das Material bleibt in Klammern hinter dem Namen (Ansage 12.09.2026).
-    expect(langesZiel.kopf).toContain(`${LANGER_NAME} (Mischschrott · 58 % Baumischabfall)`);
+    /*
+     * Die Fraktion bleibt in Klammern hinter dem Namen — die Prozente sind weg
+     * (E-061, 15.09.2026).
+     *
+     * Hier stand bis zum 15.09.2026 „(Mischschrott · 58 % Baumischabfall)".
+     * Patrick am selben Tag: „Es gibt Mischschrott, dann ist das Mischschrott.
+     * Dann sind mir die Anteile, zu wie viel Prozent das Mischschrott ist,
+     * relativ egal." Dieser Waechter ist dabei absichtlich rot geworden — das
+     * war die Meldung „die Prozente sind raus".
+     *
+     * Der Mittelpunkt statt der zweiten Klammer: Der Name endet hier selbst
+     * auf „)", und „(Front eingedrückt) (Mischschrott)" liest sich falsch.
+     */
+    expect(langesZiel.kopf).toContain(`${LANGER_NAME} · Mischschrott`);
+    expect(langesZiel.kopf).not.toContain("%");
+    /*
+     * Und der Zielhinweis ist weg. Er stand hier als „› ueber MISCHSCHROTT:
+     * ✕ falsche Zone". Patrick: „Die Info brauche ich nicht, weil ich sehe es
+     * ja quasi, weil es gruen aufleuchtet auf dem Feld."
+     */
+    expect(langeLadung.kopf).not.toContain(LANGE_MULDE);
+    expect(langeLadung.kopf).not.toContain("falsche Zone");
+    expect(langeLadung.kopf).not.toContain("passt");
   });
 
   it("blendet die zweite Zeile aus, wenn nichts in der Spinne liegt", () => {

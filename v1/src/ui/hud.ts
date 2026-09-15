@@ -1,4 +1,4 @@
-import { getMaterial } from "../materials/catalog";
+import { getMaterial, istAbfall, normalizeMaterialId } from "../materials/catalog";
 import { euroIndicator, masseText, preisProTonne } from "../materials/purity";
 import type { ScrapItem } from "../world/scrapItems";
 import type { AmpelState } from "../world/containers";
@@ -17,26 +17,61 @@ const GROSS_AB_KG = 60;
 const GROSS_MAX = 3;
 
 /**
- * Woraus das Stueck vorwiegend besteht.
+ * Wann die Klammer hinter dem Namen schweigt (E-061, 15.09.2026).
  *
- * Ansage 12.09.2026: „Bei Spinne sollte immer das Hauptmaterial wie Alu, VA
- * etc. mit angezeigt werden." Bei sortenreinem Schrott ist das die Fraktion
- * selbst; bei einem Verbundteil die groesste Fraktion darin — sonst stuende da
- * nur „Mischschrott", und man wuesste nicht, ob man eine Waschmaschine oder
- * einen Kupfermotor in der Schale hat.
+ * Patrick, woertlich:
+ *
+ * > „Ich muss natuerlich sehen, was ich greife. Wenn es Mischschrott ist, muss
+ * > ich das sehen. Wenn es VA ist, muss ich das sehen. **Ausser es ist bei dem
+ * > Objekt schon klar, was es ist** — eine Couch ist Muell, da brauche ich
+ * > keine Materialbeschreibung zu."
+ *
+ * ## Die Regel, nach der entschieden wird
+ *
+ * Die Klammer beantwortet genau eine Frage: **Koennte dasselbe Ding auch aus
+ * etwas anderem sein?** Wo die Antwort Ja ist, steht die Fraktion dabei; wo
+ * sie Nein ist, waere sie doppelt gemoppelt und kostet nur Platz.
+ *
+ * Nein heisst sie in zwei Faellen, und beide sind aus den Daten ablesbar —
+ * es gibt keine dritte Liste, die jemand pflegen muesste:
+ *
+ *  1. **Der Name sagt den Stoff schon.** „Alutafel (Aluminium)",
+ *     „Kupferrohr-Bund (Kupfer)", „Kantholz (Holz)" — das Wort steht zweimal
+ *     in derselben Zeile. Geprueft wird gegen `STOFFWORT` unten.
+ *  2. **Der Gegenstand ist Muell, und das sieht man ihm an.** Alle vier
+ *     Entsorgungsfraktionen (`ABFALL`: Holz, Reifen, Baumischabfall,
+ *     Kunststoff) fallen darunter. Eine Couch, ein Matratzenstapel, ein
+ *     Reifenhaufen, ein Betonrohr: Niemand rechnet damit, dass daraus noch
+ *     Geld kommt, und welcher der vier Abfallcontainer es genau ist, aendert
+ *     am Handgriff nichts.
+ *
+ * Alles andere behaelt die Klammer — und zwar ausdruecklich die, wo man sich
+ * irren kann: Aluminium gegen Edelstahl, Stahlschrott gegen Mischschrott,
+ * Kupfer in einem lackierten Motor. Das ist derselbe Wunsch wie am
+ * 12.09.2026: „Fluggasttreppe sagt nichts ueber das Material aus."
  */
-function hauptMaterial(item: GriffStueck): string {
-  const eigen = getMaterial(item.materialId).name;
-  if (!item.composition || item.composition.length === 0) return eigen;
-  let groesster = item.composition[0];
-  let summe = 0;
-  for (const c of item.composition) {
-    summe += c.massKg;
-    if (c.massKg > groesster.massKg) groesster = c;
-  }
-  if (groesster.materialId === item.materialId || summe <= 0) return eigen;
-  const anteil = Math.round((groesster.massKg / summe) * 100);
-  return `${eigen} · ${anteil} % ${getMaterial(groesster.materialId).name}`;
+const STOFFWORT: Record<string, string[]> = {
+  steel: ["stahl"],
+  va: ["va-", "edelstahl", "v2a"],
+  alu: ["alu"],
+  copper: ["kupfer"],
+  brass: ["messing"],
+  zinc: ["zink", "verzinkt"],
+  cable: ["kabel"],
+  battery: ["batterie", "akku"],
+  wood: ["holz", "bohlen"],
+  tires: ["reifen"],
+  plastic: ["kunststoff", "gfk"],
+  rubble: ["beton", "schutt"],
+};
+
+/**
+ * Nennt der Name den Stoff schon? Kleinschreibung, damit „Alutafel" und
+ * „ALU-RONDE" gleich behandelt werden.
+ */
+function nameNenntStoff(name: string, materialId: string): boolean {
+  const klein = name.toLowerCase();
+  return (STOFFWORT[materialId] ?? []).some((w) => klein.includes(w));
 }
 
 /**
@@ -51,7 +86,7 @@ function hauptMaterial(item: GriffStueck): string {
 export interface GriffStueck {
   materialId: string;
   massKg: number;
-  shape?: { name?: string };
+  shape?: { name?: string; zusammensetzung?: Array<{ materialId: string; anteil: number }> };
   composition?: Array<{ materialId: string; massKg: number }>;
 }
 
@@ -79,19 +114,54 @@ export interface GriffZeilen {
 }
 
 /**
+ * Wie ein Stueck in der Griff-Info heisst.
+ *
+ * Der Name aus dem Katalog, und wenn keiner da ist, die Fraktion. Seit alle
+ * Katalogstuecke Namen tragen (`world/scrapItems.ts`, E-061) greift der Ersatz
+ * nur noch bei Presspaketen und Wrackteilen.
+ */
+function stueckName(item: GriffStueck): string {
+  return item.shape?.name ?? getMaterial(item.materialId).name;
+}
+
+/**
+ * Name plus Fraktion, wenn die Fraktion etwas beitraegt.
+ *
+ * Die Entscheidung faellt `nameNenntStoff` und `ABFALL` (siehe oben bei
+ * `STOFFWORT`); hier steht nur noch, wie es gesetzt wird. Endet der Name
+ * selbst auf einer Klammer, trennt ein Mittelpunkt statt einer zweiten
+ * Klammer — „Wohnwagen-Kuehlschrank (Absorber) (Mischschrott)" liest sich wie
+ * ein Tippfehler.
+ */
+function mitFraktion(item: GriffStueck): string {
+  const name = stueckName(item);
+  if (!item.shape?.name) return name; // der Name IST schon die Fraktion
+  const id = normalizeMaterialId(item.materialId);
+  if (istAbfall(id) || nameNenntStoff(name, id)) return name;
+  const frak = getMaterial(id).name;
+  return name.endsWith(")") ? `${name} · ${frak}` : `${name} (${frak})`;
+}
+
+/**
  * Text fuer ein anvisiertes Stueck.
  *
- * Wortlaut unveraendert gegenueber dem 12.09.2026: Name zuerst, Material in
- * Klammern dahinter („Fluggasttreppe sagt nichts über das Material aus"),
- * dann Gewicht und Preis je Tonne. Es ist ein einzelnes Stueck, also eine
- * begrenzte Zeile — hier gibt es nichts zu kuerzen.
+ * `▼ Kühlschrank (Mischschrott) · 55 kg · 160 €/t €`
+ *
+ * Drei Aenderungen am 15.09.2026 (E-061), alle auf Ansage:
+ *
+ *  - **Die Prozente sind weg.** Dort stand „(Mischschrott · 34 % Kupfer)".
+ *    Patrick: „Dann sind mir die Anteile, zu wie viel Prozent das Mischschrott
+ *    ist, relativ egal."
+ *  - **Die Fraktion bleibt.** „Ich muss natuerlich sehen, was ich greife."
+ *  - **Bei eindeutigen Gegenstaenden faellt sie weg** — siehe `STOFFWORT`.
+ *
+ * Es ist ein einzelnes Stueck, also eine begrenzte Zeile — hier gibt es nichts
+ * zu kuerzen.
  */
 export function griffZiel(item: GriffStueck): GriffZeilen {
   const mat = getMaterial(item.materialId);
-  const name = item.shape?.name;
-  const kopf = name ? `${name} (${hauptMaterial(item)})` : hauptMaterial(item);
   return {
-    kopf: `▼ ${kopf} · ${masseText(item.massKg)} · ${preisProTonne(mat)} ${euroIndicator(mat)}`,
+    kopf: `▼ ${mitFraktion(item)} · ${masseText(item.massKg)} · ${preisProTonne(mat)} ${euroIndicator(mat)}`,
     liste: "",
   };
 }
@@ -102,10 +172,20 @@ export function griffZiel(item: GriffStueck): GriffZeilen {
  * Grosse Stuecke werden beim Namen genannt, kleine nach Fraktion
  * zusammengefasst (Wunsch 12.09.2026: „evtl. Listenbeschreibung einbauen, was
  * in Spinne liegt, zumindest fuer grosse Teile").
+ *
+ * **Ohne Zielhinweis seit E-061.** Hier stand „› ueber MISCHSCHROTT: ✓ passt".
+ * Patrick am 15.09.2026: „Ich brauche jetzt nicht die Info, ob ich das zum
+ * Mischschrott hinladen soll oder zum Stahlschrott. … Die Info brauche ich
+ * nicht, weil ich sehe es ja quasi, weil es gruen aufleuchtet auf dem Feld."
+ *
+ * Damit haengt die Abwurfentscheidung allein an der Ampel an der Mulde. Der
+ * Parameter `hover` bleibt in der Signatur: Die Zone wird weiterhin gemeldet
+ * (`ContainerManager.updateHover` faerbt daran das Schild), und wer die Zeile
+ * eines Tages zurueckwill, braucht dafuer keine Verdrahtung neu zu bauen.
  */
 export function griffLadung(
   items: GriffStueck[],
-  hover: { container: string; ampel: AmpelState } | null
+  _hover: { container: string; ampel: AmpelState } | null
 ): GriffZeilen {
   const byMat = new Map<string, number>();
   const gross: string[] = [];
@@ -114,8 +194,7 @@ export function griffLadung(
     total += it.massKg;
     const name = it.shape?.name;
     if (name && it.massKg >= GROSS_AB_KG && gross.length < GROSS_MAX) {
-      // Auch in der Ladungsliste: Name ohne Material sagt nichts.
-      gross.push(`${name} (${hauptMaterial(it)})`);
+      gross.push(mitFraktion(it));
       continue;
     }
     byMat.set(it.materialId, (byMat.get(it.materialId) ?? 0) + 1);
@@ -128,14 +207,7 @@ export function griffLadung(
   if (parts.length > gezeigt.length) gezeigt.push(`+${parts.length - gezeigt.length} weitere`);
   // Gewicht in den Kopf, nicht ans Ende der Aufzaehlung: Es ist die Zahl, nach
   // der man den Abwurf entscheidet, und darf nie mit abgeschnitten werden.
-  let kopf = `Greifer: ${masseText(total)}`;
-  if (hover) {
-    // Zielzone unter dem Greifer samt Bewertung — nicht das Material selbst
-    const verdict =
-      hover.ampel === "green" ? "✓ passt" : hover.ampel === "yellow" ? "! gemischt" : "✕ falsche Zone";
-    kopf += `  ›  über ${hover.container}: ${verdict}`;
-  }
-  return { kopf, liste: gezeigt.join(", ") };
+  return { kopf: `Greifer: ${masseText(total)}`, liste: gezeigt.join(", ") };
 }
 
 /**

@@ -110,17 +110,23 @@ describe("Was der Katalog daraus macht", () => {
    * Zahlen halten den Stand fest. Wandern sie, hat jemand den Katalog
    * umgebaut, und dann gehört die Bestandsaufnahme nachgezogen.
    */
-  it("280 erreichbare Einträge, davon 56 mit Stückliste", () => {
+  it("280 erreichbare Einträge, davon 55 mit Stückliste", () => {
     // 271 waren es bis E-042; neun massive Kleinteile sind dazugekommen
     // (Bremsscheibe, Bahnschwelle, Schienenabschnitt, Kurbelwelle …), weil
     // Patricks eigene Premium-Beispiele im Katalog fehlten.
+    //
+    // 56 waren es bis E-061. Die Couch hat ihre Stückliste verloren und ist
+    // damit Kunststoff statt Mischschrott — „eine Couch ist Müll, dann ist es
+    // kein VA" (Patrick, 15.09.2026). Eine Stückliste, die aus Sperrmüll eine
+    // Fraktion macht, die Geld bringt, ist rechnerisch richtig und sachlich
+    // falsch.
     expect(ALLE.length).toBe(280);
-    expect(ALLE.filter((s) => s.zusammensetzung).length).toBe(56);
+    expect(ALLE.filter((s) => s.zusammensetzung).length).toBe(55);
   });
 
-  it("von den 56 werden 54 zu Mischschrott, genau 2 bleiben sortenrein", () => {
+  it("von den 55 werden 53 zu Mischschrott, genau 2 bleiben sortenrein", () => {
     const mitZus = ALLE.filter((s) => s.zusammensetzung);
-    expect(mitZus.filter((s) => s.materialId === "mixed").length).toBe(54);
+    expect(mitZus.filter((s) => s.materialId === "mixed").length).toBe(53);
     const rein = mitZus.filter((s) => s.materialId !== "mixed").map((s) => s.name);
     expect(rein.sort()).toEqual(["Baggerlöffel", "Seecontainer 20 Fuß"]);
   });
