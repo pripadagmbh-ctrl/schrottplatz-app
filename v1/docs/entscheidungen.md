@@ -2544,3 +2544,104 @@ den Schirm:
    erzeugt, obwohl die Werkzeuge wieder laufen. Sie halten den Stand ihres
    Datums fest; neu gezeichnet wären sie eine Fälschung des Protokolls. Wer ein
    aktuelles Blatt braucht, erzeugt es unter neuem Datum.
+
+---
+
+### E-040 — Der Kabinenhub wird ein Schwenkwerk mit Mast hinter der Kabine (15.09.2026)
+
+**Entscheidung.** Der Kabinenhub wird als **Mast hinter der Kabine** gebaut:
+Drehpunkt (y 2,213 | z −0,894), 1,858 m über dem Deck, zwei Lenker von 1,88 m
+auf einer gemeinsamen Welle, und **ein** echter Zylinder, der über einen
+0,42-m-Hebel auf dieselbe Welle drückt. Die Motorhaube bekommt dafür eine nach
+vorn offene Aussparung (7,4 % ihres Rauminhalts); Hydrauliktank und Ölkühler
+rücken hinter den Mast. Damit ist das achte und letzte Paket von E-025 gebaut.
+
+**Begründung.** Der bisherige Hub war **mechanisch unmöglich** (E-025, Befund 2):
+Hubverhältnis 5,18 : 1, ein 1,10-m-Rohr in einem 0,65-m-Spalt, und zwei
+„Parallelogramm-Lenker", die um Faktor 4,8 gedehnt wurden. Patrick hat die
+Bauform am 15.09.2026 am Bild entschieden, gegen die Alternative „Lenker vor der
+Kabine".
+
+**Der Drehpunkt ist nicht gewählt, er folgt.** Aus Lenkerlänge 1,88 m, Hub
+2,60 m, Vorlauf 0,34 und dem **unveränderten** Anlenkpunkt (y 0,50 | z −0,12)
+ergeben sich genau zwei Lösungen; die hintere ist diese. Über den Hebel fällt
+das Hubverhältnis von 5,18 : 1 auf **1,47 : 1** — dieselbe Größenordnung wie
+beim Hubzylinder des Auslegers (1,49). Aus zwei unmöglichen Zylindern ist einer
+geworden, der es kann.
+
+**Die Bahn des Augpunkts.** Senkrecht ist sie in jeder Stellung identisch
+(3,28 m + Hub). Waagerecht weicht sie ab — immer nach vorn, nie nach hinten:
+
+| Hub | heute z | neu z | Δ |
+|---|---|---|---|
+| 0,00 | 0,200 | **0,200** | **0,000** |
+| 0,60 | 0,404 | 0,941 | 0,537 |
+| **1,20** | 0,608 | 1,235 | **0,627** ← größte |
+| 1,80 | 0,812 | 1,304 | 0,492 |
+| 2,60 | 1,084 | **1,084** | **0,000** |
+
+**Unten und oben stimmt es auf unter einen Millimeter.** Dazwischen schiebt es
+auf halbem Weg 0,63 m nach vorn — das ist die „0,60 m", die im Konzept stand,
+und der einzige Punkt, an dem dieses Paket das Spielgefühl berührt.
+
+**Null Durchdringungen des Kabineninnenraums**, über 861 abgetastete Stellungen
+nachgewiesen. Zum Beleg, dass der Prüfer wirklich prüft, wurde die verworfene
+Variante durchgerechnet: **186 von 861**. Die härtere Probe mit den echten
+Eckpunkten aller bewegten Netze gegen Haube, Tank, Geländer und Auspuff findet
+ebenfalls keine — engste Stelle **17 mm** zwischen Lenker und Kabinenbodenblech
+in der untersten Stellung.
+
+**Zwei Erwartungen trafen nicht ein, beide zugunsten der Sache.**
+
+1. **Das Geländer braucht keine Umleitung.** Die Aussparung endet bei x −0,80,
+   die Fußplatte des Geländerpfostens beginnt bei −1,03 — 23 cm Blech
+   dazwischen. Der Mast kreuzt das Geländer nur oberhalb des Handlaufs (14 cm
+   Luft). Die Zahl steht jetzt als Wächter im Test: Wer die Aussparung breiter
+   schneidet, fällt auf.
+2. **Die Aussparung ist keine Eckausnehmung geworden.** „Vordere linke Ecke"
+   hätte 0,61 m³ gekostet (15,6 % statt 7,4 %), drei Lüftungslamellen in der
+   Luft hängen lassen und **dem vorderen Geländerpfosten den Boden weggenommen**.
+   Gebaut ist die kleinere Nische. Bei abgesenkter Kabine ist sie von außen
+   vollständig verdeckt.
+
+**Das Netzziel aus E-025 ist erreicht: 59 → 57.** Zeichenrufe 89 → 86. Die
+Hubwerksrechnung kostet dabei **18 % weniger** als vorher (0,868 → 0,714 ms je
+Bild), weil nichts mehr gedehnt wird.
+
+**`test/zylinder.test.ts` führt den Kabinenhub nicht mehr als Ausnahme.** Er war
+bis heute die einzige benannte Ausnahme von der Regel „kein `scale` auf Rohr oder
+Stange". Die Ausnahme ist weg.
+
+**Verworfene Alternativen.** Drehpunkt **vor** der Kabine (186 von 861
+Durchdringungen, und der Zylinder lässt sich gar nicht erst bauen — die
+Bauteilfunktion wirft „Rohr hat die Länge −0,054 m"). Aussparung als echte
+Eckausnehmung. Zylinder direkt am Lenker statt am Hebel (über 2 : 1, wieder
+nichts für einen einstufigen Zylinder). Zweites Lenkerpaar — siehe offen.
+
+**Offen.**
+
+1. **Ein Lenkerpaar, nicht zwei.** Das Konzept nannte zwei; gebaut ist eines —
+   genau das, was auf dem Bild stand, das Patrick entschieden hat. Die Kabine
+   bleibt waagerecht, weil der Quelltext sie waagerecht hält, nicht weil die
+   Mechanik es erzwingt. Das war vorher genauso.
+2. **Die äußere Mastsäule ragt 8,5 cm über die Deckkante.** Sie bleibt 20 cm
+   innerhalb der Radaußenkanten und wird nie das breiteste Teil der Maschine.
+   Ob sie stört, entscheidet das Bild.
+3. **Nachbarbefund, nicht von diesem Paket:** Bei angehobener Kabine und
+   aufgerichtetem Ausleger schneidet die Achse der **Hubzylinder des Auslegers**
+   den Umriss der Kabine. Gemessen ist der Wert auf der alten geraden und auf
+   der neuen Bogenbahn **exakt gleich** — dieses Paket macht es weder besser
+   noch schlechter.
+
+**Auf dem Gerät zu prüfen — ausdrücklich in der Kabine (Taste C).**
+
+1. Kabine unten, durch die Fußscheibe auf den Greifer schauen: Sieht es aus wie
+   gestern? Daran darf sich nichts geändert haben.
+2. In der Kabine bleiben und hochfahren, geradeaus schauen. Auf halbem Weg
+   schiebt es dich 0,63 m nach vorn und wieder zurück. **Nach Maschine oder nach
+   Schaukel?** Hier gilt „so" oder „zurück".
+3. Oben stehen bleiben und einen Träger sortieren: Steht das Bild da, wo du es
+   kennst?
+4. In der Außenansicht die Kabine hoch- und runterfahren: Stört der Pfosten an
+   der Deckkante? Sieht man die Aussparung in der Haube, wenn die Kabine oben
+   ist?
