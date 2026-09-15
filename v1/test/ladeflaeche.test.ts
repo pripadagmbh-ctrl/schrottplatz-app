@@ -1,5 +1,5 @@
 /**
- * BLECH UND KOLLIDER DER LADEFLÄCHE LIEGEN AUF DERSELBEN HÖHE (E-051).
+ * BLECH UND KOLLIDER DER LADEFLÄCHE LIEGEN AUF DERSELBEN HÖHE (E-051, E-071).
  *
  * Befund Patrick, 15.09.2026: „Teile fallen immer noch beim Kippen durch die
  * Ladefläche."
@@ -43,7 +43,12 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { FLAECHE_KOLLIDER_OBEN } from "../src/delivery/vehicleModel";
+import {
+  FLAECHE_KOLLIDER_OBEN,
+  BRUECKE_DICKE_VORN,
+  brueckenKeilEcken,
+} from "../src/delivery/vehicleModel";
+import { BED_HALF_W, bedLenFor } from "../src/delivery/routes";
 
 const quelle = (datei: string): string =>
   readFileSync(resolve(__dirname, "..", "src", "delivery", datei), "utf8");
@@ -51,21 +56,77 @@ const quelle = (datei: string): string =>
 /** Dicke des sichtbaren Blechs (`vehicleModel`: BoxGeometry(bedW, 0.12, bedLen)). */
 const BLECH_DICKE = 0.12;
 
+/** Laenge der Kipper-Ladeflaeche (Quelle: `routes.BED_LEN`). */
+const BED_LEN = bedLenFor("kipper");
+
 describe("Ladefläche: Blech und Kollider", () => {
-  it("die Kollideroberkante steht dort, wo `vehicles.ts` sie baut", () => {
+  it("die Kollideroberkante ist waagerecht und liegt auf der Flaechenhoehe", () => {
     /*
-     * `vehicles.ts` legt den Boden als Quader mit Halbhöhe 0,30 auf −0,26 an.
-     * Oberkante also −0,26 + 0,30 = +0,04. Die Abschrift in `vehicleModel.ts`
-     * muss dasselbe sagen — sonst sitzt das Blech beim nächsten Umbau wieder
-     * daneben.
+     * SEIT E-071 IST DIE BRÜCKE EIN KEIL, KEIN QUADER. Hier stand eine
+     * Abschrift-Prüfung per Textsuche auf `cuboid(halfW, 0.30, …)`; die geht
+     * jetzt nicht mehr und wäre auch die schwächere Prüfung. Gefragt wird
+     * stattdessen die Funktion selbst, aus der `vehicles.ts` den Kollider baut.
+     *
+     * Geprüft wird die Eigenschaft, auf der alles andere aufsetzt: Die
+     * DECKFLÄCHE ist über die ganze Länge waagerecht und liegt genau auf
+     * `FLAECHE_KOLLIDER_OBEN`. Kippt sie, sinkt die Ladung an einem Ende ein.
      */
-    const v = quelle("vehicles.ts");
-    const m = v.match(/cuboid\(halfW,\s*([\d.]+),\s*this\.bedLen \/ 2\)\.setTranslation\(0,\s*(-?[\d.]+),/);
-    expect(m, "der Bodenquader steht nicht mehr da, wo dieser Wächter ihn sucht").toBeTruthy();
-    const halbHoehe = Number(m![1]);
-    const mitte = Number(m![2]);
-    expect(Number.isFinite(halbHoehe) && Number.isFinite(mitte), "NaN aus dem Quelltext").toBe(true);
-    expect(mitte + halbHoehe, "Kollideroberkante").toBeCloseTo(FLAECHE_KOLLIDER_OBEN, 10);
+    const ecken = brueckenKeilEcken(BED_HALF_W, BED_LEN);
+    const ys: number[] = [];
+    for (let i = 0; i < ecken.length; i += 3) ys.push(ecken[i + 1]!);
+    // Float32Array: auf sechs Nachkommastellen genau, mehr gibt einfache
+    // Genauigkeit nicht her (0,04 wird zu 0,039999999).
+    const oben = ys.filter((y) => Math.abs(y - FLAECHE_KOLLIDER_OBEN) < 1e-6);
+    expect(oben.length, "die Deckflaeche hat nicht vier Ecken auf einer Hoehe").toBe(4);
+    expect(Math.max(...ys), "hoechster Punkt der Bruecke").toBeCloseTo(FLAECHE_KOLLIDER_OBEN, 6);
+  });
+
+  it("die Bruecke laeuft nach hinten auf die Blechdicke aus", () => {
+    /*
+     * Der Kern von E-071 als Geometrie: Am Drehpunkt (lokal z 0) ist der
+     * Kollider genau so dick wie das sichtbare Blech — dort, wo er beim Kippen
+     * unter die Brücke schwenkt. Vorn an der Kabine bleibt er dick, damit der
+     * Spalt zum Rahmen zu ist.
+     */
+    const ecken = brueckenKeilEcken(BED_HALF_W, BED_LEN);
+    const tiefstesBei = (z: number): number => {
+      let y = Number.POSITIVE_INFINITY;
+      for (let i = 0; i < ecken.length; i += 3) {
+        if (Math.abs(ecken[i + 2]! - z) < 1e-6) y = Math.min(y, ecken[i + 1]!);
+      }
+      return y;
+    };
+    expect(FLAECHE_KOLLIDER_OBEN - tiefstesBei(0), "Dicke am Heck").toBeCloseTo(BLECH_DICKE, 6);
+    expect(FLAECHE_KOLLIDER_OBEN - tiefstesBei(BED_LEN), "Dicke an der Kabine").toBeCloseTo(
+      BRUECKE_DICKE_VORN,
+      6
+    );
+    /*
+     * Und die Unterkante darf den Rahmen nicht berühren: `chassisBody` ist ein
+     * Quader der Halbhöhe 0,185 auf y 0,265 in Fahrzeugkoordinaten, seine
+     * Oberkante liegt auf 0,45. Die Ladefläche hängt auf 1,05, in ihren
+     * Koordinaten also auf −0,60. Zwei kinematische Körper, die sich
+     * überschneiden, klemmen die Ladung ein (E-029) — das war der Befund vom
+     * 13.09.2026 und darf nicht zurückkommen.
+     */
+    const RAHMEN_OBEN = 0.45 - 1.05;
+    expect(tiefstesBei(BED_LEN), "Bruecke sitzt auf dem Rahmen auf").toBeGreaterThan(RAHMEN_OBEN);
+    expect(tiefstesBei(0), "Bruecke sitzt am Heck auf dem Rahmen auf").toBeGreaterThan(RAHMEN_OBEN);
+  });
+
+  it("GEGENPROBE: eine schiefe Deckflaeche wird gemeldet", () => {
+    /*
+     * Derselbe Prüfgedanke auf einen absichtlich kaputten Eingang: Wenn die
+     * Brücke auch OBEN keilförmig wäre, dürfte die erste Prüfung nicht mehr
+     * grün sein. `brueckenKeilEcken` kann so etwas gar nicht bauen — also wird
+     * die Eckenliste von Hand verbogen.
+     */
+    const ecken = Array.from(brueckenKeilEcken(BED_HALF_W, BED_LEN));
+    ecken[1 + 3 * 4] = FLAECHE_KOLLIDER_OBEN + 0.2; // eine vordere Oberkante anheben
+    const ys: number[] = [];
+    for (let i = 0; i < ecken.length; i += 3) ys.push(ecken[i + 1]!);
+    const oben = ys.filter((y) => Math.abs(y - FLAECHE_KOLLIDER_OBEN) < 1e-6);
+    expect(oben.length, "die verbogene Deckflaeche wird nicht bemerkt").not.toBe(4);
   });
 
   it("die Oberkante des Blechs liegt genau darauf, nicht darüber", () => {

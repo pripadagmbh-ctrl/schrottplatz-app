@@ -13,6 +13,81 @@ import { BED_HALF_W } from "./routes";
 export const FLAECHE_KOLLIDER_OBEN = 0.04;
 
 /**
+ * DIE KIPPBRÜCKE IST EIN KEIL, KEIN QUADER (E-071).
+ *
+ * Bis zum 15.09.2026 war der Kollider der Ladefläche ein Quader von 0,60 m
+ * Dicke unter einem 0,12 m dünnen Blech. Beim Kippen dreht die Brücke um ihre
+ * HINTERE Kante; die Rückwand dieses Quaders — 0,60 m hoch, 0,00 m vom
+ * Drehpunkt entfernt — beschreibt dabei einen Kreissektor UNTER der Brücke:
+ *
+ *     Vorlauf der Unterkante nach vorn  =  Dicke × sin(Kippwinkel)
+ *     Bei 0,60 m und 58°                =  0,509 m
+ *     überstrichene Fläche              =  ½ × Dicke² × Winkel  =  0,182 m²
+ *
+ * Alles, was in diesem Sektor liegt — Material, das über die Heckkante
+ * gerutscht ist und noch fällt —, wird von der aufschwenkenden Unterkante nach
+ * vorn und oben geschaufelt. Die Fläche geht mit dem QUADRAT der hinteren
+ * Dicke; das ist der Grund, warum ein dickerer Quader schlechter ist, und die
+ * Rechnung dahinter, dass es keilförmig sein muss und nicht nur dünn.
+ *
+ * DIE BEIDEN MASSE SIND NICHT GEWÄHLT, SONDERN ABGELEITET:
+ *
+ *   HINTEN 0,12 m — genau die Dicke des sichtbaren Blechs (`BoxGeometry(bedW,
+ *     0,12, bedLen)` weiter unten in dieser Datei). Dünner darf der Kollider
+ *     nicht sein, sonst steht das Blech unten aus ihm heraus und die Ladung
+ *     sinkt sichtbar ein; dicker muss er nicht sein. Zugleich ist 0,12 m über
+ *     der Grenze, unter der dünne Platten in Rapier unzuverlässig greifen
+ *     (v2-Lehre „Bleche mit Mindestdicke").
+ *   VORN 0,60 m — unverändert. Die Unterkante liegt damit vorn weiter auf
+ *     −0,56, also 4 cm über dem Rahmen (`chassisBody`, Oberkante lokal −0,60).
+ *     Es entsteht keine neue Überschneidung zweier kinematischer Körper, und
+ *     der Spalt zum Rahmen wird nach hinten größer statt kleiner.
+ *
+ * Damit schwenkt die Hinterkante nur noch 0,12 × sin 58° = 0,102 m vor, und
+ * der überstrichene Sektor schrumpft von 0,182 auf 0,0073 m² — auf 4 %.
+ *
+ * Keilneigung: (0,60 − 0,12) / 6,00 = 0,08, also 4,57°.
+ */
+export const BRUECKE_DICKE_VORN = 0.6;
+export const BRUECKE_DICKE_HINTEN = 0.12;
+
+/**
+ * Die keilförmige Kippbrücke als konvexe Hülle (acht Ecken).
+ *
+ * Deckfläche waagerecht auf `FLAECHE_KOLLIDER_OBEN` über die ganze Länge, die
+ * Unterseite von `hinten` am Drehpunkt (lokal z 0) auf `vorn` an der Kabine
+ * (lokal z = `bedLen`). Beide Dicken werden VON DER LADEFLÄCHE NACH UNTEN
+ * gemessen.
+ */
+export function brueckenKeilEcken(
+  halfW: number,
+  bedLen: number,
+  vorn = BRUECKE_DICKE_VORN,
+  hinten = BRUECKE_DICKE_HINTEN
+): Float32Array {
+  const o = FLAECHE_KOLLIDER_OBEN;
+  return new Float32Array([
+    // Heck (z = 0), Drehpunkt
+    -halfW, o, 0, halfW, o, 0, -halfW, o - hinten, 0, halfW, o - hinten, 0,
+    // Kabinenseite (z = bedLen)
+    -halfW, o, bedLen, halfW, o, bedLen, -halfW, o - vorn, bedLen, halfW, o - vorn, bedLen,
+  ]);
+}
+
+/**
+ * Wie weit die Unterkante der Brücke beim Kippen nach vorn schwenkt (m).
+ * Genau das Maß, das die Ladung unter der Brücke aufschaufelt.
+ */
+export function heckVorlauf(dickeHinten: number, kippwinkelRad: number): number {
+  return dickeHinten * Math.sin(kippwinkelRad);
+}
+
+/** Fläche, die die Rückwand der Brücke beim Kippen unter sich überstreicht (m²). */
+export function heckSektor(dickeHinten: number, kippwinkelRad: number): number {
+  return 0.5 * dickeHinten * dickeHinten * kippwinkelRad;
+}
+
+/**
  * Modellbau der Anlieferfahrzeuge.
  *
  * Hier entsteht, was man sieht: Fahrerhaus, Ladefläche, Bordwände,

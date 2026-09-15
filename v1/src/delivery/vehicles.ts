@@ -65,7 +65,7 @@ import {
   type Fahrerlage,
   type CustomerProfile,
 } from "./customers";
-import { buildVehicleModel, wandHoehe, type Rad } from "./vehicleModel";
+import { buildVehicleModel, wandHoehe, brueckenKeilEcken, type Rad } from "./vehicleModel";
 import { Federung, federungsDatenFuer } from "./federung";
 import {
   ANHAENGER_HALB_BREITE,
@@ -869,10 +869,26 @@ class DeliveryVehicle {
     // Ladefläche: Boden + Wände. Innenbreite MUSS über dem breitesten Großteil
     // liegen (Blechtafel 1,9 m), sonst klemmt die Ladung und die Physik explodiert.
     const halfW = BED_HALF_W;
-    world.createCollider(
-      RAPIER.ColliderDesc.cuboid(halfW, 0.3, this.bedLen / 2).setTranslation(0, -0.26, this.bedLen / 2),
-      this.bedBody
-    );
+    /*
+     * DIE BRÜCKE IST EIN KEIL, KEIN QUADER (E-071).
+     *
+     * Hier stand `cuboid(halfW, 0.3, bedLen/2)` auf −0,26: ein 0,60 m dicker
+     * Block unter einem 0,12 m dünnen Blech. Beim Kippen dreht die Brücke um
+     * ihre hintere Kante, und die 0,60 m hohe Rückwand dieses Blocks schwenkt
+     * dabei 0,60 × sin 58° = 0,51 m nach vorn UNTER die Brücke — genau durch
+     * den Raum, durch den die abrutschende Fuhre fällt. Die überstrichene
+     * Fläche geht mit dem Quadrat der hinteren Dicke.
+     *
+     * Der Keil läuft nach hinten auf die Blechdicke aus (0,12 m): Vorlauf
+     * 0,10 m statt 0,51 m, überstrichener Sektor 0,0073 statt 0,182 m².
+     * Herleitung und Maße stehen bei `brueckenKeilEcken` in `vehicleModel.ts`.
+     *
+     * Vorn bleibt es bei 0,60 m — die Unterkante liegt dort weiter auf −0,56
+     * und damit 4 cm über dem Rahmen; nach hinten wächst der Abstand.
+     */
+    const keil = RAPIER.ColliderDesc.convexHull(brueckenKeilEcken(halfW, this.bedLen));
+    if (!keil) throw new Error("Kippbruecke: konvexe Huelle nicht baubar");
+    world.createCollider(keil, this.bedBody);
     // Abhol-LKW trägt einen hohen Container, damit geladenes Material hält
     const wh = kind === "abholer" ? 1.25 : 0.32;
     // Seitenwände sind eigene bewegliche Körper (siehe buildMeshes) — hier nur
@@ -1568,6 +1584,56 @@ class DeliveryVehicle {
       if (r.body.isValid()) r.body.setBodyType(RAPIER.RigidBodyType.Dynamic, true);
     }
     this.riding = [];
+    this.meldeMuldeNeuAn();
+  }
+
+  /**
+   * DIE KOLLIDER DER MULDE NEU ANMELDEN — der eigentliche Fund zu E-071.
+   *
+   * Befund 15.09.2026, gemessen Bild für Bild: In dem Augenblick, in dem die
+   * Mulde zu kippen anfing, fiel die GANZE Fuhre durch den Muldenboden hindurch
+   * auf den Hof. Kein Katapult, kein Schaufeln — die Stücke waren im freien
+   * Fall, Bild für Bild genau 9,81 m/s², und die Strahlprobe zeigte sie mitten
+   * IM Kollider. Das ist Patricks Meldung „Teile fallen beim Kippen durch die
+   * Ladefläche", wörtlich und messbar. Der Katapult war die Folge: Was unter
+   * der Brücke landet, wird von der aufschwenkenden Unterkante wieder
+   * herausgedrückt.
+   *
+   * WORAN ES LIEGT, EINGEGRENZT MIT EINEM SCHALTER NACH DEM ANDEREN
+   * (`tools/kipper-messreihe.ts`, gepaart über dieselben Ladungen):
+   *
+   *   CCD an/aus, Rahmen weg, Bordwände weg, ein Stück statt vierzehn,
+   *   Quader statt Bruchstück-Hülle, Reibung, Dämpfung, Solverwerte,
+   *   ein FRISCHER Ladungskörper                    ändern NICHTS
+   *   Kippen zehnmal langsamer                      hält
+   *   IRGENDEIN Kollider der MULDE angefasst
+   *   (`setEnabled`, `setHalfExtents`, `setTranslationWrtParent`)   hält
+   *
+   * Es ist also die Paarung zwischen Muldenkollider und Ladung, und sie ist
+   * genau dann kaputt, wenn sie entstanden ist, WÄHREND beide Körper
+   * kinematisch waren: Auf der Fahrt ist die Fuhre an die Mulde verriegelt
+   * (`lockToBed`), kinematisch gegen kinematisch — dafür rechnet Rapier keine
+   * Berührungen. Wird die Ladung am Halt wieder dynamisch, trägt die Mulde sie
+   * zwar (sie liegt ruhig), aber sobald sich die Mulde BEWEGT, ist die Paarung
+   * weg. Ein Kollider anzufassen setzt in Rapier sein Änderungskennzeichen; er
+   * wird aus der Grobsuche genommen und neu eingetragen, und die Paarung
+   * entsteht sauber neu.
+   *
+   * ES MUSS FRÜH GENUG PASSIEREN. Beim Übergang nach `tipping` gesetzt wirkt es
+   * NICHT (gemessen) — ein frisch eingetragener Kollider braucht ein paar
+   * Schritte, bis die Berührung steht. Hier, beim Freigeben, liegen 1,2 s
+   * dazwischen; das reicht mit großem Abstand.
+   *
+   * Der Preis: nichts. Zwei Kollider werden einmal je Fuhre neu eingetragen.
+   */
+  private meldeMuldeNeuAn(): void {
+    if (!this.bedBody.isValid()) return;
+    for (let i = 0; i < this.bedBody.numColliders(); i++) {
+      const c = this.bedBody.collider(i);
+      if (!c.isEnabled()) continue;
+      c.setEnabled(false);
+      c.setEnabled(true);
+    }
   }
 
   /**

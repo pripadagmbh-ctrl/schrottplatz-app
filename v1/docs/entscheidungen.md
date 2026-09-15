@@ -4418,3 +4418,158 @@ Zeile im HUD (`shift.statusText`), für die Zahlungsunfähigkeit nichts;
 3. Ob ein Anlieferer, der nie abgeladen wird, nach einer Standzeit selbst
    abfährt. `waitUnload` hat keine Frist; im kopflosen Lauf stand eine Pritsche
    10 Minuten und hielt eine vorgemerkte Abholung auf.
+
+### E-071 — Der Kipper-Katapult: die Fuhre fiel durch die Brücke, und der Löser schoss sie heraus (15.09.2026)
+
+**Der Fehler, den Patrick seit dem 13.09. meldet, ist gefunden und behoben.**
+Seine drei Sätze dazu waren alle wörtlich richtig und beschrieben denselben
+Vorgang: „Teile fallen beim Kippen durch die Ladefläche", „das Material bleibt
+auf dem Chassis und taucht unter der Ladefläche", „beim Kippen sind Teile ganz
+woanders auf dem Platz gelandet, nicht mal in der Nähe vom LKW".
+
+**Der Auftrag war eine keilförmige Brücke. Die war es nicht.** Patrick hat den
+Auftrag verworfen, und das war richtig: „Der Kipper macht ja eigentlich nur was
+relativ Einfaches, der kippt die flache Fläche so, und da müsste die Schwerkraft
+einfach einsetzen … Und wenn der Kipper dazu führt, dass Teile einfach
+eintauchen — und so schnell ist der Kipper gar nicht —, dann stimmt da ja was
+grundlegend nicht."
+
+**DIE ENERGIERECHNUNG, die das entscheidet, bevor man irgendetwas baut.** Die
+Brücke braucht 4,2 s für 58°. Ihre Oberfläche bewegt sich dabei mit höchstens
+0,241 rad/s × 6,0 m = 1,45 m/s; ganz aufgerichtet liegt ihr höchster Punkt
+1,05 + 6,0 × sin 58° = 6,14 m über dem Boden. Mehr als
+√(2 · 9,81 · 6,14) + 1,45 = 12,4 m/s — 45 km/h, 60 Joule je Kilogramm — kann ein
+Stück aus diesem Vorgang nicht mitnehmen. Gemessen waren 585 km/h: 162 m/s,
+13.200 Joule je Kilogramm. **Faktor 220.** Wo eine Bewegung das Zweihundertfache
+ihres eigenen Energieinhalts abgibt, ist nicht die Form schuld.
+
+**WAS BILD FÜR BILD ZU SEHEN IST.** Ein Stück liegt ruhig auf der Brücke
+(Weltlage y 1,163, Oberkante des Kolliders 1,051, Geschwindigkeit 0,01 m/s). In
+dem Bild, in dem `tipping` beginnt, fällt es los — und zwar im **freien Fall**,
+Bild für Bild genau 9,81 m/s², durch den 0,60 m dicken Muldenboden hindurch.
+Eine Strahlprobe nach unten trifft dabei den Muldenkollider in 0,000 m Abstand:
+Das Stück ist mitten IM Kollider, und der Kollider ist eingeschaltet, kein
+Sensor, an seinem Platz. Nach 0,45 s liegt die ganze Fuhre — alle vierzehn
+Stücke — unter dem LKW auf dem Hof. Was auf dem Weg nach unten wieder gefasst
+wird, drückt der Löser mit einem einzigen Stoß heraus: gemessen −65,7 m/s an
+einem Stück, das 0,37 m tief steckte. **Das ist der Katapult: nicht das Kippen,
+sondern die Entdurchdringung.**
+
+**WORAN ES LIEGT — mit einem Schalter nach dem anderen eingegrenzt, jeder
+gepaart über dieselben Ladungen:**
+
+| Schalter | Wirkung |
+|---|---|
+| CCD an/aus (Mulde, Ladung) | keine |
+| Rahmen weg, Bordwände weg | keine |
+| ein Stück statt vierzehn | keine |
+| Quader statt Bruchstück-Hülle, Reibung 0,5 statt 2,2, Dämpfung | keine |
+| ein **frischer Ladungskörper** | keine |
+| `m.update` überspringen, Mulde selbst drehen | keine |
+| Kippen **zehnmal langsamer** | hält |
+| **irgendeinen Kollider der Mulde anfassen** (`setEnabled`, `setHalfExtents`, `setTranslationWrtParent`) | **hält** |
+
+Es ist also die **Paarung zwischen Muldenkollider und Ladung**, und sie ist
+genau dann kaputt, wenn sie entstanden ist, während beide Körper kinematisch
+waren. Auf der Fahrt ist die Fuhre an die Mulde verriegelt (`lockToBed`) —
+kinematisch gegen kinematisch, dafür rechnet Rapier keine Berührungen. Wird die
+Ladung am Halt wieder dynamisch, trägt die Mulde sie zwar (sie liegt ruhig),
+aber sobald sich die Mulde **bewegt**, ist die Paarung weg. Einen Kollider
+anzufassen setzt in Rapier sein Änderungskennzeichen: Er wird aus der Grobsuche
+genommen und neu eingetragen, und die Paarung entsteht sauber neu.
+
+**Nachweis, dass es genau daran liegt und nicht am Zeitpunkt:** Der Eingriff
+gleich nach dem Erzeugen wirkt **nicht** (die Fuhre ist dann noch kinematisch),
+beim Übergang nach `reverseIn` **nicht**, beim Freigeben der Ladung **ja**, beim
+Übergang nach `tipping` wieder **nicht** — ein frisch eingetragener Kollider
+braucht ein paar Schritte, bis die Berührung steht. Und eine synthetische
+Nachstellung (kinematische Platte, dynamischer Klotz, gleiche Maße, gleicher
+Ort, 1.400 Schritte Vorlauf, Typwechsel nachgespielt) erzeugt den Fehler
+**nicht** — er hängt an der Vorgeschichte dieses Kolliders, nicht an der
+Geometrie.
+
+**DIE REPARATUR SIND ZEHN ZEILEN** (`vehicles.meldeMuldeNeuAn`, gerufen aus
+`releaseCargo`): Beim Freigeben der Ladung werden die Kollider der Mulde einmal
+ab- und wieder angeschaltet. Bis zum Kippen liegen 1,2 s; das reicht mit großem
+Abstand. Kosten: zwei Kollider-Einträge je Fuhre.
+
+**GEMESSEN, gewürfelte Händlerfuhre aus `rollCustomer()`, 24 Saaten, ganzer
+Zyklus, nur dynamische Körper:**
+
+| | Mittel | Median | Höchst | fällt durch | bleibt liegen | Endlage Mittel/Max |
+|---|---|---|---|---|---|---|
+| vorher | 147 | 123 | 430 km/h | 86 % | 4 % | 2,7 / **27,0 m** |
+| nachher | **29** | **19** | **106 km/h** | **0 %** | 31 % | 3,1 / **5,8 m** |
+
+Über 10 m vom LKW entfernt lagen vorher 8 von 265 Stücken, jetzt **keines**.
+Damit ist auch Patricks „Teile sind ganz woanders gelandet" beantwortet: Sie
+sind nicht versetzt worden, sie sind geflogen — 430 km/h sind 119 m/s, der Platz
+ist 70 m lang.
+
+**DER KEIL IST TROTZDEM GEBAUT — und er bringt nichts gegen den Katapult.**
+Über 24 Saaten gepaart gegen den alten Quader: +6 ± 13 km/h bei der Prüfladung,
+−37 ± 31 bei der Händlerfuhre, besser in 14 bzw. 12 von 24. **Das ist Rauschen.**
+Er steht aus einem anderen, eigenen Grund da: Der alte Quader war 0,60 m dick
+unter einem 0,12 m dünnen Blech — die Kollisionsfläche lag einen halben Meter
+tiefer als das, was das Auge sieht. Am Heck folgt der Keil jetzt genau dem Blech
+(0,12 m), vorn bleibt er bei 0,60 m, damit der Spalt zum Rahmen zu bleibt
+(Unterkante −0,56, Rahmen −0,60). Nebenbei schwenkt seine Hinterkante beim
+Kippen nur noch 0,12 × sin 58° = 0,102 m statt 0,509 m nach vorn, und der Sektor,
+den sie unter sich überstreicht, schrumpft von 0,182 auf 0,0073 m². Herleitung
+steht bei `brueckenKeilEcken` in `vehicleModel.ts`. **Wenn er stört, kann er
+zurück** — die Reparatur hängt nicht an ihm.
+
+**DER WÄCHTER IST UMGESTELLT** (offener Punkt 12, erledigt). `test/kipper.test.ts`
+fuhr eine milde feste Prüfladung (5.000 kg, Füllgrad 0,60) und hielt 155/500
+km/h, während derselbe Apparat mit der gewürfelten Händlerfuhre 159/585 maß —
+über der eigenen Schranke. Er war grün und das Spiel kaputt. Jetzt fährt er die
+Fuhre, die das Spiel würfelt (`spielFuhre()` über `rollCustomer()`), prüft vier
+Eigenschaften statt einer (nicht durchfallen, nicht schleudern, in der Nähe
+liegen bleiben, Brücke wird frei) und **jede Schranke hat eine Gegenprobe**:
+Drei davon werfen denselben Prüfcode auf eine von Hand verbogene Reihe, die
+vierte fährt dieselben Fuhren mit körperlos geschalteter Brücke und verlangt,
+dass der Durchfall gemeldet wird. Der Laufapparat steht jetzt einmal da
+(`test/kipperlauf.ts`), Wächter und `tools/kipper-messreihe.ts` benutzen ihn —
+das war die Lehre aus E-062.
+
+**WAS NICHT BEHOBEN IST, ZWEI DINGE, BEIDE GEMESSEN:**
+
+1. **31 % der Fuhre bleiben auf der Brücke liegen** (vorher 4 %, aber nur, weil
+   86 % vorher durchfielen). Das ist kein Physikfehler, sondern eine Rechnung:
+   Schrott hat Reibung 2,2 (Regel MAX, „Schrott verhakt sich", `scrapItems.ts`),
+   der Kipper hebt auf 58°, und tan 58° = 1,60 < 2,2. **Eine ruhende Fuhre
+   rutscht auf dieser Neigung rechnerisch überhaupt nicht.** Was herunterkommt,
+   kommt durch Kollern, Nachrutschen und das gekippte Anziehen herunter. Zwei
+   Hebel, beide Gestaltungsfragen: steiler kippen (über 65,6° rutscht es von
+   selbst) oder die Reibung senken (trifft den ganzen Haufen).
+2. **Der LKW legt seine Ausrichtung in EINEM Schritt um bis zu 168,7° um**
+   (gemessen am Wechsel `shiftPause` → `reverseIn`; an jeder Ecke der
+   Fahrstrecke sind es 45–65°). `placeAt` setzt `group.rotation.y` hart auf die
+   Streckenrichtung. Ein an die Mulde verriegeltes Stück in 3 m Abstand legt
+   dabei rund 6 m in einem Bild zurück; Rapier leitet daraus über 1.000 km/h ab.
+   Solange nichts im Weg liegt, ist das folgenlos. Liegt aber schon Schrott da,
+   wird er getroffen: Ein zweiter Kipper über die Fuhre des ersten gefahren,
+   12 Saaten — **6.596 km/h Höchstwert und bis zu 9,3 m Verschiebung an Material,
+   das ruhig dalag**, Spitze in `reverseIn` (7 von 12) und `settleCargo` (5 von
+   12). Das ist ein eigenes Paket und eine Gestaltungsfrage (der Wagen müsste
+   einlenken statt zu knicken), deshalb hier nur gemessen und eingetragen.
+
+**Verworfene Alternative.** Die keilförmige Brücke als *Lösung* — sie mildert
+nichts Messbares (siehe oben) und hätte den Fehler stehen lassen. Ebenfalls
+verworfen: den Quader dünner zu machen (E-062 hatte dafür −55 ± 19 km/h
+gemessen); nachgerechnet war auch das nur eine andere Ziehung derselben
+chaotischen Größe — mit der Händlerfuhre war der dünne Quader sogar schlechter
+(−10 ± 29 km/h, besser in 15 von 24).
+
+**Abnahmekriterium.** `npm test` grün; `test/kipper.test.ts` fährt die gewürfelte
+Händlerfuhre über 24 Saaten und hält Mittel < 55, Median < 40, Höchst < 200 km/h,
+Durchfall ≤ 10 %, Rest ≤ 45 %, weitestes Stück < 12 m vom LKW.
+
+**Auf dem Gerät zu prüfen.**
+1. Einen Kipper abkippen lassen und zusehen: Rutscht die Fuhre über die Heckkante
+   nach unten, statt im LKW zu versinken?
+2. Nach dem Abkippen den Platz absuchen: Liegt noch irgendwo ein Stück, das
+   nicht in der Nähe des LKW gelandet ist?
+3. Zwei Fuhren hintereinander an dieselbe Stelle: Wird der erste Haufen beim
+   Rangieren des zweiten LKW verschoben? (Das ist der Befund, der NICHT behoben
+   ist — ich möchte wissen, wie stark er auffällt.)

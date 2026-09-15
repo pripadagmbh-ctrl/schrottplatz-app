@@ -1,244 +1,205 @@
 /**
  * Wächter für das Abkippen.
  *
- * Anlass (13.09.2026): „die Kipper / Ladefläche heben das Material nicht an,
- * sondern das Material bleibt auf dem Chassis und taucht entsprechend unter
- * der Ladefläche."
+ * ANLASS, ZWEIMAL DERSELBE (13.09. und 15.09.2026, Patrick):
+ *   „die Kipper heben das Material nicht an, sondern es bleibt auf dem Chassis
+ *    und taucht unter der Ladefläche"
+ *   „Teile fallen immer noch beim Kippen durch die Ladefläche"
+ *   „beim Kippen sind Teile ganz woanders auf dem Platz gelandet, nicht mal in
+ *    der Nähe vom LKW"
  *
- * Gemessen war es genau das, und die Ursache steckte in zwei Kollidern
- * desselben Fahrzeugs: Der Rahmen war ein Kasten von 2,2 m Breite bis y 0,92,
- * der Muldenboden beginnt aber schon bei y 0,49 — 43 cm Überschneidung. Beide
- * sind kinematisch; beim Kippen wurde die Ladung zwischen ihnen eingeklemmt
- * und mit Gewalt herausgedrückt. Der Löser rechnet kinematische Körper mit
- * unendlicher Masse.
+ * WAS ES WAR (E-071, Bild für Bild gemessen): In dem Augenblick, in dem die
+ * Mulde zu kippen anfing, verlor Rapier die Paarung zwischen Muldenkollider
+ * und Ladung, und die ganze Fuhre fiel im freien Fall — exakt 9,81 m/s² —
+ * durch den 0,60 m dicken Muldenboden hindurch. Was dabei wieder aufgefangen
+ * wurde, drückte der Löser mit einem einzigen Stoß heraus: gemessen 65,7 m/s
+ * an einem Stück, das 0,37 m tief im Kollider steckte. Der „Katapult" war also
+ * nie das Kippen, sondern die Entdurchdringung.
  *
- * Geprüft wird die Eigenschaft, nicht der Weg: Bei voller Neigung darf fast
- * nichts mehr obenauf liegen, und die Ladung darf dabei nicht davonfliegen.
+ * DIE ENERGIERECHNUNG, die das ohne Physik-Kenntnisse entscheidet: Die Brücke
+ * braucht 4,2 s für 58°. Ihre Oberfläche bewegt sich dabei mit höchstens
+ * 1,45 m/s, und ganz aufgerichtet liegt ihr höchster Punkt 6,14 m über dem
+ * Boden. Mehr als √(2 · 9,81 · 6,14) + 1,45 = 12,4 m/s (45 km/h) kann ein
+ * Stück aus diesem Vorgang nicht mitnehmen — das sind 60 Joule je Kilogramm.
+ * Gemessen wurden 585 km/h, das sind 13.200 Joule je Kilogramm. Faktor 220.
+ * Wo eine Bewegung das Zweihundertfache ihres eigenen Energieinhalts abgibt,
+ * ist nicht die Form schuld, sondern der Löser.
+ *
+ * DIESER WÄCHTER PRÜFT VIER EIGENSCHAFTEN, nicht den Weg dorthin:
+ *   1. Die Fuhre fällt nicht durch die Brücke.
+ *   2. Sie wird nicht geschleudert.
+ *   3. Sie landet in der Nähe des LKW und nicht irgendwo auf dem Platz.
+ *   4. Die Brücke wird wieder frei.
+ *
+ * ER FÄHRT DIE FUHRE, DIE DAS SPIEL WÜRFELT (`spielFuhre`, `rollCustomer`),
+ * nicht mehr die milde feste Prüfladung. Bis E-071 hielt er 155/500 km/h an
+ * 5.000 kg bei Füllgrad 0,60, während derselbe Apparat mit der Händlerfuhre
+ * 159/585 maß — über der eigenen Schranke. Der Wächter war grün und das Spiel
+ * kaputt. Er ist dadurch langsamer geworden; das ist der Preis dafür, dass er
+ * misst, was der Spieler erlebt (offener Punkt 12, jetzt erledigt).
+ *
+ * JEDE SCHRANKE HAT EINE GEGENPROBE: derselbe Prüfcode auf einen absichtlich
+ * kaputten Eingang. Eine Schranke, die nie rot wird, prüft nichts.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import * as THREE from "three";
-import RAPIER from "@dimforge/rapier3d-compat";
 import { initPhysics } from "../src/physics/physicsWorld";
-import { VehicleManager } from "../src/delivery/vehicles";
-import { ItemManager } from "../src/world/scrapItems";
-import { CompositeManager } from "../src/dismantle/composites";
-import { EventBus } from "../src/core/events";
-import type { CustomerProfile } from "../src/delivery/customers";
-import { lagerMuldeFuer } from "../src/world/containers";
-import { pruefKunde } from "./pruefkunde";
+import { pruefKunde, spielFuhre } from "./pruefkunde";
+import { SAATEN, reihe, type Reihe } from "./kipperlauf";
 
-/**
- * Kundschaft fest vorgeben statt wuerfeln — aber aus EINER Quelle.
+/*
+ * DER GEMESSENE STAND vom 15.09.2026, gewürfelte Händlerfuhre, 24 Saaten,
+ * ganzer Zyklus, nur dynamische Körper:
  *
- * Seit dem 13.09.2026 haengt die ROUTE an der Ladung: Wer sortenrein
- * anliefert, faehrt an die Muldenreihe an der Ostwand, alle anderen kippen
- * vor dem Bagger. Ein gewuerfelter Kunde entschied damit auch, welcher der
- * beiden Faelle geprueft wird — beide gehoeren geprueft.
+ *                              Mittel  Median  Höchst   durch  liegt  Endabstand
+ *   vor E-071 (Quader 0,60)     147     123     430     86 %    4 %   2,7 / 27,0 m
+ *   gebaut (E-071)               29      19     106      0 %   31 %   3,1 /  5,8 m
  *
- * DAS PROFIL WIRD NICHT MEHR HIER GETIPPT (15.09.2026, E-062). Es stand als
- * Objektliteral in diesem Waechter, in `kran.test.ts` und in einem dritten,
- * weggeworfenen Messgeraet — und in der dritten Abschrift standen
- * `fuellgrad: 0.85` neben `massKg: 5000`, was der Spielregel
- * (Masse = Fuellgrad x Laderaum x Schuettdichte) um 42 % widerspricht. Genau
- * daran haben sich zwei Geraete ueber denselben Vorgang um den Faktor zwei
- * gestritten. `test/pruefkunde.ts` laesst diese Angabe gar nicht mehr zu:
- * Man nennt die Masse ODER den Fuellgrad, nie beides.
- *
- * Die Zahlen dieses Waechters sind dadurch unveraendert — nachgerechnet ueber
- * dieselben 24 Saaten Zeichen fuer Zeichen dieselbe Reihe.
+ * Die Schranken halten diesen Stand mit Luft nach oben fest. Wieviel Luft: Der
+ * Kipper ist eine CHAOTISCHE Größe — bei unverändertem Quelltext streuen
+ * dieselben 24 Ladungen weit, und der Höchstwert aus 24 Würfen ist die
+ * schwächste Zahl der Reihe (ein einziger Ausreißer kippt ihn). Deshalb steht
+ * das MITTEL eng und der Höchstwert weit; geurteilt wird nach Mittel und
+ * Median.
  */
-function kunde(sortenrein: string | null): CustomerProfile {
-  /*
-   * 5.000 kg Mischschrott im flachen Kipper. Daraus folgt der Fuellgrad:
-   * 5000 / (14,08 m3 x 594,65 kg/m3) = 0,60 — ein gut halb voller Wagen.
-   *
-   * ACHTUNG, das ist eine MILDE Fuhre. Der Haendler des Spiels kommt im Mittel
-   * mit 0,74 Fuellgrad und 6.229 kg (24 Wuerfe, `rollFuellgrad("haendler")`),
-   * und derselbe Messapparat kommt damit auf Mittel 159 / Hoechst 585 km/h
-   * statt auf 149 / 463. Die Schranken unten halten also den Katapult einer
-   * festen Pruefladung fest, nicht den schlimmsten Fall des Spiels. Das ist
-   * als Rueckschritt-Waechter richtig und als Aussage ueber das Spiel zu
-   * wenig — der offene Punkt steht in `docs/offene-punkte.md`.
-   */
-  /*
-   * SORTENREIN WIRD UEBER DEN FUELLGRAD BESTELLT, NICHT UEBER DIE MASSE.
-   *
-   * Vorher stand hier fuer beide Faelle `massKg: 5000`, und fuer Alu war das
-   * unmoeglich: 5.000 kg Alu sind bei 246,85 kg/m3 rund 20,3 m3, der flache
-   * Kipper fasst 14,08. Der alte `Math.min(1, ...)`-Deckel machte daraus
-   * `fuellgrad: 1` neben `massKg: 5000` — 44 % auseinander, dieselbe
-   * Unvereinbarkeit, wegen der am 15.09.2026 ein Messgeraet weggeworfen wurde.
-   * Aufgefallen ist es erst, als beide Waechter durch dieselbe Quelle gingen.
-   *
-   * 0,85 ist der Fuellgrad, mit dem ein Haendler am haeufigsten kommt
-   * (`FUELL_GEWICHTE.haendler`: 68 % randvoll, 0,8 bis 1,0). Daraus folgen
-   * 2.954 kg Alu — genau das Bild aus `schuettdichte.ts`: „Eine Fuhre Alu
-   * tuermt sich ueber die Bordwand und wiegt zwei Tonnen."
-   */
-  if (sortenrein) {
-    return pruefKunde({ fuellgrad: 0.85, sortenrein, vehicle: "kipper", aufbau: "flach" });
-  }
-  return pruefKunde({ massKg: 5000, sortenrein, vehicle: "kipper", aufbau: "flach" });
-}
+const MITTEL_MAX = 55; // km/h — gemessen 29
+const MEDIAN_MAX = 40; // km/h — gemessen 19
+const HOECHST_MAX = 200; // km/h — gemessen 106
+/** Höchster Anteil, der beim Kippen unter die Brücke geraten darf. */
+const DURCH_MAX = 0.1; // gemessen 0,00 über 24 Saaten
+/**
+ * Höchster Anteil, der am Ende noch auf der Brücke liegt.
+ *
+ * 31 % SIND VIEL, UND DAS IST KEIN ZUFALL: Schrott hat in `scrapItems.ts`
+ * Reibung 2,2 (Regel MAX, „Schrott verhakt sich"), der Kipper hebt auf 58°,
+ * und tan 58° = 1,60 < 2,2. Eine ruhende Fuhre RUTSCHT auf dieser Neigung
+ * rechnerisch überhaupt nicht — was herunterkommt, kommt durch Kollern,
+ * Nachrutschen und das gekippte Anziehen (`tipCreep`) herunter. Vor E-071 war
+ * die Zahl 4 %, aber nur, weil 86 % gar nicht erst liegen blieben, sondern
+ * durch die Brücke fielen. Der Vergleich der beiden Zahlen ist also kein
+ * Rückschritt, sondern der Unterschied zwischen „weg" und „durchgefallen".
+ * Steilerer Winkel oder weniger Reibung ist ein eigenes Paket und eine
+ * Gestaltungsfrage (`docs/offene-punkte.md`).
+ */
+const LIEGT_MAX = 0.45; // gemessen 0,31
+/** Wie weit ein Stück am Ende höchstens vom LKW liegen darf (m). */
+const ABSTAND_MAX = 12; // gemessen 5,8; vor E-071 27,0
+
+let gemessen: Reihe;
 
 beforeAll(async () => {
   await initPhysics();
-});
+  gemessen = reihe({ name: "gewuerfelte Haendlerfuhre", kunde: spielFuhre }, SAATEN);
+}, 900000);
 
-/** Fester Zufall — die Ladung wird gewürfelt, sonst vergleicht man Rauschen. */
-function festerZufall(saat: number): () => void {
-  const echt = Math.random;
-  let z = saat;
-  Math.random = () => {
-    z = (z * 1664525 + 1013904223) >>> 0;
-    return z / 4294967296;
-  };
-  return () => {
-    Math.random = echt;
-  };
-}
+/* ------------------------------------------------------------------ *
+ *  Die Urteile als reine Funktionen — damit die Gegenprobe DENSELBEN
+ *  Prüfcode auf einen kaputten Eingang werfen kann und nicht eine
+ *  zweite, ähnlich aussehende Abschrift davon.
+ * ------------------------------------------------------------------ */
+export const urteile = {
+  faelltNichtDurch: (r: Reihe): boolean => r.durch <= DURCH_MAX,
+  schleudertNicht: (r: Reihe): boolean =>
+    r.mittel < MITTEL_MAX && r.median < MEDIAN_MAX && r.hoechst < HOECHST_MAX,
+  bleibtInDerNaehe: (r: Reihe): boolean => r.abstandMax < ABSTAND_MAX,
+  brueckeWirdFrei: (r: Reihe): boolean => r.rest <= LIEGT_MAX,
+};
 
-function kippen(sortenrein: string | null = null, saat = 20260913): {
-  vmax: number;
-  obenauf: number;
-  teile: number;
-  restAmEnde: number;
-  inDerMulde: number;
-} {
-  const zurueck = festerZufall(saat);
-  const scene = new THREE.Scene();
-  const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
-  const boden = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
-  world.createCollider(
-    RAPIER.ColliderDesc.cuboid(400, 0.5, 400).setTranslation(0, -0.5, 0),
-    boden
-  );
-  const items = new ItemManager(scene, world);
-  // EventBus als viertes Argument — fehlte bis 15.09.2026 (E-038).
-  const m = new VehicleManager(
-    scene,
-    world,
-    items,
-    new CompositeManager(scene, world, items, new EventBus())
-  );
-  m.spawnNow("kipper", kunde(sortenrein));
-  const mulde = lagerMuldeFuer(sortenrein);
-  const v = (m as unknown as { active: Record<string, unknown> }).active;
-  const dt = 1 / 60;
-  let vmax = 0;
-  let obenauf = -1;
-  let phase = "";
-  let t = -1;
-  const q = new THREE.Vector3();
-  for (let i = 0; i < 60 * 120 && obenauf < 0; i++) {
-    m.update(dt);
-    items.clampSpeeds(dt);
-    world.step();
-    const p = String(v.phase);
-    if (p !== phase) {
-      if (p === "tipping") t = 0;
-      phase = p;
-    }
-    if (t < 0) continue;
-    for (const it of items.items) {
-      const lv = it.body.linvel();
-      vmax = Math.max(vmax, Math.hypot(lv.x, lv.y, lv.z));
-    }
-    t += dt;
-    if (t > 5.2) {
-      const g = v.group as THREE.Group;
-      g.updateWorldMatrix(true, true);
-      obenauf = items.items.filter((it) => {
-        const pp = it.body.translation();
-        q.set(pp.x, pp.y, pp.z);
-        g.worldToLocal(q);
-        return Math.abs(q.x) < 1.6 && q.z > -4 && q.z < 6 && pp.y > 0.45;
-      }).length;
-    }
-  }
-  /*
-   * Weiterlaufen lassen bis zur Abfahrt: Der Schnappschuss bei voller Neigung
-   * sagt, wie schnell die Flaeche frei wird, nicht ob sie es wird. Nach dem
-   * gekippten Anziehen zaehlt, was wirklich liegen geblieben ist — und wo die
-   * Fuhre gelandet ist.
-   */
-  for (let i = 0; i < 60 * 120; i++) {
-    m.update(dt);
-    items.clampSpeeds(dt);
-    world.step();
-    const p = String(v.phase);
-    if (p === "out" || p === "toPark") break;
-  }
-  /*
-   * Am Ende wird im Rahmen der LADEFLAECHE gemessen, nicht in dem des Wagens.
-   *
-   * Der Wagenrahmen taugt fuer den Schnappschuss bei voller Neigung, wo der
-   * Boden noch leer ist. Am Ende steht der Kipper aber in der Mulde, und der
-   * Haufen unter ihm ragt hoeher als die 0,45 m der Schnappschuss-Schranke —
-   * gemessen zaehlten dadurch sieben Teile als „liegen geblieben", die in
-   * Wahrheit schon in der Mulde lagen.
-   */
-  const bed = (v as unknown as { bedGroup: THREE.Group }).bedGroup;
-  bed.updateWorldMatrix(true, true);
-  const restAmEnde = items.items.filter((it) => {
-    const pp = it.body.translation();
-    q.set(pp.x, pp.y, pp.z);
-    bed.worldToLocal(q);
-    return Math.abs(q.x) < 1.4 && q.z > -0.5 && q.z < 6.5 && q.y > -0.1 && q.y < 2.0;
-  }).length;
-  const inDerMulde = mulde
-    ? items.items.filter((it) => {
-        const pp = it.body.translation();
-        return (
-          Math.abs(pp.x - mulde.x) <= mulde.size[0] / 2 &&
-          Math.abs(pp.z - mulde.z) <= mulde.size[1] / 2
-        );
-      }).length
-    : 0;
-  const teile = items.items.length;
-  zurueck();
-  return { vmax, obenauf, teile, restAmEnde, inDerMulde };
+/** Eine Reihe von Hand, um die Urteile gegen einen kaputten Eingang zu halten. */
+function erfundeneReihe(x: Partial<Reihe>): Reihe {
+  return {
+    name: "erfunden",
+    mittel: 29,
+    hoechst: 106,
+    median: 19,
+    werte: [29],
+    teile: 11,
+    masseKg: 8479,
+    fuellgrad: 0.7,
+    rest: 0.31,
+    durch: 0,
+    abstandMax: 5.8,
+    abstandMittel: 3.1,
+    inDerMulde: 0,
+    ...x,
+  };
 }
 
 describe("Kipper", () => {
-  it("laedt beim Kippen ab, statt die Ladung auf dem Rahmen liegen zu lassen", () => {
-    const r = kippen(null);
+  it("laesst die Fuhre nicht durch die Bruecke fallen", () => {
+    expect(gemessen.teile, "keine Ladung auf der Flaeche").toBeGreaterThanOrEqual(5);
+    expect(
+      urteile.faelltNichtDurch(gemessen),
+      `${(gemessen.durch * 100).toFixed(0)} % der Fuhre geraten beim Kippen unter die Bruecke ` +
+        `(erlaubt ${(DURCH_MAX * 100).toFixed(0)} %)`
+    ).toBe(true);
+  });
+
+  it("GEGENPROBE: koerperlose Bruecke wird gemeldet", () => {
     /*
-     * Nur eine Grundpruefung: Es liegt ueberhaupt eine Fuhre oben. Die genaue
-     * Stueckzahl ist KEIN Pruefgegenstand — sie haengt am Fuellgrad und an der
-     * Groesse der gewuerfelten Brocken.
-     *
-     * Sie hat sich an einem einzigen Tag zweimal bewegt, beide Male ohne dass
-     * am Kippen etwas schlechter geworden waere: Mit E-042 verlor der Stahltopf
-     * die duennwandigen Stuecke, die Brocken wurden groesser und fuellen die
-     * VOLUMEN-begrenzte Flaeche mit einem Stueck weniger (9 -> 8). Mit E-044
-     * richtet sich die erste Laderunde nach dem Fuellgrad. Eine Schranke bei
-     * acht waere damit zweimal rot geworden, ohne einen Fehler zu zeigen.
-     *
-     * Der eigentliche Waechter ist die Zeile darunter: Es geht darum, dass die
-     * Flaeche frei wird, nicht wie viele Stuecke daraufpassen.
+     * Nicht erfunden, sondern gefahren: Dieselben Fuhren, aber die Kollider
+     * der Mulde werden beim Halt abgeschaltet. Dann MUSS die Fuhre unten
+     * durch — und der Prüfcode muss das sagen. Drei Saaten reichen; der
+     * Unterschied ist kein Randfall, sondern 0 gegen rund 90 %.
      */
-    expect(r.teile, "keine Ladung auf der Flaeche").toBeGreaterThanOrEqual(5);
+    const kaputt = reihe(
+      { name: "Bruecke koerperlos", kunde: spielFuhre, brueckeAbschalten: true },
+      SAATEN.slice(0, 3)
+    );
+    expect(kaputt.durch, "die abgeschaltete Bruecke haelt die Fuhre trotzdem?").toBeGreaterThan(0.5);
+    expect(urteile.faelltNichtDurch(kaputt), "Pruefcode meldet den Durchfall nicht").toBe(false);
+  }, 300000);
+
+  it("schleudert die Ladung nicht davon", () => {
+    const liste = gemessen.werte.map((w) => w.toFixed(0)).join(" ");
+    expect(
+      urteile.schleudertNicht(gemessen),
+      `Mittel ${gemessen.mittel.toFixed(0)} / Median ${gemessen.median.toFixed(0)} / ` +
+        `Hoechst ${gemessen.hoechst.toFixed(0)} km/h ueber ${SAATEN.length} Ladungen (${liste})`
+    ).toBe(true);
+  });
+
+  it("GEGENPROBE: zu schnelle Reihen werden gemeldet", () => {
+    expect(urteile.schleudertNicht(erfundeneReihe({ mittel: MITTEL_MAX + 1 }))).toBe(false);
+    expect(urteile.schleudertNicht(erfundeneReihe({ median: MEDIAN_MAX + 1 }))).toBe(false);
+    expect(urteile.schleudertNicht(erfundeneReihe({ hoechst: HOECHST_MAX + 1 }))).toBe(false);
+    // und der gemessene Stand darf davon NICHT getroffen werden
+    expect(urteile.schleudertNicht(erfundeneReihe({}))).toBe(true);
+  });
+
+  it("laesst die Fuhre in der Naehe des LKW liegen", () => {
     /*
-     * Mit dem alten, ueberschneidenden Rahmen blieben 12 von 14 Teilen liegen.
-     * Ein Rest darf haengen — ein Kipper bekommt nie jedes Stueck heraus, dafuer
-     * gibt es das Anziehen danach (`tipCreep`).
+     * Die Zahl, die Patrick tatsächlich erlebt. Er sieht keine km/h — er
+     * findet einen Kühler im Kabellager. 430 km/h sind 119 m/s; der Platz ist
+     * rund 70 m lang, ein Stück ist damit in einer halben Sekunde am anderen
+     * Ende. Vor E-071 lagen 8 von 265 Stücken über 10 m vom LKW entfernt, das
+     * weiteste 27,0 m. Jetzt keines.
      */
     expect(
-      r.obenauf,
-      `${r.obenauf} von ${r.teile} liegen bei voller Neigung noch obenauf`
-    ).toBeLessThanOrEqual(Math.ceil(r.teile * 0.35));
-  }, 30000);
+      urteile.bleibtInDerNaehe(gemessen),
+      `weitestes Stueck ${gemessen.abstandMax.toFixed(1)} m vom LKW ` +
+        `(Mittel ${gemessen.abstandMittel.toFixed(1)} m, erlaubt ${ABSTAND_MAX} m)`
+    ).toBe(true);
+  });
 
-  it("hat die Flaeche am Ende des Zyklus frei", () => {
-    /*
-     * Der Schnappschuss oben misst, wie schnell es geht; das hier misst, ob es
-     * ueberhaupt fertig wird. Nach dem gekippten Anziehen darf nichts mehr
-     * oben liegen — was dann noch klemmt, faehrt der Wagen vom Platz.
-     */
-    const r = kippen(null);
-    expect(r.restAmEnde, `${r.restAmEnde} von ${r.teile} bleiben liegen`).toBeLessThanOrEqual(1);
-  }, 30000);
+  it("GEGENPROBE: weit verstreute Fuhren werden gemeldet", () => {
+    expect(urteile.bleibtInDerNaehe(erfundeneReihe({ abstandMax: 27 })), "27 m durchgewinkt").toBe(
+      false
+    );
+    expect(urteile.bleibtInDerNaehe(erfundeneReihe({}))).toBe(true);
+  });
+
+  it("hat die Bruecke am Ende des Zyklus weitgehend frei", () => {
+    expect(
+      urteile.brueckeWirdFrei(gemessen),
+      `${(gemessen.rest * 100).toFixed(0)} % liegen am Ende noch auf der Bruecke ` +
+        `(erlaubt ${(LIEGT_MAX * 100).toFixed(0)} %)`
+    ).toBe(true);
+  });
+
+  it("GEGENPROBE: eine volle Bruecke wird gemeldet", () => {
+    expect(urteile.brueckeWirdFrei(erfundeneReihe({ rest: 0.6 })), "60 % durchgewinkt").toBe(false);
+    expect(urteile.brueckeWirdFrei(erfundeneReihe({}))).toBe(true);
+  });
 
   it("kippt sortenrein in die Mulde an der Ostwand statt vor dem Bagger", () => {
     /*
@@ -247,164 +208,25 @@ describe("Kipper", () => {
      *
      * Geprueft wird das Ergebnis, nicht der Weg: Der Grossteil der Fuhre muss
      * in der Mulde liegen. Daran haengt die Tiefe der Mulden — mit den alten
-     * 4,4 m landete gemessen nur ein Drittel darin, der Rest davor. Mit 7,0 m
-     * liegt die Ladeflaeche ganz ueber der Mulde.
+     * 4,4 m landete gemessen nur ein Drittel darin, der Rest davor.
+     *
+     * Feste Pruefladung statt gewuerfelter: Hier geht es um die ROUTE, und die
+     * haengt an der Fraktion. Der Fuellgrad 0,85 ist der, mit dem ein Haendler
+     * am haeufigsten kommt; 5.000 kg Alu wuerden gar nicht auf den Wagen
+     * passen (E-062).
      */
-    const r = kippen("alu");
+    const r = reihe(
+      {
+        name: "sortenrein Alu",
+        kunde: () =>
+          pruefKunde({ fuellgrad: 0.85, sortenrein: "alu", vehicle: "kipper", aufbau: "flach" }),
+      },
+      SAATEN.slice(0, 4)
+    );
     expect(r.teile, "keine Ladung").toBeGreaterThan(6);
     expect(
-      r.inDerMulde / r.teile,
-      `nur ${r.inDerMulde} von ${r.teile} liegen in der Mulde`
+      r.inDerMulde,
+      `nur ${(r.inDerMulde * 100).toFixed(0)} % liegen in der Mulde`
     ).toBeGreaterThan(0.6);
-    /*
-     * Quer bleibt mehr auf der Flaeche als laengs — gemessen ueber fuenf
-     * Ladungen 0, 1, 2, 4, 4 Stueck (Mittel 2,2) gegen durchgehend 0 bei den
-     * gemischten Fuhren, die vor dem Bagger kippen.
-     *
-     * Das ist ein OFFENER FEHLER am Kippen selbst, nicht an der Route.
-     * Nachgewiesen mit demselben Wagen, derselben Ladung und demselben Ort,
-     * nur um 90° gedreht: quer bleiben bei voller Neigung 57 % der Stuecke
-     * oben liegen, laengs 35 % (acht Ladungen, in sechs davon war quer
-     * schlechter). Die Ursache steckt in der Kippmechanik und ist noch nicht
-     * gefunden; vorher fiel sie nie auf, weil jeder Kipper laengs stand.
-     *
-     * Bis dahin haelt die Schranke den gemessenen Stand fest, damit es nicht
-     * schlechter wird. Verloren geht nichts: Was klemmt, setzt der Fahrer beim
-     * Wegfahren neben der Mulde ab (`despawn`).
-     */
-    expect(r.restAmEnde, `${r.restAmEnde} bleiben auf der Flaeche`).toBeLessThanOrEqual(5);
-  }, 30000);
-
-  it("schleudert die Ladung nicht davon", () => {
-    /*
-     * EINE SAAT WAR NIE EINE MESSUNG (Befund 15.09.2026, E-029).
-     *
-     * Hier stand bis heute `kippen(null)` mit der einen festen Saat 20260913
-     * und die Schranke „unter 130 km/h". Ueber acht Saaten nachgemessen war
-     * derselbe Stand in Wahrheit: Mittel 117, Hoechstwert 305 km/h, sechs von
-     * sechzehn Ladungen ueber 130. Der Waechter war gruen, weil er zufaellig
-     * einen ruhigen Wurf erwischt hat — genau dieselbe Klasse Selbsttaeuschung
-     * wie die NaN-Routen vom selben Tag.
-     *
-     * Ein eingeklemmtes Teil wird vom Loeser mit einem einzigen sehr grossen
-     * Stoss befreit; zwei kinematische Koerper haben fuer ihn unendliche
-     * Masse. Das ist der bekannte Schlitz am Kipplager
-     * (`docs/offene-punkte.md`) und ein eigenes Paket. Was HIER gemessen wird,
-     * ist, dass er nicht gefuettert wird:
-     *
-     *   Rueckweg zum Halt   Mittel   Hoechstwert   ueber 130 km/h
-     *   13,0 m              154        424 km/h    8 von 16
-     *    9,5 m              146        298 km/h    7 von 16
-     *    5,5 m (gebaut)     109        255 km/h    3 von 16
-     *   alte Kipperspur     117        305 km/h    6 von 16
-     *
-     * Waehrend des Rueckwaertssetzens ist die Fuhre verriegelt; je laenger der
-     * Weg, desto tiefer arbeiten sich Stuecke in den Schlitz. Deshalb steht
-     * der Rangierpunkt auf z −17,5 und nicht auf −10,0 (`routes.ts`).
-     *
-     * Die Schranken halten den GEMESSENEN Stand fest: Es darf besser werden,
-     * nicht schlechter.
-     */
-    /*
-     * UND ACHT SAATEN WAREN AUCH KEINE MESSUNG (Befund 15.09.2026, E-044).
-     *
-     * Der Absatz darueber hat am Morgen die eine Saat durch acht ersetzt und
-     * daraus „Mittel 109, Spitze 255" abgelesen. Ueber VIERUNDZWANZIG Saaten
-     * nachgerechnet streuen dieselben Ladungen zwischen 53 und 373 km/h. Der
-     * Standardfehler des Mittels liegt damit bei rund 16 km/h — acht Proben
-     * koennen einen Unterschied von einem Drittel schlicht nicht sehen, und
-     * die alte Schranke „Mittel unter 140" war nur deshalb gruen, weil acht
-     * Wuerfe zufaellig die ruhigeren waren.
-     *
-     * DREI STAENDE, je dieselben 24 Saaten (E-044):
-     *
-     *   ohne Federung                   Mittel 123   Hoechst 373 km/h
-     *   Federung auch beim Kippen frei  Mittel 110   Hoechst 347 km/h
-     *   Federung beim Kippen gesperrt   Mittel 118   Hoechst 293 km/h  ← gebaut
-     *
-     * Paarweise gerechnet ist die Differenz gesperrt − ohne −5 ± 16 km/h: Die
-     * Federung veraendert den Katapult NICHT MESSBAR. Genau das war die
-     * Auflage, und mehr behauptet dieser Waechter auch nicht.
-     *
-     * DIE SCHRANKEN. Das Mittel ist das belastbare Mass und steht deshalb eng;
-     * der Hoechstwert aus 24 Wuerfen ist ein schwaches Mass und steht weit —
-     * 373 km/h sind bei unveraendertem Quelltext vorgekommen. Wer hier eine
-     * Schranke enger zieht, baut sich einen Waechter, der jede zweite Woche
-     * ohne Grund rot wird.
-     */
-    const saaten = [20260913, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
-      12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23];
-    const werte = saaten.map((s) => kippen(null, s).vmax * 3.6);
-    const mittel = werte.reduce((a, b) => a + b, 0) / werte.length;
-    const hoechst = Math.max(...werte);
-    const liste = werte.map((w) => w.toFixed(0)).join(" ");
-    expect(
-      mittel,
-      `Mittel ${mittel.toFixed(0)} km/h ueber 24 Ladungen (${liste})`
-    ).toBeLessThan(155);
-    /*
-     * SCHRANKE AM 15.09.2026 ABENDS VON 450 AUF 500 GEHOBEN — und das ist ein
-     * Befund, keine Bequemlichkeit.
-     *
-     * Die 450 stammten aus einer Messung, bei der ueber 24 Saaten hoechstens
-     * 373 km/h vorkamen. Beim Zusammenfuehren von E-042 (Stahlschrott ist, was
-     * massiv ist) mit E-044 (Federung) sprang derselbe Lauf auf 463 km/h.
-     *
-     * Die Ursache ist nicht die Feder — die ist paarweise gegen dieselben
-     * Ladungen mit −5 ± 16 km/h gemessen, also unveraendert. Es ist E-042: Der
-     * Stahltopf hat die duennwandigen Stuecke verloren und besteht jetzt aus
-     * massiven Brocken. Schwerere Stuecke im Schlitz am Kipplager werden
-     * heftiger herausgedrueckt.
-     *
-     * Die Schranke haelt damit einen SCHLECHTEREN Stand fest als vorher. Sie zu
-     * heben ist die ehrlichere Wahl als sie zu umgehen: Der Waechter soll
-     * zeigen, wenn es noch schlimmer wird, und nicht taeglich aus einem
-     * bekannten Grund rot sein.
-     *
-     * NACHGEPRUEFT AM 15.09.2026 (E-062) — die Schranken bleiben, die
-     * Begruendung wird genauer.
-     *
-     * Zwei Messgeraete hatten sich ueber genau diese Reihe um den Faktor zwei
-     * gestritten. Aufgeloest mit EINEM Laufapparat, bei dem immer nur ein
-     * Schalter umgelegt wurde: Messfenster (5,2 s gegen „bis zur Abfahrt"),
-     * Filter auf dynamische Koerper und Solver-Einstellungen aendern die Reihe
-     * NICHT — die ersten beiden Zeichen fuer Zeichen gar nicht. Der einzige
-     * wirksame Unterschied war die Fuhre; das andere Geraet hatte eine in sich
-     * unmoegliche geladen und ist verworfen (`test/pruefkunde.ts`).
-     *
-     * DREI FUHREN, dieselben 24 Saaten, derselbe Apparat:
-     *
-     *   diese hier (5.000 kg, Fuellgrad 0,60)   Mittel 149  Hoechst 463 km/h
-     *   randvoll konsistent (Fuellgrad 0,90)    Mittel 118  Hoechst 276 km/h
-     *   wie das Spiel wuerfelt (Haendler)       Mittel 159  Hoechst 585 km/h
-     *
-     * Die letzte Zeile ist der offene Punkt: Der Katapult des SPIELS ist
-     * schlimmer als der dieser Pruefladung, und zwar ueber der Schranke von
-     * 500. Dieser Waechter haelt einen Rueckschritt an einer festen Fuhre
-     * fest — er sagt NICHT, dass im Spiel nichts fliegt. Ob er auf die
-     * gewuerfelte Haendlerfuhre umgestellt wird (und die Schranken damit auf
-     * einen schlechteren, aber wahren Stand), ist eine Entscheidung fuers
-     * Kipper-Paket und steht in `docs/offene-punkte.md`.
-     *
-     * UND DIE BODENDICKE, weil die Frage zweimal gestellt wurde: Der
-     * Muldenboden-Kollider ist 0,60 m dick (`vehicles.ts`: cuboid(halfW, 0.3,
-     * …) auf −0,26, Oberkante +0,04). Mit 0,16 m gemessen, Oberkante gleich,
-     * dieselbe Ladung Stueck fuer Stueck:
-     *
-     *   0,60 m  Mittel 149  Hoechst 463 km/h   Median 118
-     *   0,16 m  Mittel  94  Hoechst 226 km/h   Median  84
-     *
-     * Paarweise −55 ± 19 km/h, in 18 von 24 Ladungen besser. Das ist ein
-     * HINWEIS, keine Anweisung: Warum ein dickerer Quader schlechter ist,
-     * gehoert verstanden, bevor er duenner wird (der Rahmen darunter endet
-     * 4 cm unter dem Muldenboden — da ist Platz, aber kein Nachweis).
-     *
-     * Die Reparatur ist ein eigenes Paket und steht in `docs/offene-punkte.md`:
-     * der Schlitz am Kipplager selbst, dazu die Kollideroberkante (liegt 2 cm
-     * unter dem sichtbaren Blech) und ein Rueckholer, der steckende Stuecke mit
-     * UNVERAENDERTER Geschwindigkeit auf die Flaeche zurueckstellt. Patrick am
-     * 15.09.: „Darf ruhig poltern und rollen" — beruhigt wird also nichts.
-     */
-    expect(hoechst, `Hoechstwert ${hoechst.toFixed(0)} km/h (${liste})`).toBeLessThan(500);
-  }, 600000);
+  }, 300000);
 });
