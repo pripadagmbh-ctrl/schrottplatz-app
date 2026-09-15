@@ -133,7 +133,7 @@ describe("Positionsliste des Baggers", () => {
       "03_PRATZE_VL_TELLER",
       "04_DREHKRANZ",
       "05_MOTORHAUBE",
-      "05_GEGENGEWICHT",
+      "05_LEUCHTEN",
       "06_SITZ",
       "06_SCHEIBE_FRONT",
       "07_AUSLEGER_KASTEN",
@@ -182,9 +182,15 @@ describe("Positionsliste des Baggers", () => {
      * 155 Zeichenrufe. Der Unterwagen wurde von 1 auf 2 Netze (Lack, Stahl);
      * dafuer sind der Drehkranzring und die vier Pratzenausleger darin
      * aufgegangen.
+     *
+     * Stand 15.09.2026 nach dem Oberwagen-Paket: 107 Netze, 20 388 Dreiecke,
+     * 147 Zeichenrufe. Zehn Netze (Haube, acht Lueftungsschlitze,
+     * Gegengewicht) plus die Deckplatte wurden drei: Lack, Stahl, Leuchten.
+     * `05_GEGENGEWICHT` heisst deshalb nicht mehr so — es liegt im Stahl-Netz
+     * `04_DREHKRANZ`, wo auch der Drehkranzdeckel steckt.
      */
     const meshes = baggerMeshes();
-    expect(meshes.length, "Bauteilzahl am Bagger").toBe(115);
+    expect(meshes.length, "Bauteilzahl am Bagger").toBe(107);
   });
 });
 

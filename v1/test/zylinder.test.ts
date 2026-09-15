@@ -326,14 +326,26 @@ describe("Drehkranz — die Taille, an der man das Schwenken sieht", () => {
      * Sie wurde dünner und rückte nach oben, damit der Ring Platz hat. Ihre
      * OBERKANTE musste dabei bleiben, wo sie war — auf ihr stehen Motorhaube,
      * Gegengewicht und Kabine, und darüber liegt der Auslegerdrehpunkt.
+     *
+     * Gemessen wird am Rand: Seit dem Oberwagen-Paket liegt im Netz
+     * `04_DREHKRANZ` der ganze Stahl des Oberwagens (Geländer, Auspuff,
+     * Gegengewicht). Nur die Deckplatte reicht bis x ±1,45 — dort steht sonst
+     * nichts, und deshalb lässt sich ihre Dicke dort ablesen.
      */
     const deck = finde("04_DREHKRANZ") as THREE.Mesh;
-    const geo = deck.geometry as THREE.BufferGeometry;
-    geo.computeBoundingBox();
-    const bb = geo.boundingBox!;
+    const pos = (deck.geometry as THREE.BufferGeometry).getAttribute(
+      "position"
+    ) as THREE.BufferAttribute;
+    let oben = -Infinity;
+    let unten = Infinity;
+    for (let i = 0; i < pos.count; i++) {
+      if (Math.abs(pos.getX(i)) < 1.3) continue;
+      oben = Math.max(oben, pos.getY(i));
+      unten = Math.min(unten, pos.getY(i));
+    }
     // Oberwagen-Ursprung liegt bei y 1,60
-    expect(1.6 + bb.max.y, "Oberkante der Deckplatte").toBeCloseTo(1.955, 3);
-    expect(1.6 + bb.min.y, "Unterkante — über der Ringoberkante 1,78").toBeGreaterThan(
+    expect(1.6 + oben, "Oberkante der Deckplatte").toBeCloseTo(1.955, 3);
+    expect(1.6 + unten, "Unterkante — über der Ringoberkante 1,78").toBeGreaterThan(
       DREHKRANZ_Y_OBEN - 0.001
     );
   });

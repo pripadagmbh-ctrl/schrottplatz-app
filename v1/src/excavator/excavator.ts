@@ -18,7 +18,7 @@ import {
   stielSchlauch,
   stielStahl,
 } from "./armParts";
-import { drehkranzDeckel, PLATTE_UNTEN } from "./drehkranzParts";
+import { oberwagenLack, oberwagenLeuchten, oberwagenStahl } from "./oberwagenParts";
 import { unterwagenLack, unterwagenStahl } from "./unterwagenParts";
 import { BAGGER_STAND } from "../world/baggerstand";
 import {
@@ -108,6 +108,10 @@ const GRAPPLE_LINK = 0.55; // Abstand Stielspitze → Palm-Oberkante
  * (`armParts.ts`). Vorher hing jeder Zylinder an einem `Object3D` ohne Blech
  * darum — er kam buchstäblich aus dem Nichts.
  */
+/** Fußanker des rechten Hubzylinders, im Oberwagenframe (m). */
+const HUB_FUSS_R: [number, number, number] = [-0.52, 0.02, 1.05];
+/** Fußanker des linken Hubzylinders, im Oberwagenframe (m). */
+const HUB_FUSS_L: [number, number, number] = [0.52, 0.02, 1.05];
 /** Kopfanker des rechten Hubzylinders, im Auslegerframe (m). */
 const HUB_KOPF_R: [number, number, number] = [-0.28, -0.2, 2.6];
 /** Kopfanker des linken Hubzylinders, im Auslegerframe (m). */
@@ -685,8 +689,8 @@ export class Excavator {
     // Ausleger — so sieht es an echten Umschlagbaggern aus.
     // Gemessen: Ankerabstand 2,518 … 3,757 m (Hub 1,239 m, Verhältnis 1,49).
     const HUB_MASS: ZylinderMasse = { kurz: 2.518, lang: 3.757, rRohr: 0.1 };
-    addCyl("07_ZYLINDER_HUB_R", this.cabGroup, [-0.52, 0.02, 1.05], this.boomGroup, HUB_KOPF_R, HUB_MASS);
-    addCyl("07_ZYLINDER_HUB_L", this.cabGroup, [0.52, 0.02, 1.05], this.boomGroup, HUB_KOPF_L, HUB_MASS);
+    addCyl("07_ZYLINDER_HUB_R", this.cabGroup, HUB_FUSS_R, this.boomGroup, HUB_KOPF_R, HUB_MASS);
+    addCyl("07_ZYLINDER_HUB_L", this.cabGroup, HUB_FUSS_L, this.boomGroup, HUB_KOPF_L, HUB_MASS);
     // Kabinenhub: zwei kleine Zylinder unten links und rechts an der Kabine.
     // Verlangt 5,18 : 1 — mechanisch unmöglich, siehe `gestreckt`. Paket 8.
     addStretchCyl("06_ZYLINDER_KABINE_A", this.cabGroup, [-1.5, 0.3, 0.1], this.cabLiftGroup, [-1.5, 0.95, 0.1], 1.1, 0.055);
@@ -844,38 +848,39 @@ export class Excavator {
     this.cabGroup.name = "05_OBERWAGEN";
     this.root.add(this.cabGroup);
     /*
-     * Deckel des Drehkranzes samt Deckplatte des Oberwagens — EIN Netz.
+     * OBERWAGEN (Paket 3 aus E-025, Frage 2 von Patrick bejaht).
      *
-     * Die Deckplatte war bis zum 15.09.2026 ein 0,35 m dicker Quader, der bis
-     * y 1,605 hinunterreichte und damit genau den Platz einnahm, in dem der
-     * Drehkranz sitzt. Sie ist jetzt 0,135 m dick und beginnt bei y 1,82;
-     * **ihre Oberkante bleibt bei y 1,955**, wo sie war — Motorhaube,
-     * Gegengewicht, Kabine und Auslegerdrehpunkt wandern keinen Millimeter.
+     * Vorher: 10 Netze für 120 Dreiecke — Motorhaube 12, Gegengewicht 12, acht
+     * Lüftungsschlitze à 12. Jetzt drei Netze für 29 Teile, mit gestufter
+     * Haube, Wartungsklappe, umlaufendem Geländer, Auspuff, Laufblech,
+     * Hydrauliktank und Leuchten. Teil für Teil in `oberwagenParts.ts`.
+     *
+     * Das Stahl-Netz heißt weiter `04_DREHKRANZ`: Darin steckt der
+     * Drehkranzdeckel, und die Deckplatte des Oberwagens gehört dazu.
      */
-    const deck = new THREE.Mesh(drehkranzDeckel(2.9, 3.2, PLATTE_UNTEN + 0.135), dark);
+    const deck = new THREE.Mesh(
+      oberwagenStahl([HUB_FUSS_R, HUB_FUSS_L]),
+      dark
+    );
+    deck.castShadow = true;
     deck.name = "04_DREHKRANZ";
     this.cabGroup.add(deck);
     this.buildCabin(machineBlue, dark, glass);
-    // Motorhaube mit Lüftungsgittern + Gegengewicht (wie am Umschlagbagger)
-    const hood = new THREE.Mesh(new THREE.BoxGeometry(2.5, 1.0, 1.7), machineBlue);
-    hood.position.set(0, 0.85, -1.0);
-    hood.castShadow = true;
-    hood.name = "05_MOTORHAUBE";
-    this.cabGroup.add(hood);
-    const louver = new THREE.MeshStandardMaterial({ color: 0x1f2224, roughness: 0.8 });
-    for (const sx of [-1.27, 1.27]) {
-      for (let i = 0; i < 4; i++) {
-        const slot = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.5, 0.12), louver);
-        slot.position.set(sx, 0.9, -1.55 + i * 0.32);
-        slot.name = `05_LUEFTUNGSGITTER_${sx > 0 ? "L" : "R"}${i + 1}`;
-        this.cabGroup.add(slot);
-      }
-    }
-    const counterweight = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.75, 0.7), dark);
-    counterweight.position.set(0, 0.5, -2.0);
-    counterweight.castShadow = true;
-    counterweight.name = "05_GEGENGEWICHT";
-    this.cabGroup.add(counterweight);
+    const haube = new THREE.Mesh(oberwagenLack(), machineBlue);
+    haube.castShadow = true;
+    haube.name = "05_MOTORHAUBE";
+    this.cabGroup.add(haube);
+    const heckLicht = new THREE.Mesh(
+      oberwagenLeuchten(),
+      new THREE.MeshStandardMaterial({
+        color: 0xfff3d0,
+        emissive: 0xffe9a8,
+        emissiveIntensity: 0.55, // SW: etwas schwächer als am Ausleger
+        roughness: 0.3,
+      })
+    );
+    heckLicht.name = "05_LEUCHTEN";
+    this.cabGroup.add(heckLicht);
     this.buildOutriggers(machineBlue, dark);
 
     // Ausleger

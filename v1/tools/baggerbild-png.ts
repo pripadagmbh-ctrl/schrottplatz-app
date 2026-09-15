@@ -182,3 +182,16 @@ const FAHRWERK = [
 feld(b3, nur(FAHRWERK), SEITE, 10, 10, ZB, 620);
 feld(b3, nur(FAHRWERK), new THREE.Vector3(0.45, 0.22, 1), 20 + ZB, 10, ZB, 620);
 b3.schreibe("docs/messungen/2026-09-15-bagger/04-fahrwerk.png");
+
+/*
+ * Blatt 5 — der OBERWAGEN gross.
+ *
+ * Geländer, Auspuff, Lüftungsgitter und die gestufte Haube sind auf dem
+ * Übersichtsblatt je zwei Pixel breit. Wer sie beurteilen soll, braucht sie
+ * gross.
+ */
+const b5 = new Blatt(BREITE, 640);
+const OBERWAGEN = ["04_DREHKRANZ", "05_MOTORHAUBE", "05_LEUCHTEN"];
+feld(b5, nur(OBERWAGEN), new THREE.Vector3(0.8, 0.3, 1), 10, 10, ZB, 620);
+feld(b5, nur(OBERWAGEN), new THREE.Vector3(1, 0.12, 0.05), 20 + ZB, 10, ZB, 620);
+b5.schreibe("docs/messungen/2026-09-15-bagger/05-oberwagen.png");
