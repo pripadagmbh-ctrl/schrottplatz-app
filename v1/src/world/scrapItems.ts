@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
-import { getMaterial } from "../materials/catalog";
+import { ABFALLFRAKTIONEN, getMaterial } from "../materials/catalog";
 import { type Anteil, fraktionVonTeil, istPressbar } from "../materials/purity";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { baueGeometrie, type BauId } from "./objektbau";
@@ -1033,6 +1033,33 @@ function colorFor(spec: PileSpec, seed: number): number {
 }
 
 /**
+ * Das letzte Fuenftel des Fraktionsmix, als Lostopf.
+ *
+ * Bis zum 16.09.2026 stand hier eine Liste aus neun Namen, aus der gleich
+ * verteilt gezogen wurde — sechs Metalle und DREI Abfallsorten. Die vierte,
+ * `tires`, fehlte: Reifen waren eine Fraktion mit Namen, Farbe, Preis und
+ * eigener Mulde, die **nie angeliefert werden konnte**. Sie kamen nur als
+ * Bestandteil von Fahrzeugen und aus dem Wrack.
+ *
+ * Der Topf haelt die Anteile der neun Lose EXAKT fest, obwohl jetzt zehn
+ * Fraktionen darin sind. Jedes Metall bekommt VIER Lose, jede Abfallsorte
+ * DREI: 6 x 4 = 24 gegen 4 x 3 = 12, zusammen 36. Das sind zwei Drittel Metall
+ * und ein Drittel Abfall — genau das Verhaeltnis 6:3 von vorher. Ein Metall
+ * zieht 4/36 = 11,11 % des Topfes wie vorher 1/9, und die vier Abfallsorten
+ * teilen sich die drei Lose, die vorher drei von ihnen hatten.
+ *
+ * Warum das wichtig ist: Abfall KOSTET Geld (negativer Preis). Waere `tires`
+ * einfach als zehnter Name dazugekommen, waere der Abfallanteil einer
+ * Anlieferung von 6,67 % auf 8,0 % gestiegen und damit der Verdienst gesunken —
+ * eine Wirtschaftsaenderung, die niemand bestellt hat (E-067 hat genau deshalb
+ * die Finger davon gelassen). `test/abfall.test.ts` misst den Anteil.
+ */
+const REST_LOSE: string[] = [
+  ...["va", "copper", "brass", "zinc", "battery", "cable"].flatMap((f) => [f, f, f, f]),
+  ...ABFALLFRAKTIONEN.flatMap((f) => [f, f, f]),
+];
+
+/**
  * Zufalls-Ladung für Anlieferungen.
  * @param bigShare 0..1 — Anteil Großteile (Händler liefern überwiegend groß)
  */
@@ -1064,7 +1091,8 @@ export function randomCargo(
      * in dieser Liste wurde keiner davon je gezogen, und sie waren mit einem
      * Schlag aus dem Spiel.
      *
-     * 42 % Stahl, 22 % Mischschrott, 16 % Alu, der Rest verteilt sich.
+     * 42 % Stahl, 22 % Mischschrott, 16 % Alu, der Rest verteilt sich
+     * (`REST_LOSE`, siehe dort — die Anteile stehen dort gerechnet).
      */
     const r = Math.random();
     const wanted =
@@ -1075,9 +1103,7 @@ export function randomCargo(
           ? "mixed"
           : r < 0.8
             ? "alu"
-            : ["va", "copper", "brass", "zinc", "battery", "cable", "wood", "plastic", "rubble"][
-                Math.floor(Math.random() * 9)
-              ]);
+            : REST_LOSE[Math.floor(Math.random() * REST_LOSE.length)]);
     let matching = pool.filter((s) => s.materialId === wanted);
     // Sortenreine Ladung: notfalls in der anderen Größenklasse suchen, damit
     // die Fraktion auf jeden Fall stimmt

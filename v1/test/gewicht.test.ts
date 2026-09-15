@@ -313,23 +313,26 @@ describe("Eine sortenreine Fuhre wiederholt sich nicht sofort (E-063)", () => {
     expect(k + g + r).toBe(ALLE.filter((e) => fraktionVonTeil(e.spec) === "steel").length);
   });
 
-  it("BEFUND: Reifen, Holz und Baumischabfall sind weiter duenn", () => {
+  it("BEFUND BEHOBEN: auch Reifen, Holz und Baumischabfall haben acht", () => {
     /*
-     * Nicht behoben, und zwar absichtlich. Der Auftrag nannte die
-     * Metallfraktionen (Kupfer, Messing, Kabel, VA); Zink und Batterien sind
-     * mitgenommen, weil sie eine eigene Mulde haben und mit vier Sorten noch
-     * duenner waren als VA.
+     * Diese Zeile stand bis zum 16.09.2026 als BEFUND da und hielt den Mangel
+     * als Zahl fest: Reifen 4, Holz 6, Baumischabfall **0** Kleinteile. Der
+     * Satz dazu lautete „Ob sie aufgefuellt werden … ist Patricks
+     * Entscheidung, nicht Aufraeumarbeit".
      *
-     * Reifen (4), Holz (6) und Baumischabfall (0 Kleinteile) sind
-     * ABFALLfraktionen — sie kommen als Beifang mit, niemand bestellt eine
-     * sortenreine Reifenfuhre. Ob sie aufgefuellt werden, verschiebt den Anteil
-     * in `randomCargo` und damit den Verdienst; das ist Patricks Entscheidung,
-     * nicht Aufraeumarbeit (dieselbe Begruendung wie beim rubble-Befund in
-     * `bauart.test.ts`).
+     * Patrick hat entschieden: „‚Stoerstoff' aufloesen in Holz,
+     * Baumischabfall, Reifen und Kunststoffe." Damit ist der Test bewusst rot
+     * geworden, und das war die Meldung „der Mangel ist weg" — dieselbe
+     * Bauart wie bei V-6 in `fraktionen.test.ts`.
+     *
+     * Die Sorge von E-067 (mehr Abfall im Katalog = weniger Verdienst) ist
+     * NICHT eingetreten und auch nicht ignoriert: Der Fraktionsmix zieht aus
+     * einem Lostopf mit festen Anteilen, nicht aus der Katalogzahl. Gemessen
+     * in `test/abfall.test.ts` — der Abfallanteil einer Anlieferung liegt
+     * unveraendert bei 6,7 %.
      */
-    expect(sorten("tires", "klein")).toBe(4);
-    expect(sorten("wood", "klein")).toBe(6);
-    expect(sorten("rubble", "klein")).toBe(0);
+    for (const frak of ["tires", "wood", "rubble", "plastic"])
+      expect(sorten(frak, "klein"), `${frak} ist weiter duenn`).toBeGreaterThanOrEqual(8);
   });
 });
 

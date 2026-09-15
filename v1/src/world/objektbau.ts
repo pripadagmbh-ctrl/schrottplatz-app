@@ -325,8 +325,9 @@ const BLEI = 0x8d9099;
  * unlackiert … behalten ihren Metallton"): Der Metallton von Kupfer ist
  * kupfern.
  *
- * Nur Buntmetall steht in dieser Tabelle. Stahl, Mischschrott und die
- * Abfallfraktionen bekommen weiterhin `STAHL`, und damit aendert sich an rund
+ * Seit dem 16.09.2026 stehen auch die vier Abfallsorten darin (Begruendung
+ * unten in der Tabelle). Stahl, Mischschrott und Batterien bekommen weiterhin
+ * `STAHL`, und damit aendert sich an rund
  * zweihundert Eintraegen **kein Pixel** — gemessen `tools/metallton.ts`:
  * Stahl-Fraktion zu STAHL ist ΔE2000 = 8,8, ein sichtbarer Unterschied, den
  * niemand bestellt hat. Fuer Kupfer (25,1), Messing (31,7), VA (37,1), Zink
@@ -338,18 +339,47 @@ const BLEI = 0x8d9099;
  * `world/objektbau.ts` sonst von `materials/` abhaengt; `test/bauart.test.ts`
  * haelt die beiden Listen zusammen.
  */
-const BUNTTON: Record<string, number> = {
+const FRAKTIONSTON: Record<string, number> = {
   va: 0xdfe6ea,
   alu: 0x928d85,
   copper: 0xc7622b,
   brass: 0xc9a227,
   zinc: 0x9aa6ad,
   cable: 0xb0682a,
+  /*
+   * DIE VIER ABFALLSORTEN, dazugekommen am 16.09.2026 („Stoerstoff aufloesen").
+   *
+   * Sie standen bis dahin ausdruecklich NICHT hier — mit der Begruendung von
+   * E-063, dass Stahl und Mischschrott ihren Bauton behalten sollen. Fuer Stahl
+   * (ΔE 8,8) und Mischschrott (ΔE 6,0) gilt das weiter: ihre Fraktionsfarbe
+   * liegt so nah am Bauton, dass die Umstellung nur Unruhe waere.
+   *
+   * Bei diesen vier ist es umgekehrt, und das ist gemessen:
+   *
+   *   Holz 14,2 · Baumischabfall 15,2 · Kunststoff 20,0 · Reifen 21,5
+   *
+   * — alle weit ueber 10, und untereinander 17 bis 37 auseinander. Bis heute
+   * stand ein Lattenrost-Stapel, ein Bohlenbund, ein Reifenstapel und eine
+   * Kunststoffplatte im selben Stahlgrau da wie ein Blechstapel. Genau darueber
+   * ist Patrick gestolpert: „Er sieht ein Teil und weiss nicht, was er in der
+   * Hand haelt." Eine Fraktion, die man nicht sieht, ist nur ein Wort.
+   *
+   * Betroffen sind allein die Teile mit einem `bau`, der einen Grundton
+   * annimmt (stapel, buendel, platte, haufen, tank, trommel). Polster, Kiste
+   * und Beton bringen ihren eigenen Anblick mit und bleiben unberuehrt.
+   */
+  wood: 0x8a6a42,
+  rubble: 0x9a9083,
+  tires: 0x2e2c2b,
+  plastic: 0x3f6d8a,
 };
 
-/** Der Grundton eines blanken Bauteils: Buntmetall nach Fraktion, sonst Stahl. */
+/**
+ * Der Grundton eines blanken Bauteils: nach Fraktion, wo die Fraktionsfarbe
+ * etwas aussagt — sonst Stahl (Stahlschrott, Mischschrott, Batterien).
+ */
 export function metallton(materialId?: string): number {
-  return BUNTTON[materialId ?? ""] ?? STAHL;
+  return FRAKTIONSTON[materialId ?? ""] ?? STAHL;
 }
 
 /**

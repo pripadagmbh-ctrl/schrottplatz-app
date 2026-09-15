@@ -318,7 +318,7 @@ describe("Ein Kupferkessel ist kupfern, ein Stahltank bleibt grau", () => {
       expect(metallton(id), `${id} zeigt seine Fraktionsfarbe nicht`).toBe(MATERIALS[id]!.color);
   });
 
-  it("Stahl, Mischschrott und Abfall bleiben, wie sie waren", () => {
+  it("Stahl, Mischschrott und Batterien bleiben, wie sie waren", () => {
     /*
      * Die Gegenprobe zur Zeile darueber — und der Grund, warum diese Aenderung
      * an rund zweihundert Eintraegen kein Pixel bewegt. Der Stahlton der
@@ -328,8 +328,21 @@ describe("Ein Kupferkessel ist kupfern, ein Stahltank bleibt grau", () => {
      */
     const stahlton = metallton("steel");
     expect(stahlton).not.toBe(MATERIALS.steel!.color);
-    for (const id of ["steel", "mixed", "wood", "plastic", "tires", "rubble", "battery"])
+    for (const id of ["steel", "mixed", "battery"])
       expect(metallton(id), `${id} sollte den Stahlton behalten`).toBe(stahlton);
+  });
+
+  it("die vier Abfallsorten zeigen dagegen ihre Farbe (16.09.2026)", () => {
+    /*
+     * Bis zum 16.09.2026 standen Holz, Kunststoff, Reifen und Baumischabfall
+     * mit in der Zeile darueber. Sie sind ausgezogen: Ihre Fraktionsfarben
+     * liegen ΔE2000 = 14,2 bis 21,5 vom Bauton weg — das ist der Unterschied
+     * zwischen „unauffaellig" und „nicht erkennbar", und Patricks Befund war
+     * genau der zweite Fall („Stoerstoff sagt niemandem etwas"). Die Messung
+     * steht in `test/abfall.test.ts`.
+     */
+    for (const id of ["wood", "rubble", "tires", "plastic"])
+      expect(metallton(id), `${id} steht noch in Stahlgrau da`).toBe(MATERIALS[id]!.color);
   });
 });
 
@@ -426,28 +439,33 @@ describe("Was eine Fuhre ansagt, liegt auch drauf", () => {
     expect(polster.map((c) => c.shape.name)).toEqual([]);
   });
 
-  it("BEFUND: die feste Fraktionstabelle liefert Baumischabfall nicht aus", () => {
+  it("BEFUND BEHOBEN: die Fraktionstabelle liefert jetzt auch Baumischabfall aus", () => {
     /*
-     * Die Tabelle in `randomCargo` verspricht 42 % Stahl, 22 % Mischschrott,
-     * 16 % Alu und den Rest zu gleichen Teilen auf neun Fraktionen — also je
-     * 2,2 %. Bei `rubble` geht das nicht auf: In der Liste der Kleinteile
-     * steht kein einziger Eintrag dieser Fraktion, und dann greift der
-     * Notausgang (`pool[Math.random() …]`) und zieht irgendetwas.
+     * Diese Zeile hielt bis zum 16.09.2026 einen Mangel als Zahl fest und
+     * lautete `expect(anteil("rubble")).toBe(0)`.
      *
-     * Er LUEGT dabei nicht — das gezogene Stueck traegt seine eigene Fraktion,
-     * das prueft der Waechter oben. Aber die Mischung stimmt nicht mit dem
-     * ueberein, was daneben als Absicht steht. Gemessen ohne Grossteile:
-     * 0,0 % statt 2,2 %.
+     * Der Grund war nicht die Tabelle, sondern der leere Katalog: In der
+     * Kleinteil-Klasse — der einzigen, aus der eine gewoehnliche Anlieferung
+     * zieht — stand KEIN EINZIGER Eintrag der Fraktion `rubble`. Dann greift
+     * der Notausgang in `randomCargo` (`pool[Math.random() …]`) und zieht
+     * irgendetwas; er luegt dabei nicht, aber die Mischung stimmt nicht mit
+     * dem ueberein, was daneben als Absicht steht.
      *
-     * Nicht behoben, weil jede Aenderung an dieser Tabelle den Verdienst
-     * verschiebt (E-042: Der Stahlanteil haengt daran) und das eine
-     * Entscheidung von Patrick ist, keine Aufraeumarbeit.
+     * Acht Gegenstaende spaeter stimmt sie. Der Verdienst hat sich dabei NICHT
+     * verschoben — das war die Sorge, unter der der Befund stehen blieb: Die
+     * Tabelle zieht aus einem Lostopf mit festen Anteilen (`REST_LOSE`), und
+     * der Abfallanteil einer Anlieferung liegt unveraendert bei 6,7 %
+     * (gemessen in `test/abfall.test.ts`).
      */
     vi.spyOn(Math, "random").mockImplementation(festerZufall(1));
     const ladung = randomCargo(4000, 0, 0);
     const anteil = (id: string) => ladung.filter((c) => c.materialId === id).length / ladung.length;
-    expect(anteil("rubble")).toBe(0);
-    // Der Stahlanteil dagegen sitzt: Stahl gibt es in jeder Groessenklasse.
+    // Ein Sechsunddreissigstel des letzten Fuenftels x 3 Lose = 1,67 %.
+    expect(anteil("rubble")).toBeGreaterThan(0.008);
+    expect(anteil("rubble")).toBeLessThan(0.026);
+    // Und dasselbe fuer die Fraktion, die es bis heute gar nicht gab.
+    expect(anteil("tires"), "Reifen werden weiter nicht angeliefert").toBeGreaterThan(0.008);
+    // Der Stahlanteil dagegen sitzt wie eh: Stahl gibt es in jeder Klasse.
     expect(anteil("steel")).toBeGreaterThan(0.38);
     expect(anteil("steel")).toBeLessThan(0.47);
   });

@@ -106,10 +106,29 @@ export function normalizeMaterialId(id: string): string {
 }
 
 /**
- * Abfallfraktionen: Sie bringen kein Geld, sie kosten. Ein Abnehmer bestellt
- * sie nie — sie werden entsorgt.
+ * DIE VIER ABFALLFRAKTIONEN — und zwar an genau EINER Stelle.
+ *
+ * Sie bringen kein Geld, sie kosten. Ein Abnehmer bestellt sie nie; sie werden
+ * entsorgt.
+ *
+ * Diese Liste ist die Quelle, aus der sich alles andere bedient: die
+ * Schuettdichten (`schuettdichte.ts`), der Fraktionsmix der Anlieferungen
+ * (`world/scrapItems.ts`, `randomCargo`), die Mulden (`world/containers.ts`)
+ * und das HUD. Bis zum 16.09.2026 stand dieselbe Vierergruppe ZWEIMAL im
+ * Quelltext — hier und als `STOERSTOFFE` in `schuettdichte.ts` —, und im
+ * Fraktionsmix stand eine DRITTE Fassung mit nur drei davon: Reifen konnten
+ * nie angeliefert werden. Genau diese Fehlerklasse (zwei Stellen, die dasselbe
+ * wissen sollen, und sie wissen es verschieden) hat am 15.09.2026 fuenf
+ * Waechter beschaeftigt. `test/abfall.test.ts` haelt die Liste jetzt zusammen.
+ *
+ * Die Reihenfolge ist die, in der Patrick sie genannt hat („Holz,
+ * Baumischabfall, Reifen und Kunststoffe") — sie bestimmt nichts ausser der
+ * Lesbarkeit.
  */
-export const ABFALL = new Set(["wood", "tires", "rubble", "plastic"]);
+export const ABFALLFRAKTIONEN = ["wood", "rubble", "tires", "plastic"] as const;
+
+/** Dieselbe Liste als Menge, fuer schnelle Abfragen. */
+export const ABFALL: ReadonlySet<string> = new Set<string>(ABFALLFRAKTIONEN);
 
 /** Ist das eine Abfallfraktion? */
 export function istAbfall(id: string): boolean {

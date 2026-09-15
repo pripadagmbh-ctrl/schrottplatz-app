@@ -110,7 +110,7 @@ describe("Was der Katalog daraus macht", () => {
    * Zahlen halten den Stand fest. Wandern sie, hat jemand den Katalog
    * umgebaut, und dann gehört die Bestandsaufnahme nachgezogen.
    */
-  it("313 erreichbare Einträge, davon 55 mit Stückliste", () => {
+  it("327 erreichbare Einträge, davon 55 mit Stückliste", () => {
     // 271 waren es bis E-042; neun massive Kleinteile sind dazugekommen
     // (Bremsscheibe, Bahnschwelle, Schienenabschnitt, Kurbelwelle …), weil
     // Patricks eigene Premium-Beispiele im Katalog fehlten.
@@ -126,7 +126,13 @@ describe("Was der Katalog daraus macht", () => {
     // Polstermoebel („Auffuellen, mindestens acht je Fraktion", 15.09.2026).
     // Keiner davon hat eine Stueckliste — es sind sortenreine Einzelteile, und
     // genau deshalb bleibt die zweite Zahl stehen.
-    expect(ALLE.length).toBe(313);
+    //
+    // 313 waren es bis E-067. Vierzehn sind dazugekommen, als „Stoerstoff"
+    // aufgeloest wurde (16.09.2026): acht Baumischabfall (die Fraktion hatte
+    // in der Kleinteil-Klasse **null** Gegenstaende), vier Reifen, zwei Holz.
+    // Keiner davon hat eine Stueckliste — ein Reifen ist ein Reifen —, und
+    // genau deshalb bleibt die zweite Zahl stehen.
+    expect(ALLE.length).toBe(327);
     expect(ALLE.filter((s) => s.zusammensetzung).length).toBe(55);
   });
 
@@ -297,7 +303,7 @@ describe("Die Farbe trägt die Fraktion nicht", () => {
     expect(d, "über 10 wäre eine klar andere Farbe").toBeLessThan(10);
   });
 
-  it("21 von 313 Teilen tragen die Fraktionsfarbe unmittelbar", () => {
+  it("23 von 327 Teilen tragen die Fraktionsfarbe unmittelbar", () => {
     /*
      * Alles mit `bau` wird nach Zweck gefärbt (objektbau.ts:22-30).
      * 16 waren es bis E-042; Bremsscheibe und Großzahnrad sind absichtlich
@@ -309,8 +315,13 @@ describe("Die Farbe trägt die Fraktion nicht", () => {
      * Buntmetall zeigt seine Farbe jetzt auch DURCH den Bau (`metallton` in
      * `objektbau.ts`). Ein Kupferkessel ist kupfern, obwohl er `bau: "tank"`
      * trägt. Was dieser Wächter zählt, ist nur noch der unmittelbare Weg.
+     *
+     * 23 seit dem 16.09.2026: LKW-Reifen und Erdbaureifen sind wie der
+     * Traktorreifen nackte Ringe. Und `metallton` trägt seither auch die vier
+     * Abfallsorten — ein Lattenrost-Stapel ist braun, ein Reifenstapel
+     * schwarz (`test/abfall.test.ts`).
      */
-    expect(ALLE.filter((s) => !s.bau).length).toBe(21);
+    expect(ALLE.filter((s) => !s.bau).length).toBe(23);
   });
 
   it("Aluminium ist nicht mehr mit Edelstahl zu verwechseln (E-042)", () => {
