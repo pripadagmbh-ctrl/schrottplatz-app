@@ -33,9 +33,10 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { alleEintraege, huellVolumen, leitstoff } from "../tools/stahlschrott";
+import { alleEintraege } from "../tools/stahlschrott";
+import { baueGeometrie, metallton } from "../src/world/objektbau";
+import { MATERIALS } from "../src/materials/catalog";
 import { fraktionVonTeil } from "../src/materials/purity";
-import { feststoffdichte } from "../src/materials/schuettdichte";
 import { randomCargo } from "../src/world/scrapItems";
 import { griffLadung, griffZiel } from "../src/ui/hud";
 import type { PileSpec } from "../src/world/objektkatalog";
@@ -58,37 +59,34 @@ const ALLE: Eintrag[] = alleEintraege().map(({ spec, liste }) => ({
 }));
 
 /* ------------------------------------------------------------------------ */
-/* Das Messwerkzeug: welcher Zweig von `moebel` greift                        */
+/* Der Polsterzweig haengt nicht mehr an den Abmessungen (E-063)              */
 /* ------------------------------------------------------------------------ */
 
 /**
- * Die Bedingung wird aus dem QUELLTEXT von `objektbau.ts` gelesen, nicht hier
- * abgeschrieben.
+ * Wird dieses Stueck als Polstermoebel gebaut — in Stoff bezogen, mit Lehne?
  *
- * Eine Kopie einer Regel driftet von ihrem Original weg, und dann glaubt man
- * der falschen — dieselbe Lehre, aus der `test/cssmass.ts` entstanden ist.
- * Aendert jemand den Zweig, faellt zuerst dieser Test und nicht irgendwann
- * Patrick eine Couch auf.
+ * Bis E-063 war das eine RECHNUNG aus den Kantenlaengen: `moebel` waehlte
+ * seinen Zweig mit `h < w*0,75 && d > h*0,7`, und wer zufaellig flach und tief
+ * genug war, wurde zur Couch. Vier Gegenstaende traf es — Stahlschrank,
+ * Holzkiste, Kuechenzeile, Fahrzeug-Sitzbank.
+ *
+ * Jetzt steht es am Eintrag. Das ist der ganze Punkt: Eine Eigenschaft, die
+ * man am Katalog ABLESEN kann, laesst sich pruefen; eine, die aus drei Zahlen
+ * herausfaellt, nicht.
  */
-function polsterSchwellen(): { a: number; b: number } {
-  const m = /const weich = h < w \* ([\d.]+) && d > h \* ([\d.]+);/.exec(objektbau);
-  if (!m) throw new Error("Der Polster-Zweig von `moebel` steht nicht mehr da, wo er stand");
-  return { a: Number(m[1]), b: Number(m[2]) };
-}
-
-/** Wird dieses Stueck als Polstermoebel gebaut — in Stoff bezogen, mit Lehne? */
 function istPolster(spec: PileSpec): boolean {
-  if (spec.bau !== "moebel") return false;
-  const { a, b } = polsterSchwellen();
-  const [w, h, d] = spec.dims;
-  return h < w * a && d > h * b;
+  return spec.bau === "polster";
 }
 
-describe("Das Messwerkzeug trifft den richtigen Zweig", () => {
-  it("liest die Bedingung aus objektbau.ts statt sie abzuschreiben", () => {
-    const { a, b } = polsterSchwellen();
-    expect(a).toBeCloseTo(0.75, 6);
-    expect(b).toBeCloseTo(0.7, 6);
+describe("Der Polsterzweig haengt am Eintrag, nicht an den Massen (E-063)", () => {
+  it("die alte Massenbedingung steht nicht mehr in objektbau.ts", () => {
+    /*
+     * Der eigentliche Waechter dieser Entscheidung. Solange diese Zeile im
+     * Quelltext steht, kann jeder neue Eintrag in den falschen Massen wieder
+     * zur Couch werden — egal, was im Katalog steht.
+     */
+    expect(objektbau).not.toMatch(/const weich = h < w \*/);
+    expect(objektbau, "der Bau `polster` fehlt").toContain('case "polster":');
   });
 
   it("erkennt das Sofa als Polster und die Schrankwand als Korpus", () => {
@@ -99,18 +97,43 @@ describe("Das Messwerkzeug trifft den richtigen Zweig", () => {
     expect(istPolster(sofa.spec)).toBe(true);
     expect(istPolster(schrank.spec)).toBe(false);
   });
+
+  it("die vier falschen Polster von E-061 sind keine mehr", () => {
+    /*
+     * Namentlich, weil es Patricks Befund ist: Ein Stahlschrank, eine
+     * Holzkiste, eine Kuechenzeile und eine Fahrzeug-Sitzbank standen als
+     * Polstersofa auf dem Platz. Die Sitzbank IST eins — sie behaelt den Bau,
+     * jetzt aber, weil es am Eintrag steht, und nicht, weil ihre Masse
+     * zufaellig passen.
+     */
+    const bauVon = (n: string) => ALLE.find((e) => e.name === n)!.spec.bau;
+    expect(bauVon("Stahlschrank")).toBe("moebel");
+    expect(bauVon("Küchenzeile (Segment)")).toBe("moebel");
+    expect(bauVon("Holzkiste")).toBe("kiste");
+    expect(bauVon("Fahrzeug-Sitzbank")).toBe("polster");
+  });
+
+  it("Polster und Korpus sehen verschieden aus", () => {
+    /*
+     * Gegenprobe zur Zeile darueber: Waeren `polster` und `moebel` derselbe
+     * Bau unter zwei Namen, waere die Umstellung eine Umbenennung und kein
+     * Umbau. Verglichen wird die Eckenzahl bei GLEICHEN Massen.
+     */
+    const masse = [2.1, 0.9, 0.95];
+    const p = baueGeometrie("polster", masse, "box");
+    const m = baueGeometrie("moebel", masse, "box");
+    const ecken = (g: { koerper: { getAttribute: (n: string) => { count: number } } }) =>
+      g.koerper.getAttribute("position").count;
+    expect(ecken(p)).not.toBe(ecken(m));
+  });
 });
 
 /* ------------------------------------------------------------------------ */
 /* Die Regel: keine Fraktion, die der Bauart widerspricht                     */
 /* ------------------------------------------------------------------------ */
 
-/**
- * Was als METALL gilt — die Fraktionen, die man einem Polstermoebel nie
- * ansehen wuerde. `mixed` gehoert ausdruecklich NICHT dazu: Ein Sofa hat einen
- * Stahlrahmen, und Mischschrott ist genau die richtige Antwort darauf.
- */
-const METALL = new Set(["steel", "va", "alu", "copper", "brass", "zinc", "battery", "cable"]);
+/** Fraktionen, die kosten statt zu bringen — die Antwort auf Sperrmuell. */
+const istAbfall = (f: string): boolean => (MATERIALS[f]?.sellPricePerKg ?? 1) < 0;
 
 /**
  * Verbotene Paare aus Bauart und Fraktion.
@@ -128,8 +151,27 @@ const VERBOTEN: Array<{
   {
     was: "Polstermoebel",
     trifft: (e) => istPolster(e.spec),
-    erlaubt: (f) => !METALL.has(f),
-    warum: "Was in Stoff bezogen dasteht, ist nie sortenreines Metall (Patricks Couch)",
+    /*
+     * Schaerfer als „kein Metall" (E-063). Patrick, 15.09.2026: „Wenn etwas
+     * wie eine Couch aussieht, dass es auch eine Couch ist. Und dann ist es
+     * Muell." Mischschrott BRINGT Geld (0,16 €/kg) — er ist damit keine
+     * gueltige Antwort auf ein Polstermoebel. Es muss eine Fraktion sein, die
+     * kostet.
+     */
+    erlaubt: (f) => istAbfall(f),
+    warum: "Ein Polstermoebel ist Muell, nicht Metall und auch nicht Mischschrott",
+  },
+  {
+    was: "Bleiakku",
+    trifft: (e) => e.spec.bau === "batterie",
+    erlaubt: (f) => f === "battery",
+    warum: "Was wie ein Akku gebaut wird, gehoert in die Batteriemulde (Sondermuell)",
+  },
+  {
+    was: "Armatur",
+    trifft: (e) => e.spec.bau === "armatur",
+    erlaubt: (f) => f === "brass" || f === "copper" || f === "steel" || f === "va",
+    warum: "Ein Ventilkoerper ist aus Rotguss, Messing oder Stahl — nie aus Holz",
   },
   {
     was: "weisse Ware",
@@ -179,30 +221,115 @@ describe("Kein Stueck traegt eine Fraktion, die seiner Bauart widerspricht", () 
   });
 });
 
-describe("Was noch als Polster gebaut wird, obwohl es keins ist (BEFUND)", () => {
-  it("vier Stuecke sehen aus wie eine Couch und heissen anders", () => {
+describe("Wer als Polster gebaut wird, ist eins (E-063)", () => {
+  it("die Liste enthaelt nur Polstermoebel und ist nicht leer", () => {
     /*
-     * BEFUND, nicht Soll-Zustand. Diese vier tragen keine Metallfraktion und
-     * verletzen die Regel oben darum nicht — aber ein Stahlschrank, eine
-     * Holzkiste und eine Kuechenzeile als Polstersofa sind trotzdem falsch.
+     * Frueher stand hier ein BEFUND mit vier falschen Namen. Jetzt ist es eine
+     * Soll-Eigenschaft: Jeder Traeger des Baus heisst nach einem Polstermoebel.
      *
-     * Aus dem Katalog allein ist das nicht zu heilen: `moebel` hat nur die
-     * beiden Zweige, und der andere faerbt in Holztoenen. Der saubere Weg ist
-     * ein eigener Bau `polster`, den nur echte Polstermoebel tragen — das ist
-     * eine Aenderung in `objektbau.ts` und gehoert dem Orchestrator vorgelegt.
-     *
-     * Wird die Liste LAENGER, hat jemand den Fehler vermehrt. Wird sie
-     * kuerzer, ist er behoben, und dann gehoert dieser Waechter angepasst.
+     * Wird die Liste laenger, ist das in Ordnung — solange jeder neue Name die
+     * Probe besteht. Wird sie LEER, prueft dieser Test nichts mehr, und genau
+     * dagegen steht die zweite Zeile.
      */
-    const falsch = ALLE.filter((e) => istPolster(e.spec) && e.name !== "Couch (Dreisitzer)")
-      .map((e) => e.name)
-      .sort();
-    expect(falsch).toEqual([
-      "Fahrzeug-Sitzbank",
-      "Holzkiste",
-      "Küchenzeile (Segment)",
-      "Stahlschrank",
-    ]);
+    const polster = ALLE.filter((e) => istPolster(e.spec)).map((e) => e.name).sort();
+    expect(polster.length).toBeGreaterThanOrEqual(3);
+    const keinPolstername = polster.filter((n) => !/Couch|Sofa|Sessel|Sitzbank|Polster/i.test(n));
+    expect(keinPolstername).toEqual([]);
+  });
+
+  it("und umgekehrt: was nach Polstermoebel heisst, wird auch als eins gebaut", () => {
+    /*
+     * Die Gegenrichtung ist Patricks eigentlicher Satz: „Wenn etwas wie eine
+     * Couch aussieht, dass es auch eine Couch ist." Ohne diese Zeile koennte
+     * jemand ein „Sofa (Leder)" mit `bau: "tank"` eintragen, und alles waere
+     * gruen.
+     *
+     * Ausnahme mit Namen: Der Matratzenstapel. Ein Stapel Matratzen ist
+     * geschichtet, nicht bezogen — `stapel` trifft ihn besser als `polster`.
+     */
+    const AUSNAHMEN = new Set(["Matratzenstapel"]);
+    const falsch = ALLE.filter(
+      (e) => /\b(Couch|Sofa|Sessel|Sitzbank)\b/i.test(e.name) && !istPolster(e.spec) && !AUSNAHMEN.has(e.name)
+    ).map((e) => `${e.name} wird als ${e.spec.bau ?? "(nackter Quader)"} gebaut`);
+    expect(falsch).toEqual([]);
+  });
+
+  it("und jedes davon ist Muell, keine Fraktion, die Geld bringt", () => {
+    for (const e of ALLE.filter((x) => istPolster(x.spec)))
+      expect(MATERIALS[e.frak]!.sellPricePerKg, `${e.name} bringt Geld`).toBeLessThan(0);
+  });
+});
+
+/* ------------------------------------------------------------------------ */
+/* Bau und Name decken sich — nicht nur bei Polstermoebeln                    */
+/* ------------------------------------------------------------------------ */
+
+describe("Wer einen Bau traegt, heisst auch danach (E-063)", () => {
+  /**
+   * Fuer jeden Bau, dessen Name diagnostisch ist: Welche Woerter muss ein
+   * Eintrag im Namen fuehren, um ihn tragen zu duerfen?
+   *
+   * Absichtlich nicht vollstaendig. `maschine`, `stapel` oder `buendel`
+   * beschreiben eine Bauform, keinen Gegenstand — da sagt der Name nichts
+   * vorher. Diese sieben tun es: Ein Motorblock, ein Boot und eine
+   * Autobatterie sehen nicht gleich aus, und ihre Namen sagen es auch.
+   */
+  const NAMENSBAU: Array<[string, RegExp]> = [
+    ["motor", /Motor|Triebwerk|Aggregat/i],
+    ["batterie", /Batterie|Akku|Traktionszellen|Solarspeicher/i],
+    ["boot", /Boot|Rumpf|Ponton/i],
+    ["armatur", /Armatur|Ventil|Schieber|Hahn/i],
+    ["propeller", /Schraube|Propeller/i],
+    ["kiste", /Kiste|Kasten/i],
+    ["anker", /Anker/i],
+    ["beton", /Beton|Schacht|Hohlkammer|Ballast/i],
+  ];
+
+  for (const [bau, re] of NAMENSBAU) {
+    it(`${bau}: jeder Traeger heisst danach`, () => {
+      const traeger = ALLE.filter((e) => e.spec.bau === bau);
+      expect(traeger.length, `kein Eintrag traegt den Bau ${bau}`).toBeGreaterThan(0);
+      const falsch = traeger.filter((e) => !re.test(e.name)).map((e) => e.name);
+      expect(falsch).toEqual([]);
+    });
+  }
+
+  it("der Waechter greift wirklich — ein Stahlschrank als Motorblock faellt durch", () => {
+    /*
+     * Die Gegenprobe. Ohne sie koennte jedes Muster oben auf alles passen und
+     * die Liste bliebe leer, weil nichts geprueft wird. Geprueft wird mit
+     * demselben Code, mit dem der echte Katalog geprueft wird.
+     */
+    const erfunden = { name: "Stahlschrank", bau: "motor" };
+    const regel = NAMENSBAU.find(([b]) => b === erfunden.bau)!;
+    expect(regel[1].test(erfunden.name)).toBe(false);
+    // Und ein echter Motorblock kommt durch — sonst meldet die Regel immer.
+    expect(regel[1].test("Motorblock (V8, ausgebaut)")).toBe(true);
+  });
+});
+
+/* ------------------------------------------------------------------------ */
+/* Buntmetall zeigt seine Farbe (E-063)                                       */
+/* ------------------------------------------------------------------------ */
+
+describe("Ein Kupferkessel ist kupfern, ein Stahltank bleibt grau", () => {
+  it("der Grundton der Bauten kommt bei Buntmetall aus der Fraktion", () => {
+    for (const id of ["copper", "brass", "va", "zinc", "alu", "cable"])
+      expect(metallton(id), `${id} zeigt seine Fraktionsfarbe nicht`).toBe(MATERIALS[id]!.color);
+  });
+
+  it("Stahl, Mischschrott und Abfall bleiben, wie sie waren", () => {
+    /*
+     * Die Gegenprobe zur Zeile darueber — und der Grund, warum diese Aenderung
+     * an rund zweihundert Eintraegen kein Pixel bewegt. Der Stahlton der
+     * Fraktion (0x6e5a4e) liegt ΔE2000 = 8,8 neben dem Bauton (0x6f6a63);
+     * haette man ihn mitgenommen, waere jeder Stahltank auf dem Platz brauner
+     * geworden, ohne dass es jemand bestellt hat (`tools/metallton.ts`).
+     */
+    const stahlton = metallton("steel");
+    expect(stahlton).not.toBe(MATERIALS.steel!.color);
+    for (const id of ["steel", "mixed", "wood", "plastic", "tires", "rubble", "battery"])
+      expect(metallton(id), `${id} sollte den Stahlton behalten`).toBe(stahlton);
   });
 });
 
@@ -414,89 +541,15 @@ describe("Was die Griff-Info sagt und was nicht (E-061)", () => {
   });
 });
 
+/* Das Gewicht: siehe test/gewicht.test.ts (E-063)                            */
 /* ------------------------------------------------------------------------ */
-/* Das Gewicht muss zum Stoff passen                                          */
-/* ------------------------------------------------------------------------ */
-
-describe("Kein Stueck wiegt mehr, als sein Stoff in seinem Volumen wiegen kann", () => {
-  /*
-   * Patrick, 15.09.2026: „Ganz oft sind Aluminium-Sachen, die haben dann zwei
-   * Tonnen. Aber Aluminium ist ja leicht, das ist ja die Eigenschaft von
-   * Aluminium." Gewicht ist einer seiner drei Erkennungskanaele fuer Alu
-   * (neben Farbe und Zusammensetzung) — und ein Kanal, der luegt, ist keiner.
-   *
-   * Die Obergrenze ist keine Setzung: Ein Koerper von V Kubikmetern aus einem
-   * Stoff der Dichte rho kann hoechstens rho x V wiegen. Alles darueber ist
-   * unmoeglich, nicht bloss ungewoehnlich.
-   */
-  const grenze = (e: Eintrag): number =>
-    feststoffdichte(leitstoff(e.spec).id) * huellVolumen(e.spec.kind, e.spec.dims);
-
-  it("kein Katalogeintrag ueberschreitet die Feststoffdichte", () => {
-    const zuSchwer = ALLE.filter((e) => e.spec.massKg > grenze(e) * 1.001).map(
-      (e) => `${e.name}: ${e.spec.massKg} kg, moeglich waeren ${grenze(e).toFixed(0)} kg`
-    );
-    expect(zuSchwer).toEqual([]);
-  });
-
-  it("der Waechter greift wirklich — ein erfundener Alu-Wuerfel faellt durch", () => {
-    // 0,4 x 0,3 x 0,2 m Aluminium = 0,024 m3 x 2700 = 65 kg. 1800 kg waeren
-    // das Achtundzwanzigfache — genau Patricks „kleines Aluminiumteil mit 1,8
-    // Tonnen".
-    const moeglich = feststoffdichte("alu") * huellVolumen("box", [0.4, 0.3, 0.2]);
-    expect(moeglich).toBeCloseTo(64.8, 1);
-    expect(1800).toBeGreaterThan(moeglich);
-  });
-
-  it("ein Alupaket ist leichter als ein Stahlpaket gleicher Groesse (E-061)", () => {
-    /*
-     * Die Presse gab bis zum 15.09.2026 dem Alupaket die Dichte 1450 und dem
-     * Stahlpaket 1250 — Alu war das SCHWERERE von beiden. Ein Alupaket von
-     * 1,8 t mass damit 1,24 m3: der kleine, schwere Klotz aus Patricks Befund.
-     *
-     * Geprueft wird das Verhaeltnis, nicht die Zahl: Ein Paket packt sich auf
-     * einen Anteil seines Feststoffs zusammen, und dieser Anteil darf bei Alu
-     * nicht hoeher sein als bei Stahl.
-     */
-    const quelle = readFileSync(resolve(wurzel, "src/world/scrapItems.ts"), "utf8");
-    const dichteVon = (frak: string): number => {
-      const m = new RegExp(`^\\s*${frak}: \\{ dichte: (\\d+)`, "m").exec(quelle);
-      if (!m) throw new Error(`Pressprofil ${frak} nicht gefunden`);
-      return Number(m[1]);
-    };
-    const stahl = dichteVon("steel");
-    const alu = dichteVon("alu");
-    expect(alu, "ein Alupaket war schwerer als ein Stahlpaket").toBeLessThan(stahl);
-    // Und zwar ungefaehr im Verhaeltnis der Feststoffe: 1250 x 2700/7850 = 430.
-    const erwartet = stahl * (feststoffdichte("alu") / feststoffdichte("steel"));
-    expect(alu).toBeGreaterThan(erwartet * 0.8);
-    expect(alu).toBeLessThan(erwartet * 1.25);
-  });
-
-  it("der Deckel auf die Paketgroesse schneidet erst weit oben ab (E-061)", () => {
-    /*
-     * Die zweite Haelfte desselben Fehlers. Die Dichte allein genuegt nicht:
-     * `spawnBale` deckelt das Volumen, und ein Deckel ist eine Luege in
-     * Kilogramm — ueber ihm sieht jedes Paket gleich gross aus, egal wie
-     * schwer es ist.
-     *
-     * Geprueft wird an Patricks Zahl: Ein Alupaket von 1,8 t muss deutlich
-     * groesser werden als der Wuerfel von gut einem Meter, den er gesehen hat.
-     */
-    const quelle = readFileSync(resolve(wurzel, "src/world/scrapItems.ts"), "utf8");
-    const m = /clamp\(massKg \/ \(profil\.dichte \* \(1 \+ streu\(0\.05\)\)\), 0\.1, ([\d.]+)\)/.exec(
-      quelle
-    );
-    if (!m) throw new Error("Die Groessenrechnung in `spawnBale` steht nicht mehr da, wo sie stand");
-    const deckel = Number(m[1]);
-    const aluDichte = Number(/^\s*alu: \{ dichte: (\d+)/m.exec(quelle)![1]);
-    const volumen = Math.min(1800 / aluDichte, deckel);
-    expect(volumen, "ein Alupaket von 1,8 t bleibt ein kleiner schwerer Klotz").toBeGreaterThan(3.5);
-    // Und die Kante bleibt unter der des Seecontainers (4,8 m), den es im
-    // Katalog gibt — ein Paket soll ein Paket bleiben.
-    expect(Math.cbrt(volumen) * 1.25).toBeLessThan(4.8);
-  });
-});
+/*
+ * Der Waechter ueber unmoegliche Gewichte stand bis E-063 hier. Er ist nach
+ * `test/gewicht.test.ts` gezogen und dort um drei Gegenproben und die
+ * Sortenzahl je Fraktion gewachsen. Zwei Haeuser fuer dieselbe Regel waeren
+ * genau die Bauform, aus der E-062 gelernt hat: zwei Abschriften, die
+ * auseinanderlaufen.
+ */
 
 
 /* ------------------------------------------------------------------------ */

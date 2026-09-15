@@ -3458,3 +3458,119 @@ hält. Der Wächter hält einen Rückschritt an einer festen Fuhre fest; er sagt
 nicht, dass im Spiel nichts fliegt. Ob er auf die gewürfelte Fuhre umgestellt
 wird — und die Schranken damit auf einen schlechteren, aber wahren Stand —
 gehört ins Kipper-Paket und ist bewusst **nicht** hier entschieden.
+
+---
+
+### E-063 — Ein Gegenstand ist, wonach er aussieht; und keine Mulde ist mehr zu dünn (15.09.2026)
+
+**Entscheidung.** Zwei Dinge in einem Zug, weil sie dieselben Dateien anfassen.
+
+*Teil A — Aussehen und Name in Deckung.* Der Polsterzweig von `moebel` hing an
+den **Abmessungen** (`h < w*0,75 && d > h*0,7`). Diese Zeile ist **ersatzlos
+gestrichen**. Polstermöbel tragen jetzt `bau: "polster"`, und nur sie. Dazu
+sieben weitere Bauten, damit die Gegenstände, die bisher fremdgingen, ihren
+eigenen bekommen: `kiste`, `klotz`, `batterie`, `boot`, `armatur`, `propeller`,
+`anker`. **36 Katalogeinträge** sind auf einen anderen Bauzweig umgehängt
+(nachgezählt am Diff, nicht geschätzt); zwei weitere — Stahlschrank und
+Küchenzeile — ändern ihr Aussehen, ohne dass ihr Eintrag angefasst wurde: Sie
+hingen am gestrichenen Massenzweig.
+Zusätzlich holen blanke Bauteile ihren Grundton jetzt aus der Fraktion, wenn es
+**Buntmetall** ist (`metallton()` in `objektbau.ts`) — ein Kupferkessel ist
+kupfern, ein Stahltank bleibt grau.
+
+*Teil B — dünne Fraktionen auffüllen.* **33 neue Einträge**: je sechs Kupfer,
+Messing und VA, fünf Kabel, vier Zink, vier Batterien, zwei Polstermöbel. Die
+Zielgröße „mindestens acht je Fraktion" gilt für die **Größenklasse der
+Kleinteile**, nicht für den Gesamtkatalog — `randomCargo` wählt erst die Klasse
+und zieht dann die Fraktion daraus, eine sortenreine Kleinteil-Fuhre sieht also
+nur die Kleinteile ihrer Fraktion.
+
+*Nebenbei behoben.* `baueGeometrie` las bei `kind: "wire"` die Felder `dims[1]`
+und `dims[2]`, die es dort nicht gibt. Drei Haufen (Ankerkette, Reifenhaufen,
+Stahlteile-Haufen) bekamen dadurch ein Netz aus NaN — BEFUND B-3 in
+`test/fraktionen.test.ts`, seit dem 15.09. bekannt. Bei `wire` ist die
+Kantenlänge jetzt der Durchmesser.
+
+**Begründung.** Patrick, 15.09.2026: „Ich habe jetzt eben eine Couch gehabt, da
+hat mir einer gesagt, das wäre VA … dann brauchen wir wahrscheinlich eine
+größere Liste, dass wenn etwas wie eine Couch aussieht, dass es auch eine Couch
+ist. Und dann ist es Müll."
+
+E-061 hat den Einzelfall geheilt (der Gastro-Spültisch ist keine Couch mehr) und
+dabei die **Ursache** stehen lassen: Solange die Maße entscheiden, wird der
+nächste Eintrag in den falschen Maßen wieder zur Couch. Gemessen am Katalog vom
+15.09. traf es vier — Stahlschrank, Holzkiste, Küchenzeile, Fahrzeug-Sitzbank.
+Die Durchsicht des ganzen Katalogs (`tools/katalog-aussehen.ts bau`) fand
+**weitere 26** derselben Art: elf Gegenstände im Motorblock-Zweig, die kein
+Motor sind (Amboss, Poller, Gegengewichte, Anker, Prellbock, Getriebe, zwei
+Trommeln, Rotorkopf, Pressenrahmen), fünf Boote als liegende Kessel mit
+Domdeckel, drei Autobatterien als Gitterrahmen, zwei Propeller als Blech,
+Ölradiator als Seecontainer, Aufsitzmäher als Werkzeugmaschine, Kassentheke als
+Gittergestell, Mischschnecke und Ballenpresse als Tank. Eine Couch, zu der die
+Waage „sortenrein Edelstahl" sagt, ist der sichtbarste Fall — der Rest wirkt
+leiser und genauso.
+
+Teil B hat denselben Grund von der anderen Seite: In der Kleinteil-Klasse standen
+Kupfer 2 Sorten, Messing 2, Kabel 3, Zink 4, Batterien 4, VA 6. Eine sortenreine
+Kupferfuhre bestand aus **zwei verschiedenen Dingen**, hundertmal gelegt. Die
+Namen sind Sachen, die auf einem Platz wirklich anfallen (Stromschiene,
+Erdungsband, Absperrschieber, Lagerschale, Opferanode, USV-Block); jede Masse
+ist aus Volumen × Feststoffdichte des richtigen Werkstoffs **gerechnet**, die
+Rechnung steht an jeder Zeile.
+
+**Verworfene Alternativen.**
+
+1. *Nur die Couchen reparieren.* Patrick auf die Frage: „In einem Zug
+   aufräumen." Ein zweiter Durchgang hätte denselben Katalog ein zweites Mal
+   durchgesehen.
+2. *`moebel` einen dritten Zweig geben, der Holz von Stahl unterscheidet.* Wäre
+   wieder eine Regel, die rät. Die Auswahl darf nicht mehr an Eigenschaften
+   hängen, die man dem Eintrag nicht ansieht — das war der Fehler.
+3. *Den Grundton ALLER Bauten aus der Fraktion holen.* Gemessen
+   (`tools/metallton.ts`) liegt die Stahl-Fraktionsfarbe ΔE2000 = 8,8 neben dem
+   bisherigen Bauton: ein sichtbarer Unterschied an rund zweihundert
+   Gegenständen, den niemand bestellt hat. Nur Buntmetall wird umgestellt.
+4. *Auch Reifen, Holz und Baumischabfall auffüllen.* Das sind
+   Abfallfraktionen — niemand bestellt eine sortenreine Reifenfuhre, und jede
+   Änderung an der Mischung in `randomCargo` verschiebt den Verdienst. Bleibt
+   als BEFUND stehen (`test/gewicht.test.ts`), ausdrücklich nicht entschieden.
+
+**Abnahmekriterium.**
+
+- `test/bauart.test.ts`: Die alte Massenbedingung steht nicht mehr im Quelltext;
+  jeder Träger von `polster` heißt nach einem Polstermöbel **und** landet in
+  einer Fraktion, die Geld **kostet**; umgekehrt trägt jedes Stück, das Couch,
+  Sofa, Sessel oder Sitzbank heißt, diesen Bau (Ausnahme mit Namen:
+  Matratzenstapel). Acht weitere Bau↔Name-Regeln (motor, batterie, boot,
+  armatur, propeller, kiste, anker, beton), jede mit Gegenprobe.
+- `test/gewicht.test.ts` (neu, 17 Prüfungen): Der ganze Katalog hält die
+  Feststoffdichte seines Werkstoffs ein, und die daraus folgende Wandstärke
+  liegt zwischen 0,5 und 60 mm. **Vier Gegenproben**, alle mit demselben
+  Prüfcode: Patricks Alu-Klotz von 1,8 t (möglich wären 65 kg), die
+  Messingarmatur von 900 kg, ein Blech von 0,05 mm, ein Klotz von 300 mm — jede
+  muss melden, und ein echtes Stück daneben darf es nicht. Dazu: acht Sorten je
+  Fraktion in der Kleinteil-Klasse, mit einer Gegenprobe, dass die Zählung
+  wirklich nur eine Klasse sieht.
+- `test/fraktionen.test.ts`: 313 erreichbare Einträge (vorher 280), kein Bau
+  liefert mehr ein Netz mit NaN-Ecken.
+- 1041 Tests in 90 Dateien grün, `npm run build` grün.
+- Kosten gemessen (`tools/katalog-aussehen.ts ecken`): Die acht neuen Bauten
+  liegen bei 236–684 Eckpunkten und damit **innerhalb** des Bestands (Platte
+  144, Tank 764, Gitterbox bis 1464). Ein Gegenstand bleibt ein Zeichenruf;
+  kein neuer Körper, keine neue Physik.
+
+**Auf dem Gerät zu prüfen.**
+
+1. **Sortieren wie immer und auf die Couch achten.** Wenn ein Polstermöbel im
+   Greifer hängt, muss es aussehen wie eins (Sitz, Lehne, zwei Armlehnen,
+   Kissenfugen) — und die Griff-Info darf keine Metallklasse nennen. Kommt ein
+   Stahlschrank oder eine Küchenzeile, stehen sie jetzt als Korpus mit
+   Türfronten da, nicht mehr in Stoff bezogen.
+2. **Einmal eine sortenreine Kupfer- oder Messingfuhre kommen lassen** und die
+   Pritsche ansehen: Es müssen mindestens fünf verschiedene Dinge draufliegen,
+   und sie müssen **kupfern bzw. messingfarben** sein — nicht grau wie bisher.
+   Stimmt der Anblick mit dem Namen im Greifer überein?
+3. **Eine Autobatterie greifen.** Sie war bis heute ein Gitterrahmen, durch den
+   man hindurchsah; jetzt ist es ein schwarzer Kasten mit hellem Deckel und zwei
+   Polen. Und: Liegt das Gewicht im Greifer plausibel — die Motorradbatterie bei
+   4 kg, die Staplerbatterie bei 320?

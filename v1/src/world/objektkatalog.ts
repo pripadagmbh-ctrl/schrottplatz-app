@@ -76,10 +76,51 @@ export const KATALOG_SPECS: PileSpec[] = [
   { materialId: "zinc", massKg: 22, kind: "box", dims: [0.6, 0.12, 1.8], bau: "platte", name: "Zinkblech-Tafel" },
   { materialId: "zinc", massKg: 31, kind: "box", dims: [0.45, 0.5, 0.9], bau: "buendel", name: "Fallrohr-Bund" },
   { materialId: "zinc", massKg: 58, kind: "box", dims: [0.7, 0.6, 1.2], bau: "stapel", name: "Verzinkte Gitterroste" },
-  { materialId: "battery", massKg: 19, kind: "box", dims: [0.35, 0.22, 0.19], bau: "rahmenbox", name: "Starterbatterie" },
-  { materialId: "battery", massKg: 46, kind: "box", dims: [0.52, 0.24, 0.28], bau: "rahmenbox", name: "LKW-Batterie" },
-  { materialId: "battery", massKg: 180, kind: "box", dims: [0.9, 0.7, 0.75], bau: "stapel", name: "Batteriepalette" },
-  { materialId: "battery", massKg: 320, kind: "box", dims: [1.2, 0.8, 0.9], bau: "rahmenbox", name: "Staplerbatterie" },
+  /* --- Vier Zinksorten mehr (E-063) ------------------------------------
+   * Titanzink hat 7140 kg/m³ (`FESTSTOFFDICHTE.zinc`). Alle vier Massen sind
+   * daraus gerechnet, nicht geschaetzt; die Rechnung steht je Zeile.
+   */
+  // Bandzink 0,7 mm, 0,65 m breit, 8 m lang = 5,2 m² x 0,0007 x 7140 = 26 kg.
+  { materialId: "zinc", massKg: 26, kind: "cyl", dims: [0.25, 0.7], bau: "trommel", name: "Zinkblech-Rolle" },
+  // Verzinkte Leitungsrinnen, 2,2 m, gebuendelt: 0,198 m³ Huelle, 278 kg/m³.
+  // Nicht „Kabelrinne": Das Wort Kabel im Namen verspricht die Fraktion Kabel,
+  // und das Stueck ist verzinktes Blech (`test/bauart.test.ts`, NAMENSSTOFF).
+  { materialId: "zinc", massKg: 55, kind: "box", dims: [0.3, 0.3, 2.2], bau: "buendel", name: "Verzinkte Leitungsrinnen (Bund)" },
+  // Opferanoden vom Schiffsrumpf, massiver Zinkguss: 0,05 m³, 120 kg =
+  // 2400 kg/m³ — ein Drittel Feststoff, der Rest Luft zwischen den Bloecken.
+  { materialId: "zinc", massKg: 120, kind: "box", dims: [0.4, 0.25, 0.5], bau: "stapel", name: "Zink-Opferanoden (Stapel)" },
+  // Regentonne aus Zinkblech, 0,8 mm: 1,2 m² Mantel x 0,0008 x 7140 = 7 kg,
+  // mit Boden und Wulstrand 14 kg.
+  { materialId: "zinc", massKg: 14, kind: "cyl", dims: [0.3, 0.5], bau: "tank", name: "Zink-Regentonne" },
+  /*
+   * E-063: Die Akkus standen als GITTERRAHMEN da (`rahmenbox`) — ein Geflecht
+   * aus Kanten und Draehten, durch das man hindurchsieht. Ein Bleiakku ist das
+   * Gegenteil: ein geschlossener schwarzer Kasten mit hellem Deckel, zwei
+   * Polen und Zellenstopfen. Eigener Bau `batterie`; die Palette bekommt ihn
+   * auch, damit alles, was Batterie heisst, gleich aussieht.
+   *
+   * Massen unveraendert. Sie halten die Feststoffprobe: Ein 60-Ah-Akku wiegt
+   * 16 kg bei 7,6 Litern (`FESTSTOFFDICHTE.battery` = 2100 kg/m³).
+   */
+  { materialId: "battery", massKg: 19, kind: "box", dims: [0.35, 0.22, 0.19], bau: "batterie", name: "Starterbatterie" },
+  { materialId: "battery", massKg: 46, kind: "box", dims: [0.52, 0.24, 0.28], bau: "batterie", name: "LKW-Batterie" },
+  { materialId: "battery", massKg: 180, kind: "box", dims: [0.9, 0.7, 0.75], bau: "batterie", name: "Batteriepalette" },
+  { materialId: "battery", massKg: 320, kind: "box", dims: [1.2, 0.8, 0.9], bau: "batterie", name: "Staplerbatterie" },
+  /* --- Vier Akkus mehr (E-063): vier Sorten waren zu wenig fuer eine Mulde ---
+   *
+   * Masse je Stueck aus Volumen x 2100 kg/m³ (Akku als Geraet, nicht als
+   * reines Blei — `materials/schuettdichte.ts`), mit dem Fuellgrad, den die
+   * Bauform hergibt. Zum Vergleich von Hand: Eine Motorradbatterie traegt man
+   * mit zwei Fingern, eine Batteriebank braucht den Bagger.
+   */
+  // 18 x 17 x 9 cm, 4 kg — die Groesse einer 12-V-Motorradbatterie.
+  { materialId: "battery", massKg: 4, kind: "box", dims: [0.18, 0.17, 0.09], bau: "batterie", name: "Motorrad-Batterie" },
+  // USV-Einschub aus dem Serverraum: 0,12 m³, 180 kg = 1500 kg/m³.
+  { materialId: "battery", massKg: 180, kind: "box", dims: [0.6, 0.4, 0.5], bau: "batterie", name: "USV-Batterieblock" },
+  // Traktionszellen aus einem Elektrostapler, gebuendelt: 0,105 m³, 160 kg.
+  { materialId: "battery", massKg: 160, kind: "box", dims: [0.5, 0.6, 0.35], bau: "batterie", name: "Traktionszellen (Bund)" },
+  // Hausspeicher, Bleigel: 0,149 m³, 95 kg = 640 kg/m³ (viel Gehaeuse).
+  { materialId: "battery", massKg: 95, kind: "box", dims: [0.55, 0.9, 0.3], bau: "batterie", name: "Solarspeicher-Batterie" },
   // --- Landwirtschaft ---
   { materialId: "steel", massKg: 95, kind: "box", dims: [1.9, 1.1, 0.3], bau: "stapel", name: "Silo-Blechsegment" },
   { materialId: "steel", massKg: 140, kind: "box", dims: [0.45, 0.45, 2.2], bau: "rahmenbox", name: "Melkstand-Gitterwerk" },
@@ -106,7 +147,10 @@ export const KATALOG_SPECS: PileSpec[] = [
   { materialId: "steel", massKg: 36, kind: "box", dims: [0.45, 0.8, 0.35], bau: "maschine", name: "Gastherme", zusammensetzung: [{ materialId: "steel", anteil: 0.55 }, { materialId: "copper", anteil: 0.28 }, { materialId: "alu", anteil: 0.07 }, { materialId: "plastic", anteil: 0.1 }] },
   { materialId: "plastic", massKg: 45, kind: "box", dims: [1.2, 1.5, 0.75], bau: "tank", name: "Öltank (Keller, Kunststoff)" },
   { materialId: "copper", massKg: 34, kind: "box", dims: [0.9, 0.65, 0.35], bau: "maschine", name: "Split-Klimagerät", zusammensetzung: [{ materialId: "steel", anteil: 0.45 }, { materialId: "copper", anteil: 0.3 }, { materialId: "alu", anteil: 0.15 }, { materialId: "plastic", anteil: 0.1 }] },
-  { materialId: "steel", massKg: 24, kind: "box", dims: [0.45, 0.65, 0.25], bau: "container", name: "Ölradiator" },
+  // E-063: war `container` — mit Eckbeschlaegen und Tuerfluegeln, in
+  // Seecontainer-Blau. Ein Ölradiator ist ein Rippenkoerper: `platte`, wie der
+  // Heizkoerper drei Zeilen weiter unten.
+  { materialId: "steel", massKg: 24, kind: "box", dims: [0.45, 0.65, 0.25], bau: "platte", name: "Ölradiator" },
   { materialId: "steel", massKg: 130, kind: "box", dims: [0.55, 0.7, 0.5], bau: "maschine", name: "Gusseiserner Badeofen" },
   { materialId: "steel", massKg: 165, kind: "box", dims: [0.6, 0.8, 0.55], bau: "maschine", name: "Kachelofen-Einsatz" },
   { materialId: "steel", massKg: 40, kind: "box", dims: [1.45, 0.35, 2.05], bau: "rahmenbox", name: "Doppelbett-Gestell" },
@@ -132,13 +176,33 @@ export const KATALOG_SPECS: PileSpec[] = [
    *
    * Nebenwirkung, gewollt: Die Griff-Info schweigt jetzt bei der Couch. Abfall
    * braucht keine Materialangabe (`src/ui/hud.ts`, `STOFFWORT`).
+   *
+   * E-063 setzt den zweiten Teil um: Die Couch traegt jetzt `bau: "polster"`.
+   * Vorher entschied `moebel` nach den Abmessungen, ob etwas in Stoff bezogen
+   * dasteht — die Couch traf es zufaellig richtig, vier andere zufaellig
+   * falsch. Jetzt sagt es der Eintrag selbst, und `test/bauart.test.ts` haelt
+   * fest, dass jeder Traeger dieses Baus in den MUELL geht.
    */
-  { materialId: "plastic", massKg: 70, kind: "box", dims: [2.1, 0.9, 0.95], bau: "moebel", name: "Couch (Dreisitzer)" },
+  { materialId: "plastic", massKg: 70, kind: "box", dims: [2.1, 0.9, 0.95], bau: "polster", name: "Couch (Dreisitzer)" },
+  /*
+   * Zwei Polstermoebel mehr (E-063). Patrick nannte „Couch, Sessel,
+   * Matratze" — Sessel und Ohrensessel fehlten, und ein Bau mit einem
+   * einzigen Traeger laesst sich nicht pruefen.
+   *
+   * Masse: Ein Dreisitzer wiegt 70 kg (Zeile oben). Der Sessel hat rund ein
+   * Drittel der Sitzflaeche, der Zweisitzer zwei Drittel — 24 und 48 kg.
+   * Beides traegt ein Mensch allein; die Hüllwichte bleibt weit unter der von
+   * Kunststoff (1900 kg/m³), wie es sich fuer Schaum und Stoff gehoert.
+   */
+  { materialId: "plastic", massKg: 24, kind: "box", dims: [0.95, 0.85, 0.9], bau: "polster", name: "Sessel (Polster)" },
+  { materialId: "plastic", massKg: 48, kind: "box", dims: [1.6, 0.85, 0.9], bau: "polster", name: "Couch (Zweisitzer)" },
   { materialId: "wood", massKg: 65, kind: "box", dims: [1.0, 2.0, 0.6], bau: "moebel", name: "Schrankwand-Segment", zusammensetzung: [{ materialId: "wood", anteil: 0.88 }, { materialId: "steel", anteil: 0.08 }, { materialId: "plastic", anteil: 0.04 }] },
   { materialId: "alu", massKg: 26, kind: "box", dims: [0.9, 1.9, 0.12], bau: "fensterflaeche", name: "Duschkabine" },
   { materialId: "alu", massKg: 42, kind: "cyl", dims: [0.28, 1.5], bau: "rohrFlansch", name: "Rollladenpanzer (aufgerollt)" },
   { materialId: "wood", massKg: 85, kind: "box", dims: [2.1, 1.9, 0.12], bau: "fensterflaeche", name: "Gartenhaus-Wandelement" },
-  { materialId: "steel", massKg: 180, kind: "box", dims: [1.0, 0.9, 1.7], bau: "maschine", name: "Aufsitzmäher", zusammensetzung: [{ materialId: "steel", anteil: 0.7 }, { materialId: "plastic", anteil: 0.14 }, { materialId: "alu", anteil: 0.06 }, { materialId: "tires", anteil: 0.06 }, { materialId: "copper", anteil: 0.04 }] },
+  // E-063: war `maschine` — Verkleidung mit Bedienpult und vier Fuessen. Ein
+  // Aufsitzmaeher hat Sitz, Lenkrad und vier Raeder: `kleinfahrzeug`.
+  { materialId: "steel", massKg: 180, kind: "box", dims: [1.0, 0.9, 1.7], bau: "kleinfahrzeug", name: "Aufsitzmäher", zusammensetzung: [{ materialId: "steel", anteil: 0.7 }, { materialId: "plastic", anteil: 0.14 }, { materialId: "alu", anteil: 0.06 }, { materialId: "tires", anteil: 0.06 }, { materialId: "copper", anteil: 0.04 }] },
 
   // --- Wohnwagen und Freizeit ---
   { materialId: "steel", massKg: 95, kind: "box", dims: [1.55, 0.4, 0.6], bau: "achse", name: "Wohnwagen-Achse" },
@@ -151,7 +215,9 @@ export const KATALOG_SPECS: PileSpec[] = [
   { materialId: "steel", massKg: 95, kind: "box", dims: [0.7, 1.05, 1.9], bau: "einspurig", name: "Motorroller (komplett)", zusammensetzung: [{ materialId: "steel", anteil: 0.58 }, { materialId: "plastic", anteil: 0.2 }, { materialId: "alu", anteil: 0.12 }, { materialId: "tires", anteil: 0.06 }, { materialId: "copper", anteil: 0.04 }] },
   // Kufen vorn, Raupe hinten — kein Rad (Befund 14.09.2026, siehe objektbau.ts)
   { materialId: "steel", massKg: 205, kind: "box", dims: [1.15, 1.1, 2.2], bau: "kufenRaupe", name: "Schneemobil", zusammensetzung: [{ materialId: "steel", anteil: 0.55 }, { materialId: "plastic", anteil: 0.22 }, { materialId: "alu", anteil: 0.12 }, { materialId: "tires", anteil: 0.07 }, { materialId: "copper", anteil: 0.04 }] },
-  { materialId: "alu", massKg: 55, kind: "box", dims: [1.2, 0.45, 2.2], bau: "tank", name: "Ruderboot (Alu)" },
+  // E-063: war `tank` — liegender Zylinder mit Sattel, Domdeckel und Stutzen.
+  // Ein Ruderboot ist ein Rumpf mit Steven und Duchten: eigener Bau `boot`.
+  { materialId: "alu", massKg: 55, kind: "box", dims: [1.2, 0.45, 2.2], bau: "boot", name: "Ruderboot (Alu)" },
 
   // --- Fahrzeugschrott ---
   { materialId: "tires", massKg: 45, kind: "cyl", dims: [0.32, 1.0], bau: "stapel", name: "Reifenstapel (Pkw)" },
@@ -167,7 +233,10 @@ export const KATALOG_SPECS: PileSpec[] = [
   { materialId: "plastic", massKg: 32, kind: "box", dims: [1.7, 0.6, 0.7], bau: "stapel", name: "Stoßfänger-Stapel" },
   { materialId: "steel", massKg: 88, kind: "box", dims: [1.5, 0.35, 1.3], bau: "stapel", name: "Motorhauben-Stapel" },
   { materialId: "steel", massKg: 110, kind: "box", dims: [1.1, 0.55, 1.2], bau: "buendel", name: "Fahrzeugtüren-Bund" },
-  { materialId: "plastic", massKg: 30, kind: "box", dims: [1.35, 0.75, 0.7], bau: "moebel", name: "Fahrzeug-Sitzbank" },
+  // E-063: Eine Sitzbank IST ein Polstermoebel — sie stand nur aus dem
+  // falschen Grund als eines da (Massenzweig von `moebel`). Jetzt sagt es der
+  // Eintrag, und die Fraktion ist wie bei der Couch Kunststoff = Muell.
+  { materialId: "plastic", massKg: 30, kind: "box", dims: [1.35, 0.75, 0.7], bau: "polster", name: "Fahrzeug-Sitzbank" },
 
   // --- Bauabbruch ---
   { materialId: "steel", massKg: 205, kind: "box", dims: [1.1, 0.85, 0.95], bau: "schaufel", name: "Baggerlöffel", massiv: true, zusammensetzung: [{ materialId: "steel", anteil: 0.97 }, { materialId: "tires", anteil: 0.03 }] }, // E-042: Verschleissblech 15-20 mm, gerechnet nur 4,7 mm
@@ -184,21 +253,29 @@ export const KATALOG_SPECS: PileSpec[] = [
   { materialId: "va", massKg: 160, kind: "box", dims: [0.9, 1.1, 0.85], bau: "weisseWare", name: "Krankenhaus-Sterilisator" },
   { materialId: "steel", massKg: 95, kind: "box", dims: [0.4, 1.1, 0.4], bau: "kabine", name: "Parkhaus-Schrankenanlage" },
   { materialId: "va", massKg: 145, kind: "box", dims: [2.2, 1.1, 0.75], bau: "weisseWare", name: "Supermarkt-Kühlregal", zusammensetzung: [{ materialId: "va", anteil: 0.45 }, { materialId: "steel", anteil: 0.3 }, { materialId: "copper", anteil: 0.12 }, { materialId: "plastic", anteil: 0.13 }] },
-  { materialId: "steel", massKg: 70, kind: "box", dims: [1.8, 0.9, 0.7], bau: "rahmenbox", name: "Supermarkt-Kassentheke" },
+  // E-063: war `rahmenbox` — ein Gittergestell, durch das man hindurchsieht.
+  // Eine Kassentheke ist ein geschlossener Korpus: `moebel`.
+  { materialId: "steel", massKg: 70, kind: "box", dims: [1.8, 0.9, 0.7], bau: "moebel", name: "Supermarkt-Kassentheke" },
 
   // --- Luftfahrt ---
   { materialId: "alu", massKg: 80, kind: "box", dims: [1.5, 1.6, 0.15], bau: "platte", name: "Flugzeug-Seitenleitwerk" },
   { materialId: "alu", massKg: 110, kind: "box", dims: [2.2, 0.15, 0.8], bau: "platte", name: "Flugzeug-Höhenleitwerk" },
   { materialId: "steel", massKg: 195, kind: "box", dims: [0.45, 1.5, 0.5], bau: "achse", name: "Flugzeug-Fahrwerksbein" },
   { materialId: "alu", massKg: 65, kind: "cyl", dims: [0.8, 1.6], bau: "tank", name: "Triebwerksverkleidung" },
-  { materialId: "alu", massKg: 90, kind: "box", dims: [2.2, 0.25, 2.2], bau: "platte", name: "Propeller (Metall)" },
-  { materialId: "steel", massKg: 205, kind: "cyl", dims: [0.45, 0.6], bau: "motor", name: "Rotorkopf" },
+  // E-063: war `platte` — ein Blech mit umgekanteten Raendern. Eine
+  // Luftschraube ist Nabe plus zwei Blaetter: eigener Bau `propeller`.
+  { materialId: "alu", massKg: 90, kind: "box", dims: [2.2, 0.25, 2.2], bau: "propeller", name: "Propeller (Metall)" },
+  // E-063: war `motor` — mit Zylinderkopf und Oelwanne. Ein Rotorkopf ist eine
+  // Nabe mit Blattanschluessen; `achse` trifft das am naechsten.
+  { materialId: "steel", massKg: 205, kind: "cyl", dims: [0.45, 0.6], bau: "achse", name: "Rotorkopf" },
   { materialId: "alu", massKg: 75, kind: "box", dims: [0.35, 0.25, 2.2], bau: "buendel", name: "Rotorblätter (Bund)" },
   { materialId: "alu", massKg: 85, kind: "box", dims: [1.5, 1.3, 1.6], bau: "rahmenbox", name: "Flughafen-Gepäckwagen" },
   { materialId: "alu", massKg: 130, kind: "box", dims: [1.5, 1.5, 2.0], bau: "container", name: "Luftfracht-Container (ULD)" },
 
   // --- Schiene ---
-  { materialId: "steel", massKg: 200, kind: "box", dims: [0.6, 0.5, 0.6], bau: "achse", name: "Eisenbahn-Puffer (Paar)" },
+  // E-063: war `achse` — Rohr mit Bremstrommeln und Federbock. Ein Pufferpaar
+  // ist zweimal Stahlguss am Stueck: `klotz`.
+  { materialId: "steel", massKg: 200, kind: "box", dims: [0.6, 0.5, 0.6], bau: "klotz", name: "Eisenbahn-Puffer (Paar)" },
   { materialId: "steel", massKg: 175, kind: "box", dims: [0.35, 0.35, 2.2], bau: "buendel", name: "Schienenbündel" },
   { materialId: "steel", massKg: 160, kind: "box", dims: [0.3, 0.3, 2.2], bau: "buendel", name: "Weichenzunge" },
   { materialId: "steel", massKg: 140, kind: "box", dims: [0.4, 2.2, 0.4], bau: "buendel", name: "Oberleitungsmast" },
@@ -206,11 +283,14 @@ export const KATALOG_SPECS: PileSpec[] = [
   { materialId: "wood", massKg: 190, kind: "box", dims: [0.9, 0.55, 2.2], bau: "stapel", name: "Bahnschwellen (Holzstapel)" },
 
   // --- Hafen ---
-  { materialId: "brass", massKg: 180, kind: "box", dims: [1.1, 0.3, 1.1], bau: "platte", name: "Schiffsschraube" },
+  // E-063: Schiffsschraube war `platte`, Stockanker und Poller waren `motor`.
+  // Drei Gegenstaende, drei Formen — und keiner davon sieht aus wie ein
+  // Motorblock mit Kruemmern.
+  { materialId: "brass", massKg: 180, kind: "box", dims: [1.1, 0.3, 1.1], bau: "propeller", name: "Schiffsschraube" },
   { materialId: "steel", massKg: 175, kind: "box", dims: [1.4, 0.2, 1.1], bau: "platte", name: "Ruderblatt" },
   { materialId: "steel", massKg: 205, kind: "wire", dims: [0.7], bau: "haufen", name: "Ankerkette (Haufen)" },
-  { materialId: "steel", massKg: 195, kind: "box", dims: [0.9, 1.3, 0.7], bau: "motor", name: "Stockanker" },
-  { materialId: "steel", massKg: 190, kind: "cyl", dims: [0.3, 0.8], bau: "motor", name: "Poller" },
+  { materialId: "steel", massKg: 195, kind: "box", dims: [0.9, 1.3, 0.7], bau: "anker", name: "Stockanker" },
+  { materialId: "steel", massKg: 190, kind: "cyl", dims: [0.3, 0.8], bau: "klotz", name: "Poller" },
   { materialId: "steel", massKg: 165, kind: "box", dims: [1.9, 0.2, 1.4], bau: "platte", name: "Schiffsluke (Deckel)" },
 
   // --- Lose Schrottmaterialien (nur Metall, Holz, Reifen) ---
@@ -249,13 +329,96 @@ export const KATALOG_SPECS: PileSpec[] = [
   // Grosszahnrad, 560 mm Durchmesser, mit Nabe 0,12 m breit (wie oben). -> 15,4 mm
   { materialId: "steel", massKg: 85, kind: "cyl", dims: [0.28, 0.12], name: "Großzahnrad" },
   // Schmiedeamboss, 120 kg — das massivste Stueck seiner Groesse. -> 21,8 mm
-  { materialId: "steel", massKg: 120, kind: "box", dims: [0.5, 0.25, 0.3], bau: "motor", name: "Amboss" },
+  { materialId: "steel", massKg: 120, kind: "box", dims: [0.5, 0.25, 0.3], bau: "klotz", name: "Amboss" }, // E-063: war `motor`
   // Grobblech 20 mm, Zuschnitt 0,80 x 1,20 m: 7850 x 0,02 x 0,96 = 151 kg.
   // Das Huellmass ist mit 0,06 m absichtlich dicker als die Platte — duenner
   // legt Rapier Bleche nicht sicher ab (Lehre v2 E-011). Gegenstueck zum
   // "Blech" aus SPECS (55 kg, 4,8 mm, Mischschrott): dieselbe Form, dreimal
   // die Masse, andere Mulde. -> 8,8 mm
   { materialId: "steel", massKg: 150, kind: "box", dims: [0.8, 0.06, 1.2], bau: "platte", name: "Grobblech-Zuschnitt (20 mm)" },
+
+  /* ====================================================================== *
+   * Die duennen Fraktionen auffuellen (E-063, 15.09.2026)                  *
+   * ====================================================================== *
+   *
+   * Patrick, 15.09.2026, auf die Frage nach den duennen Fraktionen:
+   * „Auffuellen, mindestens acht je Fraktion."
+   *
+   * Warum die Zahl an dieser Liste haengt und nicht am Gesamtkatalog:
+   * `randomCargo` zieht jedes Stueck aus GENAU EINER Groessenklasse. Eine
+   * sortenreine Kleinteil-Fuhre sieht nur das, was hier und in `SPECS` steht.
+   * Gemessen am 15.09.2026 (`npx vite-node tools/katalog-aussehen.ts klassen`)
+   * waren das Kupfer 2, Messing 2, Kabel 3, VA 6, Zink 4, Batterien 4: Eine
+   * sortenreine Kupferfuhre bestand aus zwei verschiedenen Dingen.
+   *
+   * **Jede Masse ist gerechnet, keine geschaetzt.** Die Rechnung steht je
+   * Zeile: Volumen mal Feststoffdichte des Werkstoffs mal dem Fuellgrad, den
+   * die Bauform hergibt (Kupfer 8960, Messing 8700, Kabel 2500, VA 7900
+   * kg/m³ — `materials/schuettdichte.ts`). `test/gewicht.test.ts` prueft das
+   * Ergebnis gegen dieselbe Dichte nach: Eine Messingarmatur von 900 kg ist
+   * ein Fehler, keine Armatur.
+   *
+   * Die Bauzweige sind so gewaehlt, dass Name und Anblick decken — sonst waere
+   * mit der einen Hand kaputtgemacht, was die andere gerade in Ordnung
+   * gebracht hat.
+   */
+
+  // --- Kupfer: Rohr, Draht, Schiene, Kessel (2 -> 8) ---
+  // Wickeldraht einer ausgeschlachteten Motorwicklung. Ringvolumen
+  // 2π²·0,13·0,05² = 0,00642 m³, bei 60 % Wickeldichte 34 kg.
+  { materialId: "copper", massKg: 34, kind: "torus", dims: [0.13, 0.05], name: "Wickeldraht (Kupferspule)" },
+  // Sechs Sammelschienen 40 x 10 mm, 2,0 m: 6 · 0,0008 · 2 · 8960 = 86 kg.
+  { materialId: "copper", massKg: 86, kind: "box", dims: [0.12, 0.12, 2.0], bau: "buendel", name: "Stromschienen-Bund (Kupfer)" },
+  // Waschkessel, Ø 560 mm, 450 hoch, 2 mm Wand: 1,04 m² · 0,002 · 8960 = 19 kg.
+  { materialId: "copper", massKg: 19, kind: "cyl", dims: [0.28, 0.45], bau: "tank", name: "Kupferkessel (Waschkessel)" },
+  // Sieben Fallrohre Ø 80, 0,6 mm, 2,2 m: 7 · 2,2 · 1,35 kg/m = 21 kg.
+  { materialId: "copper", massKg: 21, kind: "box", dims: [0.22, 0.22, 2.2], bau: "buendel", name: "Kupfer-Fallrohr (Bund)" },
+  // Lamellenblock eines Kuehlers, rund 6 % Feststoff auf 0,05 m³: 27 kg.
+  { materialId: "copper", massKg: 27, kind: "box", dims: [0.5, 0.4, 0.25], bau: "stapel", name: "Kupfer-Lamellenblock" },
+  // Erdungsband 30 x 3 mm, 25 m aufgerollt: 0,00225 m³ · 8960 = 20 kg.
+  { materialId: "copper", massKg: 20, kind: "cyl", dims: [0.2, 0.12], bau: "trommel", name: "Erdungsband (Kupfer, Rolle)" },
+
+  // --- Messing: Armatur, Ventil, Lagerschale, Beschlag (2 -> 8) ---
+  // Absperrschieber DN100, Rotguss — Katalogmasse eines echten Schiebers.
+  { materialId: "brass", massKg: 22, kind: "box", dims: [0.34, 0.4, 0.34], bau: "armatur", name: "Absperrschieber (Messing)" },
+  // Industrie-Ventilblock, 0,09 m³ Huelle, 833 kg/m³ (viel Hohlraum im Gehaeuse).
+  { materialId: "brass", massKg: 75, kind: "box", dims: [0.45, 0.5, 0.4], bau: "armatur", name: "Messing-Ventilblock" },
+  // Vierzig ausgebaute Hauswasserzaehler à 2,5 kg auf einer Palette.
+  { materialId: "brass", massKg: 105, kind: "box", dims: [0.8, 0.5, 0.6], bau: "stapel", name: "Wasserzähler (Messing, Palette)" },
+  // Gestapelte Gleitlagerschalen: 0,061 m³ bei rund 18 % Feststoff = 95 kg.
+  { materialId: "brass", massKg: 95, kind: "box", dims: [0.45, 0.3, 0.45], bau: "stapel", name: "Messing-Lagerschalen (Stapel)" },
+  // Tuerklinken, Schilder, Bandbeschlaege lose geschuettet: 0,043 m³, 980 kg/m³.
+  { materialId: "brass", massKg: 42, kind: "box", dims: [0.35, 0.35, 0.35], bau: "haufen", name: "Messing-Türbeschläge (Haufen)" },
+  // Rohrbogen und Fittinge gebuendelt: 0,075 m³ Huelle, 400 kg/m³.
+  { materialId: "brass", massKg: 30, kind: "box", dims: [0.25, 0.25, 1.2], bau: "buendel", name: "Messing-Rohrbogen (Bund)" },
+
+  // --- Kabel: Erdkabel, Steuerleitung, Litze (3 -> 8) ---
+  // NYY-Ring, Ringvolumen 2π²·0,35·0,10² = 0,069 m³, 55 % Wickeldichte.
+  { materialId: "cable", massKg: 85, kind: "torus", dims: [0.35, 0.1], name: "Erdkabel-Ring (NYY)" },
+  // Steuerleitung, kleiner Ring: 0,0131 m³, 1140 kg/m³.
+  { materialId: "cable", massKg: 15, kind: "torus", dims: [0.22, 0.055], name: "Steuerleitung (Ring)" },
+  // Feindraehtige Litze, gebuendelt: 0,056 m³, 800 kg/m³.
+  { materialId: "cable", massKg: 45, kind: "box", dims: [0.25, 0.25, 0.9], bau: "buendel", name: "Kabellitze (Bund)" },
+  // Abschnitte aus einer Trafostation, gebuendelt: 0,099 m³, 1110 kg/m³.
+  { materialId: "cable", massKg: 110, kind: "box", dims: [0.3, 0.3, 1.1], bau: "buendel", name: "Starkstromkabel (Bund)" },
+  // Ausgerissene Netzwerkverkabelung, loser Verhau — 0,70 m³ und nur 57 kg/m³:
+  // fast alles Luft, und genau so sperrig faehrt es sich auf der Pritsche.
+  { materialId: "cable", massKg: 40, kind: "wire", dims: [0.55], bau: "haufen", name: "Datenkabel-Verhau (Ballen)" },
+
+  // --- VA: Rohrbogen, Behaelter, Gelaender, Blech (6 -> 12) ---
+  // Rohrbogen DN200, 2 mm Wand, mit zwei Flanschen: 18 kg.
+  { materialId: "va", massKg: 18, kind: "box", dims: [0.35, 0.35, 0.5], bau: "rohrFlansch", name: "VA-Rohrbogen (DN200)" },
+  // Gastro-Kochkessel Ø 700, 750 hoch, 2,5 mm: 2,42 m² · 0,0025 · 7900 = 48 kg.
+  { materialId: "va", massKg: 48, kind: "cyl", dims: [0.35, 0.75], bau: "tank", name: "Gastro-Kochkessel (VA)" },
+  // Zwoelf Gelaenderstaebe Ø 14 mm, 2,0 m, massiv: 12 · 0,000308 m³ · 7900 = 29 kg.
+  { materialId: "va", massKg: 30, kind: "box", dims: [0.18, 0.18, 2.0], bau: "buendel", name: "VA-Geländerstäbe (Bund)" },
+  // Milchkanne, 1,2 mm Blech, 1,13 m² Mantel und Boden: 11 kg, mit Deckel 12.
+  { materialId: "va", massKg: 12, kind: "cyl", dims: [0.22, 0.6], bau: "tank", name: "Milchkanne (VA)" },
+  // Lochblech 3 mm, 0,9 x 1,2 m, 30 % Lochanteil: 1,08 · 0,003 · 0,7 · 7900 = 18 kg.
+  // Huellmass 0,06 m statt 3 mm — duenner legt Rapier ein Blech nicht ab (v2 E-011).
+  { materialId: "va", massKg: 18, kind: "box", dims: [0.9, 0.06, 1.2], bau: "platte", name: "VA-Lochblech (Tafel)" },
+  // Plattenwaermetauscher, 0,09 m³ Huelle bei rund 9 % Feststoff: 65 kg.
+  { materialId: "va", massKg: 65, kind: "box", dims: [0.3, 0.6, 0.5], bau: "stapel", name: "VA-Plattenwärmetauscher" },
 ];
 
 
@@ -270,7 +433,7 @@ export const KATALOG_BIG: PileSpec[] = [
   { materialId: "steel", massKg: 260, kind: "box", dims: [1.9, 0.5, 0.6], bau: "achse", name: "Traktor-Vorderachse" },
   { materialId: "steel", massKg: 380, kind: "box", dims: [1.3, 0.5, 2.9], bau: "ausleger", name: "Frontlader-Schwinge" },
   { materialId: "steel", massKg: 240, kind: "box", dims: [2.1, 0.8, 0.9], bau: "schaufel", name: "Frontlader-Schaufel", massiv: true }, // E-042: Schaufelboden ist 8-15 mm Verschleissblech
-  { materialId: "steel", massKg: 480, kind: "cyl", dims: [0.42, 0.85], bau: "motor", name: "Häcksler-Trommel" },
+  { materialId: "steel", massKg: 480, kind: "cyl", dims: [0.42, 0.85], bau: "trommel", name: "Häcksler-Trommel" }, // E-063: war `motor`
   { materialId: "steel", massKg: 210, kind: "box", dims: [0.8, 0.9, 0.7], bau: "maschine", name: "Güllefass-Pumpwerk" },
   { materialId: "steel", massKg: 340, kind: "cyl", dims: [0.4, 1.5], bau: "buendel", name: "Presskammerwalzen (Bund)" },
   { materialId: "steel", massKg: 420, kind: "box", dims: [2.6, 1.3, 1.0], bau: "gitterturm", name: "Sämaschine mit Saatkasten" },
@@ -300,8 +463,10 @@ export const KATALOG_BIG: PileSpec[] = [
   // --- Wohnwagen und Freizeit ---
   { materialId: "steel", massKg: 420, kind: "box", dims: [2.0, 0.6, 3.4], bau: "fahrgestell", name: "Wohnwagen-Chassis" },
   { materialId: "steel", massKg: 260, kind: "box", dims: [1.8, 0.8, 3.2], bau: "fahrgestell", name: "Bootsanhänger" },
-  { materialId: "plastic", massKg: 340, kind: "box", dims: [1.7, 1.1, 3.4], bau: "tank", name: "Sportboot-Rumpf (GFK)" },
-  { materialId: "plastic", massKg: 280, kind: "box", dims: [2.0, 1.4, 2.6], bau: "tank", name: "Kajütboot-Aufbau" },
+  // E-063: beide waren `tank`. Fuenf Boote im Katalog sahen aus wie liegende
+  // Kessel mit Sattel und Domdeckel.
+  { materialId: "plastic", massKg: 340, kind: "box", dims: [1.7, 1.1, 3.4], bau: "boot", name: "Sportboot-Rumpf (GFK)" },
+  { materialId: "plastic", massKg: 280, kind: "box", dims: [2.0, 1.4, 2.6], bau: "boot", name: "Kajütboot-Aufbau" },
   { materialId: "steel", massKg: 380, kind: "box", dims: [2.0, 1.5, 3.0], bau: "fahrgestell", name: "Campinganhänger (Faltcaravan)", zusammensetzung: [{ materialId: "steel", anteil: 0.48 }, { materialId: "alu", anteil: 0.2 }, { materialId: "plastic", anteil: 0.22 }, { materialId: "wood", anteil: 0.1 }] },
 
   // --- Fahrzeugschrott ---
@@ -328,7 +493,7 @@ export const KATALOG_BIG: PileSpec[] = [
 
   // --- Gebäudetechnik ---
   { materialId: "steel", massKg: 520, kind: "box", dims: [1.5, 2.2, 1.5], bau: "container", name: "Aufzugskabine" },
-  { materialId: "steel", massKg: 580, kind: "box", dims: [0.5, 1.8, 0.6], bau: "motor", name: "Aufzugs-Gegengewicht" },
+  { materialId: "steel", massKg: 580, kind: "box", dims: [0.5, 1.8, 0.6], bau: "klotz", name: "Aufzugs-Gegengewicht" }, // E-063: war `motor`
   { materialId: "alu", massKg: 260, kind: "box", dims: [0.9, 0.5, 3.2], bau: "ausleger", name: "Rolltreppen-Stufenband" },
   { materialId: "steel", massKg: 430, kind: "box", dims: [2.6, 1.8, 2.2], bau: "maschine", name: "Großklimagerät (Dach)" },
   { materialId: "steel", massKg: 380, kind: "box", dims: [2.2, 1.4, 1.6], bau: "maschine", name: "Rückkühler (Dachaufbau)" },
@@ -347,22 +512,22 @@ export const KATALOG_BIG: PileSpec[] = [
   { materialId: "alu", massKg: 230, kind: "cyl", dims: [0.35, 3.2], bau: "rohrFlansch", name: "Hubschrauber-Heckausleger" },
 
   // --- Schiene ---
-  { materialId: "steel", massKg: 580, kind: "box", dims: [1.6, 1.3, 0.9], bau: "motor", name: "Prellbock" },
+  { materialId: "steel", massKg: 580, kind: "box", dims: [1.6, 1.3, 0.9], bau: "klotz", name: "Prellbock" }, // E-063: war `motor`
   { materialId: "steel", massKg: 560, kind: "cyl", dims: [0.48, 1.5], bau: "achse", name: "Radsatz (Eisenbahn)" },
   { materialId: "steel", massKg: 520, kind: "box", dims: [2.2, 2.0, 1.6], bau: "kabine", name: "Lokomotiv-Führerstand", zusammensetzung: [{ materialId: "steel", anteil: 0.86 }, { materialId: "rubble", anteil: 0.06 }, { materialId: "plastic", anteil: 0.08 }] },
   { materialId: "rubble", massKg: 590, kind: "box", dims: [1.0, 0.7, 2.6], bau: "stapel", name: "Bahnschwellen (Betonstapel)" },
   { materialId: "steel", massKg: 470, kind: "box", dims: [2.8, 1.9, 0.15], bau: "platte", name: "Schiebewand-Waggon-Seitenteil" },
 
   // --- Hafen ---
-  { materialId: "steel", massKg: 520, kind: "box", dims: [2.4, 1.2, 3.2], bau: "tank", name: "Ponton-Segment" },
+  { materialId: "steel", massKg: 520, kind: "box", dims: [2.4, 1.2, 3.2], bau: "boot", name: "Ponton-Segment" }, // E-063: war `tank`
   { materialId: "steel", massKg: 580, kind: "box", dims: [2.6, 0.9, 1.4], bau: "maschine", name: "Reachstacker-Spreader" },
-  { materialId: "steel", massKg: 490, kind: "box", dims: [1.6, 1.4, 3.2], bau: "tank", name: "Bootsrumpf (Stahl)" },
+  { materialId: "steel", massKg: 490, kind: "box", dims: [1.6, 1.4, 3.2], bau: "boot", name: "Bootsrumpf (Stahl)" }, // E-063: war `tank`
   { materialId: "steel", massKg: 430, kind: "box", dims: [1.0, 1.0, 3.4], bau: "ausleger", name: "Hafenkran-Ausleger" },
   // --- Massives Grossteil (E-042, 15.09.2026) ---
   // Palette mit rund zehn LKW-Bremsscheiben, 400 kg. -> 10,5 mm
   { materialId: "steel", massKg: 400, kind: "box", dims: [1.0, 0.8, 0.9], bau: "stapel", name: "Bremsscheiben (Palette)" },
   // Gegengewicht eines Gabelstaplers, Gussblock. -> 30,5 mm
-  { materialId: "steel", massKg: 450, kind: "box", dims: [0.9, 0.5, 0.35], bau: "motor", name: "Stapler-Gegengewicht" },
+  { materialId: "steel", massKg: 450, kind: "box", dims: [0.9, 0.5, 0.35], bau: "klotz", name: "Stapler-Gegengewicht" }, // E-063: war `motor`
 ];
 
 
@@ -373,10 +538,10 @@ export const KATALOG_BIG: PileSpec[] = [
 export const KATALOG_HUGE: PileSpec[] = [
   // --- Landwirtschaft ---
   { materialId: "steel", massKg: 1300, kind: "box", dims: [4.6, 0.9, 1.3], bau: "schaufel", name: "Mähdrescher-Schneidwerk" },
-  { materialId: "steel", massKg: 620, kind: "cyl", dims: [0.65, 1.5], bau: "tank", name: "Mähdrescher-Dreschtrommel" },
+  { materialId: "steel", massKg: 620, kind: "cyl", dims: [0.65, 1.5], bau: "trommel", name: "Mähdrescher-Dreschtrommel" }, // E-063: war `tank`
   { materialId: "steel", massKg: 640, kind: "box", dims: [2.6, 1.6, 2.2], bau: "tank", name: "Mähdrescher-Korntank" },
   { materialId: "steel", massKg: 1500, kind: "cyl", dims: [0.95, 3.4], bau: "tank", name: "Güllefass" },
-  { materialId: "steel", massKg: 1900, kind: "box", dims: [2.4, 2.3, 3.2], bau: "tank", name: "Ballenpresse (Rundballen)" },
+  { materialId: "steel", massKg: 1900, kind: "box", dims: [2.4, 2.3, 3.2], bau: "maschine", name: "Ballenpresse (Rundballen)" }, // E-063: war `tank`
   { materialId: "steel", massKg: 760, kind: "box", dims: [3.0, 1.0, 1.4], bau: "gitterturm", name: "Grubber mit Zinkenfeld" },
   { materialId: "steel", massKg: 840, kind: "box", dims: [2.9, 0.9, 1.6], bau: "gitterturm", name: "Scheibenegge" },
   { materialId: "steel", massKg: 720, kind: "box", dims: [2.6, 0.8, 1.1], bau: "gitterturm", name: "Kreiselegge" },
@@ -384,7 +549,7 @@ export const KATALOG_HUGE: PileSpec[] = [
   { materialId: "steel", massKg: 830, kind: "box", dims: [2.4, 2.0, 3.4], bau: "rahmenbox", name: "Ladewagen-Aufbau" },
   { materialId: "steel", massKg: 920, kind: "box", dims: [1.6, 1.5, 2.4], bau: "maschine", name: "Miststreuer-Streuwerk" },
   { materialId: "steel", massKg: 1700, kind: "box", dims: [2.6, 2.0, 3.0], bau: "tank", name: "Futtermischwagen-Behälter" },
-  { materialId: "steel", massKg: 900, kind: "cyl", dims: [0.55, 2.2], bau: "tank", name: "Futtermischwagen-Mischschnecke" },
+  { materialId: "steel", massKg: 900, kind: "cyl", dims: [0.55, 2.2], bau: "achse", name: "Futtermischwagen-Mischschnecke" }, // E-063: war `tank` — eine Schnecke ist eine Welle, kein Kessel
 
   // --- Industrie ---
   { materialId: "steel", massKg: 2300, kind: "box", dims: [2.2, 2.4, 2.6], bau: "maschine", name: "CNC-Fräsmaschine" },
@@ -410,7 +575,7 @@ export const KATALOG_HUGE: PileSpec[] = [
 
   // --- Bauabbruch ---
   { materialId: "steel", massKg: 2500, kind: "box", dims: [2.2, 2.2, 3.4], bau: "karosserie", name: "Minibagger (ausgeschlachtet)", zusammensetzung: [{ materialId: "steel", anteil: 0.86 }, { materialId: "plastic", anteil: 0.06 }, { materialId: "copper", anteil: 0.04 }, { materialId: "rubble", anteil: 0.04 }] },
-  { materialId: "steel", massKg: 2200, kind: "cyl", dims: [0.85, 2.1], bau: "tank", name: "Vibrationswalze (Bandage)" },
+  { materialId: "steel", massKg: 2200, kind: "cyl", dims: [0.85, 2.1], bau: "trommel", name: "Vibrationswalze (Bandage)" }, // E-063: war `tank`
   { materialId: "steel", massKg: 1200, kind: "box", dims: [1.4, 1.4, 4.8], bau: "gitterturm", name: "Turmdrehkran-Ausleger" },
   { materialId: "rubble", massKg: 2400, kind: "box", dims: [2.4, 0.8, 1.8], bau: "beton", name: "Kranballast-Platten" },
   { materialId: "steel", massKg: 1500, kind: "cyl", dims: [1.1, 2.6], bau: "tank", name: "Betonmischer-Trommel" },
