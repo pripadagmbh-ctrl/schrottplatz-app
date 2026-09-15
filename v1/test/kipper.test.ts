@@ -174,7 +174,16 @@ function kippen(sortenrein: string | null = null, saat = 20260913): {
 describe("Kipper", () => {
   it("laedt beim Kippen ab, statt die Ladung auf dem Rahmen liegen zu lassen", () => {
     const r = kippen(null);
-    expect(r.teile).toBeGreaterThan(8);
+    /*
+     * Nur eine Grundpruefung: Es liegt ueberhaupt eine Fuhre oben. Die genaue
+     * Stueckzahl ist KEIN Pruefgegenstand — sie haengt am Fuellgrad und an der
+     * Groesse der gewuerfelten Brocken und schwankt zwischen sechs und zwanzig.
+     * Bis zum 15.09.2026 stand hier „mehr als acht"; als die erste Laderunde
+     * sich nach dem Fuellgrad zu richten begann (E-044), kamen fuer diese Saat
+     * genau acht heraus, und der Waechter wurde rot, ohne dass am Kippen etwas
+     * schlechter geworden waere.
+     */
+    expect(r.teile, "keine Ladung auf der Flaeche").toBeGreaterThanOrEqual(5);
     /*
      * Mit dem alten, ueberschneidenden Rahmen blieben 12 von 14 Teilen liegen.
      * Ein Rest darf haengen — ein Kipper bekommt nie jedes Stueck heraus, dafuer

@@ -27,6 +27,7 @@ const FAHRER_TEMPO = 1.5;
 /** Rechenhilfe fuer boxen() — kein neuer Vektor je Bild. */
 const BOX_TMP = new THREE.Vector3();
 import { hitsObstacle } from "../world/obstacles";
+import { BAGGER_STAND } from "../world/baggerstand";
 import { lagerMuldeFuer, type ContainerConfig } from "../world/containers";
 import { rollCustomer, vehicleForCustomer, type CustomerProfile } from "./customers";
 import { buildVehicleModel, wandHoehe, type Rad } from "./vehicleModel";
@@ -136,8 +137,47 @@ class DeliveryVehicle {
   private letzterYaw = 0;
   /** Ladekran der Händler — nur Bild, schwenkt beim Andocken zur Seite */
   private crane: THREE.Group | null = null;
-  private craneSide = 1;
   private craneSwing = 0;
+
+  /**
+   * Zu welcher Seite der Ladekran schwenkt: IMMER vom Bagger weg.
+   *
+   * Ansage Patrick, 15.09.2026: „LKW-Kran immer vom Bagger weg bewegen."
+   * Vorher wurde die Seite beim Erzeugen gewürfelt — jede zweite Fuhre hängte
+   * ihren Ausleger also in den Arbeitsbereich. Ein Fahrer dreht seinen Kran
+   * zur Straßenseite, nicht dorthin, wo gearbeitet wird.
+   *
+   * Die Seite wird GERECHNET, nicht je Halteplatz eingetragen. Die Fahrzeuge
+   * halten an vier verschiedenen Stellen (Abladeplatz, Silo-Gasse, Warteplätze,
+   * Waage), und „weg vom Bagger" ist an jeder eine andere Richtung — als
+   * Tabelle stünde sie beim nächsten Umzug des Baggers wieder falsch.
+   *
+   * DIE RECHNUNG, in drei Schritten und ohne gegriffene Vorzeichen.
+   *
+   * 1. Der Ausleger zeigt bei Schwenkwinkel 0 nach lokal −z (über die
+   *    Ladefläche, Transportstellung). Eine Drehung um die Hochachse um φ
+   *    bildet ihn auf (−sin φ, 0, −cos φ) ab: POSITIVER Schwenk bringt die
+   *    Spitze nach lokal −x.
+   * 2. Die Kabine schaut nach lokal +z, oben ist +y. Rechts ist damit
+   *    vorwärts × oben = ẑ × ŷ = −x̂ — lokal −x ist die RECHTE Seite,
+   *    lokal +x die linke. Positiver Schwenk heißt also: Kran nach rechts.
+   * 3. Auf welcher Seite steht der Bagger? Der Vektor zu ihm, projiziert auf
+   *    die lokale x-Achse (dieselbe Umrechnung wie in `steigeAus`):
+   *
+   *      d        = Bagger − Fahrzeug, in Weltkoordinaten
+   *      d · x̂lok = d.x·cos(gier) − d.z·sin(gier)
+   *
+   *    Ist das positiv, steht der Bagger LINKS — dann schwenkt der Kran nach
+   *    rechts, also mit positivem Winkel.
+   */
+  private get craneSide(): 1 | -1 {
+    const dx = BAGGER_STAND.x - this.group.position.x;
+    const dz = BAGGER_STAND.z - this.group.position.z;
+    const yaw = this.group.rotation.y;
+    const baggerLinks = dx * Math.cos(yaw) - dz * Math.sin(yaw);
+    if (!Number.isFinite(baggerLinks)) return 1;
+    return baggerLinks > 0 ? 1 : -1;
+  }
   /** Restweg des gekippten Anziehens (Phase tipCreep) */
   private creepLeft = 0;
   /** true, solange die Mulde waehrend der Abfahrt noch heruntergefahren wird */
@@ -701,9 +741,6 @@ class DeliveryVehicle {
     this.federZiel = teile.trailer ?? this.group;
     this.federHebt = teile.trailer === null;
     this.federZiel.rotation.order = "YXZ";
-    // Zu welcher Seite geschwenkt wird, entscheidet das Fahrzeug einmal —
-    // sonst schwenken alle gleich und es sieht nach Choreografie aus.
-    this.craneSide = Math.random() < 0.5 ? -1 : 1;
     scene.add(this.group);
     this.chassisBody = world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased());
     // Oberkante MUSS unter dem Muldenboden (0,99 m) liegen UND das Chassis darf
@@ -1776,6 +1813,11 @@ class DeliveryVehicle {
         this.phase === "waitLoad" ||
         this.phase === "tipping" ||
         this.phase === "tipHold";
+      /*
+       * Die Seite wird JEDES BILD neu gerechnet, nicht einmal gemerkt. Am
+       * Halteplatz steht der Wagen still, also ist sie dort stabil; unterwegs
+       * ist der Kran ohnehin eingeklappt (ziel = 0).
+       */
       const ziel = amPlatz ? this.craneSide * CRANE_SWING : 0;
       // Langsam: ein Kran schwenkt nicht, er dreht sich gemaechlich
       this.craneSwing += THREE.MathUtils.clamp(ziel - this.craneSwing, -dt * 0.5, dt * 0.5);
