@@ -1084,3 +1084,91 @@ Kollider sind unverändert**, `npm test` grün.
 **Am Bild zu entscheiden** (Fragen 1–4 in `docs/baggerkonzept.md`): Silhouette
 des Unterwagens · Geländer auf dem Oberwagen · Kabinenhub als Parallelogramm oder
 Hubsäule · Aussehen des Fahrers.
+
+---
+
+### E-027 — Griff-Info und Ladeanzeige stehen als Stapel am freien Rand (15.09.2026)
+
+**Entscheidung.** Beide Zeilen stehen in einem gemeinsamen Halter `#hudunten`
+(Flex-Spalte, 6 px Zwischenraum), **linksbündig im freien Streifen zwischen
+Fahrpedalen und Drehtasten** — in drei statt zwei Fassungen: iPad quer
+`left 198 / right 82 / bottom 10`, iPhone quer `156 / 252 / 6`, iPhone hoch
+`12 / 82 / 118`. Ohne Berührungseingabe bleibt alles, wo es war.
+
+Die Griff-Info hat jetzt **zwei Zeilen**: ein Kopf mit Zustand, Gewicht, Preis
+und Ampelurteil, der umbrechen darf, und darunter die Aufzählung auf genau einer
+Zeile, die am Ende mit „…" gekappt wird.
+
+**Begründung.** Patrick am iPhone mini: „Bei iPhone Mini wird auch durch die
+Greifanzeige, also was gegriffen worden ist, die Sicht verdeckt." Drei Ursachen
+lagen übereinander:
+
+1. **Beide Zeilen waren mittig zentriert und ohne Breitengrenze.** Im Hochformat
+   ist ein `left: 50%`-Kasten höchstens 188 px breit — die Ladungszeile brach auf
+   fünf bis sieben Zeilen um und stand als Textsäule genau dort, wo man beim
+   Greifen hinsieht.
+2. **Jede hing einzeln am Rand** (118 und 163 px). Wurde die untere zweizeilig,
+   schob sie sich unter die obere.
+3. **Die Anhebung auf 118 px stammte vom 14.09.**, als die Fahrpedale noch unten
+   in der Bildmitte standen. Nach ihrem Umzug nach links war sie übrig.
+
+Dazu kam ein vierter Punkt, der keinem aufgefallen war: **Das Hochformat lief mit
+den Tablet-Regeln.** `@media (max-height: 430px)` fasst nur das Querformat der
+Telefone; ein iPhone mini hochkant ist 375 × 812 und fiel durch jede Sonderregel
+hindurch.
+
+**Was es jetzt kostet.** Beim **längstmöglichen** Text — volle Spinne über der
+falschen Mulde *und* wartender Abholer — 14,2 % der Bildhöhe auf dem iPad, 22,1 %
+im Querformat, 31,4 % im Hochformat. Im Ruhezustand („Greifer: offen") sind es
+134 × 37 px in einem blassen Kasten am Rand.
+
+**Was beim Kappen verlorengeht.** Nur der Schwanz der Aufzählung — also bei einer
+randvollen Spinne die hinteren Fraktionszählungen, und die sagen von sich aus
+schon, dass mehr da ist („+3 weitere"). **Gewicht, Preis, Materialangabe und
+Ampelurteil stehen im Kopf und brechen um, statt zu verschwinden.** Das war die
+Bedingung: Patrick hat sich Material und Ladungsliste am 12.09. ausdrücklich
+gewünscht; ein Kürzen, das den Preis frisst, wäre keine Lösung gewesen.
+
+**Verworfene Alternativen.**
+
+- Nur `bottom` zurücksetzen — tauscht den Fehler: Die zentrierte Zeile reicht bei
+  langem Text bis in die Pedalecke.
+- Nach oben unter den Tagesablauf — dort sitzt im Hochformat die Tutorialkarte,
+  und der Blick müsste bei jedem Griff 600 px weit springen.
+- Die Zeile im Ruhezustand ganz ausblenden — der Greiferzustand muss ablesbar
+  bleiben, und auf Touch gibt es dafür keinen zweiten dauerhaften Kanal.
+  Stattdessen tritt der Kasten optisch zurück.
+- Die Drehtasten im Hochformat nach unten rechts verlegen, um die volle Breite zu
+  gewinnen — dort liegt der Home-Indicator.
+
+**Abnahmekriterium.** `test/greifanzeige.test.ts` rechnet die Kästen **mit Rahmen
+und Fassung** aus dem CSS und prüft in allen drei Fassungen mit dem
+längstmöglichen Text: keine Überlappung, mindestens 8 px Luft, Block im unteren
+Drittel. Messung unter `docs/messungen/2026-09-15-greifanzeige/`.
+
+**Offen, jeweils eigenes kleines Paket.**
+
+1. **Schriftgröße im Querformat des Telefons.** Die Griff-Info steht dort auf
+   12 px, die Ladeanzeige wurde ihr angeglichen (vorher 14). Briefing Kap. 20
+   verlangt ≥ 14 px. Am Gerät zu entscheiden: Sind 12 px lesbar, bleibt es so und
+   die Ausnahme kommt ins Log; sonst beide auf 14, das kostet quer rund 40 px.
+2. **Sichere Ränder.** `viewport-fit=cover` ist gesetzt, `env(safe-area-inset-*)`
+   wird nirgends benutzt. Im Querformat sitzt der Block 6 px über der Unterkante,
+   wo die Balkenanzeige liegt. Gehört für **alle** unteren Elemente gemeinsam
+   gelöst — Pedale, Drehtasten, HUD-Block —, nicht für eines allein.
+3. **Konto und Tagesablauf überlappen sich um rund 6 px.** `#money` steht auf
+   top 12 und ist wegen Zeilenabstand 1,5 tatsächlich 40,5 px hoch; `#shift`
+   beginnt bei 46. Nicht angefasst, weil ein Verschieben nach unten den
+   Debugblock bei 80 trifft. Derselbe Stapel-Trick wie hier löst es.
+
+**Auf dem Gerät zu prüfen.**
+
+1. **iPhone mini hochkant:** Großes Teil greifen — steht die Anzeige links über
+   den Pedalen statt mitten im Bild, und bleibt sie beim Drehen dort?
+2. **iPhone mini hochkant:** Spinne offen, nichts anvisiert — ist der blasse
+   kleine Kasten „Greifer: offen" lesbar genug, oder soll er ganz verschwinden?
+3. **iPhone mini quer:** Volle Spinne über die falsche Mulde — steht
+   „✕ falsche Zone" vollständig da, und endet die Aufzählung sauber mit „…",
+   ohne Pedale oder Drehtasten zu berühren?
+4. **iPad quer:** Abholer rufen und gleichzeitig greifen — stehen beide Zeilen
+   getrennt übereinander, ohne sich zu überdecken?
