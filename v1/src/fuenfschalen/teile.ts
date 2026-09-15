@@ -1059,6 +1059,91 @@ export function baueMitteltraverse(st: Stoffe): THREE.Group {
   return g;
 }
 
+/* ------------------------------------------- 08 Zylinderschutz-Verkleidung */
+
+/**
+ * Wie weit die Verkleidung an ihrem Knie noch hinausdarf (m).
+ *
+ * GEMESSEN, nicht gewählt: Die fünf Schalen schwenken beim Öffnen mit ihrem
+ * oberen Ende nach innen und kommen dabei auf **r 0,349 m** heran (kleinster
+ * Radius aller Schalen- und Zylindereckpunkte über 21 Stellungen des
+ * Schließwegs, 1-cm-Bänder, gemessen am gebauten Netz am 15.09.2026, y −1,15).
+ * 0,30 lässt dort knapp 5 cm. Der Wächter in `test/verkleidung.test.ts` misst
+ * den wirklichen Freigang am fertigen Teil nach und meldet unter 3 cm.
+ */
+const VERKLEIDUNG_KNIE_R = 0.3;
+/** Wie weit unter ihrem oberen Rand das Knie sitzt (m). SW 15.09.2026 — am Riss gewählt. */
+const VERKLEIDUNG_KNIE_TIEF = 0.055;
+/** Blechstärke (m). SW 15.09.2026: 12 mm, eine Abdeckung, kein tragendes Teil. */
+const VERKLEIDUNG_BLECH = 0.012;
+
+/**
+ * Der Zylinderschutz — das Blech über der Mittelsäule. TRÄGT NICHTS.
+ *
+ * Patrick, 15.09.2026, vor sieben Vorbildaufnahmen: „Der Kopf ist zu schlank."
+ * Und, zur Deutung der Bilder: „Das, was du als Guss … verortet hast, das ist
+ * im Grunde genommen nur eine Abblendung. Das ist ein Zylinderschutz. Also es
+ * ist kein Gusskörper."
+ *
+ * WAS DIESES TEIL IST: ein gekantetes Blech, das die nackte Säule zwischen
+ * Mitteltraverse und Stempel verkleidet und die Kontur des Kopfes bis zur Nabe
+ * durchzieht. Zehn Flächen wie die Traverse, in derselben Phase, damit die
+ * Kanten durchlaufen.
+ *
+ * WAS ES NICHT IST: kein Kollider, kein Körper, keine Masse, kein Teil der
+ * Kinematik. Es hängt im Starrkörper des Kopfes (`GRAPPLE_HEAD`) und wird mit
+ * ihm zusammengelegt (E-025); weil die Traverse schon Blech trägt (die zehn
+ * Sitzringe), kommt dabei KEIN NETZ dazu, nur Eckpunkte. `test/verkleidung.test.ts`
+ * hält beides fest — mit einer Gegenprobe, die meldet, wenn doch einmal ein
+ * Kollider daran hängt. Genau dieser Fehler ist am 15.09. in der Presse
+ * gefunden worden (E-071: unsichtbare Klappe, Kollider in voller Größe).
+ *
+ * WARUM SIE NICHT WEITER HINAUFREICHT. Am Vorbild deckt das Blech auch die
+ * Zylinder ab. Hier geht das nicht: Zwischen Traversenrand (r 0,475) und dem
+ * inneren Rand der fünf Zylinder liegen auf Höhe der Aufnahme nur 3,2 cm, und
+ * weiter oben laufen die Zylinderköpfe durch den Bereich, den ein Blech
+ * bräuchte. Wer dort verkleiden will, muss die Zylinderaufnahme nach außen
+ * setzen — und das ist die Anlenkung (E-075/E-076). Gebaut ist deshalb genau
+ * das Stück, für das Platz ist: die Säule.
+ *
+ * ALLE MASSE SIND ABGELEITET, KEINES IST GESETZT: oben der untere Rand des
+ * Traversenkörpers, unten der obere Rand des Stempels. Wer eines der beiden
+ * Bauteile ändert, zieht die Verkleidung mit.
+ */
+export function baueVerkleidung(st: Stoffe): THREE.Group {
+  const g = new THREE.Group();
+  g.name = "08_ZYLINDERSCHUTZ";
+  const R = MASS.traverse.breite / 2;
+  /* Genau der untere Rand des Traversenkörpers — dieselbe Rechnung wie dort. */
+  const rOben = R * 0.86;
+  const yOben = -(MASS.traverse.hoehe * 0.75) / 2;
+  /* Genau der obere Rand des Stempels, im Frame der Traverse. */
+  const yUnten = STEMPEL_AUGE.y + MASS.stempel.hoehe - TRAVERSE_Y;
+  const rUnten = MASS.stempel.breite / 2 + 0.01;
+  const yKnie = yOben - VERKLEIDUNG_KNIE_TIEF;
+  const d = VERKLEIDUNG_BLECH;
+  /*
+   * Ein geschlossenes Profil: außen hinunter, innen wieder herauf. `LatheGeometry`
+   * macht daraus eine Haut mit Außen- UND Innenseite — eine einseitige Fläche
+   * wäre von unten, also genau aus der Arbeitsrichtung, unsichtbar.
+   */
+  const profil = [
+    new THREE.Vector2(rOben, yOben),
+    new THREE.Vector2(VERKLEIDUNG_KNIE_R, yKnie),
+    new THREE.Vector2(rUnten, yUnten),
+    new THREE.Vector2(rUnten - d, yUnten),
+    new THREE.Vector2(VERKLEIDUNG_KNIE_R - d, yKnie),
+    new THREE.Vector2(rOben - d, yOben),
+    new THREE.Vector2(rOben, yOben),
+  ];
+  const blech = new THREE.Mesh(new THREE.LatheGeometry(profil, 10), st.blech);
+  blech.name = "08_VERKLEIDUNG";
+  /* Dieselbe Phase wie der Traversenkörper, damit die Kanten durchlaufen. */
+  blech.rotation.y = Math.PI / 10;
+  g.add(blech);
+  return g;
+}
+
 /* ------------------------------------- 09 Zentrale untere Gelenkeinheit */
 
 /**

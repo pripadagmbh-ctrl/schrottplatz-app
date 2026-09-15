@@ -325,7 +325,14 @@ describe("Fünfschalen — die Formzahlen nach dem Zusammenlegen (E-039, E-048)"
     const m = miss(fuenfschalen());
     expect(m.nettokorb * 1000, "Nettokorb (l)").toBeCloseTo(1525, 0);
     expect(m.bruttokorb * 1000, "Bruttokorb (l)").toBeCloseTo(1615, 0);
-    expect(m.dreiecke, "Dreiecke").toBe(14884);
+    /*
+     * 14.884 + 120 = 15.004 seit E-077: Der Zylinderschutz (`08_VERKLEIDUNG`,
+     * zehn Flächen über ein geschlossenes Profil aus sechs Punkten) bringt
+     * genau 120 Dreiecke mit. NETZE bringt er keines mit — er fällt ins Blech
+     * des Kopfes, und die Zeile „58 Netze" weiter unten steht unverändert da.
+     * Dreiecke sind nicht der Engpass (E-025), Netze sind es.
+     */
+    expect(m.dreiecke, "Dreiecke").toBe(15004);
   }, 120000);
 });
 
@@ -369,7 +376,13 @@ describe("Fünfschalen — ein Netz je Starrkörper und Werkstoff (E-025, E-053)
     }
     expect(zaehl(g.wurzel), "Netze im ganzen Greifer").toBe(58);
     /* Zum Vergleich: so viele waren es vorher, und so viele hat die Sichelkralle. */
-    expect(zaehl(baueGreiferInTeilen(stoffe()).wurzel), "Netze in Einzelteilen").toBe(217);
+    /*
+     * 218 seit E-077 (vorher 217): In Einzelteilen ist der Zylinderschutz ein
+     * eigenes Netz — zusammengelegt ist er keines mehr. Genau dieser
+     * Unterschied ist der Beweis, dass er eingeschmolzen wird; wären beide
+     * Zahlen gleich, hätte das Zusammenlegen ihn übersehen.
+     */
+    expect(zaehl(baueGreiferInTeilen(stoffe()).wurzel), "Netze in Einzelteilen").toBe(218);
   });
 
   it("behält die Knotennamen, auf die der GLB-Export sich verlässt", () => {
