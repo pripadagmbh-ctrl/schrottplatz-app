@@ -512,21 +512,21 @@ class DeliveryVehicle {
   private get routeApproach(): Array<[number, number]> {
     if (this.isPickup) return this.meineAnfahrt ?? pickupApproach();
     const mulde = this.zielMulde;
-    if (mulde) return bayApproach(mulde.z);
+    if (mulde) return bayApproach(mulde);
     if (this.isSelfTipping) return TIP_APPROACH;
     return this.meineAnfahrt ?? routeApproach();
   }
   private get routeRev(): Array<[number, number]> {
     if (this.isPickup) return this.meinRueckweg ?? pickupInRev();
     const mulde = this.zielMulde;
-    if (mulde) return bayInRev(mulde.z);
+    if (mulde) return bayInRev(mulde);
     if (this.isSelfTipping) return TIP_IN_REV;
     return this.meinRueckweg ?? routeInRev();
   }
   private get routeOut(): Array<[number, number]> {
     if (this.isPickup) return this.meineAusfahrt ?? pickupOut();
     const mulde = this.zielMulde;
-    if (mulde) return bayOut(mulde.z);
+    if (mulde) return bayOut(mulde);
     if (this.isSelfTipping) return TIP_OUT;
     return this.meineAusfahrt ?? routeOut();
   }

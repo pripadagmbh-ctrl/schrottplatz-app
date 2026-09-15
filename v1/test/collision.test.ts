@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import * as THREE from "three";
-import { CONFIGS } from "../src/world/containers";
+import { CONFIGS, bayVorderkante, bayRuecken, bayOeffnung } from "../src/world/containers";
 import {
   YARD_MIN_X,
   YARD_MAX_X,
@@ -260,17 +260,15 @@ describe("Feste Bauten", () => {
      * Waechter beim naechsten Umzug die geschlossene Seite.
      */
     for (const c of SILOS) {
-      const [w] = c.size;
-      const auf = c.facing === "east" ? 1 : -1;
+      const v = bayVorderkante(c);
+      const r = bayRuecken(c);
+      const o = bayOeffnung(c);
       expect(hitsObstacle(c.x, c.z, 0), `${c.label}: Innenraum frei`).toBeNull();
       expect(
-        hitsObstacle(c.x + auf * (w / 2 + 0.9), c.z, 0),
+        hitsObstacle(v.x + o.x * 0.9, v.z + o.z * 0.9, 0),
         `${c.label}: Öffnung frei`
       ).toBeNull();
-      expect(
-        hitsObstacle(c.x - auf * (w / 2), c.z, 0),
-        `${c.label}: Rückwand sperrt`
-      ).not.toBeNull();
+      expect(hitsObstacle(r.x, r.z, 0), `${c.label}: Rückwand sperrt`).not.toBeNull();
     }
   });
 
@@ -342,10 +340,15 @@ describe("Feste Bauten", () => {
      * gewechselt. Gemessen wird gegen die Wand, an der die Reihe steht, nicht
      * gegen eine fest eingetragene.
      */
-    const ruecken = Math.max(...SILOS.map((c) => c.x + c.size[0] / 2));
-    const luft = YARD_MAX_X - ruecken;
-    expect(luft, `${luft.toFixed(1)} m Leere hinter der letzten Mulde`).toBeLessThan(4);
-    expect(luft, "die Mauer steht auf der Mulde").toBeGreaterThan(0.8);
+    for (const c of SILOS) {
+      const r = bayRuecken(c);
+      // Jedes Silo gegen die Wand, an der es steht — seit E-028 sind das zwei
+      // verschiedene (Westwand und Suedmauer).
+      const luft =
+        c.facing === "north" ? r.z - -(YARD_D / 2) : r.x - YARD_MIN_X;
+      expect(luft, `${c.label}: ${luft.toFixed(1)} m Leere hinter der Mulde`).toBeLessThan(4);
+      expect(luft, `${c.label}: die Mauer steht auf der Mulde`).toBeGreaterThan(0.8);
+    }
   });
 
   it("an der alten Reifenstelle steht nichts mehr — und nichts Unsichtbares", () => {
@@ -440,13 +443,19 @@ describe("Reichweite des Baggers", () => {
     expect(Math.hypot(dx, dz)).toBeLessThan(REICHWEITE_M);
   });
 
-  it("die Silos stehen in einer Flucht an der Ostwand", () => {
-    // Der Abholer faehrt sie in einem Zug ab (Ansage 12.09.2026). Steht eine
-    // aus der Reihe, muss er rangieren, und die Spur trifft sie nicht mehr.
-    const reiheX = SILOS[0]!.x;
-    for (const c of SILOS) {
-      expect(c.x, `${c.label} steht nicht in der Flucht`).toBeCloseTo(reiheX, 3);
-    }
+  it("die Silos stehen in zwei Fluchten — Westwand und Suedwand", () => {
+    /*
+     * Der Abholer faehrt einen Schenkel in einem Zug ab (Ansage 12.09.2026).
+     * Steht eines aus der Reihe, muss er rangieren, und die Spur trifft es
+     * nicht mehr. Seit E-028 gibt es ZWEI Fluchten; geprueft wird jede fuer
+     * sich, sonst meldet der Waechter die Ecke als Fehler.
+     */
+    const west = SILOS.filter((c) => c.facing === "east");
+    const sued = SILOS.filter((c) => c.facing === "north");
+    expect(west.length, "kein Westschenkel").toBeGreaterThan(0);
+    expect(sued.length, "kein Suedschenkel").toBeGreaterThan(0);
+    for (const c of west) expect(c.x, `${c.label} nicht in der Westflucht`).toBeCloseTo(west[0]!.x, 3);
+    for (const c of sued) expect(c.z, `${c.label} nicht in der Suedflucht`).toBeCloseTo(sued[0]!.z, 3);
   });
 
   it("die Ruecknwand ist hoeher als die Flanken", () => {

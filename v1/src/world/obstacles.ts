@@ -196,6 +196,26 @@ function bayObstacles(cfg: ContainerConfig): Obstacle[] {
       top: top + RUECKWAND_PLUS,
       label: `${L} Stirn`,
     });
+  } else if (cfg.niedrigeStirn) {
+    /*
+     * Die niedrige Schwelle auf der Baggerseite (E-028). Sie steht an
+     * derselben Stelle wie die volle Stirnwand, ist aber nur `niedrigeStirn`
+     * hoch — `hitsObstacle` laesst Arm und Spinne darueber hinweg, und der
+     * Blick aus der abgesenkten Kabine geht ebenfalls darueber (gerechnet in
+     * `containers.ts`, `totenStreifen`).
+     *
+     * Sie MUSS hier stehen: Was gebaut ist und nicht verzeichnet, faellt
+     * Lambert und den LKW nicht auf — und was verzeichnet ist und nicht
+     * gebaut, ist die unsichtbare Barriere vom 12.09.2026.
+     */
+    waende.push({
+      x: cfg.x + stirn,
+      z: cfg.z,
+      hw: BAY_T,
+      hd,
+      top: cfg.niedrigeStirn,
+      label: `${L} Schwelle`,
+    });
   }
   return waende;
 }

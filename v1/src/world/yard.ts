@@ -301,21 +301,35 @@ export function baumStandort(
  * die Warteplaetze links und rechts daneben.
  */
 /*
- * Nachtrag 14.09.2026 (E-010): von (−10,5 | 27,0) auf (−9,5 | 15,5).
+ * Nachtrag 15.09.2026 (E-028): von (−9,5 | 15,5) zurueck an die Nordmauer,
+ * auf (−9,5 | 26,8).
  *
- * An der alten Stelle steht seit heute die erste Sortierhalle (x −17,75 bis
- * −10,25, z +17,5 bis +26,5) — gemessen lag der Wagen mit 2,75 x 0,9 m in
- * ihrer Ecke. Der neue Platz ist die Luecke zwischen Halle 1 und Halle 2, ein
- * paar Meter davor: Dort warten die Fahrer auf ihre Einweisung, und dort
- * stehen auch die drei Warteplaetze.
+ * Ansage Patrick: „Janine kommt wieder an die Aussengrenze, links neben dem
+ * Tor, da wo auch die LKWs parkieren." Links vom Sitz ist +x, also OESTLICH
+ * der Einfahrt (Tor auf x −22, 9,0 m breit) — genau dort, wo die beiden
+ * noerdlichen Warteplaetze stehen.
  *
- * Ein Zwischenstand bei (−22,5 | 19,5) ist gemessen wieder verworfen worden:
- * Der Wagen stand dort 3,9 m neben der Sehne, mit der ein LKW vier Meter
- * vorausschaut — der erste Kipper blieb 292 Sekunden lang hinter der Waage
- * stehen und kam nie auf den Platz. Feste Bauten kennen keine
- * Aufgeben-Regel: Was sie versperren, bleibt versperrt.
+ * Auf (−9,5 | 15,5) war sie der engste Punkt der vorderen Haelfte: Sie hat
+ * die Abholer-Spur gedreht (der Wagen waere sonst durch den Kaffeewagen
+ * gefahren) und den dritten Warteplatz von der Nordwand vertrieben.
+ *
+ * DIE ZAHLEN, gemessen gegen die Fahrzeugumrisse:
+ *
+ *   Wagen belegt          x −12,0 … −7,0, z +25,4 … +28,2
+ *   Nordmauer innen       z +28,70   →  0,50 m Luft
+ *   Warteplatz 2 (−14,5)  Standflaeche bis x −12,95  →  0,95 m Luft
+ *   Torspur (x −22 ± 1,55)                           →  8,45 m Luft
+ *   Waagenspur (x −27,5)                             → 14,0 m Luft
+ *
+ * Der Zwischenstand (−22,5 | 19,5) vom 13.09.2026 bleibt verworfen und ist
+ * der Grund, warum hier mit dem Umriss gerechnet wird und nicht nach Gefuehl:
+ * Dort stand der Wagen 3,9 m neben der Sehne, mit der ein LKW vier Meter
+ * vorausschaut — der erste Kipper blieb 292 Sekunden hinter der Waage stehen
+ * und kam nie auf den Platz. Feste Bauten kennen keine Aufgeben-Regel: Was
+ * sie versperren, bleibt versperrt. Die neue Stelle liegt 8,45 m neben der
+ * Torspur und beruehrt keine Sehne einer Route.
  */
-export const KAFFEE_POS = new THREE.Vector3(-9.5, 0, 15.5);
+export const KAFFEE_POS = new THREE.Vector3(-9.5, 0, 26.8);
 /** Gedreht, damit die Klappe nach Sueden zeigt und der Wagen laengs zur Wand steht. */
 export const KAFFEE_ROT = Math.PI / 2;
 /** Grundriss des Wagens [halbe Breite in x, halbe Tiefe in z] — dreht mit. */

@@ -1,7 +1,14 @@
 import * as THREE from "three";
 import { umkugelRadius, type ItemManager, type ScrapItem } from "./scrapItems";
 import { hitsObstacle, slideAround } from "./obstacles";
-import { CONFIGS, gehoertHierhin, type ContainerConfig } from "./containers";
+import {
+  CONFIGS,
+  gehoertHierhin,
+  bayVorderkante,
+  bayOeffnung,
+  bayHalb,
+  type ContainerConfig,
+} from "./containers";
 import { KAFFEE_ROT, BUCHT_Z } from "./yard";
 import { findeBox, ausBox, type Box } from "./boxen";
 import {
@@ -1238,9 +1245,13 @@ export class StaffManager {
       if (ausDerBox) {
         hol(ausDerBox);
         const p = ausDerBox.body.translation();
-        const box = CONFIGS.filter((c) => c.sortierbox === true).find(
-          (c) => Math.abs(p.x - c.x) <= c.size[0] / 2 && Math.abs(p.z - c.z) <= c.size[1] / 2
-        );
+        const box = CONFIGS.filter((c) => c.sortierbox === true).find((c) => {
+          // In WELTachsen, nicht in Muldenachsen: `bayHalb` dreht mit, wenn
+          // eine Mulde nach Norden zeigt. Sonst sucht Lambert das Stueck in
+          // einem um 90 Grad verdrehten Rechteck.
+          const { hw, hd } = bayHalb(c);
+          return Math.abs(p.x - c.x) <= hw && Math.abs(p.z - c.z) <= hd;
+        });
         if (box && box.kind === "bay") {
           const [ax, az] = StaffManager.anlieferPunkt(box);
           this.lambertTarget.set(ax, 0, az);
@@ -1569,12 +1580,20 @@ export class StaffManager {
     return passend.find((c) => c.kind === "rolloff") ?? passend[0];
   }
 
-  /** Halteplatz vor einer Mulde: vor ihrer offenen Seite, nicht darin. */
+  /**
+   * Halteplatz vor einer Mulde: 2,2 m vor ihrer offenen Seite, nicht darin.
+   *
+   * Rechnet seit E-028 mit `bayVorderkante` statt mit einer eigenen Fallunter-
+   * scheidung. Die alte las bei Oeffnung nach Norden `size[1]` statt
+   * `size[0]` — also die Laenge an der Wand statt der Tiefe — und stellte
+   * Lambert damit 0,9 m zu weit vorn ab, in die Mulde hinein. Solange keine
+   * Mulde nach Norden zeigte, fiel das nicht auf; die halbe Silo-Reihe zeigt
+   * jetzt so.
+   */
   private static anlieferPunkt(c: ContainerConfig): [number, number] {
-    const [w, d] = c.size;
-    if (c.facing === "north") return [c.x, c.z + d / 2 + 2.2];
-    if (c.facing === "east") return [c.x + w / 2 + 2.2, c.z];
-    return [c.x - w / 2 - 2.2, c.z];
+    const v = bayVorderkante(c);
+    const o = bayOeffnung(c);
+    return [v.x + o.x * 2.2, v.z + o.z * 2.2];
   }
 
   /**

@@ -10,12 +10,26 @@
  * hier fest.
  */
 import { describe, it, expect } from "vitest";
-import { CONFIGS, gehoertHierhin, lagerMuldeFuer } from "../src/world/containers";
+import {
+  CONFIGS,
+  gehoertHierhin,
+  lagerMuldeFuer,
+  bayHalb,
+  bayOeffnung,
+  bayVorderkante,
+  bayRuecken,
+  type ContainerConfig,
+} from "../src/world/containers";
 import { MATERIALS } from "../src/materials/catalog";
-import { YARD_MAX_X, YARD_D } from "../src/world/yard";
+import { YARD_MAX_X, YARD_MIN_X, YARD_D } from "../src/world/yard";
 import { hitsObstacle } from "../src/world/obstacles";
 import { BAGGER_STAND, SCHWENK_INNEN, SCHWENK_AUSSEN, abstandVomStand } from "../src/world/baggerstand";
-import { ABLADE_SPUR_X, ABLADE_HALT_Z, MULDEN_GASSE_X } from "../src/delivery/routes";
+import {
+  ABLADE_SPUR_X,
+  ABLADE_HALT_Z,
+  MULDEN_GASSE_X,
+  MULDEN_GASSE_Z,
+} from "../src/delivery/routes";
 import { StaffManager, imBaggerrevier } from "../src/world/people";
 
 const LAGER = CONFIGS.filter((c) => c.lager === true);
@@ -75,30 +89,91 @@ describe("Keine Fraktion verliert ihr Lager", () => {
   });
 });
 
-describe("Die Reihe steht an der Wand und in der Nordhälfte", () => {
-  it("es sind sechs", () => {
+/** Westschenkel (Oeffnung nach Osten) und Suedschenkel (Oeffnung nach Norden). */
+const WEST = LAGER.filter((c) => c.facing === "east");
+const SUED = LAGER.filter((c) => c.facing === "north");
+
+describe("Die Reihe steht als L an Westwand und Suedwand (E-028)", () => {
+  it("es sind sechs, drei je Schenkel", () => {
     expect(LAGER.length).toBe(6);
+    expect(WEST.length, "Westschenkel").toBe(3);
+    expect(SUED.length, "Suedschenkel").toBe(3);
+    expect(WEST.length + SUED.length, "ein Silo zeigt in keine der beiden Richtungen").toBe(
+      LAGER.length
+    );
   });
 
-  it("jedes Silo steht mit dem Rücken an der Ostgrenze", () => {
+  it("jedes Silo steht mit dem Ruecken an SEINER Platzgrenze", () => {
+    /*
+     * Gemessen gegen die Wand, an der das Silo steht — nicht gegen eine fest
+     * eingetragene. Bis zum 15.09.2026 stand hier `YARD_MAX_X` und damit die
+     * Ostwand; nach dem Umzug haette derselbe Test 43,50 m „Leere hinter dem
+     * Silo" gemeldet, obwohl das Silo sauber an der Westwand steht.
+     */
     for (const c of LAGER) {
-      const ruecken = c.x + c.size[0] / 2;
-      const luft = YARD_MAX_X - ruecken;
+      const r = bayRuecken(c);
+      const wand = c.facing === "north" ? -YARD_D / 2 : YARD_MIN_X;
+      const luft = Math.abs(c.facing === "north" ? r.z - wand : r.x - wand);
       expect(luft, `${c.label}: ${luft.toFixed(2)} m Leere hinter dem Silo`).toBeLessThan(1.5);
       expect(luft, `${c.label}: steht in der Mauer`).toBeGreaterThan(0.3);
     }
   });
 
-  it("die Reihe hat gleichen Achsabstand und bleibt innerhalb der Mauern", () => {
-    const z = LAGER.map((c) => c.z).sort((a, b) => b - a);
-    for (let i = 1; i < z.length; i++) {
-      expect(z[i - 1]! - z[i]!, "ungleicher Achsabstand").toBeCloseTo(4.6, 6);
+  it("jeder Schenkel steht in einer Flucht und hat gleichen Achsabstand", () => {
+    for (const [name, leg] of [
+      ["West", WEST],
+      ["Sued", SUED],
+    ] as Array<[string, ContainerConfig[]]>) {
+      const quer = leg[0]!.facing === "north" ? "z" : "x";
+      const laengs = quer === "z" ? "x" : "z";
+      for (const c of leg) {
+        expect(c[quer], `${c.label} steht nicht in der ${name}-Flucht`).toBeCloseTo(
+          leg[0]![quer],
+          6
+        );
+      }
+      const achsen = leg.map((c) => c[laengs]).sort((a, b) => b - a);
+      for (let i = 1; i < achsen.length; i++) {
+        expect(achsen[i - 1]! - achsen[i]!, `${name}: ungleicher Achsabstand`).toBeCloseTo(4.6, 6);
+      }
     }
-    // Flankenmaß: halbe Tiefe plus Steinreihe (0,275 m)
-    const flanke = LAGER[0]!.size[1] / 2 + 0.275;
-    expect(z[0]! + flanke, "das nördlichste Silo steht in der Nordmauer").toBeLessThan(
-      YARD_D / 2 - 0.3
-    );
+  });
+
+  it("kein Silo steht in einer Mauer", () => {
+    for (const c of LAGER) {
+      const { hw, hd } = bayHalb(c);
+      // Flankenmass: halbe Laenge plus Steinreihe (0,275 m)
+      const fw = c.facing === "north" ? hw + 0.275 : hw;
+      const fd = c.facing === "north" ? hd : hd + 0.275;
+      expect(c.x - fw, `${c.label} steht in der Westmauer`).toBeGreaterThan(YARD_MIN_X + 0.3);
+      expect(c.x + fw, `${c.label} steht in der Ostmauer`).toBeLessThan(YARD_MAX_X - 0.3);
+      expect(c.z - fd, `${c.label} steht in der Suedmauer`).toBeGreaterThan(-YARD_D / 2 + 0.3);
+      expect(c.z + fd, `${c.label} steht in der Nordmauer`).toBeLessThan(YARD_D / 2 - 0.3);
+    }
+  });
+
+  it("die beiden Schenkel kommen sich an der Ecke nicht ins Gehege", () => {
+    /*
+     * Die Ecke ist der heikle Punkt des L. Geprueft wird der Streifen, den
+     * die Gasse des Suedschenkels braucht: Sie liegt auf z −17,0, ein LKW ist
+     * dort 3,10 m breit, und das unterste Westsilo darf nicht hineinragen.
+     */
+    const LKW_HALB = 1.55;
+    for (const c of WEST) {
+      const { hd } = bayHalb(c);
+      const suedkante = c.z - hd - 0.275;
+      expect(
+        suedkante,
+        `${c.label} reicht bis z ${suedkante.toFixed(2)} und damit in die Suedgasse`
+      ).toBeGreaterThan(MULDEN_GASSE_Z + LKW_HALB);
+    }
+    for (const c of SUED) {
+      const { hw } = bayHalb(c);
+      const nordkante = c.z + hw + 0.275;
+      expect(nordkante, `${c.label} ragt in die Suedgasse`).toBeLessThan(
+        MULDEN_GASSE_Z - LKW_HALB
+      );
+    }
   });
 
   it("und bewusst außerhalb des Schwenkbands — dorthin wird gefahren", () => {
@@ -114,10 +189,6 @@ describe("Die Reihe steht an der Wand und in der Nordhälfte", () => {
      * Lambert faehrt nicht in den Arbeitsbereich des Baggers (Ansage
      * 12.09.2026). Faellt ein Silo in dieses Gebiet, traegt er nichts mehr
      * dorthin — ohne Fehlermeldung, das Material bleibt einfach liegen.
-     *
-     * Genau das drohte am 15.09.2026: Die Reihe steht jetzt an der Ostwand,
-     * ihr suedlichstes Silo auf z +0,8, und die Nordgrenze des Sperrgebiets
-     * stand als feste 2,0 im Quelltext.
      */
     for (const c of LAGER) {
       expect(imBaggerrevier(c.x, c.z), `${c.label} liegt in Lamberts Sperrgebiet`).toBe(false);
@@ -126,18 +197,30 @@ describe("Die Reihe steht an der Wand und in der Nordhälfte", () => {
         imBaggerrevier(ax, az),
         `${c.label}: der Halteplatz (${ax.toFixed(1)}|${az.toFixed(1)}) liegt im Sperrgebiet`
       ).toBe(false);
+      // Und er haelt VOR der Oeffnung, nicht darin.
+      const v = bayVorderkante(c);
+      const o = bayOeffnung(c);
+      const davor = (ax - v.x) * o.x + (az - v.z) * o.z;
+      expect(davor, `${c.label}: Halteplatz ${davor.toFixed(2)} m vor der Oeffnung`).toBeCloseTo(
+        2.2,
+        6
+      );
     }
   });
 
-  it("die Gasse läuft vor den Öffnungen, nicht in ihnen", () => {
+  it("die Gasse läuft 5,0 m vor den Öffnungen, nicht in ihnen", () => {
     for (const c of LAGER) {
-      const oeffnung = c.x - c.size[0] / 2;
-      const abstand = oeffnung - MULDEN_GASSE_X;
+      const v = bayVorderkante(c);
+      const gasse = c.facing === "north" ? MULDEN_GASSE_Z : MULDEN_GASSE_X;
+      const eigen = c.facing === "north" ? v.z : v.x;
+      const abstand = Math.abs(gasse - eigen);
       expect(abstand, `${c.label}: Gasse ${abstand.toFixed(2)} m vor der Öffnung`).toBeCloseTo(
         5.0,
         6
       );
-      expect(hitsObstacle(MULDEN_GASSE_X, c.z, 1.4), `${c.label}: Gasse versperrt`).toBeNull();
+      const gx = c.facing === "north" ? c.x : MULDEN_GASSE_X;
+      const gz = c.facing === "north" ? MULDEN_GASSE_Z : c.z;
+      expect(hitsObstacle(gx, gz, 1.4), `${c.label}: Gasse versperrt`).toBeNull();
     }
   });
 });

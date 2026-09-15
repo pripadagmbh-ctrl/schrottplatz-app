@@ -137,9 +137,9 @@ describe("Kein Fahrzeugumriss schneidet ein festes Bauwerk", () => {
       ["Abholer-Ausfahrt", pickupOut(), "abholer", false],
     ];
     for (const c of lager) {
-      strecken.push([`Silo ${c.label} Anfahrt`, bayApproach(c.z), "kipper", false]);
-      strecken.push([`Silo ${c.label} Rangieren`, bayInRev(c.z), "kipper", true]);
-      strecken.push([`Silo ${c.label} Ausfahrt`, bayOut(c.z), "kipper", false]);
+      strecken.push([`Silo ${c.label} Anfahrt`, bayApproach(c), "kipper", false]);
+      strecken.push([`Silo ${c.label} Rangieren`, bayInRev(c), "kipper", true]);
+      strecken.push([`Silo ${c.label} Ausfahrt`, bayOut(c), "kipper", false]);
     }
     for (const [i, p] of PARK_SLOTS.entries()) {
       strecken.push([
@@ -151,6 +151,28 @@ describe("Kein Fahrzeugumriss schneidet ein festes Bauwerk", () => {
         "pritsche",
         true,
       ]);
+    }
+    /*
+     * ERST PRUEFEN, OB DIE STRECKE EINE IST.
+     *
+     * Am 15.09.2026 hat dieser Waechter zwei Stunden lang nichts gemeldet,
+     * weil die Silo-Routen `NaN` enthielten: `bayApproach` bekam seit dem
+     * Umbau einen Datensatz statt einer z-Koordinate, der Test uebergab
+     * weiter `c.z` — und jeder Vergleich mit NaN ist falsch, also fand die
+     * Trennachsenpruefung nie eine Ueberschneidung. Ein Test, der wegen
+     * kaputter Eingaben gruen ist, ist schlimmer als keiner.
+     *
+     * Die Tests laufen ohne `tsc` (tsconfig sammelt nur `src`), deshalb faengt
+     * das kein Typ ab. Diese drei Zeilen tun es.
+     */
+    for (const [name, route] of strecken) {
+      expect(route.length, `${name}: leere Strecke`).toBeGreaterThan(1);
+      for (const [x, z] of route) {
+        expect(
+          Number.isFinite(x) && Number.isFinite(z),
+          `${name}: Wegpunkt (${x} | ${z}) ist keine Zahl`
+        ).toBe(true);
+      }
     }
     const treffer = new Map<string, number>();
     for (const [name, route, kind, rev] of strecken) {

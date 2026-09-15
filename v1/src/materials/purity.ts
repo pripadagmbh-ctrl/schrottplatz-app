@@ -27,6 +27,50 @@ export function containerValue(
 }
 
 /**
+ * Erlös eines Behälters, der MEHRERE Fraktionen fasst — je Stoff zu seinem
+ * eigenen Preis.
+ *
+ * `containerValue` rechnet den ganzen Inhalt zum Preis der Leitfraktion. Das
+ * war richtig, solange eine Mulde eine Fraktion hatte; seit zwei Paare
+ * zusammengelegt sind (Kupfer + Messing, Alu + Zink) zahlt es Messing zum
+ * Kupferpreis und Zink zum Alupreis. Gemessen am Beispiel aus E-028 —
+ * je 100 kg Alu, Zink, Kupfer, Messing, Kabel — sind das 1960 statt 1602 €:
+ * **22 % zu viel**, und zwar auf dem Schild, an dem der Spieler entscheidet.
+ *
+ * Mit der Buntmetall-Mulde (fünf Fraktionen in einem Behälter) wäre aus dem
+ * Fehler ein Sprung geworden: Derselbe Inhalt stünde je nach gewählter
+ * Leitfraktion zwischen 410 € (Zink) und 3600 € (Kupfer) auf dem Schild.
+ *
+ * Diese Rechnung ist gegen das Zusammenlegen unempfindlich: Wer dieselben
+ * Stücke auf eine oder auf fünf Mulden verteilt, liest dieselbe Summe. Was
+ * Fremdmasse ist, drückt weiterhin quadratisch (Briefing Kap. 7).
+ *
+ * `gehoert` sagt, welche Fraktion hier richtig liegt (`gehoertHierhin`).
+ */
+export function containerValueGemischt(
+  massen: Iterable<[string, number]>,
+  gehoert: (materialId: string) => boolean,
+  preis: (materialId: string) => number
+): number {
+  let gesamt = 0;
+  let passend = 0;
+  let brutto = 0;
+  for (const [id, kg] of massen) {
+    if (kg <= 0) continue;
+    gesamt += kg;
+    if (gehoert(id)) {
+      passend += kg;
+      brutto += kg * preis(id);
+    }
+  }
+  if (gesamt <= 0) return 0;
+  // Entsorgungsfraktionen kosten unabhängig von der Reinheit (wie oben).
+  if (brutto < 0) return brutto;
+  const reinheit = passend / gesamt;
+  return brutto * reinheit * reinheit;
+}
+
+/**
  * Preis als Zahl, die im Handel benutzt wird: **Euro je Tonne**.
  *
  * Intern rechnet alles in Euro je Kilogramm, weil die Massen der Teile in

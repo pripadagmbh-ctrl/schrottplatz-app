@@ -48,7 +48,12 @@ const BAGGER = { x: BAGGER_STAND.x, z: BAGGER_STAND.z };
  * steht bewusst ausserhalb — dorthin faehrt der Bagger, oder Lambert traegt
  * es hin.
  */
-const SELBST_BEFUELLT = ["c_mixed", "c_steel", "r_cable", "r_copper", "r_alu"];
+/*
+ * Seit E-028 ist aus den drei Metallmulden EINE geworden. Die alten Namen
+ * standen hier noch drin — der Test lief weiter gruen und prueft dabei drei
+ * Behaelter, die es nicht mehr gibt, also faktisch nur noch die beiden Halden.
+ */
+const SELBST_BEFUELLT = ["c_mixed", "c_steel", "r_bunt", "r_rubble"];
 
 /**
  * Die Arbeitslinie des Baggers.

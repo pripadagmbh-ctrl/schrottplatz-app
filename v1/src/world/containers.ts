@@ -2,7 +2,7 @@ import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { getMaterial } from "../materials/catalog";
 import { maxSpeedFor } from "./scrapItems";
-import { computePurity, containerValue } from "../materials/purity";
+import { computePurity, containerValueGemischt } from "../materials/purity";
 import { reihenstuecke } from "./legoreihe";
 import type { ItemManager, ScrapItem } from "./scrapItems";
 import type { EventBus } from "../core/events";
@@ -109,6 +109,19 @@ export interface ContainerConfig {
    */
   nurHuelle?: boolean;
   /**
+   * Niedrige Schwelle auf der dem BAGGER zugewandten Seite, in Metern.
+   *
+   * Wunsch Patrick 14.09.2026, bestaetigt am 15.09.: „vorn niedrig zumauern,
+   * damit nichts zurueckrollt — aber bei abgesenkter Kabine muss man noch
+   * hineinsehen koennen." Das ist keine Geschmacksfrage, sondern eine
+   * Sichtlinie, und sie ist gerechnet (`AUGPUNKT_UNTEN`, siehe unten).
+   *
+   * Sie ersetzt NICHT die volle Stirnwand: `shareEast` bleibt gesetzt, der
+   * Greifer faehrt weiter frei von der Baggerseite hinein. Was dazukommt, ist
+   * eine Bordkante.
+   */
+  niedrigeStirn?: number;
+  /**
    * Lagermulde in der Silo-Reihe: das ENDE des Materialwegs.
    *
    * Dorthin faehrt ein sortenreiner Kipper, und dorthin traegt Lambert aus
@@ -126,6 +139,56 @@ export interface ContainerConfig {
  */
 export function gehoertHierhin(cfg: ContainerConfig, fractionId: string): boolean {
   return cfg.fractionId === fractionId || (cfg.mitFraktionen?.includes(fractionId) ?? false);
+}
+
+/* ------------------------------------------- Muldengeometrie, einmalig ---- */
+/*
+ * `size` ist in MULDENachsen angegeben, nicht in Weltachsen: `size[0]` ist die
+ * Tiefe von der Oeffnung bis zur Rueckwand, `size[1]` die Laenge an der Wand
+ * entlang. Solange alle Mulden nach Westen zeigten, war beides dasselbe, und
+ * die Umrechnung stand an fuenf Stellen abgeschrieben.
+ *
+ * Mit der L-Reihe von E-028 zeigt die Haelfte der Silos nach NORDEN — dort
+ * sind Tiefe und Laenge vertauscht. Jede abgeschriebene Umrechnung waere
+ * damit an einem halben Platz falsch, und zwar stumm: Ein um 90 Grad
+ * verdrehtes Rechteck sieht fuer sich genommen richtig aus. Deshalb steht die
+ * Rechnung ab hier EINMAL, und Bau, Hindernisliste, Routen und Tests lesen
+ * sie.
+ */
+
+/** Wohin die Mulde offen ist, als Einheitsvektor. Standard: nach Westen. */
+export function bayOeffnung(cfg: ContainerConfig): { x: number; z: number } {
+  if (cfg.facing === "north") return { x: 0, z: 1 };
+  if (cfg.facing === "east") return { x: 1, z: 0 };
+  return { x: -1, z: 0 };
+}
+
+/** Halbe Ausdehnung in WELTachsen — bei Oeffnung nach Norden sind sie getauscht. */
+export function bayHalb(cfg: ContainerConfig): { hw: number; hd: number } {
+  const [w, d] = cfg.size;
+  const nord = cfg.facing === "north";
+  return { hw: (nord ? d : w) / 2, hd: (nord ? w : d) / 2 };
+}
+
+/** Mitte der offenen Vorderkante — dorthin schaut der Bagger, dort faehrt der Kipper an. */
+export function bayVorderkante(cfg: ContainerConfig): { x: number; z: number } {
+  const o = bayOeffnung(cfg);
+  const t = cfg.size[0] / 2;
+  return { x: cfg.x + o.x * t, z: cfg.z + o.z * t };
+}
+
+/** Mitte der geschlossenen Rueckwand — die Seite, die an der Platzmauer steht. */
+export function bayRuecken(cfg: ContainerConfig): { x: number; z: number } {
+  const o = bayOeffnung(cfg);
+  const t = cfg.size[0] / 2;
+  return { x: cfg.x - o.x * t, z: cfg.z - o.z * t };
+}
+
+/** Drehung der Mulde um die Hochachse (0 = Oeffnung nach Westen). */
+export function bayDrehung(cfg: ContainerConfig): number {
+  if (cfg.facing === "north") return Math.PI / 2;
+  if (cfg.facing === "east") return Math.PI;
+  return 0;
 }
 
 /**
@@ -196,61 +259,63 @@ export const CONFIGS: ContainerConfig[] = [
     haldeWaende: { rueck: false, aussen: false, nord: false, trenn: false } },
 
   /*
-   * DIE DREI MULDEN AN DER WESTFLANKE — rechts vom Sitz.
+   * DIE BUNTMETALL-MULDE AN DER WESTFLANKE — rechts vom Sitz, EINE statt drei.
    *
-   * Von der Platzmauer nach vorn: Alu+Zink, Kabel, Kupfer+Messing. Sie haben
-   * nur Seitenwaende, keine Rueckwand (E-006, Ansage 13.09.2026:
-   * „Rueckwaende raus, nur Seitenwaende"): Der Greifer setzt von oben ein,
-   * Lambert faehrt mit dem Radlader von Westen hinein. `shareEast` nimmt die
-   * Stirnwand heraus; `test/platz.test.ts` haelt fest, dass sie weg bleibt.
+   * Ansage Patrick 15.09.2026: „Das mit der Buntmetallmulde ist in Ordnung.
+   * Das heisst, du kannst da die Mulden alle wegmachen und machst nur noch
+   * eine Buntmetallmulde."
    *
-   * Zwei Paare sind zusammengelegt (E-010): Kupfer + Messing, Alu + Zink.
-   * Vier Ziele waeren an dieser Flanke nicht unterzubringen, ohne dass eines
-   * unter die innere Grenze von 5,8 m rutscht.
+   * Vorher standen hier drei: ALU + ZINK (7,28 m), KABEL (9,17 m) und
+   * KUPFER + MESSING (12,26 m). Die dritte lag seit dem 14.09. ausserhalb des
+   * Schwenkbands 5,8 bis 9,2 m und war damit nicht zu befuellen — der offene
+   * Punkt aus E-024. Drei Mulden neben die Presse zu stellen und alle drei im
+   * Band zu halten geht nicht: Zwischen Pressenrahmen (Nordkante −23,55) und
+   * der aeusseren Grenze liegen keine drei Muldenlaengen.
    *
-   * Die erste steht mit ihrer Suedseite an der Aussenmauer und braucht dort
-   * keine eigene Wand, nur eine Erhoehung (ausdrueckliche Ansage 14.09.2026)
-   * — deshalb `shareSouth` und `SUED_HOCH_VON = −10,5` in `yard.ts`. Die
-   * beiden anderen teilen sich je die Nordwand ihres Nachbarn; zwei
-   * Steinreihen mit 20 cm Luft dazwischen saehen aus wie ein Baufehler.
+   * WAS DAS KOSTET — nachgerechnet, nicht geschaetzt (E-028):
    *
-   * 4,0 m Tiefe statt der 3,2 aus dem Konzeptplan: Die offene Spinne misst
-   * 3,38 m, und wer eine Mulde schmaler macht, kann sie nicht mehr ausraeumen
-   * (`test/spinnenmass.test.ts`). Die Reihe ist dafuer um 0,6 m nach Norden
-   * gerueckt, damit die erste Mulde nicht in der Aussenmauer steht.
+   * Verdient wird NICHT an dieser Mulde, sondern erst beim Verkauf aus dem
+   * Container des Abholers (`economy/account.ts`, `sellContainer`). Dort
+   * zaehlt jedes STUECK mit seiner eigenen Fraktion, und Lambert traegt jedes
+   * Stueck einzeln in das Silo seiner Fraktion (`people.ts`, `muldeFuer` liest
+   * `item.materialId`). Die Mulde am Bagger ist Durchgang, nicht Abrechnung.
+   * Solange die SILOS getrennt bleiben, ist die Euro-Differenz aus dem
+   * Zusammenlegen deshalb **genau null** — gerechnet an einer Fuhre von je
+   * 100 kg Alu, Zink, Kupfer, Messing und Kabel: 437,50 € vorher wie nachher.
+   *
+   * Was verlorengeht, ist die AMPEL: Wer hier Kupfer ablegt, bekommt kein
+   * „falsche Zone" mehr, wenn Kabel danebenliegt. Das Sortieren zwischen den
+   * sechs Fraktionen verschiebt sich vom Spieler zu Lambert — und genau das
+   * ist gewollt (Ansage 15.09.2026: „erstmal alles rausfischen in die Mulde
+   * tun und dann spaeter entweder ich oder Lambert das sortieren").
+   *
+   * EDELSTAHL LIEGT MIT DRIN (Entscheidung Patrick, 15.09.2026). VA hatte am
+   * Bagger bis heute ueberhaupt kein Ziel: Wer ihn aus einem Wrack fischte,
+   * bekam ueberall „falsche Zone" — offener Punkt seit dem 14.09. Fachlich
+   * ist Edelstahl kein Buntmetall, sondern legierter Stahl; deshalb heisst die
+   * Mulde `BUNT + VA` und nicht „BUNTMETALL". Zwei Woerter, wie „VA-LAGER"
+   * daneben, und beides ist die Abkuerzung, die auf einem Platz wirklich
+   * gesagt wird. Sein Lagersilo bleibt getrennt — dort findet das Sortieren
+   * statt.
+   *
+   * Der Preis auf dem Schild rechnet seit E-028 je Stoff einzeln
+   * (`containerValueGemischt`) — sonst staende derselbe Inhalt je nach
+   * gewaehlter Leitfraktion zwischen 410 € (Zink) und 3600 € (Kupfer) da.
+   *
+   * LAGE. x −7,6 bleibt (das ist die Flucht neben der Presse, die schon
+   * stand). 6,0 m lang statt 4,0 — sie fasst jetzt, was vorher auf drei
+   * Mulden lag. Die Mitte liegt auf z −19,2, also 7,83 m vom Sitz, mitten im
+   * Band; ihre Suedwand endet auf −22,55 und laesst dem Pressenrahmen 1,00 m.
+   * Auf der Muldenachse sind 5,56 der 6,00 m vom Sitz aus erreichbar.
+   *
+   * Sie hat wie ihre Vorgaenger keine Rueckwand (`shareEast`, E-006, Ansage
+   * 13.09.2026: „Rueckwaende raus, nur Seitenwaende"): Der Greifer setzt von
+   * oben ein, Lambert faehrt mit dem Radlader von Westen hinein.
    */
-  /*
-   * Nachtrag 14.09.2026 abends: Die Presse hat die Suedhaelfte der Westflanke
-   * uebernommen, und die Reihe ist um zwei Muldenlaengen nach NORDEN
-   * gerueckt.
-   *
-   * Das kostet Reichweite, und zwar nachrechenbar. Vom Sitz (−0,5 | −22,5):
-   *
-   *   ALU + ZINK   (−7,6 | −20,9)   7,28 m   im Band
-   *   KABEL        (−7,6 | −16,7)   9,17 m   am aeusseren Rand (Grenze 9,20)
-   *   KUPFER + MSG (−7,6 | −12,5)  12,26 m   NICHT mehr im Band
-   *
-   * Die Flanke fasst neben der Presse nicht mehr drei Mulden im Schwenkband —
-   * das ist Geometrie, keine Meinung: Zwischen Pressenrahmen (Nordkante
-   * −23,55) und der aeusseren Grenze liegen keine drei Muldenlaengen. Patrick
-   * hat die Mulden ausdruecklich als zweitrangig eingestuft („die ueberlegen
-   * wir uns noch"); sie stehen deshalb ohne Konflikt in einer Flucht, und was
-   * daraus wird, entscheidet er (siehe Bericht zum Paket).
-   *
-   * x −7,6 statt −8,0: Das holt KABEL gerade noch ins Band (9,17 statt 9,48)
-   * und laesst der Presse trotzdem ihre Flucht.
-   *
-   * ALU + ZINK bekommt seine Suedflanke zurueck (`shareSouth` weg): Suedlich
-   * steht jetzt die Presse und keine Mauer mehr.
-   */
-  { id: "r_alu", fractionId: "alu", mitFraktionen: ["zinc"], label: "ALU + ZINK",
-    kind: "bay", x: -7.6, z: -20.9, size: [4.2, 4.0, 2.0],
-    sortierbox: true, shareEast: true },
-  { id: "r_cable", fractionId: "cable", label: "KABEL", kind: "bay", x: -7.6,
-    z: -16.7, size: [4.2, 4.0, 2.0], sortierbox: true, shareEast: true, shareSouth: true },
-  { id: "r_copper", fractionId: "copper", mitFraktionen: ["brass"], label: "KUPFER + MESSING",
-    kind: "bay", x: -7.6, z: -12.5, size: [4.2, 4.0, 2.0],
-    sortierbox: true, shareEast: true, shareSouth: true },
+  { id: "r_bunt", fractionId: "copper",
+    mitFraktionen: ["brass", "alu", "zinc", "cable", "va"],
+    label: "BUNT + VA", kind: "bay", x: -7.6, z: -19.2, size: [4.2, 6.0, 2.0],
+    sortierbox: true, shareEast: true, niedrigeStirn: 0.5 },
 
   /*
    * MUELL — nicht mehr in der Suedostecke, sondern in der Luecke zwischen
@@ -322,67 +387,82 @@ export const CONFIGS: ContainerConfig[] = [
    */
 
   /*
-   * DIE SILO-REIHE — an der gegenueberliegenden Wand, sechs statt neun
-   * (15.09.2026).
+   * DIE SILO-REIHE — ein L: neben den Hallen die Westwand hinunter, dann um
+   * die Suedwestecke an der Suedmauer entlang (15.09.2026, E-028).
    *
-   * Ansage Patrick: „Die Hallen muessen wieder zur Ostwand, da wo die Silos
-   * sind. Bitte da wieder platzieren und entsprechend die Silos kuerzen und
-   * auf die andere Seite bringen." Aus dem Sitz beschrieben: Die Silos raeumen
-   * die Wand bei x −36 fuer die Hallen und ziehen an die Wand bei x +10,5.
+   * Ansage Patrick: „Die Silos, die da links stehen, die sollen neben den
+   * Hallen stehen und dann ums Eck ueber die Suedseite weitergehen, damit
+   * links die Seite erstmal frei ist."
    *
-   * LAGE. Gespiegelt, nicht neu erfunden: Die Westmauer steht innen bei
-   * x −39,7, die Reihe stand 3,7 m davor auf −36. Die Ostmauer steht innen bei
-   * +10,2, die Reihe steht also auf +6,5 — Kasten von x 3,5 bis 9,5, Stirnwand
-   * aussen bei 10,05, 15 cm vor der Mauer. Die Oeffnung zeigt nach WESTEN auf
-   * den Platz (Standardrichtung, deshalb steht kein `facing` mehr dabei).
+   * LINKS UND RECHTS. Aus dem Sitz beschrieben ist +x LINKS und −x RECHTS:
+   * Der Bagger schaut nach +z, und wer mit +y oben nach +z blickt, hat +x auf
+   * der linken Bildhaelfte (rechts = vorn × oben = z × y = −x). Die Reihe
+   * stand seit dem Morgen auf x +6,5 an der Ostwand — das ist die Seite, die
+   * Patrick „links" nennt, und die wird jetzt frei.
    *
-   * WIE VIELE. Nach Sueden ist bei z ≈ 0 Schluss: Dort beginnt die
-   * Rueckfahrspur zum Abladeplatz (Rangierpunkt 6,3 | −8). Nach Norden steht
-   * die Mauer innen bei z +28,7; mit 2,375 m Flankenmass liegt die
-   * noerdlichste Mitte auf 26,2. Bei 4,6 m Achsabstand passen damit sechs
-   * Silos: 26,2 · 21,6 · 17,0 · 12,4 · 7,8 · 3,2. Die suedlichste Flanke endet
-   * auf z +0,825.
+   * ZWEI SCHENKEL, je drei Silos:
    *
-   * WAS GESTRICHEN IST — und wohin die Fraktion geht:
+   *   WEST  x −36,0, Oeffnung nach OSTEN, auf z −3,4 · −8,0 · −12,6. Dieselbe
+   *         Flucht wie die Hallen (deren Suedkante liegt auf z −0,10); das
+   *         noerdlichste Silo haelt mit seiner Flanke auf −1,025 und laesst
+   *         der Hallenwand 0,675 m.
+   *   SUED  z −25,0, Oeffnung nach NORDEN, auf x −30,0 · −25,4 · −20,8.
    *
-   *   E-MOTOREN     ersatzlos. Es war eine leere Huelle (`nurHuelle`), die
-   *                 Fraktion gibt es nicht (E-011). Kein Material verliert ein
-   *                 Ziel.
-   *   HOLZ          → ABFALL
-   *   KUNSTSTOFF    → ABFALL
-   *   BAUMISCH      → ABFALL (heisst jetzt so)
+   * Die Masse sind nicht gegriffen, sondern gespiegelt: Die Ostreihe stand
+   * 1,00 m vor der Mauer (Ruecken 9,50, Mauer 10,50). Westmauer −40,0 →
+   * Ruecken −39,0 → Mitte −36,0. Suedmauer −29,0 → Ruecken −28,0 → Mitte
+   * −25,0. Achsabstand 4,60 wie bisher.
    *
-   * Die drei Abfallsilos werden zu EINEM. Begruendung aus dem Katalog: Alle
-   * vier Abfallsaetze sind negativ und liegen zwischen −0,02 und −0,06 €/kg
-   * (`materials/catalog.ts`) — sie werden entsorgt, nicht verkauft, und ein
-   * Abnehmer bestellt sie nie. Am Bagger liegen Reifen und Baumisch seit dem
-   * 14.09. ohnehin in einer Mulde; das Sortieren des Abfalls ist ausdruecklich
-   * vertagt (E-024). Abgerechnet wird nach `fractionId` = `rubble`, also zum
-   * Baumisch-Satz.
+   * WARUM DREI UND DREI — und nicht vier und zwei. Beides ist nachgerechnet:
    *
-   * Damit hat JEDE Fraktion mit Lagerbedarf weiter ein Ziel: battery, alu,
-   * zinc, cable, copper, brass, va, wood, plastic, rubble, tires. Stahl und
-   * Mischschrott haben bewusst keines (E-010: direkt an der Halde verladen) —
-   * nachgerechnet in `test/silos.test.ts`.
+   *  - Auf der Westwand allein passten SECHS (von Mitte −2,725 bis −25,725);
+   *    die L-Form ist also Patricks Bild, nicht Platznot.
+   *  - Mit VIER Westsilos reichte das unterste bis z −19,575 hinunter. Die
+   *    Gasse der Suedreihe muss 5,0 m vor deren Oeffnung liegen, also auf
+   *    z −17,0, und ein LKW ist dort 3,10 m breit — er fuehre mitten durch
+   *    das vierte Silo. Bei drei endet das unterste auf −14,975 und laesst
+   *    der Gasse 0,475 m Luft. Das ist die Zahl, an der die Aufteilung haengt.
+    *  - Die SUEDWESTECKE bleibt frei, und das ist gerechnet, nicht vergessen:
+   *    Ein Kipper, der in der Suedgasse (z −17,0) nach Westen faehrt, steht
+   *    mit der Kabine 4,90 m vor seinem Haltepunkt. Bei einem Silo auf x −36,0
+   *    reichte er bis −40,9 und damit 1,20 m in die Westmauer; und beim
+   *    Zurueckstossen ragte er 4,90 m nach Norden in die Suedflanke des
+   *    untersten Westsilos. Die Suedreihe beginnt deshalb erst auf x −30,0 —
+   *    dort liegt der Wagen 1,45 m neben der Westreihe. In der Ecke wendet
+   *    die Gasse; sie ist kein verlorener Platz, sondern die Kurve.
+   *  - Im Osten hoert sie bei −20,8 auf. Weiter oestlich waere Platz bis zur
+   *    Presse (deren Rahmen beginnt auf x −10,375, die offene Deckelklappe
+   *    schwingt bis −11,85) — dort passten noch ZWEI weitere. Die Reihe kann
+   *    also ohne Umbau wachsen.
    *
-   * `lager: true` heisst: Hierhin faehrt der sortenreine Kipper, und hierhin
-   * traegt Lambert aus den Mulden am Bagger. Die Behaelter am Bagger tragen
-   * das Kennzeichen bewusst nicht — sonst traegt Lambert aus der Alu-Mulde in
-   * die Alu-Mulde (gemessen am 13.09.2026: 4 von 4 blieben liegen).
+   * IM SCHWENKBAND liegt keines: das naechste (−20,8 | −25,0) ist 20,5 m vom
+   * Sitz. Die Reihe ist bewusst draussen — dorthin wird gefahren (E-010).
+   *
+   * WAS AM VERLADEPLATZ HAENGT. Er zieht mit auf (−25,5 | −8,0): 7,5 m zur
+   * Silo-Vorderkante (x −33,0), 7,5 m zur LKW-Spur (x −18,0). Von dort
+   * erreicht der Arm den GANZEN Westschenkel (8,80 · 7,50 · 8,80 m). Die drei
+   * Suedsilos nicht — sie sind 15 bis 20 m weg. Das ist kein Rueckschritt: An
+   * der Ostwand waren es ebenfalls drei von sechs, und es waren dieselben drei
+   * Fraktionen (Kupfer, Kabel, Alu). Ein ZWEITER Verladestand fuer den
+   * Suedschenkel waere (−30,0 | −14,5) mit LKW-Spur auf z −7,0; er ist
+   * gerechnet, aber nicht gebaut — der Abholer haelt an genau einem Ort, und
+   * das zu aendern ist ein eigenes Paket.
    */
-  { id: "c_rubble", fractionId: "rubble", mitFraktionen: ["tires", "wood", "plastic"],
-    label: "ABFALL", kind: "bay", x: 6.5, z: 23.8, size: [6.0, 4.2, 3.0], lager: true },
-  { id: "c_battery", fractionId: "battery", label: "BATTERIEN", kind: "bay", x: 6.5,
-    z: 19.2, size: [6.0, 4.2, 3.0], lager: true },
-  { id: "c_va_lager", fractionId: "va", label: "VA-LAGER", kind: "bay", x: 6.5,
-    z: 14.6, size: [6.0, 4.2, 3.5], lager: true },
-  { id: "c_alu_lager", fractionId: "alu", mitFraktionen: ["zinc"], label: "ALU-LAGER",
-    kind: "bay", x: 6.5, z: 10.0, size: [6.0, 4.2, 3.0], lager: true },
   { id: "c_copper_lager", fractionId: "copper", mitFraktionen: ["brass"],
-    label: "KUPFER-LAGER", kind: "bay", x: 6.5, z: 5.4, size: [6.0, 4.2, 3.0],
-    lager: true },
-  { id: "c_cable_lager", fractionId: "cable", label: "KABEL-LAGER", kind: "bay", x: 6.5,
-    z: 0.8, size: [6.0, 4.2, 3.0], lager: true },
+    label: "KUPFER-LAGER", kind: "bay", x: -36.0, z: -3.4, size: [6.0, 4.2, 3.0],
+    facing: "east", lager: true },
+  { id: "c_cable_lager", fractionId: "cable", label: "KABEL-LAGER", kind: "bay",
+    x: -36.0, z: -8.0, size: [6.0, 4.2, 3.0], facing: "east", lager: true },
+  { id: "c_alu_lager", fractionId: "alu", mitFraktionen: ["zinc"], label: "ALU-LAGER",
+    kind: "bay", x: -36.0, z: -12.6, size: [6.0, 4.2, 3.0], facing: "east", lager: true },
+  /* Um die Ecke, Oeffnung nach Norden. */
+  { id: "c_va_lager", fractionId: "va", label: "VA-LAGER", kind: "bay", x: -30.0,
+    z: -25.0, size: [6.0, 4.2, 3.5], facing: "north", lager: true },
+  { id: "c_battery", fractionId: "battery", label: "BATTERIEN", kind: "bay",
+    x: -25.4, z: -25.0, size: [6.0, 4.2, 3.0], facing: "north", lager: true },
+  { id: "c_rubble", fractionId: "rubble", mitFraktionen: ["tires", "wood", "plastic"],
+    label: "ABFALL", kind: "bay", x: -20.8, z: -25.0, size: [6.0, 4.2, 3.0],
+    facing: "north", lager: true },
 ];
 
 /**
@@ -407,6 +487,40 @@ export function lagerMuldeFuer(fractionId: string | null): ContainerConfig | nul
    * (`gehoertHierhin`).
    */
   return CONFIGS.find((c) => c.lager === true && gehoertHierhin(c, fractionId)) ?? null;
+}
+
+/* ------------------------------------------------- Sicht in die Mulde ---- */
+/**
+ * Augpunkt des Fahrers bei ABGESENKTER Kabine, in Metern ueber Grund.
+ *
+ * Gelesen, nicht geschaetzt: `excavator.ts` setzt `cabGroup.position.y = 1,60`
+ * und den Augpunkt lokal auf 1,68 — zusammen 3,28 m. Dieselbe Zahl steht in
+ * `docs/baggerkonzept.md`, Tabelle „Augpunkt Kabine: y 3,28, z 0,20 (Kabine
+ * unten)". Mit Kabinenhub kaemen 2,60 m dazu; gerechnet wird mit dem
+ * schlechtesten Fall, also unten.
+ */
+export const AUGPUNKT_UNTEN = 3.28;
+
+/**
+ * Wie breit der tote Streifen hinter einer Wand ist.
+ *
+ * Der Blick streift die Wandkrone und trifft den Boden erst dahinter. Aus
+ * Strahlensatz: `blind = h × D / (H − h)`, mit H = Augenhoehe, h = Wandhoehe,
+ * D = waagerechter Abstand vom Auge zur Wand.
+ *
+ * Beispiel Buntmetall-Mulde (E-028): Ihre Baggerseite laeuft von (−5,5 |
+ * −22,2) bis (−5,5 | −16,2), also 5,01 bis 8,04 m vom Sitz.
+ *
+ *   Wandhoehe 0,50 m (EINE Lage):  blind 0,90 bis 1,45 m  →  65–79 % des
+ *                                  4,20 m tiefen Bodens bleiben sichtbar
+ *   Wandhoehe 1,00 m (ZWEI Lagen): blind 2,20 bis 3,53 m  →  16–48 %
+ *
+ * Deshalb steht dort EINE Lage und nicht zwei. Ab 1,13 m sieht man vom
+ * hinteren Ende der Mulde ueberhaupt keinen Boden mehr.
+ */
+export function totenStreifen(wandHoehe: number, abstand: number, augHoehe = AUGPUNKT_UNTEN): number {
+  if (wandHoehe >= augHoehe) return Infinity;
+  return (wandHoehe * abstand) / (augHoehe - wandHoehe);
 }
 
 /* ------------------------------------------------------ Muldenwände ------ */
@@ -448,6 +562,13 @@ export type AmpelState = "green" | "yellow" | "red";
 class GameContainer {
   contentKg = 0;
   contaminationKg = 0;
+  /**
+   * Was genau drinliegt, je Fraktion. Gebraucht, seit eine Mulde mehrere
+   * Fraktionen fasst: Ohne diese Aufstellung muesste das Schild den ganzen
+   * Inhalt zum Preis der Leitfraktion rechnen — bei der Buntmetall-Mulde
+   * waere das zwischen 410 und 3600 € fuer denselben Inhalt (E-028).
+   */
+  readonly massen = new Map<string, number>();
   readonly itemIds = new Set<string>();
   private label: ContainerLabel;
   /**
@@ -486,6 +607,16 @@ class GameContainer {
     this.group = group;
     this.px = cfg.x;
     this.pz = cfg.z;
+    /*
+     * Die Zaehlzone dreht mit der Mulde. `containsPoint` misst in
+     * MULDENachsen (`size[0]` quer zur Wand, `size[1]` an ihr entlang); bei
+     * einer nach Norden offenen Mulde sind das nicht die Weltachsen. Ohne
+     * diese Zeile zaehlte ein Silo der Suedreihe ein 6,0 x 4,2 m grosses
+     * Rechteck quer zu sich selbst — ein Teil in der Mulde faellt heraus,
+     * eines daneben zaehlt mit. Die Halden bleiben bei 0: Sie werden
+     * ausdruecklich in Weltachsen gebaut (siehe unten).
+     */
+    if (cfg.kind === "bay") this.pyaw = bayDrehung(cfg);
 
     if (cfg.kind === "halde") {
       /*
@@ -839,6 +970,17 @@ class GameContainer {
             placeBlock(w / 2 + BLOCK_T / 2, y, s.mitte, false, s.laenge);
           }
         }
+        /*
+         * Die niedrige Schwelle auf der Baggerseite (E-028). Aus derselben
+         * Quelle wie jede andere Reihe seit E-018 (`reihenstuecke`), damit der
+         * letzte Stein an der Wandkante endet und nicht uebersteht.
+         */
+        if (cfg.niedrigeStirn && y < cfg.niedrigeStirn) {
+          const bord = muldenWandSpannen(w, d, true).rueck;
+          for (const s of reihenstuecke(bord[0], bord[1], BLOCK_L, versatz)) {
+            placeBlock(w / 2 + BLOCK_T / 2, y, s.mitte, false, s.laenge);
+          }
+        }
       }
       const wandMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.98 });
       const bauen = (
@@ -860,13 +1002,30 @@ class GameContainer {
       bauen(blockGeo, bloecke);
       bauen(studGeo, nieten);
 
-      // Öffnung nach Norden: die ganze Mulde wird gedreht, statt die
-      // Wandlogik zu verdoppeln
-      if (cfg.facing === "north") group.rotation.y = Math.PI / 2;
-      else if (cfg.facing === "east") group.rotation.y = Math.PI;
-      // Kollider: drei Wandquader (Ostseite offen)
+      // Öffnung nach Norden oder Osten: die ganze Mulde wird gedreht, statt
+      // die Wandlogik zu verdoppeln
+      const drehung = bayDrehung(cfg);
+      group.rotation.y = drehung;
+      /*
+       * DER KOERPER DREHT MIT — bis zum 15.09.2026 tat er das nicht.
+       *
+       * Die sichtbaren Steine steckten in einer gedrehten Gruppe, die
+       * Kollider hingen an einem ungedrehten Koerper. Bei `facing: "east"`
+       * (Drehung 180°) lag die physische Rueckwand damit genau dort, wo die
+       * sichtbare OEFFNUNG war: An der Muellmulde (−3,2 | −14,6) stand eine
+       * 2,2 m hohe unsichtbare Wand quer vor dem Einwurf, waehrend die
+       * sichtbare Stirnwand aus Beton ohne Wirkung dastand. Dieselbe Klasse
+       * Fehler wie die „unsichtbare Barriere" vom 12.09.2026 — nur diesmal
+       * zwischen Bau und Physik statt zwischen Bau und Hindernisliste.
+       *
+       * Aufgefallen ist es beim Drehen der halben Silo-Reihe nach Norden
+       * (E-028): Ohne Drehung des Koerpers haette dort JEDES Silo seine
+       * Rueckwand im Weg gehabt.
+       */
       const body = world.createRigidBody(
-        RAPIER.RigidBodyDesc.fixed().setTranslation(cfg.x, 0, cfg.z)
+        RAPIER.RigidBodyDesc.fixed()
+          .setTranslation(cfg.x, 0, cfg.z)
+          .setRotation({ x: 0, y: Math.sin(drehung / 2), z: 0, w: Math.cos(drehung / 2) })
       );
       const wallH = ROWS * BLOCK_H;
       for (const sz of [-1, 1]) {
@@ -894,9 +1053,35 @@ class GameContainer {
         ),
         body
       );
+      /*
+       * Die niedrige Schwelle auf der Baggerseite (E-028). Sie sitzt an
+       * derselben Stelle wie die volle Stirnwand, nur eine Lage hoch.
+       */
+      if (cfg.niedrigeStirn) {
+        const hoehe = Math.max(1, Math.round(cfg.niedrigeStirn / BLOCK_H)) * BLOCK_H;
+        world.createCollider(
+          RAPIER.ColliderDesc.cuboid(BLOCK_T / 2, hoehe / 2, d / 2 + BLOCK_T).setTranslation(
+            w / 2 + BLOCK_T / 2,
+            hoehe / 2,
+            0
+          ),
+          body
+        );
+      }
       this.label = new ContainerLabel(cfg.label, fraction.color);
-      // Schild am hinteren (geschlossenen) Ende — so steht es nicht im Blickfeld
-      this.label.sprite.position.set(cfg.x + w / 2 + 0.6, wallH + 1.1, cfg.z);
+      /*
+       * Schild am hinteren (geschlossenen) Ende — so steht es nicht im
+       * Blickfeld. Die Seite kommt aus `bayRuecken`, nicht aus `+ w/2`: Bei
+       * einer nach Norden oder Osten offenen Mulde stand es sonst mitten in
+       * der Einfuelloeffnung.
+       */
+      const schild = bayRuecken(cfg);
+      const auf = bayOeffnung(cfg);
+      this.label.sprite.position.set(
+        schild.x - auf.x * 0.6,
+        wallH + 1.1,
+        schild.z - auf.z * 0.6
+      );
     } else if (cfg.kind === "rolloff" || cfg.kind === "grosscontainer") {
       /*
        * Absetzcontainer: flache Wanne auf zwei Kufen, Rungen außen, vorn die
@@ -1198,7 +1383,16 @@ class GameContainer {
   }
 
   get value(): number {
-    return containerValue(getMaterial(this.cfg.fractionId), this.contentKg, this.contaminationKg);
+    /*
+     * Je Stoff zu seinem eigenen Preis (E-028). `containerValue` bleibt als
+     * reine Funktion bestehen und wird von den Wirtschaftstests geprueft;
+     * hier zaehlt, was wirklich in der Mulde liegt.
+     */
+    return containerValueGemischt(
+      this.massen,
+      (id) => gehoertHierhin(this.cfg, id),
+      (id) => getMaterial(id).sellPricePerKg
+    );
   }
 
   setLabelVisible(v: boolean): void {
@@ -1210,6 +1404,7 @@ class GameContainer {
     this.itemIds.clear();
     this.contentKg = 0;
     this.contaminationKg = 0;
+    this.massen.clear();
     this.refreshLabel();
   }
 
@@ -1369,12 +1564,14 @@ export class ContainerManager {
       c.itemIds.clear();
       c.contentKg = 0;
       c.contaminationKg = 0;
+      c.massen.clear();
     }
     for (const item of itemManager.items) {
       if (!item.containerId) continue;
       const c = this.byId(item.containerId);
       c.itemIds.add(item.id);
       c.contentKg += item.massKg;
+      c.massen.set(item.materialId, (c.massen.get(item.materialId) ?? 0) + item.massKg);
       if (!gehoertHierhin(c.cfg, item.materialId)) c.contaminationKg += item.massKg;
     }
     for (const c of this.containers) {

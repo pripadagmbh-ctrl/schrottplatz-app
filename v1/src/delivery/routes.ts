@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { GATE_X, WEIGH_X } from "../world/yard";
 import { VERLADE_STAND } from "../world/baggerstand";
+import type { ContainerConfig } from "../world/containers";
 
 /**
  * Halteplatz auf der Brueckenwaage.
@@ -196,22 +197,27 @@ export const PICKUP_IN_FWD: Array<[number, number]> = [
 /**
  * Die LKW-Spur des Verladeplatzes und der Punkt, an dem der Abholer steht.
  *
- * x −18,0 ist gesucht: 7,5 m oestlich des zweiten Baggerstands, genau so weit,
- * wie die Silo-Vorderkante westlich davon liegt. Der Bagger steht in der
- * Mitte und dreht sich zwischen beiden — er muss nicht umsetzen.
- */
-export const VERLADE_SPUR_X = VERLADE_STAND.x - 7.5;
-/**
- * Suedende der Verladespur — von hier setzt der Abholer nach NORDEN zurueck.
+ * 7,5 m vom zweiten Baggerstand, genau so weit, wie die Silo-Vorderkante auf
+ * der anderen Seite liegt. Der Bagger steht in der Mitte und dreht sich
+ * zwischen beiden — er muss nicht umsetzen.
  *
- * Bis zum 15.09.2026 lag der Verladeplatz im Sueden und der Abholer kam von
- * Norden. Jetzt ist es umgekehrt, und das ist kein Geschmack, sondern
- * gemessen: Janines Kaffeewagen steht auf (−9,5 | 15,5) und belegt
- * x −12,0 … −7,0, z +14,1 … +16,9. Die Spur laeuft auf x −11,5 mitten durch
- * diesen Streifen — von Norden kommend faehrt der Wagen durch den Kaffeewagen.
- * Von Sueden bleibt er 2,0 m darunter.
+ * VORZEICHEN GEWECHSELT am 15.09.2026 (E-028): Die Silo-Reihe ist an die
+ * WESTwand gezogen, ihre Vorderkante liegt auf x −33,0 und damit WESTlich des
+ * Stands (−25,5). Der Abholer gehoert folglich nach Osten, auf −18,0. Mit dem
+ * alten `− 7,5` waere er auf −33,0 gelandet, also mitten in der Silo-Reihe.
  */
-const ABHOL_RANGIER: [number, number] = [VERLADE_SPUR_X, -1.0];
+export const VERLADE_SPUR_X = VERLADE_STAND.x + 7.5;
+/**
+ * Nordende der Verladespur — von hier setzt der Abholer nach SUEDEN zurueck.
+ *
+ * Der Verladeplatz liegt seit E-028 in der leeren Suedwesthaelfte (−25,5 |
+ * −8,0), die Spur auf x −18,0. Der Wagen kommt von der Waage herunter, haelt
+ * auf z 0,0 und setzt 8,0 m nach Sueden zurueck — dieselbe Strecke wie vorher,
+ * nur andersherum. Noerdlich davon ist der Platz frei: Janines Kaffeewagen
+ * steht seit heute an der Nordmauer, die Silo-Gasse liegt zehn Meter weiter
+ * westlich.
+ */
+const ABHOL_RANGIER: [number, number] = [VERLADE_SPUR_X, 0.0];
 
 let abholStelle: [number, number] = [VERLADE_SPUR_X, VERLADE_STAND.z];
 
@@ -231,12 +237,11 @@ export function abholstelle(): [number, number] {
 
 export function pickupApproach(): Array<[number, number]> {
   /*
-   * Von der Waage suedlich an Janines Kaffeewagen vorbei auf die Spur. Der
-   * Knick bei (−20 | 8) haelt die Sehne, mit der ein LKW vier Meter
-   * vorausschaut, aus dem Kaffeewagen heraus: Auf der Geraden von dort zum
-   * Rangierpunkt liegt sie bei x −12 auf z +0,6 — 13,5 m suedlich des Wagens.
+   * Von der Waage in die leere Suedwesthaelfte. Der Knick bei (−22 | 9) haelt
+   * die Gerade oestlich der Hallenfront (x −30,6) und westlich der
+   * Silo-Gasse; dazwischen steht auf dieser Haelfte des Platzes nichts.
    */
-  return [WAAGE_HALT, VERTEILER, [-20, 8], ABHOL_RANGIER];
+  return [WAAGE_HALT, VERTEILER, [-22, 9], ABHOL_RANGIER];
 }
 export function pickupInRev(): Array<[number, number]> {
   return [ABHOL_RANGIER, abholStelle];
@@ -245,7 +250,7 @@ export function pickupOut(): Array<[number, number]> {
   return [
     abholStelle,
     ABHOL_RANGIER,
-    [-20, 8],
+    [-22, 9],
     VERTEILER,
     WAAGE_HALT,
     [GATE_X, 28],
@@ -344,79 +349,98 @@ export const TIP_OUT: Array<[number, number]> = [
 /* ------------------------------------------ Sortenrein: die Silo-Reihe ---- */
 
 /**
- * Wer sortenrein anliefert, kippt in das Silo seiner Fraktion an der Westwand.
+ * Wer sortenrein anliefert, kippt in das Silo seiner Fraktion.
  *
  * Ansage 13.09.2026: „sortenreine Kipper sollen direkt in den Mulden kippen,
  * nicht bei mir." Vorher ging jede Fuhre auf den Mischschrott vor dem Bagger
  * — auch die sauber getrennte, die dort nur wieder auseinandersortiert werden
  * musste.
  *
- * Die Reihe ist mit E-010 von x −34,5 auf −36 gerueckt und laeuft jetzt von
- * z +10 bis −26,8. Die Gasse musste dabei mitwandern: Sie lag auf x −26, und
- * dort steht seither der zweite Baggerstand (−25,5 | −12).
+ * Seit E-028 ist die Reihe ein L, und die Gasse ist es auch: ein Schenkel
+ * laengs der Westwand, einer laengs der Suedwand, verbunden ueber die Ecke.
+ * Welcher Schenkel gilt, steht nicht in der Route, sondern am Silo
+ * (`facing`) — `bayApproach` bekommt deshalb seit heute den ganzen Datensatz
+ * und nicht mehr nur ein z. Mit der alten Signatur haette ein Suedsilo seine
+ * Anfahrt an der falschen Wand bekommen, und zwar stumm.
  */
-/**
- * Gassenmitte, auf der die Anlieferer an der Silo-Reihe entlangfahren.
- *
- * GESPIEGELT am 15.09.2026, weil die Reihe die Wand gewechselt hat — die
- * Massverhaeltnisse sind uebernommen, nicht neu geraten. Die alte Reihe
- * oeffnete sich auf x −33, die Gasse lag 5,0 m davor auf −28. Die neue Reihe
- * oeffnet sich auf x +3,5; die Gasse liegt also auf −1,5.
- *
- * Warum ausgerechnet 5,0 m: Ein LKW schaut vier Meter voraus, und zwar auf der
- * SEHNE von seinem Standort zum Vorausschaupunkt, nicht der Strecke entlang.
- * Mit einer Gasse dichter an der Reihe lag dieser Punkt schon hinter der Ecke,
- * die Sehne schnitt sie ab und kam der Flanke des Nachbarsilos auf 1,74 m nahe
- * — die Schranke liegt bei 1,75 m. Ein Zentimeter, und das Fahrzeug steht fuer
- * immer (gemessen 14.09.2026: 275 s ohne einen Meter Fortschritt). Bei 5,0 m
- * ist die gerade Strecke aus dem Silo 7,6 m lang; nachgemessen 10 von 10
- * Fuhren durch.
- */
-export const MULDEN_GASSE_X = -1.5;
-/**
- * Wie weit der Wagen in das Silo zurueckstoesst (Wagenmitte, x).
- *
- * Auch das gespiegelt — aber mit dem RICHTIGEN Heckmass. Die Stirnwand steht
- * innen bei x +9,15, und der Wagen reicht nicht 3,0 m nach hinten, sondern
- * bedLen/2 + 0,14 = 3,14 m (Unterfahrschutz, `vehicleModel.ts`). Bei +5,9
- * endet er auf 9,04 und bleibt 0,11 m vor der Wand. Die alte Rechnung an der
- * Westwand nahm 3,0 m an und schickte den Wagen 0,70 m in die Stirnwand —
- * gefunden hat das erst `test/fahrumriss.test.ts` am 15.09.2026.
- *
- * Nach vorn reicht die Ladeflaeche damit bis x +2,9; 0,6 m von ihr stehen vor
- * der Muldenoeffnung (3,5).
- *
- * Die Blockadepruefung laesst das zu: Sie tastet mit 1,40 m Radius, die
- * Flanken stehen 2,375 m von der Mittellinie entfernt.
- */
-const MULDE_TIEFE_X = 5.9;
 
-export function bayApproach(z: number): Array<[number, number]> {
+/**
+ * Gassenmitte vor dem WESTschenkel (x) und vor dem SUEDschenkel (z).
+ *
+ * Beide liegen 5,0 m vor der Muldenoeffnung — dieselbe Zahl wie seit E-024,
+ * und sie ist gemessen, nicht gegriffen: Ein LKW schaut vier Meter voraus, und
+ * zwar auf der SEHNE von seinem Standort zum Vorausschaupunkt. Mit einer Gasse
+ * dichter an der Reihe liegt dieser Punkt schon hinter der Ecke, die Sehne
+ * schneidet sie ab und kommt der Flanke des Nachbarsilos auf 1,74 m nahe — die
+ * Schranke liegt bei 1,75 m. Ein Zentimeter, und das Fahrzeug steht fuer immer
+ * (gemessen 14.09.2026: 275 s ohne einen Meter Fortschritt).
+ *
+ * Westschenkel: Oeffnungen auf x −33,0 → Gasse −28,0.
+ * Suedschenkel: Oeffnungen auf z −22,0 → Gasse −17,0.
+ *
+ * Die Ecke liegt auf (−28,0 | −17,0). Dort steht ein wartender Wagen mit der
+ * Kabine auf z −21,6, also 0,40 m vor der Nordkante der Suedsilos.
+ */
+export const MULDEN_GASSE_X = -28.0;
+export const MULDEN_GASSE_Z = -17.0;
+/** Die Ecke, an der beide Schenkel ineinander uebergehen. */
+const GASSEN_ECKE: [number, number] = [MULDEN_GASSE_X, MULDEN_GASSE_Z];
+/** Wo die Gasse von der Waage her beginnt — suedlich der dritten Halle. */
+const GASSEN_KOPF: [number, number] = [MULDEN_GASSE_X, -2.0];
+
+/**
+ * Wie weit der Wagen in das Silo zurueckstoesst (Wagenmitte).
+ *
+ * Mit dem RICHTIGEN Heckmass gerechnet: Der Wagen reicht nicht 3,0 m nach
+ * hinten, sondern bedLen/2 + 0,14 = 3,14 m (Unterfahrschutz,
+ * `vehicleModel.ts`). Die alte Rechnung nahm 3,0 m an und schickte den Wagen
+ * 0,70 m in die Stirnwand — gefunden hat das erst `test/fahrumriss.test.ts`.
+ *
+ * WEST  Stirnwand innen auf x −38,65; bei −35,40 endet das Heck auf −38,54
+ *       und bleibt 0,11 m davor.
+ * SUED  Rueckwand innen auf z −27,65; bei −24,40 endet das Heck auf −27,54.
+ *
+ * Nach vorn reicht die Ladeflaeche damit bis 0,6 m vor die Muldenoeffnung.
+ * Die Blockadepruefung laesst das zu: Sie tastet mit 1,40 m Radius, die
+ * Flanken stehen 2,10 m von der Mittellinie entfernt und sind 0,35 m dick —
+ * es bleiben 0,20 m Luft je Seite.
+ */
+const MULDE_TIEFE_X = -35.4;
+const MULDE_TIEFE_Z = -24.4;
+
+/** Steht dieses Silo am Suedschenkel? (Oeffnung nach Norden.) */
+function amSuedschenkel(c: ContainerConfig): boolean {
+  return c.facing === "north";
+}
+
+/** Halteplatz in der Gasse vor diesem Silo. */
+function gassenHalt(c: ContainerConfig): [number, number] {
+  return amSuedschenkel(c) ? [c.x, MULDEN_GASSE_Z] : [MULDEN_GASSE_X, c.z];
+}
+/** Wo die Wagenmitte beim Kippen steht. */
+function muldenHalt(c: ContainerConfig): [number, number] {
+  return amSuedschenkel(c) ? [c.x, MULDE_TIEFE_Z] : [MULDE_TIEFE_X, c.z];
+}
+
+export function bayApproach(c: ContainerConfig): Array<[number, number]> {
   /*
-   * Quer ueber den freien Mittelplatz auf die Gasse. Der Knick bei (−20 | 11)
-   * ist gesetzt, damit die Gerade suedlich an Janines Kaffeewagen vorbeilaeuft
-   * (er belegt x −12,0 … −7,0 auf z +14,1 … +16,9): Auf der Strecke von dort
-   * zum Gasseneingang liegt sie bei x −12 auf z +9,7 und bei x −7 auf z +8,9.
+   * Von der Waage senkrecht nach Sueden in die Gasse. Der Knick bei (−27 | 6)
+   * haelt den Wagen von der Hallenfront (x −30,6) weg: Er schwenkt dort nur
+   * 7 Grad aus der Suedrichtung, seine westlichste Ecke liegt damit auf
+   * −30,02 — 0,58 m Luft. Ein schaerferer Knick kostete pro Grad rund 7 cm.
    */
-  return [WAAGE_HALT, VERTEILER, [-20, 11], [MULDEN_GASSE_X, 8], [MULDEN_GASSE_X, z]];
+  const kopf: Array<[number, number]> = [WAAGE_HALT, VERTEILER, [-27, 6], GASSEN_KOPF];
+  if (!amSuedschenkel(c)) return [...kopf, gassenHalt(c)];
+  return [...kopf, GASSEN_ECKE, gassenHalt(c)];
 }
-export function bayInRev(z: number): Array<[number, number]> {
-  return [
-    [MULDEN_GASSE_X, z],
-    [MULDE_TIEFE_X, z],
-  ];
+export function bayInRev(c: ContainerConfig): Array<[number, number]> {
+  return [gassenHalt(c), muldenHalt(c)];
 }
-export function bayOut(z: number): Array<[number, number]> {
-  return [
-    [MULDE_TIEFE_X, z],
-    [MULDEN_GASSE_X, z],
-    [MULDEN_GASSE_X, 8],
-    [-20, 11],
-    VERTEILER,
-    WAAGE_HALT,
-    [GATE_X, 28],
-    [GATE_X, 40],
-  ];
+export function bayOut(c: ContainerConfig): Array<[number, number]> {
+  const zurueck: Array<[number, number]> = amSuedschenkel(c)
+    ? [muldenHalt(c), gassenHalt(c), GASSEN_ECKE, GASSEN_KOPF]
+    : [muldenHalt(c), gassenHalt(c), GASSEN_KOPF];
+  return [...zurueck, [-27, 6], VERTEILER, WAAGE_HALT, [GATE_X, 28], [GATE_X, 40]];
 }
 
 /**
@@ -486,16 +510,23 @@ export const WORK_ZONES: Array<[number, number, number]> = [
   [ABLADE_SPUR_X, ABLADE_HALT_Z, 9],
   /*
    * Der Verladeplatz vor der Silo-Reihe: Dort steht der Abholer, und dort
-   * liegt zwangslaeufig Material, waehrend der Bagger ihn belaedt.
+   * liegt zwangslaeufig Material, waehrend der Bagger ihn belaedt. Der
+   * Mittelpunkt liegt zwischen Bagger und LKW-Spur — seit E-028 also OESTLICH
+   * des Stands, weil die Silos nach Westen gewandert sind.
    */
-  [VERLADE_STAND.x - 3.5, VERLADE_STAND.z, 11],
+  [VERLADE_STAND.x + 3.5, VERLADE_STAND.z, 11],
   /*
-   * Die Silo-Reihe samt Gasse. Dorthin kippt der sortenreine Kipper; was dort
-   * liegt, ist Ziel und nicht Hindernis. Ein Radius deckt die ganze Reihe ab:
-   * Sie laeuft seit dem 15.09.2026 von z +0,8 bis +28,6 auf x +6,5, die Gasse
-   * auf x −1,5. Von (2,5 | 14,7) sind es 15,6 m in die entfernteste Ecke.
+   * Die L-foermige Silo-Reihe samt Gasse. Dorthin kippt der sortenreine
+   * Kipper; was dort liegt, ist Ziel und nicht Hindernis. Ein Kreis je
+   * Schenkel, damit kein Radius quer ueber den halben Platz greift:
+   *
+   *   WEST  Silos auf x −36,0 von z −3,4 bis −12,6, Gasse auf x −28,0.
+   *         Von (−32,0 | −8,0) sind es 6,9 m in die entfernteste Ecke.
+   *   SUED  Silos auf z −25,0 von x −30,0 bis −20,8, Gasse auf z −17,0.
+   *         Von (−25,4 | −21,0) sind es 10,1 m in die entfernteste Ecke.
    */
-  [2.5, 14.7, 16],
+  [-32.0, -8.0, 9],
+  [-25.4, -21.0, 11],
 ];
 /** Nach so langer Blockade fährt der Fahrer vorsichtig weiter (kein Deadlock) */
 export const BLOCK_GIVEUP_S = 35;
