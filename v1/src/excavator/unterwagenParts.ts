@@ -316,31 +316,162 @@ function oesenUndSchutz(): THREE.BufferGeometry[] {
  * Unterwagen-Netz, wie im Konzept vorgesehen: Sie bewegen sich nicht — nur der
  * Fuß darunter fährt aus.
  *
- * Ihr INNERES Ende musste wandern: Es lag bei x ±1,05 und damit im alten,
- * 2,40 m breiten Kasten. Der neue Mittelträger ist 1,50 m breit; ohne diese
- * Verlängerung hinge der Ausleger frei in der Luft. Das ÄUSSERE Ende bleibt,
- * wo es war (x ±1,80) — dort sitzt der Fuß, und der wird nicht angefasst.
+ * WO SIE STEHEN — und warum dort (E-047, 15.09.2026).
+ *
+ * Bis heute lief der Ausleger bei z ±1,35 quer aus dem Rahmen heraus, also
+ * mitten durch das Rad: gemessen **25,2 cm** tief im Vorderrad
+ * (`tools/pratzenfreigang.ts`). Das fiel erst auf, als die Räder mit dem
+ * Fahrwerk-Paket frei unter die Maschine kamen; vorher steckten sie zur Hälfte
+ * im Rahmenkasten und beide Teile waren dunkel.
+ *
+ * Patrick hat entschieden: nach vorn und hinten heraus, nicht nach innen
+ * zwischen die Räder — sonst wird die Stützbasis schmal und die Abstützung tut
+ * weniger, als sie soll. Seine Zahl war z ±2,30. Gemessen wurde daraus
+ * z ±2,45, und der Fuß musste zusätzlich 10 cm weiter nach aussen:
+ *
+ *   z ±2,30, x ±1,80 → **8,3 cm im Rad** (Vorderrad bei Lenkeinschlag; der
+ *                      Tellerfuß steht dann in der Reifenflanke) und der
+ *                      Teller kreuzt die Seitenwange des Räumschilds.
+ *   z ±2,45, x ±1,90 → frei: 8 cm zum Rad in JEDER Lenkstellung, 7 cm zur
+ *                      Schildwange.
+ *
+ * Die 0,62 m tiefe Bodenplatte ist der Grund für die 2,45: Sie reicht 31 cm
+ * nach hinten, und der Reifen misst über die Stollen 0,62 m Halbmesser —
+ * beides zusammen ergibt den Abstand, den die Fußmitte vom Radmittelpunkt
+ * halten muss.
+ *
+ * WARUM DER AUSLEGER JETZT AN DER SEITENWANGE HÄNGT und nicht mehr quer aus
+ * der Mitte kommt: Vor dem Rahmen ist kein Platz mehr. Der Rahmen endet bei
+ * z ±2,20, und den Raum davor füllen Streben und Zylinder des Räumschilds —
+ * sie überstreichen bei x ±0,62 … ±0,78 die ganze Höhe von y 0,42 bis 1,33.
+ * Ein Querträger durch die Mitte führte dort mitten hindurch. Aussen, an der
+ * Seitenwange (x ±1,17, y 1,24 … 1,60), ist die Maschine dagegen offen.
+ *
+ * UND WARUM ER IM KNIE GEHT — Kragarm waagerecht, Stiel senkrecht:
+ *
+ * Eine durchgehende Schrägstrebe von der Wange zum Fuß war der erste Versuch.
+ * Sie muss durch einen Schlitz: unter ihr der Kotflügelbogen, über ihr die
+ * Deckplatte des Oberwagens, die beim Schwenken bei y 1,61 vorbeistreicht.
+ * Gemessen blieben davon 7,6 cm zum Rad und 7,3 cm zum Deck — aber ihre
+ * hintere untere Kante schnitt in die Kotflügelspitze (202 Kreuzungen,
+ * x 1,25 … 1,61). Der Grund ist nicht die Mitte der Strebe, sondern ihre ECKE:
+ * ein schräg gestelltes Kastenprofil greift weiter um sich, als seine
+ * Mittellinie vermuten lässt.
+ *
+ * Im Knie ist beides gerade: Der Kragarm liegt waagerecht auf Wangenhöhe
+ * (y 1,40), also über dem Kotflügel und unter dem Deck; der Stiel steht
+ * senkrecht vor dem Rad und hat dort nichts mehr neben sich. Das ist zugleich
+ * die Form, die ein Umschlagbagger an dieser Stelle wirklich hat.
  */
-function pratzenausleger(): THREE.BufferGeometry[] {
+/** Fußmitte in x (m) — gemessen, siehe oben. */
+export const PRATZE_X = 1.9;
+/** Fußmitte in z (m) — gemessen, siehe oben. */
+export const PRATZE_Z = 2.45;
+/**
+ * Anlenkpunkt des Kragarms an der Seitenwange (m).
+ *
+ * x 1,16 liegt im Wangenblech (1,14 … 1,20) — dort steckt der Kragarm drin
+ * statt davorzuhängen.
+ *
+ * y 1,40 ist die Höhe, in der er zwischen Kotflügel und Deckplatte durchpasst:
+ * Sein Profil reicht damit von 1,27 bis 1,53. Die Deckplatte des Oberwagens
+ * streicht beim Schwenken bei 1,61 darüber hinweg (8 cm Luft), die Spitze des
+ * Kotflügelbogens liegt bei z 1,91 auf y 1,23 (5,6 cm Luft). Beides gemessen
+ * mit `tools/pratzenfreigang.ts`, nicht abgeschätzt.
+ *
+ * z 2,08 liegt knapp vor dem Ende der Wange (sie reicht bis ±2,10). Weiter
+ * hinten schiebt sich die hintere Kante des Profils über den Kotflügel — bei
+ * z 1,95 kreuzte sie ihn.
+ */
+const AUSLEGER_ANKER = { x: 1.16, y: 1.4, z: 2.08 };
+/**
+ * Kantenlänge des Auslegerprofils (m).
+ *
+ * 0,30 statt 0,34, und das Mass kommt vom Fuß, nicht vom Augenmaß: Der Stiel
+ * ist das ROHR, in dem der Pratzenkasten steckt. Der Kasten misst 0,26
+ * (`pratzeFuss` in `schildParts.ts`), also muss der Stiel WEITER sein — bei
+ * gleichem Mass lägen beide Mäntel deckungsgleich, und der Tiefenpuffer kann
+ * zwischen zwei deckungsgleichen Flächen nicht entscheiden (derselbe Befund
+ * wie an Reifen und Felge, 14.09.2026). 2 cm Luft je Seite: eingefahren
+ * verschwindet der Kasten im Stiel, ausgefahren fährt er unten heraus.
+ */
+const AUSLEGER_DICKE = 0.3;
+/**
+ * Kantenlänge des Kragarms (m) — schmaler als der Stiel.
+ *
+ * Der Schlitz, durch den er muss, ist 38 cm hoch: unten die Kotflügelspitze
+ * (y 1,23 bei z 1,91), oben die Deckplatte des Oberwagens (y 1,61). Bei 0,30
+ * blieben davon 4 cm je Seite, bei 0,26 sind es 6 und 8 — und schmaler sieht
+ * ein Kragarm ohnehin richtiger aus als der Stiel, der die Last trägt.
+ */
+const KRAGARM_DICKE = 0.26;
+/** Höhe des Auslegerkopfs über dem Boden (m) — dort sitzt der Fuß. Unverändert. */
+const AUSLEGER_KOPF_Y = 0.7;
+/** Überstand hinten (m): nur so viel, dass er im 6 cm dicken Wangenblech steckt. */
+const VORSTAND_HINTEN = 0.06;
+/** Überstand vorn (m): eine halbe Profilbreite, damit Kragarm und Stiel sich treffen. */
+const VORSTAND_VORN = 0.15;
+
+/**
+ * EIN Balken als Kastenprofil von `von` nach `bis`, an beiden Enden etwas
+ * länger, damit er einsteckt statt stumpf davor zu enden.
+ *
+ * WICHTIG ist die Rollage: Das Profil wird waagerecht gestellt (eine
+ * Kastenachse bleibt in der Waagerechten), nicht beliebig um seine Längsachse
+ * verdreht. `setFromUnitVectors` liefert die kürzeste Drehung von der Z-Achse
+ * auf die Richtung — und die kippt das Profil auf die Ecke. Bei einer
+ * schrägen Strebe griff es dadurch 3 cm weiter nach unten aus als nötig, und
+ * genau diese Ecke schnitt in den Kotflügel.
+ */
+export function auslegerBalken(
+  von: THREE.Vector3,
+  bis: THREE.Vector3,
+  dicke = AUSLEGER_DICKE
+): THREE.BufferGeometry {
+  const richtung = bis.clone().sub(von);
+  const laenge = richtung.length();
+  const d = richtung.clone().normalize();
+  const g = new THREE.BoxGeometry(dicke, dicke, laenge + VORSTAND_HINTEN + VORSTAND_VORN);
+  // Waagerechte Querachse; beim senkrechten Stiel gibt es keine — dann X.
+  let u = new THREE.Vector3(0, 1, 0).cross(d);
+  if (u.lengthSq() < 1e-8) u = new THREE.Vector3(1, 0, 0);
+  u.normalize();
+  const v = d.clone().cross(u).normalize();
+  const q = new THREE.Quaternion().setFromRotationMatrix(
+    new THREE.Matrix4().makeBasis(u, v, d)
+  );
+  g.applyQuaternion(q);
+  const mitte = von
+    .clone()
+    .add(bis)
+    .multiplyScalar(0.5)
+    .addScaledVector(d, (VORSTAND_VORN - VORSTAND_HINTEN) / 2);
+  g.translate(mitte.x, mitte.y, mitte.z);
+  return g;
+}
+
+export function pratzenausleger(
+  lage?: { x: number; z: number },
+  anker = AUSLEGER_ANKER
+): THREE.BufferGeometry[] {
+  const X = lage?.x ?? PRATZE_X;
+  const Z = lage?.z ?? PRATZE_Z;
   const teile: THREE.BufferGeometry[] = [];
   for (const sx of [-1, 1]) {
     for (const sz of [-1, 1]) {
-      const von = new THREE.Vector3(sx * 0.62, 0.95, sz * 1.35);
-      const bis = new THREE.Vector3(sx * 1.8, 0.7, sz * 1.35);
-      const richtung = bis.clone().sub(von);
-      const laenge = richtung.length();
-      const g = new THREE.BoxGeometry(0.34, 0.34, laenge + 0.3);
-      const q = new THREE.Quaternion().setFromUnitVectors(
-        new THREE.Vector3(0, 0, 1),
-        richtung.clone().normalize()
+      const knie = new THREE.Vector3(sx * X, anker.y, sz * Z);
+      // Kragarm: waagerecht von der Wange nach aussen und nach vorn/hinten
+      teile.push(
+        auslegerBalken(
+          new THREE.Vector3(sx * anker.x, anker.y, sz * anker.z),
+          knie,
+          KRAGARM_DICKE
+        )
       );
-      g.applyQuaternion(q);
-      g.translate(
-        von.x + richtung.x / 2,
-        von.y + richtung.y / 2,
-        von.z + richtung.z / 2
+      // Stiel: senkrecht herunter auf den Kopf des Fußes
+      teile.push(
+        auslegerBalken(knie, new THREE.Vector3(sx * X, AUSLEGER_KOPF_Y, sz * Z))
       );
-      teile.push(g);
     }
   }
   return teile;
