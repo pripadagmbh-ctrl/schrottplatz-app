@@ -58,6 +58,7 @@ import {
   baueMitteltraverse,
   baueRotator,
   baueStempel,
+  baueVerkleidung,
   baueZylinder,
   mittellinie,
   nahtStoff,
@@ -280,6 +281,14 @@ export function baueGreifer(
   const stempel = baueStempel(st, form.drehpunktR);
   stempel.position.y = LAGE.stempel;
   rotator.add(stempel);
+
+  /*
+   * Der Zylinderschutz haengt AN DER TRAVERSE, nicht an den Schalen: Er gehoert
+   * zum Kopf und dreht nur mit ihm. Weil die Traverse schon Blech traegt (die
+   * zehn Sitzringe), kommt beim Zusammenlegen KEIN Netz dazu — nur Eckpunkte.
+   * Er traegt nichts: kein Kollider, kein Koerper, keine Masse (E-077).
+   */
+  traverse.add(baueVerkleidung(st));
 
   const schalen: Schale[] = [];
   const zylinder: Zylinder[] = [];

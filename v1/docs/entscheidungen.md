@@ -5396,3 +5396,154 @@ oder ein Prospektriss täte es auch.
 3. Die Entscheidung: Verkleidung bauen (billig, ändert nichts an der Mechanik),
    Verkleidung **und** Säule auf 49 cm (E-075, Spalte 2), oder erst einmal nur
    die Verkleidung und den Rest lassen?
+
+---
+
+### E-077 — Der Zylinderschutz ist gebaut: 77 Eckpunkte, kein Netz, kein Kollider (15.09.2026)
+
+**Entscheidung.** Gebaut ist **ein** Teil: `08_VERKLEIDUNG`, ein gekantetes
+Blech über der nackten Mittelsäule des Fünfschalengreifers. Es trägt nichts.
+Keine Säulenkürzung, keine breite Platte, keine Änderung an der Anlenkung —
+Patricks Entscheidung am Blatt von E-076.
+
+**Anlass.** Patrick, 15.09.2026, vor sieben Vorbildaufnahmen: „Der Kopf ist zu
+schlank." Und die Korrektur, ohne die alles Weitere falsch gewesen wäre: „Das
+ist ein Zylinderschutz. Also es ist kein Gusskörper."
+
+---
+
+#### Was gebaut ist
+
+Ein Blech von 12 mm, zehn Flächen in derselben Phase wie der Traversenkörper,
+als geschlossenes Profil über `LatheGeometry` — also mit Außen- **und**
+Innenseite, weil eine einseitige Fläche von unten, aus der Arbeitsrichtung,
+unsichtbar wäre.
+
+**Alle Maße sind abgeleitet, keines gesetzt:**
+
+- oben Ø 0,817 m auf y −1,0150 m — **der untere Rand des Traversenkörpers**
+- unten Ø 0,480 m auf y −1,2735 m — **der obere Rand des Stempels**
+- dazwischen ein Knie auf r 0,30
+
+Es verkleidet damit genau die **25,8 cm nackte Säule**. Wer Traverse oder
+Stempel ändert, zieht die Verkleidung mit.
+
+**Warum sie nicht weiter hinaufreicht — die Zahl, die es entscheidet.** Am
+Vorbild deckt das Blech auch die Zylinder ab. Hier geht das nicht: Zwischen dem
+Traversenrand (r 0,475) und dem inneren Rand der fünf Zylinder liegen auf Höhe
+der Aufnahme **3,2 cm**, und weiter oben laufen die Zylinderköpfe durch genau
+den Bereich, den ein Blech bräuchte. Wer dort verkleiden will, muss die
+Zylinderaufnahme nach außen setzen — und das ist die Anlenkung (E-075, E-076).
+Gebaut ist deshalb das Stück, für das Platz ist.
+
+**Die Ø 1,02 aus Spalte 2 sind NICHT gebaut**, und das mit Absicht: Der
+Kopfdurchmesser folgt in `traverse-rechnen.ts` fest dem Aufnahmeradius
+(`traverseAus(Zr) = 2·Zr + 0,02`). Ø 1,02 hieße Zr 0,50 statt 0,465 — und das
+ist eine Änderung der Anlenkung. Die Traverse bleibt bei Ø 0,95.
+
+---
+
+#### Was es kostet
+
+| | vorher | nachher |
+|---|---|---|
+| Netze im Greifer, zusammengelegt | 58 | **58** |
+| Netze in Einzelteilen | 217 | 218 |
+| `GRAPPLE_HEAD` | 4 Netze | **4 Netze** |
+| Eckpunkte | 23.208 | 23.285 (**+77**) |
+| Dreiecke | 14.884 | 15.004 (**+120**) |
+
+**Kein Netz.** Die Verkleidung ist aus `st.blech`, und die Mitteltraverse trägt
+schon Blech (die zehn Sitzringe) — beim Zusammenlegen (E-025, E-053) fällt sie
+in ein vorhandenes Netz. Der Engpass sind Netze, nicht Dreiecke; das ist auf
+Patricks Gerät gemessen worden und steht so im Kopf von `verschmelzen.ts`.
+
+**Kein Kollider, keine Masse.** Am Greiferkörper hängen unverändert **11**
+Kollider: ein Zylinder für den Körper selbst und zehn Krallenkapseln
+(`form.schalen · KOLLIDER_REIHEN · 2`). Kein zwölfter.
+
+**Freigang.** Kleinster Abstand zu Schalen und Zylindern über den ganzen
+Schließweg: **71 mm** (21 Stellungen, Punkte der Verkleidung gegen **Dreiecke**
+der Anlenkung — nicht Eckpunkt gegen Eckpunkt, das ist der Fehler, an dem die
+Kastenmessung von E-065 gescheitert ist).
+
+**Sicht.** Unverändert, weil der Kopf unverändert ist: Mit abgesenkter Kabine
+verdeckt er in keiner Entfernung etwas; hochgefahren sind es bei 4 m Abstand
+**12 %** des Spitzenrings, bei 7 m null. Die Verkleidung sitzt **unter** dem
+Kopf und ist enger als er — sie verdeckt nichts, was er nicht schon verdeckt.
+
+---
+
+#### Die Nachweise
+
+**Die Sichelkralle ist Zeichen für Zeichen dieselbe** — zum fünften Mal:
+112 Netze gegen 112, Reihenfolge und Art gleich; **5.020 Bewegungswerte,
+110 Kolliderwerte, 5.200 Korbwerte, größter Unterschied jeweils 0,000e+0**
+(`tools/greifer-abdruck.ts` gegen den Stand vor diesem Paket).
+
+**Der Fünfschalengreifer verhält sich identisch** — am gebauten Netz
+nachgemessen, nicht behauptet:
+
+| | Soll (E-069/E-039) | gemessen |
+|---|---|---|
+| Schwebehöhe geschlossen | 19,4 cm | **19,4 cm** |
+| Maulweite offen | 3,095 m | **3,095 m** |
+| Korbtiefe geschlossen | 0,9792 m | **0,9792 m** |
+| Zahnwinkel bei Bodenkontakt | 23,5° | **23,5°** |
+| Hebelarm kleinster | 118 mm | **118 mm** |
+| Neigung größte | 24,4° | **24,4°** |
+| Nettokorb / Bruttokorb | 1.525 / 1.615 l | **1.525 / 1.615 l** |
+
+---
+
+**Verworfene Alternative.** Das Blech außen um die Zylinder legen, wie es das
+Vorbild tut. Dafür fehlen die 3,2 cm zwischen Traversenrand und Zylinder — es
+hätte sich durch die Anlenkung geschnitten, und das fällt auf einem Standbild
+nicht auf, wohl aber in Bewegung.
+
+**Abnahmekriterium.** `test/verkleidung.test.ts`, 6 Prüfungen, **jede
+Zahlenschranke mit Gegenprobe, die melden muss:**
+
+- Sie hängt an der Mitteltraverse. Gegenprobe: an keiner Schale und an keinem
+  Zylinder — sonst schwenkte sie beim Schließen mit.
+- Sie kostet kein Netz (58 bleibt 58, kein Netz trägt ihren Namen). Gegenprobe:
+  in Einzelteilen ist sie sehr wohl eines (218 statt 217) — wären beide Zahlen
+  gleich, hätte der Test gar kein Teil gemessen.
+- Ihre Maße kommen aus Traverse und Stempel (auf 1e−6). Gegenprobe: sie deckt
+  eine Strecke ab, keinen Punkt (über 0,2 m).
+- Freigang über 3 cm. Gegenprobe: die Messung liefert einen endlichen Wert unter
+  0,5 m, ist also nicht blind.
+- **Am Greiferkörper hängen 11 Kollider, kein zwölfter. Gegenprobe: ein
+  versehentlich angelegtes Blech-Kollider wird gezählt** — genau der Fehler, der
+  am selben Tag in der Presse gefunden wurde (E-071: unsichtbare Klappe,
+  Kollider in voller Größe, hielt den Greifer auf).
+- Jede Zahl der Form ist unverändert (absolute Werte aus E-069/E-065).
+  Gegenprobe: die Verkleidung liegt über einen Meter über dem tiefsten Punkt —
+  sie könnte `maxTiefe` gar nicht setzen.
+
+**Zwei Zählstände nachgezogen** in `test/verschmelzen.test.ts`: Dreiecke
+14.884 → 15.004 und Netze in Einzelteilen 217 → 218, beide mit dem Grund
+danebengeschrieben. Die Zeile „58 Netze" und „GRAPPLE_HEAD 4" stehen
+unverändert — das ist der Beweis, dass eingeschmolzen wird.
+
+1.117 bestehende Prüfungen bleiben grün (jetzt **1.123 in 99 Dateien**).
+`npm run build` sauber.
+
+**Unangetastet.** Anlenkung, Bodenanschlag, Greiffenster, Kollider, Sensorkugel,
+Pendel, Rotator, Kamera. `ZYLINDER_AUFNAHME`, `OBERE_ANBINDUNG`, `TRAVERSE_Y`,
+`STEMPEL_AUGE`, `MASS.traverse` — keine Zahl der Kinematik ist angefasst. Die
+drei Wächter (25°, 115 mm, 200 mm) stehen auf ihren alten Zahlen.
+
+**Das Blatt zum Nachsehen:** `docs/f5-verkleidung-2026-09-15.svg` — links ohne,
+rechts mit, beide im selben Maßstab, offen und geschlossen; das neue Blech ist
+orange eingefärbt, alles Unveränderte bleibt grau.
+
+**Auf dem Gerät zu prüfen.**
+
+1. Den Fünfschalengreifer anhängen und **von der Seite** ansehen: Ist die Lücke
+   zwischen Traverse und Nabe zu — sieht der Kopf jetzt aus wie ein Stück statt
+   wie eine Scheibe auf einem Stiel?
+2. **Auf und zu fahren** und dabei auf die Verkleidung schauen: Bleibt sie
+   ruhig am Kopf stehen, während die Schalen laufen? Berührt sie nie etwas?
+3. Einen Träger vom Haufen greifen: Fühlt sich das Zupacken genauso an wie
+   vorher? (Es muss — die Verkleidung hat keinen Kollider.)
