@@ -167,6 +167,8 @@ export interface Greifer {
   schalen: Schale[];
   zylinder: Zylinder[];
   setOeffnung(t: number): void;
+  /** Eine einzelne Schale schwenken (rad) — fuer den Greifer am Bagger. */
+  stelleSchale(i: number, schwenk: number): void;
   setDrehung(rad: number): void;
   oeffnung(): number;
 }
@@ -380,12 +382,17 @@ export function baueGreifer(
 
   let stand = 0;
 
-  const setOeffnung = (t: number): void => {
-    stand = Math.min(1, Math.max(0, t));
-    const schwenk = ZU + (form.offen - ZU) * stand;
-    for (const s of schalen) {
-      s.gelenk.rotation.x = rund(-schwenk);
-    }
+  /**
+   * EINE Schale auf ihren Schwenk stellen, samt ihrem Zylinder.
+   *
+   * Getrennt von `setOeffnung`, seit der Greifer am Bagger haengt (E-058):
+   * Dort geht jede Schale ihren eigenen Weg — was blockiert ist, bleibt
+   * stehen, der Rest geht weiter zu. Mit einem gemeinsamen Winkel waere das
+   * ungleichmaessige Schliessen der Spinne verloren.
+   */
+  const stelleSchale = (i: number, schwenk: number): void => {
+    const s = schalen[i];
+    if (s) s.gelenk.rotation.x = rund(-schwenk);
     const l = anbindungspunkt(schwenk, form);
     const dr = l.r - ZYLINDER_AUFNAHME.r;
     const dy = l.y - ZYLINDER_AUFNAHME.y;
@@ -405,13 +412,19 @@ export function baueGreifer(
      * seinem Bolzen. Jetzt wird nur der Stab gedehnt; das Auge wird gesetzt.
      */
     const frei = Math.max(dist - rohrLaenge, 0.04);
-    for (const z of zylinder) {
-      z.gelenk.rotation.x = psi;
-      z.stange.position.y = rund(-rohrLaenge);
-      z.stab.scale.y = rund((frei + EINSTAND) / auszug);
-      z.stab.position.y = rund(EINSTAND - (frei + EINSTAND) / 2);
-      z.auge.position.y = rund(-frei);
-    }
+    const z = zylinder[i];
+    if (!z) return;
+    z.gelenk.rotation.x = psi;
+    z.stange.position.y = rund(-rohrLaenge);
+    z.stab.scale.y = rund((frei + EINSTAND) / auszug);
+    z.stab.position.y = rund(EINSTAND - (frei + EINSTAND) / 2);
+    z.auge.position.y = rund(-frei);
+  };
+
+  const setOeffnung = (t: number): void => {
+    stand = Math.min(1, Math.max(0, t));
+    const schwenk = ZU + (form.offen - ZU) * stand;
+    for (let i = 0; i < schalen.length; i++) stelleSchale(i, schwenk);
   };
 
   const setDrehung = (rad: number): void => {
@@ -430,6 +443,7 @@ export function baueGreifer(
     schalen,
     zylinder,
     setOeffnung,
+    stelleSchale,
     setDrehung,
     oeffnung: () => stand,
   };
