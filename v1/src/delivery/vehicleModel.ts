@@ -424,14 +424,28 @@ function baueFahrerhaus(
   }
   /*
    * Dachspoiler: vorn niedrig, hinten hoch — damit der Aufbau nicht anströmt.
-   * Der Kranwagen hat keinen: Hinter seinem kurzen Haus steht der Kranturm,
-   * und der Spoiler waere genau dort (gemessen 0,54 m Ueberschneidung). Echte
-   * Kranwagen fahren auch keinen — die Luft ist nicht ihr Problem.
+   *
+   * Beim Kranwagen sitzt er weiter VORN. Auf dem kurzen Haus (1,00 m Dach)
+   * steht er sonst mit seiner Hinterkante auf `bedLen/2 + 0,54` und damit im
+   * Kranturm, der auf `+0,10 … +0,56` steht. Mittig aufs Dach gesetzt endet
+   * er auf `+0,80` — 24 cm Luft.
+   *
+   * Er wird NICHT weggelassen, obwohl ein echter Kranwagen selten einen
+   * fährt: Jedes three-Objekt zieht beim Anlegen vier Zufallszahlen
+   * (`MathUtils.generateUUID`). Ein Netz mehr oder weniger verschiebt damit
+   * den ganzen Zufallsstrom — und `test/kipper.test.ts` würfelt dann 24
+   * andere Ladungen und misst etwas anderes. Wer am Modell arbeitet, soll
+   * nicht nebenbei eine Kippmessung verstellen.
    */
-  if (!mitKran) {
-    const spoiler = add(new THREE.BoxGeometry(1.95, 0.42, 0.7), lack, 0, 2.28, cz - 0.3, true);
-    spoiler.rotation.x = -0.18;
-  }
+  const spoiler = add(
+    new THREE.BoxGeometry(1.95, 0.42, 0.7),
+    lack,
+    0,
+    2.28,
+    mitKran ? cz : cz - 0.3,
+    true
+  );
+  spoiler.rotation.x = -0.18;
   // Sonnenblende über der Frontscheibe
   const blende = add(new THREE.BoxGeometry(2.0, 0.1, 0.3), lack, 0, 2.12, front - 0.08, true);
   blende.rotation.x = 0.3;
@@ -568,21 +582,28 @@ function buildCrane(v: VehicleModelContext, dark: THREE.MeshStandardMaterial): T
    * tief. Beide Zahlen sind oben vorgerechnet.
    */
   const sockelZ = v.bedLen / 2 + KRAN_Z;
-  const bock = new THREE.Group();
-  bock.name = BAUGRUPPE.kranbock;
-  v.group.add(bock);
+  /*
+   * Die fünf Teile des Bocks bekommen einzeln ihren Gruppennamen, statt in
+   * einer gemeinsamen `THREE.Group` zu hängen. Grund ist derselbe wie beim
+   * Dachspoiler: Eine Gruppe mehr ist ein Objekt mehr, und jedes Objekt zieht
+   * vier Zufallszahlen aus `MathUtils.generateUUID` — was die 24 Ladungen von
+   * `test/kipper.test.ts` durcheinanderwürfelt. Ein Name kostet nichts.
+   */
   const sockel = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.34, KRAN_BOCK_TIEFE), dark);
+  sockel.name = BAUGRUPPE.kranbock;
   sockel.position.set(0, 1.05, sockelZ);
   sockel.castShadow = true;
-  bock.add(sockel);
+  v.group.add(sockel);
   // Zwei Abstützungen seitlich — ohne die steht kein Kran auf einem LKW
   for (const sx of [-1, 1]) {
     const stuetze = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.5, 0.22), stahl);
+    stuetze.name = BAUGRUPPE.kranbock;
     stuetze.position.set(sx * 1.05, 0.95, sockelZ);
-    bock.add(stuetze);
+    v.group.add(stuetze);
     const fuss = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.2, 0.1, 8), dark);
+    fuss.name = BAUGRUPPE.kranbock;
     fuss.position.set(sx * 1.05, 0.72, sockelZ);
-    bock.add(fuss);
+    v.group.add(fuss);
   }
 
   const saeule = new THREE.Group();

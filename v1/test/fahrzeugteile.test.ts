@@ -58,6 +58,20 @@ beforeAll(async () => {
  * aus `alleBauarten()` ist Vorrat des Werkzeugs — geprüft wird hier, was
  * vorfahren kann.
  */
+/**
+ * Alle Teile des Krans — Bockplatte, Stützen, Füße und die drehbare Säule.
+ *
+ * Sie hängen seit E-076 einzeln am Fahrzeug und nicht in einer gemeinsamen
+ * Gruppe: Jedes `THREE.Object3D` zieht beim Anlegen vier Zufallszahlen
+ * (`MathUtils.generateUUID`), und eine Gruppe mehr verschiebt den Zufallsstrom
+ * so weit, dass `test/kipper.test.ts` andere Ladungen würfelt.
+ */
+function kranTeileVon(group: THREE.Object3D): THREE.Object3D[] {
+  return group.children.filter(
+    (k) => k.name === BAUGRUPPE.kranbock || k.name === BAUGRUPPE.kransaeule
+  );
+}
+
 function gebauteBauarten(): Bauart[] {
   return alleBauarten().filter(
     (b) => !b.mitKran || b.kind === "kipper" || b.kind === "pritsche"
@@ -116,12 +130,8 @@ describe("Am Fahrzeug steckt kein Teil im anderen", () => {
       "vor dem Versetzen steckt der Kran schon in der Fläche"
     ).toEqual([]);
 
-    // Kran versetzen — Bock UND Säule, sie gehören zusammen
-    for (const kind of fz.group.children) {
-      if (kind.name === BAUGRUPPE.kranbock || kind.name === BAUGRUPPE.kransaeule) {
-        kind.position.z -= 0.4;
-      }
-    }
+    // Kran versetzen — Bockteile UND Säule, sie gehören zusammen
+    for (const teil of kranTeileVon(fz.group)) teil.position.z -= 0.4;
     fz.group.updateWorldMatrix(true, true);
     const nachher = messeStellung(teile, "Kran 40 cm versetzt", () => true).filter(
       (b) =>
@@ -148,12 +158,12 @@ describe("Am Fahrzeug steckt kein Teil im anderen", () => {
      */
     const fz = baueMessfahrzeug(welt, "pritsche", "flach", true);
     const teile = sammleTeile(fz.group, BAUGRUPPEN);
-    const kranTeile = fz.group.children.filter(
-      (k) => k.name === BAUGRUPPE.kranbock || k.name === BAUGRUPPE.kransaeule
-    );
-    expect(kranTeile.length, "kein Kran am Prüfstand").toBe(2);
+    const kranTeile = kranTeileVon(fz.group);
+    // Fünf Bockteile (Platte, zwei Stützen, zwei Füße) und die Säule
+    expect(kranTeile.length, "kein Kran am Prüfstand").toBe(6);
+    const ruhe = kranTeile.map((k) => k.position.z);
     const zaehle = (versatz: number): number => {
-      for (const k of kranTeile) k.position.z = -versatz;
+      kranTeile.forEach((k, i) => (k.position.z = ruhe[i]! - versatz));
       fz.group.updateWorldMatrix(true, true);
       return messeStellung(teile, `Versatz ${versatz}`, () => true).filter(
         (b) =>
