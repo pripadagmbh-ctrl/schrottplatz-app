@@ -2645,3 +2645,158 @@ nichts für einen einstufigen Zylinder). Zweites Lenkerpaar — siehe offen.
 4. In der Außenansicht die Kabine hoch- und runterfahren: Stört der Pfosten an
    der Deckkante? Sieht man die Aussparung in der Haube, wenn die Kabine oben
    ist?
+
+---
+
+### E-039 — Die Mitteltraverse des Fünfschalengreifers wird Ø 0,95 (15.09.2026)
+
+**Entscheidung.** Variante B des Blattes `docs/f5-traverse-2026-09-15.svg` ist
+gebaut: `MASS.traverse` Ø 0,70 → **Ø 0,95**, `ZYLINDER_AUFNAHME`
+(0,34 / −0,730) → (0,465 / −0,635), `OBERE_ANBINDUNG` (0 / 0,310) →
+(−0,08 / 0,245), `TRAVERSE_Y` −0,96 → −0,865. Das Zylinderauge bekommt dabei
+einen **Steg** zur Lagerhülse (`06_AUGENKONSOLE`). Patrick hat am Bild
+entschieden.
+
+**Begründung.** E-009 hatte zwei Kennwerte offen gelassen: Zylinderneigung
+(38,9° gegen Ziel 20°) und Hebelarm (0,092 m gegen Ziel 0,10 m). **Der Hebelarm
+ist die gefährlichere Zahl, weil seine schwächste Stelle die offene ist** — die,
+in der man in den Haufen sticht.
+
+| | vorher | gemessen |
+|---|---|---|
+| Zylinderneigung offen / geschlossen / größte | 23,6 / 34,9 / 38,9° | **15,4 / 20,7 / 24,4°** |
+| Hebelarm zu / offen | 0,254 / 0,092 m | **0,201 / 0,118 m** |
+| Schließkraft | — | **+28 %** |
+| Mündung von oben zugebaut | 52 % | 60,8 % |
+
+Die Traverse **allein** zu vergrößern hätte es schlechter gemacht — bei Ø 1,10
+fällt der Hebelarm auf 0,005 m, ein Totpunkt. Erst Traverse **und** Schalenauge
+zusammen lösen es.
+
+**Die fünf Unveränderlichen, nachgemessen und jetzt als absolute Zahlen im
+Wächter:** Grabtiefe **2,7511 m** · Bauhöhe 2,505 · Hüllkreis 3,232 ·
+Spitzenabstand 142,3 mm · Sektor 26,34°. Vorher prüfte der Wächter nur „alle drei
+Varianten gleich" und „zwischen 2,7 und 2,8" — das hätte 4 cm durchgelassen.
+
+**Bricht der Steg E-013?** Das war die Frage, weil E-013 hart erkämpft ist: Der
+Zinken ist **ein** Gussstück, offen entsteht eine flache Fläche, kein Stempel
+guckt heraus. Gemessen (2-mm-Raster über die Silhouette, offene Schale):
+
+| Ansicht | Silhouette | davon Steg |
+|---|---|---|
+| von der Seite | 3.898 cm² | **14,5 cm² = 0,37 %** |
+| von außen-oben (die flache Fläche) | 5.010 cm² | **0,00 %** |
+| von vorn | 3.052 cm² | **0,00 %** |
+
+**Sichtbar bricht er E-013 nicht.** Die flache Fläche ist auf das Rasterfeld
+genau unverändert. In der Seitenansicht füllt er eine kleine Kerbe zwischen Nabe
+und Ferse — **ohne** ihn hängt das Auge an einem Hals und liest sich eher als
+angesetztes Teil als mit ihm. Blatt: `docs/f5-augenkonsole.png`, links mit,
+rechts ohne.
+
+**Offengelegt:** Im Modellbaum ist es ein eigener Knoten. Wer die Bauteilliste
+liest, sieht ein Teil mehr an der Schale, auch wenn man es im Bild nicht findet.
+
+**Der Nettokorb verliert nichts.** Gleich gemessen: vorher 1.520 l, jetzt
+1.523 l — **+3 l**. Der Steg nimmt 6 l, die Form gibt 9 zurück. Das war
+Patricks ursprüngliche Klage am Fünfschalengreifer (Traverse und Stempel nehmen
+dem Material den Platz); sie trifft hier nicht zu.
+
+**Zwei Befunde kamen aus dem Scheitern, nicht aus dem Nachdenken.** Die erste
+Fassung des Stegs war **ein Loch statt eines Klotzes**, weil die Bahn gegen die
+Hausregel lief — die Messsonde meldete es sofort. Und der erste Wächter „lässt
+beide Bohrungen frei" war grün, während der Steg beide Löcher zur Hälfte
+verschloss: Er prüfte **Eckpunkte**, und der Querschnitt ist ein gefastes
+Achteck, dessen Ecken neben den Bohrungen liegen. Er prüft jetzt Flächen.
+
+**Verworfene Alternativen.** C (Ø 1,10) hält beide Ziele, aber nur mit 0,25°
+Reserve, und der Kopf wird halb so breit wie der Korb. A\* (Ø 0,70 nachgestellt)
+lässt den Kopf schlank, bleibt aber bei 32° — und braucht den Steg auch.
+
+**Offen.** Traverse und Drehwerksgehäuse überdecken sich jetzt 0,19 m statt
+0,10 m. Von außen sieht man nichts davon, aber ob der Flansch im Gehäuse sitzt
+oder umgekehrt, ist gezeichnet und nicht konstruiert.
+
+**Auf dem Gerät zu prüfen.**
+
+1. Greifer in der Vorschau ganz zu und ganz auf fahren: Der Kopf ist jetzt 43 %
+   der Korbweite statt 32 %. **Kräftig oder wuchtig?** Stehen die Zylinder
+   sichtbar gerader?
+2. Von schräg unten an einen Zinken heranfahren, dort wo der Zylinder ankommt:
+   Liest sich das immer noch als **ein** Gussstück — Hülse, Auge, Bogen, Zahn?
+3. `docs/f5-augenkonsole.png` daneben halten: Siehst du überhaupt einen
+   Unterschied? Wenn ja, welche Seite ist besser?
+
+---
+
+### E-043 — Wie viele Schalen anliegen müssen, hängt an der Größe des Teils (15.09.2026)
+
+**Entscheidung.** `gripSystem.tryGrab` verlangt nicht mehr fest **zwei**
+anliegende Schalen, sondern `min(2, floor(Größe / 0,629 m))` — **je angefangener
+Schalenlücke eine Schale**. Die Lücke ist aus `clawGeometry` gerechnet, die Größe
+am Kollider abgetastet.
+
+**Begründung.** Patrick, auch nach der ersten Reparatur (E-030): „Kleinteile sind
+sehr schwer zu greifen." Zwei Schalen waren für alles unter 0,63 m
+**unerfüllbar**: Im Greiffenster stehen benachbarte Schalen 0,63 bis 1,30 m
+auseinander. Gemessen an 63 Griffen über drei Zufallssaaten meldet
+`krallenKontakte` für Teile bis 0,40 m höchstens 0, 1 oder 2 — meist **0**. Die
+Prüfung fiel praktisch immer auf die Ausnahme „Schwerpunkt mittig" zurück, einen
+Punkttest gegen einen Kegel mit 0,14 m Radius am Boden. **61 Bilder**, in denen
+ein Teil nachweislich im Korb lag und trotzdem abgelehnt wurde.
+
+| Haufen-Treffer | vorher | nachher |
+|---|---|---|
+| gesamt | 53 von 63 | **59 von 63** |
+| am Korbrand, kleine Teile | 6 von 12 | **11 von 12** |
+
+**Im Klartext:** Von etwas, das zwischen zwei geschlossene Schalen passt, Kontakt
+zu verlangen, ist eine Bedingung, die es nie erfüllen kann. Unter 0,63 m
+entscheidet jetzt allein, ob es im Korb liegt. **Ab 1,26 m bleibt es bei zwei** —
+und damit bleibt die Kiste draußen, die nur mit einer Ecke hineinragt.
+
+**Ein Vorschlag aus dem Vorbericht wurde gemessen und verworfen:** „alle neun
+Stationen abtasten statt zweier" ändert **nichts** (dieselben Zahlen; nur der
+Betonblock steigt von 3 auf 5), auch nicht mit doppelter Toleranz. Der Grund ist
+physikalisch: Das Greiffenster öffnet bei Schließgrad 0,60, da stehen die Schalen
+noch 1,3 m auseinander — **sie liegen zum Zeitpunkt der Entscheidung schlicht
+noch nicht an.**
+
+**Die beiden alten Fehler sind nachweislich nicht zurückgekommen.** Am Griff-Kern
+wurde nichts angefasst. Die Gegenprobe „Kiste mit nur einer Ecke im Korb" ist
+**vorher wie nachher grün** — die Lockerung hat sie nicht durchlässig gemacht.
+Ein gefasstes Teil wandert 0,016 m (Schwelle 0,05); kein Saugen in die Korbmitte.
+Mit zurückgesetztem Stand sind 4 der 7 neuen Prüfungen rot.
+
+**Offen, und vermutlich der Rest des Problems.** Im **dichten** Haufen verdrängen
+schwere Nachbarn das Zielteil, weil `candidates.sort` das Schwerste zuerst nimmt
+und `MAX_ITEMS` 5 ist. Gemessen bei 30 Nachbarn, Ziel genau unter der Achse und
+in allen neun Bildern nachweislich im Korb:
+
+| Ziel | gegriffen |
+|---|---|
+| Kleinteil 0,10 m, 8 kg | **0 von 5** |
+| Messingarmatur 0,30 m, 15 kg | **0 von 5** |
+| Motorblock 0,40 m, 110 kg | 4 von 5 |
+
+Der Korb ist bei **jedem** Griff voll (5 von 5 in allen 63 Versuchen). Ein
+8-kg-Teil hat dort keine Chance. **Das ist mit hoher Wahrscheinlichkeit der Rest
+dessen, was Patrick erlebt** — und diese Entscheidung ist seine: Soll das
+anvisierte Teil zuerst genommen werden statt des schwersten? Dann bekommt man,
+worauf man zielt; dafür bekommt man beim blinden Hineinlangen nicht mehr sicher
+das große Teil.
+
+**Zweiter offener Punkt:** Die Spinne steigt beim Zupacken um **0,548 m**, weil
+der Bodenanschlag mit der Momentanstellung rechnet — sie zieht sich in genau den
+Bildern unter dem Teil weg, in denen sie greifen soll. Am Korbrand ist das die
+Ursache der verbleibenden Fehlgriffe.
+
+**Auf dem Gerät zu prüfen — im Haufen, nicht auf dem Beton.**
+
+1. Spinne so absetzen, dass ein kleines Teil **am Rand** des Korbs liegt, dann
+   zupacken. Kommt es mit? Genau dort blieb es vorher liegen.
+2. Ein Kleinteil aus einer **dichten** Stelle greifen. Kommt es weiterhin nicht
+   mit, obwohl es mitten unter der Spinne lag, ist es die Verdrängung — dann
+   liegen zwei Wege bereit.
+3. Gegenprobe: nur an die **Kante** einer großen Kiste fahren und zupacken. Sie
+   darf **nicht** mitkommen.
