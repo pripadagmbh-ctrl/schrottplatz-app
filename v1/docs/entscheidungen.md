@@ -5071,3 +5071,165 @@ fünf kurze Laschen. (c) ist ein großer Umbau und eine eigene Rechnung.
    Foto gesehen hast — kurze Lasche statt langem Zylinder?
 3. Die Entscheidung: bleibt es, wie es ist, oder soll die Anlenkung auf die
    Bauart des Vorbilds umgerechnet werden (ein Zylinder im Kopf, fünf Laschen)?
+
+---
+
+### E-075 — Es gibt eine Lösung, und sie liegt in der anderen Richtung: die Säule fällt von 66,9 auf 49 cm (15.09.2026)
+
+**Entscheidung.** Eine Karte statt einer Variantenprüfung, und daraus zwei
+gerechnete Vorschläge: `docs/f5-anlenkungsraum-2026-09-15.svg`. **Am Spielcode
+ist keine Zeile geändert**, `src/` ist unberührt, **keiner der Wächter ist
+nachgezogen**. Gebaut wird nichts, bevor Patrick am Bild entschieden hat.
+
+**Anlass, wörtlich.** Patrick, 15.09.2026, vor dem Anlenkungsblatt aus E-074:
+„Also ich glaube, das liegt halt ein bisschen an deinem oberen Aufbau. Das
+Problem, das ursprüngliche Problem ist ja, dass der Stempel breiter sein muss
+oder die Traverse, was auch immer, als der obere Teil, wo die Zylinder da sind.
+Da muss er die Spinne halt ein bisschen anders bauen, damit wir das gelöst
+bekommen. **Aber es kann nicht sein, dass wir da keine Lösung finden.**"
+
+**Er hat mit beidem recht — und mit der Richtung nicht.**
+
+---
+
+#### Warum unsere bisherigen Antworten falsch waren
+
+E-072 und E-074 haben immer nur **eine** Größe verschoben (die Höhe) und alles
+andere festgehalten. Dann bleibt zwangsläufig „nicht baubar". Hier sind **vier**
+Größen frei: `rOben` (Zylinderaufnahme am Kopf), `rUnten` (Schalenbolzenkreis)
+und die Lage des oberen Schalenauges `Ay`/`Az` — letztere zu Recht, denn E-039
+hat sie selbst als Stellschraube benutzt (von 0/0,31 auf −0,08/0,245).
+
+**Zwei Befunde, bevor eine Zahl fällt:**
+
+1. **Die Anlenkung sieht von den beiden Radien nur ihre DIFFERENZ.** In
+   `zylinderLaenge`, `zylinderNeigung` und `hebelarm` stehen ausschließlich
+   Differenzen. Eine Karte über (rOben, rUnten) wäre entlang ihrer Diagonalen
+   konstant — deshalb ist die Karte eine **Kurve** über `rUnten − rOben`, und
+   was die absolute Breite entscheidet, ist nicht die Hydraulik, sondern der
+   Korb. (Dieselbe Lehre wie E-074, eine Ebene höher.)
+2. **Der heutige Stand ist eine Nadel, kein Gebiet.** Die erste Fassung des
+   Rasters hat ihn **verfehlt** und „keine Lösung" gemeldet — für einen
+   Greifer, der gebaut dasteht. Grund: `OBERE_ANBINDUNG.z` ist 0,245 und lag
+   zwischen zwei Rasterpunkten. Neigung 24,4° von 25, Hebelarm 118 von 115,
+   Hebelarm zu 201 von 200: drei Schranken, alle im Prozentbereich. Seitdem
+   stehen die gebauten Zahlen im Raster, und ein Wächter hält fest, dass er
+   gefunden wird.
+
+---
+
+#### Die Karte
+
+| Bolzenkreis − Kopfradius | kleinste Säule | woran es sonst scheitert |
+|---|---|---|
+| −0,40 m | 37 cm | — |
+| −0,20 m | 46 cm | — |
+| −0,10 m | 49 cm | — |
+| **0,00 m** | **49 cm** | — |
+| +0,05 m | 50 cm | — |
+| +0,10 m | 60 cm | — |
+| **+0,125 m (heute)** | **66 cm** | — |
+| +0,15 m | **keine** | Neigung, 2 % daneben |
+| +0,20 m | **keine** | Hebelarm, 6 % daneben |
+| +0,30 m | **keine** | Zylinder zu lang, 14 % daneben |
+
+**Die Richtung stimmt nicht mit der Vermutung.** Je weiter der Bolzenkreis über
+den Kopf hinausragt, desto **länger** muss die Säule sein — heute ragt er
+12,5 cm hinaus und liegt damit **unmittelbar vor dem Rand**, ab 15 cm gibt es
+überhaupt keine Lösung mehr. Gesucht ist also nicht „Stempel breiter als der
+Kopf", sondern **Kopf so breit wie der Stempel**.
+
+**Und die Kurve ist flach zwischen −0,25 und +0,05.** Mehr Kopfbreite kostet
+dort fast nichts mehr an Säule: von 49 auf 46 cm für 40 cm mehr Kopfdurchmesser.
+Unter 37 cm kommt die Außenzylinder-Bauart überhaupt nicht, und dafür müsste der
+Kopf Ø 2,0 m bekommen — breiter als der geschlossene Korb.
+
+---
+
+#### Die zwei Vorschläge, am gebauten Netz nachgemessen
+
+| | 1 HEUTE | 2 schlank | 3 Maul bleibt |
+|---|---|---|---|
+| rOben / rUnten (m) | 0,465 / 0,590 | **0,500 / 0,500** | **0,590 / 0,590** |
+| Kopf-Durchmesser | 0,95 m | **1,02 m** | 1,20 m |
+| **SÄULE** | 66,9 cm | **49 cm** | **49 cm** |
+| Bauhöhe des Greifers | 2,707 m | **2,471 m** | 2,529 m |
+| Schalenauge Ay / Az | −0,08 / 0,245 | −0,12 / 0,24 | −0,12 / 0,24 |
+| Neigung größte (< 25°) | 24,4° | **22,3°** | 22,3° |
+| Hebelarm kleinster (> 115 mm) | 118 | **141** | 141 |
+| Hebelarm geschlossen (> 200 mm) | 201 | 202 | 202 |
+| Zylinder offen (Rohr 0,420 m) | 0,670 m | 0,473 m | 0,473 m |
+| Hub | 376 mm | 402 mm | 402 mm |
+| Maulweite offen | 3,095 m | **2,895 m** | 3,095 m |
+| Korbtiefe geschlossen | 0,979 m | 0,979 m | 0,979 m |
+| Hüllkreis | 3,226 m | 3,027 m | 3,226 m |
+| Schwebehöhe | 19,4 cm | **13,6 cm** | 19,4 cm |
+| Sektor je Schale (< 36°) | 26,3° | 31,4° | 26,3° |
+| Schlund 5 cm über den Bolzen | 3.822 cm² | unverändert | unverändert |
+
+**Alle drei halten alle Wächter.** Beide Vorschläge haben bei Neigung und
+Hebelarm sogar **mehr** Luft als der gebaute Stand.
+
+**Was auffällt und nicht erwartet war:** Vorschlag 2 macht den Greifer nicht nur
+24 cm kürzer, sondern senkt auch die **Schwebehöhe von 19,4 auf 13,6 cm** — der
+kleinere Bolzenkreis ist genau der Hebel, den E-065 dafür benannt hat. Der Preis
+steht daneben: **20 cm weniger Maulweite** (3,10 → 2,90 m) und ein engerer
+Sektor (26,3 → 31,4° von 36).
+
+**Der Kopf ragt in keinem Fall in den Korb**, und der Schlund bleibt, wie er ist:
+Bei 49 cm Säule steht die Traverse 29 cm über der Ebene 5 cm über den Bolzen.
+
+---
+
+**Verworfene Alternative.** Eine Variante prüfen statt den Raum abrechnen. Genau
+das haben E-072 und E-074 getan, und beide sind mit „nicht baubar" geendet —
+nicht weil die Maschine es nicht kann, sondern weil die Frage zu eng gestellt
+war.
+
+**Zum großen Umbau (die Bauart des Vorbilds: ein Zylinder im Kopf, fünf kurze
+Laschen, gar keine Außenzylinder).** **Die Karte spricht nicht zwingend dafür.**
+49 cm sind mit der heutigen Bauart zu haben, ohne eine Schranke anzurühren. Sie
+zeigt aber seine Grenze: Ganz ohne Säule geht es mit Außenzylindern nie, weil
+das Schalenauge beim Öffnen um fast den ganzen Querabstand nach OBEN schwenkt —
+es braucht diese Höhe, damit der Zylinder überhaupt nach unten zieht. Wer die
+Säule wirklich auf null will, braucht die Bauart des Vorbilds.
+
+**Werkzeuge.** `tools/fuenfschalen/anlenkungsraum.ts` (die Rechnung und die
+Suche) und `tools/fuenfschalen/anlenkungsriss.ts` (der Seitenriss mit Kopf,
+Säule, Bolzen, Schale und dem Zylinder **als Zylinder**, herausgelöst aus dem
+Blatt von E-074). Beide prüfen sich bei jedem Lauf gegen `rig.ts`: die
+Anlenkungsrechnung auf **2,2e−16**, die gezeichnete Schalenbahn gegen
+`mittellinie()` auf **4,4e−16**.
+
+**Abnahmekriterium.** `test/mittelsaeule.test.ts`, jetzt **15 Prüfungen**; die
+fünf neuen mit Gegenprobe, die melden muss:
+
+- Rechnung und Schalenbahn treffen `rig.ts`. Gegenproben: 1 cm Radiusabstand
+  ändert den Hebelarm um 3,3e−3; ein anderer Bolzenkreis ändert die Bahn um über
+  5 cm — sonst prüften beide Zeilen nur, dass die Funktionen konstant sind.
+- Der gebaute Stand wird vom Raster **gefunden** (Säule zwischen 0,60 und 0,669).
+- Bei gleichem Radius liegt die Säule zwischen 0,44 und 0,53 m, und alle vier
+  Schranken halten dort.
+- Bei +0,20 m Radiusabstand gibt es **keine** Lösung — die Gegenprobe zur Suche
+  selbst: Wäre sie blind erfolgreich, fände sie auch dort etwas.
+- Der kleinere Bolzenkreis kostet Maulweite, nicht Korbtiefe; die geschlossene
+  Form bleibt auf 1e−9 dieselbe, und die fünf Schalen passen noch nebeneinander.
+
+1.109 bestehende Prüfungen bleiben grün (jetzt **1.114 in 98 Dateien**).
+`npm run build` sauber.
+
+**Unangetastet.** `src/` vollständig. Beide Wächter aus E-039 (25° und 0,115 m)
+und der dritte (Hebelarm geschlossen > 0,2 m) stehen auf ihren alten Zahlen.
+Sichelkralle, Griff-Kern, Pendel, Rotator, Kamera, Bodenanschlag. Die
+Mittelsäule steht weiter bei 66,9 cm.
+
+**Auf dem Gerät zu prüfen.**
+
+1. `docs/f5-anlenkungsraum-2026-09-15.svg`, **die drei Silhouetten
+   nebeneinander**: Sieht Spalte 2 gedrungener aus als Spalte 1 — und stört das,
+   oder sieht es richtiger aus?
+2. **Die Karte in der Mitte**: Erkennst du, dass der heutige Greifer ganz am
+   rechten Rand des Möglichen sitzt, kurz vor dem roten Gebiet?
+3. Die Entscheidung: Spalte 2 (schlanker Kopf, 24 cm kürzer, weniger
+   Schwebehöhe — Preis: 20 cm Maulweite), Spalte 3 (Maulweite bleibt, Kopf wird
+   Ø 1,20), oder bleibt es bei Spalte 1?
