@@ -386,6 +386,40 @@ function achtkant(radius: number, halbHoehe: number): RAPIER.ColliderDesc {
  * eine Muenze auf dem Tisch minutenlang aus und halten ueber die gemeinsame
  * Schlafregel den ganzen Haufen wach (v2 mass 128 Koerper).
  */
+/**
+ * Mindestdaempfung fuer Platzinventar — GEMESSEN, nicht gewaehlt.
+ *
+ * Befund 15.09.2026 (E-037): Der Kehrbesen kam auf dem gebauten Platz nicht
+ * zur Ruhe. Er wanderte zwar nur 5 mm in 30 Sekunden, aber er blieb WACH —
+ * und ein wacher Koerper rechnet in jedem Bild mit, auch wenn sich nichts
+ * bewegt (Regel: „Wird der Haufen unruhig, ist das ein Blocker").
+ *
+ * Die Ursache ist nicht seine Form, sondern das Zusammenspiel aus weichen
+ * Kontakten (`physicsWorld.ts`: Kontaktfrequenz 30, zugelassener Fehler
+ * 0,005) und der sehr niedrigen Daempfung, die `dampLin` schweren Koerpern
+ * gibt (Boden 0,02). Gemessen im gebauten Platz, je 30 s:
+ *
+ *   100 kg  wach (v 0,226)      400 kg  wach (v 0,040)
+ *   200 kg  schlaeft ab 317     500 kg  wach (v 0,077)
+ *   300 kg  schlaeft ab 145     680 kg  wach (v 0,050)
+ *
+ * Es haengt also nicht an der Masse, sondern ist ein Grenzzyklus des Loesers —
+ * mal faellt er hinein, mal nicht. Sogar der Ort entscheidet mit, weil dort
+ * andere Rundungsfehler anfallen. Ueber sechs Stellen gemessen:
+ *
+ *   0,1 / 0,2   an vier von sechs Stellen eingeschlafen
+ *   0,2 / 0,3   an allen sechs, aber traege (bis 23 s)
+ *   0,4 / 0,6   an allen sechs, nach 7,7 s — GENOMMEN
+ *
+ * Warum nur fuer Platzinventar und nicht fuer alles: Die niedrige Daempfung
+ * schwerer Teile ist Absicht („Schweres behaelt seinen Schwung") und praegt,
+ * wie sich ein Motorblock anfuehlt. Ein WERKZEUG soll dagegen genau dort
+ * liegenbleiben, wo der Spieler es hinlegt — dieselbe Ansage wie beim
+ * Muellcontainer (E-034: „bleibt er dort stehen, wo du ihn absetzt").
+ */
+const INVENTAR_DAMP_LIN = 0.4;
+const INVENTAR_DAMP_ANG = 0.6;
+
 function dampAngFuer(shape: ScrapShape, massKg: number): number {
   const rund =
     shape.kind === "torus" ||
@@ -439,8 +473,12 @@ export function umkugelRadius(shape: ScrapShape): number {
  * Damit werden die Massen mehrteiliger Kollider aufgeteilt. Das ist eine
  * Naeherung — der echte Rauminhalt einer konvexen Huelle waere genauer —, aber
  * eine ehrliche: Sie trifft die Groessenordnung und stellt sicher, dass der
- * dicke Teil auch die Masse bekommt. Beim Besen ergibt sie 87 % Faecher zu
- * 13 % Kopf, und damit sitzt der Schwerpunkt tief, wie bei einem Besen.
+ * dicke Teil auch die Masse bekommt.
+ *
+ * Genutzt wird sie derzeit von keinem Bau: Der Kehrbesen war bis zum
+ * 15.09.2026 der einzige mit Taille und ist seit E-037 ein Ballen mit einer
+ * einzigen Huelle. Die Rechnung bleibt fuer den naechsten Gegenstand mit Hals
+ * stehen und wird in `test/besen.test.ts` an einer Attrappe nachgeprueft.
  */
 export function quaderRaum(punkte: Float32Array): number {
   if (punkte.length < 3) return 0;
@@ -535,12 +573,18 @@ const FLAT_SCALE_Y = 0.55;
 /* ------------------------------------------------------------------------ */
 
 /**
- * Der Maschendraht-Besen.
+ * Der Kehrbesen: ein Ballen aus zusammengetretenem Maschendraht.
  *
- * Wunsch Patrick, 15.09.2026: „Ich bräuchte einen Maschendrahtzaun, der quasi
- * oben schon gequetscht ist und unten breit ist, der quasi wie ein Besen
- * fungiert ... Damit ich quasi mit dem Maschendrahtzaun den Boden bzw. die
- * Ladeflächen abkehren kann."
+ * Wunsch Patrick, 15.09.2026 vormittags: „Ich bräuchte einen Maschendrahtzaun,
+ * der quasi oben schon gequetscht ist und unten breit ist, der quasi wie ein
+ * Besen fungiert ... Damit ich quasi mit dem Maschendrahtzaun den Boden bzw.
+ * die Ladeflächen abkehren kann."
+ *
+ * Befund am Geraet, 15.09.2026 abends: „Der ist viel zu klein. Er soll fast so
+ * breit sein wie eine Pritsche und viel voluminoeser ... es ist halt ein
+ * bisschen wie ein Tee-Ei." Daraufhin E-037: aus dem Trichter wurde ein
+ * Ballen. Die Form steht in `world/objektbau.ts` (`BESEN_FORM`), hier stehen
+ * seine Masse.
  *
  * Er steht mit Absicht NICHT in `SPECS`, `KATALOG_SPECS`, `BIG_SPECS` oder
  * `HUGE_SPECS`. Alles, was dort steht, kann `randomCargo` auf einen Lkw laden;
@@ -548,35 +592,52 @@ const FLAT_SCALE_Y = 0.55;
  * gibt genau einen Besen"). Gesetzt wird er einmal beim Neuen Spiel,
  * `ItemManager.spawnBesen()`.
  *
- * ## Woher die Zahlen kommen
+ * ## Woher die Zahlen kommen — jede einzeln gerechnet
  *
- * **Breite 1,20 m.** Handelsueblicher Maschendrahtzaun ist 1,25 m hoch. Wer
- * eine Bahn aufrollt und oben zusammenquetscht, hat genau diese Bahnhoehe als
- * Besenbreite; abgerundet auf 1,20 m. Sie passt zwischen die Bordwaende einer
- * Pritsche (Innenbreite 2 x 1,35 m, `delivery/routes.ts`) und unter die offene
- * Spinne (Spannweite 3,38 m).
+ * **Breite 2,40 m.** „Fast so breit wie eine Pritsche." Die Ladeflaeche einer
+ * Pritsche ist innen 2 x `BED_HALF_W` = 2,70 m breit (`delivery/routes.ts`).
+ * Er muss zwischen die Bordwaende PASSEN, sonst kann er sie nicht auskehren —
+ * also 0,15 m Luft je Seite: 2,40 m, das sind 89 % der Ladeflaeche. Damit
+ * geht eine Pritsche in EINER Bahn leer statt in dreien.
  *
- * **Hoehe 1,30 m.** Bahnhoehe plus der aufgerollte Wulst oben. Wichtiger ist
- * die Gegenprobe: Der Schalenkorb der geschlossenen Spinne ist von der
- * Gelenkebene bis zur Spitze 1,78 m tief (`excavator/clawGeometry.ts`,
- * gerechnet). Ein Besen von 1,30 m haengt also vollstaendig im Korb, wenn man
- * ihn oben fasst — das ist die Bedingung dafuer, dass er sicher gegriffen wird.
+ * **Tiefe 1,30 m.** Nicht gewaehlt, sondern die Spur dessen, was den Ballen
+ * geformt hat: Die geschlossene Spinne misst quer 1,297 m
+ * (`clawWidth(CLAW_CLOSED_SPLAY)`, `excavator/clawGeometry.ts`). So breit ist
+ * der Abdruck, den sie beim Niederdruecken hinterlaesst — „immer wieder
+ * zwischen Spinne, Birne und Boden gedrueckt". Aufgerundet auf den Zentimeter.
+ * Die Breite bleibt damit klar das Groesste: 2,40 : 1,30 : 1,10.
  *
- * **Tiefe 0,38 m.** Die Dicke des aufgefaecherten Endes. Schmal genug, dass
- * die Schleppkante eine Kante ist und keine Flaeche; breit genug, dass der
- * Besen beim Ziehen nicht sofort nach vorn wegkippt.
+ * **Masse 680 kg — aus der Drahtmenge, nicht gegriffen.**
+ * 2,8-mm-Draht bei 50-mm-Masche ergibt rund 56,6 m Draht je Quadratmeter;
+ * 2,8-mm-Stahldraht wiegt 0,048 kg/m, also **2,72 kg/m²**. Eine handelsuebliche
+ * Rolle ist 1,25 m hoch und 25 m lang = 31,25 m². „Sehr viele Maschendraehte"
+ * sind hier **acht Rollen** = 250 m² = **679,2 kg**, aufgerundet 680 kg.
  *
- * **Masse 52 kg.** Gerechnet, nicht geschaetzt: 2,8-mm-Draht, 50-mm-Masche
- * ergibt rund 56,6 m Draht je Quadratmeter; 2,8-mm-Stahldraht wiegt 0,048 kg/m,
- * also 2,73 kg/m². Eine Bahn von 1,25 m Hoehe und 15 m Laenge = 18,75 m² wiegt
- * damit 51,2 kg. Aufgerundet 52 kg.
+ * **Hoehe 1,10 m — das Ergebnis, nicht die Vorgabe.** Aus der Drahtmenge folgt,
+ * wieviel Raum der Ballen einnehmen MUSS, und daraus bei gegebener Breite und
+ * Tiefe seine Hoehe:
  *
- * Warum die Masse ueberhaupt zaehlt: Am Haken ist der Besen kinematisch und
- * folgt der Spinne ohne Ruecksicht auf sein Gewicht — beim Kehren spielt sie
- * also keine Rolle. Sie spielt eine Rolle, wenn er losgelassen am Boden liegt
- * (bei 52 kg schiebt ihn kein Kleinteil weg) und beim Traglimit der Spinne
- * (`MAX_TOTAL_KG` 3500 kg — 52 kg sind anderthalb Prozent, es bleibt also
- * Platz fuer vier weitere Teile, `MAX_ITEMS` 5).
+ *   - massiver Draht:    250 m² x 3,49e-4 m³/m²  = 0,087 m³
+ *   - dichteste flache Lage: 250 m² x 0,0056 m (zwei Drahtdurchmesser je Lage)
+ *                                              = 1,40 m³
+ *   - ein getretener Ballen ist lockerer als das, weil zwischen den Lagen Luft
+ *     bleibt — gebaut ist das 1,41-fache      = 1,98 m³
+ *
+ * Bei 2,40 m Breite und 1,30 m Tiefe kommt der gebaute Ballen damit auf
+ * **1,10 m Hoehe**. Nachgemessen am fertigen Kollider (Rasterabtastung,
+ * `test/besen.test.ts`): **1,98 m³**.
+ *
+ * Gegenprobe zur Packung: 680 kg auf 1,98 m³ sind **344 kg/m³**. Eine stramm
+ * gewickelte Rolle liegt bei rund 700 kg/m³, die dichteste flache Lage bei
+ * 490 kg/m³ — der Ballen ist also deutlich lockerer als beides und hat noch
+ * Luft drin. Genau so sieht plattgetretener Draht aus.
+ *
+ * **Was die Masse bedeutet.** Am Haken ist der Besen kinematisch und folgt der
+ * Spinne ohne Ruecksicht auf sein Gewicht — beim Kehren spielt sie keine
+ * Rolle. Sie spielt eine Rolle, wenn er losgelassen am Boden liegt (bei 680 kg
+ * schiebt ihn nichts mehr weg, was auf dem Platz herumliegt) und beim
+ * Traglimit der Spinne (`MAX_TOTAL_KG` 3500 kg — 680 kg sind 19 %, es bleibt
+ * also Platz fuer weitere Teile, `MAX_ITEMS` 5).
  *
  * **Fraktion Zink.** Verzinkter Draht laeuft im Spiel wie die „Verzinkten
  * Gitterroste" und die „Zink-Dachrinne" im Zinkstrom (`objektkatalog.ts`).
@@ -585,9 +646,9 @@ const FLAT_SCALE_Y = 0.55;
  */
 export const BESEN: PileSpec = {
   materialId: "zinc",
-  massKg: 52,
+  massKg: 680,
   kind: "box",
-  dims: [1.2, 1.3, 0.38],
+  dims: [2.4, 1.1, 1.3],
   bau: "besen",
   name: "Maschendraht-Besen",
 };
@@ -1275,8 +1336,10 @@ export class ItemManager {
         // Dämpfung nach Masse: eine feste Bremse für alles nahm schweren
         // Teilen ihr Gewicht — ein Motorblock kam so schnell zur Ruhe wie ein
         // Blech. Leichtes bremst stark, Schweres behält seinen Schwung.
-        .setLinearDamping(dampLin(massKg))
-        .setAngularDamping(dampAngFuer(shape, massKg))
+        .setLinearDamping(Math.max(dampLin(massKg), istPlatzinventar(shape) ? INVENTAR_DAMP_LIN : 0))
+        .setAngularDamping(
+          Math.max(dampAngFuer(shape, massKg), istPlatzinventar(shape) ? INVENTAR_DAMP_ANG : 0)
+        )
         // Ohne durchgehende Prüfung schlagen schnelle Teile durch Boden,
         // Bordwände und Bagger hindurch
         .setCcdEnabled(true)
@@ -1287,8 +1350,10 @@ export class ItemManager {
     //
     // Meist ist es genau ein Kollider. Formen mit Taille bringen mehrere mit
     // (siehe oben); dann bekommt jeder seinen Massenanteil, und der
-    // Schwerpunkt sitzt dort, wo das Material ist — beim Besen also unten im
-    // Faecher und nicht in der Mitte.
+    // Schwerpunkt sitzt dort, wo das Material ist. Derzeit nutzt das kein
+    // Bau — der Kehrbesen, der es gebraucht hatte, ist seit E-037 ein Ballen
+    // ohne Taille, und dessen Schwerpunkt sitzt schon von der Huelle her tief
+    // (gemessen y −0,149 m bei 1,10 m Hoehe).
     const teile = shape.flat || teilKollider.length === 0 ? [collider] : teilKollider;
     const anteile = teile.length === 1 ? [1] : teilAnteile;
     for (let i = 0; i < teile.length; i++) {
@@ -1443,22 +1508,27 @@ export class ItemManager {
   spawnBesen(): ScrapItem | null {
     if (this.items.some((it) => it.shape?.inventar === "besen")) return null;
     /*
-     * Er liegt flach, nicht aufrecht: Ein Zaunstueck, das jemand an die Wand
-     * gelehnt hat, faellt beim ersten Anstossen um; flach liegend ist der
-     * Wulst von oben zu fassen, und genau so greift man ihn.
+     * Er liegt so, wie er gebaut ist — und das ist seit E-037 schon die
+     * Gebrauchslage.
      *
-     * Um die Hochachse verdreht, damit die Schleppkante quer zur Blickrichtung
-     * liegt — dann sieht man beim Start, wie breit er ist.
+     * Der Trichter von vormittags musste auf die Flanke gelegt werden
+     * (`Euler(PI/2, 0, 0)`), sonst haette er wie ein Besen an der Wand
+     * gestanden und waere beim ersten Anstossen umgefallen. Der Ballen hat
+     * diese Frage nicht: Seine Form IST die Lage, in der er entstanden ist —
+     * unten platt vom Boden, oben rund von der Spinne. Er wird hingelegt,
+     * nicht gekippt, und steht damit sofort richtig zum Kehren.
+     *
+     * `gier` dreht ihn nur um die Hochachse: 0 heisst, die 2,40 m breite
+     * Schleppkante liegt quer (Ost–West) — man sieht beim Start, wie breit er
+     * ist.
      */
-    const q = new THREE.Quaternion()
-      .setFromEuler(new THREE.Euler(0, BESEN_PLATZ.gier, 0))
-      .multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0)));
+    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, BESEN_PLATZ.gier, 0));
     return this.spawnScrap(
       BESEN.materialId,
       BESEN.massKg,
       besenForm(),
-      // Halbe Tiefe hoch: liegend ruht er auf seiner Flanke (0,38 m dick).
-      new THREE.Vector3(BESEN_PLATZ.x, BESEN.dims[2] / 2 + 0.05, BESEN_PLATZ.z),
+      // Halbe Hoehe hoch plus fuenf Zentimeter: er ruht auf seinem platten Boden.
+      new THREE.Vector3(BESEN_PLATZ.x, BESEN.dims[1] / 2 + 0.05, BESEN_PLATZ.z),
       q
     );
   }
