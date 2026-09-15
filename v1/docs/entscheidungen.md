@@ -2800,3 +2800,65 @@ Ursache der verbleibenden Fehlgriffe.
    liegen zwei Wege bereit.
 3. Gegenprobe: nur an die **Kante** einer großen Kiste fahren und zupacken. Sie
    darf **nicht** mitkommen.
+
+### E-045 — Worauf du zielst, das bekommst du: die Auswahl geht nicht mehr nach Gewicht (15.09.2026)
+
+**Entscheidung.** `candidates.sort((a, b) => b.mass() - a.mass())` fällt weg. Es
+kommt **alles** mit, was die Greifbedingung erfüllt — was im Korb liegt, was von
+den Schalen gefasst ist, was verkantet ist. `MAX_ITEMS` steigt von **5 auf 24**
+und ist damit kein Auswahlmittel mehr, sondern ein Notnagel. Sortiert wird nur
+noch danach, **wie sicher ein Teil gehalten wird** (Schwerpunkt im Korb schlägt
+„nur gefasst", Feinunterschied: Abstand zur Sensormitte); das entscheidet nichts
+darüber, *was* mitkommt, sondern nur, wen die Traglastgrenze abschneidet, wenn
+sie greift. `MAX_TOTAL_KG` (3.500 kg) bleibt unangetastet — das ist
+Tragfähigkeit, keine Auswahl.
+
+**Begründung.** Ansage Patrick 15.09.2026: „Worauf du zielst, das bekommst du:
+Alles mitnehmen, was in der Spinne liegt und wo der Greifer sich festkrallt oder
+was verkantet ist. **Nicht nach Gewicht gehen.**" Der offene Punkt aus E-043 ist
+damit entschieden, und die Messung dazu war eindeutig: Im dichten Nest erfüllten
+**7 bis 12** Körper je Griff die Bedingung, fünf hatten Platz, die fünf
+schwersten bekamen ihn.
+
+| Zielteil, dichtes Nest (30 Nachbarn je 20–50 kg) | vorher | nachher |
+|---|---|---|
+| Kleinteil 0,10 m, 8 kg | 0 von 5 | **5 von 5** |
+| Messingarmatur 0,30 m, 15 kg | 0 von 5 | **5 von 5** |
+| Motorblock 0,40 m, 110 kg | 4 von 5 | **5 von 5** |
+| Kleinteil im normalen Haufen, 0,40 m daneben | 2 von 5 | **5 von 5** |
+
+**Der Kommentar „wer in einen Haufen greift, bekommt das große Teil sicher" ist
+damit überholt** und steht nicht mehr im Code. Wer blind hineinlangt, bekommt
+jetzt, was wirklich zwischen den Schalen liegt — auch das Kleine.
+
+**Woher die 24 kommt.** Gemessen, nicht gegriffen: Im **echten** Starthaufen
+(`spawnPile`, 150 gewürfelte Teile mit den Formen des Objektkatalogs, drei
+Saaten) erfüllen je Griff nur **2 bis 4** Körper die Bedingung — es kommen 2 bis
+4 Teile mit, 160 bis 250 kg. Echter Schrott ist größer als ein 25-cm-Würfel, es
+passt schlicht weniger in den Korb. Nur im künstlich dichten Nest aus lauter
+Kleinteilen waren es bis zu 12. 24 ist das Doppelte des je Gemessenen: hoch
+genug, dass der Deckel nie auswählt, niedrig genug, dass ein künftiger Fehler
+nicht unbemerkt den halben Platz anhängt.
+
+**Verworfene Alternative.** Den Deckel ganz streichen (dann gäbe es gegen einen
+Fehler in der Sensorkugel keine Bremse mehr); den Deckel bei 5 lassen und nur
+das anvisierte Teil vorziehen (wäre wieder eine Auswahl, nur eine andere — und
+Patricks Ansage sagt ausdrücklich „alles mitnehmen").
+
+**Abnahmekriterium.** `npm test` grün: **74 Dateien, 840 Tests**, darunter drei
+neue Wächter in `test/greifhaufen.test.ts` („nimmt das leichte Teil mit",
+„der Deckel wählt nicht mehr aus", „die Physik bleibt ruhig") und einer am
+echten Starthaufen („es kommt kein halber Haufen mit": höchstens 8 Teile je
+Griff, gemessen 2 bis 4). Mit zurückgesetzter Auswahl sind alle drei rot.
+Gemessen bleibt der schnellste lose Körper bei 6–7,5 m/s (Spieldeckel 28),
+keiner sackt durch den Beton, ein gefasstes Teil wandert höchstens 0,030 m
+(Saug-Schwelle 0,05).
+
+**Auf dem Gerät zu prüfen.**
+
+1. In eine **dichte** Stelle greifen, in der ein kleines Teil zwischen großen
+   liegt: Kommt das Kleine jetzt mit?
+2. Wie voll fühlt sich ein Griff an? Es hängt **mehr** in der Spinne als vorher
+   — ist das die Handvoll, die man erwartet, oder zu viel?
+3. Gegenprobe: nur an die **Kante** einer großen Kiste fahren. Sie darf weiter
+   **nicht** mitkommen.
