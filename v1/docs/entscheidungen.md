@@ -3126,3 +3126,97 @@ Ecke im Korb bleibt liegen — auf dem Beton wie im Haufen.
    ginge einfach etwas nicht?
 3. Gegenprobe wie immer: nur an die **Kante** einer großen Kiste fahren — sie
    darf nicht mitkommen.
+
+---
+
+### E-050 — Der Auslegerbock: der Arm hängt jetzt sichtbar am Oberwagen (15.09.2026)
+
+**Entscheidung.** Auf der Deckplatte steht ein Auslegerbock: zwei Lagerwangen
+aus 60-mm-Blech, dazwischen der Auslegerfuß, ein durchgehender Bolzen r 0,10 mit
+Sicherungsblech, zwei Schrauben und Schmiernippel, dazu zwei Querbleche und zwei
+Fußflansche. 17 Bauteile im Stahl-Netz des Oberwagens.
+
+**Begründung.** Patrick am Gerät: „Keine Verbindung des Arms am Turm."
+
+**Nachgemessen war es kein Eindruck, sondern ein Loch.** Der Auslegerfuß endete
+auf y 2,641, die Deckplatte begann auf y 1,955 — **0,686 m nichts**, über die
+ganze Breite und über den ganzen Schwenkbereich. Neun senkrechte Strahlen trafen
+alle als erstes die Deckplatte. Der Arm hing 69 cm über dem Aufbau, gehalten von
+nichts.
+
+Die **Lagerböcke der Hubzylinder** gab es dagegen schon und sie sitzen richtig —
+ihre Konsolenbleche reichen 6 cm in die Deckplatte hinein, also verschweißt statt
+danebengestellt. Unangetastet.
+
+**Der Drehpunkt ist nicht gewandert.** `BOOM_PIVOT`, `BOOM_LEN` 5,20 und
+`STICK_LEN` 4,00 sind unverändert; der ganze Platz bleibt um das Schwenkband
+5,80–9,20 m gebaut. Die Achse des Bocks wird **aus `BOOM_PIVOT` abgeleitet**,
+damit es keine zweite Zahl gibt.
+
+**Gemessen, nicht geschätzt.** 594 Armstellungen (66 Ausleger- × 9 Stielwinkel),
+der Bock exakt gerechnet, der Arm im 3-cm-Raster abgetastet — 432.824 Punkte.
+Kleinster Freigang **0,027 m** (Rohr des Hubzylinders am Fußflansch bei 70°), zur
+Kabine 0,047 m, zum Auslegerfuß 0,030 m. Keine Berührung.
+
+**Zwei Entwürfe sind an dieser Messung gescheitert, nicht am Nachdenken:** ein
+1,20 m langer Fußflansch stand bei 47° und 70° **9 mm im Rohr des
+Hubzylinders**; und ein Hals so breit wie das Lagerauge ergab im Riss eine glatte
+Kuppe, an der die Lagerstelle nicht mehr zu finden war.
+
+**Kosten: null.** Der Bock bewegt sich nicht gegen den Oberwagen und liegt
+deshalb in dessen Stahl-Netz. **57 Netze vorher, 57 nachher**, +448 Dreiecke.
+Kollider, Reichweite, Gelenkpunkte, Grabtiefe unverändert.
+
+**Abnahmekriterium.** Aus der Außenansicht ist von der Deckplatte bis zum
+Auslegerfuß auf jeder Höhe Material zu sehen. Die Gegenprobe steht **dauerhaft**
+im Wächter: Ein Oberwagen wird ausdrücklich ohne Bock gebaut, und derselbe Strahl
+muss dort ins Leere gehen.
+
+**Auf dem Gerät zu prüfen.**
+
+1. Um die Maschine herumdrehen, bis der Ausleger quer steht: Sitzt der Arm
+   sichtbar in zwei Wangen — erkennt man die Lagerstelle als runden Kopf mit
+   Bolzen?
+2. Ausleger langsam ganz ablegen und ganz aufrichten: Läuft der Fuß sauber
+   zwischen den Wangen durch, besonders dort, wo die Hubzylinder vorbeigehen?
+3. In der Kabine einmal voll durchschwenken: Verdeckt der Bock etwas, das man
+   zum Sortieren braucht?
+
+---
+
+### E-055 — Der erste Tag beginnt ohne Schrott (15.09.2026)
+
+**Entscheidung.** Beim Neuen Spiel liegt **kein loser Schrott** auf dem Platz:
+kein Starthaufen, kein Streugut. `LEERER_START` in `src/world/startplatz.ts`
+steht auf `true`, und daraus folgen beide Zahlen.
+
+**Begründung.** Patrick, 15.09.2026: „Erster Tag ohne Schrott anfangen als Test."
+
+Es ist ausdrücklich ein Versuch, und deshalb ist es **eine** Zahl. Wer den vollen
+Start zurückwill, setzt `false` und bekommt Haufen (85 Teile) und Streugut (10)
+in den Größen zurück, die begründet danebenstehen.
+
+**Was das prüfbar macht:** Alles, was auf dem Platz liegt, ist dann angeliefert
+worden. Man sieht dem Platz am Abend an, wie der Tag gelaufen ist — und man sieht
+sofort, wenn der Nachschub klemmt. Das ist heute kein theoretischer Fall: Am
+selben Tag hat sich gezeigt, dass beim Beladen bis zu 96 % einer Fuhre
+verschwanden (E-044), und **auf einem vollen Platz fällt so etwas nicht auf.**
+
+**Nicht betroffen: die beiden Altfahrzeuge** (`START_AUTOS`). Sie sind kein loser
+Schrott, sondern das, woran Schere und Ausschlachten hängen — ohne sie wäre der
+erste Tag nicht nur leer, sondern leer **und** ohne Beschäftigung, bis der erste
+Händler kommt.
+
+**Ein Nebeneffekt, der zu prüfen ist.** Der Starthaufen kam nur in einem von vier
+Läufen ganz zur Ruhe (dokumentiert seit dem 14.09., ein eigener offener Punkt).
+Ohne ihn beginnt der Platz zum ersten Mal **still**. Falls die Bilder je Sekunde
+am Anfang spürbar besser sind, ist das ein Messwert für genau diesen offenen
+Punkt — und kein Verdienst dieses Eintrags.
+
+**Auf dem Gerät zu prüfen.**
+
+1. Neues Spiel: Ist der Platz wirklich leer — und wirkt er dadurch groß und
+   ordentlich, oder tot?
+2. Den ersten Händler abwarten und ihn ganz ausräumen: Reicht **eine** Fuhre für
+   ein Gefühl von Betrieb, oder fehlt zu lange etwas zu tun?
+3. Am Abend hinsehen: Erkennt man dem Platz an, was an dem Tag passiert ist?

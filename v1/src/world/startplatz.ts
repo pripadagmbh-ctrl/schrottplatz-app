@@ -48,7 +48,33 @@
  * 2,9 m Streuung bis −35,9 gereicht und waere hinten an der Buchtwand
  * gelegen; auf −32,0 liegt er mit −34,9 bis −29,1 vollstaendig in der Halde.
  */
-export const START_HAUFEN = { x: 4.0, z: -32.0, streuung: 2.9, teile: 85 };
+/**
+ * LEERER PLATZ AM ERSTEN TAG.
+ *
+ * Ansage Patrick, 15.09.2026: „Erster Tag ohne Schrott anfangen als Test."
+ *
+ * Steht das hier auf `true`, liegt beim Neuen Spiel **kein** Schrott auf dem
+ * Platz — kein Haufen, kein Streugut. Alles, was da ist, kommt dann durch
+ * Anlieferungen, und man sieht dem Platz an, wie ein Tag gelaufen ist.
+ *
+ * Es ist ausdruecklich ein Versuch und deshalb EINE Zahl: Wer den vollen
+ * Start zurueckwill, setzt `false` und bekommt Haufen und Streugut in den
+ * Groessen, die darunter stehen und begruendet sind.
+ *
+ * Nicht betroffen: die beiden **Altfahrzeuge** (`START_AUTOS`). Sie sind kein
+ * loser Schrott, sondern das, woran Schere und Ausschlachten ueberhaupt
+ * haengen — ohne sie waere der erste Tag nicht leer, sondern leer UND ohne
+ * Beschaeftigung, bis der erste Haendler kommt. Wenn Patrick auch die weg
+ * haben will, ist das eine Zeile mehr.
+ */
+export const LEERER_START = true;
+
+/** Wie viele Teile der Starthaufen haette — null, solange `LEERER_START` gilt. */
+const HAUFEN_TEILE = LEERER_START ? 0 : 85;
+/** Dasselbe fuer das Streugut ringsum. */
+const STREU_TEILE = LEERER_START ? 0 : 10;
+
+export const START_HAUFEN = { x: 4.0, z: -32.0, streuung: 2.9, teile: HAUFEN_TEILE };
 
 /**
  * Die beiden Altfahrzeuge, je eines an der vorderen Kante einer Halde.
@@ -66,7 +92,7 @@ export const START_AUTOS: Array<{ x: number; z: number }> = [
 ];
 
 /** Streuschrott ringsum: zehn Teile auf einem Kreis um den Haufen. */
-export const START_STREU = { x: 4.0, z: -32.0, radius: 2.9, teile: 10 };
+export const START_STREU = { x: 4.0, z: -32.0, radius: 2.9, teile: STREU_TEILE };
 
 /**
  * Wo der eine Kehrbesen liegt (E-031, neu gerechnet in E-037 und E-049).
