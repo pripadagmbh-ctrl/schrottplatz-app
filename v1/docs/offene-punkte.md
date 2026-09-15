@@ -329,9 +329,14 @@ Alle Zeichnungen liegen unter `/v1/plaene/` und sind auf dem Telefon aufrufbar.
 9. **Federnde LKW beim Abladen**, Wrackzustände (fehlende Türen, Reifen,
    ausgeschlachteter Motor), Motorräder und Velos, Kranfarben und -typen,
    Bordwände und Türen — die Notizen weiter oben in dieser Datei.
-10. **Greifer:** Traverse Ø 0,70 → Ø 1,10, ja oder nein? Die einzige Tür zu den
-    offenen Kennwerten aus E-009 (Zylinderneigung, Hebelarm). Am Bild zu
-    entscheiden, 4.567 gerechnete Lösungen liegen bereit.
+10. ~~**Greifer:** Traverse Ø 0,70 → Ø 1,10, ja oder nein?~~ **Entschieden am
+    15.09.2026 am Blatt `docs/f5-traverse-2026-09-15.svg`: Variante B, Ø 0,95**
+    (E-039). Gebaut und gemessen: Zylinderneigung 38,9° → 24,4°, Hebelarm an
+    der schwächsten Stelle 0,092 → 0,118 m (+28 % Schließkraft), Nettokorb
+    1.524 → 1.529 l. Das 20°-Ziel aus E-009 bleibt verfehlt — dafür hätte es
+    Ø 1,10 gebraucht. **Offen geblieben** ist, wie Traverse und
+    Drehwerksgehäuse ineinandergreifen, seit die Traverse 10 cm höher sitzt
+    (−0,96 → −0,865): gezeichnet, nicht konstruiert.
 
 ### Abschnitt 2 — der Kreislauf
 

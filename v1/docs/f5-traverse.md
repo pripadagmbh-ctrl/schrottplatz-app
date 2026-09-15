@@ -3,9 +3,11 @@
 **Zum Ansehen:** `docs/f5-traverse-2026-09-15.svg` — in der Planmappe unter `/v1/plaene/`.
 Drei Spalten nebeneinander, jede offen und geschlossen, alle im selben Maßstab.
 
-**Status:** Entscheidungsvorlage. Es ist nichts gebaut. Der Fünfschalengreifer sitzt
-weiter in der Vorschau (`/greifer.html`), am Bagger hängt unverändert die Sichelkralle
-(E-009). Diese Seite ändert keine Zeile am gespielten Spiel.
+**Status:** **Entschieden und gebaut — Variante B, Ø 0,95** (E-039, 15.09.2026). Die
+Seite bleibt stehen, wie sie am Entscheidungstag war; was sich seither geändert hat,
+steht im Nachtrag ganz unten. Der Fünfschalengreifer sitzt weiter in der Vorschau
+(`/greifer.html`), am Bagger hängt unverändert die Sichelkralle (E-009). Auch nach dem
+Umbau ändert sich keine Zeile am gespielten Spiel.
 
 **Was offen ist:** E-009 hat zwei Kennwerte ausdrücklich nicht entschieden — die
 Zylinderneigung (heute 38,90°, Ziel unter 20°) und den Hebelarm (heute 0,0924 m, Ziel
@@ -253,3 +255,24 @@ dem gebauten Stand steht.
    ruhigere Antwort?
 
 Ins Spiel geht nichts, bevor diese Frage beantwortet ist.
+
+---
+
+## Nachtrag 15.09.2026 — was gebaut wurde (E-039)
+
+Patrick hat am Blatt entschieden: **B**. Eingebaut sind die vier Zahlen der Spalte B in
+`src/fuenfschalen/teile.ts` — `MASS.traverse` Ø 0,95, `ZYLINDER_AUFNAHME` (0,465 /
+−0,635), `OBERE_ANBINDUNG` (−0,08 / 0,245), `TRAVERSE_Y` −0,865. Nachgemessen am
+gebauten Modell stimmt jede Zahl der Spalte B auf die Stelle, mit der sie hier steht;
+die fünf Unveränderlichen (Grabtiefe 2,7511 m, Bauhöhe 2,505 m, Hüllkreis 3,232 m,
+Spitzen 142,3 mm, Sektor 26,34°) sind unverändert.
+
+**Was das Blatt nicht wusste:** Wie die Konsole am Zylinderauge aussieht. Gebaut ist sie
+als **Steg zwischen den beiden Naben** — Lagerhülse und Zylinderauge haben denselben
+Außenradius von 85 mm, der Steg läuft bündig von einer zur anderen und ist nirgends
+breiter oder höher als sie. Gemessen vergrößert er die Silhouette einer Schale von der
+Seite um 14,5 cm² von 3.898 cm² (0,37 %), von außen-oben und von vorn um **0,0 cm²**.
+Das Bild dazu: `docs/f5-augenkonsole.png`, links mit Steg, rechts ohne.
+
+**Weiter offen:** Wie Traverse und Drehwerksgehäuse ineinandergreifen, seit die Traverse
+10 cm höher sitzt. Gezeichnet ist es, konstruiert nicht.

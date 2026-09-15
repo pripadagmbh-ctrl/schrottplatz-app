@@ -24,13 +24,21 @@
  *   Adapter           0,00 … −0,40
  *   Rotator          −0,36 … −0,66
  *   Drehwerksgehäuse −0,58 … −0,88
- *   Mitteltraverse   −0,78 … −1,11   (Zylindergabeln bis −0,66)
- *   Stempel          −1,53 … −1,27   (Auge auf −1,5335, Säule bis −0,96)
+ *   Mitteltraverse   −0,69 … −1,02   (Zylindergabeln bis −0,57)
+ *   Stempel          −1,53 … −1,27   (Auge auf −1,5335, Säule bis −0,865)
  *
  * Die beiden unteren Zeilen sind am 14.09.2026 nachgemessen worden, nachdem
  * Traverse und Stempel gekürzt wurden; vorher stand hier −0,80 … −1,20 und
  * −1,49 … −1,84, und die zweite Zeile beschrieb einen Stempel, der unter seine
  * Bolzenebene reichte — das tut er seit dem 13.09. nicht mehr.
+ *
+ * Mit E-039 (15.09.2026) ist die Traverse von −0,78 … −1,11 auf −0,69 … −1,02
+ * gestiegen, ihre Bauhöhe bleibt 0,45 m. Sie schiebt sich dadurch TIEFER ins
+ * Drehwerksgehäuse: Die beiden überdecken sich jetzt 0,19 m statt 0,10 m. Das
+ * ist die offene Konstruktionsfrage aus `docs/f5-traverse.md` — ob der Flansch
+ * im Gehäuse sitzt oder das Gehäuse in der Traverse steckt, ist gezeichnet und
+ * nicht konstruiert. Im Netz stehen sie ineinander, und von außen sieht man
+ * davon nichts.
  */
 import * as THREE from "three";
 import {

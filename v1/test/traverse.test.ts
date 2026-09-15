@@ -28,7 +28,8 @@ import {
 } from "../src/fuenfschalen/teile";
 import { hebelarm, zylinderLaenge, zylinderNeigung } from "../src/fuenfschalen/rig";
 import {
-  HEUTE,
+  GEBAUT,
+  VOR_E039,
   arbeitspunkt,
   aufnahmeFuer,
   haeltVertrag,
@@ -46,7 +47,7 @@ describe("Traversenblatt — die Rechnung", () => {
      * über den ganzen Öffnungsweg, nicht nur an den Enden: Genau dazwischen
      * liegen der größte Neigungswinkel und der kleinste Hebelarm.
      */
-    const k = kennwerte(HEUTE);
+    const k = kennwerte(GEBAUT);
     let neigungMax = 0;
     let hebelMin = Infinity;
     for (let i = 0; i <= 60; i++) {
@@ -60,15 +61,46 @@ describe("Traversenblatt — die Rechnung", () => {
     expect(k.laengeOffen).toBeCloseTo(zylinderLaenge(OFFEN), 6);
   });
 
-  it("beschreibt mit Variante A genau den gebauten Stand", () => {
-    expect(A.Zr).toBeCloseTo(ZYLINDER_AUFNAHME.r, 9);
-    expect(A.Zy).toBeCloseTo(ZYLINDER_AUFNAHME.y, 9);
-    expect(A.Ay).toBeCloseTo(OBERE_ANBINDUNG.y, 9);
-    expect(A.Az).toBeCloseTo(OBERE_ANBINDUNG.z, 9);
-    expect(A.durchmesser).toBeCloseTo(MASS.traverse.breite, 9);
-    expect(traverseAus(A.Zr)).toBeCloseTo(MASS.traverse.breite, 9);
-    /* Und A rührt die Traverse nicht an. */
+  it("beschreibt mit Variante B genau den gebauten Stand", () => {
+    /*
+     * Bis E-039 stand hier A. Seit dem 15.09.2026 ist B gebaut, und dieser
+     * Wächter ist die Klammer zwischen Blatt und Bauteil: Wer eine der vier
+     * Zahlen in `teile.ts` ändert, ohne das Blatt mitzuziehen, wird hier rot.
+     */
+    expect(B.Zr).toBeCloseTo(ZYLINDER_AUFNAHME.r, 9);
+    expect(B.Zy).toBeCloseTo(ZYLINDER_AUFNAHME.y, 9);
+    expect(B.Ay).toBeCloseTo(OBERE_ANBINDUNG.y, 9);
+    expect(B.Az).toBeCloseTo(OBERE_ANBINDUNG.z, 9);
+    expect(B.durchmesser).toBeCloseTo(MASS.traverse.breite, 9);
+    expect(traverseAus(B.Zr)).toBeCloseTo(MASS.traverse.breite, 9);
+    /* Die Traverse folgt ihrer Aufnahme — 9,5 cm hoch, auf −0,865. */
+    expect(traverseHoehe(B.Zy)).toBeCloseTo(-0.865, 9);
     expect(traverseHoehe(A.Zy)).toBeCloseTo(-0.96, 9);
+    /*
+     * Und der Abstand Aufnahme–Traversenmitte bleibt 0,23 m. Daran hängt die
+     * Bauhöhe von 0,45 m und der Gabelfuß, der 9 cm in den Flansch greift.
+     */
+    expect(ZYLINDER_AUFNAHME.y - traverseHoehe(B.Zy)).toBeCloseTo(0.23, 9);
+  });
+
+  it("hält am gebauten Stand die Kennwerte, wegen derer umgebaut wurde", () => {
+    /*
+     * Die Zahlen des Blattes vom 15.09.2026, Spalte B. Sie stehen hier als
+     * ABSOLUTE Werte und nicht als „besser als vorher": Ein Wächter, der nur
+     * eine Richtung prüft, lässt jede Zwischenstufe durch.
+     *
+     * Mit der alten Anlenkung (A) meldet er 38,90° statt 24,44° und 0,0924 m
+     * statt 0,1179 m — nachgestellt am 15.09.2026, er wird rot.
+     */
+    const k = kennwerte(GEBAUT);
+    expect(k.neigungOffen).toBeCloseTo(15.4, 1);
+    expect(k.neigungZu).toBeCloseTo(20.7, 1);
+    expect(k.neigungMax).toBeCloseTo(24.4, 1);
+    expect(k.hebelZu).toBeCloseTo(0.201, 3);
+    expect(k.hebelMin).toBeCloseTo(0.118, 3);
+    /* +28 % Schließkraft an der schwächsten Stelle gegen den Stand bis E-039. */
+    const alt = kennwerte(VOR_E039);
+    expect(k.hebelMin / alt.hebelMin).toBeCloseTo(1.28, 2);
   });
 
   it("hält mit allen drei Varianten den Vertrag der Anlenkung", () => {
@@ -118,9 +150,12 @@ describe("Traversenblatt — die harten Bedingungen", () => {
     for (const m of gemessen) {
       expect(m.grabtiefe, `${m.name} gräbt anders tief`).toBeCloseTo(gemessen[0]!.grabtiefe, 6);
     }
-    /* Und sie liegt dort, wo sie am 14.09. lag. */
-    expect(gemessen[0]!.grabtiefe).toBeGreaterThan(2.7);
-    expect(gemessen[0]!.grabtiefe).toBeLessThan(2.8);
+    /*
+     * Und sie liegt auf den Zehntelmillimeter dort, wo sie am 14.09. lag.
+     * `toBeGreaterThan(2.7)` stand hier und hätte jede Variante durchgelassen,
+     * die 4 cm tiefer gräbt — 2,7511 m ist die Zahl, die gilt.
+     */
+    expect(gemessen[0]!.grabtiefe).toBeCloseTo(2.7511, 4);
   });
 
   it("lässt die fünf Spitzen weiterhin zusammenlaufen", () => {
@@ -146,6 +181,12 @@ describe("Traversenblatt — die harten Bedingungen", () => {
     }
     /* Der Hüllkreis bleibt unter dem Platzmaß der Sichelkralle (E-009). */
     expect(gemessen[0]!.huellkreis).toBeLessThan(3.3805);
+    /* Die fünf Unveränderlichen des Auftrags E-039, als Zahlen. */
+    expect(gemessen[0]!.bauhoehe).toBeCloseTo(2.505, 3);
+    expect(gemessen[0]!.huellkreis).toBeCloseTo(3.232, 3);
+    expect(gemessen[0]!.breiteZu).toBeCloseTo(2.19, 3);
+    expect(gemessen[0]!.spitzenAufAchse * 1000).toBeCloseTo(142.3, 1);
+    expect(gemessen[0]!.sektor).toBeCloseTo(26.34, 2);
   });
 
   it("meldet ehrlich, wo das Zylinderauge den Gusskörper verlässt", () => {
@@ -170,12 +211,12 @@ describe("Traversenblatt — die harten Bedingungen", () => {
      * messen, die niemand gebaut hat — und es fiele niemandem auf.
      */
     miss(C, false);
-    expect(ZYLINDER_AUFNAHME.r).toBeCloseTo(0.34, 9);
-    expect(ZYLINDER_AUFNAHME.y).toBeCloseTo(-0.73, 9);
-    expect(OBERE_ANBINDUNG.y).toBeCloseTo(0, 9);
-    expect(OBERE_ANBINDUNG.z).toBeCloseTo(0.31, 9);
-    expect(MASS.traverse.breite).toBeCloseTo(0.7, 9);
-    expect(MASS.traverse.tiefe).toBeCloseTo(0.7, 9);
+    expect(ZYLINDER_AUFNAHME.r).toBeCloseTo(0.465, 9);
+    expect(ZYLINDER_AUFNAHME.y).toBeCloseTo(-0.635, 9);
+    expect(OBERE_ANBINDUNG.y).toBeCloseTo(-0.08, 9);
+    expect(OBERE_ANBINDUNG.z).toBeCloseTo(0.245, 9);
+    expect(MASS.traverse.breite).toBeCloseTo(0.95, 9);
+    expect(MASS.traverse.tiefe).toBeCloseTo(0.95, 9);
   });
 });
 

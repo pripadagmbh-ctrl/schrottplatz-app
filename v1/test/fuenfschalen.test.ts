@@ -15,6 +15,7 @@ import {
   SCHALEN_ABSCHNITTE,
   STEMPEL_AUGE,
   TRAVERSE_Y,
+  ZYLINDER_AUFNAHME,
   ZU,
   mittellinie,
   schalenStationen,
@@ -179,29 +180,39 @@ describe("Fünfschalen — Zylinder", () => {
   });
 
   /*
-   * ACHTUNG, offene Frage (14.09.2026): Die Sichelkralle hält an dieser Stelle
-   * 20° Neigung und 0,10 m Hebelarm ein. Diese Form tut es NICHT — gemessen
-   * 38,9° bei 40 % Öffnung und 0,092 m ganz offen. Beides ist unverändert aus
-   * dem Archiv (alt wie neu dieselbe Zahl) und folgt allein aus der Anlenkung
-   * `ZYLINDER_AUFNAHME` (r 0,34 / y −0,73), `STEMPEL_AUGE` (r 0,59 / y −1,5335)
-   * und `OBERE_ANBINDUNG` (z 0,31). Die sind der Formvertrag und dürfen in
-   * diesem Paket nicht angefasst werden.
+   * BEANTWORTET am 15.09.2026 (E-039). Hier stand bis dahin:
    *
-   * Die beiden Wächter stehen deshalb auf dem GEMESSENEN Stand: Sie halten
-   * fest, dass es nicht schlechter wird. Ob die Anlenkung nachgerechnet werden
-   * soll, entscheidet der Auftraggeber — es ist der einzige Weg zu 20°/0,10 m.
+   *   „Die Sichelkralle hält an dieser Stelle 20° Neigung und 0,10 m Hebelarm
+   *   ein. Diese Form tut es NICHT — gemessen 38,9° bei 40 % Öffnung und
+   *   0,092 m ganz offen. … Ob die Anlenkung nachgerechnet werden soll,
+   *   entscheidet der Auftraggeber — es ist der einzige Weg zu 20°/0,10 m."
+   *
+   * Sie ist nachgerechnet und umgebaut: Traverse Ø 0,95, Aufnahme (0,465 /
+   * −0,635), Schalenauge (−0,08 / 0,245). Gemessen sind es jetzt 24,4° und
+   * 0,118 m. Das Hebelarmziel ist erreicht, das 20°-Ziel nicht — dafür hätte
+   * es Ø 1,10 gebraucht, und der Kopf wäre halb so breit wie der geschlossene
+   * Korb geworden (`docs/f5-traverse.md`).
+   *
+   * Die beiden Wächter stehen deshalb wieder auf dem GEMESSENEN Stand — jetzt
+   * aber eng: 25° statt 39°, 0,115 m statt 0,09 m. Weit gesetzte Grenzen
+   * hätten den Umbau nicht bemerkt.
    */
-  it("steht nicht quer über dem Kopf — Neigung bleibt, wo sie ist", () => {
+  it("steht nicht quer über dem Kopf — Neigung bleibt unter 25°", () => {
     for (let s = 0; s <= 20; s++) {
       const grad = (zylinderNeigung(schwenkFuer(s / 20)) * 180) / Math.PI;
-      expect(grad, `Öffnung ${s / 20}: ${grad.toFixed(0)}°`).toBeLessThan(39);
+      expect(grad, `Öffnung ${s / 20}: ${grad.toFixed(1)}°`).toBeLessThan(25);
     }
+    /* Offen steht er am flachsten, geschlossen am steilsten — beide gemessen. */
+    expect((zylinderNeigung(OFFEN) * 180) / Math.PI).toBeCloseTo(15.4, 1);
+    expect((zylinderNeigung(ZU) * 180) / Math.PI).toBeCloseTo(20.7, 1);
   });
 
   it("hat einen Hebelarm, der über den ganzen Weg trägt", () => {
     for (let s = 0; s <= 20; s++) {
-      expect(hebelarm(schwenkFuer(s / 20)), `Öffnung ${s / 20}`).toBeGreaterThan(0.09);
+      expect(hebelarm(schwenkFuer(s / 20)), `Öffnung ${s / 20}`).toBeGreaterThan(0.115);
     }
+    /* Die schwächste Stelle ist die offene — dort wird in den Haufen gestochen. */
+    expect(hebelarm(OFFEN), "Hebelarm offen").toBeCloseTo(0.118, 3);
     /* Kein Totpunkt beim SCHLIESSEN — dort wird die Kraft gebraucht. */
     expect(hebelarm(ZU), "Hebelarm geschlossen").toBeGreaterThan(0.2);
   });
@@ -224,6 +235,45 @@ describe("Fünfschalen — Mittelsäule", () => {
     for (let i = 1; i <= MASS.schalen; i++) {
       const gabel = kasten(`04_ZYLINDERAUFNAHME_${String(i).padStart(2, "0")}`);
       expect(koerper.max.y - gabel.min.y, `Gabel ${i} schwebt über der Traverse`).toBeGreaterThan(0);
+    }
+  });
+
+  it("sitzt auf −0,865 und bleibt 0,45 m hoch über alles (E-039)", () => {
+    /*
+     * Die Positionsliste nennt für Position 4 „Ø 0,70 × 0,45". Der Durchmesser
+     * ist mit E-039 auf 0,95 gegangen, die 0,45 nicht — sie sind die Bauhöhe
+     * der ganzen Traverse MIT ihren fünf Zylindergabeln, und die hängt daran,
+     * dass Aufnahme und Traversenmitte ihren Abstand von 0,23 m behalten.
+     *
+     * Gemessen über die Knoten, nicht gerechnet: Grundkörper, Oberflansch und
+     * die fünf Gabeln zusammen.
+     */
+    let alles = kasten("04_GRUNDKOERPER").union(kasten("04_OBERFLANSCH"));
+    for (let i = 1; i <= MASS.schalen; i++)
+      alles = alles.union(kasten(`04_ZYLINDERAUFNAHME_${String(i).padStart(2, "0")}`));
+    /* Gemessen 0,4482 m — die Fase am Gabelfuß nimmt die letzten 2 mm. */
+    expect(
+      alles.max.y - alles.min.y,
+      `Bauhöhe der Traverse: ${alles.min.y.toFixed(4)} … ${alles.max.y.toFixed(4)}`
+    ).toBeCloseTo(0.448, 3);
+    expect(TRAVERSE_Y, "Einbauhöhe").toBeCloseTo(-0.865, 9);
+    /*
+     * Und der Rand des Grundkörpers liegt AUSSERHALB der Zylinderaufnahme —
+     * sonst steckt die Gabel im eigenen Körper statt auf seinem Rand. Das war
+     * der Fehler, den die Ø-0,75-Zeile am 14.09.2026 hatte.
+     */
+    expect(MASS.traverse.breite / 2, "Gabel steckt im Grundkörper").toBeGreaterThan(
+      ZYLINDER_AUFNAHME.r
+    );
+    /* Jede Gabel sitzt auf dem Bolzenkreis, gemessen über ihren Knoten. */
+    for (let i = 1; i <= MASS.schalen; i++) {
+      const m = kasten(`04_ZYLINDERAUFNAHME_${String(i).padStart(2, "0")}`).getCenter(
+        new THREE.Vector3()
+      );
+      expect(Math.hypot(m.x, m.z), `Gabel ${i} nicht auf r ${ZYLINDER_AUFNAHME.r}`).toBeCloseTo(
+        ZYLINDER_AUFNAHME.r,
+        2
+      );
     }
   });
 

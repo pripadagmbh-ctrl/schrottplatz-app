@@ -37,6 +37,7 @@ import {
   MASS,
   OBERE_ANBINDUNG,
   STEMPEL_AUGE,
+  TRAVERSE_Y,
   ZU,
   ZYLINDER_AUFNAHME,
   mittellinie,
@@ -272,8 +273,15 @@ export interface Messung {
   schattenSchalen: number;
 }
 
-/** Einbauhoehe der Traverse im gebauten Stand — `LAGE.traverse` aus `rig.ts`. */
-const LAGE_TRAVERSE = traverseHoehe(-0.73);
+/**
+ * Einbauhoehe der Traverse im gebauten Stand — `LAGE.traverse` aus `rig.ts`.
+ *
+ * Hier stand `traverseHoehe(-0.73)`, also die Aufnahmehoehe der Variante A als
+ * feste Zahl. Das war richtig, solange A gebaut war, und wurde mit E-039 zur
+ * Falle: Nach dem Umbau haette das Werkzeug jede Variante um 9,5 cm versetzt
+ * gemessen. `TRAVERSE_Y` sagt dasselbe, ohne eine Variante zu kennen.
+ */
+const LAGE_TRAVERSE = TRAVERSE_Y;
 
 const URSPRUNG = {
   Zr: ZYLINDER_AUFNAHME.r,

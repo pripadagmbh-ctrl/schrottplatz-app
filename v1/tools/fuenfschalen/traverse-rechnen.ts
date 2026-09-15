@@ -32,7 +32,13 @@
  *
  * Diese Datei rechnet nur. Die Tabellen dazu druckt `traverse.ts`.
  */
-import { OBERE_ANBINDUNG, OFFEN, STEMPEL_AUGE, ZU } from "../../src/fuenfschalen/teile";
+import {
+  OBERE_ANBINDUNG,
+  OFFEN,
+  STEMPEL_AUGE,
+  ZU,
+  ZYLINDER_AUFNAHME,
+} from "../../src/fuenfschalen/teile";
 
 /** Rohrlaenge des Zylinders: MASS.zylinder.laenge * 0,6 — wie in `anlenkung.ts`. */
 const ROHR = 0.42;
@@ -146,7 +152,32 @@ export function haeltVertrag(k: Kennwert): boolean {
   return k.hub >= 0.15 && k.laengeMin >= ROHR + 0.02 && k.laengeMax <= 1.05 && k.hebelZu > 0.2;
 }
 
-export const HEUTE: Anlenkung = { Zr: 0.34, Zy: -0.73, Ay: OBERE_ANBINDUNG.y, Az: OBERE_ANBINDUNG.z };
+/**
+ * Der Stand BIS E-039 — Variante A, Ø 0,70.
+ *
+ * Hieß bis zum 15.09.2026 `HEUTE` und las `Ay`/`Az` aus `teile.ts`. Beides ist
+ * mit dem Umbau falsch geworden: Gebaut ist seitdem B, und ein `HEUTE`, das
+ * gestern meint, ist genau die Art Name, an der man sich verrechnet. Die vier
+ * Zahlen stehen jetzt ausgeschrieben da, weil dieses Blatt sie als FESTEN
+ * Vergleichspunkt braucht — die Tabellen in `traverse.ts` zeigen, was ein
+ * Durchmesser gegenueber diesem Stand bringt.
+ */
+export const VOR_E039: Anlenkung = { Zr: 0.34, Zy: -0.73, Ay: 0, Az: 0.31 };
+
+/**
+ * Der GEBAUTE Stand — abgelesen aus `teile.ts`, nicht abgeschrieben.
+ *
+ * Beim Laden des Moduls gelesen, also bevor `traverse-messen.ts` irgendetwas
+ * umsetzen kann. Daran haengt der Waechter, der die Rechnung dieses Blattes
+ * gegen `rig.ts` haelt: Beide muessen dieselbe Anlenkung meinen, sonst prueft
+ * er nichts.
+ */
+export const GEBAUT: Anlenkung = {
+  Zr: ZYLINDER_AUFNAHME.r,
+  Zy: ZYLINDER_AUFNAHME.y,
+  Ay: OBERE_ANBINDUNG.y,
+  Az: OBERE_ANBINDUNG.z,
+};
 
 /* --------------------------------------------------- Suche je Durchmesser */
 

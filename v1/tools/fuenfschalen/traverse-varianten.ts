@@ -48,15 +48,23 @@ export interface Variante {
  * dem Koerper, an dem sie angeschweisst sein sollen. Genau dieser Fehler stand
  * am 14.09. im Code (Aufnahme −0,80, Gabel gezeichnet bei −1,14).
  *
- * Gerechnet wird gegen `A.Zy`, nicht gegen `ZYLINDER_AUFNAHME.y`: Das
+ * Gerechnet wird gegen `GEBAUT.Zy`, nicht gegen `ZYLINDER_AUFNAHME.y`: Das
  * Messwerkzeug setzt diesen Wert vor jedem Bau um, ein Bezug darauf waere von
- * der Aufrufreihenfolge abhaengig.
+ * der Aufrufreihenfolge abhaengig. `TRAVERSE_Y` dagegen ist eine Konstante und
+ * beschreibt die Einbauhoehe der gebauten Variante — beide Enden des Bezugs
+ * gehoeren also zusammen und wandern gemeinsam.
  */
 export function traverseHoehe(Zy: number): number {
-  return TRAVERSE_Y + (Zy - A.Zy);
+  return TRAVERSE_Y + (Zy - GEBAUT.Zy);
 }
 
-/** A — der gebaute Stand. Ø 0,70 × 0,45 nach Positionsliste (E-009). */
+/**
+ * A — der Stand bis E-039. Ø 0,70 × 0,45 nach Positionsliste (E-009).
+ *
+ * Bis zum 15.09.2026 war das der gebaute Greifer; seitdem ist es `B`. A bleibt
+ * hier stehen, weil das Blatt vom 15.09.2026 drei Spalten hat und die erste
+ * zeigt, wogegen entschieden wurde.
+ */
 export const A: Variante = {
   name: "A  Ø 0,70",
   kurz: "A",
@@ -65,7 +73,7 @@ export const A: Variante = {
   Zy: -0.73,
   Ay: 0,
   Az: 0.31,
-  ruf: "wie heute gebaut",
+  ruf: "der Stand bis E-039",
   aussehen: "schlank",
 };
 
@@ -83,12 +91,17 @@ export const A_NACHGESTELLT: Variante = {
 };
 
 /**
- * B — mein Vorschlag, Ø 0,95.
+ * B — Ø 0,95, seit E-039 der GEBAUTE Stand.
  *
  * Der kleinste Durchmesser, dessen flachster Arbeitspunkt noch denselben
  * Hebelarm traegt wie die Ø-1,10-Loesung (0,1179 m). Ø 0,90 kommt dort nur auf
  * 0,1003 m — es steht auf dem Ziel, nicht darueber. Ø 0,95 kauft damit rund
  * drei Viertel des Neigungsgewinns fuer knapp zwei Drittel des Zuwachses.
+ *
+ * Patrick hat am 15.09.2026 am Blatt entschieden. Seitdem stehen diese vier
+ * Zahlen auch in `src/fuenfschalen/teile.ts`; der Waechter
+ * „beschreibt mit Variante B genau den gebauten Stand" haelt beide Stellen
+ * zusammen.
  */
 export const B: Variante = {
   name: "B  Ø 0,95",
@@ -98,9 +111,17 @@ export const B: Variante = {
   Zy: -0.635,
   Ay: -0.08,
   Az: 0.245,
-  ruf: "die mittlere",
+  ruf: "wie heute gebaut",
   aussehen: "kräftig",
 };
+
+/**
+ * Welche Variante GEBAUT ist — die einzige Stelle, an der das steht.
+ *
+ * `traverseHoehe` und die Waechter haengen daran. Wird der Greifer je wieder
+ * umgebaut, wandert diese eine Zeile mit, und alles andere folgt.
+ */
+export const GEBAUT: Variante = B;
 
 /** C — der Vorschlag aus E-009. Kleinste Traverse, die BEIDE Ziele haelt. */
 export const C: Variante = {

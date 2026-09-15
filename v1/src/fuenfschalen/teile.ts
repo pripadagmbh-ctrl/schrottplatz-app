@@ -147,6 +147,13 @@ function verstVorn(): number {
  *
  *   Gesamt geschlossen: 1,85 m hoch, 1,60 m breit, 1.200 l Schüttgut
  *
+ * Nachtrag 15.09.2026 (E-039): Position 4 steht hier weiter mit Ø 0,70 — so
+ * nennt die Positionsliste sie, und das bleibt stehen. GEBAUT ist sie seit
+ * E-039 mit Ø 0,95. Die Liste beschreibt ein Gerät, dessen Zylinder 38,9° quer
+ * über dem Kopf stehen und dessen Hebelarm beim Zubeißen auf 0,092 m fällt;
+ * beides ist gemessen und beides war der Grund für das Traversenblatt vom
+ * 15.09.2026. Warum die Traverse dafür wachsen MUSS, steht bei `MASS.traverse`.
+ *
  * Zwei Dinge macht die Datei anders als das Spielmodell:
  *
  *   - **Hülsengelenke sind echte Hülsen.** Ein Auge ist ein Rohr mit Bohrung,
@@ -165,20 +172,35 @@ export const MASS = {
   rotator: { breite: 0.4, tiefe: 0.4, hoehe: 0.3 },
   drehwerksgehaeuse: { breite: 0.5, tiefe: 0.45, hoehe: 0.3 },
   /*
-   * Ø 0,70 × 0,45 — so, wie die Positionsliste es oben nennt.
+   * Ø 0,95 × 0,45 — Variante B des Traversenblattes (E-039, 15.09.2026).
    *
-   * Im Code stand 0,75 × 0,55 × 0,40, und das war an zwei Stellen falsch: Die
-   * Liste nennt einen RUNDEN Koerper (Ø 0,70), also ist „tiefe" dasselbe Mass
-   * wie „breite" — die 0,55 hat nie jemand gelesen, `baueMitteltraverse`
-   * benutzt sie nicht. Und mit Ø 0,75 stand der Rand des Koerpers auf r 0,375,
-   * also AUSSERHALB der Zylinderaufnahme auf r 0,34: Die Gabel steckte im
-   * eigenen Grundkoerper. Mit Ø 0,70 sitzt sie auf dem Rand.
+   * Bis dahin Ø 0,70 nach Positionsliste. Die Traverse traegt die fuenf
+   * Zylinderaufnahmen; ihr Radius IST `ZYLINDER_AUFNAHME.r` plus dem Rand von
+   * 0,01 m. Damit ist sie die Tuer zu den beiden Kennwerten, die E-009 offen
+   * gelassen hat — Zylinderneigung und Hebelarm. Gerechnet in
+   * `tools/fuenfschalen/traverse-rechnen.ts`, gemessen am gebauten Modell in
+   * `traverse-messen.ts`, entschieden am Blatt
+   * `docs/f5-traverse-2026-09-15.svg`:
+   *
+   *   Ø 0,70 (bis E-039)   Neigung groesste 38,9°   Hebelarm offen 0,092 m
+   *   Ø 0,95 (E-039)       Neigung groesste 24,4°   Hebelarm offen 0,118 m
+   *
+   * Ø 0,95 ist der kleinste Durchmesser, dessen flachster Arbeitspunkt noch
+   * denselben Hebelarm traegt wie die Ø-1,10-Loesung (0,1179 m gegen 0,1179 m);
+   * Ø 0,90 kommt dort nur auf 0,1003 m. Der Preis steht in der Muendung: von
+   * oben zugebaut 52 % → 61 % (gemessen, `traverse-korb.ts`).
+   *
+   * Warum „tiefe" dasselbe Mass ist wie „breite": Die Positionsliste nennt
+   * einen RUNDEN Koerper, `baueMitteltraverse` liest nur `breite`. Und der Rand
+   * des Grundkoerpers (r 0,475) muss AUSSERHALB der Zylinderaufnahme (r 0,465)
+   * liegen — sonst steckt die Gabel im eigenen Koerper statt auf seinem Rand.
    *
    * Die 0,45 sind die Bauhoehe der ganzen Traverse mit ihren Zylindergabeln,
    * nicht die des Grundkoerpers; sie ergeben sich aus `TRAVERSE_Y` (gemessen
-   * 14.09.2026: 0,45 m ueber alles).
+   * 14.09.2026: 0,45 m ueber alles) und bleiben es, weil Aufnahme und Traverse
+   * um denselben Betrag gestiegen sind.
    */
-  traverse: { breite: 0.7, tiefe: 0.7, hoehe: 0.4 },
+  traverse: { breite: 0.95, tiefe: 0.95, hoehe: 0.4 },
   zylinder: { laenge: 0.7, breite: 0.2, durchmesser: 0.12 },
   schale: { laenge: 1.2, breite: 0.4, tiefe: 0.3 },
   spitze: { laenge: 0.25, breite: 0.12, dicke: 0.08 },
@@ -334,10 +356,28 @@ export const ZU = 0;
  * Schrott einstechen koennen.
  */
 export const OFFEN = SCHALEN_ABSCHNITTE * SCHALEN_BOGEN - SCHALEN_BOGEN / 2;
-/** Obere Schalenanbindung — wo der Zylinder angreift, im Frame des Drehpunkts. */
-export const OBERE_ANBINDUNG = { y: 0, z: 0.31 };
-/** Oberer Zylinderanschluss an der Mitteltraverse, im Frame des Greifers. */
-export const ZYLINDER_AUFNAHME = { r: 0.34, y: -0.73 };
+/**
+ * Obere Schalenanbindung — wo der Zylinder angreift, im Frame des Drehpunkts.
+ *
+ * Von (0 / 0,31) auf (−0,08 / 0,245) gerueckt (E-039, 15.09.2026). Das Auge
+ * allein zu versetzen bringt nichts und die Traverse allein zu vergroessern
+ * macht es schlechter — beides zusammen ist die Loesung. Das Auge wandert
+ * dabei 8 cm die Schale hinunter und 6,5 cm auf den Bolzen zu.
+ *
+ * Woher: `tools/fuenfschalen/traverse-rechnen.ts` rastert je Durchmesser alle
+ * Anlenkungen ab, die den Vertrag aus `anlenkung.ts` halten, und waehlt den
+ * flachsten Zylinder unter denen mit Hebelarm ueber dem E-009-Ziel 0,10 m.
+ */
+export const OBERE_ANBINDUNG = { y: -0.08, z: 0.245 };
+/**
+ * Oberer Zylinderanschluss an der Mitteltraverse, im Frame des Greifers.
+ *
+ * Von (0,34 / −0,73) auf (0,465 / −0,635) gerueckt (E-039, 15.09.2026). Der
+ * Radius folgt dem Traversendurchmesser Ø 0,95 (`MASS.traverse`), die Hoehe
+ * der Anlenkungsrechnung. `TRAVERSE_Y` steigt um denselben Betrag mit — sonst
+ * schweben die fuenf Gabeln neben dem Koerper, an dem sie sitzen.
+ */
+export const ZYLINDER_AUFNAHME = { r: 0.465, y: -0.635 };
 /**
  * Höhe der Mitteltraverse im Frame des Greifers (m).
  *
@@ -351,12 +391,20 @@ export const ZYLINDER_AUFNAHME = { r: 0.34, y: -0.73 };
  * 0,1425 m unter ihrem Auge und steht 0,07 m darueber; der Grundkoerper reicht
  * 0,15 m unter die Traversenmitte. Mit −1,00 endete er 6,6 cm UNTER dem
  * Gabelfuss — die fuenf Gabeln schwebten frei neben dem Bauteil, an dem sie
- * angeschweisst sein sollen. Mit −0,96 greift der Gabelfuss um 9 cm in den
- * Flansch, und die Bauhoehe der ganzen Traverse ist
+ * angeschweisst sein sollen. Mit −0,96 griff der Gabelfuss um 9 cm in den
+ * Flansch, und die Bauhoehe der ganzen Traverse war
  *   (−0,73 − TRAVERSE_Y) + 0,07 + 0,15 = 0,45 m
  * — genau das Mass der Positionsliste.
+ *
+ * Von −0,96 auf −0,865 gerueckt (E-039, 15.09.2026). Das ist kein neuer
+ * Gedanke, sondern dieselbe Regel: Die Aufnahme ist mit `ZYLINDER_AUFNAHME.y`
+ * von −0,73 auf −0,635 gestiegen, also steigt die Traverse um dieselben
+ * 0,095 m. Der Abstand Aufnahme−Traverse bleibt damit 0,23 m, der Gabelfuss
+ * greift weiter 9 cm in den Flansch und die Bauhoehe bleibt 0,45 m. Die
+ * Traverse rueckt dadurch 10 cm hoch, unter das Drehwerksgehaeuse — das ist
+ * Teil der Loesung und auf dem Blatt gezeichnet.
  */
-export const TRAVERSE_Y = -0.96;
+export const TRAVERSE_Y = -0.865;
 
 /** Schwenkwinkel zu einem Öffnungsgrad 0 (zu) … 1 (offen). */
 export function schwenkFuer(oeffnung: number): number {
@@ -519,6 +567,15 @@ export function fersenStationen(
   }
   return aus;
 }
+
+/**
+ * Aussenradius beider Naben am Zinken (m) — Lagerhuelse wie Zylinderauge.
+ *
+ * Dass es dieselbe Zahl ist, ist keine Bequemlichkeit: Der Steg zwischen den
+ * beiden (`06_AUGENKONSOLE`) ist genau so hoch wie sie und laeuft damit
+ * buendig von Nabe zu Nabe, ohne Absatz an beiden Enden.
+ */
+export const AUGE_R = 0.085;
 
 /**
  * Das Schalenende, wie es die gebaute Schale wirklich hat.
@@ -950,12 +1007,17 @@ export function baueDrehwerksgehaeuse(st: Stoffe): THREE.Group {
 /* ------------------------------------------------------ 04 Mitteltraverse */
 
 /**
- * Mitteltraverse — 0,75 × 0,55 × 0,40 m, die zentrale Baugruppe.
+ * Mitteltraverse — Ø 0,95 × 0,45 m, die zentrale Baugruppe.
  *
  * Oben der Flansch zum Drehwerk, rundum fünf Gabeln für die oberen
  * Zylinderanschlüsse. Die Schalen hängen NICHT hier — das war mein Fehler bis
  * zur zweiten Fassung der Zeichnung. Sie hängen am Stempel (Position 9); die
  * Traverse trägt nur die Zylinder und den Stempel selbst.
+ *
+ * Hier stand „0,75 × 0,55 × 0,40 m" — schon vor E-039 falsch: `MASS.traverse`
+ * nannte seit dem 14.09.2026 Ø 0,70, und die 0,55 hat nie jemand gelesen.
+ * Seit E-039 sind es Ø 0,95 und 0,45 m über alles; die Maße stehen bei
+ * `MASS.traverse`, hier steht nur, woraus das Bauteil besteht.
  */
 export function baueMitteltraverse(st: Stoffe): THREE.Group {
   const g = new THREE.Group();
@@ -1558,14 +1620,104 @@ export function baueGreiferschale(
    * durchgehend, es steht nichts mehr davor. `OBERE_ANBINDUNG` selbst bleibt
    * unverändert; daran hängt die ganze Zylinderkinematik.
    */
-  const zylinderauge = new THREE.Mesh(rohr(0.085, 0.032, STREBE_B_OBEN + 0.06), st.guss);
+  const zylinderauge = new THREE.Mesh(rohr(AUGE_R, 0.032, STREBE_B_OBEN + 0.06), st.guss);
   zylinderauge.name = "06_ZYLINDERAUGE";
   zylinderauge.position.set(0, OBERE_ANBINDUNG.y, OBERE_ANBINDUNG.z + schub);
   g.add(zylinderauge);
   /*
+   * DER HALS ZWISCHEN NABE UND KERN — die Konsole, so klein wie sie sein darf.
+   *
+   * Mit E-039 rueckt das Auge von (0 / 0,31) auf (−0,08 / 0,245). Gemessen
+   * (`tools/fuenfschalen/augensonde.ts`) steht der Bohrungsmittelpunkt danach
+   * 26 mm vor dem Gusskoerper; 28 von 72 Punkten des Nabenrandes stecken noch
+   * darin, die uebrigen haengen frei. Ohne Werkstoff dazwischen schwebte die
+   * Nabe unter der Ferse — schlimmer als jede Konsole.
+   *
+   * E-013 hat genau so ein Teil abgeschafft („der Zinken ist ein Gussstueck,
+   * ein Element, kein Stempel guckt heraus"). Drei Dinge halten den Rueckschritt
+   * so klein wie moeglich:
+   *
+   *   1. DERSELBE WERKSTOFF, KEINE NAHT. `st.guss`, keine Kehlnaht, gefaste
+   *      Laengskanten wie am Zinken — der Hals liest sich als Teil des
+   *      Gussstuecks, nicht als angeschweisster Sockel.
+   *   2. NIE BREITER ALS DIE NABE. Quer zur Bahn misst er 2 · `AUGE_R`, also
+   *      genau den Aussendurchmesser des Auges. In der Seitenansicht — der
+   *      Ansicht, in der Patrick die Form liest — verschwindet er damit hinter
+   *      der Nabe: Die Silhouette zeigt den Nabenkreis und sonst nichts.
+   *      Ein Stempel ist etwas, das ueber seinen Anschluss hinaussteht; das
+   *      kann dieser Koerper nicht.
+   *   3. ER LAEUFT VON NABE ZU NABE, NICHT VON DER HAUT ZUM AUGE. Sein Fuss
+   *      sitzt auf der LAGERHUELSE — dem Bolzen, Ursprung dieses Frames —, und
+   *      beide Naben haben denselben Aussenradius `AUGE_R`. Damit ist er der
+   *      Steg zwischen zwei gleich hohen Naben, so wie ihn jedes Gussstueck
+   *      hat, das zwei Bohrungen verbindet. Von seiner Laenge liegen die
+   *      ersten rund vier Fuenftel im Werkstoff der Ferse; frei steht nur der Rest.
+   *      Sass das Auge im Guss (so war es bis E-039), liegt er bis auf einen
+   *      Rest darin — nachgestellt mit der Anlenkung A verdeckt er noch
+   *      0,015 m² mehr vom Schlund, sonst nichts. Deshalb gibt es keine
+   *      Fallunterscheidung, die man vergessen koennte.
+   *
+   * WAS ER KOSTET, gemessen: 6 l Korb von 1.615 l. Das ist genau der Rest,
+   * der frei steht — 26 mm bei einem Querschnitt von 170 x 280 mm, fuenfmal.
+   * Die 1.529 l auf dem Blatt vom 15.09.2026 sind ohne ihn gerechnet, weil es
+   * ihn da noch nicht gab; mit ihm sind es 1.523 l, und der Stand bis E-039
+   * kommt, gleich gemessen, auf 1.520 l.
+   *
+   * Nicht genommen: den Fuss auf die naechste Stelle der Fersenkurve zu legen.
+   * Die liegt bei Station 0, also schraeg nach AUSSEN — der Steg haette dann
+   * quer unter der Schalenhaut gelegen statt laengs zum Bolzen, und genau das
+   * liest sich als angesetzte Rippe.
+   */
+  const halsY = OBERE_ANBINDUNG.y;
+  const halsZ = OBERE_ANBINDUNG.z + schub;
+  const halsL = Math.hypot(halsY, halsZ);
+  /*
+   * BEIDE BOHRUNGEN BLEIBEN FREI — der Steg endet 60 mm vor jeder Nabenmitte.
+   *
+   * Von Mitte zu Mitte gezogen legte er sich ueber beide Bohrungen und
+   * schloss jede zur Haelfte; im Umriss stand statt eines Loches ein
+   * halbmondfoermiger Schlitz. Ein Lagerauge, durch das kein Bolzen passt, ist
+   * im Bild sofort als Fehler zu erkennen — und es war einer.
+   *
+   * 60 mm liegen noch innerhalb des Nabenrandes (`AUGE_R` = 85 mm): Der Steg
+   * steckt also an beiden Enden im vollen Werkstoff der Nabe und laesst die
+   * Bohrungen (Ø 84 bzw. 64 mm) frei.
+   */
+  const halsAb = 0.06 / halsL;
+  /*
+   * Die Bahn ist eine Strecke; `strang` traegt den Querschnitt laengs der
+   * Normalen (−sin th, cos th) ab, und die Laufrichtung einer Station ist bei
+   * allen Bahnen dieser Datei (−cos th, −sin th) — so legen es
+   * `schalenStationen` und `fersenStationen` an. Also `atan2(−dz, −dy)`, nicht
+   * `atan2(dz, dy)`.
+   *
+   * Mit dem falschen Vorzeichen laeuft die Bahn der Regel entgegen, und
+   * `strang` dreht dabei die Flaechen nach innen: Der Koerper ist dann ein
+   * LOCH statt eines Klotzes. Gemessen hat die Sonde das sofort gemeldet — mit
+   * Konsole steckten noch 9 von 72 Punkten des Nabenrandes im Werkstoff statt
+   * 28 ohne sie. Ein Koerper, der Werkstoff wegnimmt, ist keine Konsole.
+   */
+  const halsTh = Math.atan2(-halsZ, -halsY);
+  const halsBahn = [0, 1 / 3, 2 / 3, 1].map((s) => {
+    const t = halsAb + (1 - 2 * halsAb) * s;
+    return { y: halsY * t, z: halsZ * t, th: halsTh };
+  });
+  /*
+   * Quer misst er ueberall 2 · `AUGE_R`, laengs der Bolzenachse ueberall so
+   * viel wie die Nabe (`STREBE_B_OBEN` + 0,06). Ein Steg mit konstantem
+   * Querschnitt, nicht ein Keil, der irgendwo breiter wird als seine Naben.
+   */
+  const hals = new THREE.Mesh(
+    strang(halsBahn, 0, STREBE_B_OBEN + 0.06, 2 * AUGE_R, -AUGE_R),
+    st.guss
+  );
+  hals.name = "06_AUGENKONSOLE";
+  g.add(hals);
+  /*
    * Keine Kehlnähte mehr an der Schale. Drei waren hier: zwei längs der Nabe,
    * eine unter der Konsole. Eine Schweißnaht ist die Ansage „hier sind zwei
    * Teile zusammengesetzt" — und genau das soll die Schale nicht mehr sagen.
+   * Auch der Hals bekommt keine: Er ist mitgegossen, nicht angesetzt.
    */
 
   return g;
