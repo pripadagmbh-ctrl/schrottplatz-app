@@ -19,6 +19,8 @@ import {
   stielStahl,
 } from "./armParts";
 import { oberwagenLack, oberwagenLeuchten, oberwagenStahl } from "./oberwagenParts";
+import { pratzeFuss, pratzeStempel, schildKoerper, schildSchneide } from "./schildParts";
+import { farbstoff } from "./bauteile";
 import { unterwagenLack, unterwagenStahl } from "./unterwagenParts";
 import { BAGGER_STAND } from "../world/baggerstand";
 import {
@@ -1323,6 +1325,14 @@ export class Excavator {
     });
     this.buildBlade(darkMat, frameMat, rodMat);
 
+    /*
+     * Die Geometrie eines Pratzenfußes wird EINMAL gebaut und von allen vier
+     * Füßen geteilt — wie beim Rad. Das spart Speicher, nicht Zeichenrufe:
+     * Die kostet jedes Netz einzeln, gleich welche Geometrie darin steckt.
+     */
+    const pratzenGeo = { fuss: pratzeFuss(), stempel: pratzeStempel() };
+    const pratzenStoff = farbstoff(0.7);
+
     const UP = new THREE.Vector3(0, 1, 0);
     for (const [sx, sz] of [
       [-1, 1],
@@ -1363,21 +1373,23 @@ export class Excavator {
        * angeschweisstem Stahl aussehen, also ein schlankes Kastenprofil, das
        * nach unten leicht zulaeuft.
        */
-      const cyl = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.5, 0.26), frameMat);
-      cyl.position.y = 0.42;
-      cyl.castShadow = true;
-      cyl.name = `03_PRATZE_${e}_KASTEN`;
-      foot.add(cyl);
-      const rod = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.35, 0.17), rodMat);
-      rod.position.y = 0.14;
-      rod.name = `03_PRATZE_${e}_STEMPEL`;
-      foot.add(rod);
-      const pad = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.14, 0.62), darkMat);
-      pad.position.y = 0.07;
-      pad.castShadow = true;
-      pad.name = `03_PRATZE_${e}_TELLER`;
-      foot.add(pad);
+      /*
+       * ZWEI Netze je Fuß statt drei (Konzept 03): Kasten, Teller, Lagerböcke,
+       * Bolzen und Schläuche fahren gemeinsam aus und liegen deshalb in einem
+       * bunten Netz; nur der blanke Stempel bleibt eigen, weil blanker Stahl
+       * eine andere Oberfläche hat und nicht nur eine andere Farbe.
+       * Teil für Teil in `schildParts.ts`.
+       */
+      const fuss = new THREE.Mesh(pratzenGeo.fuss, pratzenStoff);
+      fuss.castShadow = true;
+      fuss.name = `03_PRATZE_${e}_FUSS`;
+      foot.add(fuss);
+      const stempel = new THREE.Mesh(pratzenGeo.stempel, rodMat);
+      stempel.name = `03_PRATZE_${e}_STEMPEL`;
+      foot.add(stempel);
       void UP;
+      void frameMat;
+      void darkMat;
     }
   }
 
@@ -2642,46 +2654,23 @@ export class Excavator {
     this.root.add(g);
     this.bladeGroup = g;
 
-    // Schildblatt: leicht nach vorn geneigt, mit umlaufender Kante
-    const blade = new THREE.Mesh(new THREE.BoxGeometry(BLADE_W, 0.72, 0.16), dark);
-    blade.position.set(0, 0.42, 0);
-    blade.rotation.x = -0.22;
-    blade.castShadow = true;
-    blade.name = "01_RAEUMSCHILD_BLATT";
-    g.add(blade);
-    // Schneide unten, hell abgesetzt wie angeschliffener Stahl
-    const edge = new THREE.Mesh(
-      new THREE.BoxGeometry(BLADE_W, 0.14, 0.2),
-      new THREE.MeshStandardMaterial({ color: 0x9aa2a8, roughness: 0.4, metalness: 0.9 })
-    );
-    edge.position.set(0, 0.07, 0.03);
-    edge.name = "01_RAEUMSCHILD_SCHNEIDE";
-    g.add(edge);
-    // Seitenwangen, damit das Material nicht seitlich wegläuft
-    for (const s of [-1, 1]) {
-      const wing = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.62, 0.5), dark);
-      wing.position.set((s * BLADE_W) / 2, 0.4, 0.22);
-      wing.name = `01_RAEUMSCHILD_WANGE_${s > 0 ? "L" : "R"}`;
-      g.add(wing);
-    }
-    // Verstrebungen zum Fahrgestell samt Hubzylinder
-    for (const s of [-1, 1]) {
-      const seite = s > 0 ? "L" : "R";
-      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.9), frame);
-      arm.position.set(s * 0.7, 0.5, -0.45);
-      arm.name = `01_RAEUMSCHILD_STREBE_${seite}`;
-      g.add(arm);
-      const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.5, 8), frame);
-      cyl.position.set(s * 0.42, 0.78, -0.3);
-      cyl.rotation.x = 0.9;
-      cyl.name = `01_RAEUMSCHILD_ZYLINDER_${seite}`;
-      g.add(cyl);
-      const piston = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.34, 8), rod);
-      piston.position.set(s * 0.42, 0.55, -0.16);
-      piston.rotation.x = 0.9;
-      piston.name = `01_RAEUMSCHILD_STANGE_${seite}`;
-      g.add(piston);
-    }
+    /*
+     * Schild und Schneide — ZWEI Netze für 16 Teile (Konzept 01x).
+     *
+     * Vorher waren es zehn: Blatt, Schneide, zwei Wangen, zwei Streben, zwei
+     * Zylinder, zwei Kolbenstangen. Alle schwenken gemeinsam auf und ab; keins
+     * bewegt sich gegen ein anderes. Neu sind vier Augen und zwei Bolzen an
+     * den Anlenkpunkten. Teil für Teil in `schildParts.ts`.
+     */
+    const blatt = new THREE.Mesh(schildKoerper(BLADE_W), farbstoff(0.8));
+    blatt.castShadow = true;
+    blatt.name = "01_RAEUMSCHILD_BLATT";
+    g.add(blatt);
+    const schneide = new THREE.Mesh(schildSchneide(BLADE_W), rod);
+    schneide.name = "01_RAEUMSCHILD_SCHNEIDE";
+    g.add(schneide);
+    void dark;
+    void frame;
   }
 
   /** Zustand fürs Bordinstrument zusammenstellen. */

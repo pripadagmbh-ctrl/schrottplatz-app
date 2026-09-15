@@ -130,7 +130,9 @@ describe("Positionsliste des Baggers", () => {
       "02_RAD_VR",
       "02_RAD_HL",
       "02_RAD_HR",
-      "03_PRATZE_VL_TELLER",
+      "03_PRATZE_VL_FUSS",
+      "03_PRATZE_VL_STEMPEL",
+      "01_RAEUMSCHILD_SCHNEIDE",
       "04_DREHKRANZ",
       "05_MOTORHAUBE",
       "05_LEUCHTEN",
@@ -188,9 +190,14 @@ describe("Positionsliste des Baggers", () => {
      * Gegengewicht) plus die Deckplatte wurden drei: Lack, Stahl, Leuchten.
      * `05_GEGENGEWICHT` heisst deshalb nicht mehr so — es liegt im Stahl-Netz
      * `04_DREHKRANZ`, wo auch der Drehkranzdeckel steckt.
+     *
+     * Stand 15.09.2026 nach Raeumschild und Pratzen: 95 Netze, 21 072
+     * Dreiecke, 131 Zeichenrufe. Das Schild ging von 10 auf 2, die vier
+     * Pratzenfuesse von 12 auf 8 — in beiden Faellen bewegt sich innerhalb der
+     * Gruppe nichts gegeneinander.
      */
     const meshes = baggerMeshes();
-    expect(meshes.length, "Bauteilzahl am Bagger").toBe(107);
+    expect(meshes.length, "Bauteilzahl am Bagger").toBe(95);
   });
 });
 
