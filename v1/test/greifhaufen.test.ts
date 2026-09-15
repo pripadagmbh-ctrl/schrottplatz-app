@@ -334,6 +334,44 @@ function starthaufenGriff(saat: number): {
   return { teile, korb, kg, kandidaten, unterBoden };
 }
 
+/**
+ * Zwei schwere Teile, von denen nur eines an den Haken passt.
+ *
+ * Seit die Stueckzahlgrenze weg ist (E-052), ist die **Traglast** der einzige
+ * Abschneider. Dieser Aufbau bringt sie zum Greifen: zwei Brocken von je
+ * 2000 kg, zusammen 4000 kg — `MAX_TOTAL_KG` sind 3500. Einer bleibt liegen,
+ * und die Sortierung nach Haltwert entscheidet, welcher.
+ *
+ * `versatzB` legt den zweiten Brocken weiter nach aussen; beide liegen mit dem
+ * Schwerpunkt im Korb, der zweite aber lockerer.
+ */
+function traglastProbe(versatzB: number): {
+  aGefasst: boolean;
+  bGefasst: boolean;
+  kg: number;
+  korb: number;
+} {
+  const s = aufbau();
+  absetzen(s);
+  const gp = s.bagger.grappleGroup.position;
+  const a = quader(s, new THREE.Vector3(gp.x, 0.23, gp.z), [0.4, 0.4, 0.4], 2000);
+  const b = quader(
+    s,
+    new THREE.Vector3(gp.x + versatzB * 0.93, 0.23, gp.z + versatzB * 0.37),
+    [0.4, 0.4, 0.4],
+    2000
+  );
+  for (let i = 0; i < 30; i++) takt(s);
+  s.tasten.down.add("Space");
+  for (let i = 0; i < 90; i++) takt(s);
+  const aGefasst = s.grip.grippedBodies.some((x) => x.handle === a.handle);
+  const bGefasst = s.grip.grippedBodies.some((x) => x.handle === b.handle);
+  const kg = s.grip.totalMassKg;
+  const korb = s.grip.grippedCount;
+  s.world.free();
+  return { aGefasst, bGefasst, kg, korb };
+}
+
 describe("Schalenluecke — Herkunft der Zahl", () => {
   it("ist gerechnet, nicht gewaehlt", () => {
     // Nachgerechnet aus der Krallenform: zwei benachbarte Schalen an der
@@ -469,8 +507,12 @@ describe("Greifen im Haufen — was die Spinne aus dem Haufen holt", () => {
  * Ansage Patrick 15.09.2026: „Alles mitnehmen, was in der Spinne liegt und wo
  * der Greifer sich festkrallt oder was verkantet ist. Nicht nach Gewicht
  * gehen." Vorher entschied das Gewicht: `candidates.sort` nahm das Schwerste
- * zuerst, `MAX_ITEMS` war 5 — im dichten Nest erfuellten 7 bis 12 Koerper die
- * Bedingung, die fuenf schwersten kamen mit, das anvisierte Kleinteil nie.
+ * zuerst, und eine Stueckzahlgrenze von 5 schnitt ab — im dichten Nest
+ * erfuellten 7 bis 12 Koerper die Bedingung, die fuenf schwersten kamen mit,
+ * das anvisierte Kleinteil nie.
+ *
+ * Seit E-052 gibt es die Stueckzahlgrenze gar nicht mehr („Deckel ganz weg"),
+ * die einzige Grenze ist die Traglast.
  */
 describe("Greifen im Haufen — worauf du zielst, das bekommst du", () => {
   it(
@@ -529,28 +571,78 @@ describe("Greifen im Haufen — worauf du zielst, das bekommst du", () => {
   );
 });
 
+describe("Traglast — der einzige Abschneider, seit der Deckel weg ist (E-052)", () => {
+  it(
+    "schneidet ab, wenn zwei Brocken zusammen zu schwer sind",
+    () => {
+      const r = traglastProbe(0.5);
+      expect(r.korb, "einer der beiden Brocken haengt").toBe(1);
+      expect(r.kg, "und die Traglast ist eingehalten").toBeLessThanOrEqual(3500);
+    },
+    120000
+  );
+
+  it(
+    "und laesst dabei das liegen, was lockerer sass",
+    () => {
+      /*
+       * Wenn die Traglast abschneidet, entscheidet die Reihenfolge — und die
+       * geht seit E-045 nach Haltwert, nicht nach Gewicht. Beide Brocken sind
+       * hier gleich schwer, beide liegen mit dem Schwerpunkt im Korb; der
+       * zweite nur weiter aussen. Mitkommen muss der, der tiefer im Korb
+       * liegt.
+       */
+      const r = traglastProbe(0.5);
+      expect(r.aGefasst, "der Brocken unter der Achse blieb liegen").toBe(true);
+      expect(r.bGefasst, "statt seiner kam der aeussere mit").toBe(false);
+    },
+    120000
+  );
+});
+
 describe("Greifen im echten Starthaufen — es kommt kein halber Haufen mit", () => {
   it(
     "ein Griff in den gewuerfelten Starthaufen nimmt eine Handvoll, nicht den Haufen",
     () => {
       /*
-       * Der Waechter gegen die Sorge, „alles mitnehmen" heisse „den halben
-       * Platz anhaengen". Gemessen wird nicht an Quadern, sondern am echten
-       * Starthaufen (`ItemManager.spawnPile`, 150 gewuerfelte Teile mit den
-       * Formen des Objektkatalogs): Der Arm faehrt hinein und packt zu.
+       * DIESER WAECHTER ERSETZT DIE STUECKZAHLGRENZE (E-052).
+       *
+       * Bis heute stand im Greifsystem ein Deckel — erst 5, dann 24 —, damit
+       * eine kaputte Greifbedingung nicht unbemerkt den halben Platz anhaengt.
+       * Ansage Patrick: „Deckel ganz weg." Der Einwand bleibt trotzdem
+       * richtig, nur ist ein stiller Deckel die falsche Antwort: Er VERDECKT
+       * den Fehler (die Maschine nimmt dann 24 statt 200 Teile, und niemand
+       * merkt etwas). Ein Waechter, der rot wird, ist mehr wert.
+       *
+       * Gemessen wird deshalb nicht an Quadern, sondern am echten Starthaufen
+       * (`ItemManager.spawnPile`, 150 gewuerfelte Teile mit den Formen des
+       * Objektkatalogs): Der Arm faehrt hinein und packt zu.
        *
        * Gemessen 15.09.2026 (drei Saaten): 2 bis 4 Koerper erfuellen je Griff
-       * die Bedingung, 2 bis 4 kommen mit, 160 bis 250 kg. Der Grund fuer den
-       * Unterschied zum kuenstlichen Nest oben ist die Groesse: Echter Schrott
-       * ist groesser als 25-cm-Wuerfel, es passt schlicht weniger in den Korb.
+       * die Bedingung, 2 bis 4 kommen mit, 160 bis 250 kg, aus 105 bis 123
+       * Teilen. Der Grund fuer den Unterschied zum kuenstlichen Nest oben ist
+       * die Groesse: Echter Schrott ist groesser als ein 25-cm-Wuerfel, es
+       * passt schlicht weniger in den Korb.
+       *
+       * Die Schwellen liegen beim Doppelten des Gemessenen. Wer sie reissen
+       * sieht, sucht den Fehler nicht hier, sondern in der Greifbedingung:
+       * Sensorkugel, `insideGrapple`, `noetigeKrallen`.
        */
-      for (const saat of [20260915, 4711]) {
+      for (const saat of [20260915, 4711, 99991]) {
         const r = starthaufenGriff(saat);
         expect(r.teile, "der Haufen ist gespawnt").toBeGreaterThan(90);
+        expect(
+          r.kandidaten,
+          `${r.kandidaten} Koerper erfuellten gleichzeitig die Greifbedingung — gemessen sind 2 bis 4. Das riecht nach einem Fehler in der Bedingung, nicht nach einem fehlenden Deckel.`
+        ).toBeLessThanOrEqual(8);
         expect(
           r.korb,
           `${r.korb} von ${r.teile} Teilen auf einmal gegriffen (${r.kg.toFixed(0)} kg)`
         ).toBeLessThanOrEqual(8);
+        expect(
+          r.kg,
+          `${r.kg.toFixed(0)} kg an einem Griff — gemessen sind 160 bis 250`
+        ).toBeLessThan(600);
         expect(r.unterBoden, "ein Teil ist durch den Beton gesackt").toBe(0);
       }
     },
