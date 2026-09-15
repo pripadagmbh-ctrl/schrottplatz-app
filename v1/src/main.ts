@@ -804,6 +804,24 @@ async function main(): Promise<void> {
   };
 
   // Kundschaft meldet sich bei der Ankunft — Name, Herkunft und ein Wort
+  /*
+   * Der Abholer funkt durch, wo er steht (E-056b).
+   *
+   * Ansage Patrick 15.09.2026, auf die Frage, wie man ihn findet, wenn er
+   * nicht mehr immer an derselben Stelle haelt: „Er funkt es an, wie ein
+   * Fahrer." Verworfen hat er einen Zeiger am Bildrand (dauerhaft im Bild)
+   * und gar nichts (man dreht sich beim ersten Mal im Kreis).
+   *
+   * Es laeuft ueber denselben Kanal wie die Begruessung eines Haendlers —
+   * eine Einblendung, einmal je Fuhre, zum Ueberhoeren. Kein neues Ereignis,
+   * kein Kasten, der stehen bleibt: Wer nicht hinhoert, sucht halt.
+   *
+   * Der Ort im Spruch kommt aus dem Schild des Behaelters, nicht aus einer
+   * zweiten Liste — ein neues Silo bekommt seinen Spruch damit von selbst
+   * richtig.
+   */
+  vehicles.onPickupFunk = (wer, spruch) => hud.toast(`${wer}: „${spruch}"`);
+
   vehicles.onCustomerArrived = (c) => {
     const wer =
       c.group === "haendler"

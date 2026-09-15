@@ -66,6 +66,24 @@ describe("Platzinventar kommt am naechsten Tag wieder", () => {
     );
   });
 
+  it("und der Abholer-Funkspruch kommt im HUD an", () => {
+    /*
+     * Dieselbe Klasse zum dritten Mal: `onPickupFunk` ist in `vehicles.ts`
+     * gebaut und feuert, wenn der Abholer steht — aber ohne die Zeile in
+     * `main.ts` hoert es niemand. Zwei fertige Haelften, eine fehlende Zeile.
+     *
+     * Und hier faellt es besonders spaet auf: Der Funkspruch ist seit E-056
+     * der EINZIGE Weg, auf dem der Spieler erfaehrt, wo der Abholer haelt.
+     * Ohne ihn sucht er den halben Platz ab und haelt es fuer einen Fehler
+     * der Wegfindung.
+     */
+    expect(main, "onPickupFunk wird nie verdrahtet").toMatch(
+      /vehicles\.onPickupFunk\s*=/
+    );
+    const block = main.slice(main.indexOf("vehicles.onPickupFunk"));
+    expect(block.slice(0, 200), "der Spruch landet nirgends").toContain("hud.toast");
+  });
+
   it("der Spieler erfaehrt davon", () => {
     /*
      * Ein Werkzeug, das ueber Nacht zurueckkommt, ohne dass es jemand sagt,
