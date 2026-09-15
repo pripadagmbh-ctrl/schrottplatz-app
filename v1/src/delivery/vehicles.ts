@@ -36,7 +36,13 @@ import {
 } from "./umriss";
 import { BAGGER_STAND } from "../world/baggerstand";
 import { lagerMuldeFuer, type ContainerConfig } from "../world/containers";
-import { rollCustomer, vehicleForCustomer, type CustomerProfile } from "./customers";
+import {
+  rollCustomer,
+  vehicleForCustomer,
+  abholerFunk,
+  ABHOLER_FUNKNAME,
+  type CustomerProfile,
+} from "./customers";
 import { buildVehicleModel, wandHoehe, type Rad } from "./vehicleModel";
 import { Federung, federungsDatenFuer } from "./federung";
 import {
@@ -570,6 +576,15 @@ class DeliveryVehicle {
    * zu dem Platz, fuer den er gerufen wurde.
    */
   bestellung: string | null = null;
+
+  /**
+   * Meldung des Abholers, sobald er an seinem Platz steht.
+   *
+   * Gesetzt vom `VehicleManager`, der daraus den Funkspruch baut. Am Fahrzeug
+   * steht nur der Zeitpunkt — WAS gesagt wird, ist Sache der Stimmen in
+   * `customers.ts`, und WO es erscheint, ist Sache des HUD.
+   */
+  onAngekommen: (() => void) | null = null;
   /**
    * Kippt selbst ab — der Einzige, der Material ohne Spielerarbeit auf den
    * Platz bringt. Seit E-029 sagt das nichts mehr ueber seinen WEG (er faehrt
@@ -1677,6 +1692,9 @@ class DeliveryVehicle {
         if (!this.isPickup) this.releaseCargo();
         if (this.phaseT > 1.2) {
           this.phase = this.isPickup ? "waitLoad" : this.kind === "kipper" ? "tipping" : "waitUnload";
+          // Der Abholer funkt, sobald er steht — hier und nirgends sonst
+          // (E-056). Einmal je Fuhre, danach ist der Kanal wieder still.
+          if (this.isPickup) this.onAngekommen?.();
           this.phaseT = 0;
           this.routeS = 0;
         }
@@ -1987,6 +2005,14 @@ export class VehicleManager {
   onWeighOut: ((netKg: number) => void) | null = null;
   /** Abhol-LKW fährt los → Containerinhalt abrechnen */
   onPickupDepart: ((truck: DeliveryVehicle) => void) | null = null;
+  /**
+   * Der Abholer steht und funkt durch, wo (E-056).
+   *
+   * Eine Zeile, einmal je Fuhre, zum Ueberhoeren gedacht. Sie geht denselben
+   * Weg wie die Begruessung eines Haendlers (`onCustomerArrived`): Das
+   * Fahrzeugmodul sagt, WER was sagt — wo es steht, entscheidet das HUD.
+   */
+  onPickupFunk: ((wer: string, spruch: string) => void) | null = null;
 
   /**
    * Zugang zum Platzinventar (Müllcontainer). Bleibt er null, verhält sich
@@ -2055,6 +2081,20 @@ export class VehicleManager {
     this.active.platzinventar = this.platzinventar;
     // Die Bestellung reist mit dem Wagen mit — daran haengt sein Halteplatz.
     this.active.bestellung = k === "abholer" ? this.pickupOrder : null;
+    /*
+     * Und daran haengt auch, was er funkt, wenn er steht (E-056). Der Ort
+     * kommt aus dem Schild des Behaelters, an dem er haelt — dieselbe Quelle,
+     * aus der auch der Halteplatz gerechnet wird. Zwei Listen, eine fuer die
+     * Fahrt und eine fuer den Text, wuerden beim naechsten Umzug der Reihe
+     * auseinanderlaufen.
+     */
+    if (k === "abholer") {
+      const wagen = this.active;
+      wagen.onAngekommen = () => {
+        const ziel = abholPlatzFuer(wagen.bestellung).ziel;
+        this.onPickupFunk?.(ABHOLER_FUNKNAME, abholerFunk(ziel?.label ?? null));
+      };
+    }
     if (c) this.onCustomerArrived?.(c);
     // Händler bleiben gern noch auf einen Kaffee; Gewerbe hat es eilig.
     // Nur freie Plätze vergeben, sonst stünde einer im anderen.

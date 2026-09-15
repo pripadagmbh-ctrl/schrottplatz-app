@@ -31,6 +31,7 @@ import {
   WORK_ZONES,
 } from "../src/delivery/routes";
 import { CONFIGS, bayVorderkante, lagerMuldeFuer } from "../src/world/containers";
+import { abholerFunk } from "../src/delivery/customers";
 import {
   BAGGER_STAND,
   VERLADE_STAND,
@@ -251,6 +252,45 @@ describe("Jeder Halteplatz hat seine eigene Arbeitszone", () => {
       const [hx, hz] = p.halt;
       const drin = WORK_ZONES.some(([zx, zz, zr]) => Math.hypot(zx - hx, zz - hz) < zr);
       expect(drin, `${p.name} (${hx} | ${hz}) liegt in keiner Arbeitszone`).toBe(true);
+    }
+  });
+});
+
+describe("Der Abholer funkt durch, wo er steht", () => {
+  /*
+   * Entscheidung Patrick, 15.09.2026: „Er funkt es an, wie ein Fahrer" —
+   * eine kurze Zeile beim Eintreffen, in der Art von „Bin am Kupfer-Silo".
+   * Verworfen: ein Zeiger am Bildrand und gar nichts.
+   *
+   * Geprueft wird die Eigenschaft, nicht der Wortlaut: Im Spruch steht die
+   * AUFSCHRIFT des Behaelters, an dem er haelt. Damit gibt es keine zweite
+   * Liste, die beim naechsten Umzug der Silo-Reihe zurueckbleibt.
+   */
+  it("und nennt dabei das Schild, das an der Mulde steht", () => {
+    for (const c of CONFIGS.filter((s) => s.lager === true)) {
+      const p = abholPlatzFuer(c.fractionId);
+      for (let i = 0; i < 30; i++) {
+        const spruch = abholerFunk(p.ziel?.label ?? null);
+        expect(spruch, `„${spruch}" nennt ${c.label} nicht`).toContain(c.label);
+        // Kurz genug fuer eine Zeile auf dem iPhone mini.
+        expect(spruch.length, `„${spruch}" ist zu lang fuer eine Zeile`).toBeLessThan(45);
+      }
+    }
+  });
+
+  it("und beim Bagger sagt er, dass er vorn steht — ohne Schild", () => {
+    const p = abholPlatzFuer("steel");
+    expect(p.ziel).toBeNull();
+    for (let i = 0; i < 30; i++) {
+      const spruch = abholerFunk(p.ziel?.label ?? null);
+      expect(spruch.length).toBeGreaterThan(5);
+      expect(spruch.length).toBeLessThan(45);
+      // Kein Schildname, den es an dieser Stelle gar nicht gibt.
+      for (const c of CONFIGS.filter((s) => s.lager === true)) {
+        expect(spruch, `„${spruch}" nennt ${c.label}, obwohl er beim Bagger steht`).not.toContain(
+          c.label
+        );
+      }
     }
   });
 });

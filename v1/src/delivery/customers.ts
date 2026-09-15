@@ -434,6 +434,51 @@ function rollGewerbe(): CustomerProfile {
  * gerettet. Das Feld ist pflichtig, der Typlauf über `test/` (E-038) setzt es
  * durch, und wer es mit einer Umtypung umgeht, bekommt es gesagt.
  */
+/* ------------------------------------------- Funkspruch des Abholers ----- */
+
+/**
+ * Was der Abholer durchgibt, wenn er steht.
+ *
+ * Seit E-056 haelt er nicht mehr immer an derselben Stelle: Stahlschrott und
+ * Mischschrott holt er beim Bagger ab, sortenreines Metall am Silo seiner
+ * Fraktion. Damit ist „wo ist er?" eine echte Frage — und Patrick hat
+ * entschieden, wie sie beantwortet wird (15.09.2026): Er funkt es an, wie ein
+ * Fahrer. Verworfen hat er einen Zeiger am Bildrand (steht dauernd im Bild
+ * und nimmt die Ruhe) und „gar nichts" (man dreht sich beim ersten Mal im
+ * Kreis).
+ *
+ * Man darf es UEBERHOEREN. Eine Zeile im Durchlauf, nichts zum Wegklicken,
+ * nichts, was stehen bleibt — wer nicht hinhoert, sucht halt.
+ *
+ * DER ORT KOMMT AUS DEM SCHILD, nicht aus einer zweiten Liste. Uebergeben
+ * wird das `label` des Behaelters, also genau das, was an der Mulde steht;
+ * ein neues Silo bekommt seinen Spruch damit von selbst richtig. Bei einer
+ * Abholung ohne Lagersilo (Stahlschrott, Mischschrott, „Gemischt") ist es
+ * `null` — dann steht er vorn beim Bagger.
+ *
+ * Ton: Funkverkehr auf einem Platz, kein Ansagetext. Kurz, gesprochen, aus
+ * dem Mund eines Fahrers, der seit dreissig Jahren Container faehrt.
+ */
+export function abholerFunk(schild: string | null): string {
+  if (!schild) {
+    return pick([
+      "Bin vorn bei dir, Motor laeuft.",
+      "Steh am Abladeplatz, lad auf.",
+      "Bin da, laengsseits wie immer.",
+    ]);
+  }
+  return pick([`Bin am ${schild}.`, `Steh am ${schild}, kannst kommen.`, `${schild}, ich warte.`]);
+}
+
+/**
+ * Wer da funkt.
+ *
+ * Der Abholer hat kein Kundenprofil — er kauft nichts, er holt. Bis es eine
+ * Stammfigur dafuer gibt, spricht er unter seiner Rolle, wie es am Funk
+ * ueblich ist.
+ */
+export const ABHOLER_FUNKNAME = "Abholer";
+
 export function vehicleForCustomer(c: CustomerProfile): Fahrzeugart {
   if (!c.vehicle) {
     throw new Error(
