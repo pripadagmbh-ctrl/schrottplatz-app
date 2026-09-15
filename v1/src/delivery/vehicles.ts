@@ -14,6 +14,27 @@ import { packeLadung, stueckMass } from "./ladung";
 
 /** So lange haelt ein beladener Abholer auf der Waage fuer Marios Kontrolle. */
 const WIEGE_HALT_S = 6;
+/**
+ * Leergewicht des Abrollcontainers, den der Abholer mitbringt (kg).
+ *
+ * DAS IST DIE TARA SEINES LIEFERSCHEINS (E-064). Ansage Patrick, 15.09.2026:
+ * „auch abholer leer wiegen" — auf einem echten Platz wiegt der Abholer leer
+ * rein und voll raus, und die Differenz ist, was er mitnimmt.
+ *
+ * Die Waage in diesem Spiel wiegt, WAS AUF DER LADEFLAECHE LIEGT, und nicht
+ * den Lastwagen darunter (`cargoMassKg`: „Masse, die tatsaechlich AUF der
+ * Ladeflaeche liegt"). Daran wird nichts geaendert — der Ankaufspreis der
+ * Anlieferer haengt an genau dieser Zahl. Der Container aber LIEGT auf der
+ * Flaeche, und er wiegt etwas; deshalb ist er die Tara, und beide Wiegungen
+ * bleiben dieselbe Rechnung.
+ *
+ * Die Zahl (SW): Die Mulde ist 5,40 m lang, 2,70 m breit und 1,25 m hoch
+ * (`vehicleModel.ts`, `bedLen` und die Wandhoehe des Abholers) — also rund
+ * 18 m³. Ein offener 18-m³-Abrollcontainer aus 3-mm-Blech wiegt 1,6 bis 1,9 t;
+ * 1.800 kg liegt mittig. Wer sie auf 0 setzt, bekommt einen Lieferschein, auf
+ * dem „Tara 0 kg" steht — richtig gerechnet und trotzdem falsch gelesen.
+ */
+const ABHOLER_CONTAINER_KG = 1800;
 /** Rueckwaertstempo beim Einparken (m/s) — Schrittgeschwindigkeit. */
 const PARK_RUECK_SPEED = 1.6;
 /** So weit darf die Ladung ueber die Bordwand ragen (m). */
@@ -241,6 +262,14 @@ class DeliveryVehicle {
   private tailGate: { hinge: THREE.Group; mesh: THREE.Mesh; body: RAPIER.RigidBody } | null = null;
   /** Bruttogewicht der Anlieferung (Wiegung bei der Einfahrt) */
   bruttoKg = 0;
+  /**
+   * Leergewicht dieses Abholers, gewogen bei der EINFAHRT (kg).
+   *
+   * Nur der Abholer hat eine: Er kommt leer herein, und erst beim Hinausfahren
+   * steht fest, was er mitnimmt. Der Anlieferer macht es andersherum — der
+   * wiegt brutto herein und tariert beim Hinausfahren.
+   */
+  taraKg = 0;
   private weighedOut = false;
   /** Restzeit des Kontrollhalts auf der Waage (nur Abholer) */
   private wiegeHaltS = 0;
@@ -585,6 +614,18 @@ class DeliveryVehicle {
    * `customers.ts`, und WO es erscheint, ist Sache des HUD.
    */
   onAngekommen: (() => void) | null = null;
+
+  /**
+   * Die beiden Wiegungen des Abholers (E-064) — reine Meldungen.
+   *
+   * Sie gehen ABSICHTLICH nicht ueber `onWeighIn`/`onWeighOut`: An denen
+   * haengt die Abrechnung der Anlieferung (Verhandlung beim Einfahren,
+   * Auszahlung beim Ausfahren). Der Abholer verhandelt nichts und bekommt
+   * nichts bezahlt — was er mitnimmt, ist beim Losfahren vom Verladeplatz
+   * laengst abgerechnet (`onPickupDepart`). Hier wird nur gewogen und gesagt.
+   */
+  onTara: ((tara: number) => void) | null = null;
+  onAbholungGewogen: ((tara: number, brutto: number) => void) | null = null;
   /**
    * Kippt selbst ab — der Einzige, der Material ohne Spielerarbeit auf den
    * Platz bringt. Seit E-029 sagt das nichts mehr ueber seinen WEG (er faehrt
@@ -1317,6 +1358,41 @@ class DeliveryVehicle {
     return sum;
   }
 
+  /**
+   * Was in diesem Augenblick auf der Flaeche liegt — auch fremd Aufgeladenes.
+   *
+   * `cargoMassKg()` kennt nur die Fuhre, mit der der Wagen HEREINGEKOMMEN ist
+   * (`this.cargo.items`). Der Abholer kommt leer; was er mitnimmt, hat der
+   * Spieler mit der Spinne hineingelegt, und beim Losfahren wird es an die
+   * Flaeche gekoppelt (`verriegeleLadeflaeche` → `riding`, kinematisch). In
+   * `cargo.items` steht davon nichts — mit der alten Rechnung waere die
+   * Ausfahrtswiegung eines vollen Abholers 0 kg gewesen.
+   *
+   * Gezaehlt wird deshalb aus derselben Quelle, aus der auch die Federung
+   * ihre Last misst (`messeLast`): alle Teile des Platzes, gefiltert nach
+   * ihrer Lage ueber der Flaeche.
+   */
+  ladeflaecheKg(): number {
+    const local = new THREE.Vector3();
+    const gezaehlt = new Set<number>();
+    let sum = 0;
+    const pruefe = (b: RAPIER.RigidBody, massKg: number): void => {
+      if (!b.isValid() || gezaehlt.has(b.handle)) return;
+      const p = b.translation();
+      local.set(p.x, p.y, p.z);
+      this.bedGroup.worldToLocal(local);
+      if (Math.abs(local.x) > BED_HALF_W + 0.5) return;
+      if (local.z < -0.5 || local.z > this.bedLen + 0.5) return;
+      if (local.y < -0.4 || local.y > 5.0) return;
+      gezaehlt.add(b.handle);
+      sum += massKg;
+    };
+    for (const it of this.itemQuelle?.items ?? []) pruefe(it.body, it.massKg);
+    for (const it of this.cargo.items) pruefe(it.body, it.massKg);
+    if (this.cargo.car) pruefe(this.cargo.car.body, WRACK_KG);
+    return sum;
+  }
+
   /** Chassis + Ladefläche + Bordwände — Hindernisse für den Baggerarm. */
   collectBodyHandles(out: Set<number>): void {
     out.add(this.chassisBody.handle);
@@ -1623,13 +1699,18 @@ class DeliveryVehicle {
       case "in":
         this.advance(this.routeIn, SPEED * dt, false, dt);
         if (this.routeS >= this.routeLength(this.routeIn)) {
-          // Anlieferer stehen jetzt auf der Brückenwaage; der Abholer kommt
-          // leer und faehrt durch. Fuer ihn steht hier fest, wo er haelt —
-          // sonst nirgends: Er ueberspringt `weighIn`, und genau darum stand
-          // er lange auf dem Vorgabewert und damit 9,9 m vom Bagger weg
-          // (gemessen 12.09.2026), statt an der gerechneten Stelle.
-          if (this.isPickup) this.legeAbladestelleFest();
-          this.phase = this.isPickup ? "approach" : "weighIn";
+          /*
+           * JEDER HAELT AUF DER BRUECKENWAAGE — auch der Abholer (E-064).
+           *
+           * Bis zum 15.09.2026 fuhr er hier durch: „der Abholer kommt leer und
+           * faehrt durch". Ansage Patrick am Geraet: „ausserdem muss auch
+           * abholer leer wiegen." So ist es auf dem Platz auch: leer rein
+           * (Tara), voll raus (Brutto), die Differenz ist der Lieferschein.
+           *
+           * Der Halteplatz wird damit nicht mehr hier festgelegt, sondern am
+           * Ende der Wiegung — an derselben Stelle wie bei allen anderen.
+           */
+          this.phase = "weighIn";
           this.phaseT = 0;
           this.routeS = 0;
         }
@@ -1641,8 +1722,21 @@ class DeliveryVehicle {
         // stehen (Design 02.09.2026).
         if (this.phaseT > 2.5 && !this.weighedIn) {
           this.weighedIn = true;
-          this.bruttoKg = this.cargoMassKg();
-          this.onWeighIn?.(this.bruttoKg); // kann awaitingDeal setzen
+          if (this.isPickup) {
+            /*
+             * DER ABHOLER WIEGT LEER (E-064) — und verhandelt NICHT.
+             *
+             * `onWeighIn` bleibt unangetastet: Daran haengt in `main.ts` die
+             * Preisverhandlung, und ueber einen leeren Wagen wird nicht
+             * gefeilscht. Er meldet seine Tara und faehrt weiter; die Wiegung
+             * ist ein kurzer Halt, keine Verhandlung.
+             */
+            this.taraKg = this.ladeflaecheKg() + ABHOLER_CONTAINER_KG;
+            this.onTara?.(this.taraKg);
+          } else {
+            this.bruttoKg = this.cargoMassKg();
+            this.onWeighIn?.(this.bruttoKg); // kann awaitingDeal setzen
+          }
         }
         // Notausstieg: Bleibt die Antwort aus — weil der Spieler das Fenster
         // übersieht oder wegklickt —, fährt der Fahrer nach einer halben
@@ -1836,6 +1930,18 @@ class DeliveryVehicle {
           if (this.isPickup) {
             // Voll vom Hof: kurz stehen bleiben, damit die Ladung geprüft wird
             this.wiegeHaltS = WIEGE_HALT_S;
+            /*
+             * Und jetzt die zweite Haelfte des Lieferscheins (E-064): Brutto
+             * minus der Tara von der Einfahrt ist, was er mitnimmt. Gewogen
+             * wird, was auf der Flaeche liegt — beim Abholer ist das die
+             * Ladung des Spielers, die beim Losfahren an die Flaeche
+             * gekoppelt wurde, plus der Container darunter.
+             *
+             * Nur eine Meldung: Bezahlt ist das laengst (`onPickupDepart`),
+             * und am Kreislauf wird hier nichts angefasst.
+             */
+            this.bruttoKg = this.ladeflaecheKg() + ABHOLER_CONTAINER_KG;
+            this.onAbholungGewogen?.(this.taraKg, this.bruttoKg);
           } else {
             // Ausfahrtswiegung: leer über die Brückenwaage → Netto steht fest
             const tara = this.cargoMassKg();
@@ -2013,6 +2119,15 @@ export class VehicleManager {
    * Fahrzeugmodul sagt, WER was sagt — wo es steht, entscheidet das HUD.
    */
   onPickupFunk: ((wer: string, spruch: string) => void) | null = null;
+  /**
+   * Die beiden Wiegungen des Abholers (E-064).
+   *
+   * `onAbholerTara` beim Hereinfahren (er kommt leer), `onAbholerBrutto` beim
+   * Hinausfahren — dort steht mit der Differenz fest, was vom Hof geht. Beide
+   * sind reine Meldungen; sie ruehren weder Konto noch Preis an.
+   */
+  onAbholerTara: ((tara: number) => void) | null = null;
+  onAbholerBrutto: ((tara: number, brutto: number) => void) | null = null;
 
   /**
    * Zugang zum Platzinventar (Müllcontainer). Bleibt er null, verhält sich
@@ -2094,6 +2209,9 @@ export class VehicleManager {
         const ziel = abholPlatzFuer(wagen.bestellung).ziel;
         this.onPickupFunk?.(ABHOLER_FUNKNAME, abholerFunk(ziel?.label ?? null));
       };
+      // Die beiden Wiegungen (E-064) — leer herein, voll hinaus.
+      wagen.onTara = (tara) => this.onAbholerTara?.(tara);
+      wagen.onAbholungGewogen = (tara, brutto) => this.onAbholerBrutto?.(tara, brutto);
     }
     if (c) this.onCustomerArrived?.(c);
     // Händler bleiben gern noch auf einen Kaffee; Gewerbe hat es eilig.
@@ -2211,9 +2329,10 @@ export class VehicleManager {
    * Steht gerade ein Fahrzeug zur Kontrolle auf der Waage? Dann kommt Mario
    * aus dem Büro und sieht sich die Ladung an (Wunsch 11.09.2026).
    *
-   * Bei der Einfahrt gilt das für jeden Anlieferer. Bei der Ausfahrt nur für
-   * Abholer: Die fahren beladen vom Hof, und was rausgeht, wird geprüft. Wer
-   * leer rausfährt, hat nichts vorzuzeigen — dafür bleibt er drin.
+   * Bei der Einfahrt gilt das für jedes Fahrzeug — seit E-064 auch für den
+   * Abholer, der dort leer gewogen wird. Bei der Ausfahrt nur für ihn: Er
+   * fährt beladen vom Hof, und was rausgeht, wird geprüft. Ein Anlieferer
+   * fährt leer hinaus und hat nichts vorzuzeigen — dafür bleibt Mario drin.
    */
   wiegeKontrolle(): THREE.Vector3 | null {
     for (const v of [this.active, ...this.parked]) {

@@ -3458,3 +3458,140 @@ hält. Der Wächter hält einen Rückschritt an einer festen Fuhre fest; er sagt
 nicht, dass im Spiel nichts fliegt. Ob er auf die gewürfelte Fuhre umgestellt
 wird — und die Schranken damit auf einen schlechteren, aber wahren Stand —
 gehört ins Kipper-Paket und ist bewusst **nicht** hier entschieden.
+### E-063 — Der Abholer hält vor der bestellten Mulde, nicht vor der Schenkelmitte (15.09.2026)
+
+**Entscheidung.** Wer eine sortenreine Abholung ausruft, bekommt den Lastwagen
+**vor genau dieses Silo** — Halteplatz und Baggerstand wandern mit der
+Bestellung die Silo-Reihe entlang. Gerechnet wird weiter nach derselben Regel
+(7,5 m Silo → Stand, noch einmal 7,5 m Stand → LKW-Spur), nur nicht mehr von der
+Mitte des Schenkels aus. `leitSilo()` in `src/delivery/routes.ts` heißt jetzt
+`schenkelMitte()` und dient nur noch den Arbeitszonen.
+
+**Begründung.** Patrick am Gerät, 15.09.2026: „abholung fährt immer noch
+falsch." E-056 hatte den Halteplatz schon einmal umgebaut, und die Wächter dazu
+waren grün — sie prüften die alte Regel.
+
+Gemessen wurde mit einem neuen Werkzeug, `v1/tools/abholfahrt.ts`: Es **fährt**
+einen echten Abholer kopflos über `DeliveryVehicle.update()`, bis er steht,
+statt seine Route auszurechnen. Nullprobe zuerst (Bestellung ohne Fraktion muss
+am Abladeplatz 6,30 | −23,00 enden — 0,000 m Abweichung), dann jede bestellbare
+Fraktion. Befund vorher:
+
+| Bestellung | Halt | am nächsten liegt |
+|---|---|---|
+| Kupfer, Messing | (−18,00 \| −8,00) | KABEL-LAGER, **4,60 m daneben** |
+| Kabel | (−18,00 \| −8,00) | KABEL-LAGER (richtig) |
+| Alu, Zink | (−18,00 \| −8,00) | KABEL-LAGER, **4,60 m daneben** |
+| VA | (−25,40 \| −7,00) | BATTERIEN, **4,60 m daneben** |
+| Batterien | (−25,40 \| −7,00) | BATTERIEN (richtig) |
+| Abfall (4 Fraktionen) | (−25,40 \| −7,00) | BATTERIEN, **4,60 m daneben** |
+
+**10 von 12** Fraktionen hielten vor der falschen Mulde. Nachher: alle zwölf auf
+0,00 m, Nullprobe unverändert bestanden.
+
+**Warum die alte Begründung nicht trägt.** `leitSilo` stand für die Reichweite:
+Von der Schenkelmitte erreicht der Arm alle drei Silos (8,80 · 7,50 · 8,80 m),
+vom Rand nur zwei. Aber Halt und Stand hängen starr aneinander — wandern beide
+gemeinsam, bleiben die **vier Ladeflächenecken auf exakt denselben 6,72 · 6,72 ·
+9,25 · 9,25 m** wie vorher (gemessen, alle zwölf Fälle). Verloren geht nur, dass
+man aus drei Silos auf einmal laden könnte; bestellt wird aber immer **eine**
+Fraktion. Die 9,25 m sind unverändert die aus E-056 offengelegten 5 cm über dem
+bequemen Band (9,20 m) und innerhalb der harten Bodengrenze von 9,50 m — dieses
+Paket macht sie weder besser noch schlechter.
+
+**Verworfene Alternative.** `leitSilo` stehen lassen und Patrick einen zweiten
+Halt „neben" der Mulde erklären. Verworfen, weil die Ansage zweimal dieselbe
+war.
+
+**Die Strecken sind nachgemessen, nicht angenommen.** `test/fahrumriss.test.ts`
+fährt jede der neuen Anfahrten, Rangierstrecken und Ausfahrten mit dem echten
+Umriss gegen alle Bauwerke ab: keine Durchdringung. `tools/fuhren.ts`: 18 von 18
+Fuhren durchgelaufen, jede Abholung mit eigener Fahrzeit (vorher hatten drei
+Fraktionen dieselbe — dasselbe Ziel).
+
+**Offen, gemessen und NICHT von mir entschieden.** Der Halt für **Edelstahl**
+(−30,00 | −7,00) hat mit dem Heck nur noch **0,16 m Luft** zur Südwand des
+Kupfer-Lagers; er steht damit in der Mündung der Silo-Gasse. Keine
+Durchdringung, die Fahrt läuft — aber es ist die engste Stelle des Platzes. Wenn
+das auf dem Gerät eng aussieht, sind die beiden Auswege: Südschenkel-Spur um
+1,0 m nach Osten (dann steht der Wagen nicht mehr mittig vor seiner Mulde) oder
+das VA-Lager an das andere Ende des Schenkels tauschen. Beides ist eine
+Gestaltungsfrage.
+
+**Auf dem Gerät zu prüfen.**
+
+1. **Kupfer** zur Abholung ausrufen: Hält der Wagen vor dem KUPFER-Silo — dem
+   nördlichsten des Westschenkels — und nicht davor oder dahinter?
+2. **Edelstahl** ausrufen und von hinten hinsehen: Wie nah steht sein Heck an der
+   Ecke des Kupfer-Lagers? (Gemessen 0,16 m — sieht das noch aus wie Rangieren
+   oder schon wie ein Unfall?)
+3. **Abfall** ausrufen: Er hält am östlichen Ende des Südschenkels. Kommt man von
+   dort mit dem Bagger an die Mulde **und** an die Ladefläche, ohne umzusetzen?
+
+---
+
+### E-064 — Auch der Abholer wiegt: leer herein, voll hinaus (15.09.2026)
+
+**Entscheidung.** Der Abholer hält bei der Einfahrt auf der Brückenwaage wie
+jeder andere und wird **leer gewogen (Tara)**; beim Hinausfahren wird er **voll
+gewogen (Brutto)**, und die HUD-Meldung nennt die **Differenz** als abgeholte
+Menge. Die Tara eines leeren Abholers ist das Leergewicht seines
+Abrollcontainers, `ABHOLER_CONTAINER_KG = 1.800 kg` (SW, aus dem Maß der Mulde:
+5,40 × 2,70 × 1,25 m ≈ 18 m³, ein offener 18-m³-Container aus 3-mm-Blech wiegt
+1,6–1,9 t).
+
+**Begründung.** Patrick am Gerät, 15.09.2026: „ausserdem muss auch abholer leer
+wiegen." Bis dahin stand im Quelltext ausdrücklich das Gegenteil: „der Abholer
+kommt leer und faehrt durch" — er übersprang `weighIn`.
+
+**Was ausdrücklich NICHT passiert ist.** Kein Geld, kein Konto, keine
+Preisänderung: „Kreislaufsachen noch nicht." Bezahlt wird die Fuhre weiterhin
+beim Losfahren vom Verladeplatz (`onPickupDepart`). Die beiden Wiegungen gehen
+deshalb über **eigene** Meldungen (`onAbholerTara`, `onAbholerBrutto`) und nicht
+über `onWeighIn`/`onWeighOut` — an denen hängen Preisverhandlung und Auszahlung
+des Anlieferers. Ein leerer Wagen verhandelt nicht: Ohne diese Trennung stünde
+der Abholer 32 Sekunden auf der Brücke und wartete auf eine Antwort, die niemand
+gibt.
+
+**Warum überhaupt eine Tara über null.** Die Waage dieses Spiels wiegt, was auf
+der Ladefläche liegt, nicht den Lastwagen darunter — daran wird nichts geändert,
+der Ankaufspreis der Anlieferer hängt an genau dieser Zahl. Der Container aber
+**liegt** auf der Fläche und wiegt etwas. So bleiben beide Wiegungen dieselbe
+Rechnung, und auf dem Lieferschein steht nicht „Tara 0 kg".
+
+**Ein zweiter Fehler, den dieselbe Arbeit gefunden hat.** Die Ausfahrtswiegung
+eines vollen Abholers hätte mit der vorhandenen Rechnung **0 kg** ergeben:
+`cargoMassKg()` kennt nur die Fuhre, mit der ein Wagen hereinkommt. Was der
+Spieler auflädt, wird beim Losfahren an die Fläche gekoppelt (`riding`) und
+stand dort nirgends. Neu ist `ladeflaecheKg()` — dieselbe Quelle, aus der auch
+die Federung ihre Last misst.
+
+**Verworfene Alternative.** Ein Leergewicht für den ganzen Lastwagen (12 t) auf
+beiden Waagen. Verworfen: Dann stünde in der Preisverhandlung des Anlieferers
+eine andere Zahl als die, nach der bezahlt wird — zwei Wahrheiten an einer
+Waage.
+
+**Wächter.** `test/abholerwaage.test.ts` (neu, 4 Fälle): Er meldet seine Tara,
+während er in der Phase `weighIn` auf der Brücke steht (Lage gegen `WEIGH_X` und
+`WAAGE_HALT` geprüft); `onWeighIn`/`onWeighOut` werden für ihn **nie** gerufen;
+Brutto − Tara ist genau die aufgeladene Masse; und die Gegenprobe — ein leer
+wieder hinausfahrender Abholer meldet 0 kg. Dazu zwei Fälle in
+`test/platzinventar-verdrahtung.test.ts`: Beide Hälften müssen in `main.ts`
+verdrahtet sein und im HUD landen (mit Gegenprobe auf einen absichtlich
+zerschnittenen Quelltext), und im Block der Wiegung darf `account.`,
+`preisFaktor` oder `shift.` nicht vorkommen.
+
+**Nachgezogen.** `test/federungAmWagen.test.ts` maß die Ruhelage des leeren
+Wagens nach fester Zeit — seit dem Halt auf der Waage fährt er zu diesem
+Zeitpunkt gerade wieder an, und die Feder nickt beim Anfahren (2,0025 mm gegen
+eine Schranke von 2,00 mm). Gemessen wird jetzt, wenn er an seinem Platz steht.
+
+**Auf dem Gerät zu prüfen.**
+
+1. Abholung rufen und an der Waage zusehen: Hält er dort kurz an, kommt Mario
+   heraus, und steht in der Einblendung eine **Tara**?
+2. Ihn beladen, mit **V** losschicken und an der Ausfahrt hinsehen: Nennt die
+   Waagen-Meldung Brutto, Tara und die Differenz — und passt die Differenz zu
+   dem, was vorher als verkaufte Menge gemeldet wurde?
+3. Einen Abholer **leer** wieder wegschicken: Steht dann „0 kg abgeholt" da,
+   ohne dass sich am Geld etwas rührt?
