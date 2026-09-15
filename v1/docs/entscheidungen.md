@@ -4925,7 +4925,7 @@ Durchfall ≤ 10 %, Rest ≤ 45 %, weitestes Stück < 12 m vom LKW.
 
 ---
 
-### E-073 — Passt der Zylinder? Drei Wege, gezeichnet — und keiner der beiden Umbauten ist baubar (15.09.2026)
+### E-074 — Passt der Zylinder? Drei Wege, gezeichnet — und keiner der beiden Umbauten ist baubar (15.09.2026)
 
 **Entscheidung.** Ein Blatt statt einer Frage in Worten:
 `docs/f5-anlenkung-2026-09-15.svg`. Vier Spalten nebeneinander, die drei
