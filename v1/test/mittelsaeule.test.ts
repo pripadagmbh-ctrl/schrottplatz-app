@@ -34,6 +34,9 @@ import {
   korbmass,
   probe,
 } from "../tools/fuenfschalen/saeulenrechnung";
+import * as raum from "../tools/fuenfschalen/anlenkungsraum";
+import { bahnprobe } from "../tools/fuenfschalen/anlenkungsriss";
+import { schalenmass } from "../tools/fuenfschalen/anlenkungsraum-blatt";
 
 /** Länge des Zylinderrohrs (m) — dieselbe Ableitung wie in `rig.stelleSchale`. */
 const ROHR = MASS.zylinder.laenge * 0.6;
@@ -206,5 +209,75 @@ describe("Blatt 3 — die Anlenkung: passt der Zylinder? (E-073)", () => {
     const null0 = kopfHerunter(0, false);
     expect(null0.unterBolzen, "unverschoben darf der Kopf nicht im Korb stehen").toBeLessThan(0);
     expect(null0.freiZuSchale).toBeGreaterThan(0.05);
+  });
+});
+
+describe("Blatt 4 — der Anlenkungsraum: es gibt eine Lösung (E-075)", () => {
+  /*
+   * Patrick, 15.09.2026: „Aber es kann nicht sein, dass wir da keine Lösung
+   * finden." Er hatte recht. Das Blatt
+   * `docs/f5-anlenkungsraum-2026-09-15.svg` zeigt sie; hier steht, was es
+   * behauptet. Die Suche ist teuer, deshalb wird sie nur dreimal gerufen.
+   */
+  it("rechnet Anlenkung UND Schalenbahn wie rig.ts — beides nicht blind", () => {
+    const p = raum.probe();
+    expect(p.fehler, "die Kopie trifft rig.ts nicht mehr").toBeLessThan(1e-12);
+    expect(p.gegenprobe, "die Rechnung reagiert nicht auf den Radiusabstand").toBeGreaterThan(1e-6);
+    /* Die gezeichnete Schalenbahn muss beim gebauten Bolzenkreis `mittellinie` treffen. */
+    expect(bahnprobe(STEMPEL_AUGE.y, STEMPEL_AUGE.r)).toBeLessThan(1e-12);
+    /*
+     * GEGENPROBE: Ein anderer Bolzenkreis MUSS eine andere Bahn ergeben. Ohne
+     * sie prüfte die Zeile darüber nur, dass die Funktion konstant ist.
+     */
+    expect(bahnprobe(STEMPEL_AUGE.y, 0.5)).toBeGreaterThan(0.05);
+  });
+
+  it("findet den heutigen Stand wieder — er ist eine Nadel, kein Gebiet", () => {
+    /*
+     * Die erste Fassung des Rasters hat ihn VERFEHLT, weil `OBERE_ANBINDUNG.z`
+     * mit 0,245 zwischen zwei Rasterpunkten lag, und daraufhin „keine Lösung"
+     * gemeldet — für einen Greifer, der gebaut dasteht. Seitdem stehen seine
+     * beiden Zahlen im Raster, und dieser Wächter hält das fest.
+     */
+    const f = raum.kleinsteSaeule(raum.DR_HEUTE, true);
+    expect(f.saeule, "der gebaute Stand wird nicht gefunden").not.toBeNull();
+    expect(f.saeule!).toBeLessThanOrEqual(raum.SAEULE_HEUTE + 1e-9);
+    expect(f.saeule!).toBeGreaterThan(0.6);
+  });
+
+  it("verkürzt die Säule auf rund 49 cm, wenn Kopf und Bolzenkreis gleich weit sind", () => {
+    const f = raum.kleinsteSaeule(0, true);
+    expect(f.saeule, "bei gleichem Radius muss es gehen").not.toBeNull();
+    expect(f.saeule!).toBeGreaterThan(0.44);
+    expect(f.saeule!).toBeLessThan(0.53);
+    /* Und alle Wächter halten dort — keiner ist nachgezogen. */
+    const k = f.k!;
+    expect(k.neigungMax).toBeLessThan(25);
+    expect(k.hebelMin).toBeGreaterThan(0.115);
+    expect(k.hebelZu).toBeGreaterThan(0.2);
+    expect(k.laengeMin, "die Stange muss aus dem Rohr schauen").toBeGreaterThan(raum.ROHR + 0.05);
+  });
+
+  it("wird schlechter, je weiter der Bolzenkreis über den Kopf hinausragt", () => {
+    /*
+     * Der Befund, der Patricks Vermutung umdreht — und die GEGENPROBE zum Test
+     * darüber: Wäre die Suche blind erfolgreich, fände sie auch hier etwas.
+     */
+    const weit = raum.kleinsteSaeule(0.2, true);
+    expect(weit.saeule, "bei +0,20 m darf es keine Lösung geben").toBeNull();
+    expect(["Neigung", "Hebelarm", "Hebel zu", "zu lang"]).toContain(weit.grund);
+  });
+
+  it("zahlt für den kleineren Bolzenkreis mit Maulweite, nicht mit Korbtiefe", () => {
+    const heute = schalenmass(STEMPEL_AUGE.r);
+    const schlank = schalenmass(0.5);
+    /* Der Formsatz hält den Äquator — die GESCHLOSSENE Form bleibt. */
+    expect(schlank.tiefeZu).toBeCloseTo(heute.tiefeZu, 9);
+    /* Offen wird es enger, dafür schwebt der Greifer weniger. */
+    expect(schlank.maul).toBeLessThan(heute.maul);
+    expect(schlank.schwebt).toBeLessThan(heute.schwebt);
+    /* Und die fünf Schalen passen noch nebeneinander. */
+    expect(schlank.sektor, "Sektor je Schale").toBeLessThan(36);
+    expect(schlank.sektor).toBeGreaterThan(heute.sektor);
   });
 });
