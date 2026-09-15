@@ -24,7 +24,27 @@ import {
   HALLE_TIEFE,
   TOR_RICHTUNG,
 } from "../src/world/office";
-import { PRESS_CENTER } from "../src/world/press";
+import { PRESS_CENTER, pressWaende } from "../src/world/press";
+
+/**
+ * Fussabdruck der Presse aus ihren vier Waenden.
+ *
+ * Seit E-029 steht sie nicht mehr als ein Vollrechteck in `STATIC_OBSTACLES`,
+ * sondern als Wandring — sonst kaeme der Greifer nicht auf den Kammerboden
+ * (Befund Patrick 15.09.2026: „Es war auch nicht moeglich, ein
+ * zusammengepresstes Auto wieder aus der Presse zu holen"). Wer die Anordnung
+ * pruefen will, braucht trotzdem den Umriss; er wird hier aus den Eintraegen
+ * zusammengesetzt, die wirklich in der Liste stehen.
+ */
+function presseFuss(): { x: number; z: number; hw: number; hd: number } {
+  const w = STATIC_OBSTACLES.filter((o) => o.label.startsWith("Presse "));
+  expect(w.length, "die Presse fehlt in der Hindernisliste").toBe(4);
+  const x0 = Math.min(...w.map((o) => o.x - o.hw));
+  const x1 = Math.max(...w.map((o) => o.x + o.hw));
+  const z0 = Math.min(...w.map((o) => o.z - o.hd));
+  const z1 = Math.max(...w.map((o) => o.z + o.hd));
+  return { x: (x0 + x1) / 2, z: (z0 + z1) / 2, hw: (x1 - x0) / 2, hd: (z1 - z0) / 2 };
+}
 import { BAGGER_STAND } from "../src/world/baggerstand";
 import { WEIGH_X, WEIGH_Z } from "../src/world/yard";
 import {
@@ -109,7 +129,7 @@ describe("Feste Bauten", () => {
 
   it("führt die erwarteten Bauwerke", () => {
     const labels = STATIC_OBSTACLES.map((o) => o.label).join(" ");
-    for (const pflicht of ["Südwand", "Westwand", "Ostwand", "Presse"]) {
+    for (const pflicht of ["Südwand", "Westwand", "Ostwand", "Presse Nord"]) {
       expect(labels, `${pflicht} fehlt in der Hindernisliste`).toContain(pflicht);
     }
   });
@@ -428,9 +448,16 @@ describe("Reichweite des Baggers", () => {
   });
 
   it("erreicht die offene Seite der Presse", () => {
-    // Naechster Punkt der Kammer, nicht deren Mitte. Sie steht seit dem
-    // Umbau vom 13.09.2026 in der Ecke, nicht mehr in der Sitzachse.
-    const presse = STATIC_OBSTACLES.find((o) => o.label === "Presse")!;
+    /*
+     * Naechster Punkt der Kammer, nicht deren Mitte. Sie steht seit dem
+     * Umbau vom 13.09.2026 in der Ecke, nicht mehr in der Sitzachse.
+     *
+     * Seit E-029 steht sie nicht mehr als EIN Rechteck in der Liste, sondern
+     * als Wandring (sonst kaeme der Greifer nicht auf den Kammerboden). Der
+     * Fussabdruck wird deshalb aus den vier Waenden zusammengesetzt — aus
+     * derselben Liste, in der er wirklich steht.
+     */
+    const presse = presseFuss();
     const dz = Math.abs(presse.z + presse.hd - BAGGER_Z);
     const dx = Math.max(0, Math.abs(presse.x - BAGGER_X) - presse.hw);
     expect(Math.hypot(dx, dz)).toBeLessThan(REICHWEITE_M);
@@ -473,7 +500,7 @@ describe("Reichweite des Baggers", () => {
      */
     const halde = CONFIGS.find((c) => c.id === "c_mixed")!;
     const stahl = CONFIGS.find((c) => c.id === "c_steel")!;
-    const presse = STATIC_OBSTACLES.find((o) => o.label === "Presse")!;
+    const presse = presseFuss();
     expect(presse.x, "Presse nicht rechts vom Sitz").toBeLessThan(stahl.x);
     expect(halde.x, "Mischschrott nicht links von der Stahlbox").toBeGreaterThan(stahl.x);
     // Und da, wo sie stand, darf keine unsichtbare Wand zurueckbleiben.
@@ -505,11 +532,19 @@ describe("Reichweite des Baggers", () => {
      * Lage und Mass aus press.ts; dieser Test haelt fest, dass sie
      * zusammenbleiben.
      */
-    const presse = STATIC_OBSTACLES.find((o) => o.label === "Presse")!;
+    const presse = presseFuss();
     expect(presse.x).toBeCloseTo(PRESS_CENTER.x, 6);
     expect(presse.z).toBeCloseTo(PRESS_CENTER.z, 6);
-    expect(hitsObstacle(PRESS_CENTER.x, PRESS_CENTER.z, 0), "Presse ist kein Hindernis")
-      .not.toBeNull();
+    /*
+     * Seit E-029 ist die KAMMER frei und nur der Wandring sperrt — sonst kommt
+     * der Greifer nicht an das Paket. Geprueft wird deshalb der Ring, nicht
+     * die Mitte: Die Wandmitten sperren, der Kammerboden ist offen.
+     */
+    expect(hitsObstacle(PRESS_CENTER.x, PRESS_CENTER.z, 0), "die Kammer ist zugemauert")
+      .toBeNull();
+    for (const w of pressWaende()) {
+      expect(hitsObstacle(w.x, w.z, 0), `Pressenwand ${w.teil} sperrt nicht`).not.toBeNull();
+    }
     // Die Stelle, an der sie bis zum Abend des 14.09.2026 stand, muss frei
     // sein — dort steht jetzt der LKW.
     expect(hitsObstacle(6.6, -24.6, 0), "alte Pressenstelle sperrt noch").toBeNull();
