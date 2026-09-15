@@ -476,8 +476,8 @@ export function umkugelRadius(shape: ScrapShape): number {
  * dicke Teil auch die Masse bekommt.
  *
  * Genutzt wird sie derzeit von keinem Bau: Der Kehrbesen war bis zum
- * 15.09.2026 der einzige mit Taille und ist seit E-037 ein Ballen mit einer
- * einzigen Huelle. Die Rechnung bleibt fuer den naechsten Gegenstand mit Hals
+ * 15.09.2026 der einzige mit Taille und kommt seit E-037 mit einer einzigen
+ * Huelle aus. Die Rechnung bleibt fuer den naechsten Gegenstand mit Hals
  * stehen und wird in `test/besen.test.ts` an einer Attrappe nachgeprueft.
  */
 export function quaderRaum(punkte: Float32Array): number {
@@ -573,18 +573,20 @@ const FLAT_SCALE_Y = 0.55;
 /* ------------------------------------------------------------------------ */
 
 /**
- * Der Kehrbesen: ein Ballen aus zusammengetretenem Maschendraht.
+ * Der Kehrbesen: eine getretene Rolle gruener Maschendraht.
  *
  * Wunsch Patrick, 15.09.2026 vormittags: „Ich bräuchte einen Maschendrahtzaun,
  * der quasi oben schon gequetscht ist und unten breit ist, der quasi wie ein
  * Besen fungiert ... Damit ich quasi mit dem Maschendrahtzaun den Boden bzw.
  * die Ladeflächen abkehren kann."
  *
- * Befund am Geraet, 15.09.2026 abends: „Der ist viel zu klein. Er soll fast so
- * breit sein wie eine Pritsche und viel voluminoeser ... es ist halt ein
- * bisschen wie ein Tee-Ei." Daraufhin E-037: aus dem Trichter wurde ein
- * Ballen. Die Form steht in `world/objektbau.ts` (`BESEN_FORM`), hier stehen
- * seine Masse.
+ * Zwei Befunde am Geraet am selben Abend haben die Form zweimal gedreht:
+ * erst vom Trichter zum Ballen (E-037: „viel zu klein ... wie ein Tee-Ei"),
+ * dann vom Ballen zur Rolle (E-049): „Stell dir gruenen Maschendraht vor, der
+ * unten noch aufgerollt ist, und das obere Teil ist gequetscht. Sollte auch
+ * mindestens so breit sein wie die Ladeflaeche eines LKWs."
+ *
+ * Die Form steht in `world/objektbau.ts` (`BESEN_FORM`), hier stehen die Masse.
  *
  * Er steht mit Absicht NICHT in `SPECS`, `KATALOG_SPECS`, `BIG_SPECS` oder
  * `HUGE_SPECS`. Alles, was dort steht, kann `randomCargo` auf einen Lkw laden;
@@ -594,43 +596,41 @@ const FLAT_SCALE_Y = 0.55;
  *
  * ## Woher die Zahlen kommen — jede einzeln gerechnet
  *
- * **Breite 2,40 m.** „Fast so breit wie eine Pritsche." Die Ladeflaeche einer
- * Pritsche ist innen 2 x `BED_HALF_W` = 2,70 m breit (`delivery/routes.ts`).
- * Er muss zwischen die Bordwaende PASSEN, sonst kann er sie nicht auskehren —
- * also 0,15 m Luft je Seite: 2,40 m, das sind 89 % der Ladeflaeche. Damit
- * geht eine Pritsche in EINER Bahn leer statt in dreien.
+ * **Breite 2,70 m.** Ansage: „mindestens so breit wie die Ladeflaeche eines
+ * LKWs." Die Ladeflaeche ist innen 2 x `BED_HALF_W` = **2,70 m**
+ * (`delivery/routes.ts`), und genau das ist die Zahl. Sie ist damit die
+ * einzige der drei Kantenlaengen, die nicht gerechnet, sondern bestellt ist.
  *
- * **Tiefe 1,30 m.** Nicht gewaehlt, sondern die Spur dessen, was den Ballen
- * geformt hat: Die geschlossene Spinne misst quer 1,297 m
- * (`clawWidth(CLAW_CLOSED_SPLAY)`, `excavator/clawGeometry.ts`). So breit ist
- * der Abdruck, den sie beim Niederdruecken hinterlaesst — „immer wieder
- * zwischen Spinne, Birne und Boden gedrueckt". Aufgerundet auf den Zentimeter.
- * Die Breite bleibt damit klar das Groesste: 2,40 : 1,30 : 1,10.
+ * Bis E-049 waren es 2,40 m — bewusst schmaler, damit der Besen LAENGS
+ * zwischen die Bordwaende passt. Patrick hat den Zielkonflikt selbst
+ * aufgeloest: „Breite so lassen, ich kann die Spinne ja drehen, damit es
+ * passt." Gekehrt wird die Ladeflaeche seitdem QUER — dann steht die Tiefe
+ * (1,12 m) zwischen den Bordwaenden und nicht die Breite, und der Besen
+ * schiebt mit seiner Stirnscheibe statt mit der runden Flanke. Gemessen in
+ * `test/besen.test.ts`.
  *
  * **Masse 680 kg — aus der Drahtmenge, nicht gegriffen.**
  * 2,8-mm-Draht bei 50-mm-Masche ergibt rund 56,6 m Draht je Quadratmeter;
  * 2,8-mm-Stahldraht wiegt 0,048 kg/m, also **2,72 kg/m²**. Eine handelsuebliche
  * Rolle ist 1,25 m hoch und 25 m lang = 31,25 m². „Sehr viele Maschendraehte"
  * sind hier **acht Rollen** = 250 m² = **679,2 kg**, aufgerundet 680 kg.
+ * Der Kunststoffmantel ist darin nicht gerechnet; er wiegt bei 2,8-mm-Draht
+ * rund ein Fuenftel des Kerns und ist gegen die Rundung auf zehn Kilo klein.
  *
- * **Hoehe 1,10 m — das Ergebnis, nicht die Vorgabe.** Aus der Drahtmenge folgt,
- * wieviel Raum der Ballen einnehmen MUSS, und daraus bei gegebener Breite und
- * Tiefe seine Hoehe:
+ * **Tiefe 1,12 m und Hoehe 0,80 m — die getretene Rolle.** Aus der Drahtmenge
+ * folgt der Rauminhalt (2,04 m³, gemessen; siehe unten), aus Rauminhalt und
+ * Breite die Querschnittsflaeche: 2,04 / 2,70 = **0,76 m²**. Ungetreten war
+ * die Rolle rund, und ein Kreis dieser Flaeche hat **0,98 m Durchmesser** —
+ * ein glaubwuerdiges Mass fuer eine Rolle Zaun, die jemand auf dem Platz
+ * liegen gelassen hat. Treten aendert die Flaeche nicht, nur die Form: Sie
+ * geht auf 0,80 m Hoehe zusammen und quillt dabei auf 1,12 m Tiefe
+ * auseinander (Stauchung 0,71). Nachgemessen am fertigen Kollider:
+ * **2,04 m³**.
  *
- *   - massiver Draht:    250 m² x 3,49e-4 m³/m²  = 0,087 m³
- *   - dichteste flache Lage: 250 m² x 0,0056 m (zwei Drahtdurchmesser je Lage)
- *                                              = 1,40 m³
- *   - ein getretener Ballen ist lockerer als das, weil zwischen den Lagen Luft
- *     bleibt — gebaut ist das 1,41-fache      = 1,98 m³
- *
- * Bei 2,40 m Breite und 1,30 m Tiefe kommt der gebaute Ballen damit auf
- * **1,10 m Hoehe**. Nachgemessen am fertigen Kollider (Rasterabtastung,
- * `test/besen.test.ts`): **1,98 m³**.
- *
- * Gegenprobe zur Packung: 680 kg auf 1,98 m³ sind **344 kg/m³**. Eine stramm
+ * Gegenprobe zur Packung: 680 kg auf 2,04 m³ sind **333 kg/m³**. Eine stramm
  * gewickelte Rolle liegt bei rund 700 kg/m³, die dichteste flache Lage bei
- * 490 kg/m³ — der Ballen ist also deutlich lockerer als beides und hat noch
- * Luft drin. Genau so sieht plattgetretener Draht aus.
+ * 486 kg/m³ — die getretene Rolle ist also lockerer als beides und hat noch
+ * Luft zwischen den Windungen. Genau so sieht plattgetretener Draht aus.
  *
  * **Was die Masse bedeutet.** Am Haken ist der Besen kinematisch und folgt der
  * Spinne ohne Ruecksicht auf sein Gewicht — beim Kehren spielt sie keine
@@ -639,16 +639,43 @@ const FLAT_SCALE_Y = 0.55;
  * Traglimit der Spinne (`MAX_TOTAL_KG` 3500 kg — 680 kg sind 19 %, es bleibt
  * also Platz fuer weitere Teile, `MAX_ITEMS` 5).
  *
- * **Fraktion Zink.** Verzinkter Draht laeuft im Spiel wie die „Verzinkten
- * Gitterroste" und die „Zink-Dachrinne" im Zinkstrom (`objektkatalog.ts`).
- * Verkauft wird er ohnehin nie; die Fraktion bestimmt nur Farbe und Name im
- * Greifer.
+ * ## Warum Mischschrott und nicht Zink oder Stahl
+ *
+ * Ansage Patrick zur Fraktion: „Egal, er wird nie verkauft." Das stimmt — er
+ * ist Platzinventar, seine Zusammensetzung ist null Kilo, und damit rechnet
+ * jede Geldformel null Euro. Die Fraktion steht nur noch an EINER Stelle: in
+ * der Zeile, die der Spieler liest, wenn der Besen in der Spinne haengt.
+ * Genau deshalb soll sie ehrlich sein.
+ *
+ * **Zink war falsch.** Der Wert stammt aus E-031, als der Besen aus blankem
+ * verzinktem Draht war. Gezeichnet ist seit E-049 kunststoffummantelter
+ * Gartenzaun: Stahlkern, gruener PVC-Mantel. Das dominierende Metall ist
+ * Stahl, nicht Zink.
+ *
+ * **Stahlschrott waere nach der neuen Regel sofort wieder falsch.** Die
+ * Stahlschrott-Regel (E-042, `tools/stahlschrott.ts`) verlangt zweierlei:
+ * rechnerische Wandstaerke ab 6 mm UND hoechstens 10 % Fremdstoff. Gerechnet:
+ *
+ *   Aussenflaeche 12,16 m², 680 kg auf Stahldichte verteilt → **7,1 mm**
+ *     — die Wandstaerke reisst die Schwelle also NICHT, weil das Stueck gross
+ *       und schwer ist.
+ *   2,8-mm-Draht mit Mantel auf 3,8 mm: 48,3 g/m Stahl gegen 7,3 g/m PVC
+ *     → **13,1 % Fremdstoff** — und daran scheitert es.
+ *
+ * Bleibt **Mischschrott**: die Fraktion fuer alles, was nicht sortenrein ist.
+ * Ein Draht mit Kunststoffmantel ist genau das — ein Verbund, den man erst
+ * trennen muesste. Dieselbe Einordnung, die `urteile()` in E-042 einem
+ * Verbundstueck gibt.
+ *
+ * Die Farbe des Modells kommt aus dem Bau und ist gruen; der Farbfleck der
+ * Fraktion ist grau. Das ist kein Widerspruch, sondern derselbe Unterschied
+ * wie zwischen einem lackierten Kuehlschrank und seinem Schrottwert.
  */
 export const BESEN: PileSpec = {
-  materialId: "zinc",
+  materialId: "mixed",
   massKg: 680,
   kind: "box",
-  dims: [2.4, 1.1, 1.3],
+  dims: [2.7, 0.8, 1.12],
   bau: "besen",
   name: "Maschendraht-Besen",
 };
@@ -1351,9 +1378,9 @@ export class ItemManager {
     // Meist ist es genau ein Kollider. Formen mit Taille bringen mehrere mit
     // (siehe oben); dann bekommt jeder seinen Massenanteil, und der
     // Schwerpunkt sitzt dort, wo das Material ist. Derzeit nutzt das kein
-    // Bau — der Kehrbesen, der es gebraucht hatte, ist seit E-037 ein Ballen
-    // ohne Taille, und dessen Schwerpunkt sitzt schon von der Huelle her tief
-    // (gemessen y −0,149 m bei 1,10 m Hoehe).
+    // Bau — der Kehrbesen, der es gebraucht hatte, ist seit E-037 taillenlos,
+    // und sein Schwerpunkt sitzt schon von der Huelle her unter der Mitte
+    // (als Rolle gemessen: y −0,035 m bei 0,80 m Hoehe).
     const teile = shape.flat || teilKollider.length === 0 ? [collider] : teilKollider;
     const anteile = teile.length === 1 ? [1] : teilAnteile;
     for (let i = 0; i < teile.length; i++) {
@@ -1513,14 +1540,14 @@ export class ItemManager {
      *
      * Der Trichter von vormittags musste auf die Flanke gelegt werden
      * (`Euler(PI/2, 0, 0)`), sonst haette er wie ein Besen an der Wand
-     * gestanden und waere beim ersten Anstossen umgefallen. Der Ballen hat
-     * diese Frage nicht: Seine Form IST die Lage, in der er entstanden ist —
-     * unten platt vom Boden, oben rund von der Spinne. Er wird hingelegt,
-     * nicht gekippt, und steht damit sofort richtig zum Kehren.
+     * gestanden und waere beim ersten Anstossen umgefallen. Die Rolle hat
+     * diese Frage nicht: Ihre Form IST die Lage, in der sie entstanden ist —
+     * unten die Wicklung auf dem Beton, oben der gequetschte Kopf. Sie wird
+     * hingelegt, nicht gekippt, und steht damit sofort richtig zum Kehren.
      *
-     * `gier` dreht ihn nur um die Hochachse: 0 heisst, die 2,40 m breite
-     * Schleppkante liegt quer (Ost–West) — man sieht beim Start, wie breit er
-     * ist.
+     * `gier` dreht sie nur um die Hochachse: 0 heisst, die Rollenachse und
+     * damit die 2,70 m lange Schleppkante liegen quer (Ost–West) — man sieht
+     * beim Start, wie breit sie kehrt.
      */
     const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, BESEN_PLATZ.gier, 0));
     return this.spawnScrap(
