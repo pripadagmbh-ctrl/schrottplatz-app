@@ -4,8 +4,10 @@ import {
   TRADES,
   rollCustomer,
   vehicleForCustomer,
+  MINDEST_FUHRE_KG,
   type CustomerProfile,
 } from "../src/delivery/customers";
+import { NUTZLAST } from "../src/delivery/fuellgrad";
 import { Reputation, REP_MAX } from "../src/economy/reputation";
 import { getMaterial } from "../src/materials/catalog";
 
@@ -38,13 +40,27 @@ describe("Kundschaft", () => {
          *
          * Die Untergrenze selbst bewacht `test/lademenge.test.ts` über alle
          * Gruppen zugleich.
+         *
+         * NACHTRAG 15.09.2026 nachmittags (E-033): Seit die Masse aus dem
+         * Füllgrad folgt (Masse = Füllgrad × Laderaum × Schüttdichte), ist die
+         * 600-kg-Grenze für den Privatmann keine Regel mehr. Sein Anhänger
+         * fasst 2,40 m³; ein Viertel davon voll Holz und Kunststoff wiegt rund
+         * 300 kg, und der Füllgrad gewinnt. Was bleibt: Er fährt nicht mit
+         * einer Handvoll Blech vor, und er wird nie zum Händler.
          */
-        expect(c.massKg, "Privat lohnt die Fahrt").toBeGreaterThanOrEqual(600);
+        expect(c.massKg, "Privat lohnt die Fahrt").toBeGreaterThanOrEqual(MINDEST_FUHRE_KG);
         expect(c.massKg, "Privat bleibt unter einer Händlerfuhre").toBeLessThan(2000);
       } else {
-        // Was auf eine Ladefläche passt — nicht mehr
-        expect(c.massKg, `${c.group} bringt Fuhren`).toBeGreaterThanOrEqual(1000);
-        expect(c.massKg, `${c.group} passt auf einen LKW`).toBeLessThan(9001);
+        /*
+         * Wer einen LKW bewegt, bringt eine Fuhre. Die Obergrenze ist keine
+         * gewürfelte Zahl mehr, sondern die Nutzlast seines Wagens — ein
+         * Kipper trägt 9,5 t, eine Pritsche 8,5 t, und ein Händler, der ein
+         * Wrack abschleppt, bringt dessen 950 kg.
+         */
+        expect(c.massKg, `${c.group} bringt Fuhren`).toBeGreaterThanOrEqual(600);
+        expect(c.massKg, `${c.group} passt auf seinen Wagen`).toBeLessThanOrEqual(
+          NUTZLAST[c.vehicle]
+        );
       }
     }
   });
