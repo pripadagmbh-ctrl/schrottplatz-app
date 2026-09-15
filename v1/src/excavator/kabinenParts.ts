@@ -199,19 +199,30 @@ export function kabineStahl(cx: number, cz: number): THREE.BufferGeometry {
     spiegel.translate(cx + sx * 0.79, 1.96, cz + 0.62);
     teile.push({ geo: spiegel, farbe: SPIEGEL });
   }
-  // Scheibenwischer mit Blatt auf der Frontscheibe
-  const wischarm = new THREE.CylinderGeometry(0.012, 0.012, 0.42, 6);
-  wischarm.rotateZ(0.55);
-  wischarm.translate(cx + 0.15, 1.05, cz + 0.72);
-  teile.push({ geo: wischarm, farbe: STAHL });
-  const blatt = new THREE.BoxGeometry(0.03, 0.4, 0.02);
-  blatt.rotateZ(0.55);
-  blatt.translate(cx + 0.18, 1.06, cz + 0.735);
-  teile.push({ geo: blatt, farbe: STAHL });
-  // Sonnenblende innen oben an der Frontscheibe
-  const blende = new THREE.BoxGeometry(0.98, 0.028, 0.16);
+  /*
+   * KEIN SCHEIBENWISCHER, und die Sonnenblende ist kleiner.
+   *
+   * Befund Patrick am Geraet, 15.09.2026, aus der Kabinensicht:
+   * „Scheibenwischer erstmal raus, Sonnenblende kleiner."
+   *
+   * Beide standen genau dort, wo man beim Arbeiten hinschaut. Der Wischer lag
+   * mit Arm und Blatt schraeg ueber der Frontscheibe auf Augenhoehe (y 1,05,
+   * der Augpunkt liegt bei 1,68); die Blende hing mit 0,98 x 0,16 m ueber der
+   * ganzen Scheibenbreite. Von aussen sind beide Zierrat, von innen nehmen sie
+   * Sicht — und die Kabinenansicht ist die, in der gearbeitet wird.
+   *
+   * „Erstmal raus" heisst: Der Wischer kann wiederkommen, wenn es je Regen
+   * gibt und er etwas zu tun hat. Dann gehoert er in Ruhestellung an den
+   * unteren Scheibenrand, nicht quer ins Bild.
+   *
+   * Die Blende bleibt, weil sie eine Kabine als Kabine lesbar macht — aber nur
+   * noch als schmaler Streifen: 0,72 x 0,09 statt 0,98 x 0,16 m, also knapp
+   * ein Drittel der Flaeche. Sie sitzt weiter oben an der Scheibe, wo der
+   * Blick ohnehin nicht hingeht.
+   */
+  const blende = new THREE.BoxGeometry(0.72, 0.028, 0.09);
   blende.rotateX(0.5);
-  blende.translate(cx, 1.9, cz + 0.6);
+  blende.translate(cx, 1.93, cz + 0.62);
   teile.push({ geo: blende, farbe: STAHL });
 
   return verschmelzeBunt(teile, "Kabine-Stahl");
