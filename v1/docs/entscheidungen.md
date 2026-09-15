@@ -2862,3 +2862,64 @@ keiner sackt durch den Beton, ein gefasstes Teil wandert höchstens 0,030 m
    — ist das die Handvoll, die man erwartet, oder zu viel?
 3. Gegenprobe: nur an die **Kante** einer großen Kiste fahren. Sie darf weiter
    **nicht** mitkommen.
+
+### E-046 — Der Bodenanschlag rechnet über den ganzen Schließweg (15.09.2026)
+
+**Entscheidung.** `resolveGroundClamp` nimmt nicht mehr die Spitzentiefe der
+**Momentanstellung** (`clawTipDepth(currentSplay())`), sondern die größte Tiefe
+über den **ganzen** Schließweg (`CLAW_MAX_DEPTH`). Eine Zeile zum Zurückdrehen:
+`BODEN_UEBER_SCHLIESSWEG` in `excavator.ts`.
+
+**Begründung.** Die geschlossene Kralle reicht 2,95 m tief, die offene nur
+2,44 m. Wer gegen die Momentanstellung rechnet, setzt die offene Spinne so tief
+ab, dass sie beim Zudrücken in den Beton geriete — also **hob der Anschlag den
+Arm während des Schließens nach**. Gemessen am kopflosen Bagger:
+
+| beim Zupacken | vorher | nachher |
+|---|---|---|
+| Spinne steigt | **0,548 m** | **0,000 m** |
+| Spinne wandert zur Seite | **0,513 m** | **0,000 m** |
+| Höhe der Spinnenmitte beim Absetzen | 2,461 m | 3,012 m |
+| Spitzen der **offenen** Spinne über dem Beton | 0,018 m | **0,570 m** |
+| tiefster Punkt einer Spitze **während** des Griffs | 0,008 m | 0,013 m |
+
+Der Arm zog sich in genau den Bildern unter dem Teil weg, in denen er zufassen
+soll. Jetzt steht er still.
+
+**Der Preis, und er ist sichtbar.** Die **offene** Spinne hängt beim „Aufsetzen"
+gut einen halben Meter über dem Beton — genau den Unterschied zwischen offener
+und tiefster Stellung (0,557 m, gerechnet). Beim Schließen fahren die Schalen
+weiter bis 1,3 cm an den Beton heran, vom Boden aufgenommen wird also
+unverändert alles (`test/greiffenster.test.ts`, sieben Größen von 0,10 m bis
+1,10 m, grün). Aber wer die offene Spinne absetzt, sieht eine Lücke, wo vorher
+die Zähne auflagen. Das ist Patricks Urteil am Gerät; deshalb die eine Zeile.
+
+**Was die Änderung ausdrücklich NICHT bringt.** Die Vermutung aus dem
+E-043-Bericht — das Anheben sei die Ursache der verbleibenden Fehlgriffe am
+Korbrand — ist **gemessen und widerlegt**: über vier Größen und sechs
+Zufallssaaten am Korbrand (0,80 m neben der Achse) **22 von 24 vorher, 21 von 24
+nachher**, also gleich innerhalb der Streuung. Die letzten Fehlgriffe kommen
+nicht vom steigenden Arm, sondern davon, dass die schließende Schale ein
+leichtes Teil am Rand auch mal aus dem Korb schiebt, bevor sie es fasst. Wer
+daran etwas ändern will, muss an der Schale ansetzen, nicht am Anschlag — und
+das wäre ein eigener Schritt.
+
+**Verworfene Alternative.** Den vollen Anschlag nur während des Schließens
+gelten lassen (dann steht die offene Spinne wieder am Boden — aber der Arm
+springt im Moment des Zupackens um dieselben 0,55 m, also genau der Fehler);
+`surfaceUnderClaws` ebenfalls auf die tiefste Stellung umstellen (unnötig, der
+Messkreis unter den Krallen hat mit der Tiefe nichts zu tun).
+
+**Abnahmekriterium.** `npm test` grün: **75 Dateien, 843 Tests**, darunter
+`test/bodenanschlag.test.ts` mit drei Prüfungen (Hub < 0,05 m; die Spitzen
+kommen beim Schließen trotzdem bis 5 cm an den Beton; der halbe Meter
+Absetzhöhe steht als Zahl im Wächter). Mit `BODEN_UEBER_SCHLIESSWEG = false`
+sind zwei davon rot, mit den gemessenen Zahlen 0,548 m und 0,018 m.
+
+**Auf dem Gerät zu prüfen.**
+
+1. Arm absetzen und zupacken: Bleibt die Spinne jetzt **stehen**, statt beim
+   Zudrücken hochzugehen? Das ist die eigentliche Frage.
+2. Offene Spinne auf den Beton absetzen und hinsehen: Der halbe Meter Luft
+   unter den Zähnen — stört er, oder fällt er nicht auf?
+3. Ein flaches Teil (Blech) vom Beton aufnehmen: Kommt es weiter mit?
