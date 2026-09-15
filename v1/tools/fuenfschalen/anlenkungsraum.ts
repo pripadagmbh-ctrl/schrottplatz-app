@@ -37,6 +37,7 @@
  * `src/` ist unberührt. Die Rechnung prüft sich bei jedem Lauf gegen `rig.ts`.
  */
 import {
+  stoffe,
   DREHPUNKT,
   MASS,
   OBERE_ANBINDUNG,
@@ -46,7 +47,8 @@ import {
   ZYLINDER_AUFNAHME,
   schwenkFuer,
 } from "../../src/fuenfschalen/teile";
-import { hebelarm, zylinderLaenge, zylinderNeigung } from "../../src/fuenfschalen/rig";
+import { baueGreiferInTeilen, hebelarm, zylinderLaenge, zylinderNeigung } from "../../src/fuenfschalen/rig";
+import * as THREE from "three";
 
 export const GRAD = 180 / Math.PI;
 
@@ -262,7 +264,7 @@ export interface Fund {
  */
 const AY_RASTER: number[] = (() => {
   const a: number[] = [];
-  for (let y = -0.44; y <= 0.0601; y += 0.01) a.push(Math.round(y * 1e4) / 1e4);
+  for (let y = -0.44; y <= 0.5001; y += 0.01) a.push(Math.round(y * 1e4) / 1e4);
   if (!a.includes(OBERE_ANBINDUNG.y)) a.push(OBERE_ANBINDUNG.y);
   return a.sort((x, y) => x - y);
 })();
@@ -315,4 +317,169 @@ export function kurve(von: number, bis: number, schritt: number, echterUeberstan
 /** Durchmesser der Mitteltraverse zu einem Aufnahmeradius (m) — `traverseAus`. */
 export function kopfDurchmesser(rOben: number): number {
   return 2 * rOben + 0.02;
+}
+
+/* ------------------------------------------- Der Arm, in Patricks Sprache */
+
+/**
+ * Wie weit der Schalenarm über seinen Bolzen hinausragt (m) — der ABSTAND
+ * Bolzen ↔ Zylinderauge.
+ *
+ * `Ay` und `Az` sind Längs- und Quermaß im Schalenrahmen; was die Anlenkung
+ * wirklich spürt, ist ihr Betrag. Heute sind das 0,2577 m.
+ */
+export function armRadius(Ay: number, Az: number): number {
+  return Math.hypot(Ay, Az);
+}
+
+/**
+ * Wie hoch das Zylinderauge beim ÖFFNEN über den Bolzen steigt (m).
+ *
+ * DAS IST DIE GRÖSSE, DIE DIE SÄULE ERZWINGT — und sie hängt NICHT davon ab,
+ * ob der Arm nach oben oder nach unten zeigt.
+ *
+ * Das Auge läuft auf einem Kreis um den Bolzen: seine Höhe über dem Bolzen ist
+ * `Ay·cos s + Az·sin s`, und das erreicht über den Schwenk von 96,25° seinen
+ * Scheitel bei `hypot(Ay, Az)` — dem ARMRADIUS —, sobald der Winkel
+ * `atan2(Az, Ay)` im Schwenkbereich liegt. Bei unserem Anschlag liegt er das
+ * für jedes `Ay > −0,03`.
+ *
+ * Folge: Den Arm nach OBEN zu ziehen (`Ay` positiv statt negativ) verschiebt
+ * nur, WANN der Scheitel kommt, nicht WIE HOCH er ist. Die Zylinderaufnahme
+ * muss um diesen Scheitel plus den Winkelzuschlag darüberstehen — das ist die
+ * Säule. Wer sie kürzen will, muss den ARMRADIUS kürzen, und der ist nach
+ * unten durch den Hebelarm-Wächter gedeckelt: Der Hebelarm kann nie größer
+ * werden als der Armradius.
+ */
+export function augenHoch(Ay: number, Az: number, stufen = 200): number {
+  let hoch = -Infinity;
+  for (let i = 0; i <= stufen; i++) {
+    const s = ZU + ((OFFEN - ZU) * i) / stufen;
+    hoch = Math.max(hoch, Ay * Math.cos(s) + Az * Math.sin(s));
+  }
+  return hoch;
+}
+
+/**
+ * Kleinste Säule bei FESTEM Armradius — über alle Armwinkel und Kopfabstände.
+ *
+ * Damit lässt sich die Frage „hilft ein hochstehender Arm?" beantworten, ohne
+ * sie zu glauben: Der Armwinkel `phi` läuft von −90° (Arm zeigt nach unten,
+ * heute −18°) bis +90° (Arm zeigt nach oben), der Radius bleibt.
+ */
+export function kleinsteSaeuleBeiArm(
+  armR: number,
+  echterUeberstand: boolean,
+  drVon = -0.6,
+  drBis = 0.3,
+  /* Armwinkel in Grad: negativ = Arm zeigt nach unten (heute −18°). */
+  gVon = -90,
+  gBis = 90
+): { saeule: number | null; dr0: number; Ay: number; Az: number; k: Kennwert | null } {
+  for (let saeule = 0; saeule <= 0.95 + 1e-9; saeule += 0.01) {
+    const d = saeule + AUFNAHME_UEBER_TRAVERSE;
+    for (let dr0 = drVon; dr0 <= drBis + 1e-9; dr0 += 0.02) {
+      for (let g = gVon; g <= gBis + 0.01; g += 2) {
+        const Ay = armR * Math.sin((g * Math.PI) / 180);
+        const Az = armR * Math.cos((g * Math.PI) / 180);
+        const k = kennwert({ dr0, d, Ay, Az }, 21);
+        if (schwaechste(k, echterUeberstand)[1] > 0) {
+          const fein = kennwert({ dr0, d, Ay, Az }, 80);
+          if (haelt(fein, echterUeberstand)) {
+            return { saeule, dr0, Ay, Az, k: fein };
+          }
+        }
+      }
+    }
+  }
+  return { saeule: null, dr0: 0, Ay: 0, Az: 0, k: null };
+}
+
+/* --------------------------------------------------------- Maße der Schale */
+
+export interface Schalenmass {
+  rUnten: number;
+  tiefeZu: number;
+  maxTiefe: number;
+  schwebt: number;
+  maul: number;
+  huellkreis: number;
+  sektor: number;
+}
+
+/**
+ * Was ein anderer Bolzenkreis an der Schale kostet — am GEBAUTEN Netz gemessen.
+ *
+ * Der Formsatz hält `drehpunktR + versatz` auf dem Äquator (0,89), damit die
+ * GESCHLOSSENE Form dieselbe bleibt. Was sich ändert, ist der offene Zustand:
+ * Maulweite, Hüllkreis, Schwebehöhe und der Sektor, den eine Schale braucht.
+ */
+export function schalenmass(rUnten: number): Schalenmass {
+  const g = baueGreiferInTeilen(stoffe(), {
+    drehpunktR: rUnten,
+    versatz: AEQUATOR - rUnten,
+    offen: OFFEN,
+  });
+  const p = new THREE.Vector3();
+  const tiefe = (t: number): number => {
+    g.setOeffnung(t);
+    g.wurzel.updateMatrixWorld(true);
+    let d = 0;
+    g.schalen[0]!.gelenk.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      const a = m.geometry.getAttribute("position") as THREE.BufferAttribute;
+      for (let k = 0; k < a.count; k++) {
+        p.fromBufferAttribute(a, k).applyMatrix4(m.matrixWorld);
+        d = Math.max(d, STEMPEL_AUGE.y - p.y);
+      }
+    });
+    return d;
+  };
+  let maxTiefe = 0;
+  for (let i = 0; i <= 60; i++) maxTiefe = Math.max(maxTiefe, tiefe(i / 60));
+  const tiefeZu = tiefe(0);
+
+  g.setOeffnung(1);
+  g.wurzel.updateMatrixWorld(true);
+  const zahn = g.schalen[0]!.gelenk
+    .getObjectByName("SHELL_TIP_01")!
+    .getObjectByName("07_ZAHN") as THREE.Mesh;
+  const pos = zahn.geometry.getAttribute("position") as THREE.BufferAttribute;
+  const m = new THREE.Vector3();
+  const v = new THREE.Vector3();
+  for (let k = pos.count - 5; k < pos.count; k++) m.add(v.fromBufferAttribute(pos, k));
+  m.multiplyScalar(0.2).applyMatrix4(zahn.matrixWorld);
+
+  let huellkreis = 0;
+  let sektor = 0;
+  for (let i = 0; i <= 20; i++) {
+    g.setOeffnung(i / 20);
+    g.wurzel.updateMatrixWorld(true);
+    const s0 = g.schalen[0]!;
+    s0.gelenk.traverse((o) => {
+      const q = o as THREE.Mesh;
+      if (!q.isMesh) return;
+      const a = q.geometry.getAttribute("position") as THREE.BufferAttribute;
+      for (let k = 0; k < a.count; k++) {
+        p.fromBufferAttribute(a, k).applyMatrix4(q.matrixWorld);
+        const r = Math.hypot(p.x, p.z);
+        huellkreis = Math.max(huellkreis, 2 * r);
+        if (r < 0.3) continue;
+        let d = Math.atan2(p.x, p.z) - s0.winkel;
+        while (d > Math.PI) d -= 2 * Math.PI;
+        while (d < -Math.PI) d += 2 * Math.PI;
+        sektor = Math.max(sektor, Math.abs(d) * GRAD);
+      }
+    });
+  }
+  return {
+    rUnten,
+    tiefeZu,
+    maxTiefe,
+    schwebt: maxTiefe - tiefeZu,
+    maul: 2 * Math.hypot(m.x, m.z),
+    huellkreis,
+    sektor,
+  };
 }

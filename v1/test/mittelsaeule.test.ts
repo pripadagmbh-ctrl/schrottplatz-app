@@ -35,8 +35,8 @@ import {
   probe,
 } from "../tools/fuenfschalen/saeulenrechnung";
 import * as raum from "../tools/fuenfschalen/anlenkungsraum";
-import { bahnprobe } from "../tools/fuenfschalen/anlenkungsriss";
-import { schalenmass } from "../tools/fuenfschalen/anlenkungsraum-blatt";
+import { bahnprobe, verdeckung } from "../tools/fuenfschalen/anlenkungsriss";
+import { schalenmass } from "../tools/fuenfschalen/anlenkungsraum";
 
 /** Länge des Zylinderrohrs (m) — dieselbe Ableitung wie in `rig.stelleSchale`. */
 const ROHR = MASS.zylinder.laenge * 0.6;
@@ -279,5 +279,69 @@ describe("Blatt 4 — der Anlenkungsraum: es gibt eine Lösung (E-075)", () => {
     /* Und die fünf Schalen passen noch nebeneinander. */
     expect(schlank.sektor, "Sektor je Schale").toBeLessThan(36);
     expect(schlank.sektor).toBeGreaterThan(heute.sektor);
+  });
+});
+
+describe("Blatt 5 — der Kopf ist zu schlank: es ist die Verkleidung (E-076)", () => {
+  /*
+   * Patrick, 15.09.2026, zu sieben Vorbildaufnahmen: „Der Kopf ist zu schlank."
+   * Und die Korrektur, ohne die alles Weitere falsch gewesen wäre: „Das ist ein
+   * Zylinderschutz. Also es ist kein Gusskörper."
+   */
+  it("beweist, dass ein hochstehender Schalenarm nichts bringt", () => {
+    /*
+     * Das Auge läuft auf einem Kreis um den Bolzen. Seine größte Höhe über ihm
+     * ist der ARMRADIUS — gleich, ob der Arm nach oben oder nach unten zeigt.
+     * Die Rechnung steht in `augenHoch`; hier wird sie gegen die Behauptung
+     * gehalten.
+     */
+    const r = raum.armRadius(raum.HEUTE.Ay, raum.HEUTE.Az);
+    expect(r).toBeCloseTo(0.2577, 4);
+    expect(raum.augenHoch(raum.HEUTE.Ay, raum.HEUTE.Az)).toBeLessThanOrEqual(r + 1e-9);
+    /* Arm nach OBEN gedreht, gleicher Radius: der Scheitel bleibt derselbe. */
+    const hoch = raum.augenHoch(r * Math.sin(1.1), r * Math.cos(1.1));
+    expect(hoch).toBeCloseTo(r, 6);
+    /*
+     * GEGENPROBE: Ein KLEINERER Armradius senkt den Scheitel wirklich — sonst
+     * prüfte die Zeile darüber nur, dass die Funktion konstant ist.
+     */
+    expect(raum.augenHoch(0, 0.1)).toBeCloseTo(0.1, 6);
+  });
+
+  it("findet mit hochstehendem Arm keine einzige Lösung — mit hängendem schon", () => {
+    /* Arm nach oben (Armwinkel +10° bis +90°): nichts, bei keinem Radius. */
+    for (const r of [0.2577, 0.35]) {
+      const hoch = raum.kleinsteSaeuleBeiArm(r, true, -0.6, 0.3, 10, 90);
+      expect(hoch.saeule, `Armradius ${r} nach oben`).toBeNull();
+    }
+    /*
+     * GEGENPROBE, und zugleich der Befund: Mit freiem Armwinkel geht es sehr
+     * wohl — der Arm zeigt dann nach UNTEN. Meldet dieser Block nicht, sucht
+     * die Funktion gar nicht.
+     */
+    const frei = raum.kleinsteSaeuleBeiArm(0.35, true);
+    expect(frei.saeule, "mit freiem Armwinkel muss es gehen").not.toBeNull();
+    expect(Math.atan2(frei.Ay, frei.Az), "der Arm zeigt nach unten").toBeLessThan(0);
+    expect(frei.saeule!).toBeLessThan(raum.SAEULE_HEUTE);
+  });
+
+  it("rechnet die Sicht: unten verdeckt der Kopf nie, oben ab Ø 1,81 m", () => {
+    const AUF = 2.766; // Aufhängung aufgesetzt, E-065
+    /* Kabine unten: das Auge liegt kaum über dem Kopf, der Blick streift vorbei. */
+    for (const D of [0.95, 2.0, 2.8]) {
+      expect(verdeckung(D / 2, 3.28, 4, AUF, 0.72, 2.5, 3.0), `Ø ${D} unten`).toBe(0);
+    }
+    /*
+     * Kabine oben (2,60 m Hub): jetzt verdeckt er, und zwar mehr, je breiter.
+     * Das ist die Gegenprobe zur Zeile darüber — wäre die Rechnung blind,
+     * käme auch hier null heraus.
+     */
+    const schmal = verdeckung(0.95 / 2, 5.88, 4, AUF, 0.72, 2.5, 3.0);
+    const breit = verdeckung(2.8 / 2, 5.88, 4, AUF, 0.72, 2.5, 3.0);
+    expect(schmal).toBeGreaterThan(0.05);
+    expect(breit).toBeGreaterThan(schmal);
+    /* Die Grenze, unter der über 75 % sichtbar bleiben. */
+    expect(verdeckung(1.81 / 2, 5.88, 4, AUF, 0.72, 2.5, 3.0)).toBeLessThan(0.25);
+    expect(verdeckung(1.9 / 2, 5.88, 4, AUF, 0.72, 2.5, 3.0)).toBeGreaterThan(0.25);
   });
 });

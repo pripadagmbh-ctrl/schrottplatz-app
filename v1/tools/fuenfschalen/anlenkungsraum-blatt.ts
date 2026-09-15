@@ -18,18 +18,8 @@
  * Ergebnis: docs/f5-anlenkungsraum-2026-09-15.svg + die Karte auf der Konsole
  */
 import { writeFileSync } from "node:fs";
-import * as THREE from "three";
+import { MASS, OBERE_ANBINDUNG, STEMPEL_AUGE, ZYLINDER_AUFNAHME } from "../../src/fuenfschalen/teile";
 import {
-  MASS,
-  OBERE_ANBINDUNG,
-  OFFEN,
-  STEMPEL_AUGE,
-  ZYLINDER_AUFNAHME,
-  stoffe,
-} from "../../src/fuenfschalen/teile";
-import { baueGreiferInTeilen } from "../../src/fuenfschalen/rig";
-import {
-  AEQUATOR,
   DR_HEUTE,
   HEUTE,
   ROHR,
@@ -41,6 +31,8 @@ import {
   kopfDurchmesser,
   kurve,
   probe,
+  schalenmass,
+  type Schalenmass,
 } from "./anlenkungsraum";
 import {
   FARBE,
@@ -55,95 +47,6 @@ import {
 const GRAD = 180 / Math.PI;
 /** Größter Sektor je Schale, bevor sich fünf Schalen berühren: 360/5/2. */
 const SEKTOR_GRENZE = 36;
-
-/* --------------------------------------------------------- Maße der Schale */
-
-export interface Schalenmass {
-  rUnten: number;
-  tiefeZu: number;
-  maxTiefe: number;
-  schwebt: number;
-  maul: number;
-  huellkreis: number;
-  sektor: number;
-}
-
-/**
- * Was ein anderer Bolzenkreis an der Schale kostet — am GEBAUTEN Netz gemessen.
- *
- * Der Formsatz hält `drehpunktR + versatz` auf dem Äquator (0,89), damit die
- * GESCHLOSSENE Form dieselbe bleibt. Was sich ändert, ist der offene Zustand:
- * Maulweite, Hüllkreis, Schwebehöhe und der Sektor, den eine Schale braucht.
- */
-export function schalenmass(rUnten: number): Schalenmass {
-  const g = baueGreiferInTeilen(stoffe(), {
-    drehpunktR: rUnten,
-    versatz: AEQUATOR - rUnten,
-    offen: OFFEN,
-  });
-  const p = new THREE.Vector3();
-  const tiefe = (t: number): number => {
-    g.setOeffnung(t);
-    g.wurzel.updateMatrixWorld(true);
-    let d = 0;
-    g.schalen[0]!.gelenk.traverse((o) => {
-      const m = o as THREE.Mesh;
-      if (!m.isMesh) return;
-      const a = m.geometry.getAttribute("position") as THREE.BufferAttribute;
-      for (let k = 0; k < a.count; k++) {
-        p.fromBufferAttribute(a, k).applyMatrix4(m.matrixWorld);
-        d = Math.max(d, STEMPEL_AUGE.y - p.y);
-      }
-    });
-    return d;
-  };
-  let maxTiefe = 0;
-  for (let i = 0; i <= 60; i++) maxTiefe = Math.max(maxTiefe, tiefe(i / 60));
-  const tiefeZu = tiefe(0);
-
-  g.setOeffnung(1);
-  g.wurzel.updateMatrixWorld(true);
-  const zahn = g.schalen[0]!.gelenk
-    .getObjectByName("SHELL_TIP_01")!
-    .getObjectByName("07_ZAHN") as THREE.Mesh;
-  const pos = zahn.geometry.getAttribute("position") as THREE.BufferAttribute;
-  const m = new THREE.Vector3();
-  const v = new THREE.Vector3();
-  for (let k = pos.count - 5; k < pos.count; k++) m.add(v.fromBufferAttribute(pos, k));
-  m.multiplyScalar(0.2).applyMatrix4(zahn.matrixWorld);
-
-  let huellkreis = 0;
-  let sektor = 0;
-  for (let i = 0; i <= 20; i++) {
-    g.setOeffnung(i / 20);
-    g.wurzel.updateMatrixWorld(true);
-    const s0 = g.schalen[0]!;
-    s0.gelenk.traverse((o) => {
-      const q = o as THREE.Mesh;
-      if (!q.isMesh) return;
-      const a = q.geometry.getAttribute("position") as THREE.BufferAttribute;
-      for (let k = 0; k < a.count; k++) {
-        p.fromBufferAttribute(a, k).applyMatrix4(q.matrixWorld);
-        const r = Math.hypot(p.x, p.z);
-        huellkreis = Math.max(huellkreis, 2 * r);
-        if (r < 0.3) continue;
-        let d = Math.atan2(p.x, p.z) - s0.winkel;
-        while (d > Math.PI) d -= 2 * Math.PI;
-        while (d < -Math.PI) d += 2 * Math.PI;
-        sektor = Math.max(sektor, Math.abs(d) * GRAD);
-      }
-    });
-  }
-  return {
-    rUnten,
-    tiefeZu,
-    maxTiefe,
-    schwebt: maxTiefe - tiefeZu,
-    maul: 2 * Math.hypot(m.x, m.z),
-    huellkreis,
-    sektor,
-  };
-}
 
 /* ----------------------------------------------------------- Die Varianten */
 

@@ -5233,3 +5233,166 @@ Mittelsäule steht weiter bei 66,9 cm.
 3. Die Entscheidung: Spalte 2 (schlanker Kopf, 24 cm kürzer, weniger
    Schwebehöhe — Preis: 20 cm Maulweite), Spalte 3 (Maulweite bleibt, Kopf wird
    Ø 1,20), oder bleibt es bei Spalte 1?
+
+---
+
+### E-076 — „Der Kopf ist zu schlank": es ist die Verkleidung, nicht die Säule (15.09.2026)
+
+**Entscheidung.** Ein Blatt, das die Frage an der richtigen Stelle beantwortet:
+`docs/f5-kopfbreite-2026-09-15.svg`. **Am Spielcode ist keine Zeile geändert**,
+`src/` ist unberührt, **keiner der drei Wächter ist nachgezogen**.
+
+**Anlass.** Patrick hat am Abend des 15.09.2026 sieben Vorbildaufnahmen
+geschickt (ein SENNEBOGEN-Mehrschalengreifer, teils von Hand markiert), dazu
+zwei Sätze, die alles drehen:
+
+> „Der Kopf ist zu schlank."
+
+> „Das, was du als Guss oder der Agent als Gusskopf da verortet hat, das ist im
+> Grunde genommen nur eine Abblendung. Das ist ein Zylinderschutz. Also es ist
+> kein Gusskörper. … Das musst du dir wegdenken."
+
+---
+
+#### 1. Am Bild geschätzt — keine Maße
+
+Aus einer Fotografie ohne bekannten Maßstab lässt sich nichts messen. Deshalb
+stehen hier **nur Verhältnisse**, jedes mit dem Bild und den Pixelzahlen, aus
+denen es kommt (`VORBILD_GESCHAETZT` im Werkzeug):
+
+| | Vorbild (geschätzt) | wir |
+|---|---|---|
+| Deckplatte : Höhe Platte↔Bolzen | 0,57 | **1,06** |
+| Höhe Platte↔Bolzen : Maulweite | **0,37** | 0,29 |
+| Verkleidung oben : Maulweite | 0,20 | **keine** |
+| Verjüngung der Verkleidung | 0,57 | — |
+
+**Der Befund dreht die Frage um.** Der Abstand Deckplatte↔Bolzen ist beim
+Vorbild **nicht kleiner** als bei uns — an der Maulweite gemessen ist er
+**größer** (0,37 gegen 0,29). Die Säule, an der wir seit E-072 rechnen, hat das
+Vorbild auch, und zwar eine längere.
+
+**Was fehlt, ist die Verkleidung.** Beim Vorbild steckt dieser ganze Bereich in
+einem nach unten verjüngten Blech, das die fünf Zylinder abdeckt; bei uns steht
+dort eine nackte Säule von Ø 0,26 m neben fünf freistehenden Zylindern. Das ist
+der ganze Unterschied im Bild — **und er kostet keine Zeile Kinematik.**
+
+**Nicht entscheidbar aus den Bildern:** ob das untere Zylinderauge über oder
+unter dem Schalenbolzen sitzt. Auf der schärfsten Aufnahme
+(`f5-vorbild-geschlossen-beladen`) liegen beide im selben 50-Pixel-Band; das
+sind am 3,2-m-Greifer keine 5 cm, und 10 cm in beide Richtungen schließt die
+Aufnahme nicht aus.
+
+---
+
+#### 2. Hilft ein hochstehender Schalenarm? Nein — und zwar beweisbar
+
+Die Vermutung war: Wenn der Schalenarm über seinen Bolzen hinaufragt und das
+Zylinderauge oben sitzt, überbrückt der Zylinder nur eine kurze Strecke und die
+Säule verschwindet. **Geprüft, nicht übernommen — sie stimmt nicht.**
+
+| Armradius | Armwinkel frei | nur Arm nach OBEN |
+|---|---|---|
+| 0,200 m | keine Lösung | keine Lösung |
+| 0,258 m (heute) | 46 cm (Arm −56°) | **keine Lösung** |
+| 0,300 m | 34 cm (Arm −72°) | **keine Lösung** |
+| 0,350 m | 33 cm (Arm −76°) | **keine Lösung** |
+| 0,400 m | 32 cm (Arm −84°) | **keine Lösung** |
+
+Über alle Kopfbreiten, alle Armradien und Säulen bis 95 cm gibt es mit
+hochstehendem Arm **keine einzige** Lösung.
+
+**Der Grund ist eine Zeile Geometrie.** Das Zylinderauge läuft auf einem Kreis
+um den Bolzen; seine Höhe über ihm ist `Ay·cos s + Az·sin s`, und über den
+Schwenk von 96,25° erreicht das seinen Scheitel bei **`hypot(Ay, Az)` — dem
+Armradius**. Ein hochstehender Arm verschiebt nur, **wann** der Scheitel kommt,
+nicht **wie hoch** er ist. Die Zylinderaufnahme muss über diesen Scheitel plus
+den Winkelzuschlag — das *ist* die Säule.
+
+Und der Armradius ist nach unten gedeckelt: **Der Hebelarm kann nie größer
+werden als der Armradius**, also hält der 115-mm-Wächter ihn über rund 0,25 m.
+Unter 0,258 m gibt es überhaupt nichts mehr.
+
+Gemessen am gebauten Stand: Armradius **0,2577 m**, um **18° nach unten**
+gekippt, Auge steigt beim Öffnen um **0,2523 m** — fast den ganzen Radius.
+
+---
+
+#### 3. Was ein breiter Kopf wirklich kostet: Sicht
+
+Mit Patricks Korrektur (Platte + Blech statt Guss) fallen Gewicht und Material
+als Einwand weg. Es bleiben Sicht und Silhouette. Die Sicht ist gerechnet — mit
+demselben Strahlensatz wie `totenStreifen` (E-034), nur mit runder Blende:
+Anteil des Spitzenrings, den der Kopf dem Fahrer verdeckt, Greifer aufgesetzt
+(Aufhängung 2,766 m aus E-065).
+
+| Kopf-Ø | 4 m, Kabine unten | 4 m, Kabine oben | 7 m, oben |
+|---|---|---|---|
+| 0,95 | 0 % | 11 % | 0 % |
+| 1,20 | 0 % | 15 % | 0 % |
+| 2,00 | 0 % | 28 % | 0 % |
+| 2,80 | 0 % | 41 % | 15 % |
+
+**Mit abgesenkter Kabine verdeckt der Kopf in KEINER Breite etwas** — das Auge
+liegt dann nur 0,5 m über ihm, der Blick streift flach daran vorbei.
+**Die Grenze liegt bei Ø 1,81 m**: Bis dahin bleiben im schlechtesten Fall
+(Kabine oben, aufgesetzt, 4 m Abstand) über 75 % des Spitzenrings sichtbar.
+
+---
+
+**Die Empfehlung.** Spalte 2 des Blattes: **Säule 49 cm** (aus E-075, Kopf und
+Bolzenkreis gleich weit, Platte Ø 1,02 — fast wie heute) **plus die
+Verkleidung** darüber. Das ist die Silhouette aus den Bildern, ohne die
+Anlenkung anzufassen. Spalte 3 zeigt das Äußerste: Säule 32 cm für eine Platte
+von Ø 2,00 m — breiter als der geschlossene Korb, und mit hochgefahrener Kabine
+28 % Sichtverlust statt 11 %.
+
+**Verworfene Alternative.** Den Gusskegel aus den Bildern nachbauen. Es ist
+keiner — und ihn als tragendes Teil zu behandeln hätte bedeutet, Material,
+Gewicht und Netze zu bezahlen, die es gar nicht gibt. Der Fehler stand schon in
+E-074 („Kopf (Guss)") und ist von Patrick berichtigt worden.
+
+**Werkzeuge.** `tools/fuenfschalen/anlenkungsraum.ts` ist um `armRadius`,
+`augenHoch`, `kleinsteSaeuleBeiArm` und `schalenmass` gewachsen;
+`anlenkungsriss.ts` um `verkleidung` (gestrichelt, nie gefüllt — sie trägt
+nichts) und `verdeckung` (die Sichtrechnung). `schalenmass` ist aus dem
+Blatt-Werkzeug in die Rechnung gewandert, weil ein Werkzeug, das beim
+Importieren sein eigenes Blatt schreibt, sich nicht wiederverwenden lässt —
+derselbe Grund wie bei `saeulenrechnung.ts` (E-075).
+
+**Abnahmekriterium.** `test/mittelsaeule.test.ts`, jetzt **18 Prüfungen**; die
+drei neuen mit Gegenprobe, die melden muss:
+
+- Der Scheitel der Augenhöhe ist der Armradius, egal wie der Arm steht.
+  Gegenprobe: ein kleinerer Radius senkt ihn wirklich (0,1 → 0,1).
+- Mit hochstehendem Arm findet die Suche nichts. Gegenprobe: mit freiem
+  Armwinkel findet sie sehr wohl etwas, und der Arm zeigt dort nach unten —
+  sonst sucht die Funktion gar nicht.
+- Mit abgesenkter Kabine ist die Verdeckung in jeder Breite null. Gegenprobe:
+  mit hochgefahrener Kabine ist sie es nicht, und sie wächst mit der Breite.
+  Dazu die Grenze: bei Ø 1,81 unter 25 %, bei Ø 1,90 darüber.
+
+1.114 bestehende Prüfungen bleiben grün (jetzt **1.117 in 98 Dateien**).
+`npm run build` sauber.
+
+**Unangetastet.** `src/` vollständig. Die drei Wächter (25°, 115 mm, 200 mm)
+stehen auf ihren alten Zahlen. Sichelkralle, Griff-Kern, Pendel, Rotator,
+Kamera, Bodenanschlag. Die Mittelsäule steht weiter bei 66,9 cm.
+
+**Was ich sehen müsste, um die letzte offene Frage zu klären.** Ob das untere
+Zylinderauge über oder unter dem Schalenbolzen sitzt, entscheidet keines der
+sieben Bilder. Dafür bräuchte es **eine Aufnahme der GEÖFFNETEN Spinne von der
+Seite, aus Augenhöhe, ohne Verkleidung im Weg** — offen stehen Bolzen und Auge
+weit auseinander, geschlossen fallen sie zusammen. Eine Ersatzteilzeichnung
+oder ein Prospektriss täte es auch.
+
+**Auf dem Gerät zu prüfen.**
+
+1. `docs/f5-kopfbreite-2026-09-15.svg`, **Spalte 1 neben Spalte 2**: Macht
+   allein das gestrichelte Blech den Unterschied aus, den du auf den Fotos
+   gesehen hast?
+2. **Spalte 3**: Sieht die Platte mit Ø 2,00 m noch nach Umschlaggreifer aus —
+   oder nach Pilz?
+3. Die Entscheidung: Verkleidung bauen (billig, ändert nichts an der Mechanik),
+   Verkleidung **und** Säule auf 49 cm (E-075, Spalte 2), oder erst einmal nur
+   die Verkleidung und den Rest lassen?
