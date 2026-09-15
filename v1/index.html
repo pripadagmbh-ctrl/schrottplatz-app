@@ -516,7 +516,8 @@
           display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px;
           align-content: start;
         }
-        #pause h1, #pause .hint { grid-column: 1 / -1; }
+        #pause h1, #pause .hint, #pause .grund { grid-column: 1 / -1; }
+        #pause .grund { margin: 0; font-size: 10px; }
         #pause h1 { margin: 0 0 4px; font-size: 17px; letter-spacing: 3px; }
         #pause button { margin: 0; padding: 9px 10px; font-size: 12px; }
         #pause .hint { margin: 6px 0 0; font-size: 10px; line-height: 1.45; }
@@ -550,6 +551,15 @@
       }
       #pause button:hover, #pause button:active { background: rgba(240,180,41,0.75); color: #1a1c1e; }
       #pause .hint { margin: 16px 0 0; font-size: 11px; line-height: 1.7; color: #9aa2a8; }
+      /* Greiferwahl: gesperrt, solange etwas haengt — mit Grund darunter */
+      #pause button:disabled { opacity: 0.42; cursor: default; }
+      #pause button:disabled:hover, #pause button:disabled:active {
+        background: rgba(46,52,57,0.95); color: #e8e8e4;
+      }
+      #pause .grund {
+        margin: -4px 0 8px; font-size: 11px; line-height: 1.4; color: #c9a227; min-height: 0;
+      }
+      #pause .grund:empty { display: none; }
       /* --- Steuerungsmenü: eigenständige Tafel neben dem Pausenfeld --- */
       #controls-menu {
         display: none;
@@ -835,6 +845,12 @@
         <h1>PAUSE</h1>
         <button id="pause-resume">Weiterspielen</button>
         <button id="pause-controls">Steuerung</button>
+        <!--
+          Greiferwahl (E-059): ausgegraut, solange etwas in der Spinne haengt
+          oder sie nicht offen ist. Der Grund steht dann in `.grund` darunter.
+        -->
+        <button id="pause-greifer">Greifer → Fünfschalengreifer</button>
+        <p class="grund" id="pause-greifer-grund"></p>
         <button id="pause-shop">Platz ausbauen</button>
         <button id="pause-music">Musik an/aus</button>
         <button id="pause-radio">Radio</button>

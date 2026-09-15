@@ -7,6 +7,7 @@ import { EventBus } from "./core/events";
 import { initPhysics, PhysicsWorld } from "./physics/physicsWorld";
 import { GripSystem } from "./physics/gripSystem";
 import { Excavator } from "./excavator/excavator";
+import { formZu, knopfstand, setzeGreifer, wechsleGreifer } from "./excavator/greiferwahl";
 import { OrbitCamera } from "./excavator/orbitCamera";
 import { Yard } from "./world/yard";
 import { ItemManager, type ScrapItem } from "./world/scrapItems";
@@ -45,7 +46,7 @@ import { getMaterial, ABFALL } from "./materials/catalog";
 import { StaffManager } from "./world/people";
 import { WEIGH_X, WEIGH_Z, KAFFEE_POS } from "./world/yard";
 import { setBaggerOrt } from "./delivery/routes";
-import { clearSave, readSave, storeSave, type SaveData } from "./core/save";
+import { clearSave, readSave, speichereGreifer, storeSave, type SaveData } from "./core/save";
 import { Zwischenbild } from "./core/zwischenbild";
 
 const FIXED_DT = 1 / 60;
@@ -251,6 +252,7 @@ async function main(): Promise<void> {
     upgrades: ausbau.toJSON(),
     timeOfDay: daylight.time,
     radio: { songId: audio.songId },
+    greifer: excavator.greiferform.id,
     items: items.items
       .filter((i) => i.shape)
       .map((i) => {
@@ -283,6 +285,11 @@ async function main(): Promise<void> {
   };
   excavator.getVehicleBoxes = alleFahrzeugBoxen;
   const grip = new GripSystem(physics.world, excavator.grappleBody);
+  /*
+   * Der Spielstand merkt sich den Greifer (E-059). Ein Stand ohne das Feld
+   * ist ein Stand mit der Sichelkralle — so wie jeder Stand bis heute.
+   */
+  if (save?.greifer) setzeGreifer(excavator, grip, formZu(save.greifer));
   const orbit = new OrbitCamera(window.innerWidth / window.innerHeight);
   const debug = new DebugOverlay();
   const aimRing = new AimRing(scene);
@@ -361,11 +368,36 @@ async function main(): Promise<void> {
   const setPaused = (v: boolean): void => {
     paused = v;
     pauseEl.classList.toggle("open", v);
+    if (v) zeigeGreiferwahl();
     if (!v) {
       pauseEl.classList.remove("settings");
       document.getElementById("controls-menu")!.classList.remove("open");
     }
   };
+  /*
+   * Greiferwahl (E-059). Der Knopf steht im Pausenmenue, weil er nichts ist,
+   * was man im Betrieb macht: Er wechselt das Werkzeug an der Maschine.
+   *
+   * Gesperrt, solange etwas in der Spinne haengt oder sie nicht offen ist —
+   * die Begruendung steht in `Excavator.greiferWechselBereit`.
+   */
+  const greiferKnopf = document.getElementById("pause-greifer") as HTMLButtonElement;
+  const greiferGrund = document.getElementById("pause-greifer-grund")!;
+  const zeigeGreiferwahl = (): void => {
+    const st = knopfstand(excavator);
+    greiferKnopf.textContent = st.text;
+    greiferKnopf.disabled = !st.moeglich;
+    greiferGrund.textContent = st.grund;
+  };
+  greiferKnopf.addEventListener("click", () => {
+    const form = wechsleGreifer(excavator, grip);
+    zeigeGreiferwahl();
+    bus.emit("greifer:gewechselt", { greifer: form.id, name: form.name });
+  });
+  bus.on("greifer:gewechselt", (e) => {
+    hud.toast(`${e.name} angebaut.`);
+    speichereGreifer(e.greifer);
+  });
   document.getElementById("pause-resume")!.addEventListener("click", () => setPaused(false));
   document.getElementById("pause-save")!.addEventListener("click", () => {
     hud.toast(storeSave(buildSaveData()) ? "Gespeichert." : "Speichern fehlgeschlagen!");

@@ -1,13 +1,7 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import type { TearTarget } from "../dismantle/composites";
-import {
-  CLAW_CLOSED_SPLAY,
-  CLAW_COUNT,
-  CLAW_OPEN_SPLAY,
-  CLAW_SEGMENTS,
-  clawPoint,
-} from "../excavator/clawGeometry";
+import { SICHELKRALLE, type Greiferform } from "../excavator/greiferform";
 
 /**
  * Greifsystem nach Briefing Kap. 6.2:
@@ -42,19 +36,17 @@ const MAX_TOTAL_KG = 3500; // (SW) — eine ganze Karosse muss hochgehen
 const GRAB_WINDOW_START = 0.6;
 const GRAB_WINDOW_END = 0.98;
 /**
- * Abstand vom Ursprung der Spinne bis zur Sensormitte (m).
+ * Abstand vom Ursprung der Spinne bis zur Sensormitte (m) — der der
+ * SICHELKRALLE.
  *
- * Spiegelt `GRAPPLE_LINK + 0.2 + PALM_TO_SENSOR` aus `excavator.ts`. Die Zahl
- * steht hier nur, weil der Bagger sie nicht ausgibt; `test/greiffenster.test.ts`
- * misst sie am echten Bagger nach (`getSensorPosition` gegen die Spinnenmitte)
- * und faellt um, sobald sie dort anders wird.
+ * Die Zahl kommt seit E-057 von der Form und nicht mehr aus diesem Modul; der
+ * Bagger setzt die Kugel aus derselben Quelle. `test/greiffenster.test.ts`
+ * misst sie am echten Bagger nach (`getSensorPosition` gegen die
+ * Spinnenmitte). Der Export bleibt, weil die Waechter ihn benutzen — er
+ * bezeichnet ausdruecklich die Sichelkralle, nicht den gerade angehaengten
+ * Greifer.
  */
-export const SENSOR_UNTER_SPINNE = 1.5;
-/**
- * Luft, die `isInsideGrapple` (excavator.ts) unter die Spitzen legt. Bis dorthin
- * gilt ein Punkt noch als „im Korb", also muss die Sensorkugel so weit reichen.
- */
-const KORB_LUFT_UNTEN = 0.18;
+export const SENSOR_UNTER_SPINNE = SICHELKRALLE.sensorSitz;
 /**
  * Radius der Sensorkugel (m) — GERECHNET, nicht gewaehlt.
  *
@@ -80,18 +72,14 @@ const KORB_LUFT_UNTEN = 0.18;
  * Die Regel lautet jetzt: Die Kugel reicht so tief, wie die Schalen in
  * IRGENDEINER Stellung reichen. In der Breite bleibt sie Vorfilter wie bisher.
  * Ergibt 2,875 + 0,18 − 1,50 = 1,555 m.
+ *
+ * Seit E-057 steht die RECHNUNG in `greiferform.ts` (`sensorRadiusVon`) und
+ * wird je Form ausgefuehrt — die Regel ist dieselbe geblieben, sie gilt jetzt
+ * nur fuer zwei Greifer. Dieser Export ist der Wert der Sichelkralle und
+ * bleibt fuer die Waechter stehen; die Spinne selbst liest ihn nicht mehr von
+ * hier, sondern von ihrer Form (`GripSystem.form`).
  */
-export const SENSOR_RADIUS: number = (() => {
-  const p = new THREE.Vector3();
-  let tiefste = 0;
-  // Abtasten statt die beiden Endlagen vergleichen: Der tiefste Punkt liegt
-  // weder ganz offen noch ganz zu, sondern dazwischen (clawGeometry.ts).
-  for (let i = 0; i <= 200; i++) {
-    const splay = CLAW_CLOSED_SPLAY + ((CLAW_OPEN_SPLAY - CLAW_CLOSED_SPLAY) * i) / 200;
-    tiefste = Math.max(tiefste, -clawPoint(0, splay, CLAW_SEGMENTS, p).y);
-  }
-  return tiefste + KORB_LUFT_UNTEN - SENSOR_UNTER_SPINNE;
-})();
+export const SENSOR_RADIUS: number = SICHELKRALLE.sensorRadius;
 /** So lange muss die Spinne ganz zu gehalten werden, bis das Teil nachgibt */
 const CRUSH_TIME = 1.1;
 /**
@@ -119,28 +107,24 @@ const MIN_KRALLEN = 2;
  * Abstand zweier benachbarter Schalen bei geschlossener Spinne (m) — GERECHNET.
  *
  * Fuenf Schalen stehen im Kreis; an der Station, die `krallenKontakte`
- * abtastet (`CLAW_SEGMENTS * 0.6`), liegen zwei Nachbarn 0,629 m auseinander.
- * Die Zahl kommt aus `clawGeometry`, nicht aus einer Schaetzung, und wandert
- * mit, wenn jemand die Krallenform aendert.
+ * abtastet (60 % der Schalenlaenge), liegen zwei Nachbarn 0,629 m
+ * auseinander. Die Zahl kommt aus der Geometrie, nicht aus einer Schaetzung,
+ * und wandert mit, wenn jemand die Krallenform aendert.
+ *
+ * Gerechnet wird sie seit E-057 in `greiferform.ts` (`schalenlueckeVon`), je
+ * Form. Dieser Export ist der Wert der Sichelkralle — fuer die Waechter.
  *
  * Wofuer sie gebraucht wird, steht bei `noetigeKrallen`.
  */
-export const SCHALENLUECKE: number = (() => {
-  const a = new THREE.Vector3();
-  const b = new THREE.Vector3();
-  const station = Math.round(CLAW_SEGMENTS * 0.6);
-  clawPoint(0, CLAW_CLOSED_SPLAY, station, a);
-  clawPoint((1 / CLAW_COUNT) * Math.PI * 2, CLAW_CLOSED_SPLAY, station, b);
-  return a.distanceTo(b);
-})();
+export const SCHALENLUECKE: number = SICHELKRALLE.schalenluecke;
 /**
  * Wie viele Schalen an einem Teil dieser Groesse anliegen muessen, damit es
  * als gefasst gilt — die Regel als reine Rechnung, damit sie ohne Welt
  * nachzuprüfen ist (`test/greifhaufen.test.ts`). Begruendung bei
  * `GripSystem.noetigeKrallen`.
  */
-export function noetigeKrallenFuer(groesseM: number): number {
-  return Math.min(MIN_KRALLEN, Math.floor(groesseM / SCHALENLUECKE));
+export function noetigeKrallenFuer(groesseM: number, luecke = SCHALENLUECKE): number {
+  return Math.min(MIN_KRALLEN, Math.floor(groesseM / luecke));
 }
 /** Richtungen, in denen die Groesse eines Teils abgetastet wird */
 const TASTRICHTUNGEN: ReadonlyArray<[number, number, number]> = [
@@ -179,7 +163,27 @@ interface GrippedItem {
 
 export class GripSystem {
   private items: GrippedItem[] = [];
-  private sensorShape = new RAPIER.Ball(SENSOR_RADIUS);
+  /**
+   * Die angehaengte Greiferform (E-057). Von ihr kommen Sensorradius und
+   * Schalenluecke; alles andere am Greifsystem ist formunabhaengig.
+   *
+   * Vorgabe ist die Sichelkralle. Wer den Greifer wechselt, setzt sie ueber
+   * `setForm` — die Sensorkugel wird dabei neu angelegt, denn eine
+   * `RAPIER.Ball` laesst ihren Radius nicht nachtraeglich aendern.
+   */
+  private form: Greiferform = SICHELKRALLE;
+  private sensorShape = new RAPIER.Ball(SICHELKRALLE.sensorRadius);
+
+  /** Greiferform wechseln — Sensorkugel und Schalenluecke wandern mit. */
+  setForm(form: Greiferform): void {
+    this.form = form;
+    this.sensorShape = new RAPIER.Ball(form.sensorRadius);
+  }
+
+  /** Welche Form gerade haengt. */
+  get greiferform(): Greiferform {
+    return this.form;
+  }
   /**
    * Wie viel Gewalt gerade auf die gefasste Baugruppe wirkt: 0 = ruhig
    * halten, 1 = kräftig drehen und reißen. Von main aus Rotator- und
@@ -366,7 +370,7 @@ export class GripSystem {
         const body = collider.parent();
         if (body && body.isDynamic() && !candidates.some((k) => k.body.handle === body.handle)) {
           /** Abstand des naechsten Oberflaechenpunkts zur Sensormitte (m) */
-          let abstand = SENSOR_RADIUS;
+          let abstand = this.form.sensorRadius;
           // Nur fassen, was wirklich zwischen den Schalen liegt. Geprüft wird
           // der nächstgelegene Punkt der Oberfläche, nicht der Schwerpunkt:
           // bei einem Auto liegt der in der Fahrzeugmitte und damit nie im
@@ -382,7 +386,7 @@ export class GripSystem {
             abstand = this.probe.distanceTo(sensorPos);
           }
           /** wie sicher die Spinne das Teil hat — siehe oben */
-          let halt = 1 - Math.min(abstand / SENSOR_RADIUS, 1) * 0.5;
+          let halt = 1 - Math.min(abstand / this.form.sensorRadius, 1) * 0.5;
           /*
            * Kontaktbedingung: Eine Kiste, die mit einer Ecke in den Korb
            * ragt, bestand die Pruefung oben — und hing dann halb neben der
@@ -501,7 +505,7 @@ export class GripSystem {
    * Bedingung repariert hat.
    */
   private noetigeKrallen(body: RAPIER.RigidBody): number {
-    return noetigeKrallenFuer(this.groesseVon(body));
+    return noetigeKrallenFuer(this.groesseVon(body), this.form.schalenluecke);
   }
 
   /*

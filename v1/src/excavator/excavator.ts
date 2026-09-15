@@ -6,7 +6,6 @@ import type { Input } from "../core/input";
 import { ExcavatorCollision, type ArmShape } from "./collision";
 import { InstrumentPanel, type InstrumentReadout } from "./instruments";
 import { buildDriver } from "./driver";
-import { baueSpinne } from "./grappleParts";
 import { baueRad, radGeometrien, radStoffe, RAD_R } from "./wheelParts";
 import { baueZylinder, type ZylinderMasse } from "./zylinderParts";
 import {
@@ -42,20 +41,13 @@ import {
   kabinenmast,
 } from "./kabinenhubParts";
 import { BAGGER_STAND } from "../world/baggerstand";
+import { naechsteSpreizung } from "./clawGeometry";
 import {
-  CLAW_COUNT,
-  CLAW_OPEN_SPLAY,
-  CLAW_CLOSED_SPLAY,
-  CLAW_RING_R,
-  CLAW_RING_Y,
-  CLAW_SEGMENTS,
-  clawPoint,
-  naechsteSpreizung,
-  NACHDRUECK_RESERVE,
-  WEICH_RESERVE,
-  clawTipDepth,
-  CLAW_MAX_DEPTH,
-} from "./clawGeometry";
+  SICHELKRALLE,
+  type Greiferbau,
+  type Greiferform,
+  type GreiferId,
+} from "./greiferform";
 
 /**
  * Fuchsbagger (Umschlagbagger) — M0.
@@ -76,15 +68,26 @@ import {
  * Zone, und keine Mulde war von der Standposition aus erreichbar.
  *
  * Reine Geometrie, kein Zustand — absichtlich ohne die Klasse benutzbar.
+ *
+ * ANNAHME: die Greiferachse lotet; `tief` wird senkrecht abgezogen. Siehe
+ * Kopf von `greiferform.ts`.
  */
-export function hoechsteKrallenspitze(abstandM: number): number {
+export function hoechsteKrallenspitze(
+  abstandM: number,
   /*
    * Die groesste Tiefe ueber alle Stellungen, nicht die der offenen Spinne.
    * Mit der Sichelkralle vom 12.09. mittags haengt die geschlossene Spinne
    * 13 cm tiefer als die offene — wer nur die offene rechnet, haelt den Arm
    * fuer hoeher, als er ist, und der Greifer streift die Wand.
+   *
+   * Vorgabe ist die Sichelkralle, nicht der gerade angehaengte Greifer: An
+   * dieser Zahl haengt die Planung des Platzes (wo Mulden stehen duerfen), und
+   * die soll sich nicht aendern, wenn Patrick im Menue den Greifer wechselt.
+   * Wer wissen will, was der andere Greifer erreicht, gibt seine Tiefe mit —
+   * gemessen sind es 0,2484 m mehr Hoehe (E-048).
    */
-  const tief = CLAW_MAX_DEPTH;
+  tief: number = SICHELKRALLE.maxTiefe
+): number {
   let best = -Infinity;
   for (let b = BOOM_MIN; b <= BOOM_MAX; b += 0.004) {
     for (let st = STICK_MIN; st <= STICK_MAX; st += 0.004) {
@@ -179,7 +182,14 @@ function ecke(sx: number, sz: number): string {
   return `${sz > 0 ? "V" : "H"}${sx > 0 ? "L" : "R"}`;
 }
 
-const PALM_TO_SENSOR = 0.75; // Palm-Zentrum → Sensor in der Mitte des Schalenkorbs
+/*
+ * Der Sensorsitz stand hier als `PALM_TO_SENSOR = 0.75` („Palm-Zentrum →
+ * Sensor in der Mitte des Schalenkorbs") und wurde zu
+ * `GRAPPLE_LINK + 0.2 + PALM_TO_SENSOR` = 1,50 m zusammengerechnet. Seit E-057
+ * gibt ihn die Form vor (`Greiferform.sensorSitz`) — fuer die Sichelkralle auf
+ * die Zahl genau dieselben 1,50 m. `test/greiffenster.test.ts` misst sie am
+ * gebauten Bagger nach.
+ */
 
 // Achsgrenzen (SW)
 const BOOM_MIN = THREE.MathUtils.degToRad(5);
@@ -527,20 +537,27 @@ export class Excavator {
   private stickGroup = new THREE.Group();
   private stickTip = new THREE.Object3D();
   readonly grappleGroup = new THREE.Group(); // top-level, hängt lotrecht
-  private fingerPivots: THREE.Group[] = [];
   /**
-   * Greifer-Hydraulik: Die Zylinder sind über Gelenke mit Traverse und Schale
-   * verbunden und werden IM Spinnen-Koordinatensystem berechnet — so bilden sie
-   * mit den Schalen eine Einheit und schwingen mit dem Pendel mit.
+   * Die angehaengte Greiferform (E-057).
+   *
+   * Sie ist die einzige Stelle, an der der Bagger etwas ueber den Greifer
+   * weiss: Schalenzahl, Anschlaege, Mittellinie, Korb, Sensorkugel. Vorgabe
+   * ist die Sichelkralle des Prototyps.
    */
-  private grappleCylinders: Array<{
-    pivot: THREE.Group;
-    fromLocal: THREE.Vector3;
-    toLocalOnShell: THREE.Vector3;
-    barrel: THREE.Mesh;
-    rod: THREE.Mesh;
-    barrelLen: number;
-  }> = [];
+  private form: Greiferform = SICHELKRALLE;
+  /** Das gebaute Modell der aktiven Form — Schalen drehen, Zylinder fuehren. */
+  private greiferbau!: Greiferbau;
+  /**
+   * Alle bisher gebauten Greifer, nach Kennung.
+   *
+   * Beide haengen in der Szene, der inaktive unsichtbar (E-059). Three.js
+   * ueberspringt unsichtbare Teilbaeume vollstaendig — Zeichenrufe kostet das
+   * nicht. Gebaut wird der zweite erst beim ersten Wechsel: Der
+   * Fuenfschalengreifer braucht dafuer rund 0,25 s (gemessen), und die soll
+   * nicht jeder Spielstart zahlen, der ihn nie sieht. Danach ist das
+   * Umschalten ein `visible`-Merker.
+   */
+  private greifer = new Map<GreiferId, Greiferbau>();
   private joyLeft!: THREE.Group;
   private joyRight!: THREE.Group;
   private cabinEye = new THREE.Object3D();
@@ -1016,19 +1033,75 @@ export class Excavator {
      * und nie zuordnen, welche Aenderung was bewirkt hat (Ansage: „baue
      * erstmal die einzelnen Bauteile").
      */
-    const spinne = baueSpinne();
-    this.grappleGroup.add(spinne.gruppe);
-    this.fingerPivots.push(...spinne.gelenke);
-    for (const z of spinne.zylinder) {
-      this.grappleCylinders.push({
-        pivot: z.gelenk,
-        fromLocal: z.obenLokal,
-        toLocalOnShell: z.untenAmGelenk,
-        barrel: z.rohr,
-        rod: z.stange,
-        barrelLen: z.rohrLaenge,
-      });
+    this.greiferbau = this.form.baue();
+    this.greifer.set(this.form.id, this.greiferbau);
+    this.grappleGroup.add(this.greiferbau.gruppe);
+  }
+
+  /** Welcher Greifer haengt gerade? */
+  get greiferform(): Greiferform {
+    return this.form;
+  }
+
+  /**
+   * Darf der Greifer jetzt gewechselt werden?
+   *
+   * Nur mit leerer, ganz offener Spinne (E-059). Der Grund ist gemessen, nicht
+   * vorsichtshalber: Die gefassten Teile ueberleben den Wechsel technisch,
+   * aber die Schalen stehen danach woanders — das Teil haengt sichtbar frei in
+   * der Luft. Genau das „Schweben" ist am 11.09.2026 abgestellt worden. Und
+   * „beim Wechseln loslassen" wuerfe bis zu 3,5 t aus beliebiger Armhoehe ab
+   * (v2 E-018: „Teile fliegen umher").
+   *
+   * `carriedCount` setzt main aus dem Greifsystem; es ist dieselbe Zahl, die
+   * im HUD steht.
+   */
+  get greiferWechselBereit(): boolean {
+    if (this.carriedCount > 0) return false;
+    if (this.closure > 0.02) return false;
+    for (const w of this.clawSplayIst) {
+      if (w < this.form.offen - 0.02) return false;
     }
+    return true;
+  }
+
+  /**
+   * Greifer wechseln. Liefert false, wenn gerade etwas haengt oder die Spinne
+   * nicht offen ist — dann bleibt alles, wie es ist.
+   *
+   * Was dabei neu entsteht: das Modell (einmal je Form), die Krallen-Kollider
+   * (Zahl und Radius kommen von der Form) und die Stellung der Schalen. Die
+   * Sensorkugel haengt am Greifsystem und wird von dort gesetzt
+   * (`GripSystem.setForm`) — der Bagger kennt sie nicht.
+   */
+  setGreifer(form: Greiferform): boolean {
+    if (form.id === this.form.id) return true;
+    if (!this.greiferWechselBereit) return false;
+    let bau = this.greifer.get(form.id);
+    if (!bau) {
+      bau = form.baue();
+      this.greifer.set(form.id, bau);
+      this.grappleGroup.add(bau.gruppe);
+    }
+    this.greiferbau.gruppe.visible = false;
+    bau.gruppe.visible = true;
+    this.form = form;
+    this.greiferbau = bau;
+    /*
+     * Die Stellung geht auf „ganz offen" der NEUEN Form — die Anschlaege sind
+     * andere (Sichelkralle 0,5495 … 1,555, Fuenfschalen 0 … 1,6799). Wer die
+     * alten Winkel stehen liesse, haette Schalen, die 30 Grad zu weit zu
+     * stehen.
+     */
+    this.closure = 0;
+    this.clawSplayIst = new Array(form.schalen).fill(form.offen);
+    this.clawReserve = new Array(form.schalen).fill(form.nachdrueckReserve);
+    this.clawArt = new Array(form.schalen).fill(0);
+    this.baueKrallenKollider();
+    this.updateClawColliders();
+    for (let i = 0; i < form.schalen; i++) this.greiferbau.setWinkel(i, form.offen);
+    this.greiferbau.nachfuehren();
+    return true;
   }
 
   /**
@@ -1454,9 +1527,23 @@ export class Excavator {
      * Seite; an der Spitze laufen sie ohnehin zusammen, weil die Schale dort
      * schmal wird.
      */
-    for (let i = 0; i < CLAW_COUNT * KOLLIDER_REIHEN * 2; i++) {
+    this.baueKrallenKollider();
+  }
+
+  /**
+   * Die Kapselketten der Schalen anlegen — je Schale `KOLLIDER_REIHEN` Reihen
+   * zu zwei Kapseln. Eigene Methode, weil sie beim Greiferwechsel neu
+   * entstehen muessen: Die Form gibt Zahl und Radius vor.
+   */
+  private baueKrallenKollider(): void {
+    for (const c of this.clawColliders) this.world.removeCollider(c, false);
+    this.clawColliders.length = 0;
+    for (let i = 0; i < this.form.schalen * KOLLIDER_REIHEN * 2; i++) {
       this.clawColliders.push(
-        world.createCollider(RAPIER.ColliderDesc.capsule(0.16, 0.09), this.grappleBody)
+        this.world.createCollider(
+          RAPIER.ColliderDesc.capsule(0.16, this.form.kolliderRadius),
+          this.grappleBody
+        )
       );
     }
   }
@@ -1467,8 +1554,8 @@ export class Excavator {
    */
   private updateClawColliders(): void {
     const carrying = this.carriedCount > 0 || this.clawGraceS > 0;
-    for (let c = 0; c < CLAW_COUNT; c++) {
-      const a = (c / CLAW_COUNT) * Math.PI * 2;
+    for (let c = 0; c < this.form.schalen; c++) {
+      const a = (c / this.form.schalen) * Math.PI * 2;
       // Jede Kralle mit ihrem eigenen Winkel — sonst stuenden die Kollider
       // woanders als die Zacken, die man sieht
       const splay = this.clawSplayIst[c] ?? this.currentSplay();
@@ -1484,8 +1571,8 @@ export class Excavator {
         const col = this.clawColliders[(c * KOLLIDER_REIHEN + reihe) * 2 + h];
         col.setEnabled(!carrying);
         if (carrying) continue;
-        clawPoint(a + u, splay, h * (CLAW_SEGMENTS / 2), this.clawA);
-        clawPoint(a + u, splay, (h + 1) * (CLAW_SEGMENTS / 2), this.clawB);
+        this.form.punkt(a + u, splay, h * (this.form.stationen / 2), this.clawA);
+        this.form.punkt(a + u, splay, (h + 1) * (this.form.stationen / 2), this.clawB);
         this.clawMid.addVectors(this.clawA, this.clawB).multiplyScalar(0.5);
         this.clawDir.subVectors(this.clawB, this.clawA);
         const len = this.clawDir.length();
@@ -1824,14 +1911,22 @@ export class Excavator {
      * Geschlossen ist nicht mehr Spreizung 0, sondern CLAW_CLOSED_SPLAY.
      * Ladung haelt die Schalen darueber hinaus offen — das kommt oben drauf.
      */
+    /*
+     * Die drei Zahlen der Ladung stehen als ANTEIL am Oeffnungsweg da
+     * (Ansage Patrick 15.09.2026, E-058): Der Fuenfschalengreifer hat einen
+     * 67 % laengeren Weg, und dieselbe absolute Zahl hiesse dort ein Drittel
+     * weniger Wirkung. Fuer die Sichelkralle kommen wieder genau 0,50 / 0,06 /
+     * 0,28 heraus, weil ihr Weg der Massstab ist.
+     */
+    const weg = (this.form.offen - this.form.zu) / (SICHELKRALLE.offen - SICHELKRALLE.zu);
     const minSplay =
-      CLAW_CLOSED_SPLAY +
+      this.form.zu +
       Math.min(
-        0.5,
-        this.carriedCount * 0.06 + Math.min(this.carriedMassKg / NENNLAST_KG, 1) * 0.28
+        this.form.ladungOffen,
+        (this.carriedCount * 0.06 + Math.min(this.carriedMassKg / NENNLAST_KG, 1) * 0.28) * weg
       );
     // Der Anschlag federt kurz zurueck — siehe anschlag().
-    return THREE.MathUtils.lerp(CLAW_OPEN_SPLAY, minSplay, this.closure) + this.anschlagWinkel;
+    return THREE.MathUtils.lerp(this.form.offen, minSplay, this.closure) + this.anschlagWinkel;
   }
 
   /*
@@ -1876,7 +1971,7 @@ export class Excavator {
    * Zaehnen steckte. Jede Kralle hat jetzt ihren eigenen Weg: Was blockiert
    * ist, bleibt stehen, der Rest geht weiter zu.
    */
-  private clawSplayIst: number[] = new Array(CLAW_COUNT).fill(CLAW_OPEN_SPLAY);
+  private clawSplayIst: number[] = new Array(SICHELKRALLE.schalen).fill(SICHELKRALLE.offen);
   /**
    * Schonfrist nach dem Loslassen: Solange sie laeuft, sind die Krallen-Kollider
    * abgeschaltet. Beim Oeffnen sind die Zacken noch fast zu und die Spinne sinkt
@@ -1885,20 +1980,21 @@ export class Excavator {
    */
   private clawGraceS = 0;
   /** Verbleibendes Nachdruecken je Kralle, damit sie nicht schlagartig steht */
-  private clawReserve: number[] = new Array(CLAW_COUNT).fill(NACHDRUECK_RESERVE);
+  private clawReserve: number[] = new Array(SICHELKRALLE.schalen).fill(
+    SICHELKRALLE.nachdrueckReserve
+  );
   /** Was jeder Zahn zuletzt vorgefunden hat: 0 frei, 1 weich, 2 hart. */
-  private clawArt: Array<0 | 1 | 2> = new Array(CLAW_COUNT).fill(0);
+  private clawArt: Array<0 | 1 | 2> = new Array(SICHELKRALLE.schalen).fill(0);
   private blockTmp = new THREE.Vector3();
   // Feine Tastkugel: Mit 0,14 blieb der Zahn sichtbar auf Abstand stehen,
   // als griffe er ins Leere. Er soll bis fast an das Teil heran.
   private blockShape = new RAPIER.Ball(0.08);
   private static readonly IDENT = { x: 0, y: 0, z: 0, w: 1 };
-  /**
-   * Wie schnell eine freie Kralle ihrem Sollwinkel folgt. Bewusst hoch: Eine
-   * unbehinderte Spinne soll sich anfuehlen wie vorher, sichtbar werden soll
-   * nur, was haengen bleibt.
+  /*
+   * Wie schnell eine freie Kralle ihrem Sollwinkel folgt, steht seit E-057 an
+   * der Form (`Greiferform.rate`) — sie haengt am Oeffnungsweg und der ist je
+   * Greifer verschieden. Fuer die Sichelkralle sind es unveraendert 4,0 rad/s.
    */
-  private static readonly CLAW_RATE = 4.0; // rad/s
 
   /**
    * Sitzt diese Kralle bei der angepeilten Spreizung auf etwas auf?
@@ -1943,7 +2039,7 @@ export class Excavator {
    * schliessen, aber eine gewisse Starre bzw. Kraft muss jeder Zahn haben").
    */
   private clawBlocked(a: number, splay: number): { art: 0 | 1 | 2; koerper: RAPIER.RigidBody | null } {
-    clawPoint(a, splay, CLAW_SEGMENTS, this.blockTmp);
+    this.form.punkt(a, splay, this.form.stationen, this.blockTmp);
     this.grappleGroup.localToWorld(this.blockTmp);
     let art: 0 | 1 | 2 = 0;
     let koerper: RAPIER.RigidBody | null = null;
@@ -1984,11 +2080,12 @@ export class Excavator {
     // Stand des Vorschritts — bei 60 Hz ist das ein Sechzigstel Versatz.
     this.krallenBlockiert = false;
     const ziel = this.currentSplay();
-    const schritt = Excavator.CLAW_RATE * dt;
-    for (let c = 0; c < CLAW_COUNT; c++) {
+    const schritt = this.form.rate * dt;
+    const frei = this.form.nachdrueckReserve;
+    for (let c = 0; c < this.form.schalen; c++) {
       const ist = this.clawSplayIst[c]!;
       if (ziel >= ist) {
-        const auf = naechsteSpreizung(ist, ziel, schritt, false, this.clawReserve[c]!);
+        const auf = naechsteSpreizung(ist, ziel, schritt, false, this.clawReserve[c]!, frei);
         this.clawSplayIst[c] = auf.winkel;
         this.clawReserve[c] = auf.reserve;
         // Beim Oeffnen hat der Zahn nichts mehr vor sich; sonst behielte er
@@ -1998,7 +2095,7 @@ export class Excavator {
         continue;
       }
       const naechste = Math.max(ziel, ist - schritt);
-      const a = (c / CLAW_COUNT) * Math.PI * 2;
+      const a = (c / this.form.schalen) * Math.PI * 2;
       const fund = this.clawBlocked(a, naechste);
       if (fund.art !== 0) this.krallenBlockiert = true;
       /*
@@ -2011,10 +2108,10 @@ export class Excavator {
        */
       if (fund.art !== this.clawArt[c]) {
         this.clawArt[c] = fund.art;
-        this.clawReserve[c] = fund.art === 1 ? WEICH_RESERVE : NACHDRUECK_RESERVE;
+        this.clawReserve[c] = fund.art === 1 ? this.form.weichReserve : frei;
       }
       const vorher = this.clawReserve[c]!;
-      const zu = naechsteSpreizung(ist, ziel, schritt, fund.art !== 0, vorher);
+      const zu = naechsteSpreizung(ist, ziel, schritt, fund.art !== 0, vorher, frei);
       this.clawSplayIst[c] = zu.winkel;
       this.clawReserve[c] = zu.reserve;
       /*
@@ -2061,6 +2158,12 @@ export class Excavator {
    *
    * Ausgenommen sind die eigenen Körper und die Ladung: Sonst setzte die Spinne
    * auf ihrer eigenen Kralle oder auf dem Teil auf, das sie gerade trägt.
+   */
+  /*
+   * ANNAHME: die Greiferachse lotet — der Strahl geht senkrecht nach unten aus
+   * der Greifermitte. Bei einem seitlich gekippten Greifer liegen die Schalen
+   * nicht mehr unter ihrem Ursprung; dann braucht es den Strahl unter dem
+   * tiefsten Punkt, nicht unter der Mitte (siehe Kopf von `greiferform.ts`).
    */
   private surfaceUnderClaws(_splay: number): number {
     this.grappleGroup.updateWorldMatrix(true, false);
@@ -2144,9 +2247,9 @@ export class Excavator {
         if (this.selfHandles.has(b.handle) || this.grippedHandles.has(b.handle)) return true;
         // Was sich schieben laesst, wird geschoben — nicht umfahren
         if (b.mass() < EINDRING_SCHWER_KG) return true;
-        for (let c = 0; c < CLAW_COUNT; c++) {
-          const a = (c / CLAW_COUNT) * Math.PI * 2;
-          clawPoint(a, this.clawSplayIst[c] ?? splay, CLAW_SEGMENTS, this.clawA);
+        for (let c = 0; c < this.form.schalen; c++) {
+          const a = (c / this.form.schalen) * Math.PI * 2;
+          this.form.punkt(a, this.clawSplayIst[c] ?? splay, this.form.stationen, this.clawA);
           this.clawA.applyMatrix4(this.grappleGroup.matrixWorld);
           const pr = col.projectPoint(
             { x: this.clawA.x, y: this.clawA.y, z: this.clawA.z },
@@ -2177,8 +2280,17 @@ export class Excavator {
   private resolveGroundClamp(): void {
     // Spitzentiefe direkt aus der Krallengeometrie — so bleibt der Bodenanschlag
     // richtig, auch wenn sich Form oder Öffnungswinkel ändern.
+    /*
+     * ANNAHME: die Greiferachse lotet. `form.maxTiefe` ist eine Tiefe unter
+     * dem Greiferursprung, gemessen laengs seiner Achse, und wird hier
+     * senkrecht vom Boden abgezogen. Solange der Greifer lotrecht haengt, ist
+     * das dasselbe. Wenn er spaeter zur Seite kippen soll (Wunsch 15.09.2026,
+     * „zum Kehren und Schleudern"), liegt der tiefste Punkt woanders und
+     * diese Zeile braucht die Ausladung in Weltrichtung −y statt der Tiefe.
+     * Die Annahme steht vollstaendig im Kopf von `greiferform.ts`.
+     */
     const splay = this.currentSplay();
-    const tipDepth = BODEN_UEBER_SCHLIESSWEG ? CLAW_MAX_DEPTH : clawTipDepth(splay);
+    const tipDepth = BODEN_UEBER_SCHLIESSWEG ? this.form.maxTiefe : this.form.tiefe(splay);
     // Gemessene Fläche statt angenommener Ebene: darauf setzt die Spinne auf.
     const flaeche = this.surfaceUnderClaws(splay);
     // tipY() rechnet ab der Maschinenbasis; steht die Maschine aufgebockt,
@@ -2311,27 +2423,23 @@ export class Excavator {
     // Zacken: offen weit gespreizt. Geschlossen fügen sich die Schalen zur
     // dichten Kalotte — es sei denn, es liegt Material darin: dann bleibt die
     // Spinne so weit offen, wie die Ladung Platz braucht.
-    this.fingerPivots.forEach((pivot, i) => {
     /*
-     * Um -Spreizung, nicht um -(Spreizung - ZU).
-     *
-     * Die Segmentkette ist bei Spreizung 0 gebaut: Segment i steht um i mal
-     * CLAW_SEG_BEND weiter gekippt als sein Vorgaenger, und clawPoint rechnet
-     * mit -Spreizung + i mal CLAW_SEG_BEND. Der Drehpunkt muss also genau
-     * -Spreizung liefern.
-     *
-     * Solange „zu" die Spreizung 0 war, war -(Spreizung - ZU) dasselbe und der
-     * Abzug fiel nicht auf. Am Zapfen ist „zu" 0,5495: Die gezeichnete Kralle
-     * stand damit 31 Grad weiter zu als die gerechnete und schoss geschlossen
-     * 76 cm ueber die Achse — jede Schale mitten im Sektor der uebernaechsten.
+     * Jede Schale bekommt ihren eigenen Winkel; wie er in eine Drehung
+     * umgesetzt wird, weiss nur die Form (`Greiferbau.setWinkel`). Bei der
+     * Sichelkralle ist das -Spreizung, nicht -(Spreizung - ZU): Die
+     * Segmentkette ist bei Spreizung 0 gebaut. Solange „zu" die Spreizung 0
+     * war, war beides dasselbe und der Abzug fiel nicht auf. Am Zapfen ist
+     * „zu" 0,5495 — die gezeichnete Kralle stand damit 31 Grad weiter zu als
+     * die gerechnete.
      */
-      pivot.rotation.x = -(this.clawSplayIst[i] ?? this.currentSplay());
-    });
+    for (let i = 0; i < this.form.schalen; i++) {
+      this.greiferbau.setWinkel(i, this.clawSplayIst[i] ?? this.currentSplay());
+    }
     this.updateClawColliders();
 
     this.updateHydraulics();
 
-    this.updateGrappleCylinders();
+    this.greiferbau.nachfuehren();
 
     // Joysticks samt Unterarmen kippen genau so, wie der Spieler steuert:
     // links Hauptarm und Oberwagen, rechts Ausleger und Spinne. Vorher stand
@@ -2419,32 +2527,6 @@ export class Excavator {
     const qYaw = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yaw, 0));
     const qTilt = new THREE.Quaternion().setFromEuler(new THREE.Euler(this.swing.x, 0, this.swing.y));
     this.grappleGroup.quaternion.copy(qTilt).multiply(qYaw);
-  }
-
-  private cylA = new THREE.Vector3();
-  private cylB = new THREE.Vector3();
-  private cylDir = new THREE.Vector3();
-
-  /**
-   * Zylinder zwischen Traversen-Gelenk und Schale ausrichten — alles im
-   * lokalen Spinnenraum, damit sie beim Pendeln nicht nachhinken.
-   */
-  private updateGrappleCylinders(): void {
-    for (const c of this.grappleCylinders) {
-      this.cylA.copy(c.fromLocal);
-      this.cylB.copy(c.toLocalOnShell).applyEuler(c.pivot.rotation).add(c.pivot.position);
-      this.cylDir.copy(this.cylB).sub(this.cylA);
-      const dist = Math.max(this.cylDir.length(), 0.2);
-      this.cylDir.normalize();
-      const q = new THREE.Quaternion().setFromUnitVectors(Excavator.UP, this.cylDir);
-      c.barrel.position.copy(this.cylA).addScaledVector(this.cylDir, c.barrelLen / 2);
-      c.barrel.quaternion.copy(q);
-      c.barrel.scale.set(1, c.barrelLen, 1);
-      const rodLen = Math.max(dist - c.barrelLen + 0.08, 0.08);
-      c.rod.position.copy(this.cylB).addScaledVector(this.cylDir, -rodLen / 2);
-      c.rod.quaternion.copy(q);
-      c.rod.scale.set(1, rodLen, 1);
-    }
   }
 
   private syncBodies(): void {
@@ -2591,14 +2673,18 @@ export class Excavator {
   }
 
   getSensorPosition(out: THREE.Vector3): THREE.Vector3 {
+    /*
+     * Der Sitz kommt von der Form (E-057). Fuer die Sichelkralle ist er auf
+     * die Zahl genau `GRAPPLE_LINK + 0.2 + PALM_TO_SENSOR` = 1,50 m; die
+     * beiden Konstanten stehen weiter oben und bleiben die Herkunft.
+     */
     return out
-      .set(0, -GRAPPLE_LINK - 0.2 - PALM_TO_SENSOR, 0)
+      .set(0, -this.form.sensorSitz, 0)
       .applyQuaternion(this.grappleGroup.quaternion)
       .add(this.grappleGroup.position);
   }
 
   private basketTmp = new THREE.Vector3();
-  private basketTip = new THREE.Vector3();
   private basketQuatInv = new THREE.Quaternion();
 
   /**
@@ -2615,21 +2701,20 @@ export class Excavator {
       .copy(worldPoint)
       .sub(this.grappleGroup.position)
       .applyQuaternion(this.basketQuatInv.copy(this.grappleGroup.quaternion).invert());
-    // clawPoint legt den Umfangswinkel auf x/z: bei a = 0 steht der Radius in z
-    clawPoint(0, this.currentSplay(), CLAW_SEGMENTS, this.basketTip);
-    const tipY = this.basketTip.y;
-    const tipR = Math.max(this.basketTip.z, 0);
-    // Wenig Luft nach oben und unten. Vorher waren es 0,45 bzw. 0,35 m — damit
-    // galt als gefasst, was gut einen halben Meter neben der Spinne schwebte,
-    // ohne jede Beruehrung. Der Zuschlag stammt aus der Zeit vor der
-    // Oberflaechen-Projektion unten in tryGrab: Damals wurde der Schwerpunkt
-    // geprueft, und sperrige Teile waren sonst nicht zu fassen. Seit der
-    // naechstgelegene Oberflaechenpunkt zaehlt, braucht es das nicht mehr.
-    if (p.y > CLAW_RING_Y + 0.22 || p.y < tipY - 0.18) return false;
-    // Radius des Korbs auf dieser Höhe: vom Gelenkring zur Spitze verjüngt
-    const t = THREE.MathUtils.clamp((CLAW_RING_Y - p.y) / Math.max(CLAW_RING_Y - tipY, 0.01), 0, 1);
-    const r = THREE.MathUtils.lerp(CLAW_RING_R, tipR, t) + 0.14;
-    return Math.hypot(p.x, p.z) <= r;
+    /*
+     * Wie der Korb aussieht, weiss die Form (E-057). Bei der Sichelkralle ist
+     * es unveraendert der gerade Kegel vom Lagerkranz zur Spitze mit 0,14 m
+     * Luft, wie er bis zum 15.09.2026 hier stand; der Fuenfschalengreifer
+     * bringt seine eigene Korbform mit (E-058), weil derselbe Kegel bei ihm
+     * nur 28 % der Korbflaeche treffen wuerde.
+     *
+     * Wenig Luft nach oben und unten. Vorher waren es 0,45 bzw. 0,35 m — damit
+     * galt als gefasst, was gut einen halben Meter neben der Spinne schwebte,
+     * ohne jede Beruehrung. Der Zuschlag stammt aus der Zeit vor der
+     * Oberflaechen-Projektion in `tryGrab`: Damals wurde der Schwerpunkt
+     * geprueft, und sperrige Teile waren sonst nicht zu fassen.
+     */
+    return this.form.imKorb(p, this.currentSplay());
   }
 
   /**
@@ -2648,12 +2733,12 @@ export class Excavator {
     if (!col) return 0;
     this.grappleGroup.updateWorldMatrix(true, false);
     let treffer = 0;
-    for (let c = 0; c < CLAW_COUNT; c++) {
-      const a = (c / CLAW_COUNT) * Math.PI * 2;
+    for (let c = 0; c < this.form.schalen; c++) {
+      const a = (c / this.form.schalen) * Math.PI * 2;
       const splay = this.clawSplayIst[c] ?? this.currentSplay();
       let nah = false;
-      for (const seg of [CLAW_SEGMENTS, Math.round(CLAW_SEGMENTS * 0.6)]) {
-        clawPoint(a, splay, seg, this.clawA);
+      for (const seg of [this.form.stationen, Math.round(this.form.stationen * 0.6)]) {
+        this.form.punkt(a, splay, seg, this.clawA);
         this.clawA.applyMatrix4(this.grappleGroup.matrixWorld);
         const pr = col.projectPoint({ x: this.clawA.x, y: this.clawA.y, z: this.clawA.z }, false);
         if (!pr) continue;
