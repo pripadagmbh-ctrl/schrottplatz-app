@@ -29,11 +29,21 @@ export const BAGGER_STAND: Stand = { x: -0.5, z: -22.5 };
 /**
  * Der zweite Standplatz: der Verladeplatz zwischen Silo-Reihe und LKW-Spur.
  *
- * Von hier räumt der Spieler aus den Silos in den Container des Abholers.
- * 7,5 m nach beiden Seiten — die Silo-Vorderkante liegt bei x −33,0, die
- * LKW-Spur bei x −18,0.
+ * Von hier raeumt der Spieler aus den Silos in den Container des Abholers.
+ * 7,5 m nach beiden Seiten — die Eigenschaft ist dieselbe wie seit E-010, nur
+ * die Seite hat gewechselt: Seit dem 15.09.2026 steht die Silo-Reihe an der
+ * Wand bei x +10,5, ihre Vorderkante liegt auf x +3,5. Der Bagger steht 7,5 m
+ * davor auf −4,0, die LKW-Spur noch einmal 7,5 m weiter auf −11,5.
+ *
+ * z +5,4: die Mitte des fuenften Silos von Norden (KUPFER-LAGER) — dorthin
+ * geht die meiste Fuhre, und der Halt liegt weit genug suedlich, dass der
+ * Abholer Janines Kaffeewagen nicht beruehrt. Gemessen: Seine Standflaeche
+ * reicht 4,90 m nach vorn und 3,14 m nach hinten; von Sueden angesetzt endet
+ * er auf z +10,3, der Kaffeewagen beginnt auf +14,1 — 3,8 m Luft.
+ *
+ * Vom Hauptstandplatz sind es hypot(3,5 | 27,9) = 28,1 m (vorher 27,1 m).
  */
-export const VERLADE_STAND: Stand = { x: -25.5, z: -12 };
+export const VERLADE_STAND: Stand = { x: -4.0, z: 5.4 };
 
 /**
  * Das Schwenkband: näher als `SCHWENK_INNEN` bekommt der Arm den Ausleger

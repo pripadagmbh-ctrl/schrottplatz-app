@@ -253,41 +253,65 @@ export const CONFIGS: ContainerConfig[] = [
     sortierbox: true, shareEast: true, shareSouth: true },
 
   /*
-   * MUELL — in der Suedostecke, unter dem neuen LKW-Abladeplatz.
+   * MUELL — nicht mehr in der Suedostecke, sondern in der Luecke zwischen
+   * Kabel-Mulde und Kipperspur (15.09.2026).
    *
-   * Konzeptplan 14.09.2026: „Beim Stahlschrott ein grosser schwarzer
-   * Muellcontainer." Was beim Sortieren an Bauschutt und Restmuell anfaellt,
-   * wandert hier hinein statt quer ueber den Platz zu den Silos.
+   * Ansage Patrick: „Die Muellmulde muss weg. Die LKWs fahren in die
+   * Muellmulde und ich kann noch nicht mal die LKWs vollstaendig abladen, weil
+   * ich in die Wand greife. … Sie stehen mitten im Arbeitsweg des LKWs und
+   * Arbeitsbereich des Baggers."
    *
-   * Kein `lager`: Ein sortenreiner Kipper faehrt nicht hierher, sondern in
-   * die BAUMISCH-Mulde an der Westwand — hier steht der Bagger im Weg.
+   * NACHGEMESSEN an der alten Stelle (7,0 | −27,0), gegen den echten Umriss
+   * des LKW (`vehicles.ts`: Ursprung = Muldenmitte, Ladeflaeche ± bedLen/2,
+   * Standflaeche ± (bedLen/2 + 1,6)):
    *
-   * NEUE LAGE (14.09.2026 abends), gesucht gegen den LKW-Abladeplatz:
-   * Der Wagen setzt jetzt auf x 6,3 bis z −24,0 zurueck. Damit die
-   * Blockadepruefung der LKW (1,40 m Tastradius) nicht an der Nordflanke der
-   * Mulde haengenbleibt, muss zwischen Halt und Flankenmitte 1,75 m liegen —
-   * das ergibt z −27,0. Die Suedflanke steht dann 22 cm vor der Suedmauer.
+   *   Ladeflaeche im Halt        z −26,70 … −21,30 auf x 4,95 … 7,65
+   *   Nordwand der Muellmulde    z −26,15 … −25,45 auf x 5,20 … 8,80
+   *   → Ueberschneidung          2,45 m x 0,70 m — die Pritsche steckt in der
+   *                              Wand, genau so, wie es zu sehen war.
+   *   Standflaeche des Wagens    z −28,30 … −19,70
+   *   → ueberdeckt die Mulde     2,65 m x 2,85 m, also fast ganz.
+   *   Greifen an der SO-Ecke     Abstand Ladeflaechenecke (7,65 | −26,70) zur
+   *                              Stirnwand der Mulde (x 8,45): 0,80 m. Die
+   *                              offene Spinne misst 3,38 m, braucht also
+   *                              1,69 m Halbmass — „ich greife in die Wand".
    *
-   * 2,40 m tief statt 3,00: Bei 3,00 waere die Nordflanke 60 cm weiter
-   * noerdlich, der LKW muesste entsprechend vorruecken, und dann faellt die
-   * hintere Ecke seiner Ladeflaeche mit 9,4 m aus der Reichweite. Die Front
-   * bleibt bei 3,60 m — sie ist das Mass, das die offene Spinne (3,38 m)
-   * hineinlaesst.
+   * DIE NEUE STELLE ist gesucht, nicht gegriffen. Frei im Schwenkband 5,8 bis
+   * 9,2 m ist nach dem Umbau nur noch der Streifen zwischen der Kabel-Mulde
+   * (Ostkante x −5,5) und der Kipperspur (x 2,0, Wagenflanke x 0,45):
    *
-   * Vom Sitz sind es 8,75 m (vorher 8,81) — eines der vier Pflichtziele
-   * (Ansage: „vor allem an Mischschrott drankommen, an die Presse, an
-   * Stahlschrott und an den Muell").
+   *   Mitte (−3,2 | −14,6)   8,35 m vom Sitz — im Band
+   *   Westkante x −5,0       0,50 m bis zur Kabel-Mulde
+   *   Stirnwand bis x −1,05  1,50 m bis zur Flanke des Kippers (Schranke 1,40)
+   *
+   * z −14,6 ist dabei nicht frei gewaehlt: Die Mulde steht zwischen den
+   * Oeffnungen von KABEL (Mitte z −16,7) und KUPFER + MESSING (−12,5), und
+   * ihre Flanken duerfen vor keiner der beiden stehen. Bei −14,6 liegen sie
+   * auf z −16,15 … −15,45 und −13,75 … −13,05 — beide Oeffnungen bleiben frei
+   * (`test/platz.test.ts` tastet sie ab).
+   *
+   * `facing: "east"` — die geschlossene Stirnwand steht nach WESTEN, zur
+   * Kabel-Mulde hin, die Oeffnung nach Osten zum Bagger und zur Kipperspur.
+   * Andersherum staende eine 2,2 m hohe Wand zwischen Sitz und Mulde, und die
+   * Oeffnung schaute 0,5 m weit auf die Flanke des Nachbarn.
+   *
+   * Sie liegt damit WESTLICH der Rueckfahrspur zum Abladeplatz (x 6,3) und
+   * ausserhalb jeder Wagenflaeche. Vierte Pflichtstation (Ansage: „vor allem
+   * an Mischschrott drankommen, an die Presse, an Stahlschrott und an den
+   * Muell") — geprueft in `test/platz.test.ts`.
    */
   /*
-   * Reifen gehoeren seit dem 14.09.2026 abends hierhin (`mitFraktionen`):
-   * Ihr eigener Container ist weg, und ohne diesen Eintrag zaehlte jeder
-   * Reifen als Verunreinigung und druecke die Reinheit des ganzen
+   * Reifen gehoeren seit dem 14.09.2026 abends hierhin, Holz und Kunststoff
+   * seit dem 15.09. (`mitFraktionen`): Ohne diese Eintraege zaehlte jedes
+   * solche Stueck als Verunreinigung und druecke die Reinheit des ganzen
    * Behaelters (Briefing Kap. 7, Reinheit²). Abgerechnet wird nach
-   * `fractionId`, also zum Baumisch-Satz (−0,04 €/kg statt −0,05) — die
-   * bewusste Vereinfachung dieser Zusammenlegung, wie bei Kupfer + Messing.
+   * `fractionId`, also zum Baumisch-Satz (−0,04 €/kg) — dieselbe bewusste
+   * Vereinfachung wie bei Kupfer + Messing. Der Muell am Bagger und das
+   * ABFALL-Silo fassen damit genau dieselben vier Fraktionen; was der Spieler
+   * hier hineinwirft, darf Lambert eins zu eins weitertragen.
    */
-  { id: "r_rubble", fractionId: "rubble", mitFraktionen: ["tires"], label: "MUELL",
-    kind: "bay", x: 7.0, z: -27.0, size: [3.6, 2.4, 2.2] },
+  { id: "r_rubble", fractionId: "rubble", mitFraktionen: ["tires", "wood", "plastic"],
+    label: "MUELL", kind: "bay", x: -3.2, z: -14.6, size: [3.6, 2.4, 2.2], facing: "east" },
 
   /*
    * REIFEN ist ersatzlos weg (Ansage 14.09.2026 abends: „Der Reifencontainer
@@ -298,40 +322,67 @@ export const CONFIGS: ContainerConfig[] = [
    */
 
   /*
-   * DIE SILO-REIHE an der Westwand — neun statt acht.
+   * DIE SILO-REIHE — an der gegenueberliegenden Wand, sechs statt neun
+   * (15.09.2026).
    *
-   * E-010: E-Motoren, Batterien, Alu, Kabel, Kupfer, VA, Holz, Baumisch,
-   * Kunststoff. Stahl entfaellt. Achsabstand 4,6 m ab z +10, alle auf x −36
-   * mit der Oeffnung nach Osten zum Platz. Davor liegt der Verladeplatz.
+   * Ansage Patrick: „Die Hallen muessen wieder zur Ostwand, da wo die Silos
+   * sind. Bitte da wieder platzieren und entsprechend die Silos kuerzen und
+   * auf die andere Seite bringen." Aus dem Sitz beschrieben: Die Silos raeumen
+   * die Wand bei x −36 fuer die Hallen und ziehen an die Wand bei x +10,5.
    *
-   * 6,0 m Front statt 7,0: Hinter der Reihe bleibt damit 1,0 m bis zur
-   * Westmauer (frueher 2,0). Die Front bleibt weit ueber den 3,38 m, die die
-   * offene Spinne misst.
+   * LAGE. Gespiegelt, nicht neu erfunden: Die Westmauer steht innen bei
+   * x −39,7, die Reihe stand 3,7 m davor auf −36. Die Ostmauer steht innen bei
+   * +10,2, die Reihe steht also auf +6,5 — Kasten von x 3,5 bis 9,5, Stirnwand
+   * aussen bei 10,05, 15 cm vor der Mauer. Die Oeffnung zeigt nach WESTEN auf
+   * den Platz (Standardrichtung, deshalb steht kein `facing` mehr dabei).
+   *
+   * WIE VIELE. Nach Sueden ist bei z ≈ 0 Schluss: Dort beginnt die
+   * Rueckfahrspur zum Abladeplatz (Rangierpunkt 6,3 | −8). Nach Norden steht
+   * die Mauer innen bei z +28,7; mit 2,375 m Flankenmass liegt die
+   * noerdlichste Mitte auf 26,2. Bei 4,6 m Achsabstand passen damit sechs
+   * Silos: 26,2 · 21,6 · 17,0 · 12,4 · 7,8 · 3,2. Die suedlichste Flanke endet
+   * auf z +0,825.
+   *
+   * WAS GESTRICHEN IST — und wohin die Fraktion geht:
+   *
+   *   E-MOTOREN     ersatzlos. Es war eine leere Huelle (`nurHuelle`), die
+   *                 Fraktion gibt es nicht (E-011). Kein Material verliert ein
+   *                 Ziel.
+   *   HOLZ          → ABFALL
+   *   KUNSTSTOFF    → ABFALL
+   *   BAUMISCH      → ABFALL (heisst jetzt so)
+   *
+   * Die drei Abfallsilos werden zu EINEM. Begruendung aus dem Katalog: Alle
+   * vier Abfallsaetze sind negativ und liegen zwischen −0,02 und −0,06 €/kg
+   * (`materials/catalog.ts`) — sie werden entsorgt, nicht verkauft, und ein
+   * Abnehmer bestellt sie nie. Am Bagger liegen Reifen und Baumisch seit dem
+   * 14.09. ohnehin in einer Mulde; das Sortieren des Abfalls ist ausdruecklich
+   * vertagt (E-024). Abgerechnet wird nach `fractionId` = `rubble`, also zum
+   * Baumisch-Satz.
+   *
+   * Damit hat JEDE Fraktion mit Lagerbedarf weiter ein Ziel: battery, alu,
+   * zinc, cable, copper, brass, va, wood, plastic, rubble, tires. Stahl und
+   * Mischschrott haben bewusst keines (E-010: direkt an der Halde verladen) —
+   * nachgerechnet in `test/silos.test.ts`.
    *
    * `lager: true` heisst: Hierhin faehrt der sortenreine Kipper, und hierhin
    * traegt Lambert aus den Mulden am Bagger. Die Behaelter am Bagger tragen
    * das Kennzeichen bewusst nicht — sonst traegt Lambert aus der Alu-Mulde in
    * die Alu-Mulde (gemessen am 13.09.2026: 4 von 4 blieben liegen).
    */
-  { id: "c_emotor", fractionId: "mixed", label: "E-MOTOREN", kind: "bay", x: -36,
-    z: 10.0, size: [6.0, 4.2, 3.0], facing: "east", nurHuelle: true },
-  { id: "c_battery", fractionId: "battery", label: "BATTERIEN", kind: "bay", x: -36,
-    z: 5.4, size: [6.0, 4.2, 3.0], facing: "east", lager: true },
+  { id: "c_rubble", fractionId: "rubble", mitFraktionen: ["tires", "wood", "plastic"],
+    label: "ABFALL", kind: "bay", x: 6.5, z: 23.8, size: [6.0, 4.2, 3.0], lager: true },
+  { id: "c_battery", fractionId: "battery", label: "BATTERIEN", kind: "bay", x: 6.5,
+    z: 19.2, size: [6.0, 4.2, 3.0], lager: true },
+  { id: "c_va_lager", fractionId: "va", label: "VA-LAGER", kind: "bay", x: 6.5,
+    z: 14.6, size: [6.0, 4.2, 3.5], lager: true },
   { id: "c_alu_lager", fractionId: "alu", mitFraktionen: ["zinc"], label: "ALU-LAGER",
-    kind: "bay", x: -36, z: 0.8, size: [6.0, 4.2, 3.0], facing: "east", lager: true },
-  { id: "c_cable_lager", fractionId: "cable", label: "KABEL-LAGER", kind: "bay", x: -36,
-    z: -3.8, size: [6.0, 4.2, 3.0], facing: "east", lager: true },
+    kind: "bay", x: 6.5, z: 10.0, size: [6.0, 4.2, 3.0], lager: true },
   { id: "c_copper_lager", fractionId: "copper", mitFraktionen: ["brass"],
-    label: "KUPFER-LAGER", kind: "bay", x: -36, z: -8.4, size: [6.0, 4.2, 3.0],
-    facing: "east", lager: true },
-  { id: "c_va_lager", fractionId: "va", label: "VA-LAGER", kind: "bay", x: -36,
-    z: -13.0, size: [6.0, 4.2, 3.5], facing: "east", lager: true },
-  { id: "c_wood", fractionId: "wood", label: "HOLZ", kind: "bay", x: -36,
-    z: -17.6, size: [6.0, 4.2, 3.0], facing: "east", lager: true },
-  { id: "c_rubble", fractionId: "rubble", label: "BAUMISCH", kind: "bay", x: -36,
-    z: -22.2, size: [6.0, 4.2, 3.0], facing: "east", lager: true },
-  { id: "c_plastic", fractionId: "plastic", label: "KUNSTSTOFF", kind: "bay", x: -36,
-    z: -26.8, size: [6.0, 4.2, 3.0], facing: "east", lager: true },
+    label: "KUPFER-LAGER", kind: "bay", x: 6.5, z: 5.4, size: [6.0, 4.2, 3.0],
+    lager: true },
+  { id: "c_cable_lager", fractionId: "cable", label: "KABEL-LAGER", kind: "bay", x: 6.5,
+    z: 0.8, size: [6.0, 4.2, 3.0], lager: true },
 ];
 
 /**

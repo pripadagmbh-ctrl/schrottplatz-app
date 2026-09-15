@@ -1603,11 +1603,13 @@ export class StaffManager {
    * dieselbe (er faehrt nicht in den Arbeitsbereich des Baggers), sie wird nur
    * dort gezogen, wo die Mulden heute enden.
    */
-  private static readonly REVIER_X =
-    Math.max(...CONFIGS.filter((c) => c.sortierbox).map((c) => c.x + c.size[0] / 2)) + 0.5;
-
   private static imBaggerrevier(x: number, z: number): boolean {
-    return x > StaffManager.REVIER_X && z < 2.0 && z > BUCHT_Z;
+    return imBaggerrevier(x, z);
+  }
+
+  /** Halteplatz vor einer Mulde — als Modulfunktion, damit Tests sie lesen. */
+  static anfahrtZu(c: ContainerConfig): [number, number] {
+    return StaffManager.anlieferPunkt(c);
   }
 
   private reachable(tx: number, tz: number): boolean {
@@ -1883,3 +1885,23 @@ export class StaffManager {
     return best;
   }
 }
+
+/**
+ * Sperrgebiet fuer Lambert: der Arbeitsbereich des Baggers.
+ *
+ * Steht als freie Funktion da, damit `test/silos.test.ts` sie lesen kann —
+ * ohne sie waere die Regel nur in einer privaten Methode nachzubauen, und
+ * zwei Wahrheiten ueber dieselbe Sache halten nie. Genau hier ist am
+ * 15.09.2026 ein Silo unbemerkt aus Lamberts Revier gefallen.
+ */
+export function imBaggerrevier(x: number, z: number): boolean {
+  return x > REVIER_X && z < REVIER_Z && z > BUCHT_Z;
+}
+const REVIER_X =
+  Math.max(...CONFIGS.filter((c) => c.sortierbox).map((c) => c.x + c.size[0] / 2)) + 0.5;
+const REVIER_Z =
+  Math.max(
+    ...CONFIGS.filter((c) => c.sortierbox === true || c.id === "r_rubble").map(
+      (c) => c.z + c.size[1] / 2
+    )
+  ) + 1.5;

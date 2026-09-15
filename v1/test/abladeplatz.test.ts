@@ -95,14 +95,20 @@ describe("Der Händler-LKW am neuen Abladeplatz", () => {
 
     // Und damit steht die Längsachse quer zur Richtung, in die der Bagger schaut.
     const mx = fuhre.x;
-    const mz = fuhre.z + 2.7; // Mitte der Ladefläche
+    const mz = fuhre.z; // Mitte der Ladefläche = Ursprung des Wagens
     const zumSitz = Math.atan2(BAGGER_STAND.x - mx, BAGGER_STAND.z - mz);
     const quer = Math.abs(Math.abs(zumSitz) - Math.PI / 2);
     expect(quer, "der Wagen steht nicht quer zum Sitz").toBeLessThan(0.45);
   });
 
   it("und seine Ladefläche liegt in Reichweite", () => {
-    for (const dz of [0, 2.7, 5.4]) {
+    /*
+     * Die Ladefläche liegt UM den Ursprung herum, nicht davor: `bedGroup`
+     * sitzt auf lokal −bedLen/2 (`vehicleModel.ts`). Bis zum 15.09.2026
+     * tastete dieser Test 2,7 m zu weit nördlich — und maß damit eine Stelle,
+     * an der keine Ladung liegt.
+     */
+    for (const dz of [-2.7, 0, 2.7]) {
       const d = Math.hypot(fuhre.x - BAGGER_STAND.x, fuhre.z + dz - BAGGER_STAND.z);
       expect(d, `Ladefläche bei ${d.toFixed(2)} m`).toBeLessThanOrEqual(SCHWENK_AUSSEN);
     }

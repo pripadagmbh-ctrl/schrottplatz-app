@@ -25,6 +25,10 @@ import {
 } from "../src/delivery/routes";
 import { baleYard, PRESS_CENTER as PRESSE } from "../src/world/press";
 import { BAGGER_STAND, VERLADE_STAND } from "../src/world/baggerstand";
+/** Vorderkante der Silo-Reihe — die Seite, auf der der Bagger das Silo hat. */
+const SILO_KANTE_X = Math.min(
+  ...CONFIGS.filter((c) => c.lager === true).map((c) => c.x - c.size[0] / 2)
+);
 
 /**
  * Standplatz des Baggers — aus `world/baggerstand.ts`, nicht abgeschrieben.
@@ -121,9 +125,15 @@ describe("Reichweite des Arms", () => {
      * (14.09.2026 abends): Was auf seiner Flaeche liegt, muss man auch
      * herunterbekommen. Vorher lag die hintere Haelfte bei 10 bis 13,5 m.
      */
+    /*
+     * Die Flaeche liegt UM den Haltepunkt herum: Der Ursprung eines Fahrzeugs
+     * ist die Mitte der Ladeflaeche (`vehicleModel.ts`). Bis zum 15.09.2026
+     * rechnete dieser Test sie noerdlich davon — und pruefte damit einen Ort,
+     * an dem keine Ladung liegt.
+     */
     const laenge = 5.4;
     for (const dx of [-BED_HALF_W, 0, BED_HALF_W]) {
-      for (const dz of [0, laenge / 2, laenge]) {
+      for (const dz of [-laenge / 2, 0, laenge / 2]) {
         const d = Math.hypot(
           ABLADE_SPUR_X + dx - BAGGER_STAND.x,
           ABLADE_HALT_Z + dz - BAGGER_STAND.z
@@ -212,8 +222,17 @@ describe("Reichweite des Arms", () => {
     expect(d, `Abholer ${d.toFixed(1)} m vom Verladeplatz`).toBeGreaterThanOrEqual(4.0);
     expect(d, `Abholer ${d.toFixed(1)} m vom Verladeplatz`).toBeLessThanOrEqual(9.5);
     expect(hoechsteKrallenspitze(d), `Hubhoehe bei ${d.toFixed(1)} m`).toBeGreaterThan(2.5);
-    // Und er steht nicht in der Silo-Reihe, sondern östlich davon.
-    expect(x, "der Abholer steht westlich des Baggers").toBeGreaterThan(VERLADE_STAND.x);
+    /*
+     * Und er steht auf der dem Silo ABGEWANDTEN Seite des Baggers — sonst
+     * stuende er in der Reihe. Seit dem 15.09.2026 liegen die Silos oestlich
+     * des Verladeplatzes, der Abholer also westlich davon; bis dahin war es
+     * umgekehrt. Geprueft wird die Eigenschaft, nicht die Himmelsrichtung.
+     */
+    const siloSeite = Math.sign(SILO_KANTE_X - VERLADE_STAND.x);
+    expect(
+      Math.sign(x - VERLADE_STAND.x),
+      "der Abholer steht auf derselben Seite wie die Silo-Reihe"
+    ).toBe(-siloSeite);
   });
 
   it("das Presspaket bleibt in der Kammer", () => {
