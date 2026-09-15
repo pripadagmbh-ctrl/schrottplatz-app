@@ -44,6 +44,38 @@ import {
  * Bodenanschlag, Eindringtiefe, Greiffenster. Die Form sagt, wo ihre Schalen
  * stehen und was in ihrem Korb liegt; was der Bagger damit anstellt, steht
  * weiter in `excavator.ts` und `gripSystem.ts`.
+ *
+ * ──────────────────────────────────────────────────────────────────────────
+ * ANNAHME: DIE GREIFERACHSE STEHT SENKRECHT.
+ *
+ * Aufgeschrieben, weil sie demnaechst fallen soll (Wunsch Patrick 15.09.2026:
+ * „Greifer muss komplett zur Seite kippen koennen, zum Kehren und
+ * Schleudern."). Gebaut ist die Neigung NICHT — hier steht nur, wo sie
+ * anschlagen wird und wo nicht.
+ *
+ * TRAGFAEHIG AUCH GENEIGT, weil es im Frame des Greifers rechnet:
+ *   `punkt`        Mittellinie im Greiferframe — dreht mit.
+ *   `imKorb`       bekommt den Punkt bereits im Greiferframe (der Bagger
+ *                  rechnet ihn mit `grappleGroup.quaternion` um). Kippt der
+ *                  Greifer, kippt der Korb mit, ohne dass sich hier etwas
+ *                  aendert.
+ *   `sensorSitz`   wird in `getSensorPosition` mit derselben Drehung gelegt —
+ *                  die Fuehlkugel kippt also mit.
+ *   `sensorRadius`, `schalenluecke`, `kolliderRadius`, die vier Zahlen des
+ *                  Schliessens: reine Bauteilmasse, richtungslos.
+ *
+ * HAENGT AN DER SENKRECHTEN — und ist beim Kippen neu zu fassen:
+ *   `tiefe(winkel)`, `maxTiefe`   Beides ist eine Tiefe UNTER DEM URSPRUNG,
+ *                  gemessen laengs der Greiferachse. Solange die Achse lotet,
+ *                  ist das dasselbe wie „ueber dem Beton". Geneigt ist es das
+ *                  nicht mehr: Gefragt waere dann die Ausladung in
+ *                  Weltrichtung −y, also so etwas wie
+ *                  `ausladung(winkel, richtung)`. Wer kippt, faengt hier an.
+ *
+ * Die drei Stellen im Bagger, die diese Tiefe senkrecht verrechnen, stehen mit
+ * derselben Notiz in `excavator.ts`: `resolveGroundClamp`,
+ * `surfaceUnderClaws` und `hoechsteKrallenspitze`.
+ * ──────────────────────────────────────────────────────────────────────────
  */
 
 /** Kennung einer Greiferform — sie steht so auch im Spielstand. */
@@ -80,7 +112,10 @@ export interface Greiferform {
    * `a` ist der Umfangswinkel der Schale, `k` die Station.
    */
   punkt(a: number, winkel: number, k: number, out: THREE.Vector3): THREE.Vector3;
-  /** Tiefe des tiefsten GEZEICHNETEN Punktes unter dem Ursprung (m). */
+  /**
+   * Tiefe des tiefsten GEZEICHNETEN Punktes unter dem Ursprung (m).
+   * Setzt voraus, dass die Greiferachse lotet — siehe Kopf der Datei.
+   */
   tiefe(winkel: number): number;
   /** Dieselbe Tiefe, ueber den ganzen Schliessweg genommen (m). */
   readonly maxTiefe: number;

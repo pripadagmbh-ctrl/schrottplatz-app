@@ -117,15 +117,20 @@ function punkt(a: number, schwenk: number, k: number, out: THREE.Vector3): THREE
  */
 let zahnpunkte: Array<{ y: number; z: number }> | null = null;
 
-function messeZahn(): Array<{ y: number; z: number }> {
-  if (zahnpunkte) return zahnpunkte;
-  const g = baueGreifer(stoffe());
+/**
+ * Den Zahn an einem GESCHLOSSENEN Modell abgreifen und merken.
+ *
+ * Die erste Schale steht auf Umfangswinkel 0, ihr lokales +z zeigt also in
+ * Welt-+z; bei Schwenk 0 ist sie unverdreht. Damit lassen sich die Weltpunkte
+ * ohne Umweg in den Rahmen der Schale umrechnen.
+ */
+function zahnAusModell(g: ReturnType<typeof baueGreifer>): void {
+  if (zahnpunkte) return;
   g.setOeffnung(0);
   g.wurzel.updateMatrixWorld(true);
   const raus: Array<{ y: number; z: number }> = [];
   const v = new THREE.Vector3();
-  const gelenk = g.schalen[0]!.gelenk;
-  gelenk.traverse((n) => {
+  g.schalen[0]!.gelenk.traverse((n) => {
     if (n.name !== "07_ZAHN") return;
     n.traverse((m) => {
       const netz = m as THREE.Mesh;
@@ -138,23 +143,42 @@ function messeZahn(): Array<{ y: number; z: number }> {
     });
   });
   if (raus.length === 0) throw new Error("07_ZAHN nicht gefunden");
-  // Netze wieder freigeben: Das Modell hat seinen Zweck erfuellt.
+  zahnpunkte = raus;
+}
+
+function messeZahn(): Array<{ y: number; z: number }> {
+  if (zahnpunkte) return zahnpunkte;
+  /*
+   * Kein Modell zur Hand — dann eins bauen und gleich wieder wegwerfen. Das
+   * passiert nur, wenn jemand nach der Tiefe fragt, ohne den Greifer je
+   * angebaut zu haben (Werkzeuge, Waechter). Wird er angebaut, greift `baue()`
+   * den Zahn an seinem eigenen Modell ab und dieser Fall tritt nie ein.
+   */
+  const g = baueGreifer(stoffe());
+  zahnAusModell(g);
   g.wurzel.traverse((n) => {
     const m = n as THREE.Mesh;
     if (m.isMesh) m.geometry.dispose();
   });
-  zahnpunkte = raus;
-  return raus;
+  return zahnpunkte!;
 }
 
 /** Tiefe der Zahnunterkante unter dem Aufhaengepunkt, bei diesem Schwenk (m). */
+let letzterSchwenk = NaN;
+let letzteTiefe = 0;
+
 function tiefe(schwenk: number): number {
+  // Gemerkt, weil `imKorb` sie je Kandidat und Bild braucht und sich der
+  // Schwenk innerhalb eines Bildes nicht aendert.
+  if (schwenk === letzterSchwenk) return letzteTiefe;
   const c = Math.cos(-schwenk);
   const sn = Math.sin(-schwenk);
   let tief = 0;
   for (const p of messeZahn()) {
     tief = Math.max(tief, -(STEMPEL_AUGE.y + (p.y * c - p.z * sn)));
   }
+  letzterSchwenk = schwenk;
+  letzteTiefe = tief;
   return tief;
 }
 
@@ -254,7 +278,14 @@ export const FUENFSCHALEN: Greiferform = {
   get maxTiefe(): number {
     return maxTiefe();
   },
-  sensorRadius: sensorRadiusVon(KERN),
+  /*
+   * Die Kugel reicht bis zum Korbboden — und der geht bis an die gezeichneten
+   * Zaehne (siehe `imKorb`). Also der tiefere der beiden Werte:
+   * Mittellinie + Luft = 1,2289 m, Zahn = 2,7511 − 1,50 = 1,2511 m.
+   */
+  get sensorRadius(): number {
+    return Math.max(sensorRadiusVon(KERN), maxTiefe() - KERN.sensorSitz);
+  },
   schalenluecke: schalenlueckeVon(KERN),
   /**
    * Der Korb aus der wirklichen Mittellinie — siehe Kopf dieser Datei.
@@ -277,7 +308,23 @@ export const FUENFSCHALEN: Greiferform = {
       yO = Math.max(yO, korbY[k]!);
       yU = Math.min(yU, korbY[k]!);
     }
-    if (p.y > yO + KORB_LUFT_OBEN || p.y < yU - KORB_LUFT_UNTEN) return false;
+    /*
+     * DER KORBBODEN REICHT BIS AN DIE GEZEICHNETEN ZAEHNE.
+     *
+     * Die Mittellinie endet dort, wo die Schale in ihre Spitze uebergeht; der
+     * ZAHN haengt noch darunter. Bei der Sichelkralle sind das 0,124 m, und die
+     * 0,18 m Luft decken sie mit 5,6 cm Rest ab — der Korbboden liegt dort
+     * ohnehin unter den Zaehnen. Beim Fuenfschalengreifer sind es 0,202 m: Die
+     * Luft reicht NICHT, der Korb endete 2,2 cm ueber den eigenen Zaehnen.
+     *
+     * Gemessen hat das der Waechter: Ein 6 cm dickes Blech auf dem Beton
+     * blieb liegen, obwohl die Zaehne daran standen (`greiferwechsel.test.ts`,
+     * „fasst Blech, 6 cm dick"). Deshalb der tiefere der beiden Boeden. Fuer
+     * die Sichelkralle waere das dieselbe Zahl wie bisher — sie rechnet
+     * trotzdem weiter mit ihrer eigenen, unveraenderten Fassung.
+     */
+    const boden = Math.min(yU - KORB_LUFT_UNTEN, -tiefe(winkel));
+    if (p.y > yO + KORB_LUFT_OBEN || p.y < boden) return false;
     const r =
       korbRadiusBei(Math.max(yU, Math.min(yO, p.y))) + KORB_LUFT_SEITE;
     return Math.hypot(p.x, p.z) <= r;
@@ -313,6 +360,9 @@ export const FUENFSCHALEN: Greiferform = {
   kolliderRadius: SICHELKRALLE.kolliderRadius,
   baue(): Greiferbau {
     const g = baueGreifer(stoffe());
+    // Die Grabtiefe an DIESEM Modell abgreifen, statt dafuer ein zweites zu
+    // bauen — das sparte beim ersten Anbauen eine halbe Sekunde.
+    zahnAusModell(g);
     return {
       gruppe: g.wurzel,
       setWinkel(i: number, winkel: number): void {

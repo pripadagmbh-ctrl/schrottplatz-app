@@ -73,7 +73,17 @@ describe("Fuenfschalengreifer — die Form am Bagger", () => {
   });
 
   it("Sensorradius und Schalenluecke treffen die Rechnung aus E-048", () => {
-    expect(FUENFSCHALEN.sensorRadius).toBeCloseTo(1.2289, 4);
+    /*
+     * E-048 hat 1,2289 m gerechnet: tiefste Mittellinie (2,5489) + 0,18 Luft
+     * − 1,50 Sitz. Am Bagger sind es 1,2511 m, und der Unterschied ist
+     * gemessen, nicht gewaehlt: Der Korbboden reicht bis an die GEZEICHNETEN
+     * Zaehne (2,7511 m), die 0,202 m unter der Mittellinie haengen — mehr als
+     * die 0,18 m Luft. Ohne die 2,2 cm blieb ein 6 cm dickes Blech auf dem
+     * Beton liegen, obwohl die Zaehne daran standen
+     * (`greiferwechsel.test.ts`).
+     */
+    expect(FUENFSCHALEN.sensorRadius).toBeCloseTo(1.2511, 4);
+    expect(2.5489 + 0.18 - 1.5, "die Rechnung aus E-048").toBeCloseTo(1.2289, 4);
     expect(FUENFSCHALEN.schalenluecke).toBeCloseTo(0.5954, 4);
     expect(FUENFSCHALEN.sensorSitz, "Sensorsitz wie bei der Sichelkralle").toBe(1.5);
   });
@@ -91,7 +101,12 @@ describe("Fuenfschalengreifer — die Form am Bagger", () => {
      * Punkt, den die Mittellinie ueber den ganzen Weg erreicht (2,5489 m —
      * derselbe, aus dem der Sensorradius kommt).
      */
-    const tiefste = FUENFSCHALEN.sensorRadius + FUENFSCHALEN.sensorSitz - 0.18;
+    let tiefste = 0;
+    for (let i = 0; i <= 200; i++) {
+      const w = ZU + ((OFFEN - ZU) * i) / 200;
+      for (const p of mittellinie(w)) tiefste = Math.max(tiefste, -p.y);
+    }
+    expect(tiefste, "tiefste Mittellinie ueber den Weg (E-048)").toBeCloseTo(2.5489, 4);
     const huelle = [...mittellinie(ZU), { r: 0, y: -tiefste }];
     const mitte = (STEMPEL_AUGE.y - tiefste) / 2;
     let vonOben = 0;
@@ -101,6 +116,9 @@ describe("Fuenfschalengreifer — die Form am Bagger", () => {
       vonMitte = Math.max(vonMitte, Math.hypot(p.r, p.y - mitte));
     }
     expect(vonOben).toBeCloseTo(1.049, 2);
+    // Der Korbboden geht noch 2,2 cm tiefer als die Mittellinie — bis an die
+    // Zaehne. Die Kugel deckt beides.
+    expect(FUENFSCHALEN.sensorRadius).toBeGreaterThan(FUENFSCHALEN.maxTiefe - 1.5 - 1e-9);
     expect(FUENFSCHALEN.sensorRadius, "die Kugel laesst den Korb aussen vor").toBeGreaterThan(
       vonOben
     );

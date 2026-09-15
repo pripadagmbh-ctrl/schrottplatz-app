@@ -19,6 +19,14 @@ export interface GameEvents {
   partTorn: { name: string };
   /** Zaunfeld aus der Verankerung gerissen/gefahren */
   fenceBroken: { x: number; y: number; z: number };
+  /**
+   * Der Greifer wurde im Pausenmenue gewechselt (E-059).
+   *
+   * `greifer` ist die Kennung, die auch im Spielstand steht („sichel" oder
+   * „fuenfschalen"), `name` der Klartext fuers HUD. Ton und Anzeige haengen
+   * nur hier dran, nicht an der Maschine (Projektregel 10).
+   */
+  "greifer:gewechselt": { greifer: string; name: string };
 }
 
 type Handler<K extends keyof GameEvents> = (payload: GameEvents[K]) => void;

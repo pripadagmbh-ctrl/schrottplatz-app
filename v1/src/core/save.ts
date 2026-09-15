@@ -46,6 +46,15 @@ export interface SaveData {
   upgrades?: string[];
   /** Gewaehlter Radiosender (ab Schema 2) */
   radio?: RadioState;
+  /**
+   * Welcher Greifer haengt — „sichel" oder „fuenfschalen" (E-059).
+   *
+   * Optional und ohne Schemawechsel: Ein Stand ohne dieses Feld ist ein Stand
+   * mit der Sichelkralle, so wie bisher jeder Stand. Das ist dieselbe
+   * Behandlung wie bei `upgrades` und spart einen Migrationspfad fuer eine
+   * Wahl, die sich in zwei Sekunden im Menue wiederholen laesst.
+   */
+  greifer?: string;
   items: SavedItem[];
   cars: SavedCar[];
   fencesBroken: boolean[];
@@ -106,6 +115,21 @@ export function speichereRadio(radio: RadioState): boolean {
   const d = readSave();
   if (!d) return false;
   d.radio = radio;
+  return storeSave(d);
+}
+
+/**
+ * Die Greiferwahl im vorhandenen Stand nachtragen, ohne sonst etwas
+ * anzufassen — genau wie `speichereRadio` (E-059).
+ *
+ * Existiert noch kein Spielstand, wird auch keiner angelegt: Die Wahl steht
+ * dann im Arbeitsspeicher und wandert beim naechsten Speichern mit. Liefert
+ * true, wenn sie auf der Platte gelandet ist.
+ */
+export function speichereGreifer(greifer: string): boolean {
+  const d = readSave();
+  if (!d) return false;
+  d.greifer = greifer;
   return storeSave(d);
 }
 

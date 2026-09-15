@@ -42,7 +42,12 @@ import {
 } from "./kabinenhubParts";
 import { BAGGER_STAND } from "../world/baggerstand";
 import { naechsteSpreizung } from "./clawGeometry";
-import { SICHELKRALLE, type Greiferform } from "./greiferform";
+import {
+  SICHELKRALLE,
+  type Greiferbau,
+  type Greiferform,
+  type GreiferId,
+} from "./greiferform";
 
 /**
  * Fuchsbagger (Umschlagbagger) — M0.
@@ -63,6 +68,9 @@ import { SICHELKRALLE, type Greiferform } from "./greiferform";
  * Zone, und keine Mulde war von der Standposition aus erreichbar.
  *
  * Reine Geometrie, kein Zustand — absichtlich ohne die Klasse benutzbar.
+ *
+ * ANNAHME: die Greiferachse lotet; `tief` wird senkrecht abgezogen. Siehe
+ * Kopf von `greiferform.ts`.
  */
 export function hoechsteKrallenspitze(
   abstandM: number,
@@ -527,7 +535,18 @@ export class Excavator {
    */
   private form: Greiferform = SICHELKRALLE;
   /** Das gebaute Modell der aktiven Form — Schalen drehen, Zylinder fuehren. */
-  private greiferbau!: { gruppe: THREE.Object3D; setWinkel(i: number, w: number): void; nachfuehren(): void };
+  private greiferbau!: Greiferbau;
+  /**
+   * Alle bisher gebauten Greifer, nach Kennung.
+   *
+   * Beide haengen in der Szene, der inaktive unsichtbar (E-059). Three.js
+   * ueberspringt unsichtbare Teilbaeume vollstaendig — Zeichenrufe kostet das
+   * nicht. Gebaut wird der zweite erst beim ersten Wechsel: Der
+   * Fuenfschalengreifer braucht dafuer rund 0,25 s (gemessen), und die soll
+   * nicht jeder Spielstart zahlen, der ihn nie sieht. Danach ist das
+   * Umschalten ein `visible`-Merker.
+   */
+  private greifer = new Map<GreiferId, Greiferbau>();
   private joyLeft!: THREE.Group;
   private joyRight!: THREE.Group;
   private cabinEye = new THREE.Object3D();
@@ -1004,7 +1023,74 @@ export class Excavator {
      * erstmal die einzelnen Bauteile").
      */
     this.greiferbau = this.form.baue();
+    this.greifer.set(this.form.id, this.greiferbau);
     this.grappleGroup.add(this.greiferbau.gruppe);
+  }
+
+  /** Welcher Greifer haengt gerade? */
+  get greiferform(): Greiferform {
+    return this.form;
+  }
+
+  /**
+   * Darf der Greifer jetzt gewechselt werden?
+   *
+   * Nur mit leerer, ganz offener Spinne (E-059). Der Grund ist gemessen, nicht
+   * vorsichtshalber: Die gefassten Teile ueberleben den Wechsel technisch,
+   * aber die Schalen stehen danach woanders — das Teil haengt sichtbar frei in
+   * der Luft. Genau das „Schweben" ist am 11.09.2026 abgestellt worden. Und
+   * „beim Wechseln loslassen" wuerfe bis zu 3,5 t aus beliebiger Armhoehe ab
+   * (v2 E-018: „Teile fliegen umher").
+   *
+   * `carriedCount` setzt main aus dem Greifsystem; es ist dieselbe Zahl, die
+   * im HUD steht.
+   */
+  get greiferWechselBereit(): boolean {
+    if (this.carriedCount > 0) return false;
+    if (this.closure > 0.02) return false;
+    for (const w of this.clawSplayIst) {
+      if (w < this.form.offen - 0.02) return false;
+    }
+    return true;
+  }
+
+  /**
+   * Greifer wechseln. Liefert false, wenn gerade etwas haengt oder die Spinne
+   * nicht offen ist — dann bleibt alles, wie es ist.
+   *
+   * Was dabei neu entsteht: das Modell (einmal je Form), die Krallen-Kollider
+   * (Zahl und Radius kommen von der Form) und die Stellung der Schalen. Die
+   * Sensorkugel haengt am Greifsystem und wird von dort gesetzt
+   * (`GripSystem.setForm`) — der Bagger kennt sie nicht.
+   */
+  setGreifer(form: Greiferform): boolean {
+    if (form.id === this.form.id) return true;
+    if (!this.greiferWechselBereit) return false;
+    let bau = this.greifer.get(form.id);
+    if (!bau) {
+      bau = form.baue();
+      this.greifer.set(form.id, bau);
+      this.grappleGroup.add(bau.gruppe);
+    }
+    this.greiferbau.gruppe.visible = false;
+    bau.gruppe.visible = true;
+    this.form = form;
+    this.greiferbau = bau;
+    /*
+     * Die Stellung geht auf „ganz offen" der NEUEN Form — die Anschlaege sind
+     * andere (Sichelkralle 0,5495 … 1,555, Fuenfschalen 0 … 1,6799). Wer die
+     * alten Winkel stehen liesse, haette Schalen, die 30 Grad zu weit zu
+     * stehen.
+     */
+    this.closure = 0;
+    this.clawSplayIst = new Array(form.schalen).fill(form.offen);
+    this.clawReserve = new Array(form.schalen).fill(form.nachdrueckReserve);
+    this.clawArt = new Array(form.schalen).fill(0);
+    this.baueKrallenKollider();
+    this.updateClawColliders();
+    for (let i = 0; i < form.schalen; i++) this.greiferbau.setWinkel(i, form.offen);
+    this.greiferbau.nachfuehren();
+    return true;
   }
 
   /**
@@ -2062,6 +2148,12 @@ export class Excavator {
    * Ausgenommen sind die eigenen Körper und die Ladung: Sonst setzte die Spinne
    * auf ihrer eigenen Kralle oder auf dem Teil auf, das sie gerade trägt.
    */
+  /*
+   * ANNAHME: die Greiferachse lotet — der Strahl geht senkrecht nach unten aus
+   * der Greifermitte. Bei einem seitlich gekippten Greifer liegen die Schalen
+   * nicht mehr unter ihrem Ursprung; dann braucht es den Strahl unter dem
+   * tiefsten Punkt, nicht unter der Mitte (siehe Kopf von `greiferform.ts`).
+   */
   private surfaceUnderClaws(_splay: number): number {
     this.grappleGroup.updateWorldMatrix(true, false);
     // EIN Strahl, aus der Mitte der Spinne senkrecht nach unten.
@@ -2177,6 +2269,15 @@ export class Excavator {
   private resolveGroundClamp(): void {
     // Spitzentiefe direkt aus der Krallengeometrie — so bleibt der Bodenanschlag
     // richtig, auch wenn sich Form oder Öffnungswinkel ändern.
+    /*
+     * ANNAHME: die Greiferachse lotet. `form.maxTiefe` ist eine Tiefe unter
+     * dem Greiferursprung, gemessen laengs seiner Achse, und wird hier
+     * senkrecht vom Boden abgezogen. Solange der Greifer lotrecht haengt, ist
+     * das dasselbe. Wenn er spaeter zur Seite kippen soll (Wunsch 15.09.2026,
+     * „zum Kehren und Schleudern"), liegt der tiefste Punkt woanders und
+     * diese Zeile braucht die Ausladung in Weltrichtung −y statt der Tiefe.
+     * Die Annahme steht vollstaendig im Kopf von `greiferform.ts`.
+     */
     const splay = this.currentSplay();
     const tipDepth = BODEN_UEBER_SCHLIESSWEG ? this.form.maxTiefe : this.form.tiefe(splay);
     // Gemessene Fläche statt angenommener Ebene: darauf setzt die Spinne auf.
