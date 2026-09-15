@@ -2271,7 +2271,7 @@ Grundriss nachgezogen: `docs/messungen/2026-09-15_eine-mulde.svg`.
    (4,30 > 4,20) und die lichte Weite (3,42 > 3,38 m Sichelkralle) halten
    beide Lagen aus. Empfehlung: erst am Gerät ansehen, dann entscheiden.
 2. **`docs/entscheidungen.md` enthält seit dem Zusammenführen am 15.09. abends
-   echte Konfliktmarken** (`<<<<<<< HEAD` Zeile 1540, `=======` 1950,
+   echte Konfliktmarken** (`` Zeile 1540, `=======` 1950,
    `>>>>>>>` 2158). Beide Seiten tragen Inhalt. Nicht mein Paket, aber es
    gehört aufgelöst, bevor jemand den Stand liest.
 3. **Der eine Rahmen-Befund aus Nebenbefund 2** — Rad und Maschine ein Bild
@@ -2923,3 +2923,138 @@ sind zwei davon rot, mit den gemessenen Zahlen 0,548 m und 0,018 m.
 2. Offene Spinne auf den Beton absetzen und hinsehen: Der halbe Meter Luft
    unter den Zähnen — stört er, oder fällt er nicht auf?
 3. Ein flaches Teil (Blech) vom Beton aufnehmen: Kommt es weiter mit?
+
+---
+
+### E-042 — Stahlschrott ist, was massiv ist: 6 mm rechnerische Wandstärke (15.09.2026)
+
+**Entscheidung.** Die Fraktion eines Teils hängt nicht mehr allein an seiner
+Stückliste, sondern an Masse und Maß: `Wandstärke = Masse ÷ (7850 kg/m³ ×
+Außenfläche)`. **Ab 6 mm ist es Stahlschrott, darunter Mischschrott**, dazu
+höchstens 10 % Fremdstoff. Acht Einträge sind mit `massiv: true`
+übersteuert — jeder mit Begründung in derselben Zeile. Es bleibt bei **zwei**
+Fraktionen; eine dritte („Blechschrott") hat Patrick abgelehnt.
+
+**Begründung.** Patrick: „Ich möchte ein bisschen strenger werden, was
+Stahlschrott ist. Das ist halt so das Premium. Es geht da eher so um
+Bahnschwellen, Bremsscheiben, Träger. … Ein Elektroherd, das ist vor allem
+Blechschrott. Das ist nicht massiv."
+
+Der messbare Kern des alten Fehlers (`docs/fraktionen.md`): Von 317
+Katalogeinträgen haben **250 keine Stückliste** und galten deshalb ungeprüft als
+sortenrein — nicht weil sie es sind, sondern weil niemand sie eingetragen hat.
+Ein *Elektroherd* war damit Stahlschrott und ein *Einbauherd mit Umluftofen*
+(78 % Stahl) Mischschrott: derselbe Küchenherd, dieselbe Bauart, dieselbe Farbe.
+Die neue Regel braucht keine neue Eingabe, weil Masse und Maß an jedem Eintrag
+stehen — und sie trifft die Wirklichkeit: Elektroherd **1,3 mm** (Herdblech ist
+1 mm), Doppel-T-Träger **6,7 mm** (der Steg eines IPE 280 ist 6,5 mm). Die 6 mm
+sind die Grenze der europäischen Sortenliste zwischen E1/E3 und Blechschrott —
+Branchenwissen, im Projekt sonst unbelegt, im Code mit diesem Vorbehalt.
+
+| | Einträge | Stahlschrott vorher | jetzt |
+|---|---:|---:|---:|
+| ganzer Katalog | 317 | 165 | **73** |
+| Masse | | 85,5 t | **54,5 t** |
+
+Alle **92 Wechsel** gehen Richtung Mischschrott. Die Gitterbox, nach der Patrick
+ausdrücklich gefragt hatte: **3,0 mm — Mischschrott**, halbe Schwelle.
+
+**Verworfene Alternativen.**
+
+1. **Dritte Fraktion „Blechschrott"** — von Patrick abgelehnt.
+2. **Schüttdichte (kg je m³ Hüllraum, E-033)** — bestraft große Stücke doppelt:
+   Der Hohlraum wächst mit der dritten Potenz, das Blech nur mit der zweiten.
+   Ein Eisenbahn-Radsatz läge bei 516 kg/m³ neben einem Kühlschrank bei 90.
+3. **Massenschwelle als zweites Merkmal** („Übersee-Container haben viel Masse,
+   auch wenn es dünnes Blech ist") — **geprüft und verworfen.** Der Seecontainer
+   ist mit 2200 kg das schwerste dünnwandige Stück ohne Verbund im ganzen
+   Katalog; der nächste ist eine Rundballenpresse mit 1900 kg. Jede Schwelle
+   dazwischen nimmt genau ein Stück mit — das, für das sie gemacht wurde. Wer
+   tiefer geht, um den *Lagertank* (1400 kg, nackter Stahlbehälter) zu fassen,
+   lässt vorher zwei falsche herein. Dazu: Masse ist nicht maßstabsfrei — ein
+   40-Fuß-Container wäre Premium, ein 10-Fuß-Container nicht, derselbe
+   Gegenstand in zwei Mulden. **Also Übersteuerung statt Regel**, offen gezählt
+   und begründet; ein Wächter meldet, wenn je ein schwereres dünnwandiges Stück
+   dazukommt.
+4. **Handliste „Bauarten, die nie Premium sind"** — gebaut und verworfen, weil
+   überflüssig: Waschmaschine 2,2 mm, Karosserie 3,6 mm, Kühlschrank 1,5 mm
+   fallen schon an der Wandstärke durch.
+5. **`bau` als Verbundkennzeichen** — geht nicht, `bau` ist eine Zeichenform:
+   `bau: "motor"` trägt der Motorblock genauso wie das Traktor-Frontgewicht,
+   ein Gussklotz ohne bewegliches Teil.
+
+**Neun neue Stücke.** Von Patricks drei Beispielen war nur *Träger* im Katalog;
+Bremsscheiben fehlten ganz, Bahnschwellen gab es nur aus Beton und Holz. Dazu
+wären im Stahltopf der Kleinteile nur 19 Sorten geblieben. Neu: Bremsscheibe
+(LKW), Bremsscheiben (Palette), Bahnschwelle (Stahl, Y-Form), Schienenabschnitt,
+Kurbelwelle (LKW), Großzahnrad, Amboss, Stapler-Gegengewicht,
+Grobblech-Zuschnitt (20 mm). Alle Massen gerechnet, nicht geschätzt. Der
+Grobblech-Zuschnitt ist mit Absicht dabei: gleiche Bauform wie das *Blech*
+(4,8 mm, Mischschrott), dreimal die Masse, andere Mulde — daran kann man die
+Regel sehen, ohne dass sie jemand erklärt.
+
+**Aluminium ist grau geworden.** Patrick am selben Tag: „Aluminium ist in den
+meisten Fällen grau." Zuerst die Gegenfrage, ob er die Fraktionsfarbe überhaupt
+sieht: Von 30 Alu-Einträgen tragen **drei** sie; die anderen 27 werden in
+`objektbau.ts` gefärbt, die flächigsten davon mit `ALU = 0xa8adb2`. **Beide**
+Stellen stehen jetzt auf `0x928d85`, mattes warmes Mittelgrau.
+
+| Paar | vorher | jetzt | warum es zählt |
+|---|---:|---:|---|
+| alu ↔ **va** | **6,98** | **24,63** | verschiedene Silos (ALU-/VA-LAGER) |
+| alu ↔ zinc | 10,23 | 12,25 | teilen sich jeden Behälter, egal |
+| alu ↔ mixed | 37,90 | 20,25 | bleibt klar getrennt |
+
+Die 6,98 waren der Fehler: Unter ΔE 10 ist es dieselbe Farbe, bei Abendsonne
+lagen Alu und Edelstahl bei 6,54. `CHROM` bleibt hell — Verchromtes ist hell.
+
+**Zwei Lehren, die teuer hätten werden können.**
+
+* **Runde Teile nicht dünner als 0,12 m.** Bremsscheibe und Großzahnrad standen
+  zuerst mit ihrem echten Reibring- und Zahnbreitenmaß da (0,045 und 0,09 m).
+  Der Katapult-Wächter des Kippers sprang sofort auf **146 km/h** (Schranke
+  140): So dünne Achtkant-Kollider verhaken sich in der Ladung und werden
+  herausgeschossen. Mit Hüllmaß 0,12 m — Topf und Nabe mitgerechnet, und gleich
+  `DUENN_M` — war der Wert wieder in der Schranke.
+* **`THREE.Color.set(hex)` rechnet seit three r152 nach Linear-sRGB um.** Die
+  erste Farbmessung gab für jedes gebaute Teil fast Schwarz (`#1d1510` statt
+  `#a8adb2`), weil die Vertexfarbe ohne Rückrechnung als Byte gelesen wurde.
+  Steht als Warnung in `tools/alufarbe.ts`.
+
+**Was es kostet.** Zwischen **−0 % und +2 %** je Anlieferung. `randomCargo`
+würfelt zuerst die Fraktion (42 % Stahl, 22 % Misch, 16 % Alu) und sucht dann
+ein Stück — die Umsortierung ändert nicht, wie oft Stahl kommt, nur welche
+Stücke im Topf liegen. **Wer die Mischtabelle anfasst, muss neu rechnen:** Käme
+die Verteilung aus dem Katalog, fiele der Stahlanteil von 74 % auf 33 % der
+Sorten. Der Zulauf der **Stahlhalde** steigt (2,22 : 1 → **2,42 : 1**), weil die
+verbliebenen Stücke schwerer sind — wenn eine Halde zu klein wird, ist es die
+Stahlhalde. Je Fuhre liegen **8 statt 9** Stücke auf dem Kipper, weil die
+Ladefläche volumenbegrenzt ist und die Brocken größer sind.
+
+**Drei Wächter sind dabei absichtlich rot geworden** und wurden umgeschrieben:
+„derselbe Küchenherd, zwei Fraktionen" (jetzt: eine), „271 Einträge" (jetzt 280
+in den exportierten Listen), „16 von 271 tragen die Fraktionsfarbe" (jetzt 18).
+
+**Abnahmekriterium.** 73 von 317 Katalogstücken sind Stahlschrott. Gitterbox,
+Elektroherd, Blech, Badewanne sind Mischschrott; Doppel-T-Träger,
+Schienenbündel, Bremsscheibe, Bahnschwelle, LKW-Felge und Seecontainer sind
+Stahlschrott. Der Verdienst je Anlieferung ändert sich um höchstens 5 %.
+
+**Offen.** (1) Fünf Maschinen ohne Stückliste rutschen als Premium durch
+(Spritzguss-, CNC-, Drehmaschine, Förderband-Antriebsstation,
+Schul-Heizkesselanlage) — bewusst nicht mitgemacht, weil es fünf weitere Stücke
+ohne Auftrag umsortiert hätte. (2) Seecontainer (Stahl) und
+Baustellencontainer (Misch) haben denselben Maß-Hash und damit **ΔE 0,00** —
+der kleinste Weg wäre, den Baustellencontainer auf 3 m zu kürzen. (3) Die
+Wandstärke gehört ins Griff-Info-HUD, damit man die Regel am Teil ablesen kann.
+
+**Auf dem Gerät zu prüfen.**
+
+1. `/v1/plaene/` → `stahlschrott-2026-09-15.svg`: Stimmt die Grenze? Besonders
+   die **Frontlader-Schaufel** (3,6 mm, von Hand auf massiv) — die ist am
+   weitesten von der Schwelle entfernt.
+2. Eine **Felge** und ein **Alu-Profil** in die Hand nehmen und neben ein
+   VA-Teil legen: Ist Aluminium jetzt erkennbar stumpfer als Edelstahl?
+3. Eine **Gitterbox** und einen **Doppel-T-Träger** greifen: Ist ohne Zahl zu
+   ahnen, dass sie in verschiedene Mulden gehören? Davon hängt ab, ob die
+   HUD-Zeile gebaut wird.

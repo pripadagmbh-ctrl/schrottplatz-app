@@ -192,7 +192,18 @@ function kippen(sortenrein: string | null = null, saat = 20260913): {
 describe("Kipper", () => {
   it("laedt beim Kippen ab, statt die Ladung auf dem Rahmen liegen zu lassen", () => {
     const r = kippen(null);
-    expect(r.teile).toBeGreaterThan(8);
+    /*
+     * Acht statt neun seit E-042 (15.09.2026), und das ist gewollt: Der
+     * Stahltopf, aus dem `randomCargo` zieht, hat die duennwandigen Stuecke
+     * verloren und besteht jetzt aus den massiven — Radsatz, LKW-Achse, dickes
+     * Rohr statt Blech und Badewanne. Die Ladeflaeche ist VOLUMEN-begrenzt
+     * (`vehicles.ts`, `packeLadung`), also fuellen groessere Brocken sie mit
+     * einem Stueck weniger. Gemessen auf der Bezugssaat: 9 -> 8.
+     *
+     * Der eigentliche Waechter ist die Zeile darunter: Es geht darum, dass die
+     * Flaeche frei wird, nicht wie viele Stuecke daraufpassen.
+     */
+    expect(r.teile).toBeGreaterThanOrEqual(8);
     /*
      * Mit dem alten, ueberschneidenden Rahmen blieben 12 von 14 Teilen liegen.
      * Ein Rest darf haengen — ein Kipper bekommt nie jedes Stueck heraus, dafuer

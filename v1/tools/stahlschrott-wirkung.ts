@@ -37,7 +37,7 @@ function margeJeKg(fraktion: string): number {
 }
 
 /** Erwartete Masse und Marge eines einzelnen angelieferten Stücks. */
-function erwartung(pool: Urteil[], welche: "heute" | "neu") {
+function erwartung(pool: Urteil[], welche: "vorher" | "jetzt") {
   let kg = 0;
   let eur = 0;
   for (const [fraktion, p] of Object.entries(MIX)) {
@@ -54,20 +54,23 @@ function erwartung(pool: Urteil[], welche: "heute" | "neu") {
 }
 
 const listen: [string, string[]][] = [
-  ["Kleinteile (SPECS)", ["SPECS"]],
-  ["Großteile (BIG_SPECS + KATALOG_BIG)", ["BIG_SPECS", "KATALOG_BIG"]],
-  ["Schwergewichte (HUGE_SPECS + KATALOG_HUGE)", ["HUGE_SPECS", "KATALOG_HUGE"]],
+  // Die Toepfe, aus denen `randomCargo` zieht (`scrapItems.ts:788`): `SPECS`
+  // enthaelt `...KATALOG_SPECS`, `BIG_SPECS` enthaelt `...KATALOG_BIG` und so
+  // fort. Wer nur die Basisliste zaehlt, misst ein Drittel des Sortiments.
+  ["Kleinteile (SPECS)", ["SPECS", "KATALOG_SPECS"]],
+  ["Großteile (BIG_SPECS)", ["BIG_SPECS", "KATALOG_BIG"]],
+  ["Schwergewichte (HUGE_SPECS)", ["HUGE_SPECS", "KATALOG_HUGE"]],
 ];
 
 console.log("");
 console.log("## Der Stahltopf, aus dem randomCargo zieht");
 console.log("");
-console.log("| Ladungsliste | Stahl-Stücke heute | ø kg | Stahl-Stücke neu | ø kg |");
+console.log("| Ladungsliste | Stahl-Stücke vorher | ø kg | Stahl-Stücke jetzt | ø kg |");
 console.log("|---|---:|---:|---:|---:|");
 for (const [titel, quellen] of listen) {
   const pool = urteile.filter((u) => quellen.includes(u.liste));
-  const h = pool.filter((u) => u.heute === "steel");
-  const n = pool.filter((u) => u.neu === "steel");
+  const h = pool.filter((u) => u.vorher === "steel");
+  const n = pool.filter((u) => u.jetzt === "steel");
   const mit = (a: Urteil[]) => (a.length ? a.reduce((s, u) => s + u.spec.massKg, 0) / a.length : 0);
   console.log(
     `| ${titel} | ${h.length} | ${z(mit(h), 0)} | ${n.length} | ${z(mit(n), 0)} |`
@@ -77,12 +80,12 @@ for (const [titel, quellen] of listen) {
 console.log("");
 console.log("## Was eine Anlieferung einbringt (Reinheit 1, ein Stück)");
 console.log("");
-console.log("| Ladungsliste | ø kg heute | ø € heute | ø kg neu | ø € neu | Verdienst |");
+console.log("| Ladungsliste | ø kg vorher | ø € vorher | ø kg jetzt | ø € jetzt | Verdienst |");
 console.log("|---|---:|---:|---:|---:|---:|");
 for (const [titel, quellen] of listen) {
   const pool = urteile.filter((u) => quellen.includes(u.liste));
-  const h = erwartung(pool, "heute");
-  const n = erwartung(pool, "neu");
+  const h = erwartung(pool, "vorher");
+  const n = erwartung(pool, "jetzt");
   const faktor = h.eur !== 0 ? (n.eur / h.eur - 1) * 100 : 0;
   console.log(
     `| ${titel} | ${z(h.kg, 0)} | ${z(h.eur)} | ${z(n.kg, 0)} | ${z(n.eur)} | ${faktor >= 0 ? "+" : ""}${z(faktor, 0)} % |`
@@ -92,7 +95,7 @@ for (const [titel, quellen] of listen) {
 console.log("");
 console.log("## Die beiden Halden am Bagger");
 console.log("");
-for (const welche of ["heute", "neu"] as const) {
+for (const welche of ["vorher", "jetzt"] as const) {
   const st = urteile.filter((u) => u[welche] === "steel");
   const mi = urteile.filter((u) => u[welche] === "mixed");
   const kg = (a: Urteil[]) => a.reduce((s, u) => s + u.spec.massKg, 0);
@@ -108,8 +111,8 @@ console.log("");
 console.log("");
 console.log("## Was in die beiden Halden fliesst — je 100 angelieferte Kleinteile");
 console.log("");
-for (const welche of ["heute", "neu"] as const) {
-  const pool = urteile.filter((u) => u.liste === "SPECS");
+for (const welche of ["vorher", "jetzt"] as const) {
+  const pool = urteile.filter((u) => u.liste === "SPECS" || u.liste === "KATALOG_SPECS");
   const mit = (f: string) => {
     const a = pool.filter((u) => u[welche] === f);
     return a.length ? a.reduce((s, u) => s + u.spec.massKg, 0) / a.length : 0;

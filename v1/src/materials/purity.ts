@@ -127,6 +127,159 @@ export function fraktionAus(zusammensetzung: Anteil[], vorgabe = "steel"): strin
   return groesster.anteil >= SORTENREIN_AB ? groesster.materialId : "mixed";
 }
 
+/* ------------------------------------------------------------------------ */
+/* Stahlschrott: was Premium ist (E-042, 15.09.2026)                          */
+/* ------------------------------------------------------------------------ */
+
+/**
+ * Dichte von Stahl in kg/m³. Physik, keine Setzung.
+ */
+export const STAHL_KG_M3 = 7850;
+
+/**
+ * Aussenflaeche eines Teils in m², je Grundform.
+ *
+ * Die echte Aussenform, nicht der Quader drumherum: Ein Rohr, das man als
+ * Quader rechnet, saehe 27 % huelliger aus, als es ist (1 − π/4).
+ *
+ * - `box`   dims = [a, b, c]                  → 2(ab + bc + ca)
+ * - `cyl`   dims = [Radius, Laenge]           → 2πrl + 2πr²
+ * - `torus` dims = [Ringradius, Rohrradius]   → 4π²Rr
+ * - `wire`  dims = [Radius]                   → 4πr² (Kugel, wie der Kollider)
+ *
+ * Die Zuordnung der dims steht in `world/scrapItems.ts` beim Kollierbau.
+ */
+export function aussenflaeche(kind: string, dims: number[]): number {
+  if (kind === "cyl") {
+    const [r, l] = dims;
+    return Math.max(2 * Math.PI * r * l + 2 * Math.PI * r * r, 1e-4);
+  }
+  if (kind === "torus") {
+    const [R, r] = dims;
+    return Math.max(4 * Math.PI * Math.PI * R * r, 1e-4);
+  }
+  if (kind === "wire") {
+    const r = dims[0];
+    return Math.max(4 * Math.PI * r * r, 1e-4);
+  }
+  const [a = 1, b = 1, c = 1] = dims;
+  return Math.max(2 * (a * b + b * c + c * a), 1e-4);
+}
+
+/**
+ * Die rechnerische Wandstaerke in Millimetern — das Mass, auf dem die
+ * Stahlschrott-Regel steht.
+ *
+ * Gedankenexperiment: Man schmilzt das Stueck ein und streicht das Metall
+ * gleichmaessig als Haut ueber seine eigene Aussenflaeche. Wie dick wird die
+ * Haut?
+ *
+ *     t = Masse / (Dichte von Stahl × Aussenflaeche)
+ *
+ * Ein Elektroherd von 30 kg hat 3,03 m² Aussenflaeche — das ergibt 1,3 mm, und
+ * genau so dick ist Herdblech. Ein Doppel-T-Traeger von 180 kg auf 3,40 m²
+ * ergibt 6,7 mm, und genau so dick ist der Steg eines IPE 280. Das Mass raet
+ * also nicht, es trifft.
+ *
+ * Warum nicht die Huellwichte (kg je m³), die es seit E-033 gibt: Sie bestraft
+ * grosse Stuecke doppelt. Der Hohlraum waechst mit der dritten Potenz der
+ * Groesse, das Blech nur mit der zweiten — ein Seecontainer kaeme auf
+ * 73 kg/m³, ein Eisenbahn-Radsatz auf 516, ein Kuehlschrank auf 90. Die
+ * Wandstaerke rechnet den Groesseneffekt heraus und sortiert einen kleinen und
+ * einen grossen Klotz gleich ein.
+ */
+export function wandstaerkeMm(massKg: number, kind: string, dims: number[]): number {
+  return (1000 * massKg) / (STAHL_KG_M3 * aussenflaeche(kind, dims));
+}
+
+/**
+ * Ab dieser Wandstaerke ist Stahl Premium.
+ *
+ * Herkunft: die europaeische Sortenliste fuer Stahlschrott. Dort trennen 6 mm
+ * den schweren Altschrott (Sorten E1/E3) vom Blechschrott. Das ist
+ * Branchenwissen und im Projekt sonst nirgends belegt — `docs/02_Briefing.md`
+ * Kap. 7 nennt Preise, keine Sortenliste. Wer eine Quelle findet, prueft die
+ * Zahl gegen.
+ *
+ * Patrick, 15.09.2026: „Es geht da eher so um Bahnschwellen, Bremsscheiben,
+ * Traeger — das ist so wirklich ganz gutes Material. … Ein Elektroherd, das
+ * ist vor allem Blechschrott."
+ */
+export const WAND_AB_MM = 6;
+
+/**
+ * Hoechstens so viel Fremdstoff darf an einem Premium-Stueck haengen.
+ *
+ * Patrick, 15.09.2026: „Stahlschrott sind selten Verbundmaterialien.
+ * Natuerlich hast du mal Tanks, wo dann noch was dran ist." Eine Regel, die an
+ * einer einzigen Dichtung scheitert, bildet den Platz falsch ab — deshalb
+ * nicht 0 %.
+ *
+ * 10 % statt der 5 % von `SORTENREIN_AB`, weil 5 % genau das verbietet, was er
+ * ausdruecklich erlaubt: Ein Tank mit Kunststoff-Schauglas und Dichtungen
+ * (8 %) waere nach der alten Schwelle Mischschrott. Gemessen am Katalog vom
+ * 15.09.2026 aendert die Lockerung fuer sich genommen **gar nichts** — kein
+ * Eintrag liegt zwischen 90 % und 95 %. Sie ist eine Regel fuer kuenftige
+ * Eintraege.
+ */
+export const VERBUND_BIS = 0.1;
+
+/**
+ * Ein Teil, so weit die Sortierregel es kennen muss.
+ *
+ * `PileSpec` (world/objektkatalog.ts) erfuellt das von selbst; hier steht
+ * bewusst kein Import in die Welt, damit `materials/` unten bleibt.
+ */
+export interface TeilMass {
+  materialId: string;
+  massKg: number;
+  kind: string;
+  dims: number[];
+  zusammensetzung?: Anteil[];
+  /**
+   * Uebersteuerung, wenn Rechnung und Augenschein auseinandergehen.
+   * `true` = massiv trotz duennem Huellmass, `false` = Blech trotz dickem.
+   * Jede Setzung braucht eine Begruendung am Eintrag (E-042).
+   */
+  massiv?: boolean;
+}
+
+/**
+ * Welche Fraktion ein Teil ist — die vollstaendige Regel (E-042).
+ *
+ * Zwei Faelle:
+ *
+ * 1. **Stahl fuehrt nicht.** Dann entscheidet `fraktionAus` wie bisher: Alu,
+ *    VA, Kupfer, Holz bleiben unberuehrt. Ein Alu-Kessel ist Alu, ob massiv
+ *    oder hohl — das ist eine Frage des Stoffs, nicht der Bauweise. Die
+ *    Premium-Frage stellt sich nur dort, wo zwei Mulden dasselbe Metall
+ *    nehmen.
+ * 2. **Stahl fuehrt.** Dann ist es Stahlschrott, wenn es massiv ist
+ *    (`WAND_AB_MM`, oder `massiv` sagt es ausdruecklich) UND hoechstens
+ *    `VERBUND_BIS` Fremdstoff traegt. Sonst Mischschrott.
+ *
+ * Der Aufruf ist **mehrfach anwendbar**: Wer das Ergebnis in `materialId`
+ * zurueckschreibt und die Funktion erneut aufruft, bekommt dasselbe heraus.
+ * Darauf verlassen sich `scrapItems.ts` und `objektkatalog.ts`, die beide
+ * ueber dieselben Objekte laufen.
+ */
+export function fraktionVonTeil(teil: TeilMass): string {
+  const zus = teil.zusammensetzung ?? [];
+  let leitId = teil.materialId;
+  let leitAnteil = 1;
+  if (zus.length > 0) {
+    let groesster = zus[0];
+    for (const a of zus) if (a.anteil > groesster.anteil) groesster = a;
+    leitId = groesster.materialId;
+    leitAnteil = groesster.anteil;
+  }
+  if (leitId !== "steel") return fraktionAus(zus, teil.materialId);
+  if (1 - leitAnteil > VERBUND_BIS + 1e-9) return "mixed";
+  const massiv =
+    teil.massiv ?? wandstaerkeMm(teil.massKg, teil.kind, teil.dims) >= WAND_AB_MM;
+  return massiv ? "steel" : "mixed";
+}
+
 /**
  * Laesst sich das Ding pressen?
  *
