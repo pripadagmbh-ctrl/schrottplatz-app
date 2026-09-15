@@ -7,7 +7,7 @@
  * Aufruf:  npx vite-node tools/fuenfschalen/traverse.ts
  */
 import {
-  HEUTE,
+  VOR_E039,
   alleZu,
   arbeitspunkt,
   aufnahmeFuer,
@@ -21,19 +21,19 @@ const DURCHMESSER: number[] = [];
 for (let i = 0; i <= 12; i++) DURCHMESSER.push(Math.round((0.7 + i * 0.05) * 100) / 100);
 
 function main(): void {
-  const h = kennwerte(HEUTE);
-  console.log("1  Heute gebaut");
+  const h = kennwerte(VOR_E039);
+  console.log("1  Der Stand bis E-039 (bis 15.09.2026 gebaut)");
   console.log(
-    `   Ø ${traverseAus(HEUTE.Zr).toFixed(2)}  Neigung ${h.neigungZu.toFixed(2)}°/${h.neigungOffen.toFixed(2)}° ` +
+    `   Ø ${traverseAus(VOR_E039.Zr).toFixed(2)}  Neigung ${h.neigungZu.toFixed(2)}°/${h.neigungOffen.toFixed(2)}° ` +
       `(max ${h.neigungMax.toFixed(2)}°)  Hebel ${h.hebelZu.toFixed(4)}/${h.hebelOffen.toFixed(4)} ` +
       `(min ${h.hebelMin.toFixed(4)})  Zyl ${h.laengeZu.toFixed(3)}/${h.laengeOffen.toFixed(3)} Hub ${h.hub.toFixed(3)}`
   );
   console.log("");
 
-  console.log("2  Nur der Durchmesser — sonst alles wie gebaut (Zy −0,730, Ay 0, Az 0,310)");
+  console.log("2  Nur der Durchmesser — sonst alles wie bis E-039 (Zy −0,730, Ay 0, Az 0,310)");
   console.log("   Ø      Neigung zu/offen/max      Hebel zu/offen/min           Zyl zu/offen   Vertrag");
   for (const D of DURCHMESSER) {
-    const k = kennwerte({ ...HEUTE, Zr: aufnahmeFuer(D) });
+    const k = kennwerte({ ...VOR_E039, Zr: aufnahmeFuer(D) });
     console.log(
       `  ${D.toFixed(2)}   ${k.neigungZu.toFixed(2)}°/${k.neigungOffen.toFixed(2)}°/${k.neigungMax.toFixed(2)}°`.padEnd(
         32
@@ -47,7 +47,7 @@ function main(): void {
   console.log("3  Durchmesser + Schalenauge, Aufnahmehoehe FEST auf −0,730 (Traverse bleibt, wo sie ist)");
   console.log("   Ø      Ay     Az      Neigung zu/offen/max      Hebel zu/offen/min");
   for (const D of DURCHMESSER) {
-    const l = arbeitspunkt(aufnahmeFuer(D), 0.1, HEUTE.Zy);
+    const l = arbeitspunkt(aufnahmeFuer(D), 0.1, VOR_E039.Zy);
     if (!l) {
       console.log(`  ${D.toFixed(2)}   — nichts mit Hebel > 0,10 —`);
       continue;

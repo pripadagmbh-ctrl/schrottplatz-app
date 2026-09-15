@@ -29,7 +29,6 @@ import {
   schwenkFuer,
   zahnBahn,
 } from "../../src/fuenfschalen/teile";
-import { TRAVERSE_Y } from "../../src/fuenfschalen/teile";
 import { Kennwert, kennwerte } from "./traverse-rechnen";
 import { A, A_NACHGESTELLT, B, C, Variante, traverseHoehe } from "./traverse-varianten";
 import { Messung, miss } from "./traverse-messen";
@@ -571,7 +570,20 @@ function main(): void {
     y += 30;
     zahl(x, y, "Kopf wirkt", v.aussehen, v.durchmesser > 1 ? FARBE.schlecht : FARBE.linie);
     y += 30;
-    zahl(x, y, "Traverse rückt hoch um", `${((traverseHoehe(v.Zy) - TRAVERSE_Y) * 100).toFixed(0)} cm`);
+    /*
+     * Gegen die Traverse der Variante A, nicht gegen `TRAVERSE_Y`.
+     *
+     * `TRAVERSE_Y` ist die Einbauhoehe des GEBAUTEN Standes, und der ist seit
+     * E-039 die Variante B. Gegen ihn gerechnet meldete das Blatt fuer B „0 cm"
+     * und fuer A „−10 cm" — richtig gerechnet und trotzdem falsch: Das Blatt
+     * vergleicht drei Vorschlaege gegen den Stand VOR der Entscheidung.
+     */
+    zahl(
+      x,
+      y,
+      "Traverse rückt hoch um",
+      `${((traverseHoehe(v.Zy) - traverseHoehe(A.Zy)) * 100).toFixed(0)} cm`
+    );
     y += 30;
     zahl(
       x,
