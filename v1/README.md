@@ -130,8 +130,8 @@ ihr Standort. **Im Zweifel die Koordinaten lesen, nie den Namen.**
  │ HALLE 2  ▶                                           │
  │ HALLE 3  ▶      [P]                                  │
  │ KUPFER ▶                                             │
- │ KABEL  ▶   [B2] Verladen (−25,5 | −8)   ◀ Abholer    │
- │ ALU    ▶        │                         x −18      │
+ │ KABEL  ▶   [B2] Verladen x −25,5        ◀ Abholer    │
+ │ ALU    ▶        │  (längs beim bestellten Silo) x −18│
  │            ╌╌╌╌╌┘ Gasse x −28                        │
  │      ╌╌╌╌╌╌╌╌╌╌╌╌╌ Gasse z −17        BUNT+VA        │
  │  ▲VA  ▲BATT  ▲ABFALL          MÜLL  ▏     [B]        │
@@ -185,11 +185,14 @@ x −28 und z −17, jeweils 5,0 m vor den Öffnungen. Stahl und Mischschrott ha
 bewusst kein Silo — sie werden direkt an der Halde verladen. Nach Osten ist an
 der Südmauer Platz für zwei weitere Silos.
 
-**Der Verladeplatz** (−25,5 | −8) liegt zwischen Silo-Reihe und LKW-Spur: 7,5 m
-zur Vorderkante der Westsilos (x −33), 7,5 m zur Spur des Abholers (x −18). Der
-Bagger steht dazwischen und greift aus dem Silo in den Container, ohne
-umzusetzen. Von dort erreicht er die drei Westsilos (8,80 · 7,50 · 8,80 m); zu
-den drei Südsilos muss er fahren.
+**Der Verladeplatz gehört zur bestellten Mulde** (E-063): Er liegt 7,5 m vor
+ihrer Öffnung, die LKW-Spur noch einmal 7,5 m weiter — im Westschenkel also auf
+x −25,5 (Spur x −18), im Südschenkel auf z −14,5 (Spur z −7), und die Lage
+längs der Reihe ist die des bestellten Silos. Der Bagger steht dazwischen und
+greift aus dem Silo in den Container, ohne umzusetzen; die bestellte Mulde ist
+immer genau 7,50 m weg. Bis E-063 stand der Platz fest vor der Mitte des
+Schenkels — dann hielt der Wagen bei 10 von 12 Fraktionen 4,60 m neben ihrer
+Mulde.
 
 **Die Hallen** stehen südlich ans Bürogebäude gebaut an derselben Wand, Tor nach
 Osten auf den Platz (`TOR_RICHTUNG` in `src/world/office.ts`). Sie sperren nur
@@ -210,6 +213,10 @@ Anlieferer werden auf der Brückenwaage voll und nach dem Abladen leer gewogen �
 für die Nettomenge bekommt der Kunde 0,16 €/kg (Ausgabe). Verkauft wird über den
 Abhol-LKW: **V** ruft ihn, der Spieler belädt den Container mit der Spinne, **V**
 schickt ihn los.
+
+Der Abholer wiegt seit E-064 andersherum: **leer herein (Tara), voll hinaus
+(Brutto)**, die Differenz ist die abgeholte Menge. Das ist eine reine Meldung —
+Geld bewegt sich weiterhin nur beim Losfahren vom Verladeplatz.
 
 > **Zwei bekannte Fehler in dieser Rechnung**, festgehalten in der Bestandsaufnahme
 > vom 14.09.2026: Das Schild am Container rechnet mit Reinheit **hoch zwei**

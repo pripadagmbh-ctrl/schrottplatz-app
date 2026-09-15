@@ -268,7 +268,9 @@ export const VERLADE_RANGIER_M = 8.0;
  * Die Regel dahinter ist keine Liste von Fraktionen, sondern EINE Frage, die
  * der Platz selbst beantwortet: Gibt es fuer diese Fraktion ein LAGERSILO?
  *
- *   Lagersilo vorhanden  →  Verladeplatz vor dem Schenkel dieses Silos.
+ *   Lagersilo vorhanden  →  Verladeplatz vor GENAU DIESEM Silo (seit E-063;
+ *                           bis dahin vor der Mitte des Schenkels, und genau
+ *                           das war „faehrt immer noch falsch").
  *                           Alu, Zink, Kupfer, Messing, Kabel, VA,
  *                           Batterien, Abfall.
  *   kein Lagersilo       →  ABLADEPLATZ beim Bagger (6,3 | −23,0).
@@ -317,17 +319,32 @@ const SPUR_ANFAHRT: Record<string, [number, number]> = {
 };
 
 /**
- * Das Leitsilo eines Schenkels: das MITTLERE.
+ * Die Mitte eines Schenkels — das mittlere Silo.
  *
- * Von ihm aus greift der Arm ueber seine beiden Nachbarn hinweg — bei 7,5 m
- * Seitenabstand reicht er in der Laengsrichtung noch
- * sqrt(9,20² − 7,50²) = 5,33 m weit, der Achsabstand betraegt 4,60 m. Vom
- * Rand des Schenkels aus waeren es hoechstens zwei. Deshalb steht der
- * Verladeplatz vor dem mittleren Silo und nicht vor dem bestellten: Ein
- * LKW, der vor dem Kupfersilo haelt, ist vom Stand aus mit seiner fernen
- * Ladeflaechenecke 11,5 m weg — der Spieler muesste umsetzen.
+ * Bis zum 15.09.2026 abends hat hier das „Leitsilo" gestanden, und JEDER
+ * Abholer dieses Schenkels hielt davor. Die Begruendung war die Reichweite:
+ * Von der Mitte aus erreicht der Arm alle drei Silos (8,80 · 7,50 · 8,80 m),
+ * vom Rand nur zwei.
+ *
+ * DAS WAR DER FEHLER, DEN PATRICK ZWEIMAL GEMELDET HAT („abholung faehrt
+ * immer noch falsch", 15.09.2026). Gemessen mit `tools/abholfahrt.ts`, das
+ * den Wagen wirklich faehrt statt seine Route auszurechnen: 10 von 12
+ * bestellbaren Fraktionen liessen ihn 4,60 m neben ihrer Mulde halten — wer
+ * Kupfer rief, bekam den Wagen vor das KABEL-LAGER, wer Edelstahl rief, vor
+ * die BATTERIEN. Nur Kabel und Batterien selbst standen richtig, weil sie die
+ * mittleren sind.
+ *
+ * Und die Reichweitenbegruendung traegt nicht: Halt und Baggerstand haengen
+ * starr aneinander (7,5 m Silo→Stand, 7,5 m Stand→Spur). Wandern beide
+ * gemeinsam vor die bestellte Mulde, bleiben die vier Ladeflaechenecken auf
+ * genau denselben 6,72 · 6,72 · 9,25 · 9,25 m wie vorher — es aendert sich
+ * nur, VOR WELCHEM Silo das Ganze steht. Verloren geht allein, dass man aus
+ * drei Silos auf einmal laden koennte; bestellt wird aber immer EINE Fraktion.
+ *
+ * Geblieben ist die Funktion fuer die Arbeitszonen: Die decken den ganzen
+ * Schenkel ab und haengen deshalb weiter an seiner Mitte.
  */
-function leitSilo(c: ContainerConfig): ContainerConfig {
+function schenkelMitte(c: ContainerConfig): ContainerConfig {
   const o = bayOeffnung(c);
   // Die Reihe steht quer zur Oeffnungsrichtung.
   const laengs = (s: ContainerConfig): number => (o.x !== 0 ? s.z : s.x);
@@ -337,19 +354,22 @@ function leitSilo(c: ContainerConfig): ContainerConfig {
   return schenkel[Math.floor((schenkel.length - 1) / 2)] ?? c;
 }
 
-/** Wo der Bagger steht, wenn er aus diesem Schenkel in den Container laedt. */
+/**
+ * Wo der Bagger steht, wenn er aus DIESEM Silo in den Container laedt.
+ *
+ * 7,5 m vor der Oeffnung der bestellten Mulde — seit E-063 vor ihrer eigenen
+ * und nicht mehr vor der Schenkelmitte.
+ */
 export function verladeStandFuer(c: ContainerConfig): { x: number; z: number } {
-  const leit = leitSilo(c);
-  const o = bayOeffnung(leit);
-  const k = bayVorderkante(leit);
+  const o = bayOeffnung(c);
+  const k = bayVorderkante(c);
   return { x: k.x + o.x * VERLADE_ABSTAND, z: k.z + o.z * VERLADE_ABSTAND };
 }
 
 /** Wo der Abholer dazu haelt — noch einmal dieselben 7,5 m weiter. */
 export function verladeHaltFuer(c: ContainerConfig): [number, number] {
-  const leit = leitSilo(c);
-  const o = bayOeffnung(leit);
-  const k = bayVorderkante(leit);
+  const o = bayOeffnung(c);
+  const k = bayVorderkante(c);
   return [k.x + o.x * VERLADE_ABSTAND * 2, k.z + o.z * VERLADE_ABSTAND * 2];
 }
 
@@ -733,7 +753,14 @@ function verladeZonen(): Array<[number, number, number]> {
     const seite = c.facing ?? "west";
     if (gesehen.has(seite)) continue;
     gesehen.add(seite);
-    const stand = verladeStandFuer(c);
+    /*
+     * Ein Kreis JE SCHENKEL, um dessen Mitte — nicht um den Stand der
+     * bestellten Mulde. Seit E-063 wandert der Verladeplatz laengs des
+     * Schenkels mit der Bestellung; die Zone bleibt, wo sie war, und deckt
+     * mit ihren 11 m beide Enden mit ab (das aeusserste Silo liegt 4,60 m
+     * neben der Mitte, der Halt damit 6,12 m vom Zonenmittelpunkt).
+     */
+    const stand = verladeStandFuer(schenkelMitte(c));
     const o = bayOeffnung(c);
     out.push([stand.x + o.x * 3.5, stand.z + o.z * 3.5, 11]);
   }

@@ -115,7 +115,25 @@ describe("Die Federung kommt am Modell an", () => {
      * hier Rauschen, und beim ersten Durchlauf war es prompt einmal grün und
      * einmal rot. Geprüft wird über fünf Ladungen, nicht über eine.
      */
-    const leer = wagen(undefined, "abholer", 700).v.group.position.y;
+    /*
+     * GEMESSEN WIRD IM STAND (nachgezogen 15.09.2026, E-064).
+     *
+     * Vorher wurde der leere Wagen nach 5 Sekunden abgelesen, wo immer er
+     * dann gerade war. Seit dem Abholer auf der Bruecke wiegt, steht er zu
+     * diesem Zeitpunkt nicht mehr in gleichmaessiger Fahrt, sondern faehrt
+     * gerade wieder an — und die Feder nickt beim Anfahren, wie sie soll.
+     * Gemessen wurden 2,0025 mm gegen eine Schranke von 2,00 mm: kein
+     * Federfehler, sondern eine Messung zur falschen Zeit.
+     *
+     * Jetzt wird gewartet, bis er an seinem Platz steht. Das ist der Zustand,
+     * um den es geht — ein leerer Wagen im Stand sitzt auf seiner Ruhelage.
+     */
+    const leerer = wagen(undefined, "abholer", 700);
+    const phase = (): string => (leerer.v as unknown as { phaseName: string }).phaseName;
+    for (let i = 0; i < 60 * 300 && phase() !== "waitLoad"; i++) leerer.schritt();
+    expect(phase(), "der leere Abholer ist nie an seinem Platz angekommen").toBe("waitLoad");
+    leerer.schritt(120); // zwei Sekunden ausschwingen
+    const leer = leerer.v.group.position.y;
     expect(Number.isFinite(leer), "NaN in der Federung").toBe(true);
     expect(
       Math.abs(leer),

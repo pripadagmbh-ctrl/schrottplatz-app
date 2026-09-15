@@ -26,6 +26,7 @@ const lies = (p: string) => readFileSync(resolve(wurzel, p), "utf8");
 const main = lies("src/main.ts");
 const daylight = lies("src/world/daylight.ts");
 const scrapItems = lies("src/world/scrapItems.ts");
+const vehicles = lies("src/delivery/vehicles.ts");
 
 describe("Platzinventar kommt am naechsten Tag wieder", () => {
   it("beide Haelften sind da: der Tageszaehler und das Nachlegen", () => {
@@ -82,6 +83,57 @@ describe("Platzinventar kommt am naechsten Tag wieder", () => {
     );
     const block = main.slice(main.indexOf("vehicles.onPickupFunk"));
     expect(block.slice(0, 200), "der Spruch landet nirgends").toContain("hud.toast");
+  });
+
+  it("und beide Wiegungen des Abholers kommen im HUD an", () => {
+    /*
+     * Dieselbe Klasse zum vierten Mal (E-064). `vehicles.ts` wiegt den
+     * Abholer jetzt leer herein und voll hinaus und meldet beides ueber
+     * `onAbholerTara` / `onAbholerBrutto`. Fehlt eine der beiden Zeilen in
+     * `main.ts`, faellt genau die halbe Wiegung aus — und zwar stumm: Der
+     * Wagen haelt trotzdem auf der Bruecke, es sagt nur niemand etwas dazu.
+     *
+     * Geprueft wird mit einer Funktion, damit es dieselbe Pruefung ist, die
+     * gleich darunter die Gegenprobe bekommt.
+     */
+    const verdrahtet = (quelle: string, name: string): boolean => {
+      const stelle = quelle.search(new RegExp(`vehicles\\.${name}\\s*=`));
+      if (stelle < 0) return false;
+      return quelle.slice(stelle, stelle + 300).includes("hud.toast");
+    };
+    for (const name of ["onAbholerTara", "onAbholerBrutto"]) {
+      expect(verdrahtet(main, name), `${name} landet nicht im HUD`).toBe(true);
+      expect(vehicles, `vehicles.ts kennt ${name} nicht`).toContain(name);
+    }
+
+    /*
+     * GEGENPROBE mit dem kaputten Eingang: Wer die Zeile herausnimmt, muss
+     * gemeldet werden — sonst prueft die Schleife oben nur, dass es die Datei
+     * gibt.
+     */
+    const ohne = main.replace(/vehicles\.onAbholerBrutto\s*=/, "const weg =");
+    expect(ohne, "die Gegenprobe hat gar nichts veraendert").not.toBe(main);
+    expect(verdrahtet(ohne, "onAbholerBrutto"), "die Gegenprobe meldet nichts").toBe(false);
+    // Und eine Verdrahtung, die ins Leere laeuft, gilt auch nicht.
+    const stumm = main.replace(/vehicles\.onAbholerTara = \(tara\) =>[\s\S]{0,200}?;/, "");
+    expect(verdrahtet(stumm, "onAbholerTara"), "eine stumme Meldung gilt als verdrahtet").toBe(
+      false
+    );
+  });
+
+  it("und die Wiegung des Abholers ruehrt das Konto nicht an", () => {
+    /*
+     * Patrick, mehrfach: „Kreislaufsachen noch nicht." Die Wiegung ist eine
+     * Meldung — kein Geld, kein Konto, keine Preisaenderung. Bezahlt wird die
+     * Fuhre weiterhin beim Losfahren vom Verladeplatz (`onPickupDepart`).
+     */
+    const stelle = main.search(/vehicles\.onAbholerTara\s*=/);
+    expect(stelle, "onAbholerTara fehlt ganz").toBeGreaterThan(0);
+    const block = main.slice(stelle, main.indexOf("vehicles.onCustomerArrived", stelle));
+    expect(block.length, "der Block ist leer — so prueft das hier nichts").toBeGreaterThan(50);
+    for (const verboten of ["account.", "preisFaktor", "shift."]) {
+      expect(block, `die Wiegung fasst ${verboten} an`).not.toContain(verboten);
+    }
   });
 
   it("der Spieler erfaehrt davon", () => {

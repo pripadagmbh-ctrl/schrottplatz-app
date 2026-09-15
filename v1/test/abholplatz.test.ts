@@ -1,5 +1,7 @@
 /**
- * Waechter fuer E-056: Der Abholer haelt dort, wo das bestellte Material liegt.
+ * Waechter fuer E-056 und E-063: Der Abholer haelt dort, wo das bestellte
+ * Material liegt — seit E-063 vor GENAU DIESER Mulde und nicht mehr vor der
+ * Mitte ihres Schenkels.
  *
  * Ansage Patrick am Geraet, 15.09.2026: „Der Abholer ist in der falschen Spur.
  * Wenn ich Stahlschrott oder Mischschrott beauftrage, soll er zu mir zum
@@ -28,9 +30,15 @@ import {
   BED_HALF_W,
   bedLenFor,
   VERLADE_SPUR_X,
+  VERLADE_ABSTAND,
   WORK_ZONES,
 } from "../src/delivery/routes";
-import { CONFIGS, bayVorderkante, lagerMuldeFuer } from "../src/world/containers";
+import {
+  CONFIGS,
+  bayVorderkante,
+  bayOeffnung,
+  lagerMuldeFuer,
+} from "../src/world/containers";
 import { abholerFunk } from "../src/delivery/customers";
 import {
   BAGGER_STAND,
@@ -136,36 +144,73 @@ describe("Von seinem Stand aus kommt der Spieler an alles heran", () => {
     }
   });
 
-  it("und an jedem Verladeplatz sind ALLE Silos des Schenkels im Band", () => {
+  it("und die BESTELLTE Mulde liegt vom Stand aus genau im Band", () => {
     /*
-     * DAS IST DIE FRAGE, DIE DEN ZWEITEN VERLADEPLATZ NOETIG GEMACHT HAT.
+     * SEIT E-063 IST DIE FRAGE EINE ANDERE (Ansage Patrick, 15.09.2026:
+     * „abholung faehrt immer noch falsch").
      *
-     * Bis heute gab es einen einzigen, auf (−25,5 | −8,0). Von dort sind die
-     * drei WESTsilos 8,80 · 7,50 · 8,80 m entfernt — die drei SUEDsilos aber
-     * 14,0 bis 14,8 m. Drei von sechs. Wer Edelstahl bestellte, bekam den
-     * Wagen an eine Stelle, von der aus sein Silo unerreichbar war.
+     * Bis dahin stand der Verladeplatz vor dem MITTLEREN Silo des Schenkels,
+     * damit der Arm von dort alle drei erreicht (8,80 · 7,50 · 8,80 m).
+     * Gemessen mit `tools/abholfahrt.ts`, das den Wagen wirklich faehrt: 10
+     * von 12 bestellbaren Fraktionen liessen ihn 4,60 m NEBEN ihrer Mulde
+     * halten. Wer eine Fraktion bestellt, will aber genau diese eine laden.
      *
-     * Der Stand steht deshalb je Schenkel vor dessen MITTLEREM Silo, und von
-     * dort sind es wieder 8,80 · 7,50 · 8,80 m — dieselben drei Zahlen, weil
-     * dieselbe Geometrie.
+     * Also wandert der Platz mit der Bestellung, und geprueft wird jetzt das:
+     * Vom Stand ist die bestellte Mulde 7,50 m weg — mitten im Band.
      */
+    let geprueft = 0;
     for (const p of alleAbholPlaetze()) {
       if (!p.ziel) continue;
-      const schenkel = CONFIGS.filter(
-        (c) => c.lager === true && c.facing === p.ziel!.facing
+      geprueft++;
+      const k = bayVorderkante(p.ziel);
+      const d = Math.hypot(k.x - p.stand.x, k.z - p.stand.z);
+      expect(d, `${p.name}: ${p.ziel.label} ist ${d.toFixed(2)} m vom Stand`).toBeCloseTo(
+        VERLADE_ABSTAND,
+        6
       );
-      expect(schenkel.length, `Schenkel ${p.ziel.facing} ist leer`).toBeGreaterThan(0);
-      for (const s of schenkel) {
-        const k = bayVorderkante(s);
-        const d = Math.hypot(k.x - p.stand.x, k.z - p.stand.z);
-        expect(d, `${s.label} ist ${d.toFixed(2)} m vom Stand`).toBeGreaterThanOrEqual(
-          SCHWENK_INNEN
-        );
-        expect(d, `${s.label} ist ${d.toFixed(2)} m vom Stand`).toBeLessThanOrEqual(
-          SCHWENK_AUSSEN
-        );
-      }
+      expect(d).toBeGreaterThanOrEqual(SCHWENK_INNEN);
+      expect(d).toBeLessThanOrEqual(SCHWENK_AUSSEN);
     }
+    // Ohne diese Zeile waere der Fall gruen, wenn es kein Lagersilo gaebe.
+    expect(geprueft, "kein einziger Verladeplatz geprueft").toBeGreaterThanOrEqual(6);
+  });
+
+  it("und der Wagen haelt vor der bestellten Mulde, nicht vor ihrer Nachbarin", () => {
+    /*
+     * DER WAECHTER ZU PATRICKS SATZ, und er prueft die Laengsrichtung —
+     * quer ist der Abstand die Spurbreite und soll gerade nicht null sein.
+     *
+     * `daneben` ist die Pruefung; sie wird zweimal angewandt: auf die echten
+     * Halteplaetze (muss 0,00 m ergeben) und auf den alten Halt vor der
+     * Schenkelmitte (muss melden). Ein Waechter, der nur den guten Fall
+     * sieht, haette den Fehler von E-056 nicht gefunden — er war gruen.
+     */
+    const daneben = (halt: [number, number], ziel: (typeof CONFIGS)[number]): number => {
+      const o = bayOeffnung(ziel);
+      // Die Reihe steht quer zur Oeffnung: laengs ist z im Westschenkel, x im Sued.
+      return Math.abs(o.x !== 0 ? halt[1] - ziel.z : halt[0] - ziel.x);
+    };
+    let geprueft = 0;
+    for (const p of alleAbholPlaetze()) {
+      if (!p.ziel) continue;
+      geprueft++;
+      expect(
+        daneben(p.halt, p.ziel),
+        `${p.name}: haelt ${daneben(p.halt, p.ziel).toFixed(2)} m neben ${p.ziel.label}`
+      ).toBeCloseTo(0, 6);
+    }
+    expect(geprueft).toBeGreaterThanOrEqual(6);
+
+    /*
+     * GEGENPROBE mit dem kaputten Eingang: der alte Halt vor der Mitte des
+     * Schenkels. Fuer die Randsilos muss `daneben` genau den Achsabstand der
+     * Reihe melden (4,60 m) — tut sie das nicht, prueft der Fall oben nichts.
+     */
+    const kupfer = CONFIGS.find((c) => c.id === "c_copper_lager")!;
+    const kabel = CONFIGS.find((c) => c.id === "c_cable_lager")!;
+    const alterHalt = verladeHaltFuer(kabel); // die Schenkelmitte, wie bis E-056
+    expect(daneben(alterHalt, kupfer), "die Gegenprobe meldet nichts").toBeCloseTo(4.6, 6);
+    expect(daneben(alterHalt, kupfer)).toBeGreaterThan(0.05);
   });
 
   it("und die Ladeflaeche bleibt in Reichweite, auch an ihren fernen Ecken", () => {
@@ -229,15 +274,31 @@ describe("Der Westschenkel behaelt genau die Zahlen, die er hatte", () => {
     expect(hz).toBeCloseTo(VERLADE_STAND.z, 6);
   });
 
-  it("und der Suedschenkel bekommt seinen eigenen, 6,5 m daneben", () => {
+  it("und jedes Silo bekommt seinen eigenen Stand, 7,5 m vor seiner Oeffnung", () => {
+    /*
+     * Seit E-063 haengt der Stand am BESTELLTEN Silo, nicht mehr an der
+     * Schenkelmitte. Fuer das Kabel-Lager aendert sich dadurch nichts (es IST
+     * die Mitte, Fall oben); der Suedschenkel bekommt je Silo einen eigenen.
+     *
+     * Edelstahl: Silo (−30,0 | −25,0), Oeffnung nach Norden, Vorderkante
+     * z −22,0 → Stand (−30,0 | −14,5), Halt (−30,0 | −7,0).
+     */
     const va = CONFIGS.find((c) => c.id === "c_va_lager")!;
     const sued = verladeStandFuer(va);
-    // Mittleres Silo des Suedschenkels ist BATTERIEN auf x −25,4; die
-    // Oeffnungen liegen auf z −22,0, der Stand also 7,5 m davor.
-    expect(sued.x).toBeCloseTo(-25.4, 6);
+    expect(sued.x).toBeCloseTo(-30.0, 6);
     expect(sued.z).toBeCloseTo(-14.5, 6);
-    const weg = Math.hypot(sued.x - VERLADE_STAND.x, sued.z - VERLADE_STAND.z);
-    expect(weg, `${weg.toFixed(2)} m zwischen den beiden Verladeplaetzen`).toBeLessThan(7);
+    const [hx, hz] = verladeHaltFuer(va);
+    expect(hx).toBeCloseTo(-30.0, 6);
+    expect(hz).toBeCloseTo(-7.0, 6);
+    /*
+     * Und die Wege zwischen den Verladeplaetzen eines Schenkels bleiben kurz:
+     * Der Achsabstand der Reihe ist 4,60 m, mehr liegt zwischen zwei
+     * Nachbarstaenden nicht.
+     */
+    const battery = CONFIGS.find((c) => c.id === "c_battery")!;
+    const nachbar = verladeStandFuer(battery);
+    const weg = Math.hypot(sued.x - nachbar.x, sued.z - nachbar.z);
+    expect(weg, `${weg.toFixed(2)} m zwischen zwei Verladeplaetzen`).toBeCloseTo(4.6, 6);
   });
 });
 

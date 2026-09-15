@@ -854,6 +854,26 @@ async function main(): Promise<void> {
    */
   vehicles.onPickupFunk = (wer, spruch) => hud.toast(`${wer}: „${spruch}"`);
 
+  /*
+   * DER LIEFERSCHEIN DES ABHOLERS (E-064).
+   *
+   * Ansage Patrick, 15.09.2026: „ausserdem muss auch abholer leer wiegen."
+   * Er haelt jetzt bei der Einfahrt auf der Bruecke wie jeder andere — leer,
+   * also Tara — und beim Hinausfahren voll. Die Differenz ist, was vom Hof
+   * geht.
+   *
+   * Zwei Zeilen, sonst nichts: kein Geld, kein Konto, keine Preisaenderung.
+   * Bezahlt wird die Fuhre weiterhin beim Losfahren vom Verladeplatz
+   * (`onPickupDepart`) — der Kreislauf bleibt unberuehrt.
+   */
+  vehicles.onAbholerTara = (tara) =>
+    hud.toast(`Waage: ${tara.toFixed(0)} kg Tara — leerer Container, weiter auf den Platz.`);
+  vehicles.onAbholerBrutto = (tara, brutto) =>
+    hud.toast(
+      `Waage: ${brutto.toFixed(0)} kg brutto − ${tara.toFixed(0)} kg Tara = ` +
+        `${Math.max(brutto - tara, 0).toFixed(0)} kg abgeholt.`
+    );
+
   vehicles.onCustomerArrived = (c) => {
     const wer =
       c.group === "haendler"
