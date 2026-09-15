@@ -1536,3 +1536,73 @@ Grundriss vorher/nachher: `docs/messungen/2026-09-15_silos-l-form.svg`.
 5. **Zum Tor schauen:** Steht Janines Wagen an der Nordmauer neben den
    Warteplätzen, und laufen die wartenden Fahrer zu ihr, ohne über den
    Arbeitsbereich zu müssen?
+
+### E-029 — Die Sortierregel bekommt einen Wächter; der Abstand zwischen Schild und Kasse wird gemessen, nicht geschlossen (15.09.2026)
+
+**Entscheidung.** Drei Dinge, alle in `test/`, `tools/` und `docs/` — **kein
+Produktivcode angefasst**:
+
+1. `test/fraktionen.test.ts` (22 Prüfungen) wacht ab sofort über
+   `fraktionAus`/`SORTENREIN_AB`, über die abgeleiteten Fraktionen aller 271
+   erreichbaren Katalogeinträge und über die Frage, ob jede Fraktion ein Ziel
+   hat.
+2. `tools/farbabstand.ts` misst Farbabstände in ΔE2000 statt in RGB und prüft
+   sich dabei selbst gegen die Prüfdaten von Sharma/Wu/Dalal (2005).
+   `tools/fraktionsblatt.ts` zeichnet daraus `docs/fraktionen-2026-09-15.svg`.
+3. Der Abstand zwischen **Muldenschild** und **Kasse** wird als Befund
+   festgehalten (W-1 bis W-10 in `docs/fraktionen.md`), **nicht behoben**. Die
+   Wächter dazu sind grün und im Text mit „BEFUND" gekennzeichnet.
+
+**Begründung.** Patrick, 15.09.2026 nach dem Gerätetest: „Es ist nicht wirklich
+erkennbar, was Stahlschrott ist und was Mischschrott ist. Auch die
+Kategorisierung ist mir nicht ganz bewusst." Die Bestandsaufnahme dazu hat zwei
+Löcher gefunden:
+
+- `fraktionAus` entscheidet für **jedes** Teil im Spiel über die Fraktion und
+  hatte **keinen einzigen Test**. Gesucht am 15.09.2026 in allen 51
+  Testdateien: null Treffer für `fraktionAus`, `SORTENREIN_AB`, `istPressbar`.
+- Schild und Kasse rechnen verschieden, gemessen um Faktor **87** bei der Mulde
+  „BUNT + VA" (Schild 1742 €, Kasse 20 €) und um Faktor **6** bei KUPFER-LAGER
+  und ALU-LAGER. Das beantwortet zugleich Prüfpunkt 3 aus E-028 („stimmt der
+  Betrag am Container mit dem Schild am Silo überein?") — nein, und nicht knapp.
+
+Warum nicht behoben: Es gibt zwei Wege (die Kasse lernt `mitFraktionen`, oder
+das Schild zeigt den echten Erlös), und beide verändern das Spiel verschieden
+stark. Der eine nimmt die Entscheidung Kupfer/Messing aus dem Spiel, der andere
+lässt die HUD-Zahl „Sortierwert" deutlich fallen. Das ist Patricks Entscheidung,
+nicht meine (V-2 in `docs/fraktionen.md`).
+
+**Verworfene Alternative.** (a) Die Kasse gleich auf die Schild-Rechnung
+umstellen — die naheliegende Reparatur; sie nimmt zugleich den Anreiz, Kupfer von
+Messing zu trennen, und genau dieser Anreiz ist laut `materials/catalog.ts:19-23`
+der Sinn der eigenen Mulde. (b) Die Befunde nur in den Bericht schreiben und
+nicht in Tests gießen — dann wandern die Zahlen beim nächsten Umbau
+stillschweigend, und in vier Wochen misst sie jemand neu. (c) Die Farben in RGB
+vergleichen — RGB lügt: Stahl und Misch liegen dort in Grün 0 und in Blau 4
+Einheiten auseinander, und genau dort sieht das Auge am schärfsten.
+
+**Abnahmekriterium.** `npm test` grün: 570 Tests in 52 Dateien (vorher 548 in
+51), darunter `test/fraktionen.test.ts`. `npm run build` grün. Das Werkzeug
+prüft sich selbst: `pruefeDeltaE()` meldet größte Abweichung 0,000042 bei 16
+Prüfpaaren. Die Wächter `collision`, `customers`, `haggle`, `purity`, `save`,
+`shift`, `tutorial`, `upgradeEffects`, `upgrades` bleiben grün.
+
+**Widerspruch zu älteren Einträgen, benannt und nicht aufgelöst.** Der Kopf
+dieses Logs sagt „Neueste oben"; tatsächlich steht die neueste Entscheidung seit
+E-006 unten. Dieser Eintrag folgt der gelebten Reihenfolge, nicht dem Kopf.
+Zweitens: `src/world/containers.ts:96-99` beschreibt eine Abrechnungsregel
+(„wer Kupfer und Messing zusammen abgibt, bekommt für alles den Kupferpreis"),
+die `src/economy/account.ts` nicht hat — dort gewinnt die schwerste Fraktion in
+der Ladung, und bei Gleichstand die zuerst geladene.
+
+**Auf dem Gerät zu prüfen.**
+
+1. **Zwei weiße Geräte nebeneinander greifen** — Elektroherd und Waschmaschine:
+   Siehst du ohne die Greifanzeige einen Unterschied? Gemessen ΔE 0,18, also
+   nach der Farbmetrik keinen.
+2. **Vor die Trennsteine zwischen den beiden Halden fahren:** Weißt du ohne
+   Schild, auf welcher Seite du stehst? Das Schild blendet sich unter 4,5 m
+   Kameraabstand vollständig aus.
+3. **`docs/fraktionen-2026-09-15.svg` auf dem iPhone** unter `/v1/plaene/`
+   öffnen: ohne Zoom lesbar? Und stimmt, was daraufsteht, mit dem überein, was
+   du im Spiel erlebst?

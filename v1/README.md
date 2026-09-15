@@ -6,10 +6,18 @@ stehen in `../CLAUDE.md`, die Entscheidungen in `docs/entscheidungen.md` (ab E-0
 
 Stand: **M1 gebaut, Gerätetest offen. M2 Phase A gebaut, Gerätetest offen.** Zapfen statt
 breiter Ring an der Spinne (E-007), Rückwände raus an den vier Sortiermulden (E-006),
-Kommentar-Regel für Messwerte (E-008), der Fünfschalengreifer als Vorschaumodell (E-009).
-Prüfkette grün: `npm test` 272 Tests in 29 Dateien, `npm run build` sauber. Abgenommen ist
-nichts davon vor Patricks Gerätetest — die Handgriffe stehen bei E-006, E-007 und E-009 im
-Log.
+Kommentar-Regel für Messwerte (E-008), der Fünfschalengreifer als Vorschaumodell (E-009),
+Platzumbau auf die L-Silos und die Mulde „BUNT + VA" (E-026 bis E-028), Bestandsaufnahme
+der Sortierung (E-029). Prüfkette grün: `npm test` **570 Tests in 52 Dateien**,
+`npm run build` sauber. Abgenommen ist nichts davon vor Patricks Gerätetest — die
+Handgriffe stehen bei E-006, E-007, E-009 und E-029 im Log.
+
+**Offen und gemessen, nicht behoben (E-029, `docs/fraktionen.md`):** Das Schild an einer
+Mulde und die Kasse beim Verkauf rechnen verschieden — bei „BUNT + VA" um Faktor 87. Und
+die Fraktion eines Teils ist am Bild nicht zu erkennen: Nur 16 von 271 Katalogeinträgen
+tragen überhaupt die Fraktionsfarbe, ein Elektroherd (Stahlschrott) und eine Waschmaschine
+(Mischschrott) unterscheiden sich um ΔE 0,18. Das Blatt dazu fürs Telefon:
+`docs/fraktionen-2026-09-15.svg`.
 
 Der Spielinhalt (M0–M3 weiter unten) ist vom Prototyp geerbt und unverändert gültig; diese
 Abschnitte beschreiben, was v1 mitbringt, nicht was in v1 entstanden ist.

@@ -1,0 +1,138 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="3618" viewBox="0 0 820 3618">
+<rect width="820" height="3618" fill="#FBFAF7"/>
+<text x="34" y="76" font-family="Helvetica,Arial,sans-serif" font-size="54" font-weight="700" fill="#1F2326" text-anchor="start">WAS GEHÖRT WOHIN</text>
+<text x="34" y="110" font-family="Helvetica,Arial,sans-serif" font-size="26" font-weight="400" fill="#6E7377" text-anchor="start">Rust'n'Reibach v1 · Stand 15.09.2026</text>
+<text x="34" y="140" font-family="Helvetica,Arial,sans-serif" font-size="26" font-weight="400" fill="#6E7377" text-anchor="start">Farben und Preise aus dem Quelltext gelesen.</text>
+<rect x="34" y="186" width="752" height="178" rx="8" fill="#F0EDE6" stroke="#D8D4CC" stroke-width="2"/>
+<text x="58" y="236" font-family="Helvetica,Arial,sans-serif" font-size="30" font-weight="700" fill="#1F2326" text-anchor="start">DIE REGEL</text>
+<text x="58" y="280" font-family="Helvetica,Arial,sans-serif" font-size="34" font-weight="700" fill="#1F2326" text-anchor="start">Sortenrein ist ein Teil ab 95 %</text>
+<text x="58" y="320" font-family="Helvetica,Arial,sans-serif" font-size="34" font-weight="700" fill="#1F2326" text-anchor="start">eines Stoffes. Alles darunter ist</text>
+<text x="58" y="360" font-family="Helvetica,Arial,sans-serif" font-size="34" font-weight="700" fill="#B4342A" text-anchor="start">MISCHSCHROTT — auch bei 94 % Stahl.</text>
+<text x="34" y="404" font-family="Helvetica,Arial,sans-serif" font-size="32" font-weight="700" fill="#1F2326" text-anchor="start">STAHLSCHROTT ODER MISCHSCHROTT?</text>
+<rect x="34" y="442" width="366" height="132" rx="10" fill="#6e5a4e" stroke="#D8D4CC" stroke-width="2"/>
+<text x="52" y="488" font-family="Helvetica,Arial,sans-serif" font-size="30" font-weight="700" fill="#FFFFFF" text-anchor="start">STAHLSCHROTT</text>
+<text x="52" y="522" font-family="Helvetica,Arial,sans-serif" font-size="26" font-weight="400" fill="#FFFFFF" text-anchor="start">#6e5a4e</text>
+<text x="52" y="554" font-family="Helvetica,Arial,sans-serif" font-size="30" font-weight="700" fill="#FFFFFF" text-anchor="start">250 €/t</text>
+<rect x="420" y="442" width="366" height="132" rx="10" fill="#5f5a52" stroke="#D8D4CC" stroke-width="2"/>
+<text x="438" y="488" font-family="Helvetica,Arial,sans-serif" font-size="30" font-weight="700" fill="#FFFFFF" text-anchor="start">MISCHSCHROTT</text>
+<text x="438" y="522" font-family="Helvetica,Arial,sans-serif" font-size="26" font-weight="400" fill="#FFFFFF" text-anchor="start">#5f5a52</text>
+<text x="438" y="554" font-family="Helvetica,Arial,sans-serif" font-size="30" font-weight="700" fill="#FFFFFF" text-anchor="start">160 €/t</text>
+<text x="34" y="608" font-family="Helvetica,Arial,sans-serif" font-size="28" font-weight="700" fill="#1F2326" text-anchor="start">Farbabstand der beiden: ΔE2000 = 7,6</text>
+<text x="34" y="640" font-family="Helvetica,Arial,sans-serif" font-size="26" font-weight="400" fill="#6E7377" text-anchor="start">(unter 2 gilt als nicht unterscheidbar, unter 10 als</text>
+<text x="34" y="668" font-family="Helvetica,Arial,sans-serif" font-size="26" font-weight="400" fill="#6E7377" text-anchor="start">gleiche Farbe mit anderem Ton). Bei Abendlicht: 4,2.</text>
+<rect x="34" y="712" width="752" height="250" rx="8" fill="#FBEFEC" stroke="#B4342A" stroke-width="2"/>
+<text x="58" y="760" font-family="Helvetica,Arial,sans-serif" font-size="29" font-weight="700" fill="#B4342A" text-anchor="start">ABER: DIE TEILE TRAGEN SIE NICHT</text>
+<text x="58" y="802" font-family="Helvetica,Arial,sans-serif" font-size="32" font-weight="400" fill="#1F2326" text-anchor="start">16 von 271 Teilen tragen die</text>
+<text x="58" y="840" font-family="Helvetica,Arial,sans-serif" font-size="32" font-weight="400" fill="#1F2326" text-anchor="start">Fraktionsfarbe. Alle anderen sind nach</text>
+<text x="58" y="878" font-family="Helvetica,Arial,sans-serif" font-size="32" font-weight="400" fill="#1F2326" text-anchor="start">ZWECK gefärbt: weiß = Haushaltsgerät,</text>
+<text x="58" y="916" font-family="Helvetica,Arial,sans-serif" font-size="32" font-weight="400" fill="#1F2326" text-anchor="start">blau = Container, grün = Landmaschine.</text>
+<text x="34" y="1006" font-family="Helvetica,Arial,sans-serif" font-size="32" font-weight="700" fill="#1F2326" text-anchor="start">GEMESSEN: SO NAH LIEGEN SIE</text>
+<text x="34" y="1042" font-family="Helvetica,Arial,sans-serif" font-size="26" font-weight="400" fill="#6E7377" text-anchor="start">Flächengewichtete Mittelfarbe der gebauten Teile.</text>
+<rect x="34" y="1076" width="752" height="84" rx="8" fill="#FFFFFF" stroke="#D8D4CC" stroke-width="2"/>
+<rect x="48" y="1090" width="56" height="56" rx="4" fill="#c8c6c1" stroke="#D8D4CC" stroke-width="2"/>
+<rect x="112" y="1090" width="56" height="56" rx="4" fill="#c7c5c0" stroke="#D8D4CC" stroke-width="2"/>
+<text x="186" y="1110" font-family="Helvetica,Arial,sans-serif" font-size="27" font-weight="700" fill="#1F2326" text-anchor="start">Elektroherd · Waschmaschine</text>
+<text x="186" y="1140" font-family="Helvetica,Arial,sans-serif" font-size="25" font-weight="400" fill="#6E7377" text-anchor="start">Stahlschrott / Mischschrott</text>
+<text x="770" y="1128" font-family="Helvetica,Arial,sans-serif" font-size="32" font-weight="700" fill="#B4342A" text-anchor="end">ΔE 0,2</text>
+<rect x="34" y="1172" width="752" height="84" rx="8" fill="#FFFFFF" stroke="#D8D4CC" stroke-width="2"/>
+<rect x="48" y="1186" width="56" height="56" rx="4" fill="#34577e" stroke="#D8D4CC" stroke-width="2"/>
+<rect x="112" y="1186" width="56" height="56" rx="4" fill="#34577e" stroke="#D8D4CC" stroke-width="2"/>
+<text x="186" y="1206" font-family="Helvetica,Arial,sans-serif" font-size="27" font-weight="700" fill="#1F2326" text-anchor="start">Seecontainer · Baustellencont.</text>
+<text x="186" y="1236" font-family="Helvetica,Arial,sans-serif" font-size="25" font-weight="400" fill="#6E7377" text-anchor="start">Stahlschrott / Mischschrott</text>
+<text x="770" y="1224" font-family="Helvetica,Arial,sans-serif" font-size="32" font-weight="700" fill="#B4342A" text-anchor="end">ΔE 0,0</text>
+<rect x="34" y="1268" width="752" height="84" rx="8" fill="#FFFFFF" stroke="#D8D4CC" stroke-width="2"/>
+<rect x="48" y="1282" width="56" height="56" rx="4" fill="#67625c" stroke="#D8D4CC" stroke-width="2"/>
+<rect x="112" y="1282" width="56" height="56" rx="4" fill="#696563" stroke="#D8D4CC" stroke-width="2"/>
+<text x="186" y="1302" font-family="Helvetica,Arial,sans-serif" font-size="27" font-weight="700" fill="#1F2326" text-anchor="start">Blech · Motorblock V8</text>
+<text x="186" y="1332" font-family="Helvetica,Arial,sans-serif" font-size="25" font-weight="400" fill="#6E7377" text-anchor="start">Stahlschrott / Mischschrott</text>
+<text x="770" y="1320" font-family="Helvetica,Arial,sans-serif" font-size="32" font-weight="700" fill="#B4342A" text-anchor="end">ΔE 2,5</text>
+<text x="34" y="1398" font-family="Helvetica,Arial,sans-serif" font-size="32" font-weight="700" fill="#1F2326" text-anchor="start">ALLE FRAKTIONEN</text>
+<rect x="34" y="1436" width="752" height="122" rx="8" fill="#FFFFFF" stroke="#D8D4CC" stroke-width="2"/>
+<rect x="48" y="1450" width="96" height="94" rx="6" fill="#6e5a4e" stroke="#D8D4CC" stroke-width="2"/>
+<text x="162" y="1478" font-family="Helvetica,Arial,sans-serif" font-size="34" font-weight="700" fill="#1F2326" text-anchor="start">Stahlschrott</text>
+<text x="770" y="1478" font-family="Helvetica,Arial,sans-serif" font-size="32" font-weight="700" fill="#1F2326" text-anchor="end">250 €/t</text>
+<text x="162" y="1510" font-family="Helvetica,Arial,sans-serif" font-size="25" font-weight="400" fill="#6E7377" text-anchor="start">→ STAHLSCHROTT</text>
+<text x="162" y="1540" font-family="Helvetica,Arial,sans-serif" font-size="25" font-weight="400" fill="#6E7377" text-anchor="start">Rohr, Blech, Poller</text>
+<rect x="34" y="1572" width="752" height="122" rx="8" fill="#FFFFFF" stroke="#D8D4CC" stroke-width="2"/>
+<rect x="48" y="1586" width="96" height="94" rx="6" fill="#5f5a52" stroke="#D8D4CC" stroke-width="2"/>
+<text x="162" y="1614" font-family="Helvetica,Arial,sans-serif" font-size="34" font-weight="700" fill="#1F2326" text-anchor="start">Mischschrott</text>
+<text x="770" y="1614" font-family="Helvetica,Arial,sans-serif" font-size="32" font-weight="700" fill="#1F2326" text-anchor="end">160 €/t</text>
+<text x="162" y="1646" font-family="Helvetica,Arial,sans-serif" font-size="25" font-weight="400" fill="#6E7377" text-anchor="start">→ MISCHSCHROTT</text>
+<text x="162" y="1676" font-family="Helvetica,Arial,sans-serif" font-size="25" font-weight="400" fill="#6E7377" text-anchor="start">Quad, Jetski, Kleinbus</text>
+<rect x="34" y="1708" width="752" height="122" rx="8" fill="#FFFFFF" stroke="#D8D4CC" stroke-width="2"/>
+<rect x="48" y="1722" width="96" height="94" rx="6" fill="#dfe6ea" stroke="#D8D4CC" stroke-width="2"/>
+<text x="162" y="1750" font-family="Helvetica,Arial,sans-serif" font-size="34" font-weight="700" fill="#1F2326" text-anchor="start">Edelstahl VA</text>
+<text x="770" y="1750" font-family="Helvetica,Arial,sans-serif" font-size="32" font-weight="700" fill="#1F2326" text-anchor="end">1400 €/t</text>
+<text x="162" y="1782" font-family="Helvetica,Arial,sans-serif" font-size="25" font-weight="400" fill="#6E7377" text-anchor="start">→ BUNT + VA  ·  VA-LAGER</text>
+<text x="162" y="1812" font-family="Helvetica,Arial,sans-serif" font-size="25" font-weight="400" fill="#6E7377" text-anchor="start">Spülbecken, VA-Behälter, VA-Geländerrohr</text>
+<rect x="34" y="1844" width="752" height="122" rx="8" fill="#FFFFFF" stroke="#D8D4CC" stroke-width="2"/>
+<rect x="48" y="1858" width="96" height="94" rx="6" fill="#c4c8cc" stroke="#D8D4CC" stroke-width="2"/>
+<text x="162" y="1886" font-family="Helvetica,Arial,sans-serif" font-size="34" font-weight="700" fill="#1F2326" text-anchor="start">Aluminium</text>
+<text x="770" y="1886" font-family="Helvetica,Arial,sans-serif" font-size="32" font-weight="700" fill="#1F2326" text-anchor="end">1500 €/t</text>
+<text x="162" y="1918" font-family="Helvetica,Arial,sans-serif" font-size="25" font-weight="400" fill="#6E7377" text-anchor="start">→ BUNT + VA  ·  ALU-LAGER</text>
+<text x="162" y="1948" font-family="Helvetica,Arial,sans-serif" font-size="25" font-weight="400" fill="#6E7377" text-anchor="start">Felge, Tafel, Profil</text>
+<rect x="34" y="1980" width="752" height="122" rx="8" fill="#FFFFFF" stroke="#D8D4CC" stroke-width="2"/>
+<rect x="48" y="1994" width="96" height="94" rx="6" fill="#9aa6ad" stroke="#D8D4CC" stroke-width="2"/>
+<text x="162" y="2022" font-family="Helvetica,Arial,sans-serif" font-size="34" font-weight="700" fill="#1F2326" text-anchor="start">Zink</text>
+<text x="770" y="2022" font-family="Helvetica,Arial,sans-serif" font-size="32" font-weight="700" fill="#1F2326" text-anchor="end">820 €/t</text>
+<text x="162" y="2054" font-family="Helvetica,Arial,sans-serif" font-size="25" font-weight="400" fill="#6E7377" text-anchor="start">→ BUNT + VA  ·  ALU-LAGER</text>
+<text x="162" y="2084" font-family="Helvetica,Arial,sans-serif" font-size="25" font-weight="400" fill="#6E7377" text-anchor="start">Fallrohr-Bund, Zink-Dachrinne</text>
+<rect x="34" y="2116" width="752" height="122" rx="8" fill="#FFFFFF" stroke="#D8D4CC" stroke-width="2"/>
+<rect x="48" y="2130" width="96" height="94" rx="6" fill="#c7622b" stroke="#D8D4CC" stroke-width="2"/>
+<text x="162" y="2158" font-family="Helvetica,Arial,sans-serif" font-size="34" font-weight="700" fill="#1F2326" text-anchor="start">Kupfer</text>
+<text x="770" y="2158" font-family="Helvetica,Arial,sans-serif" font-size="32" font-weight="700" fill="#1F2326" text-anchor="end">7200 €/t</text>
+<text x="162" y="2190" font-family="Helvetica,Arial,sans-serif" font-size="25" font-weight="400" fill="#6E7377" text-anchor="start">→ BUNT + VA  ·  KUPFER-LAGER</text>
+<text x="162" y="2220" font-family="Helvetica,Arial,sans-serif" font-size="25" font-weight="400" fill="#6E7377" text-anchor="start">Kupferrohr, Kupferbund</text>
+<rect x="34" y="2252" width="752" height="122" rx="8" fill="#FFFFFF" stroke="#D8D4CC" stroke-width="2"/>
+<rect x="48" y="2266" width="96" height="94" rx="6" fill="#c9a227" stroke="#D8D4CC" stroke-width="2"/>
+<text x="162" y="2294" font-family="Helvetica,Arial,sans-serif" font-size="34" font-weight="700" fill="#1F2326" text-anchor="start">Messing</text>
+<text x="770" y="2294" font-family="Helvetica,Arial,sans-serif" font-size="32" font-weight="700" fill="#1F2326" text-anchor="end">4300 €/t</text>
+<text x="162" y="2326" font-family="Helvetica,Arial,sans-serif" font-size="25" font-weight="400" fill="#6E7377" text-anchor="start">→ BUNT + VA  ·  KUPFER-LAGER</text>
+<text x="162" y="2356" font-family="Helvetica,Arial,sans-serif" font-size="25" font-weight="400" fill="#6E7377" text-anchor="start">Schiffsschraube, Messingarmaturen</text>
+<rect x="34" y="2388" width="752" height="122" rx="8" fill="#FFFFFF" stroke="#D8D4CC" stroke-width="2"/>
+<rect x="48" y="2402" width="96" height="94" rx="6" fill="#b0682a" stroke="#D8D4CC" stroke-width="2"/>
+<text x="162" y="2430" font-family="Helvetica,Arial,sans-serif" font-size="34" font-weight="700" fill="#1F2326" text-anchor="start">Kabel</text>
+<text x="770" y="2430" font-family="Helvetica,Arial,sans-serif" font-size="32" font-weight="700" fill="#1F2326" text-anchor="end">2200 €/t</text>
+<text x="162" y="2462" font-family="Helvetica,Arial,sans-serif" font-size="25" font-weight="400" fill="#6E7377" text-anchor="start">→ BUNT + VA  ·  KABEL-LAGER</text>
+<text x="162" y="2492" font-family="Helvetica,Arial,sans-serif" font-size="25" font-weight="400" fill="#6E7377" text-anchor="start">(Teile ohne Namen)</text>
+<rect x="34" y="2524" width="752" height="122" rx="8" fill="#FFFFFF" stroke="#D8D4CC" stroke-width="2"/>
+<rect x="48" y="2538" width="96" height="94" rx="6" fill="#3d4b57" stroke="#D8D4CC" stroke-width="2"/>
+<text x="162" y="2566" font-family="Helvetica,Arial,sans-serif" font-size="34" font-weight="700" fill="#1F2326" text-anchor="start">Batterien</text>
+<text x="770" y="2566" font-family="Helvetica,Arial,sans-serif" font-size="32" font-weight="700" fill="#1F2326" text-anchor="end">550 €/t</text>
+<text x="162" y="2598" font-family="Helvetica,Arial,sans-serif" font-size="25" font-weight="400" fill="#6E7377" text-anchor="start">→ BATTERIEN</text>
+<text x="162" y="2628" font-family="Helvetica,Arial,sans-serif" font-size="25" font-weight="400" fill="#6E7377" text-anchor="start">LKW-Batterie, Starterbatterie</text>
+<rect x="34" y="2660" width="752" height="122" rx="8" fill="#FFFFFF" stroke="#D8D4CC" stroke-width="2"/>
+<rect x="48" y="2674" width="96" height="94" rx="6" fill="#8a6a42" stroke="#D8D4CC" stroke-width="2"/>
+<text x="162" y="2702" font-family="Helvetica,Arial,sans-serif" font-size="34" font-weight="700" fill="#1F2326" text-anchor="start">Holz</text>
+<text x="770" y="2702" font-family="Helvetica,Arial,sans-serif" font-size="32" font-weight="700" fill="#B4342A" text-anchor="end">−20 €/t</text>
+<text x="162" y="2734" font-family="Helvetica,Arial,sans-serif" font-size="25" font-weight="400" fill="#6E7377" text-anchor="start">→ MUELL  ·  ABFALL</text>
+<text x="162" y="2764" font-family="Helvetica,Arial,sans-serif" font-size="25" font-weight="400" fill="#6E7377" text-anchor="start">Holzbruch-Haufen, Dachstuhl-Binder</text>
+<rect x="34" y="2796" width="752" height="122" rx="8" fill="#FFFFFF" stroke="#D8D4CC" stroke-width="2"/>
+<rect x="48" y="2810" width="96" height="94" rx="6" fill="#2e2c2b" stroke="#D8D4CC" stroke-width="2"/>
+<text x="162" y="2838" font-family="Helvetica,Arial,sans-serif" font-size="34" font-weight="700" fill="#1F2326" text-anchor="start">Reifen</text>
+<text x="770" y="2838" font-family="Helvetica,Arial,sans-serif" font-size="32" font-weight="700" fill="#B4342A" text-anchor="end">−50 €/t</text>
+<text x="162" y="2870" font-family="Helvetica,Arial,sans-serif" font-size="25" font-weight="400" fill="#6E7377" text-anchor="start">→ MUELL  ·  ABFALL</text>
+<text x="162" y="2900" font-family="Helvetica,Arial,sans-serif" font-size="25" font-weight="400" fill="#6E7377" text-anchor="start">Reifenhaufen, Traktorreifen</text>
+<rect x="34" y="2932" width="752" height="122" rx="8" fill="#FFFFFF" stroke="#D8D4CC" stroke-width="2"/>
+<rect x="48" y="2946" width="96" height="94" rx="6" fill="#9a9083" stroke="#D8D4CC" stroke-width="2"/>
+<text x="162" y="2974" font-family="Helvetica,Arial,sans-serif" font-size="34" font-weight="700" fill="#1F2326" text-anchor="start">Baumischabfall</text>
+<text x="770" y="2974" font-family="Helvetica,Arial,sans-serif" font-size="32" font-weight="700" fill="#B4342A" text-anchor="end">−40 €/t</text>
+<text x="162" y="3006" font-family="Helvetica,Arial,sans-serif" font-size="25" font-weight="400" fill="#6E7377" text-anchor="start">→ MUELL  ·  ABFALL</text>
+<text x="162" y="3036" font-family="Helvetica,Arial,sans-serif" font-size="25" font-weight="400" fill="#6E7377" text-anchor="start">Schachtring, Betontreppenlauf</text>
+<rect x="34" y="3068" width="752" height="122" rx="8" fill="#FFFFFF" stroke="#D8D4CC" stroke-width="2"/>
+<rect x="48" y="3082" width="96" height="94" rx="6" fill="#3f6d8a" stroke="#D8D4CC" stroke-width="2"/>
+<text x="162" y="3110" font-family="Helvetica,Arial,sans-serif" font-size="34" font-weight="700" fill="#1F2326" text-anchor="start">Kunststoff</text>
+<text x="770" y="3110" font-family="Helvetica,Arial,sans-serif" font-size="32" font-weight="700" fill="#B4342A" text-anchor="end">−60 €/t</text>
+<text x="162" y="3142" font-family="Helvetica,Arial,sans-serif" font-size="25" font-weight="400" fill="#6E7377" text-anchor="start">→ MUELL  ·  ABFALL</text>
+<text x="162" y="3172" font-family="Helvetica,Arial,sans-serif" font-size="25" font-weight="400" fill="#6E7377" text-anchor="start">Kühlturm-Zelle, Matratzenstapel</text>
+<text x="34" y="3236" font-family="Helvetica,Arial,sans-serif" font-size="32" font-weight="700" fill="#1F2326" text-anchor="start">WORAN MAN ES HEUTE ERKENNT</text>
+<text x="34" y="3276" font-family="Helvetica,Arial,sans-serif" font-size="29" font-weight="400" fill="#1F2326" text-anchor="start">1. Anvisieren: die Zeile oben nennt Name,</text>
+<text x="34" y="3312" font-family="Helvetica,Arial,sans-serif" font-size="29" font-weight="400" fill="#1F2326" text-anchor="start">    Fraktion und Hauptmaterial. Der einzige</text>
+<text x="34" y="3348" font-family="Helvetica,Arial,sans-serif" font-size="29" font-weight="400" fill="#1F2326" text-anchor="start">    Ort im Spiel, an dem die Fraktion steht.</text>
+<text x="34" y="3384" font-family="Helvetica,Arial,sans-serif" font-size="29" font-weight="400" fill="#1F2326" text-anchor="start">2. Ampel am Muldenschild: grün = darf hinein.</text>
+<text x="34" y="3420" font-family="Helvetica,Arial,sans-serif" font-size="29" font-weight="400" fill="#1F2326" text-anchor="start">3. Sonst nichts. Kein Schild am Platz, kein</text>
+<text x="34" y="3456" font-family="Helvetica,Arial,sans-serif" font-size="29" font-weight="400" fill="#1F2326" text-anchor="start">    Menü, kein Tutorialschritt sagt es.</text>
+<text x="34" y="3522" font-family="Helvetica,Arial,sans-serif" font-size="24" font-weight="400" fill="#6E7377" text-anchor="start">Gemessen am 15.09.2026 aus dem Quelltext des</text>
+<text x="34" y="3550" font-family="Helvetica,Arial,sans-serif" font-size="24" font-weight="400" fill="#6E7377" text-anchor="start">Arbeitsstands. ΔE2000 nach CIE 142:2001,</text>
+<text x="34" y="3578" font-family="Helvetica,Arial,sans-serif" font-size="24" font-weight="400" fill="#6E7377" text-anchor="start">Werkzeug gegen Sharma/Wu/Dalal (2005) geprüft.</text>
+</svg>
