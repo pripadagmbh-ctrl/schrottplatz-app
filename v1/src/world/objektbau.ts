@@ -218,7 +218,21 @@ function fertig(): Bauteil {
 const STAHL = 0x6f6a63;
 const STAHL_DUNKEL = 0x4a4642;
 const GUSS = 0x55514c;
-const ALU = 0xa8adb2;
+/**
+ * Aluminium — derselbe Ton wie im Katalog (`materials/catalog.ts`, E-042).
+ *
+ * Patrick am 15.09.2026: „Aluminium ist in den meisten Faellen grau."
+ *
+ * Gemessen am selben Tag (`tools/alufarbe.ts`): Von 30 Alu-Eintraegen tragen
+ * nur DREI die Fraktionsfarbe — Felge, Profil und ein namenloser Zylinder,
+ * zusammen 31 kg. Die anderen 27 werden hier gefaerbt, und die drei
+ * Duschkabinen und Wandelemente (`fensterflaeche`) sind flaechig genau dieser
+ * Ton. Wer nur den Katalog aendert, aendert die Farbe, die man fast nie sieht;
+ * `VERZINKT` unten macht es seit dem Besen schon richtig vor.
+ *
+ * `CHROM` bleibt hell: Verchromtes IST hell, das war nie der Befund.
+ */
+const ALU = 0x928d85;
 const CHROM = 0xc2c7cb;
 const ROST = 0x7a4a2c;
 /**

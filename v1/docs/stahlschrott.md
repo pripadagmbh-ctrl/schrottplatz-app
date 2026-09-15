@@ -1,6 +1,6 @@
 # Was Stahlschrott ist — die Regel
 
-**Stand 15.09.2026 · Vorschlag, noch kein Umbau · alle Zahlen aus dem Katalog gerechnet**
+**Stand 15.09.2026 · gebaut (E-042) · alle Zahlen aus dem Katalog gerechnet**
 
 Anlass, Patrick am 15.09.2026:
 
@@ -13,12 +13,18 @@ Anlass, Patrick am 15.09.2026:
 > wirklich ganz gutes Material. Auch bei so Gitterboxen bin ich mir nicht
 > sicher, ob das dann wirklich Stahlschrott ist im Premium-Segment."
 
-Entschieden ist: **es bleibt bei zwei Fraktionen.** Eine dritte („Blechschrott")
-ist ausdrücklich abgelehnt. Stahlschrott ist das Massive; alles andere geht zu
-Mischschrott, auch sortenreines Dünnblech.
+Und nach dem Blick aufs erste Blatt:
+
+> „LKW-Felge, sind gehärteter Stahl und daher auf massiv setzen. Dicke
+> Übersee-Container haben auch viel Masse, auch wenn es dünnes Blech ist. Drum
+> Stahl."
+
+Entschieden: **es bleibt bei zwei Fraktionen.** Eine dritte („Blechschrott")
+ist abgelehnt. Stahlschrott ist das Massive; alles andere geht zu Mischschrott,
+auch sortenreines Dünnblech.
 
 Blatt fürs Telefon: `docs/stahlschrott-2026-09-15.svg`, in der Planmappe unter
-`/v1/plaene/`. Bestandsaufnahme des heutigen Zustands: `docs/fraktionen.md`.
+`/v1/plaene/`. Bestandsaufnahme des Zustands davor: `docs/fraktionen.md`.
 
 ---
 
@@ -32,179 +38,211 @@ Blatt fürs Telefon: `docs/stahlschrott-2026-09-15.svg`, in der Planmappe unter
 > als Stahl. Eine Schraube, eine Dichtung, ein Schauglas stören nicht; ein
 > Kupferwickel, ein Reifen oder eine Kunststoffverkleidung schon.
 
-Das ist keine neue Erfindung, sondern die Zahl, nach der ein Platz wirklich
+Das ist keine Erfindung, sondern die Zahl, nach der ein Platz wirklich
 abrechnet: In der europäischen Sortenliste trennen **6 mm Wanddicke** den
-schweren Altschrott (Sorten E1/E3) vom Blechschrott. Genau diese Grenze meint
-Patrick, wenn er Bahnschwellen und Träger gegen einen Elektroherd stellt.
+schweren Altschrott (E1/E3) vom Blechschrott.
 
 **Die Gegenprobe, dass das Maß trifft:** Ein Elektroherd von 30 kg hat 3,03 m²
 Außenfläche — die Rechnung ergibt **1,3 mm**, und so dick ist Herdblech
 tatsächlich. Ein Doppel-T-Träger von 180 kg hat 3,40 m² — die Rechnung ergibt
-**6,7 mm**, und so dick ist der Steg eines IPE 280 tatsächlich. Die Formel rät
-nicht, sie trifft.
+**6,7 mm**, und so dick ist der Steg eines IPE 280 tatsächlich.
+
+Wo sie steht: `src/materials/purity.ts` (`wandstaerkeMm`, `WAND_AB_MM`,
+`VERBUND_BIS`, `fraktionVonTeil`). Angewendet beim Laden in
+`world/scrapItems.ts` und `world/objektkatalog.ts`.
 
 ---
 
 ## Die Merkmale, einzeln
 
-### M-1 · Massiv statt dünnwandig: rechnerische Wandstärke ≥ 6 mm
+### M-1 · Massiv statt dünnwandig: Wandstärke ≥ 6 mm
 
 ```
 Wandstärke  =  Masse  ÷  (7850 kg/m³ × Außenfläche)
 ```
 
-**Woher die Zahlen:** 7850 kg/m³ ist die Dichte von Stahl (Physik, keine
-Setzung). Die 6 mm sind die Grenze der europäischen Sortenliste zwischen
-Schwerschrott und Blechschrott — **Branchenwissen, im Projekt bisher nirgends
-belegt**; `docs/02_Briefing.md` Kap. 7 nennt Preise, keine Sortenliste. Im Code
-steht sie deshalb mit Vorbehalt: `WAND_AB_MM = 6` in `tools/stahlschrott.ts`.
+**Woher die Zahlen:** 7850 kg/m³ ist die Dichte von Stahl (Physik). Die 6 mm
+sind die Grenze der europäischen Sortenliste zwischen Schwerschrott und
+Blechschrott — **Branchenwissen, im Projekt sonst nirgends belegt**;
+`docs/02_Briefing.md` Kap. 7 nennt Preise, keine Sortenliste. Im Code steht
+sie mit diesem Vorbehalt.
 
-**Warum nicht die Schüttdichte (kg je m³ Hüllraum), die es seit E-033 gibt?**
-Weil sie große Stücke doppelt bestraft. Ein 20-Fuß-Seecontainer und ein
-Kühlschrank sind beide Blech über Luft; der Hohlraum wächst aber mit der dritten
-Potenz der Größe und das Blech nur mit der zweiten. Nach Hüllwichte liegt der
-Container bei 73 kg/m³ und ein Doppel-T-Träger bei 792 — dazwischen liegt aber
-auch der Radsatz einer Eisenbahn (516), der massiv ist, und das
-Traktor-Frontgewicht (457), das ein Gussklotz ist. Die Wandstärke rechnet den
-Größeneffekt heraus: Ein kleiner Klotz und ein großer Klotz werden gleich
-einsortiert. Genau das tut ein Schrottplatz auch.
+**Warum nicht die Schüttdichte (kg je m³ Hüllraum) aus E-033?** Weil sie große
+Stücke doppelt bestraft: Der Hohlraum wächst mit der dritten Potenz der Größe,
+das Blech nur mit der zweiten. Nach Hüllwichte liegt ein Seecontainer bei
+73 kg/m³ und ein Doppel-T-Träger bei 792 — dazwischen aber auch der Radsatz
+einer Eisenbahn (516), der massiv ist. Die Wandstärke rechnet den Größeneffekt
+heraus.
 
-**Was das Merkmal leistet:** Es ist das einzige, das ohne jede neue Eingabe
-funktioniert. Masse und Maße stehen an **allen** 308 Katalogeinträgen — die
-Stückliste dagegen nur an 58. Damit fällt der Grund weg, aus dem heute ein
-*Elektroherd* Stahlschrott und ein *Einbauherd mit Umluftofen* Mischschrott ist
-(`docs/fraktionen.md`, 1.1): Beide rechnen sich zu 1,3 bzw. 1,7 mm, beide sind
-Mischschrott.
+**Was das Merkmal leistet:** Es braucht keine neue Eingabe. Masse und Maß
+stehen an **allen 317** Katalogeinträgen, eine Stückliste nur an 56. Damit
+fällt der Grund weg, aus dem ein *Elektroherd* Stahlschrott und ein
+*Einbauherd mit Umluftofen* Mischschrott war (`docs/fraktionen.md`, 1.1):
+1,3 und 1,7 mm, beide Mischschrott.
 
 ### M-2 · Kein Verbund: höchstens 10 % Fremdstoff
 
-Heute steht die Schwelle bei 5 % (`SORTENREIN_AB = 0.95`, `purity.ts:110`).
-Vorschlag: **10 %** — also **weicher**, nicht schärfer.
+Vorher 5 % (`SORTENREIN_AB`, gilt weiter für Presspakete und für alle
+Nicht-Stahl-Fraktionen). Jetzt **10 %** für Stahl — also **weicher**.
 
-**Begründung:** „Natürlich hast du mal Tanks, wo dann noch was dran ist." Eine
-Regel, die an einer Dichtung scheitert, bildet den Platz falsch ab. Bei 5 %
-rutscht ein Baggerlöffel mit Gumminoppen (3 % Fremdes) gerade so durch, ein Tank
-mit Schauglas und Dichtungen (8 %) nicht mehr. Bei 10 % bleibt das Stück
-Premium, an dem noch etwas dranhängt, und der *Motorblock-Rest* (18 % Alu und
-Kupfer) fällt heraus — der ist wirklich Verbund.
+„Natürlich hast du mal Tanks, wo dann noch was dran ist." Eine Regel, die an
+einer Dichtung scheitert, bildet den Platz falsch ab. Die Regel wird trotzdem
+strenger, weil M-1 davor greift; dass die Verbundschwelle die Sortierung vorher
+**allein** trug, war der eigentliche Fehler — 250 von 317 Einträgen haben keine
+Stückliste.
 
-Die Regel wird trotzdem strenger, weil M-1 davor greift. Dass die
-Verbundschwelle die Sortierung heute **allein** trägt, ist der eigentliche
-Fehler: Sie kann es nicht, weil 250 von 308 Einträgen keine Stückliste haben.
+**Gemessen: die Lockerung allein ändert nichts.** Kein Eintrag hat einen
+Leitstoffanteil zwischen 90 % und 95 %.
 
-**Gemessen: die Lockerung ändert heute gar nichts.** Kein einziger Eintrag hat
-einen Leitstoffanteil zwischen 90 % und 95 %. Die 10 % sind eine Regel für
-künftige Einträge, keine Umsortierung.
+### M-3 · Die Massenschwelle — geprüft und verworfen
 
-### M-3 · Was ausdrücklich NICHT im Vorschlag steht
+Patricks Begründung für den Seecontainer war **nicht** „der ist dicker",
+sondern „viel Masse, obwohl dünnes Blech". Das ist eine andere Aussage, und die
+Frage war, ob daraus ein zweites Merkmal wird. **Antwort: nein.** Gerechnet
+(`npx vite-node tools/stahlschrott-liste.ts brocken`):
 
-Ich habe eine Liste „Bauarten, die nie Premium sind" (weiße Ware, Karosserie,
-Möbel, Kabine, Gitterrahmen) gebaut und wieder verworfen. **Sie war überflüssig:**
-Jedes einzelne Stück dieser Bauarten fällt schon an M-1 durch — Waschmaschine
-2,2 mm, Kleinwagen-Karosserie 3,6 mm, Kühlschrank 1,5 mm, Gitterbox 3,0 mm. Eine
-Regel, die man nicht braucht, gehört nicht ins Spiel; jede Handliste veraltet in
-dem Moment, in dem jemand einen Eintrag hinzufügt.
+| Rang | dünnwandig, stahlgeführt, kein Verbund | kg | Wand |
+|---:|---|---:|---:|
+| 1 | **Seecontainer 20 Fuß** | **2200** | 4,6 mm |
+| 2 | Ballenpresse (Rundballen) | 1900 | 5,9 mm |
+| 3 | Futtermischwagen-Behälter | 1700 | 5,7 mm |
+| 4 | Lagertank | 1400 | 5,5 mm |
+| 5 | Turmdrehkran-Ausleger | 1200 | 5,0 mm |
 
-Zweiter verworfener Gedanke: `bau` als Verbund-Kennzeichen zu lesen („eine
-*Maschine* ist immer eine Baugruppe"). Geht nicht, weil `bau` eine **Zeichenform**
-ist und keine Materialaussage: `bau: "motor"` trägt sowohl der Motorblock als
-auch das Traktor-Frontgewicht, das ein Gussklotz ohne bewegliches Teil ist.
+Der Seecontainer ist **das schwerste dünnwandige Stück ohne Verbund im ganzen
+Katalog**. Jede Schwelle zwischen 1901 und 2200 kg nimmt genau ein Stück mit:
+das, für das sie gemacht wurde. Das ist keine Regel, das ist eine Ausnahme mit
+einer Zahl davor.
+
+Und wer tiefer geht, zahlt drauf: Um den *Lagertank* mitzunehmen (1400 kg, ein
+nackter Stahlbehälter — vertretbar), muss man vorher die *Ballenpresse* (voller
+Gummibänder und Ketten) und den *Futtermischwagen-Behälter* (dünnes Trogblech)
+hereinlassen. **Zwei falsche für einen richtigen.**
+
+Drei weitere Gründe, warum die Masse als Merkmal nicht taugt:
+
+1. **Sie ist nicht maßstabsfrei.** Verdoppelt man einen Container in jeder
+   Kante, verachtfacht sich die Masse, die Wand bleibt gleich. Ein 40-Fuß-
+   Container wäre Premium, ein 10-Fuß-Container nicht — derselbe Gegenstand,
+   zwei Mulden. Genau diese Willkür sollte E-042 beseitigen.
+2. **Sie kann Brocken nicht von Stapeln unterscheiden.** Ein Stapel Blechtafeln
+   hat auch viel Masse. Dafür bräuchte der Katalog eine Stückzahl, die er nicht
+   hat.
+3. **Der Katalog kann sie heute gar nicht tragen.** Bei 250 Einträgen ohne
+   Stückliste ist „schwerer nackter Stahlkörper" von „schwere Maschine" nicht
+   zu trennen.
+
+**Also: Übersteuerung statt Regel** — offen, gezählt und begründet (unten).
+Ein Wächter hält den Befund fest (`test/stahlschrott.test.ts`): Kommt je ein
+schwereres dünnwandiges Stück dazu, wird er rot, und dann gehört die Frage neu
+gestellt.
+
+### M-4 · Was NICHT in der Regel steht
+
+Eine Handliste „Bauarten, die nie Premium sind" (weiße Ware, Karosserie, Möbel,
+Gitterrahmen) war gebaut und wurde verworfen: **überflüssig**, weil jedes Stück
+dieser Bauarten schon an M-1 durchfällt — Waschmaschine 2,2 mm,
+Kleinwagen-Karosserie 3,6 mm, Kühlschrank 1,5 mm, Gitterbox 3,0 mm. Ebenso
+verworfen: `bau` als Verbundkennzeichen. `bau` ist eine **Zeichenform**, keine
+Materialaussage — `bau: "motor"` trägt der Motorblock genauso wie das
+Traktor-Frontgewicht, ein Gussklotz ohne bewegliches Teil.
 
 ---
 
-## Was sich ändert — die Zahlen
+## Die acht Übersteuerungen, einzeln
 
-| Ausschnitt | Einträge | Stahlschrott heute | nach der Regel | wechseln |
+`massiv?: boolean` an `PileSpec`. Jede Setzung steht mit ihrer Begründung in
+derselben Zeile im Katalog. **Das ist der Ort für Produktwissen — nicht für
+Bequemlichkeit.** Ein Wächter hält die Zahl unter einem Zwanzigstel des
+Katalogs.
+
+| Stück | gerechnet | warum trotzdem massiv |
+|---|---:|---|
+| **LKW-Felge** | 5,6 mm | Patrick wörtlich: „gehärteter Stahl". Eine Stahlfelge vom Lkw ist 10–14 mm Scheibe. |
+| **Felgenstapel (Stahl)** | 5,0 mm | Dieselben Felgen, gestapelt. Wäre die eine Premium und der Stapel nicht, wäre die Regel Geschmackssache. |
+| **Seecontainer 20 Fuß** | 4,6 mm | Patrick wörtlich: „viel Masse, auch wenn es dünnes Blech ist". 2,2 t nackter Stahlkörper ohne Innenausbau, geht ungeschnitten in die Schere. Siehe M-3. |
+| **Baggerlöffel** | 4,7 mm | Verschleißblech 15–20 mm; die Katalogmasse (205 kg) ist zu klein für einen Löffel dieser Größe. |
+| **Radlader-Schaufel** | 4,6 mm | Dieselbe Bauweise, größer. |
+| **Frontlader-Schaufel** | 3,6 mm | Dieselbe Bauweise, kleiner. Die am weitesten von der Schwelle entfernte Setzung — hier bitte ausdrücklich hinsehen. |
+| **Pflugschar** | 4,5 mm | Die Schar ist gehärtetes Verschleißblech, sonst wäre sie nach einem Acker rund. |
+| **dickes Rohr** | 5,2 mm | Der Name sagt dick; die Wand eines 440-mm-Rohres ist 8–12 mm. Entweder die Übersteuerung oder eine größere Masse im Katalog. |
+
+**Zum Streichen, falls Patrick sie nicht will:** Frontlader-Schaufel (am
+weitesten entfernt), dickes Rohr (wäre auch über die Masse zu heilen).
+
+---
+
+## Neun neue Stücke — Patricks Beispiele gab es nicht
+
+Von seinen drei Premium-Beispielen war nur **Träger** im Katalog.
+**Bremsscheiben** fehlten ganz, **Bahnschwellen** gab es nur aus Beton und Holz.
+Dazu der Befund: Nach der Regel wären im Stahltopf der Kleinteile nur 19 Sorten
+geblieben, und jede sortenreine Stahlfuhre hätte dieselben Stücke gezeigt.
+
+| Stück | kg | Wand | woher die Zahl |
+|---|---:|---:|---|
+| Bremsscheibe (LKW) | 38 | 10,7 mm | 430 mm Durchmesser, belüftet |
+| Bremsscheiben (Palette) | 400 | 10,5 mm | rund zehn davon |
+| Bahnschwelle (Stahl, Y-Form) | 105 | 6,2 mm | Y-Stahlschwelle, 2,2 m |
+| Schienenabschnitt | 60 | 10,8 mm | Schiene S49, 49,4 kg/m, 1,2 m |
+| Kurbelwelle (LKW) | 90 | 14,0 mm | Sechszylinder, geschmiedet |
+| Großzahnrad | 85 | 15,4 mm | 560 mm Durchmesser, mit Nabe |
+| Amboss | 120 | 21,8 mm | Schmiedeamboss |
+| Stapler-Gegengewicht | 450 | 30,5 mm | Gussblock |
+| Grobblech-Zuschnitt (20 mm) | 150 | 8,8 mm | 7850 × 0,02 × 0,96 m³ = 151 kg |
+
+Das **Grobblech** ist mit Absicht dabei: gleiche Bauform (`platte`) und fast
+gleiches Maß wie das *Blech* (55 kg, 4,8 mm, Mischschrott) — nur dreimal so
+schwer, und deshalb in der anderen Mulde. Daran kann ein Spieler die Regel
+lernen, ohne dass sie ihm jemand erklärt.
+
+> **Rapier-Lehre am Rande.** Bremsscheibe und Großzahnrad standen zuerst mit
+> ihrem echten Reibring- bzw. Zahnbreitenmaß da (0,045 und 0,09 m). Der
+> Katapult-Wächter des Kippers ging sofort auf **146 km/h** (Schranke 140):
+> So dünne Achtkant-Kollider verhaken sich in der Ladung und werden
+> herausgeschossen. Mit dem Hüllmaß **0,12 m** — Topf und Nabe mitgerechnet,
+> und gleich `DUENN_M` aus `purity.ts` — war der Wert wieder in der Schranke.
+> **Runde Teile nicht dünner als 0,12 m.**
+
+---
+
+## Was sich geändert hat — die Zahlen
+
+| Ausschnitt | Einträge | Stahlschrott vorher | jetzt | wechseln |
 |---|---:|---:|---:|---:|
-| wie `docs/fraktionen.md` (nur exportierte Listen) | 271 | 139 | **48** | 91 |
-| vollständig (mit `BIG_SPECS`, `HUGE_SPECS`) | 308 | 156 | **56** | 100 |
+| wie `docs/fraktionen.md` (exportierte Listen) | 280 | 148 | **64** | 84 |
+| vollständig (mit `BIG_SPECS`, `HUGE_SPECS`) | 317 | 165 | **73** | 92 |
 
-> **Nebenbefund:** Die „271 erreichbaren Einträge" aus `docs/fraktionen.md` sind
-> nicht der ganze Katalog. `BIG_SPECS` und `HUGE_SPECS` in `scrapItems.ts:685`
-> und `:703` sind **nicht exportiert** — und genau dort stehen Patricks
-> Premium-Beispiele (Doppel-T-Träger, Maschinenblock, Schwungrad). Wer nur die
-> Exporte liest, misst am Interessantesten vorbei. `tools/stahlschrott.ts` liest
-> die beiden Listen deshalb aus dem Quelltext.
+Aufgeschlüsselt: 65 Stücke holt die Regel über die Wandstärke, 8 kommen über
+die Übersteuerung; 92 fallen als dünnwandig heraus, 44 als Verbund, 108 sind
+gar kein Stahl. **Alle 92 Wechsel gehen Richtung Mischschrott** — kein Eintrag
+wandert in die Gegenrichtung.
 
-**Alle 100 Wechsel gehen in dieselbe Richtung: Stahlschrott → Mischschrott.**
-Kein einziger Eintrag wandert in die Gegenrichtung.
+In Masse: **85,5 t → 54,5 t** Stahlschrott über den ganzen Katalog.
 
-### Was Stahlschrott bleibt — alle 56, nach Wandstärke
+> **Nebenbefund:** Die „271 erreichbaren Einträge" aus `docs/fraktionen.md`
+> waren nicht der ganze Katalog. `BIG_SPECS` und `HUGE_SPECS` in
+> `scrapItems.ts` sind **nicht exportiert** — und dort stehen Patricks
+> Premium-Beispiele (Doppel-T-Träger, Maschinenblock, Schwungrad).
+> `tools/stahlschrott.ts` liest deshalb alle sechs Listen aus dem Quelltext.
 
-| mm | Stück | | mm | Stück |
-|---:|---|---|---:|---|
-| 22,7 | Kettenlaufwerk | | 8,5 | Turbinengehäuse |
-| 18,2 | Häcksler-Trommel | | 8,5 | Rohr |
-| 17,8 | Vibrationswalze (Bandage) | | 8,5 | CNC-Fräsmaschine |
-| 16,5 | Waggon-Drehgestell | | 8,4 | Kachelofen-Einsatz |
-| 16,2 | Aufzugs-Gegengewicht | | 8,3 | Güterwaggon-Boden |
-| 15,3 | U-Bahn-Drehgestell | | 8,3 | Schul-Heizkesselanlage |
-| 13,3 | Eisenbahn-Puffer (Paar) | | 8,2 | Gusseiserner Badeofen |
-| 13,1 | Pressenrahmen | | 7,9 | Traktor-Hinterachse |
-| 12,5 | Raupenlaufwerk-Ketten (Bund) | | 7,9 | Kreiselegge |
-| 12,4 | Maschinenblock | | 7,9 | Prellbock |
-| 12,1 | Drehmaschine mit Bett | | 7,7 | Dampfkessel |
-| 12,1 | Futtermischwagen-Mischschnecke | | 7,5 | Schrottschere-Abschnitte |
-| 11,9 | Radsatz (Eisenbahn) | | 7,5 | Flugzeug-Fahrwerksbein |
-| 11,7 | Poller | | 7,5 | Betonmischer-Trommel |
-| 11,3 | LKW-Achse | | 7,4 | Sattelauflieger-Chassis |
-| 10,8 | Heizkörper (früher Guss) | | 7,4 | Güllefass |
-| 10,4 | Stahlquader (namenlos) | | 7,3 | Kesselwagen-Kessel |
-| 10,1 | Großgetriebe (Industrie) | | 7,3 | Mähdrescher-Schneidwerk |
-| 9,7 | Stahlquader (namenlos) | | 7,2 | Weichenzunge |
-| 9,3 | Profilstahl | | 7,1 | Kesselwagen-Segment |
-| 9,1 | Metallpaket (gepresst) | | 7,0 | Güllefass-Pumpwerk |
-| 9,1 | Presskammerwalzen (Bund) | | 6,9 | Hinterachse mit Differenzial |
-| 9,0 | Mähdrescher-Dreschtrommel | | 6,9 | Rolltreppen-Segment |
-| 9,0 | Spritzgussmaschine | | 6,9 | Traktor-Vorderachse |
-| 8,8 | Rotorkopf | | 6,8 | Schwungrad |
-| 8,6 | Förderband-Antriebsstation | | 6,7 | Doppel-T-Träger |
-| | | | 6,7 | Schienenbündel |
-| | | | 6,3 | Tankstellen-Erdtank |
-| | | | 6,2 | Traktor-Frontgewicht |
-| | | | 6,2 | Scheibenegge |
+### Die auffälligsten Wechsel
 
-Patricks drei Beispiele stehen alle darin: **Träger** (Doppel-T-Träger 6,7 mm,
-Profilstahl 9,3 mm), **Bahn** (Schienenbündel 6,7 mm, Radsatz 11,9 mm,
-Eisenbahn-Puffer 13,3 mm, Weichenzunge 7,2 mm). **Bremsscheiben gibt es im
-Katalog nicht** — dazu unten unter „Was fehlt".
+*Blech* 4,8 · *Blechtafel* 4,5 · *Gitterbox* 3,0 · *Gitterbox-Stapel* 4,6 ·
+*Stahltür/Tor* 4,9 · *Stahlschrank* 4,4 · *Badewanne* 1,3 · *Elektroherd* 1,3 ·
+*Warmwasserspeicher* 2,2 · *Kessel* 3,4 · *Öltank/Boiler* 2,4 ·
+*Schuttcontainer (Absetzmulde)* 2,4 · *Kipper-Mulde* 2,7 · *Silo-Blechsegment*
+2,0 · *Motorradrahmen* 0,5 · *Mopedrahmen* 0,4 · *Doppelbett-Gestell* 0,6 ·
+*Drahtballen* 1,1 · *Industrie-Rolltor* 2,3 · *Palettenregal-Traversen (Bund)*
+5,8 · *Stahlstützen-Bund* 5,6 · *Lagertank* 5,5 · *LKW-Kühler* 5,5 ·
+*Oberleitungsmast* 4,6 · *LKW-Getriebe* 4,3 · *Hallenkran-Laufkatze* 4,6.
 
-### Was wechselt — die 100, nach Gruppen
-
-**Knapp darunter (5,0 bis 6,0 mm) — die strittigen 23.** Hier entscheidet die
-Schwelle, nicht der Augenschein. Wer eine davon anders haben will, muss nur
-sagen welche:
-
-Miststreuer-Streuwerk 6,0 · Ballenpresse (Rundballen) 5,9 ·
-Parkhaus-Schrankenanlage 5,8 · Häcksler-Auswurfkrümmer 5,8 ·
-Palettenregal-Traversen (Bund) 5,8 · Futtermischwagen-Behälter 5,7 · Grubber mit
-Zinkenfeld 5,6 · Stahlstützen-Bund 5,6 · LKW-Felge 5,6 · Lagertank 5,5 ·
-LKW-Kühler 5,5 · Ruderblatt 5,5 · Betonfertigteil-Wand 5,4 · Maispflücker-Vorsatz
-5,3 · Autotransporter-Rampen 5,3 · Exzenterpresse 5,3 · dickes Rohr 5,2 ·
-Mähwerk-Scheibenbalken 5,2 · Reachstacker-Spreader 5,1 · Felgenstapel (Stahl) 5,0
-· Schiebewand-Waggon-Seitenteil 5,0 · Turmdrehkran-Ausleger 5,0 · LKW-Fahrerhaus
-5,0
-
-**Eindeutig Blech (unter 5,0 mm) — die anderen 77.** Die auffälligsten, weil sie
-heute Stahlschrott sind und jeder sie für Blech hält:
-
-*Blech* 4,8 · *Blechtafel* 4,5 · *Seecontainer 20 Fuß* 4,6 · *Gitterbox* 3,0 ·
-*Gitterbox-Stapel* 4,6 · *Baggerlöffel* 4,7 · *Stahltür/Tor* 4,9 · *Stahlschrank*
-4,4 · *Badewanne* 1,3 · *Elektroherd* 1,3 · *Warmwasserspeicher*
-2,2 · *Silo-Blechsegment* 2,0 · *Kessel* 3,4 · *Öltank/Boiler* 2,4 ·
-*Schuttcontainer (Absetzmulde)* 2,4 · *Kipper-Mulde* 2,7 · *Bootsrumpf (Stahl)*
-2,6 · *Motorradrahmen* 0,5 · *Mopedrahmen* 0,4 · *Doppelbett-Gestell* 0,6 ·
-*Drahtballen* 1,1 · *Industrie-Rolltor* 2,3 · *Absperrgitter (Bund)* 2,7 ·
-*Bauzaun-Felder (Stapel)* 3,3 · *Pflugschar* 4,5 · *Frontlader-Schaufel* 3,6 ·
-*Radlader-Schaufel* 4,6 · *LKW-Getriebe* 4,3 · *Hallenkran-Laufkatze* 4,6 ·
-*Oberleitungsmast* 4,6 · *Signalmast mit Schirm* 2,8 · *Ankerkette (Haufen)* 4,2 ·
-*Stockanker* 4,6
-
-Die vollständige Liste, Zeile für Zeile mit Masse, Maß und Grund:
+Vollständig:
 
 ```
-npx vite-node tools/stahlschrott-liste.ts md > /tmp/liste.md
-npx vite-node tools/stahlschrott-liste.ts graubereich
+npx vite-node tools/stahlschrott-liste.ts md          # jede Zeile als Tabelle
+npx vite-node tools/stahlschrott-liste.ts graubereich # was von Hand zu prüfen ist
+npx vite-node tools/stahlschrott-liste.ts brocken     # die Massenschwelle-Frage
 ```
 
 ---
@@ -213,181 +251,170 @@ npx vite-node tools/stahlschrott-liste.ts graubereich
 
 > **Mischschrott. Die Zahl ist 3,0 mm.**
 
-Die Gitterbox im Katalog (`objektkatalog.ts`, 120 kg, 1,20 × 0,80 × 0,80 m) hat
-**5,12 m² Außenfläche**. 120 kg Stahl darüber verteilt ergeben eine Wand von
-**3,0 mm** — die halbe Schwelle. Der *Gitterbox-Stapel* (470 kg, 1,25 × 2,60 ×
-0,85 m, 13,06 m²) kommt auf **4,6 mm** und liegt ebenfalls darunter.
+120 kg auf **5,12 m² Außenfläche** — die halbe Schwelle. Der *Gitterbox-Stapel*
+(470 kg, 13,04 m²) kommt auf **4,6 mm** und liegt ebenfalls darunter.
 
-Fachlich ist das richtig, und zwar aus genau dem Grund, den Patrick selbst nennt:
-Eine Gitterbox ist ein **Rahmen mit Luft dazwischen**. Sie besteht aus dünnem
-Draht und kaltgeformtem Blech, nicht aus Vollmaterial; in der Sortenliste läuft
-so etwas als leichter Altschrott, nicht als E1/E3. „Mischschrott heißt ja eben,
-dass da halt was gemischt ist" — hier ist Stahl mit Luft gemischt, und der Preis
-je Kubikmeter Ladefläche ist genau deshalb der von Mischschrott.
+Fachlich richtig, und zwar aus genau Patricks Grund: Eine Gitterbox ist ein
+**Rahmen mit Luft dazwischen**, dünner Draht und kaltgeformtes Blech. „Misch-
+schrott heißt ja eben, dass da halt was gemischt ist" — hier ist Stahl mit Luft
+gemischt.
 
 ---
 
 ## Was es an Umschlag und Verdienst verschiebt
 
-**Kurz: fast nichts. Zwischen +1 % und +4 % — nach oben.**
-
-Der Grund ist eine Eigenheit, die man kennen muss: `randomCargo`
+**Kurz: zwischen −0 % und +2 %.** Der Grund: `randomCargo`
 (`scrapItems.ts:788-800`) würfelt **zuerst die Fraktion** — 42 % Stahl, 22 %
-Misch, 16 % Alu, Rest verteilt — und sucht sich **dann** ein passendes Stück.
-Die Umsortierung ändert also nicht, wie oft Stahlschrott kommt. Sie ändert nur,
-**welche Stücke** im Stahltopf liegen. Und weil die dünnen herausfallen, sind
-die verbliebenen im Mittel schwerer.
+Misch, 16 % Alu, Rest verteilt — und sucht **dann** ein passendes Stück. Die
+Umsortierung ändert nicht, wie oft Stahlschrott kommt, sondern nur, welche
+Stücke im Stahltopf liegen.
 
 Gerechnet mit `tools/stahlschrott-wirkung.ts`, Reinheit 1, Preise aus
-`catalog.ts` (Stahl 250 €/t, Misch 160 €/t) und Ankauf 160 €/t
-(`account.ts:16`):
+`catalog.ts` (Stahl 250 €/t, Misch 160 €/t), Ankauf 160 €/t (`account.ts:16`):
 
-| Ladungsliste | ø kg heute | ø € heute | ø kg neu | ø € neu | Verdienst |
+| Ladungsliste | ø kg vorher | ø € vorher | ø kg jetzt | ø € jetzt | Verdienst |
 |---|---:|---:|---:|---:|---:|
-| Kleinteile (`SPECS`) | 95 | 31,18 | 109 | 32,28 | **+4 %** |
-| Großteile (`BIG_SPECS` + `KATALOG_BIG`) | 316 | 71,97 | 336 | 72,67 | **+1 %** |
-| Schwergewichte (`HUGE_SPECS` + `KATALOG_HUGE`) | 1473 | 239,48 | 1513 | 243,37 | **+2 %** |
+| Kleinteile (`SPECS`) | 94 | 31,05 | 101 | 31,57 | **+2 %** |
+| Großteile (`BIG_SPECS`) | 317 | 71,99 | 328 | 71,81 | **−0 %** |
+| Schwergewichte (`HUGE_SPECS`) | 1473 | 239,48 | 1516 | 244,53 | **+2 %** |
 
-Sollte die Fraktionsverteilung der Anlieferungen jemals aus dem Katalog statt aus
-dieser festen Tabelle kommen, kehrt sich das um: Dann fiele der Stahlanteil von
-73 % auf 26 % der Sorten, und der Verdienst mit ihm. **Wer die Tabelle in
-`randomCargo` anfasst, muss diese Rechnung erneut machen.**
+**Wer die Mischtabelle in `randomCargo` anfasst, muss diese Rechnung erneut
+machen.** Käme die Verteilung aus dem Katalog statt aus der festen Tabelle,
+fiele der Stahlanteil von 74 % auf 33 % der Sorten — und der Verdienst mit ihm.
 
-### Die beiden Halden am Bagger — nur gemeldet, nicht umgebaut
+### Die beiden Halden am Bagger — gemeldet, nicht umgebaut
 
 | | STAHLSCHROTT | MISCHSCHROTT |
 |---|---:|---:|
-| Sorten heute | 156 | 57 |
-| Sorten neu | **56** | **157** |
-| Zulauf heute, je 100 Kleinteile | 5093 kg | 2241 kg |
-| Zulauf neu, je 100 Kleinteile | **6388 kg** | 2327 kg |
+| Sorten vorher | 165 | 57 |
+| Sorten jetzt | **73** | **149** |
+| Zulauf vorher, je 100 Kleinteile | 4973 kg | 2241 kg |
+| Zulauf jetzt, je 100 Kleinteile | **5606 kg** | 2312 kg |
 
-Zwei Befunde:
+**Die Stahlhalde wird voller, nicht leerer**: 2,22 : 1 → **2,42 : 1**, weil die
+verbliebenen Stahlstücke schwerer sind. Beide Halden sind baugleich (6,8 × 6,0 m,
+`containers.ts:242`/`:257`). Wenn eine zu klein wird, ist es die Stahlhalde.
+**Empfehlung: erst am Gerät beobachten.**
 
-1. **Die Stahlhalde wird voller, nicht leerer.** Das Verhältnis der Massen
-   verschiebt sich von 2,27 : 1 auf **2,75 : 1**, weil die verbliebenen
-   Stahlstücke schwerer sind. Beide Halden sind heute baugleich (6,8 × 6,0 m,
-   `containers.ts:242` und `:257`). Wenn eine zu klein wird, ist es die
-   Stahlhalde. **Empfehlung: erst am Gerät beobachten, dann entscheiden.**
-2. **Die Vielfalt im Stahltopf schrumpft stark.** Bei den Kleinteilen bleiben
-   von 63 Stahlsorten noch **19**. Wer eine sortenreine Stahlfuhre bestellt,
-   sieht dieselben neunzehn Stücke immer wieder. Das ist kein Fehler der Regel,
-   sondern ein Hinweis: Dem Katalog fehlen kleine massive Stahlteile — Achsen,
-   Wellen, Zahnkränze, Bremsscheiben, Kettenglieder, Schwellenplatten.
+### Was der Spieler sonst merkt
+
+* **Weniger, größere Stücke je Fuhre.** Die Ladefläche ist volumenbegrenzt
+  (`vehicles.ts`, `packeLadung`); der Stahltopf besteht jetzt aus den massiven
+  Brocken. Gemessen am Bezugsfall des Kipper-Wächters: **9 → 8 Stücke**.
+  Nebenwirkung: ein Physikkörper weniger je Fuhre.
+* **Kleinteil-Vielfalt im Stahl:** 70 → **30** Sorten (ohne die neun neuen
+  Stücke wären es 21 gewesen).
+
+---
+
+## Aluminium ist grau geworden
+
+Patrick am selben Tag: „Aluminium ist in den meisten Fällen grau."
+
+**Zuerst die Gegenfrage: Sieht er die Fraktionsfarbe überhaupt?** Gemessen mit
+`tools/alufarbe.ts`: Von 30 Alu-Einträgen tragen **drei** die Fraktionsfarbe —
+Felge (12 kg), Profil (8 kg) und ein namenloser Zylinder (11 kg). Die anderen
+27 werden in `objektbau.ts` nach Zweck gefärbt, und die flächigsten davon (drei
+`fensterflaeche` — Duschkabine, Wohnwagen-Wandelement) trugen exakt
+`ALU = 0xa8adb2`.
+
+**Also beides geändert**, auf denselben Ton `0x928d85` — mattes, warmes
+Mittelgrau statt hellem Blauweiß:
+
+| Paar | vorher | jetzt | Mittag | Abend | Flutlicht | warum es zählt |
+|---|---:|---:|---:|---:|---:|---|
+| alu ↔ **va** | **6,98** | **24,63** | 23,65 | 17,53 | 23,73 | verschiedene Silos (ALU-/VA-LAGER) |
+| alu ↔ zinc | 10,23 | 12,25 | 11,11 | 4,93 | 10,32 | teilen sich jeden Behälter |
+| alu ↔ mixed | 37,90 | 20,25 | 19,29 | 9,74 | 15,30 | bleibt klar getrennt |
+| alu ↔ steel | 37,88 | 20,44 | 19,38 | 8,40 | 15,76 | bleibt klar getrennt |
+| zinc ↔ va | 16,57 | 16,57 | 16,93 | 14,50 | 16,87 | unverändert |
+
+Die **6,98** waren der eigentliche Fehler: Unter ΔE 10 ist es dieselbe Farbe,
+und bei Abendsonne lagen Alu und Edelstahl bei **6,54**. Dass Alu dafür näher
+an Zink rückt (bei Abendsonne 4,93), kostet nichts: ALU-LAGER nimmt Zink mit,
+die beiden müssen nie getrennt werden. **Diese Reihenfolge ist kein
+Kompromiss, sondern die richtige Priorität.**
+
+`CHROM = 0xc2c7cb` bleibt hell — Verchromtes ist hell, das war nie der Befund.
+
+> **Messfehler, der dabei auffiel:** Die erste Messung gab für jedes gebaute
+> Teil fast Schwarz (`#1d1510` statt `#a8adb2`). Grund: `THREE.Color.set(hex)`
+> rechnet seit three r152 nach Linear-sRGB um; wer die Vertexfarbe ohne
+> Rückrechnung als Byte liest, misst das Quadrat. Steht jetzt als Warnung in
+> `tools/alufarbe.ts`.
 
 ---
 
 ## Erkennbarkeit: woran man die Fraktion sehen soll
 
-Patrick: „Das muss schon irgendwie ersichtlich werden." Gemessen wurde am
-15.09.2026 (`docs/fraktionen.md`, 2.3): Elektroherd gegen Waschmaschine
-**ΔE 0,18**, Seecontainer gegen Baustellencontainer **ΔE 0,00** — und zwei Teile
-derselben Mulde bis **29,8** auseinander. Die Farbe trägt heute die gegenteilige
-Information.
+Gemessen am 15.09.2026 (`docs/fraktionen.md`, 2.3): Elektroherd gegen
+Waschmaschine **ΔE 0,18**, Seecontainer gegen Baustellencontainer **ΔE 0,00** —
+und zwei Teile derselben Mulde bis **29,8** auseinander.
 
-**Der größte Gewinn dieser Regel ist, dass sie überhaupt sichtbar ist.** Die
-heutige Regel ist per Bauart unsichtbar: Ob eine Stückliste eingetragen wurde,
-sieht man einem Stück nicht an. Die neue Regel dagegen ist eine Aussage über
-**Form und Gewicht** — und beides ist im Bild. Ein Klotz sieht aus wie ein Klotz.
+**Der größte Gewinn dieser Regel ist, dass sie sichtbar ist.** Die alte Regel
+war per Bauart unsichtbar: Ob eine Stückliste eingetragen wurde, sieht man
+einem Stück nicht an. Die neue ist eine Aussage über **Form und Gewicht**, und
+beides ist im Bild.
 
-Deshalb der Vorschlag, in dieser Reihenfolge:
+1. **Erster Kanal: die Form selbst.** Elektroherd und Waschmaschine (ΔE 0,18)
+   liegen jetzt in **derselben** Mulde. Nichts zu bauen — der Widerspruch löst
+   sich auf.
+2. **Zweiter Kanal: die Zahl im Griff-Info-HUD.** `6,7 mm · massiv →
+   STAHLSCHROTT` bzw. `3,0 mm · Blech → MISCHSCHROTT`. Eine Zahl lehrt die
+   Regel, eine Farbe nie. *(Paket `ui`, klein. Empfehlung als nächstes.)*
+3. **Dritter Kanal: der Sortierblick** (V-3a aus `docs/fraktionen.md`).
+4. **Vierter Kanal: die beiden Halden** (V-4) — gepinselte Großbuchstaben auf
+   der Trennsteinmauer, weil das Schild unter 4,5 m Kameraabstand ausgeblendet
+   wird.
 
-1. **Erster Kanal: die Form selbst.** Nichts bauen — nur nicht mehr dagegen
-   arbeiten. Die beiden Paare, die heute identisch aussehen und in verschiedene
-   Mulden gehören (Seecontainer/Baustellencontainer, Elektroherd/Waschmaschine),
-   **landen nach der Regel in derselben Mulde**. Der Widerspruch löst sich von
-   allein auf. Das ist der eigentliche Grund, diese Regel zu nehmen.
-2. **Zweiter Kanal: die Zahl im Griff-Info-HUD.** Wenn die Spinne ein Stück
-   hält, steht dort heute Name, Masse und €-Indikator (Briefing Kap. 14).
-   Vorschlag: eine Zeile mehr — `6,7 mm · massiv → STAHLSCHROTT` bzw.
-   `3,0 mm · Blech → MISCHSCHROTT`. Eine Zahl lehrt die Regel, eine Farbe nie.
-   Nach drei Fuhren weiß der Spieler, wonach er greift. *(Paket `ui`, klein.)*
-3. **Dritter Kanal: der Sortierblick** (V-3a aus `docs/fraktionen.md`) — eine
-   zuschaltbare Ansicht, in der alle losen Teile in Fraktionsfarbe leuchten.
-   Ein Materialtausch, kein Eingriff in die Geometrie. Das schont die
-   Entscheidung „Farbe nach Zweck" vom 12.09.2026 vollständig, weil sie im
-   Normalbild weiter gilt.
-4. **Vierter Kanal: die beiden Halden auseinanderhalten** (V-4 aus
-   `docs/fraktionen.md`). Heute trägt das Schild alles — und wird unter 4,5 m
-   Kameraabstand ausgeblendet, also genau dann, wenn man davorsteht. Gepinselte
-   Großbuchstaben auf der Trennsteinmauer, auf Augenhöhe der abgesenkten Kabine.
+### Eine Verschlechterung, die dabei entsteht — offen gemeldet
 
-**Was ich nicht vorschlage:** Farbe als einzigen Kanal (Briefing Kap. 20 verbietet
-es), Bodeneinfärbung (Patrick hat sie am 12.09.2026 abgelehnt), und eine
-Umfärbung der Teile nach Fraktion (widerspricht „Farbe nach Zweck", `objektbau.ts:22`).
+**Seecontainer (jetzt Stahlschrott) und Baustellencontainer (Mischschrott)
+haben ΔE 0,00.** Beide sind `[2,4 × 2,6 × 4,8]`, also gleicher Maß-Hashwert,
+also gleicher Lackton (`objektbau.ts:188`) — und sie gehen ab jetzt in
+verschiedene Mulden. Vorher taten sie das auch, aber mit vertauschten Rollen.
+
+Der kleinste Weg dahin: den **Baustellencontainer auf 3 m kürzen** (`[2,4, 2,6,
+3,0]`, rund 1200 kg). Das ist die zweite gängige Baugröße, es ändert den Hash
+und damit die Farbe, und an der Fraktion ändert es nichts (3,6 mm, weiterhin
+Verbund). **Gestalterische Entscheidung — nicht ohne Patrick gemacht.**
 
 ---
 
 ## Was die Regel NICHT entscheiden kann
 
-Hier fehlt dem Katalog eine Angabe. Ich habe keine Werte erfunden.
-
 ### L-1 · Die Wandstärke ist gerechnet, nicht gemessen
 
-Die Formel erbt jeden Fehler in Masse und Maß. Wo eine Masse aus Spielgründen
-kleiner gesetzt wurde, als das Stück in Wirklichkeit wiegt, rutscht es unter die
-Schwelle. Betroffen und von Hand zu prüfen:
+Sie erbt jeden Fehler in Masse und Maß. Acht Fälle sind mit `massiv`
+übersteuert (oben). Weitere Kandidaten, heute **nicht** gesetzt:
 
-* **Baggerlöffel 4,7 mm.** Ein echter Löffel ist 15 bis 20 mm Verschleißblech.
-  Der Katalogeintrag ist zu leicht.
-* **LKW-Felge 5,6 mm.** Eine Stahlfelge vom Lkw wiegt real 40 bis 60 kg und ist
-  gutes Material. Hier ist es knapp.
-* **Schwungrad 6,8 mm.** Kommt gerade so durch — ein echtes Schwungrad wäre
+* **Schwungrad 6,8 mm** — kommt gerade so durch; ein echtes Schwungrad wäre
   Vollmaterial und läge bei 100 mm. Der Eintrag wiegt 300 kg, wo 8000 stünden.
-* **„dickes Rohr" 5,2 mm.** Der Name sagt dick, die Zahl sagt Blech.
-
-**Kleinstmögliche Ergänzung:** ein einzelnes optionales Feld an `PileSpec` —
-`massiv?: boolean` — als Übersteuerung, gesetzt nur dort, wo Rechnung und
-Augenschein auseinandergehen. Das sind heute **rund zehn Einträge**, nicht 271.
-Wer es setzt, schreibt eine Begründung daneben; wer es nicht setzt, bekommt die
-Rechnung. Ein Feld `wandstaerkeMm` für alle 308 Einträge wäre dagegen 308 neue
-erfundene Zahlen — davon rate ich ab.
+* **Stahltür/Tor 4,9 mm** und **Palettenregal-Traversen 5,8 mm** — die Regel
+  hat hier **recht**: Regaltraversen sind 2-mm-Kaltprofil, also Blechschrott.
+  Sie sehen nur nach Träger aus.
 
 ### L-2 · Bündel und Stapel: die Regel misst das Bündel, nicht das Stück
 
-Ein Bund Schienen ist in Wirklichkeit E1, auch wenn zwischen den Schienen Luft
-ist. Die Regel sieht nur die Hülle. Betroffen: *Palettenregal-Traversen (Bund)*
-5,8 · *Stahlstützen-Bund* 5,6 · *Felgenstapel* 5,0 · *Absperrgitter (Bund)* 2,7 ·
-*Bauzaun-Felder (Stapel)* 3,3.
+Ein Bund Schienen ist real E1, auch wenn Luft dazwischen ist. Betroffen:
+*Stahlstützen-Bund* 5,6 · *Absperrgitter (Bund)* 2,7 · *Bauzaun-Felder
+(Stapel)* 3,3. Fehlende Angabe: **wie viele Stücke im Bund liegen.**
+**Empfehlung: nicht bauen** — Einzelfälle über `massiv` sind billiger.
 
-Bei den Regalteilen ist das Ergebnis **zufällig richtig** (Regaltraversen und
--stützen sind kaltgeformtes 2-mm-Blech, also tatsächlich Blechschrott), beim
-Schienenbündel geht es gerade noch gut (6,7 mm). Verlassen kann man sich darauf
-nicht. Fehlende Angabe: **wie viele Stücke im Bund liegen.** Vorschlag, falls es
-je gebraucht wird: `stueckzahl?: number`; die Regel würde dann die Hülle durch
-die Stückzahl teilen. **Empfehlung: vorerst nicht bauen** — die fünf Fälle von
-Hand über `massiv?` zu klären ist billiger.
+### L-3 · Guss ist im Spiel kein eigener Stoff
 
-### L-3 · Guss ist im Spiel kein eigener Stoff mehr
+`catalog.ts:72` bildet `cast` auf `steel` ab. Bremsscheiben, Motorblöcke,
+Badeöfen sind Guss und wären real eine eigene, gut bezahlte Sorte. Solange es
+bei zwei Fraktionen bleibt, ist das keine Regelfrage.
 
-Bremsscheiben, Motorblöcke, Heizkörper, Badeöfen sind **Guss**, und Guss ist auf
-einem echten Platz eine eigene, gut bezahlte Sorte. `catalog.ts:72` bildet
-`cast` seit jeher auf `steel` ab. Die Regel kann Guss von Stahl nicht
-unterscheiden und muss es nicht — solange es bei zwei Fraktionen bleibt. Nur:
-Sollte je eine Sorte „Guss" dazukommen, ist das eine Fraktionsentscheidung, keine
-Regelfrage.
+### L-4 · Fünf Maschinen ohne Stückliste rutschen als Premium durch
 
-### L-4 · Patricks eigene Beispiele fehlen im Katalog
-
-* **Bremsscheibe** — gibt es nicht. Das Musterstück für „Premium" ist nicht
-  spielbar.
-* **Bahnschwelle aus Stahl** — es gibt nur *Bahnschwellen (Betonstapel)* und
-  *Bahnschwellen (Holzstapel)*, beide in anderen Fraktionen.
-
-**Kleinstmögliche Ergänzung:** zwei bis vier Datensätze im Katalog, keine Zeile
-Code (Regel 3 des Rollenauftrags: „ein neues Fahrzeug ist ein neuer Datensatz").
-Zusammen mit dem Befund aus dem Halden-Abschnitt (19 kleine Stahlsorten
-verbleiben) wäre eine kleine Serie massiver Kleinteile das sinnvollste
-Folgepaket.
-
-### L-5 · Maschinen ohne Stückliste rutschen als Premium durch
-
-*Spritzgussmaschine* 9,0 · *CNC-Fräsmaschine* 8,5 · *Drehmaschine mit Bett* 12,1
-· *Förderband-Antriebsstation* 8,6 · *Schul-Heizkesselanlage* 8,3. Das sind
-Baugruppen mit Motor, Kabel und Hydraulik; nach Wandstärke sind sie Klötze, weil
-das Gussbett schwer ist. Fachlich ist das vertretbar (ein Maschinenbett **ist**
-gutes Material), sauber wäre es mit einer Stückliste an diesen fünf Einträgen.
-**Empfehlung: Stückliste eintragen, nicht die Regel verbiegen.**
+*Spritzgussmaschine* 9,0 · *CNC-Fräsmaschine* 8,5 · *Drehmaschine mit Bett*
+12,1 · *Förderband-Antriebsstation* 8,6 · *Schul-Heizkesselanlage* 8,3. Nach
+Wandstärke sind das Klötze, weil das Gussbett schwer ist — fachlich
+vertretbar (ein Maschinenbett **ist** gutes Material), sauber wäre eine
+Stückliste an diesen fünf. **Bewusst nicht mitgemacht**, weil es fünf weitere
+Stücke ohne Patricks Auftrag umsortiert hätte.
 
 ---
 
@@ -395,27 +422,10 @@ gutes Material), sauber wäre es mit einer Stückliste an diesen fünf Einträge
 
 | Datei | Was sie tut |
 |---|---|
-| `tools/stahlschrott.ts` | Die Regel als reine Funktion, plus der vollständige Katalog (auch die nicht exportierten Listen). |
-| `tools/stahlschrott-liste.ts` | Die Einsortierung. `alle` = jede Zeile, `md` = Markdown-Tabelle, `graubereich` = was von Hand zu prüfen ist, `271` = Vergleich mit `docs/fraktionen.md`. |
-| `tools/stahlschrott-wirkung.ts` | Was es an Umschlag und Verdienst verschiebt. |
-| `tools/stahlschrott-blatt.ts` | Das Blatt fürs Telefon. Schreiben mit `tools/stahlschrott-blatt-schreiben.ts`. |
-| `test/stahlschrott.test.ts` | 15 Wächter: die Formel, Patricks Beispiele, die Gitterbox, die beiden aufgelösten Widersprüche. |
-
-Der Umbau später muss die Einsortierung nicht abschreiben — er ruft
-`urteile(spec)` auf. Wenn die Regel nach `src/materials/` zieht, geht der
-Katalog-Leser aus `tools/stahlschrott.ts` nicht mit: Der liest den Quelltext und
-gehört ins Werkzeug, nicht ins Spiel.
-
----
-
-## Empfehlung fürs nächste Paket
-
-1. `WAND_AB_MM`, `VERBUND_BIS` und `wandstaerkeMm` nach `src/materials/purity.ts`
-   holen, `fraktionAus` um die Maßangaben erweitern. Die Wächter aus
-   `test/stahlschrott.test.ts` ziehen mit.
-2. Die zehn Einträge aus L-1 mit `massiv?` versehen — mit Begründung je Zeile.
-3. Die fünf Maschinen aus L-5 mit Stückliste versehen.
-4. Erst danach an die Erkennbarkeit (die HUD-Zeile aus Vorschlag 2).
-
-**Nicht** im selben Paket: die Halden umbauen. Erst am Gerät sehen, ob die
-Stahlhalde wirklich überläuft.
+| `src/materials/purity.ts` | **Die Regel selbst.** `wandstaerkeMm`, `aussenflaeche`, `WAND_AB_MM`, `VERBUND_BIS`, `fraktionVonTeil`. |
+| `tools/stahlschrott.ts` | Ruft die Regel auf und stellt sie der alten gegenüber; liest alle sechs Kataloglisten aus dem Quelltext. |
+| `tools/stahlschrott-liste.ts` | `alle` · `md` · `graubereich` · `brocken` · `271`. |
+| `tools/stahlschrott-wirkung.ts` | Umschlag und Verdienst. |
+| `tools/stahlschrott-blatt.ts` | Das Blatt fürs Telefon. |
+| `tools/alufarbe.ts` | Wo Aluminium sichtbar ist und welchen Abstand es zu VA, Zink und Mischschrott hat. |
+| `test/stahlschrott.test.ts` | 21 Wächter: Formel, Patricks Beispiele, Gitterbox, Übersteuerungen, Massenschwelle-Befund. |

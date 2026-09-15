@@ -33,7 +33,7 @@
  */
 import type { ScrapShape } from "./scrapItems";
 import type { BauId } from "./objektbau";
-import { type Anteil, fraktionAus } from "../materials/purity";
+import { type Anteil, fraktionVonTeil } from "../materials/purity";
 
 export interface PileSpec {
   materialId: string;
@@ -46,6 +46,20 @@ export interface PileSpec {
   name?: string;
   /** Woraus es besteht — ohne Angabe gilt es als sortenrein. */
   zusammensetzung?: Anteil[];
+  /**
+   * Übersteuerung der Stahlschrott-Regel (E-042), wenn Rechnung und
+   * Augenschein auseinandergehen.
+   *
+   * Normalerweise entscheidet die rechnerische Wandstärke aus Masse und Maß
+   * (`materials/purity.ts`, `WAND_AB_MM`). Sie erbt jeden Fehler in diesen
+   * beiden Zahlen: Wo eine Masse aus Spielgründen kleiner gesetzt ist, als das
+   * Stück in Wirklichkeit wiegt, rutscht es unter die Schwelle.
+   *
+   * **Jede Setzung braucht eine Begründung in derselben Zeile.** Ein `massiv`
+   * ohne Begründung ist eine Bequemlichkeit, keine Entscheidung — und genau
+   * davon wollte die Regel weg.
+   */
+  massiv?: boolean;
   /** Faellt beim Zerquetschen in seine Bestandteile (Kabeltrommel, Lattenrost). */
   trennbar?: boolean;
   /** Trennbar, aber nur mit Werkzeug — Arbeit fuer Lambert, nicht fuer die Spinne. */
@@ -124,7 +138,7 @@ export const KATALOG_SPECS: PileSpec[] = [
   // Alufelge statt Stahlfelge: Das lohnt zu trennen — aber nicht mit der
   // Spinne, sondern mit Flex oder Abdrueckmaschine (Ansage 12.09.2026).
   { materialId: "mixed", massKg: 24, kind: "cyl", dims: [0.34, 0.24], name: "Rad mit Alufelge", trennbar: true, nurWerkzeug: true, zusammensetzung: [{ materialId: "tires", anteil: 0.58 }, { materialId: "alu", anteil: 0.42 }] },
-  { materialId: "steel", massKg: 95, kind: "cyl", dims: [0.28, 1.1], bau: "stapel", name: "Felgenstapel (Stahl)" },
+  { materialId: "steel", massKg: 95, kind: "cyl", dims: [0.28, 1.1], bau: "stapel", name: "Felgenstapel (Stahl)", massiv: true }, // E-042: derselbe Gegenstand wie die LKW-Felge, nur gestapelt
   { materialId: "steel", massKg: 190, kind: "box", dims: [0.75, 0.7, 0.8], bau: "motor", name: "Motorblock (V8, ausgebaut)", zusammensetzung: [{ materialId: "steel", anteil: 0.82 }, { materialId: "alu", anteil: 0.14 }, { materialId: "copper", anteil: 0.04 }] },
   { materialId: "alu", massKg: 85, kind: "box", dims: [0.6, 0.65, 0.9], bau: "maschine", name: "Automatikgetriebe" },
   { materialId: "steel", massKg: 185, kind: "box", dims: [1.55, 0.5, 0.45], bau: "achse", name: "Hinterachse mit Differenzial" },
@@ -135,7 +149,7 @@ export const KATALOG_SPECS: PileSpec[] = [
   { materialId: "plastic", massKg: 30, kind: "box", dims: [1.35, 0.75, 0.7], bau: "moebel", name: "Fahrzeug-Sitzbank" },
 
   // --- Bauabbruch ---
-  { materialId: "steel", massKg: 205, kind: "box", dims: [1.1, 0.85, 0.95], bau: "schaufel", name: "Baggerlöffel", zusammensetzung: [{ materialId: "steel", anteil: 0.97 }, { materialId: "tires", anteil: 0.03 }] },
+  { materialId: "steel", massKg: 205, kind: "box", dims: [1.1, 0.85, 0.95], bau: "schaufel", name: "Baggerlöffel", massiv: true, zusammensetzung: [{ materialId: "steel", anteil: 0.97 }, { materialId: "tires", anteil: 0.03 }] }, // E-042: Verschleissblech 15-20 mm, gerechnet nur 4,7 mm
   { materialId: "alu", massKg: 70, kind: "box", dims: [0.8, 0.45, 2.1], bau: "buendel", name: "Gerüstrahmen (Bund)" },
   { materialId: "wood", massKg: 110, kind: "box", dims: [0.6, 0.4, 2.2], bau: "stapel", name: "Gerüstbohlen (Stapel)" },
   { materialId: "steel", massKg: 145, kind: "box", dims: [0.35, 0.35, 2.2], bau: "buendel", name: "Stahlstützen-Bund" },
@@ -185,7 +199,44 @@ export const KATALOG_SPECS: PileSpec[] = [
   { materialId: "steel", massKg: 210, kind: "box", dims: [0.7, 0.7, 0.7], bau: "stapel", name: "Metallpaket (gepresst)" },
   { materialId: "tires", massKg: 95, kind: "wire", dims: [0.85], bau: "haufen", name: "Reifenhaufen" },
   { materialId: "steel", massKg: 205, kind: "box", dims: [0.55, 0.55, 1.3], bau: "stapel", name: "Schrottschere-Abschnitte" },
+  /* --- Massives Kleinzeug (E-042, 15.09.2026) ---------------------------
+   *
+   * Patrick nannte als Premium-Beispiele "Bahnschwellen, Bremsscheiben,
+   * Traeger" — und keines davon war im Katalog zu greifen. Dazu der Befund
+   * aus der Messung: Nach der neuen Regel bleiben im Stahltopf der Kleinteile
+   * nur 19 Sorten; jede sortenreine Stahlfuhre zeigte dieselben Stuecke.
+   *
+   * Alle Massen sind gerechnet, nicht geschaetzt. Die Wandstaerke dahinter
+   * ist die, die `wandstaerkeMm` aus Masse und Mass zurueckgibt — sie steht
+   * hier, damit man beim Aendern sofort sieht, wo die Schwelle (6 mm) liegt.
+   */
+  // Bremsscheibe LKW: 430 mm Durchmesser, 38 kg. Das Huellmass ist die Tiefe
+  // MIT Topf und Nabe (0,12 m), nicht die Reibringdicke — duenner legt
+  // Rapier eine Scheibe nicht ruhig ab, und 0,12 m ist im Projekt die
+  // Grenze "duenn" (`DUENN_M`, purity.ts). Ohne `bau`, also in
+  // Fraktionsfarbe: eines der wenigen Stuecke, an denen man sie ueberhaupt
+  // sieht (docs/fraktionen.md, 2.3). -> 10,7 mm
+  { materialId: "steel", massKg: 38, kind: "cyl", dims: [0.215, 0.12], name: "Bremsscheibe (LKW)" },
+  // Y-Stahlschwelle, 2,2 m lang, rund 105 kg — die Bauform, die Holz- und
+  // Betonschwellen im Gleisbau abloest. -> 6,2 mm, knapp ueber der Schwelle
+  { materialId: "steel", massKg: 105, kind: "box", dims: [0.35, 0.12, 2.2], bau: "traeger", name: "Bahnschwelle (Stahl, Y-Form)" },
+  // Schiene S49: 49,4 kg je Meter, hier ein Abschnitt von 1,2 m = 60 kg.
+  // Profilhoehe 149 mm, Fussbreite 125 mm. -> 10,7 mm
+  { materialId: "steel", massKg: 60, kind: "box", dims: [0.13, 0.15, 1.2], bau: "traeger", name: "Schienenabschnitt" },
+  // Kurbelwelle eines Sechszylinder-LKW-Motors, geschmiedet, 1,2 m. -> 14,0 mm
+  { materialId: "steel", massKg: 90, kind: "cyl", dims: [0.1, 1.2], bau: "achse", name: "Kurbelwelle (LKW)" },
+  // Grosszahnrad, 560 mm Durchmesser, mit Nabe 0,12 m breit (wie oben). -> 15,4 mm
+  { materialId: "steel", massKg: 85, kind: "cyl", dims: [0.28, 0.12], name: "Großzahnrad" },
+  // Schmiedeamboss, 120 kg — das massivste Stueck seiner Groesse. -> 21,8 mm
+  { materialId: "steel", massKg: 120, kind: "box", dims: [0.5, 0.25, 0.3], bau: "motor", name: "Amboss" },
+  // Grobblech 20 mm, Zuschnitt 0,80 x 1,20 m: 7850 x 0,02 x 0,96 = 151 kg.
+  // Das Huellmass ist mit 0,06 m absichtlich dicker als die Platte — duenner
+  // legt Rapier Bleche nicht sicher ab (Lehre v2 E-011). Gegenstueck zum
+  // "Blech" aus SPECS (55 kg, 4,8 mm, Mischschrott): dieselbe Form, dreimal
+  // die Masse, andere Mulde. -> 8,8 mm
+  { materialId: "steel", massKg: 150, kind: "box", dims: [0.8, 0.06, 1.2], bau: "platte", name: "Grobblech-Zuschnitt (20 mm)" },
 ];
+
 
 /* ------------------------------------------------------------------------ */
 /* Großteile — Händleranlieferungen                                           */
@@ -197,7 +248,7 @@ export const KATALOG_BIG: PileSpec[] = [
   { materialId: "steel", massKg: 480, kind: "box", dims: [2.4, 0.7, 0.7], bau: "achse", name: "Traktor-Hinterachse" },
   { materialId: "steel", massKg: 260, kind: "box", dims: [1.9, 0.5, 0.6], bau: "achse", name: "Traktor-Vorderachse" },
   { materialId: "steel", massKg: 380, kind: "box", dims: [1.3, 0.5, 2.9], bau: "ausleger", name: "Frontlader-Schwinge" },
-  { materialId: "steel", massKg: 240, kind: "box", dims: [2.1, 0.8, 0.9], bau: "schaufel", name: "Frontlader-Schaufel" },
+  { materialId: "steel", massKg: 240, kind: "box", dims: [2.1, 0.8, 0.9], bau: "schaufel", name: "Frontlader-Schaufel", massiv: true }, // E-042: Schaufelboden ist 8-15 mm Verschleissblech
   { materialId: "steel", massKg: 480, kind: "cyl", dims: [0.42, 0.85], bau: "motor", name: "Häcksler-Trommel" },
   { materialId: "steel", massKg: 210, kind: "box", dims: [0.8, 0.9, 0.7], bau: "maschine", name: "Güllefass-Pumpwerk" },
   { materialId: "steel", massKg: 340, kind: "cyl", dims: [0.4, 1.5], bau: "buendel", name: "Presskammerwalzen (Bund)" },
@@ -242,7 +293,7 @@ export const KATALOG_BIG: PileSpec[] = [
 
   // --- Bauabbruch ---
   { materialId: "steel", massKg: 590, kind: "box", dims: [1.1, 1.1, 3.2], bau: "ausleger", name: "Baggerausleger" },
-  { materialId: "steel", massKg: 420, kind: "box", dims: [2.6, 0.9, 1.0], bau: "schaufel", name: "Radlader-Schaufel" },
+  { materialId: "steel", massKg: 420, kind: "box", dims: [2.6, 0.9, 1.0], bau: "schaufel", name: "Radlader-Schaufel", massiv: true }, // E-042: wie die Frontlader-Schaufel, nur groesser
   { materialId: "steel", massKg: 560, kind: "cyl", dims: [0.55, 1.1], bau: "buendel", name: "Raupenlaufwerk-Ketten (Bund)" },
   { materialId: "steel", massKg: 430, kind: "box", dims: [1.4, 1.4, 2.9], bau: "gitterturm", name: "Turmdrehkran-Mastschuss" },
   { materialId: "steel", massKg: 390, kind: "box", dims: [2.4, 1.5, 0.25], bau: "platte", name: "Betonfertigteil-Wand" },
@@ -286,7 +337,13 @@ export const KATALOG_BIG: PileSpec[] = [
   { materialId: "steel", massKg: 580, kind: "box", dims: [2.6, 0.9, 1.4], bau: "maschine", name: "Reachstacker-Spreader" },
   { materialId: "steel", massKg: 490, kind: "box", dims: [1.6, 1.4, 3.2], bau: "tank", name: "Bootsrumpf (Stahl)" },
   { materialId: "steel", massKg: 430, kind: "box", dims: [1.0, 1.0, 3.4], bau: "ausleger", name: "Hafenkran-Ausleger" },
+  // --- Massives Grossteil (E-042, 15.09.2026) ---
+  // Palette mit rund zehn LKW-Bremsscheiben, 400 kg. -> 10,5 mm
+  { materialId: "steel", massKg: 400, kind: "box", dims: [1.0, 0.8, 0.9], bau: "stapel", name: "Bremsscheiben (Palette)" },
+  // Gegengewicht eines Gabelstaplers, Gussblock. -> 30,5 mm
+  { materialId: "steel", massKg: 450, kind: "box", dims: [0.9, 0.5, 0.35], bau: "motor", name: "Stapler-Gegengewicht" },
 ];
+
 
 /* ------------------------------------------------------------------------ */
 /* Schwergewichte — füllen einen Auflieger                                    */
@@ -357,7 +414,7 @@ export const KATALOG_HUGE: PileSpec[] = [
   { materialId: "steel", massKg: 2600, kind: "box", dims: [2.4, 1.2, 2.2], bau: "achse", name: "U-Bahn-Drehgestell (angetrieben)" },
 
   // --- Hafen ---
-  { materialId: "steel", massKg: 2200, kind: "box", dims: [2.4, 2.6, 4.8], bau: "container", name: "Seecontainer 20 Fuß", zusammensetzung: [{ materialId: "steel", anteil: 0.95 }, { materialId: "wood", anteil: 0.05 }] },
+  { materialId: "steel", massKg: 2200, kind: "box", dims: [2.4, 2.6, 4.8], bau: "container", name: "Seecontainer 20 Fuß", massiv: true, zusammensetzung: [{ materialId: "steel", anteil: 0.95 }, { materialId: "wood", anteil: 0.05 }] }, // E-042, Patrick 15.09.2026: "Dicke Uebersee-Container haben auch viel Masse, auch wenn es duennes Blech ist. Drum Stahl."
   { materialId: "steel", massKg: 2500, kind: "box", dims: [2.4, 2.7, 4.8], bau: "container", name: "Kühlcontainer", zusammensetzung: [{ materialId: "steel", anteil: 0.72 }, { materialId: "plastic", anteil: 0.18 }, { materialId: "copper", anteil: 0.06 }, { materialId: "alu", anteil: 0.04 }] },
   { materialId: "steel", massKg: 2400, kind: "box", dims: [2.4, 2.6, 4.6], bau: "container", name: "Bürocontainer", zusammensetzung: [{ materialId: "steel", anteil: 0.7 }, { materialId: "plastic", anteil: 0.15 }, { materialId: "wood", anteil: 0.1 }, { materialId: "alu", anteil: 0.05 }] },
   { materialId: "steel", massKg: 2500, kind: "box", dims: [2.4, 2.6, 4.6], bau: "container", name: "Werkstattcontainer", zusammensetzung: [{ materialId: "steel", anteil: 0.74 }, { materialId: "plastic", anteil: 0.12 }, { materialId: "wood", anteil: 0.1 }, { materialId: "alu", anteil: 0.04 }] },
@@ -371,7 +428,5 @@ export const KATALOG_HUGE: PileSpec[] = [
  * Mischschrott. Ein Eintrag ohne Zusammensetzung bleibt, was er ist.
  */
 for (const liste of [KATALOG_SPECS, KATALOG_BIG, KATALOG_HUGE]) {
-  for (const sp of liste) {
-    if (sp.zusammensetzung) sp.materialId = fraktionAus(sp.zusammensetzung, sp.materialId);
-  }
+  for (const sp of liste) sp.materialId = fraktionVonTeil(sp);
 }

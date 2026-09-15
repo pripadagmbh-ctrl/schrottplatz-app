@@ -25,7 +25,30 @@ export interface MaterialClass {
 export const MATERIALS: Record<string, MaterialClass> = {
   steel: { id: "steel", name: "Stahlschrott", buyPricePerKg: 0.18, sellPricePerKg: 0.25, color: 0x6e5a4e },
   va: { id: "va", name: "Edelstahl VA", buyPricePerKg: 1.0, sellPricePerKg: 1.4, color: 0xdfe6ea },
-  alu: { id: "alu", name: "Aluminium", buyPricePerKg: 1.1, sellPricePerKg: 1.5, color: 0xc4c8cc },
+  /*
+   * Aluminium: mattes, warmes Mittelgrau — nicht das Blauweiss von poliertem
+   * Blech (E-042, 15.09.2026).
+   *
+   * Patrick am Geraet: „Aluminium ist in den meisten Faellen grau." Bis dahin
+   * stand hier 0xc4c8cc, ein sehr helles blaeuliches Grau; Altaluminium ist
+   * matt, oxidiert und staubig. Gemessen mit `tools/alufarbe.ts` (DeltaE2000
+   * auf die Grundfarben):
+   *
+   *   Paar           vorher   jetzt   warum es zaehlt
+   *   alu <-> va       6,98   24,63   verschiedene Silos (ALU- und VA-LAGER)
+   *   alu <-> zinc    10,23   12,25   teilen sich jeden Behaelter, egal
+   *   alu <-> mixed   37,90   20,25   bleibt klar getrennt
+   *   alu <-> steel   37,88   20,44   bleibt klar getrennt
+   *
+   * Die 6,98 waren der eigentliche Fehler: Alu und Edelstahl waren kaum zu
+   * unterscheiden, bei Abendsonne gar nicht (6,54 — unter 10 gilt als dieselbe
+   * Farbe). Dass Alu dafuer naeher an Zink rueckt, kostet nichts: ALU-LAGER
+   * nimmt Zink mit, die beiden muessen nie getrennt werden (`containers.ts`).
+   *
+   * Derselbe Ton steht in `world/objektbau.ts` als `ALU` — dort werden 27 der
+   * 30 Alu-Teile gefaerbt, hier nur drei.
+   */
+  alu: { id: "alu", name: "Aluminium", buyPricePerKg: 1.1, sellPricePerKg: 1.5, color: 0x928d85 },
   copper: { id: "copper", name: "Kupfer", buyPricePerKg: 6.0, sellPricePerKg: 7.2, color: 0xc7622b },
   brass: { id: "brass", name: "Messing", buyPricePerKg: 3.4, sellPricePerKg: 4.3, color: 0xc9a227 },
   /*

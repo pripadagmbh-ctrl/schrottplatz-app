@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { getMaterial } from "../materials/catalog";
-import { type Anteil, fraktionAus, istPressbar } from "../materials/purity";
+import { type Anteil, fraktionVonTeil, istPressbar } from "../materials/purity";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { baueGeometrie, type BauId } from "./objektbau";
 import {
@@ -718,14 +718,14 @@ export const SPECS: PileSpec[] = [
   { materialId: "steel", massKg: 48, kind: "box", dims: [1.6, 0.55, 0.7], name: "Badewanne" },
   { materialId: "steel", massKg: 26, kind: "box", dims: [0.6, 0.9, 1.9], bau: "einspurig", name: "Motorradrahmen" },
   { materialId: "steel", massKg: 14, kind: "box", dims: [0.5, 0.7, 1.6], bau: "einspurig", name: "Mopedrahmen" },
-  { materialId: "steel", massKg: 120, kind: "box", dims: [1.1, 0.35, 0.9], bau: "schaufel", name: "Pflugschar" },
+  { materialId: "steel", massKg: 120, kind: "box", dims: [1.1, 0.35, 0.9], bau: "schaufel", name: "Pflugschar", massiv: true }, // E-042: die Schar ist gehaertetes Verschleissblech, gerechnet nur 4,5 mm
   { materialId: "steel", massKg: 85, kind: "cyl", dims: [0.34, 1.7], bau: "trommel", name: "Eggenwalze" },
   { materialId: "steel", massKg: 160, kind: "box", dims: [0.5, 0.5, 1.4], bau: "motor", name: "Traktor-Frontgewicht" },
   { materialId: "steel", massKg: 95, kind: "box", dims: [2.1, 0.25, 0.35], bau: "ausleger", name: "Heuwender-Ausleger" },
   { materialId: "steel", massKg: 210, kind: "cyl", dims: [0.16, 2.2], bau: "achse", name: "LKW-Achse" },
   { materialId: "steel", massKg: 130, kind: "box", dims: [0.8, 0.7, 0.9], bau: "motor", name: "LKW-Getriebe" },
   { materialId: "steel", massKg: 75, kind: "box", dims: [0.9, 0.75, 0.12], bau: "maschine", name: "LKW-Kuehler" },
-  { materialId: "steel", massKg: 46, kind: "cyl", dims: [0.28, 0.32], name: "LKW-Felge" },
+  { materialId: "steel", massKg: 46, kind: "cyl", dims: [0.28, 0.32], name: "LKW-Felge", massiv: true }, // E-042, Patrick 15.09.2026: "LKW-Felge, sind gehaerteter Stahl und daher auf massiv setzen."
   { materialId: "alu", massKg: 16, kind: "box", dims: [0.7, 0.5, 0.15], bau: "motor", name: "Motorradmotor" },
   { materialId: "copper", massKg: 22, kind: "box", dims: [0.45, 0.4, 0.35], bau: "elektromotor", name: "Elektromotor", trennbar: true, zusammensetzung: [{ materialId: "steel", anteil: 0.58 }, { materialId: "copper", anteil: 0.38 }, { materialId: "alu", anteil: 0.04 }] },
   { materialId: "tires", massKg: 11, kind: "torus", dims: [0.31, 0.11], name: "Traktorreifen" },
@@ -764,7 +764,7 @@ const HUGE_SPECS: PileSpec[] = [
 const BIG_SPECS: PileSpec[] = [
   { materialId: "steel", massKg: 180, kind: "box", dims: [0.28, 0.28, 2.9], bau: "traeger", name: "Doppel-T-Träger" },
   { materialId: "steel", massKg: 220, kind: "box", dims: [1.9, 0.08, 1.5], bau: "platte", name: "Blechtafel" },
-  { materialId: "steel", massKg: 160, kind: "cyl", dims: [0.22, 2.6], bau: "rohrFlansch", name: "dickes Rohr" },
+  { materialId: "steel", massKg: 160, kind: "cyl", dims: [0.22, 2.6], bau: "rohrFlansch", name: "dickes Rohr", massiv: true }, // E-042: die Wand eines 440-mm-Rohres ist 8-12 mm, gerechnet nur 5,2 mm
   { materialId: "steel", massKg: 140, kind: "box", dims: [1.2, 0.9, 0.75], bau: "tank", name: "Kessel" },
   { materialId: "steel", massKg: 95, kind: "box", dims: [0.75, 1.5, 0.7], bau: "weisseWare", name: "Waschmaschine", zusammensetzung: [{ materialId: "steel", anteil: 0.62 }, { materialId: "rubble", anteil: 0.18 }, { materialId: "copper", anteil: 0.08 }, { materialId: "plastic", anteil: 0.12 }] },
   { materialId: "steel", massKg: 420, kind: "box", dims: [0.9, 0.7, 0.95], bau: "motor", name: "Maschinenblock" },
@@ -799,9 +799,7 @@ const BIG_SPECS: PileSpec[] = [
  * Katalog (Befund 12.09.2026).
  */
 for (const liste of [SPECS, BIG_SPECS, HUGE_SPECS]) {
-  for (const sp of liste) {
-    if (sp.zusammensetzung) sp.materialId = fraktionAus(sp.zusammensetzung, sp.materialId);
-  }
+  for (const sp of liste) sp.materialId = fraktionVonTeil(sp);
 }
 
 const CABLE_COLORS = [0xb0682a, 0x71646a, 0x315e75];

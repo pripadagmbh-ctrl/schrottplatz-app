@@ -25,6 +25,7 @@ import {
   SORTENREIN_AB,
   containerValueGemischt,
   fraktionAus,
+  fraktionVonTeil,
   type Anteil,
 } from "../src/materials/purity";
 import { Account } from "../src/economy/account";
@@ -109,8 +110,11 @@ describe("Was der Katalog daraus macht", () => {
    * Zahlen halten den Stand fest. Wandern sie, hat jemand den Katalog
    * umgebaut, und dann gehört die Bestandsaufnahme nachgezogen.
    */
-  it("271 erreichbare Einträge, davon 56 mit Stückliste", () => {
-    expect(ALLE.length).toBe(271);
+  it("280 erreichbare Einträge, davon 56 mit Stückliste", () => {
+    // 271 waren es bis E-042; neun massive Kleinteile sind dazugekommen
+    // (Bremsscheibe, Bahnschwelle, Schienenabschnitt, Kurbelwelle …), weil
+    // Patricks eigene Premium-Beispiele im Katalog fehlten.
+    expect(ALLE.length).toBe(280);
     expect(ALLE.filter((s) => s.zusammensetzung).length).toBe(56);
   });
 
@@ -123,18 +127,27 @@ describe("Was der Katalog daraus macht", () => {
 
   it("die abgeleitete Fraktion stimmt mit der Regel überein — bei jedem Eintrag", () => {
     // Der Fehlerfall wäre eine Liste, die nach dem Ableiten nicht mehr passt.
+    // Seit E-042 ist die Regel `fraktionVonTeil` und nicht mehr `fraktionAus`:
+    // Sie sieht auch Masse und Maß, nicht nur die Stückliste.
     for (const s of ALLE) {
-      if (!s.zusammensetzung) continue;
-      expect(fraktionAus(s.zusammensetzung, s.materialId), s.name ?? "(ohne Namen)").toBe(
-        s.materialId
-      );
+      expect(fraktionVonTeil(s), s.name ?? "(ohne Namen)").toBe(s.materialId);
     }
   });
 
-  it("derselbe Küchenherd, zwei Fraktionen — der Widerspruch ist echt", () => {
+  it("derselbe Küchenherd, EINE Fraktion — der Widerspruch ist weg (E-042)", () => {
+    /*
+     * BEFUND BEHOBEN, und dieser Wächter ist dabei absichtlich rot geworden.
+     *
+     * Bis zum 15.09.2026 stand hier `herd === "steel"` und
+     * `einbau === "mixed"`: derselbe Küchenherd, dieselbe Bauart, dieselbe
+     * Farbe — und zwei Mulden, nur weil an einem Eintrag jemand eine
+     * Stückliste getippt hatte und am anderen nicht. Seit die Regel aus Masse
+     * und Maß rechnet, sind beide Blech (1,3 und 1,7 mm) und beide
+     * Mischschrott.
+     */
     const herd = ALLE.find((s) => s.name === "Elektroherd");
     const einbau = ALLE.find((s) => s.name === "Einbauherd mit Umluftofen");
-    expect(herd?.materialId).toBe("steel");
+    expect(herd?.materialId).toBe("mixed");
     expect(einbau?.materialId).toBe("mixed");
     expect(herd?.bau).toBe(einbau?.bau); // beide `weisseWare`, gleiche Farben
   });
@@ -272,9 +285,29 @@ describe("Die Farbe trägt die Fraktion nicht", () => {
     expect(d, "über 10 wäre eine klar andere Farbe").toBeLessThan(10);
   });
 
-  it("BEFUND: nur 16 von 271 Teilen tragen die Fraktionsfarbe überhaupt", () => {
+  it("BEFUND: nur 18 von 280 Teilen tragen die Fraktionsfarbe überhaupt", () => {
     // Alles mit `bau` wird nach Zweck gefärbt (objektbau.ts:22-30).
-    expect(ALLE.filter((s) => !s.bau).length).toBe(16);
+    // 16 waren es bis E-042; Bremsscheibe und Großzahnrad sind absichtlich
+    // ohne `bau` dazugekommen — zwei Stücke mehr, an denen man die
+    // Fraktionsfarbe überhaupt sieht.
+    expect(ALLE.filter((s) => !s.bau).length).toBe(18);
+  });
+
+  it("Aluminium ist nicht mehr mit Edelstahl zu verwechseln (E-042)", () => {
+    /*
+     * Patrick am 15.09.2026: „Aluminium ist in den meisten Fällen grau."
+     *
+     * Der messbare Teil dahinter: Alu und VA lagen bei ΔE 6,98 — zwei Farben
+     * unter 10 sind dieselbe Farbe, und die beiden gehen in VERSCHIEDENE
+     * Silos. Zink darf dagegen nah sein: ALU-LAGER nimmt es mit.
+     */
+    const alu = MATERIALS.alu!.color;
+    expect(deltaEHex(alu, MATERIALS.va!.color)).toBeGreaterThan(20);
+    expect(deltaEHex(alu, MATERIALS.steel!.color)).toBeGreaterThan(15);
+    expect(deltaEHex(alu, MATERIALS.mixed!.color)).toBeGreaterThan(15);
+    // Und Alu muss dunkler sein als Zink, sonst ist es wieder das helle Blech.
+    const hell = (c: number) => 0.2126 * ((c >> 16) & 0xff) + 0.7152 * ((c >> 8) & 0xff) + 0.0722 * (c & 0xff);
+    expect(hell(alu)).toBeLessThan(hell(MATERIALS.zinc!.color));
   });
 
   it("BEFUND B-3: drei Bauten liefern ein Netz mit NaN-Ecken", () => {
