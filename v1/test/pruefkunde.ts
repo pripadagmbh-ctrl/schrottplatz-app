@@ -37,6 +37,7 @@ import type { CustomerProfile, CustomerGroup } from "../src/delivery/customers";
 import { rollCustomer } from "../src/delivery/customers";
 import { ladeVolumen, type Aufbau, type Fahrzeugart } from "../src/delivery/fuellgrad";
 import { ladungsDichte } from "../src/materials/schuettdichte";
+import { AUSSEHEN_NEUTRAL } from "../src/delivery/aussehen";
 
 /**
  * Anteil Störstoff in einer Prüfladung.
@@ -125,6 +126,11 @@ export function pruefKunde(w: PruefKundeWunsch = {}): CustomerProfile {
     contaminantShare: stoer,
     hardness: w.hardness ?? 1,
     greeting: "",
+    /*
+     * Neutrale Figur (`aussehen.ts`). Prueflaeufe messen nicht das
+     * Aussehen, und eine gewuerfelte Statur wuerde hier nur streuen.
+     */
+    aussehen: AUSSEHEN_NEUTRAL,
   };
 }
 

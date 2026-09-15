@@ -23,6 +23,7 @@ import { VehicleManager } from "../src/delivery/vehicles";
 import type { CustomerProfile } from "../src/delivery/customers";
 import type { Federung } from "../src/delivery/federung";
 import type { Rad } from "../src/delivery/vehicleModel";
+import { AUSSEHEN_NEUTRAL } from "../src/delivery/aussehen";
 
 beforeAll(async () => {
   await initPhysics();
@@ -43,6 +44,11 @@ function kunde(massKg: number, fuellgrad: number): CustomerProfile {
     contaminantShare: 0.06,
     hardness: 1,
     greeting: "",
+    /*
+     * Neutrale Figur (`aussehen.ts`). Prueflaeufe messen nicht das
+     * Aussehen, und eine gewuerfelte Statur wuerde hier nur streuen.
+     */
+    aussehen: AUSSEHEN_NEUTRAL,
   };
 }
 

@@ -24,6 +24,7 @@ import {
   type Aufbau,
   type Fahrzeugart,
 } from "./fuellgrad";
+import type { Aussehen, KundenEintrag } from "./aussehen";
 
 export type CustomerGroup = "privat" | "haendler" | "gewerbe";
 
@@ -51,6 +52,15 @@ export interface CustomerProfile {
   hardness: number;
   /** Spruch bei der Ankunft */
   greeting: string;
+  /**
+   * Wie der Mensch aussieht, der aus dem Wagen steigt.
+   *
+   * PFLICHTIG, aus demselben Grund wie `vehicle` weiter unten: Ein Kunde ohne
+   * Aussehen ist kein Kunde, sondern ein halbes Profil, und ein Rückfall
+   * („dann nimm halt die Standardfigur") wäre die zweite Stelle, die dasselbe
+   * zu wissen meint. Prüfstände nehmen `AUSSEHEN_NEUTRAL` aus `aussehen.ts`.
+   */
+  aussehen: Aussehen;
 }
 
 /**
@@ -69,8 +79,31 @@ export interface Family {
   /** Was dieser Händler typischerweise bringt */
   typical: string | null;
   greetings: string[];
+  /**
+   * Wie er aussieht — fest, nicht gewürfelt. Willi ist immer Willi, sonst
+   * kann man ihn sich nicht merken (`offene-punkte.md`: „Der rote mit dem
+   * kurzen Kran, der bringt immer Alu").
+   */
+  aussehen: Aussehen;
 }
 
+/*
+ * DIE ACHT HÄNDLER, UND WIE SIE AUSSEHEN (15.09.2026).
+ *
+ * Gelesen wird die Tabelle so: `groesse` in Metern, `fuelle` 0 = dünn bis
+ * 1 = dick, `pflege` 0 = ölig bis 1 = frisch, `haut`/`haar` sind Indizes in
+ * die Tafeln in `aussehen.ts`.
+ *
+ * Die Zahlen sind von Hand gesetzt (SW) — sie sind CHARAKTER, kein Balancing:
+ * Wer Willi kleiner haben will, ändert eine Zahl. Was sie nicht dürfen, ist
+ * ein Muster bilden: Über alle 23 Kunden hinweg darf keine dieser Spalten mit
+ * Gruppe oder Härtegrad zusammenhängen. Nachgerechnet wird das von
+ * `aussehensBefunde()`, bewacht von `test/kundenaussehen.test.ts`.
+ *
+ * Man sieht es an den beiden Enden: Willi Bäring (Härte 5) ist ölig, Heiner
+ * Prieser (Härte 5) ist der gepflegteste Mann auf dem Hof — und beide drücken
+ * gleich hart. Genau das ist die Absicht.
+ */
 export const FAMILIES: Family[] = [
   {
     family: "Bäring",
@@ -78,6 +111,8 @@ export const FAMILIES: Family[] = [
     hardness: 5,
     typical: null,
     greetings: ["Na, was zahlst du heute?", "Ich hab was Gutes dabei.", "Der Preis von gestern gilt noch?"],
+    // Klein, breit, seit dreißig Jahren dieselbe Jacke. Goldkette über dem Kragen.
+    aussehen: { groesse: 1.66, fuelle: 0.8, pflege: 0.2, haut: 1, haar: 3, jacke: 0, weste: false, merkmal: "goldkette" },
   },
   {
     family: "Lorsbach",
@@ -85,6 +120,8 @@ export const FAMILIES: Family[] = [
     hardness: 4,
     typical: "steel",
     greetings: ["Volle Fuhre, wie besprochen.", "Wiegen wir gleich?", "Steht alles bereit?"],
+    // Lang und dürr, Weste an, Mütze auf, immer pünktlich.
+    aussehen: { groesse: 1.88, fuelle: 0.25, pflege: 0.8, haut: 0, haar: 1, jacke: 3, weste: true, merkmal: "muetze" },
   },
   {
     family: "Prieser",
@@ -92,6 +129,8 @@ export const FAMILIES: Family[] = [
     hardness: 5,
     typical: null,
     greetings: ["Du kennst mich ja.", "Machen wir es kurz.", "Was geht heute?"],
+    // Der Gepflegteste — und der Härteste. Schwere Uhr am Handgelenk.
+    aussehen: { groesse: 1.9, fuelle: 0.3, pflege: 0.9, haut: 2, haar: 0, jacke: 1, weste: false, merkmal: "uhr" },
   },
   {
     family: "Hardwig",
@@ -99,6 +138,8 @@ export const FAMILIES: Family[] = [
     hardness: 3,
     typical: "alu",
     greetings: ["Alles sauber getrennt.", "Nur das Gute heute.", "Wo soll ich hin?"],
+    // Groß, kräftig, dreckig — und der Schäferhund sitzt im Haus.
+    aussehen: { groesse: 1.85, fuelle: 0.7, pflege: 0.25, haut: 0, haar: 2, jacke: 0, weste: true, merkmal: "hund" },
   },
   {
     family: "Boxmann",
@@ -106,6 +147,8 @@ export const FAMILIES: Family[] = [
     hardness: 4,
     typical: "steel",
     greetings: ["Schwer beladen, pass auf.", "Der Kipper ist randvoll.", "Lange Fahrt gehabt."],
+    // Klein und rund, kommt von weit her und sieht auch so aus.
+    aussehen: { groesse: 1.62, fuelle: 0.85, pflege: 0.2, haut: 3, haar: 4, jacke: 4, weste: false, merkmal: "keins" },
   },
   {
     family: "Zöllner",
@@ -113,6 +156,8 @@ export const FAMILIES: Family[] = [
     hardness: 5,
     typical: "copper",
     greetings: ["Guck erst mal rein.", "Das ist was Feines.", "Nicht drücken heute."],
+    // Bauchtasche mit dem Papierkram, immer griffbereit.
+    aussehen: { groesse: 1.74, fuelle: 0.6, pflege: 0.45, haut: 1, haar: 3, jacke: 2, weste: true, merkmal: "bauchtasche" },
   },
   {
     family: "Adorf",
@@ -120,6 +165,8 @@ export const FAMILIES: Family[] = [
     hardness: 3,
     typical: null,
     greetings: ["Zusammengesammelt die Woche.", "Bisschen von allem.", "Passt das so?"],
+    // Lang, dünn, sauber — sammelt die Woche über zusammen.
+    aussehen: { groesse: 1.7, fuelle: 0.2, pflege: 0.85, haut: 2, haar: 1, jacke: 1, weste: false, merkmal: "uhr" },
   },
   {
     family: "Schmikatz",
@@ -127,6 +174,8 @@ export const FAMILIES: Family[] = [
     hardness: 4,
     typical: "va",
     greetings: ["Sortenrein, wie immer.", "Da staunst du.", "Was bietest du?"],
+    // Mittelmaß in allem, und genau deshalb erkennt man ihn an der Weste.
+    aussehen: { groesse: 1.78, fuelle: 0.45, pflege: 0.35, haut: 3, haar: 2, jacke: 2, weste: true, merkmal: "keins" },
   },
 ];
 
@@ -140,6 +189,8 @@ export interface Trade {
   /** Anteil Beifang, der nicht zur Hauptfraktion gehört */
   beifang: number;
   greetings: string[];
+  /** Der Mensch, der den Firmenwagen fährt — fest je Betrieb. */
+  aussehen: Aussehen;
 }
 
 export const TRADES: Trade[] = [
@@ -148,42 +199,49 @@ export const TRADES: Trade[] = [
     material: "steel",
     beifang: 0.25, // Schlacke kommt als Beifang mit
     greetings: ["Guss und Schlacke, wie immer.", "Der Ofen war gut ausgelastet."],
+    aussehen: { groesse: 1.72, fuelle: 0.75, pflege: 0.3, haut: 2, haar: 0, jacke: 3, weste: true, merkmal: "keins" },
   },
   {
     name: "Dreherei Kessel",
     material: "steel",
     beifang: 0.05, // Späne sind sauber, aber ölig
     greetings: ["Späne, noch ölig.", "Frisch aus der Halle."],
+    aussehen: { groesse: 1.66, fuelle: 0.35, pflege: 0.2, haut: 3, haar: 2, jacke: 1, weste: false, merkmal: "muetze" },
   },
   {
     name: "Maschinenbau Voigt",
     material: "steel",
     beifang: 0.12,
     greetings: ["Große Teile heute, Vorsicht.", "Zwei Motoren sind dabei."],
+    aussehen: { groesse: 1.9, fuelle: 0.55, pflege: 0.6, haut: 0, haar: 3, jacke: 0, weste: true, merkmal: "keins" },
   },
   {
     name: "Kfz-Werkstatt Rehm",
     material: "alu",
     beifang: 0.18,
     greetings: ["Felgen und Kleinkram.", "Wenig, aber gut."],
+    aussehen: { groesse: 1.8, fuelle: 0.25, pflege: 0.85, haut: 1, haar: 1, jacke: 2, weste: false, merkmal: "uhr" },
   },
   {
     name: "Elektro Sander",
     material: "cable",
     beifang: 0.15,
     greetings: ["Kabel vom Umbau.", "Kupferanteil ist ordentlich."],
+    aussehen: { groesse: 1.6, fuelle: 0.7, pflege: 0.9, haut: 3, haar: 4, jacke: 2, weste: true, merkmal: "bauchtasche" },
   },
   {
     name: "Schlosserei Timm",
     material: "va",
     beifang: 0.06,
     greetings: ["V2A, sauber getrennt.", "Wie immer sortenrein."],
+    aussehen: { groesse: 1.86, fuelle: 0.2, pflege: 0.55, haut: 1, haar: 0, jacke: 3, weste: false, merkmal: "hund" },
   },
   {
     name: "Abbruch Kranz",
     material: "steel",
     beifang: 0.32, // viel Störstoff aus dem Abriss
     greetings: ["Heizkörper und Rohre.", "Da ist auch Dreck dabei, ich weiß."],
+    aussehen: { groesse: 1.68, fuelle: 0.85, pflege: 0.15, haut: 0, haar: 3, jacke: 4, weste: true, merkmal: "goldkette" },
   },
 ];
 
@@ -222,15 +280,55 @@ const PRIVAT_ORTE = [
   "aus Erkelenz",
 ];
 
-const PRIVAT_NAMEN = [
-  "Herr Kowalik",
-  "Frau Dettmer",
-  "Herr Sievers",
-  "Frau Lindqvist",
-  "Herr Baumgart",
-  "Frau Öztürk",
-  "Herr Reinhold",
-  "Frau Waldmann",
+/**
+ * Die Privatleute.
+ *
+ * Bis 15.09.2026 war das eine nackte Namensliste. Jetzt ist es dieselbe Liste
+ * mit Gesicht — die Namen sind Wort für Wort unverändert geblieben, dazu ist
+ * nur gekommen, wie der Mensch dahinter aussieht.
+ *
+ * Sie kommen seltener wieder als die Händler, und trotzdem gehört das Aussehen
+ * an den Namen und nicht an den Zufall: Wer Frau Öztürk zweimal im Monat sieht,
+ * soll sie wiedererkennen.
+ */
+export interface Privatmensch {
+  name: string;
+  aussehen: Aussehen;
+}
+
+export const PRIVATLEUTE: Privatmensch[] = [
+  {
+    name: "Herr Kowalik",
+    aussehen: { groesse: 1.84, fuelle: 0.3, pflege: 0.25, haut: 3, haar: 1, jacke: 0, weste: false, merkmal: "muetze" },
+  },
+  {
+    name: "Frau Dettmer",
+    aussehen: { groesse: 1.62, fuelle: 0.7, pflege: 0.85, haut: 0, haar: 4, jacke: 1, weste: true, merkmal: "keins" },
+  },
+  {
+    name: "Herr Sievers",
+    aussehen: { groesse: 1.92, fuelle: 0.85, pflege: 0.55, haut: 1, haar: 0, jacke: 2, weste: false, merkmal: "goldkette" },
+  },
+  {
+    name: "Frau Lindqvist",
+    aussehen: { groesse: 1.7, fuelle: 0.2, pflege: 0.45, haut: 2, haar: 2, jacke: 3, weste: true, merkmal: "uhr" },
+  },
+  {
+    name: "Herr Baumgart",
+    aussehen: { groesse: 1.58, fuelle: 0.55, pflege: 0.2, haut: 1, haar: 3, jacke: 4, weste: false, merkmal: "hund" },
+  },
+  {
+    name: "Frau Öztürk",
+    aussehen: { groesse: 1.8, fuelle: 0.4, pflege: 0.9, haut: 3, haar: 0, jacke: 4, weste: true, merkmal: "bauchtasche" },
+  },
+  {
+    name: "Herr Reinhold",
+    aussehen: { groesse: 1.74, fuelle: 0.75, pflege: 0.35, haut: 0, haar: 3, jacke: 0, weste: false, merkmal: "keins" },
+  },
+  {
+    name: "Frau Waldmann",
+    aussehen: { groesse: 1.88, fuelle: 0.35, pflege: 0.6, haut: 2, haar: 1, jacke: 1, weste: true, merkmal: "keins" },
+  },
 ];
 
 const PRIVAT_SPRUECHE = [
@@ -336,9 +434,10 @@ function rollPrivat(): CustomerProfile {
   // Volumen und wiegt fast nichts — ihr Anhänger sieht voller aus, als er wiegt.
   const contaminantShare = 0.15 + Math.random() * 0.2;
   const fuhre = fuhreFuer("privat", null, contaminantShare);
+  const p = pick(PRIVATLEUTE);
   return {
     group: "privat",
-    name: pick(PRIVAT_NAMEN),
+    name: p.name,
     subtitle: pick(PRIVAT_ORTE),
     /*
      * Die Menge wird nicht mehr gewürfelt, sie wird gerechnet (Ansage Patrick
@@ -358,8 +457,9 @@ function rollPrivat(): CustomerProfile {
     dichte: fuhre.dichte,
     sortedMaterial: null,
     contaminantShare,
-    hardness: 1,
+    hardness: HAERTE_PRIVAT,
     greeting: pick(PRIVAT_SPRUECHE),
+    aussehen: p.aussehen,
   };
 }
 
@@ -389,6 +489,7 @@ function rollHaendler(): CustomerProfile {
     contaminantShare,
     hardness: f.hardness,
     greeting: pick(f.greetings),
+    aussehen: f.aussehen,
   };
 }
 
@@ -408,9 +509,49 @@ function rollGewerbe(): CustomerProfile {
     dichte: fuhre.dichte,
     sortedMaterial: t.material,
     contaminantShare: t.beifang,
-    hardness: 2, // sachlich, wenig Spielraum
+    hardness: HAERTE_GEWERBE, // sachlich, wenig Spielraum
     greeting: pick(t.greetings),
+    aussehen: t.aussehen,
   };
+}
+
+/**
+ * DIE GANZE KUNDSCHAFT AUF EINEN BLICK — 8 Händler, 7 Betriebe, 8 Privatleute.
+ *
+ * Kein zweiter Datenbestand, sondern eine Ansicht auf die drei Listen weiter
+ * oben. Sie ist die Grundlage des Ton-Wächters (`aussehensBefunde`): Der muss
+ * ALLE Kunden zugleich sehen können, sonst kann er nicht prüfen, ob sich über
+ * die Gruppen hinweg ein Muster gebildet hat.
+ *
+ * Der Härtegrad von Gewerbe und Privat stand bis hierher als nackte 1 bzw. 2
+ * mitten in `rollPrivat`/`rollGewerbe`. Er hat jetzt einen Namen und steht an
+ * EINER Stelle — sonst hätte diese Ansicht ihn abschreiben müssen, und beim
+ * nächsten Balancing wäre genau die Abschrift stehengeblieben.
+ */
+export const HAERTE_GEWERBE = 2;
+export const HAERTE_PRIVAT = 1;
+
+export function alleKunden(): KundenEintrag[] {
+  return [
+    ...FAMILIES.map((f) => ({
+      name: `${f.firstName} ${f.family}`,
+      gruppe: "haendler",
+      haerte: f.hardness,
+      aussehen: f.aussehen,
+    })),
+    ...TRADES.map((t) => ({
+      name: t.name,
+      gruppe: "gewerbe",
+      haerte: HAERTE_GEWERBE,
+      aussehen: t.aussehen,
+    })),
+    ...PRIVATLEUTE.map((p) => ({
+      name: p.name,
+      gruppe: "privat",
+      haerte: HAERTE_PRIVAT,
+      aussehen: p.aussehen,
+    })),
+  ];
 }
 
 /**

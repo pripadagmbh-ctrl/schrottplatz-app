@@ -73,9 +73,21 @@ erledigt ist, bekommt den Commit dazu.
 
 ## Leute und Stimmung
 
-- [ ] **Schrotthändler sehen verschieden aus** — gepflegt bis ölig, klein und
+- [x] **Schrotthändler sehen verschieden aus** — gepflegt bis ölig, klein und
       dick bis lang und dünn, Wiedererkennungsmerkmale (Goldkette, dicke Uhr,
       Schäferhund). Insgesamt mehr Detailtiefe als Playmobil.
+
+      *Gebaut 15.09.2026 (E-077).* Alle 23 Kunden haben ein `aussehen` in
+      ihrem Datensatz (`delivery/customers.ts`): Statur 1,58–1,92 m, Fülle,
+      Pflegegrad, Hautton, Haarfarbe, Jacke, Warnweste und **genau ein**
+      Wiedererkennungsmerkmal. Die Figur ist dabei von 10 Netzen auf **2**
+      gefallen (`world/kundenfigur.ts`), der Hund kostet ein weiteres.
+      Ein Wächter mit sechs Gegenproben hält fest, dass aus dem Aussehen
+      weder Gruppe noch Verhandlungsverhalten abzulesen ist.
+
+      *Offen geblieben:* Die Figur ist nur bei der Kaffeepause zu sehen; ein
+      Privatmann mit Hund fährt ohne (PKW-Kabine gehört dem Kran-Paket); die
+      Glieder schwingen nicht mehr beim Gehen (Netzbudget, siehe E-077).
 - [ ] **Musik nach Fasson** — Techno, Rap, Schlager, Pop; Radio im Führerhaus
       zum Umschalten.
 - [ ] **Funkgerät im Führerhaus** — Funksprüche von Mario (misstrauisch, was
