@@ -417,10 +417,29 @@ function rollGewerbe(): CustomerProfile {
  * Fahrzeugart, die zu dieser Kundschaft passt.
  *
  * Seit 15.09.2026 steht sie schon im Profil: Das Fahrzeug bestimmt den
- * Laderaum und damit die Menge, es muss also vor der Menge feststehen. Für
- * von Hand gebaute Profile (Tutorial, Tests) bleibt der alte Wurf als
- * Rückfallebene stehen.
+ * Laderaum und damit die Menge, es muss also VOR der Menge feststehen.
+ *
+ * HIER STAND EIN `?? rollFahrzeug(c.group)`, UND ES WAR EIN FEHLER (E-044).
+ *
+ * Gemeint war es als Bequemlichkeit für von Hand gebaute Profile aus Tests
+ * und Tutorial. Was es tat, war schlimmer als ein Absturz: Es WÜRFELTE das
+ * Fahrzeug. Ein Prüfstand, dessen einziger Zweck der Kipper ist, bekam
+ * dadurch zwei Wochen lang gelegentlich eine Pritsche untergeschoben, und der
+ * Wächter war trotzdem grün. Dieselbe Klasse Selbsttäuschung wie ein Wächter,
+ * der `NaN` vergleicht.
+ *
+ * Außerdem ist ein Profil ohne Fahrzeug nicht unvollständig, sondern
+ * WIDERSPRÜCHLICH: Seine Kilogramm sind aus einem Laderaum gerechnet, den es
+ * angeblich nicht gibt. Da ist nichts zu retten, also wird auch nichts
+ * gerettet. Das Feld ist pflichtig, der Typlauf über `test/` (E-038) setzt es
+ * durch, und wer es mit einer Umtypung umgeht, bekommt es gesagt.
  */
 export function vehicleForCustomer(c: CustomerProfile): Fahrzeugart {
-  return c.vehicle ?? rollFahrzeug(c.group);
+  if (!c.vehicle) {
+    throw new Error(
+      `Kundenprofil ohne Fahrzeug: "${c.name}". Das Fahrzeug bestimmt den Laderaum ` +
+        `und damit die Menge — es gehört ins Profil (siehe fuhreFuer/rollCustomer).`
+    );
+  }
+  return c.vehicle;
 }

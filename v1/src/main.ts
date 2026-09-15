@@ -11,6 +11,7 @@ import { OrbitCamera } from "./excavator/orbitCamera";
 import { Yard } from "./world/yard";
 import { ItemManager, type ScrapItem } from "./world/scrapItems";
 import { ContainerManager, type AmpelState } from "./world/containers";
+import { ContainerAbholung } from "./delivery/platzinventarAbholung";
 import { AudioManager } from "./audio/audioManager";
 import { Hud } from "./ui/hud";
 import { Particles } from "./world/particles";
@@ -200,6 +201,23 @@ async function main(): Promise<void> {
     items.settle(physics.world);
   }
   const vehicles = new VehicleManager(scene, physics.world, items, composites);
+  /*
+   * Der Abholer bringt Platzinventar zurueck (E-034/E-044).
+   *
+   * Laedt der Spieler den Muellcontainer versehentlich in den Abhol-Container,
+   * faehrt er nicht mit: Vor der Abfahrt wandert sein INHALT ins ABFALL-Silo,
+   * und die leere Huelle wird am Abladeplatz abgesetzt. Ansage Patrick
+   * 15.09.2026: „Wenn ein Abholer den Muellcontainer mitnimmt, dann bringt er
+   * ihn auch wieder und kippt ihn einfach bei mir ab" — „mit ohne Muell in dem
+   * Fall. Und der Muell landet natuerlich bei uns im Silo."
+   *
+   * Beide Seiten waren gebaut und haben sich nicht gekannt: `ContainerAbholung`
+   * in `delivery/`, `leereBehaelter` in `world/containers.ts`. Ohne diese Zeile
+   * faehrt der Container mit und ist weg — und gemerkt haette man es erst,
+   * wenn er fehlt. Dieselbe Klasse wie beim Besen, der ohne eine Zeile in
+   * dieser Datei nie wiedergekommen waere.
+   */
+  vehicles.platzinventar = new ContainerAbholung(containers, items, physics.world);
   const press = new PressManager(scene, physics.world, items, composites);
   const staff = new StaffManager(
     scene,

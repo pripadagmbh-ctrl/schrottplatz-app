@@ -52,6 +52,20 @@ describe("Platzinventar kommt am naechsten Tag wieder", () => {
     );
   });
 
+  it("und der Abholer bringt Platzinventar zurueck, statt es mitzunehmen", () => {
+    /*
+     * Dieselbe Klasse Fehler, ein Paket spaeter: `ContainerAbholung` in
+     * `delivery/` und `leereBehaelter` in `world/containers.ts` waren beide
+     * gebaut und haben sich nicht gekannt. Ohne die Zeile in `main.ts` faehrt
+     * der Muellcontainer mit dem Abholer davon und ist weg — gemerkt haette man
+     * es erst, wenn er fehlt.
+     */
+    expect(main, "main.ts kennt ContainerAbholung nicht").toContain("ContainerAbholung");
+    expect(main, "vehicles.platzinventar wird nie gesetzt").toMatch(
+      /vehicles\.platzinventar\s*=\s*new ContainerAbholung\(/
+    );
+  });
+
   it("der Spieler erfaehrt davon", () => {
     /*
      * Ein Werkzeug, das ueber Nacht zurueckkommt, ohne dass es jemand sagt,
