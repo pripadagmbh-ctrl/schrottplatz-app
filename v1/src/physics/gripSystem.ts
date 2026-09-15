@@ -3,6 +3,7 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import type { TearTarget } from "../dismantle/composites";
 import {
   CLAW_CLOSED_SPLAY,
+  CLAW_COUNT,
   CLAW_OPEN_SPLAY,
   CLAW_SEGMENTS,
   clawPoint,
@@ -91,8 +92,50 @@ const CRUSH_TIME = 1.1;
 const RELEASE_AVG_STEPS = 3;
 /** Zusaetzlicher Abwaertsimpuls beim Loslassen (m/s) */
 const RELEASE_DOWN = 0.2;
-/** So viele Schalen muessen anliegen, wenn das Teil nicht mittig im Korb sitzt */
+/**
+ * Hoechstens so viele Schalen muessen anliegen, wenn das Teil nicht mittig im
+ * Korb sitzt. Wie viele es wirklich sein muessen, haengt an der Groesse des
+ * Teils — siehe `noetigeKrallen`.
+ */
 const MIN_KRALLEN = 2;
+/**
+ * Abstand zweier benachbarter Schalen bei geschlossener Spinne (m) — GERECHNET.
+ *
+ * Fuenf Schalen stehen im Kreis; an der Station, die `krallenKontakte`
+ * abtastet (`CLAW_SEGMENTS * 0.6`), liegen zwei Nachbarn 0,629 m auseinander.
+ * Die Zahl kommt aus `clawGeometry`, nicht aus einer Schaetzung, und wandert
+ * mit, wenn jemand die Krallenform aendert.
+ *
+ * Wofuer sie gebraucht wird, steht bei `noetigeKrallen`.
+ */
+export const SCHALENLUECKE: number = (() => {
+  const a = new THREE.Vector3();
+  const b = new THREE.Vector3();
+  const station = Math.round(CLAW_SEGMENTS * 0.6);
+  clawPoint(0, CLAW_CLOSED_SPLAY, station, a);
+  clawPoint((1 / CLAW_COUNT) * Math.PI * 2, CLAW_CLOSED_SPLAY, station, b);
+  return a.distanceTo(b);
+})();
+/**
+ * Wie viele Schalen an einem Teil dieser Groesse anliegen muessen, damit es
+ * als gefasst gilt — die Regel als reine Rechnung, damit sie ohne Welt
+ * nachzuprüfen ist (`test/greifhaufen.test.ts`). Begruendung bei
+ * `GripSystem.noetigeKrallen`.
+ */
+export function noetigeKrallenFuer(groesseM: number): number {
+  return Math.min(MIN_KRALLEN, Math.floor(groesseM / SCHALENLUECKE));
+}
+/** Richtungen, in denen die Groesse eines Teils abgetastet wird */
+const TASTRICHTUNGEN: ReadonlyArray<[number, number, number]> = [
+  [1, 0, 0],
+  [-1, 0, 0],
+  [0, 1, 0],
+  [0, -1, 0],
+  [0, 0, 1],
+  [0, 0, -1],
+];
+/** So weit ausserhalb wird getastet — jedes Schrottteil ist kleiner als das */
+const TASTWEITE = 50;
 
 /**
  * Eine Greifstelle: welcher Koerper, wo die Schale ihn fasst und mit welcher
@@ -297,14 +340,19 @@ export class GripSystem {
           /*
            * Kontaktbedingung: Eine Kiste, die mit einer Ecke in den Korb
            * ragt, bestand die Pruefung oben — und hing dann halb neben der
-           * Spinne in der Luft. Jetzt braucht es entweder zwei anliegende
+           * Spinne in der Luft. Es braucht deshalb entweder anliegende
            * Schalen oder den Schwerpunkt mitten im Korb.
+           *
+           * Wie viele Schalen, haengt an der Groesse des Teils
+           * (`noetigeKrallen`) — feste zwei waren fuer Kleinteile
+           * unerfuellbar.
            */
           if (this.krallenKontakte) {
             const mitte = body.translation();
             const mittig =
               this.insideGrapple?.(this.probe.set(mitte.x, mitte.y, mitte.z)) ?? false;
-            if (!mittig && this.krallenKontakte(body) < MIN_KRALLEN) return true;
+            const noetig = mittig ? 0 : this.noetigeKrallen(body);
+            if (noetig > 0 && this.krallenKontakte(body) < noetig) return true;
           }
           candidates.push(body);
         }
@@ -320,6 +368,78 @@ export class GripSystem {
       if (this.attachBody(body)) added++;
     }
     if (added > 0) this.onGrabbed?.(this.grippedBodies);
+  }
+
+  /**
+   * Groesster Durchmesser eines Teils (m).
+   *
+   * Rapier gibt keine Huellbox her, also wird sie getastet: Ein Punkt weit
+   * ausserhalb, auf jede der sechs Achsenrichtungen gelegt, und dann gefragt,
+   * welcher Punkt der Oberflaeche ihm am naechsten liegt — das ist der
+   * aeusserste Punkt in dieser Richtung. Mehrteilige Kollider (Formen mit
+   * Taille) zaehlen alle mit, sonst waere ein zweiteiliges Teil nur halb so
+   * gross.
+   *
+   * Im Zweifel zu gross statt zu klein: Gemessen wird vom Schwerpunkt aus und
+   * verdoppelt. Das ist Absicht — die Groesse lockert unten eine Pruefung, und
+   * eine Lockerung soll eher zu selten als zu oft greifen.
+   */
+  private groesseVon(body: RAPIER.RigidBody): number {
+    const c = body.translation();
+    let gross = 0;
+    for (let i = 0; i < body.numColliders(); i++) {
+      const col = body.collider(i);
+      if (!col) continue;
+      for (const [dx, dy, dz] of TASTRICHTUNGEN) {
+        const pr = col.projectPoint(
+          {
+            x: c.x + dx * TASTWEITE,
+            y: c.y + dy * TASTWEITE,
+            z: c.z + dz * TASTWEITE,
+          },
+          true
+        );
+        if (!pr) continue;
+        gross = Math.max(
+          gross,
+          2 * Math.hypot(pr.point.x - c.x, pr.point.y - c.y, pr.point.z - c.z)
+        );
+      }
+    }
+    return gross;
+  }
+
+  /**
+   * Wie viele Schalen an einem Teil anliegen muessen, damit es als gefasst
+   * gilt — abhaengig von seiner Groesse (Befund 15.09.2026).
+   *
+   * Warum ueberhaupt abhaengig: Fuenf Schalen stehen im Kreis. Zwischen zwei
+   * benachbarten ist selbst bei geschlossener Spinne eine Luecke von
+   * `SCHALENLUECKE` = 0,63 m, und im Greiffenster (Schliessgrad 0,6 bis 0,98)
+   * sind es bis zu 1,30 m. Ein Teil, das kleiner ist als diese Luecke, kann
+   * zwei Schalen gar nicht beruehren — von ihm zwei Kontakte zu verlangen ist
+   * eine Bedingung, die es nie erfuellen kann.
+   *
+   * Nachgemessen im Haufen (15.09.2026, 63 Griffe, drei Zufallssaaten): Ueber
+   * das ganze Greiffenster meldet `krallenKontakte` fuer Teile bis 0,40 m
+   * hoechstens 0, 1 oder 2 Kontakte — meist 0. Das Abtasten aller neun
+   * Stationen statt zweier aendert daran nichts (gemessen: dieselben Zahlen,
+   * nur der Betonblock steigt von 3 auf 5); die Schalen liegen in diesem
+   * Moment schlicht noch nicht an. Die Bedingung fiel deshalb in der Praxis
+   * immer auf die Ausnahme „Schwerpunkt mittig" zurueck, und wo die nicht
+   * griff — am Korbrand —, blieb das Teil liegen, obwohl es nachweislich
+   * zwischen den Schalen lag (gemessen: 61 Bilder „im Korb und trotzdem
+   * abgelehnt").
+   *
+   * Die Regel: je angefangener Schalenluecke, die das Teil ueberspannt, eine
+   * Schale mehr, gedeckelt auf `MIN_KRALLEN`. Unter 0,63 m also keine — dann
+   * entscheidet allein, ob das Teil im Korb liegt (`insideGrapple`). Ab
+   * 1,26 m bleibt es bei zwei, und damit bleibt die Kiste, die nur mit einer
+   * Ecke hineinragt, draussen — der Fehler vom 11.09.2026, den diese
+   * Bedingung repariert hat.
+   */
+  private noetigeKrallen(body: RAPIER.RigidBody): number {
+    return noetigeKrallenFuer(this.groesseVon(body));
   }
 
   /*
