@@ -3058,3 +3058,71 @@ Wandstärke gehört ins Griff-Info-HUD, damit man die Regel am Teil ablesen kann
 3. Eine **Gitterbox** und einen **Doppel-T-Träger** greifen: Ist ohne Zahl zu
    ahnen, dass sie in verschiedene Mulden gehören? Davon hängt ab, ob die
    HUD-Zeile gebaut wird.
+
+### E-052 — Kein Stückzahl-Deckel mehr; ein Wächter statt einer stillen Grenze (15.09.2026)
+
+**Entscheidung.** `MAX_ITEMS` fällt ersatzlos. Was gehalten wird, kommt mit —
+ohne Obergrenze. Einzige Grenze bleibt die Traglast `MAX_TOTAL_KG` (3.500 kg);
+die ist Tragfähigkeit, keine Auswahl. An die Stelle des Deckels tritt ein
+**Wächter**, der misst, wie viele Körper im echten Starthaufen gleichzeitig die
+Greifbedingung erfüllen.
+
+**Begründung.** Ansage Patrick 15.09.2026 auf die Frage, ob 11 bis 14 hängende
+Teile im dichten Nest zu viel sind: **„Deckel ganz weg."** Mit E-045 war der
+Deckel schon kein Auswahlmittel mehr, sondern ein Notnagel von 24 gegen einen
+künftigen Fehler in der Greifbedingung. Der Einwand war richtig, die Antwort
+falsch: **Ein Deckel verdeckt so einen Fehler, statt ihn zu zeigen** — die
+Maschine greift dann 24 Teile statt 200, und niemand merkt, dass die Bedingung
+kaputt ist. Ein Test, der rot wird, ist mehr wert als eine Grenze, die stumm
+abschneidet.
+
+**Der Wächter, der den Deckel ersetzt.** `test/greifhaufen.test.ts`, „ein Griff
+in den gewürfelten Starthaufen nimmt eine Handvoll": echter Starthaufen
+(`spawnPile`, 150 Teile mit den Formen des Objektkatalogs), drei Saaten.
+Gemessen **2 bis 4 Kandidaten je Griff, 2 bis 4 Teile im Korb, 160 bis 250 kg**,
+aus 105 bis 123 Teilen. Die Schwellen liegen beim Doppelten (8 Stück, 600 kg).
+Gegenprobe gesehen: Mit absichtlich ausgehängter Greifbedingung meldet er
+**„22 Körper erfüllten gleichzeitig die Greifbedingung — gemessen sind 2 bis 4.
+Das riecht nach einem Fehler in der Bedingung, nicht nach einem fehlenden
+Deckel."**
+
+**Der ungedeckelte Extremfall, gemessen** (dichtestes Nest, das sich bauen
+lässt — im Spiel kommt es so nicht vor):
+
+| Nest | Kandidaten | im Korb | Masse | Physik je Schritt | schnellster loser Körper | unter dem Beton |
+|---|---|---|---|---|---|---|
+| 40 Teile à 0,15–0,30 m | 29–33 | **31–35** | 438–579 kg | 2,8–4,4 ms | 8,4 m/s | 0 |
+| 60 Teile à 0,12–0,22 m | 33–39 | **34–40** | 248–323 kg | 2,8–3,9 ms | 10,7 m/s | 0 |
+| 20 Brocken à 200–400 kg | 14–17 | 11 | **3.371–3.395 kg** | 1,7–3,0 ms | 7,9 m/s | 0 |
+
+Zum Vergleich: Der echte Starthaufen kostet beim Setzen 5,7 bis 14,8 ms je
+Schritt — vierzig hängende Teile sind billiger als ein Haufen, der sich legt.
+**Zeichenrufe ändern sich nicht:** Greifen erzeugt keine Netze, es bewegt nur
+vorhandene. Nichts kippt, also bleibt es beim Deckel-weg.
+
+**Die Traglast ist jetzt der einzige Abschneider — und sie schneidet das
+Lockerste ab.** Die dritte Zeile oben zeigt sie bei der Arbeit: 17 Körper
+erfüllen die Bedingung, 11 passen an den Haken, bei 3.395 von 3.500 kg ist
+Schluss. Welche das sind, entscheidet die Sortierung nach Haltwert aus E-045.
+Eigener Wächter mit zwei gleich schweren 2.000-kg-Brocken (zusammen 4.000 kg,
+einer bleibt liegen): Mitkommen muss der, der **tiefer im Korb** liegt. Mit
+verdrehter Sortierung ist er rot.
+
+**Verworfene Alternative.** Deckel bei 24 lassen (verdeckt Fehler, siehe oben);
+einen Deckel aus der Traglast ableiten (dieselbe stille Grenze, nur mit mehr
+Rechnerei).
+
+**Abnahmekriterium.** `npm test` grün, zwei neue Wächter darunter, beide einmal
+rot gesehen. Die beiden alten Fehler bleiben ausgeschlossen: kein Saugen
+(gefasste Teile wandern ≤ 0,030 m, Schwelle 0,05) und die Kiste mit nur einer
+Ecke im Korb bleibt liegen — auf dem Beton wie im Haufen.
+
+**Auf dem Gerät zu prüfen.**
+
+1. In eine **dichte** Stelle greifen: Wie viel hängt jetzt in der Spinne, und
+   fühlt sich das nach einem Biss an — oder nach Klettverschluss?
+2. Eine **schwere** Ladung greifen (Traktor-Frontgewicht, LKW-Achse, mehrere
+   Brocken): Merkt man die Traglastgrenze, wenn sie greift, oder wirkt es, als
+   ginge einfach etwas nicht?
+3. Gegenprobe wie immer: nur an die **Kante** einer großen Kiste fahren — sie
+   darf nicht mitkommen.

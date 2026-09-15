@@ -18,28 +18,24 @@ import {
  * Abrutschen (8 %/s unter Last) kommt in M1 — M0 hält, was gegriffen ist.
  */
 
-/**
- * Notnagel gegen Ausreisser — KEIN Auswahlmittel mehr (E-045, 15.09.2026).
+/*
+ * KEINE Stueckzahlgrenze (E-052, 15.09.2026).
  *
- * Bis heute stand hier 5, und weil `candidates` nach Gewicht sortiert war,
- * entschied der Deckel mit: Im dichten Nest aus Kleinteilen erfuellten 7 bis
- * 12 Koerper die Greifbedingung, die fuenf schwersten kamen mit, das
- * anvisierte 8-kg-Teil nie (gemessen: 0 von 5 Versuchen, in JEDEM Bild des
- * Greiffensters vom vollen Korb abgewiesen).
+ * Hier stand `MAX_ITEMS`: erst 5, dann kurz 24. Ansage Patrick: „Deckel ganz
+ * weg." Was gehalten wird, kommt mit — die einzige Grenze ist die Traglast
+ * (`MAX_TOTAL_KG`), und die ist Tragfaehigkeit, keine Auswahl.
  *
- * Ansage Patrick 15.09.2026: „Worauf du zielst, das bekommst du: Alles
- * mitnehmen, was in der Spinne liegt und wo der Greifer sich festkrallt oder
- * was verkantet ist. Nicht nach Gewicht gehen."
- *
- * Die Zahl hat jetzt eine gemessene Herkunft statt einer gegriffenen: Im
- * echten Starthaufen (150 gewuerfelte Teile, drei Saaten) erfuellen je Griff
- * 2 bis 4 Koerper die Bedingung; im kuenstlich dichten Nest aus lauter
- * Kleinteilen waren es hoechstens 12. 24 ist das Doppelte des je Gemessenen —
- * hoch genug, dass der Deckel nie auswaehlt, und niedrig genug, dass ein
- * Fehler (etwa eine Sensorkugel, die zu gross wird) nicht unbemerkt den
- * halben Platz anhaengt. Die echte Grenze ist das Gewicht, siehe unten.
+ * Der Grund, warum vorher noch ein Notnagel von 24 dastand, war nicht das
+ * Spiel, sondern die Sorge vor einem kuenftigen Fehler: Wenn die Greifbedingung
+ * einmal kaputtgeht — etwa weil die Sensorkugel zu gross geraet —, haengt die
+ * Maschine sonst den halben Platz an. Der Einwand bleibt richtig, die Antwort
+ * war falsch: Ein Deckel VERDECKT so einen Fehler (die Maschine nimmt dann 24
+ * statt 200 Teile und niemand merkt etwas). Die Antwort ist ein Waechter, der
+ * rot wird — `test/greifhaufen.test.ts`, „ein Griff in den gewuerfelten
+ * Starthaufen nimmt eine Handvoll": gemessen 2 bis 4 Teile je Griff, 160 bis
+ * 250 kg, aus 105 bis 123 echten Teilen. Wenn dort je deutlich mehr haengen,
+ * faellt der Test auf und sagt, dass die Bedingung kaputt ist.
  */
-const MAX_ITEMS = 24;
 const MAX_TOTAL_KG = 3500; // (SW) — eine ganze Karosse muss hochgehen
 // Greif-Fenster: solange die Spinne schließt und noch nicht ganz zu ist, wird
 // kontinuierlich zugepackt — so lassen sich fallende Objekte auffangen.
@@ -579,7 +575,8 @@ export class GripSystem {
 
   /** Körper per Fixed Joint an den Greifer koppeln (auch von der Reiß-Mechanik genutzt). */
   attachBody(body: RAPIER.RigidBody): boolean {
-    if (this.items.length >= MAX_ITEMS) return false;
+    // Keine Stueckzahlgrenze mehr (E-052). Was gehalten wird, kommt mit; die
+    // einzige Grenze ist die Traglast.
     if (this.items.some((it) => it.body.handle === body.handle)) return false; // schon gegriffen
     if (this.totalMassKg + body.mass() > MAX_TOTAL_KG * (this.getCapacityBonus?.() ?? 1))
       return false;
