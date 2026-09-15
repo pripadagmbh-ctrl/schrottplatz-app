@@ -1545,6 +1545,20 @@ export function baueGreiferschale(
      * Zeichnung: knapp die halbe Ferse trägt den Arm, der Absatz sitzt im
      * zweiten Drittel. Sie ändern nichts an Bolzen- und Schalenquerschnitt —
      * nur daran, WO dazwischen die Dicke verloren geht.
+     *
+     * AM 15.09.2026 PROBEWEISE AUSGELAUFEN UND WIEDER ZURÜCKGENOMMEN (E-069).
+     * Patricks Vorbildfoto (`docs/f5-vorbild-aufnahme-patrick-2026-09-15.jpg`)
+     * zeigt an genau dieser Stelle — sein gelber Kringel liegt darauf — einen
+     * durchgehenden Schwung ohne Absatz. Gemessen ist der Absatz hier auch
+     * deutlich: Im stärksten Zehntel verliert der Arm das **3,8-fache** seines
+     * mittleren Dickenabfalls (`tools/fuenfschalen/kontur.ts`).
+     *
+     * Eine einzige Glättung über die ganze Ferse (`w = t²·(3−2t)`) bringt das
+     * auf **1,7** — und kostet dem **Zylinderauge seinen Sitz im Guss**: Es
+     * steht danach **60 statt 26 mm** vor dem `06_ZINKEN` (gemessen mit
+     * `traverse-messen.miss`). Genau diese Eigenschaft hat E-013 erkämpft, als
+     * die Konsole abgeschafft wurde. Die Schulter bleibt deshalb stehen, bis
+     * die Anlenkung mitgeplant wird — mit beiden Zahlen im Log.
      */
     const SCHULTER_AB = 0.42;
     const SCHULTER_BIS = 0.74;
@@ -1835,26 +1849,39 @@ export function zahnEigenwinkel(): number {
  * Anstellwinkel des Zahns GEGEN DIE SCHALE (rad) — eine feste Zahl, keine
  * Animation.
  *
- * An einem echten Greifer ist der Zahn starr angeschraubt. Dass er offen
- * senkrecht steht, ergibt sich aus der Form des Schalenendes: Der Sitz ist
- * schräg gegossen. Das ist diese Zahl.
+ * Mit dem gebauten Anschlag ist sie **null**: Der Zahn sitzt TANGENTIAL auf
+ * dem Schalenende, seine Sitzfläche setzt die Krümmung der Schale fort, und am
+ * Übergang gibt es keinen Richtungssprung.
  *
- * Hergeleitet, nicht gewählt. Die Weltdrehung des Zahns ist
+ * DAS IST EINE ENTSCHEIDUNG GEGEN EINE FRÜHERE, UND SIE IST SO GEWOLLT.
+ * Bitte nicht „reparieren".
  *
- *   −Schwenk + `schalenEnde().th` + Anstellung
+ *   13.09.2026, Patrick: „wenn die Spinne offen ist, sollten die Schalen
+ *   weiter offen gehen, sodass die Spitzen senkrecht stehen."
  *
- * und lotrecht steht er, wenn sie bei Schwenk = `OFFEN` gerade
- * `zahnEigenwinkel()` beträgt. Umgestellt:
+ * Daraus wurde am 14.09.2026 ein Term `+ zahnEigenwinkel()`: Der Zahn ist über
+ * seine 250 mm mit R 0,70 gebogen, seine ACHSE liegt also 12,15° hinter seiner
+ * Sitztangente, und um genau diese 12,15° wurde er gegendreht, damit die Achse
+ * offen lotrecht steht. Die Gegendrehung IST der sichtbare Knick.
  *
- *   Anstellung = OFFEN − schalenEnde().th + zahnEigenwinkel()
+ *   15.09.2026, Patrick vor dem Bild und einem Vorbildfoto: „dieser harte
+ *   Knick im Zahn, den gibt es nicht. Das ist nicht so."
  *
- * Mit dem heutigen Formsatz sind `OFFEN` und `schalenEnde().th` dieselben
- * 96,25°, es bleiben die 12,15° der Eigenbiegung. Die Formel bleibt trotzdem
- * stehen: Wer `OFFEN` anfasst, bekommt die Anstellung mitgeführt, statt den
- * Zahn wieder schief zu stellen.
+ * Am Blatt `docs/f5-zahnknick-2026-09-15.svg` standen drei Formen; Patrick hat
+ * **B** gewählt (E-069). Der Term fällt weg. Der Preis steht im Log und ist
+ * gemessen: Der Zahn hängt bei voll geöffnetem Greifer **12,15° nach innen**
+ * statt lotrecht. Die Alternative C hätte die Achse lotrecht gehalten, dafür
+ * aber den Hebelarm des Zylinders ganz offen von 118 auf 47 mm fallen lassen —
+ * genau die Zahl, für die E-039 die Traverse umgebaut hat.
+ *
+ * Die Formel bleibt als Formel stehen, weil die Weltdrehung des Zahns
+ * `−Schwenk + schalenEnde().th + Anstellung` ist: Wer über den `Formsatz` in
+ * `rig.ts` einen anderen Anschlag setzt, bekommt damit die SITZTANGENTE offen
+ * lotrecht gestellt — dieselbe Regel wie für die Schale, nur auf den Zahn
+ * durchgezogen. Beim gebauten Anschlag ist das Ergebnis null.
  */
 export function zahnAnstellung(offen = OFFEN): number {
-  return offen - schalenEnde().th + zahnEigenwinkel();
+  return offen - schalenEnde().th;
 }
 
 /** Wie hoch der Zahnsitz über der Mittellinie der Schale liegt (m). */

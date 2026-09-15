@@ -75,14 +75,17 @@ describe("Fuenfschalengreifer — die Form am Bagger", () => {
   it("Sensorradius und Schalenluecke treffen die Rechnung aus E-048", () => {
     /*
      * E-048 hat 1,2289 m gerechnet: tiefste Mittellinie (2,5489) + 0,18 Luft
-     * − 1,50 Sitz. Am Bagger sind es 1,2511 m, und der Unterschied ist
-     * gemessen, nicht gewaehlt: Der Korbboden reicht bis an die GEZEICHNETEN
-     * Zaehne (2,7511 m), die 0,202 m unter der Mittellinie haengen — mehr als
-     * die 0,18 m Luft. Ohne die 2,2 cm blieb ein 6 cm dickes Blech auf dem
-     * Beton liegen, obwohl die Zaehne daran standen
-     * (`greiferwechsel.test.ts`).
+     * − 1,50 Sitz. Bis E-069 waren es am Bagger 1,2511 m, weil der Korbboden
+     * bis an die gezeichneten Zaehne reichte (2,7511 m) und die 0,202 m unter
+     * der Mittellinie mehr sind als die 0,18 m Luft.
+     *
+     * Seit E-069 sitzt der Zahn tangential; der tiefste Punkt ueber den Weg
+     * liegt bei 2,7071 m, und 2,7071 − 1,50 = 1,2071 ist KLEINER als die
+     * 1,2289 aus E-048. Damit gewinnt wieder die Mittellinienrechnung —
+     * `sensorRadius` nimmt das Maximum der beiden, und genau das ist der Zweck
+     * dieser Formel: Sie folgt der Form, statt eine Zahl festzuhalten.
      */
-    expect(FUENFSCHALEN.sensorRadius).toBeCloseTo(1.2511, 4);
+    expect(FUENFSCHALEN.sensorRadius).toBeCloseTo(1.2289, 4);
     expect(2.5489 + 0.18 - 1.5, "die Rechnung aus E-048").toBeCloseTo(1.2289, 4);
     expect(FUENFSCHALEN.schalenluecke).toBeCloseTo(0.5954, 4);
     expect(FUENFSCHALEN.sensorSitz, "Sensorsitz wie bei der Sichelkralle").toBe(1.5);
@@ -126,14 +129,17 @@ describe("Fuenfschalengreifer — die Form am Bagger", () => {
     expect(vonMitte, "von der Korbmitte aus braeuchte es mehr als 0,689 m").toBeGreaterThan(0.689);
   });
 
-  it("die Grabtiefe kommt vom gezeichneten Zahn", () => {
-    // Gegenprobe am gebauten Modell: Unterkante des Knotens `07_ZAHN`.
+  it("die Grabtiefe kommt von der ganzen gezeichneten Schale, nicht nur vom Zahn", () => {
+    /*
+     * BIS E-069 STAND HIER NUR `07_ZAHN` — und das war um 1,4 cm daneben.
+     * Gemessen (E-068): Der Ruecken des Zinken reicht geschlossen 2,5127 m
+     * unter die Aufhaengung, der Zahn nur 2,4988 m. Der Bodenanschlag rechnete
+     * also mit einer Schale, die hoeher endet, als sie es tut, und `imKorb`
+     * legte seinen Korbboden ebenso hoch. Jetzt zaehlt jedes Netz der Schale.
+     */
     const g = baueGreifer(stoffe());
-    const zaehne: THREE.Object3D[] = [];
-    g.wurzel.traverse((n) => {
-      if (n.name === "07_ZAHN") zaehne.push(n);
-    });
-    expect(zaehne.length, "fuenf Zaehne").toBe(5);
+    const zaehne: THREE.Object3D[] = g.schalen.map((s) => s.gelenk);
+    expect(zaehne.length, "fuenf Schalen").toBe(5);
     const v = new THREE.Vector3();
     const amModell = (t: number): number => {
       g.setOeffnung(t);
@@ -164,13 +170,26 @@ describe("Fuenfschalengreifer — die Form am Bagger", () => {
      */
     expect(groesste, "gerechnete gegen gezeichnete Tiefe (m)").toBeLessThan(5e-5);
 
-    // Die Zahlen aus E-048
-    expect(FUENFSCHALEN.maxTiefe).toBeCloseTo(2.7511, 4);
+    /*
+     * Die Zahlen nach E-069. Vorher: maxTiefe 2,7511 · zu 2,4987 · offen
+     * 2,2173. Zwei Dinge haben sich geaendert, beide gewollt: Der Zahn sitzt
+     * tangential — der tiefste Punkt UEBER DEN WEG kommt dadurch 4,4 cm
+     * hoeher —, und gemessen wird die ganze Schale, die geschlossen 1,4 cm
+     * tiefer reicht als der Zahn allein.
+     */
+    expect(FUENFSCHALEN.maxTiefe).toBeCloseTo(2.7071, 4);
     expect(FUENFSCHALEN.tiefe(schwenkFuer(1)), "offen").toBeCloseTo(2.2173, 3);
-    expect(FUENFSCHALEN.tiefe(ZU), "geschlossen").toBeCloseTo(2.4987, 3);
-    expect(FUENFSCHALEN.maxTiefe - FUENFSCHALEN.tiefe(schwenkFuer(1))).toBeCloseTo(0.534, 3);
+    expect(FUENFSCHALEN.tiefe(ZU), "geschlossen").toBeCloseTo(2.5127, 3);
+    /*
+     * Die SCHWEBEHOEHE geschlossen — Patricks eigentliche Beanstandung vom
+     * 15.09.2026. Vorher 25,2 cm gerechnet (23,8 cm wirklich), jetzt 19,4 cm.
+     */
+    expect(
+      FUENFSCHALEN.maxTiefe - FUENFSCHALEN.tiefe(ZU),
+      "schwebt geschlossen ueber dem Beton"
+    ).toBeCloseTo(0.194, 3);
 
-    // Und der Zahn ist wirklich das Tiefste am ganzen Greifer.
+    // Und die Schale ist wirklich das Tiefste am ganzen Greifer.
     let alles = 0;
     for (let i = 0; i <= 20; i++) {
       g.setOeffnung(i / 20);
@@ -185,7 +204,7 @@ describe("Fuenfschalengreifer — die Form am Bagger", () => {
         }
       });
     }
-    expect(FUENFSCHALEN.maxTiefe, "etwas haengt tiefer als der Zahn").toBeGreaterThanOrEqual(
+    expect(FUENFSCHALEN.maxTiefe, "etwas haengt tiefer als die Schale").toBeGreaterThanOrEqual(
       alles - 0.001
     );
   }, 60000);

@@ -103,13 +103,19 @@ function punkt(a: number, schwenk: number, k: number, out: THREE.Vector3): THREE
 /* ------------------------------------------------------------ Die Grabtiefe */
 
 /**
- * Die Unterkante des Zahns, abgegriffen am GEBAUTEN Modell.
+ * Die Unterkante der SCHALE, abgegriffen am GEBAUTEN Modell.
  *
- * Gemessen wird am Knoten `07_ZAHN` der ersten Schale in der geschlossenen
- * Stellung (Schwenk 0, Schale also unverdreht, ihr lokales +z zeigt in
- * Welt-+z). Die Punkte werden in den Rahmen der Schale umgerechnet und
- * gemerkt; von da an laesst sich die Tiefe fuer jeden Schwenk rechnen, ohne
- * noch einmal ein Netz anzufassen.
+ * Bis zum 15.09.2026 stand hier nur der Knoten `07_ZAHN` — und das war um
+ * 1,4 cm daneben. Gemessen (E-068, `tools/fuenfschalen/zahnknick.ts`): Der
+ * Ruecken des Zinken reicht geschlossen 2,5127 m unter die Aufhaengung, der
+ * Zahn nur 2,4988 m. Der Bodenanschlag rechnete also mit einer Schale, die
+ * 14 mm hoeher endet, als sie es tut — und `imKorb` setzte seinen Korbboden
+ * ebenso hoch an. Jetzt zaehlt jedes Netz der Schale.
+ *
+ * Gemessen in der geschlossenen Stellung (Schwenk 0, Schale also unverdreht,
+ * ihr lokales +z zeigt in Welt-+z). Die Punkte werden in den Rahmen der
+ * Schale umgerechnet und gemerkt; von da an laesst sich die Tiefe fuer jeden
+ * Schwenk rechnen, ohne noch einmal ein Netz anzufassen.
  *
  * Der Bau kostet rund 0,25 s (gemessen auf dem Entwicklungsrechner) und
  * passiert genau einmal — beim ersten Mal, an dem jemand nach der Tiefe des
@@ -118,7 +124,7 @@ function punkt(a: number, schwenk: number, k: number, out: THREE.Vector3): THREE
 let zahnpunkte: Array<{ y: number; z: number }> | null = null;
 
 /**
- * Den Zahn an einem GESCHLOSSENEN Modell abgreifen und merken.
+ * Die Schale an einem GESCHLOSSENEN Modell abgreifen und merken.
  *
  * Die erste Schale steht auf Umfangswinkel 0, ihr lokales +z zeigt also in
  * Welt-+z; bei Schwenk 0 ist sie unverdreht. Damit lassen sich die Weltpunkte
@@ -128,22 +134,64 @@ function zahnAusModell(g: ReturnType<typeof baueGreifer>): void {
   if (zahnpunkte) return;
   g.setOeffnung(0);
   g.wurzel.updateMatrixWorld(true);
-  const raus: Array<{ y: number; z: number }> = [];
+  const roh: Array<{ y: number; z: number }> = [];
   const v = new THREE.Vector3();
-  g.schalen[0]!.gelenk.traverse((n) => {
-    if (n.name !== "07_ZAHN") return;
-    n.traverse((m) => {
-      const netz = m as THREE.Mesh;
-      if (!netz.isMesh) return;
-      const pos = netz.geometry.getAttribute("position") as THREE.BufferAttribute;
-      for (let k = 0; k < pos.count; k++) {
-        v.fromBufferAttribute(pos, k).applyMatrix4(netz.matrixWorld);
-        raus.push({ y: v.y - STEMPEL_AUGE.y, z: v.z - STEMPEL_AUGE.r });
-      }
-    });
+  g.schalen[0]!.gelenk.traverse((m) => {
+    const netz = m as THREE.Mesh;
+    if (!netz.isMesh) return;
+    const pos = netz.geometry.getAttribute("position") as THREE.BufferAttribute;
+    for (let k = 0; k < pos.count; k++) {
+      v.fromBufferAttribute(pos, k).applyMatrix4(netz.matrixWorld);
+      roh.push({ y: v.y - STEMPEL_AUGE.y, z: v.z - STEMPEL_AUGE.r });
+    }
   });
-  if (raus.length === 0) throw new Error("07_ZAHN nicht gefunden");
-  zahnpunkte = raus;
+  if (roh.length === 0) throw new Error("Schale 0 hat keine Netze");
+  zahnpunkte = tiefstenRand(roh);
+}
+
+/**
+ * Nur die Punkte behalten, die ueberhaupt einmal der tiefste sein koennen.
+ *
+ * Im Bolzenrahmen liegt ein Punkt (y, z) beim Schwenk `s` genau
+ *   T(s) = |y_Bolzen| − y·cos s + z·sin s
+ * unter der Aufhaengung (E-065). Fuer jedes `s` gewinnt damit der Punkt, der
+ * das Skalarprodukt mit (−cos s, sin s) maximiert — und das ist IMMER ein Punkt
+ * auf der konvexen Huelle. Alles dazwischen kann weg.
+ *
+ * Aus 1.296 Netzpunkten werden so eine Handvoll. Das ist kein Sparen um des
+ * Sparens willen: `tiefe()` laeuft in `imKorb` je Kandidat und Bild, und mit
+ * dieser Kuerzung kostet der Wechsel von „nur der Zahn" auf „die ganze Schale"
+ * nichts.
+ */
+function tiefstenRand(p: Array<{ y: number; z: number }>): Array<{ y: number; z: number }> {
+  /*
+   * Gesucht wird nicht die Huelle als Figur, sondern der SIEGER je Schwenk —
+   * und den kann man einfach abfragen. 2.000 Schwenkstellungen ueber den
+   * ganzen Weg, je Stellung der tiefste Punkt, doppelte weggelassen. Zwischen
+   * zwei Stellungen liegen 0,05 Grad; der Fehler dabei ist kleiner als ein
+   * Tausendstel Millimeter.
+   *
+   * Eine Huellenrechnung waere kuerzer und leichter falsch. Das hier ist
+   * dieselbe Frage, wie `tiefe()` sie stellt, nur vorher.
+   */
+  const gewinner = new Set<number>();
+  const N = 2000;
+  for (let i = 0; i <= N; i++) {
+    const s = ZU + ((OFFEN - ZU) * i) / N;
+    const c = Math.cos(s);
+    const sn = Math.sin(s);
+    let best = -Infinity;
+    let wo = 0;
+    for (let k = 0; k < p.length; k++) {
+      const t = -p[k]!.y * c - p[k]!.z * sn;
+      if (t > best) {
+        best = t;
+        wo = k;
+      }
+    }
+    gewinner.add(wo);
+  }
+  return [...gewinner].map((i) => p[i]!);
 }
 
 function messeZahn(): Array<{ y: number; z: number }> {

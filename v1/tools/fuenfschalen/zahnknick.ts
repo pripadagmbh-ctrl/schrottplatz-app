@@ -66,14 +66,14 @@ const GRUND = { drehpunktR: STEMPEL_AUGE.r, versatz: DREHPUNKT.versatz };
 const FORMEN: Form[] = [
   {
     kurz: "A",
-    name: "A — heute gebaut",
+    name: "A — bis 15.09. gebaut",
     ruf: "Zahn 12,15° angestellt",
     form: { ...GRUND, offen: OFFEN },
-    anstellung: zahnAnstellung(OFFEN),
+    anstellung: zahnEigenwinkel(),
   },
   {
     kurz: "B",
-    name: "B — Knick weg, Anschlag bleibt",
+    name: "B — SEIT E-069 GEBAUT",
     ruf: "Zahn tangential, 96,25°",
     form: { ...GRUND, offen: OFFEN },
     anstellung: 0,
@@ -105,7 +105,7 @@ function baue(f: Form): ReturnType<typeof baueGreiferInTeilen> {
    * ist `anstellung`, also wird der Wert eingesetzt, der sie ergibt:
    *   anstellung = offen − th + eigen   →   offen = anstellung + th − eigen
    */
-  const ersatz = f.anstellung + schalenEnde().th - zahnEigenwinkel();
+  const ersatz = f.anstellung + schalenEnde().th;
   for (let i = 0; i < g.schalen.length; i++) {
     const nr = String(i + 1).padStart(2, "0");
     const alt = g.schalen[i]!.gelenk.getObjectByName(`SHELL_TIP_${nr}`)!;
@@ -430,7 +430,7 @@ function main(): void {
   T(
     40,
     82,
-    "Fünfschalengreifer · Schattenrisse der gebauten Netze, alle im selben Maßstab · gebaut ist keine der drei · 15.09.2026",
+    "Fünfschalengreifer · Schattenrisse der gebauten Netze, alle im selben Maßstab · B ist seit E-069 gebaut · 15.09.2026",
     15,
     FARBE.grau,
     "start"
@@ -534,9 +534,9 @@ function main(): void {
     /* ---- Das Urteil ---- */
     const urteil =
       i === 0
-        ? ["Der Knick ist da.", "Alles andere stimmt."]
+        ? ["Der Knick ist da.", "Alles andere stimmt.", "Bis 15.09. gebaut."]
         : i === 1
-          ? ["Knick weg, alle Kennwerte", "bleiben — aber der Zahn steht", "offen 12° schief."]
+          ? ["GEBAUT. Knick weg, alle", "Kennwerte bleiben — der Zahn", "steht offen 12° schief."]
           : ["Knick weg, Zahn lotrecht —", "aber der Hebelarm offen fällt", "von 118 auf 52 mm."];
     urteil.forEach((s, k) => T(mx, 1640 + k * 24, s, 16, i === 0 ? FARBE.grau : FARBE.schlecht));
   });
