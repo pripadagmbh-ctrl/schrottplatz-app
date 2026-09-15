@@ -2800,3 +2800,102 @@ Ursache der verbleibenden Fehlgriffe.
    liegen zwei Wege bereit.
 3. Gegenprobe: nur an die **Kante** einer großen Kiste fahren und zupacken. Sie
    darf **nicht** mitkommen.
+
+---
+
+### E-047 — Die Pratzen gehen vor und hinter die Räder, nicht mehr hindurch (15.09.2026)
+
+**Entscheidung.** Die vier Abstützpratzen wandern aus dem Rad heraus nach vorn
+und hinten: Fußmitte **x ±1,90 / z ±2,45** statt x ±1,80 / z ±1,35. Der
+Ausleger, der bisher als Querbalken aus der Rahmenmitte kam, wird zum **Knie**:
+ein waagerechter Kragarm aus der Seitenwange (y 1,40) und ein senkrechter Stiel,
+der davor auf den Fuß herunterläuft. Die Stützbasis wächst von 3,60 × 2,70 m auf
+**3,80 × 4,90 m**.
+
+**Warum.** Gemeldet in E-036 und bewusst liegengelassen: Der Pratzenausleger lag
+bei z ±1,35 mitten im Vorderrad. Gemessen mit `tools/pratzenfreigang.ts` waren
+es **25,2 cm** Durchdringung beim Balken und **22,2 cm** bei der Bodenplatte —
+seit dem 12.09.2026, sichtbar aber erst, seit die Räder frei unter der Maschine
+stehen. Patricks Richtung war „nach vorn und hinten, auf z ±2,30".
+
+**Patricks Zahl ging nicht, und das ist gemessen, nicht geschätzt.** Bei
+z ±2,30 steht die 0,62 m tiefe Bodenplatte immer noch **8,3 cm** im Reifen, und
+zwar an der Flanke bei eingeschlagenem Vorderrad. Der Grund ist einfach: Die
+Platte reicht 31 cm nach hinten, der Reifen über die Stollen 62 cm nach vorn.
+Erst ab z 2,45 ist Luft.
+
+| Fußlage | zum Rad | zur Schildwange |
+|---|---|---|
+| x 1,80 / z 1,35 (alt) | **−22,2 cm** | 23,4 cm |
+| x 1,80 / z 2,30 (Ansage) | **−8,3 cm** | **kreuzt** |
+| x 1,80 / z 2,40 | −0,5 cm | **kreuzt** |
+| x 1,80 / z 2,50 | +8,6 cm | **kreuzt** |
+| **x 1,90 / z 2,45 (gebaut)** | **+8,0 cm** | **+7,0 cm** |
+
+**Der Fuß musste auch 10 cm nach aussen** — das war nicht vorgesehen und hat
+einen Nachbarn zur Ursache, den der Auftrag nicht nennt: das **Räumschild**. Es
+steht bei z 2,55, ist 2,90 m breit, und seine Seitenwange belegt x 1,38 … 1,52
+ab z 2,52. Bei x ±1,80 beginnt die Bodenplatte bei x 1,49 — drei Zentimeter
+davor. Bei x ±1,90 sind es 7 cm Luft.
+
+**Und der Ausleger musste eine andere Form bekommen.** Vor dem Rahmen ist kein
+Platz: Er endet bei z ±2,20, und den Raum davor füllen Streben und Zylinder des
+Räumschilds — sie überstreichen bei x ±0,62 … ±0,78 alles zwischen y 0,42 und
+1,33. Ein Querträger aus der Mitte führte mitten hindurch. Die erste Lösung, eine
+durchgehende Schrägstrebe von der Wange zum Fuß, schnitt mit ihrer **unteren
+Hinterkante** in die Kotflügelspitze — ein schräg gestelltes Kastenprofil greift
+weiter um sich, als seine Mittellinie vermuten lässt. Im Knie ist beides gerade
+und beides frei, und es ist zugleich die Form, die ein Umschlagbagger an dieser
+Stelle wirklich hat.
+
+**Gemessen wurde in JEDER bewegten Stellung**, nicht nur in der Ruhelage: 67
+Lenkstellungen von Anschlag zu Anschlag (±33,3°) über den ganzen Ausfahrweg des
+Fußes, 11 × 11 Stellungen von Räumschild und Pratze, und der Oberwagen als
+überstrichener Drehkörper.
+
+| Freigang | gemessen |
+|---|---|
+| Rad, jede Lenkstellung, ganzer Ausfahrweg | **8,0 cm** |
+| Räumschild, ganzer Schildhub | **7,0 cm** |
+| Kotflügelbogen | **5,6 cm** |
+| Gegengewicht, Auspuff, Deckplatte beim Schwenken | **8,0 cm** |
+
+**Verworfene Alternative.** „Nach innen zwischen die Räder" hat Patrick selbst
+abgelehnt (Stützbasis wird schmal). Verworfen wurde ausserdem, bei x ±1,80 zu
+bleiben und die Durchdringung mit der Schildwange hinzunehmen — genau das war der
+Fehler, den dieses Paket behebt.
+
+**Unangetastet.** **Alle Kollider**, besonders der Unterwagen-Quader 2,4 × 1,5 ×
+4,4 — `test/fahrwerk.test.ts` misst ihn weiter direkt in der Rapier-Welt nach.
+Reichweite, Gelenkpunkte, Grabtiefe. Räder in Form, Größe, Material. Form von
+Pratzenfuß, Teller und Stempel (Patricks Ansage vom 12.09.). Spinne, Greifen,
+Pendel, Kamera. **Netzzahl 57, unverändert** — die vier Ausleger sind acht Balken
+geworden, aber sie liegen alle im selben Netz `01_UNTERWAGEN_STAHL` (+48
+Dreiecke, kein Zeichenruf).
+
+**Der Wächter hat sich umgedreht.** In `test/fahrwerk.test.ts` stand bis heute
+ein Test, der den Befund FESTHIELT („die Pratzenausleger stehen weiter im Rad —
+bekannter, alter Befund"). Er ist durch zwei ersetzt: einen, der den Freigang in
+jeder Lenkstellung verlangt, und einen, der dieselbe Messung auf die alte Lage
+anwendet und rot wäre, wenn sie zurückkäme. Die Messung selbst liegt in
+`tools/radraum.ts`, damit Wächter und Werkzeug nicht auseinanderlaufen. Zur
+Probe wurde die alte Lage einmal zurückgesetzt: Der Wächter meldet −22,3 cm und
+schlägt fehl.
+
+**Offen — und es ist älter als dieses Paket.** Die **Bodenplatte steht
+ausgefahren 34 cm über dem Boden.** Der Fuß fährt 0,72 m relativ zur Maschine
+aus, die Maschine hebt sich dabei aber um dieselben 0,34 m (`JACK_UP_M`) — unter
+dem Strich sinkt die Platte nur 0,38 m und erreicht den Boden nie. Die Maschine
+steht abgestützt auf nichts. Behoben ist das nicht mit einer längeren
+Ausfahrstrecke allein: Bei 1,06 m Weg rutscht der Fußkasten unten aus dem Stiel
+heraus, und der Fuß hinge frei. Das ist ein eigenes kleines Paket (Stiel länger,
+Kasten teleskopiert) und gehört einzeln abgenommen.
+
+**Auf dem Gerät zu prüfen.**
+
+1. Von der Seite auf ein Vorderrad schauen und **voll einlenken** (A oder D
+   halten): Bleibt der Reifen frei — kein Stahl im Rad, auch nicht am Anschlag?
+2. **O drücken** und zusehen: Fahren alle vier Füße aus den Stielen heraus, ohne
+   dass etwas durch den Reifen oder durch das Räumschild wandert?
+3. **Oberwagen einmal ganz herumdrehen**, Pratzen eingefahren: Streift das
+   Gegengewicht irgendwo an einem Kragarm?

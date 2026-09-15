@@ -18,6 +18,30 @@ import { leinwandAttrappe } from "../tools/leinwand-attrappe";
 import { Excavator } from "../src/excavator/excavator";
 import { initPhysics } from "../src/physics/physicsWorld";
 import type { Input } from "../src/core/input";
+import { pratzenausleger, PRATZE_X, PRATZE_Z } from "../src/excavator/unterwagenParts";
+import { pratzeFuss, pratzeStempel } from "../src/excavator/schildParts";
+import {
+  radProfil,
+  punkte,
+  dreieckeGeo,
+  fussStrecken,
+  festeStrecken,
+  kleinsterRadfreigang,
+  type Dreieck,
+} from "../tools/radraum";
+
+/** Ausfahrweg des Pratzenfußes (m) — `syncMeshes` in `excavator.ts`. */
+const FUSS_HUB = 0.72;
+
+/**
+ * Das Radprofil wird EINMAL gelesen: Es tastet rund eine halbe Million Punkte
+ * ab, und zwei Wächter brauchen dasselbe Ergebnis.
+ */
+let radraum: ReturnType<typeof radProfil> | null = null;
+function profilEinmal(rad: THREE.Object3D): ReturnType<typeof radProfil> {
+  if (!radraum) radraum = radProfil(rad);
+  return radraum;
+}
 
 /**
  * Eine Tastatur-Attrappe: Sie liefert `Input`, ohne dass ein Fenster
@@ -93,42 +117,67 @@ describe("Unterwagen", () => {
     expect(tiefster, "tiefstes Lackblech über dem Rad").toBeGreaterThanOrEqual(1.24 - 1e-6);
   });
 
-  it("die Pratzenausleger stehen weiter im Rad — bekannter, alter Befund", () => {
+  it("die Pratzen laufen in JEDER Lenkstellung am Rad vorbei", () => {
     /*
-     * ABSICHTLICH FESTGEHALTEN, NICHT BEHOBEN.
+     * WAS HIER GEGOLTEN HAT — und warum der Test sich umgedreht hat.
      *
-     * Der Pratzenausleger läuft bei z ±1,35 quer heraus. Das Vorderrad steht
-     * bei z ±1,50 mit Radius 0,62, füllt dort also z 0,88 … 2,12 und bei
-     * z = 1,35 die Höhen y 0,02 … 1,22. Der Ausleger liegt mit y 0,50 … 0,90
-     * mitten darin — er geht durch das Rad hindurch.
+     * Bis zum 15.09.2026 stand an dieser Stelle das Gegenteil: ein Wächter,
+     * der FESTHIELT, dass der Pratzenausleger im Rad steckt. Er lief bei
+     * z ±1,35 quer aus dem Rahmen, also mitten durch das Vorderrad — seit dem
+     * 12.09.2026, gesehen aber erst, als die Räder mit dem Fahrwerk-Paket frei
+     * unter die Maschine kamen. Der alte Text sagte: „Behoben wird es NICHT in
+     * diesem Paket … eine Gestaltungsfrage für Patrick."
      *
-     * Das ist NICHT neu: Die Pratzen sitzen seit dem 12.09.2026 dort
-     * (Ansage: „einfach nur vom Bagger links und rechts weg"), und schon
-     * damals lief der Ausleger von x 1,05 nach x 1,80 quer durchs Rad. Vorher
-     * fiel es nicht auf, weil das Rad zur Hälfte im Kasten steckte und beide
-     * Teile dunkel waren. Seit das Rad frei steht, sieht man es.
+     * Patrick hat sie entschieden (E-047): nach vorn und hinten aus dem Rad
+     * heraus, nicht nach innen zwischen die Räder. Gemessen wurde daraus
+     * x ±1,90 / z ±2,45 (`tools/pratzenfreigang.ts`).
      *
-     * Behoben wird es NICHT in diesem Paket: Jede Lösung verschiebt ein Maß —
-     * die Pratzen nach vorn/hinten aus dem Rad heraus (Stützbasis wächst von
-     * 2,70 auf 4,60 m Länge) oder nach innen (sie schrumpft auf 1,20 m). Das
-     * ist eine Gestaltungsfrage für Patrick, kein stiller Umbau.
+     * WIE GEMESSEN WIRD, steht in `tools/radraum.ts`. Zwei Dinge daran sind
+     * wichtig, weil sie den Unterschied zwischen einer Meldung und einer
+     * Fehlmeldung ausmachen:
      *
-     * Dieser Test hält den Befund fest, damit er nicht vergessen wird. Wenn er
-     * eines Tages fehlschlägt, ist das Problem gelöst — dann darf er weg.
+     *  - Das Rad ist KEIN Zylinder von 0,62 m. An der Flanke sind es 0,594, am
+     *    Felgenhorn 0,42 — und dort liegt die Ecke der Bodenplatte. Gerechnet
+     *    wird gegen das echte Netz.
+     *  - Gemessen wird über den ganzen Lenkbereich (±33,3°) UND über den
+     *    ganzen Ausfahrweg des Fußes. Beides trifft sich wirklich: Das
+     *    Lenkschloss fällt erst bei Ausfahrgrad 0,15, und von dort braucht die
+     *    Lenkung 0,35 s bis geradeaus.
      */
-    const m = finde("01_UNTERWAGEN_STAHL") as THREE.Mesh;
-    const pos = (m.geometry as THREE.BufferGeometry).getAttribute(
-      "position"
-    ) as THREE.BufferAttribute;
-    let tiefster = Infinity;
-    for (let i = 0; i < pos.count; i++) {
-      const x = Math.abs(pos.getX(i));
-      if (x < 1.06 || x > 1.44) continue;
-      if (Math.abs(Math.abs(pos.getZ(i)) - 1.5) > 0.55) continue;
-      tiefster = Math.min(tiefster, pos.getY(i));
-    }
-    expect(tiefster, "Stahl im Radschatten — erwartet ist der Pratzenausleger").toBeLessThan(1.24);
-    expect(tiefster, "und zwar auf Auslegerhöhe, nicht tiefer").toBeGreaterThan(0.4);
+    const profil = profilEinmal(finde("02_RAD_VL"));
+    // 5 cm Raster und 31 Lenkstufen: Der Wächter soll melden, nicht auf den
+    // Millimeter messen — das tut `tools/pratzenfreigang.ts`.
+    const fussPunkte = punkte(
+      [...dreieckeGeo(pratzeFuss()), ...dreieckeGeo(pratzeStempel())],
+      0.05
+    );
+    const ausleger: Dreieck[] = [];
+    for (const g of pratzenausleger()) ausleger.push(...dreieckeGeo(g));
+    const strecken = [
+      ...fussStrecken({ x: PRATZE_X, z: PRATZE_Z }, fussPunkte, FUSS_HUB),
+      ...festeStrecken(ausleger, 0.04),
+    ];
+    const r = kleinsterRadfreigang(strecken, profil, 31);
+    expect(r.abstand, `engste Stelle: ${r.wo}`).toBeGreaterThan(0.05);
+  });
+
+  it("und der Wächter merkt es, wenn sie zurückwandern", () => {
+    /*
+     * DERSELBE WÄCHTER AUF DER ALTEN LAGE. Ohne diese Probe wüsste niemand, ob
+     * die Messung oben überhaupt etwas merkt: Ein Wächter, der nie rot wird,
+     * ist eine Zeile Text.
+     *
+     * x ±1,80 / z ±1,35 war der Stand vom 12.09.2026. Die Bodenplatte steht
+     * dort mitten im Reifen — gemessen über 20 cm tief.
+     */
+    const profil = profilEinmal(finde("02_RAD_VL"));
+    const fussPunkte = punkte([...dreieckeGeo(pratzeFuss())], 0.05);
+    const alt = kleinsterRadfreigang(
+      fussStrecken({ x: 1.8, z: 1.35 }, fussPunkte, FUSS_HUB),
+      profil,
+      31
+    );
+    expect(alt.abstand, `alte Lage, gemessen: ${alt.wo}`).toBeLessThan(-0.2);
   });
 
   it("man sieht unter der Maschine hindurch", () => {

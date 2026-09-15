@@ -29,7 +29,7 @@ import {
   kabineSitz,
   kabineStahl,
 } from "./kabinenParts";
-import { unterwagenLack, unterwagenStahl } from "./unterwagenParts";
+import { unterwagenLack, unterwagenStahl, PRATZE_X, PRATZE_Z } from "./unterwagenParts";
 import {
   DREHPUNKT as HUB_DREHPUNKT,
   HUB_MAX as CAB_LIFT_MAX,
@@ -1209,24 +1209,21 @@ export class Excavator {
       [1, -1],
     ] as const) {
       /*
-       * Kurze Pratzen, gerade zur Seite (Ansage 12.09.2026: „einfach nur vom
-       * Bagger links und rechts weg … die duerften da keinen Meter weit
-       * rausgucken, sondern eher fuenfzig Zentimeter oder dreissig").
+       * WO DIE PRATZE STEHT, steht in `unterwagenParts.ts` (`PRATZE_X`,
+       * `PRATZE_Z`) — dort, wo auch der Ausleger gebaut wird. EINE Quelle für
+       * beide: Der Fuß sitzt am Kopf des Auslegers, und nichts wäre leichter
+       * übersehen, als die eine Zahl zu verschieben und die andere nicht.
        *
-       * Vorher spreizten sie sich diagonal nach aussen-hinten und standen
-       * 1,3 m ueber den Unterwagen hinaus — auf einem Platz, auf dem jetzt
-       * alles dicht beieinandersteht, war das die Maschine mit dem groessten
-       * Fussabdruck. Jetzt sind es massive Anbauteile: quer heraus, 45 cm
-       * ueber die Kante, und sie folgen der Laengsachse statt ins Kreuz zu
-       * gehen.
-       */
-      /*
+       * Seit E-047 (15.09.2026) stehen sie vor und hinter den Rädern statt
+       * quer daneben: Bei z ±1,35 lief der Ausleger 25 cm tief durch das
+       * Vorderrad. Die Begründung der Zahlen steht bei `PRATZE_X`.
+       *
        * Der AUSLEGER der Pratze steht seit dem 15.09.2026 nicht mehr hier: Er
        * bewegt sich nicht und liegt deshalb im Netz des Unterwagens
        * (`unterwagenParts.ts`, Funktion `pratzenausleger`). Das sparte vier
        * Netze und acht Zeichenrufe. Nur der FUSS fährt aus — der bleibt.
        */
-      const to = new THREE.Vector3(sx * 1.8, 0.7, sz * 1.35);
+      const to = new THREE.Vector3(sx * PRATZE_X, 0.7, sz * PRATZE_Z);
       const e = ecke(sx, sz);
       // Stempel + Tellerfuß in einer Gruppe — fahren gemeinsam ein und aus
       const foot = new THREE.Group();
