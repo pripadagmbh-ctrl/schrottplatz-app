@@ -289,6 +289,33 @@ export const CONFIGS: ContainerConfig[] = [
    * ist gewollt (Ansage 15.09.2026: „erstmal alles rausfischen in die Mulde
    * tun und dann spaeter entweder ich oder Lambert das sortieren").
    *
+   * BATTERIEN LIEGEN MIT DRIN (Entscheidung Patrick, 15.09.2026, E-029).
+   *
+   * Sie hatten dasselbe Problem wie VA: ein Lagersilo, aber am Bagger kein
+   * Ziel — wer einen Akku aus einem Wrack fischte, bekam ueberall „falsche
+   * Zone". Vorgeschlagen war eine eigene kleine Batteriemulde (Gefahrgut, und
+   * Blei im Kupfer drueckt die Reinheit); Patrick hat sich fuer die
+   * gemeinsame Mulde entschieden, beide Folgen lagen ihm vor.
+   *
+   * WAS DAS KOSTET — gerechnet, nicht behauptet (`test/blei.test.ts`):
+   *
+   *  - In der MULDE: null Euro. Verdient wird beim Verkauf aus dem Container
+   *    des Abholers, je Stueck nach seiner eigenen Fraktion, und Lambert
+   *    traegt jeden Akku in das BATTERIEN-Silo (`people.ts`, `muldeFuer`
+   *    liest `item.materialId`). Das Silo bleibt getrennt — sortiert wird auf
+   *    dem Weg dorthin, nicht in der Mulde (E-028).
+   *  - Wenn das Blei doch MITGEHT, also in demselben Container verkauft wird:
+   *    Eine Kupferfuhre von 200 kg bringt 180,00 €; dieselbe Fuhre mit
+   *    100 kg Akku dazwischen bringt 80,00 € — 100,00 € weniger, obwohl
+   *    100 kg mehr drin sind (Reinheit hoch drei, `sellContainer`). Getrennt
+   *    verkauft haetten die Akkus selbst 55,00 € gebracht: 235,00 € statt
+   *    80,00 €, also 155,00 € Unterschied je 100 kg Blei.
+   *  - Am SCHILD der Mulde: Vorher zaehlte ein Akku als Fremdstoff und drueckte
+   *    500 kg Buntmetall von 1602,00 € auf 1112,50 € (Reinheit²). Jetzt steht
+   *    1657,00 € da. Die Ampel warnt also nicht mehr vor Blei — das ist der
+   *    Preis der Entscheidung, und er ist kein Geldbetrag, sondern ein
+   *    fehlendes Signal.
+   *
    * EDELSTAHL LIEGT MIT DRIN (Entscheidung Patrick, 15.09.2026). VA hatte am
    * Bagger bis heute ueberhaupt kein Ziel: Wer ihn aus einem Wrack fischte,
    * bekam ueberall „falsche Zone" — offener Punkt seit dem 14.09. Fachlich
@@ -313,7 +340,7 @@ export const CONFIGS: ContainerConfig[] = [
    * oben ein, Lambert faehrt mit dem Radlader von Westen hinein.
    */
   { id: "r_bunt", fractionId: "copper",
-    mitFraktionen: ["brass", "alu", "zinc", "cable", "va"],
+    mitFraktionen: ["brass", "alu", "zinc", "cable", "va", "battery"],
     label: "BUNT + VA", kind: "bay", x: -7.6, z: -19.2, size: [4.2, 6.0, 2.0],
     sortierbox: true, shareEast: true, niedrigeStirn: 0.5 },
 
