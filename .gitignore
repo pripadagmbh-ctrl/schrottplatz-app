@@ -4,3 +4,6 @@ dist/
 .DS_Store
 v2/tools/iphone-test-log.txt
 .claude/worktrees/
+
+# Wird beim Veroeffentlichen erzeugt (tools/planmappe.mjs)
+v1/docs/index.html

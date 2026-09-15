@@ -45,6 +45,12 @@ jobs:
       - name: v1 — Bauen
         working-directory: v1
         run: npm run build
+      # Die Zeichnungen gehoeren mit auf den Server. Patrick schaut nur auf
+      # iPhone und iPad; was hier nicht liegt, kann er nicht ansehen
+      # (Befund 15.09.2026: 404 auf Baggerkonzept und Platzkonzept).
+      - name: v1 — Planmappe erzeugen
+        working-directory: v1
+        run: node tools/planmappe.mjs
 
       - name: v2 — Abhängigkeiten
         working-directory: v2/web
@@ -62,6 +68,8 @@ jobs:
           cp -r prototype/dist/. site/
           mkdir -p site/v1
           cp -r v1/dist/. site/v1/
+          mkdir -p site/v1/plaene
+          cp -r v1/docs/. site/v1/plaene/
           mkdir -p site/v2
           cp -r v2/web/dist/. site/v2/
 
