@@ -1376,6 +1376,63 @@ class DeliveryVehicle {
   }
 
   /**
+   * DIE EINE FRAGE: Liegt dieser Koerper auf meiner Ladeflaeche?
+   *
+   * Drei Stellen haben sie bis zum 15.09.2026 EINZELN beantwortet, und zwar
+   * verschieden (gemessen mit `tools/abholung-abrechnung.ts`):
+   *
+   *   `verriegeleLadeflaeche()`  |x| < 1,70   z −0,40 … L+0,40   y −0,40 … 3,00
+   *   `ladeflaecheKg()`          |x| < 1,85   z −0,50 … L+0,50   y −0,40 … 5,00
+   *   `containedItems()`         |x| < 1,60   z −0,30 … L+0,30   y −0,40 … 2,60
+   *
+   * Das ist nicht dreimal dieselbe Sache mit etwas anderer Toleranz, sondern
+   * es sind drei verschiedene Wahrheiten ueber EIN Stueck Schrott: Ein Blech
+   * auf der Bordwandkante (x 1,65) wurde an die Flaeche gekoppelt, faehrt also
+   * mit, wurde an der Ausfahrt gewogen — und war beim Verkauf nicht dabei. Es
+   * verliess den Hof, ohne bezahlt zu werden. Dasselbe gilt fuer alles auf der
+   * Heckklappe, alles an der Stirnwand und alles ueber 2,60 m.
+   *
+   * DIESELBE FEHLERKLASSE WIE E-044 UND E-064: Zwei Rechnungen ueber dieselbe
+   * Ladung, und nur eine wurde in Ordnung gebracht. Deshalb gibt es sie jetzt
+   * nur noch einmal, und die Regel dahinter ist ein Satz, den man einem
+   * Spieler sagen kann: WAS MITFAEHRT, WIRD GEWOGEN UND BEZAHLT.
+   *
+   * Massgeblich ist das Fenster des Verriegelns — es entscheidet, was den Hof
+   * ueberhaupt verlaesst. Ein Stueck, das nicht gekoppelt wird, bleibt beim
+   * Anfahren liegen; es darf folglich weder auf die Waage noch auf die
+   * Rechnung. Und eines, das gekoppelt wird, muss auf beide.
+   */
+  private static readonly FLAECHE_UEBER_X = 0.35;
+  private static readonly FLAECHE_UEBER_Z = 0.4;
+  private static readonly FLAECHE_UNTEN = -0.4;
+  private static readonly FLAECHE_OBEN = 3.0;
+
+  /** Rechenhilfe fuer `aufDerFlaeche` — kein neues Feld je Abfrage. */
+  private flaechePos = new THREE.Vector3();
+
+  /**
+   * Liegt `body` auf der Ladeflaeche? Punktprobe am Schwerpunkt.
+   *
+   * @param extra zusaetzlicher Rand in Metern (nur fuer die Karosse, deren
+   *              Schwerpunkt weit ueber dem Blech liegt)
+   */
+  private aufDerFlaeche(body: RAPIER.RigidBody, extra = 0): boolean {
+    if (!body.isValid()) return false;
+    const p = body.translation();
+    if (!Number.isFinite(p.x) || !Number.isFinite(p.y) || !Number.isFinite(p.z)) return false;
+    this.flaechePos.set(p.x, p.y, p.z);
+    this.bedGroup.worldToLocal(this.flaechePos);
+    const l = this.flaechePos;
+    return (
+      Math.abs(l.x) <= BED_HALF_W + DeliveryVehicle.FLAECHE_UEBER_X + extra &&
+      l.z >= -DeliveryVehicle.FLAECHE_UEBER_Z - extra &&
+      l.z <= this.bedLen + DeliveryVehicle.FLAECHE_UEBER_Z + extra &&
+      l.y >= DeliveryVehicle.FLAECHE_UNTEN &&
+      l.y <= DeliveryVehicle.FLAECHE_OBEN + extra
+    );
+  }
+
+  /**
    * Was in diesem Augenblick auf der Flaeche liegt — auch fremd Aufgeladenes.
    *
    * `cargoMassKg()` kennt nur die Fuhre, mit der der Wagen HEREINGEKOMMEN ist
@@ -1385,22 +1442,17 @@ class DeliveryVehicle {
    * `cargo.items` steht davon nichts — mit der alten Rechnung waere die
    * Ausfahrtswiegung eines vollen Abholers 0 kg gewesen.
    *
-   * Gezaehlt wird deshalb aus derselben Quelle, aus der auch die Federung
-   * ihre Last misst (`messeLast`): alle Teile des Platzes, gefiltert nach
-   * ihrer Lage ueber der Flaeche.
+   * Gezaehlt wird ueber `aufDerFlaeche` — dasselbe Fenster wie beim
+   * Verriegeln und beim Verkauf.
    */
   ladeflaecheKg(): number {
-    const local = new THREE.Vector3();
+    // Die Weltmatrix der Flaeche frisch rechnen: Im Spiel besorgt das sonst
+    // der Renderer, und der ist beim Messen und im Test nicht dabei.
+    this.bedGroup.updateWorldMatrix(true, false);
     const gezaehlt = new Set<number>();
     let sum = 0;
     const pruefe = (b: RAPIER.RigidBody, massKg: number): void => {
-      if (!b.isValid() || gezaehlt.has(b.handle)) return;
-      const p = b.translation();
-      local.set(p.x, p.y, p.z);
-      this.bedGroup.worldToLocal(local);
-      if (Math.abs(local.x) > BED_HALF_W + 0.5) return;
-      if (local.z < -0.5 || local.z > this.bedLen + 0.5) return;
-      if (local.y < -0.4 || local.y > 5.0) return;
+      if (gezaehlt.has(b.handle) || !this.aufDerFlaeche(b)) return;
       gezaehlt.add(b.handle);
       sum += massKg;
     };
@@ -1430,25 +1482,19 @@ class DeliveryVehicle {
     return this.phase;
   }
 
-  /** Teile, die im Container auf der Ladefläche liegen (Abhol-LKW). */
+  /**
+   * Teile, die im Container auf der Ladefläche liegen (Abhol-LKW).
+   *
+   * Daran haengt der Verkauf (`onPickupDepart` → `Account.sellContainer`) und
+   * die Ladungsanzeige im HUD. Gefragt wird `aufDerFlaeche` — dasselbe
+   * Fenster, mit dem verriegelt und gewogen wird: Was mitfaehrt, wird bezahlt.
+   */
   containedItems(items: ItemManager): ScrapItem[] {
     if (!this.isPickup) return [];
-    const local = new THREE.Vector3();
+    this.bedGroup.updateWorldMatrix(true, false);
     const out: ScrapItem[] = [];
     for (const it of items.items) {
-      if (!it.body.isValid()) continue;
-      const p = it.body.translation();
-      local.set(p.x, p.y, p.z);
-      this.bedGroup.worldToLocal(local);
-      if (
-        Math.abs(local.x) < BED_HALF_W + 0.25 &&
-        local.z > -0.3 &&
-        local.z < this.bedLen + 0.3 &&
-        local.y > -0.4 &&
-        local.y < 2.6
-      ) {
-        out.push(it);
-      }
+      if (this.aufDerFlaeche(it.body)) out.push(it);
     }
     return out;
   }
@@ -1465,22 +1511,11 @@ class DeliveryVehicle {
   verriegeleLadeflaeche(): void {
     const quelle = this.itemQuelle;
     if (!quelle) return;
+    this.bedGroup.updateWorldMatrix(true, false);
     const schon = new Set(this.riding.map((r) => r.body.handle));
-    const local = new THREE.Vector3();
     for (const it of quelle.items) {
-      if (!it.body.isValid() || schon.has(it.body.handle)) continue;
-      const p = it.body.translation();
-      local.set(p.x, p.y, p.z);
-      this.bedGroup.worldToLocal(local);
-      if (
-        Math.abs(local.x) < BED_HALF_W + 0.35 &&
-        local.z > -0.4 &&
-        local.z < this.bedLen + 0.4 &&
-        local.y > -0.4 &&
-        local.y < 3.0
-      ) {
-        this.lockToBed(it.body);
-      }
+      if (schon.has(it.body.handle)) continue;
+      if (this.aufDerFlaeche(it.body)) this.lockToBed(it.body);
     }
     this.cargoReleased = false;
   }
