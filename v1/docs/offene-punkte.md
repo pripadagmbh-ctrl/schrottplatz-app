@@ -464,6 +464,12 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
       steht unbegrenzt; im kopflosen Lauf zehn Minuten, und eine vorgemerkte
       Abholung kam nicht durch. Gefunden beim Nachstellen, nicht von ihm
       gemeldet — gehört trotzdem hierher.
+- [ ] **Beim Kippen landen Teile quer über den Platz** — „nicht mal in der
+      Nähe von dem LKW" (15.09.). Vermutlich der sichtbare Ausgang des
+      Katapults: 500 km/h sind 139 m/s, der Platz ist rund 70 m lang. Wird als
+      eigene Messgröße mitgemessen (Endlage statt Geschwindigkeit) und dient
+      zugleich als Gegenprobe — passen die Endlagen nicht zum Tempo, gibt es
+      einen zweiten Fehler.
 - [ ] **Keine stehende Anzeige für Zahlungsunfähigkeit** — „Konto leer" ist ein
       Toast und verschwindet, der Zustand bleibt. Für „Platz dicht" gibt es eine
       Dauerzeile. `Account.lowOnCash` ist gebaut und wird nirgends benutzt.
