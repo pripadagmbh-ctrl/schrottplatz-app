@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { findeBox, type Box } from "../world/boxen";
 import RAPIER from "@dimforge/rapier3d-compat";
 import type { Input } from "../core/input";
@@ -7,6 +8,28 @@ import { InstrumentPanel, type InstrumentReadout } from "./instruments";
 import { buildDriver } from "./driver";
 import { baueSpinne } from "./grappleParts";
 import { baueRad, radGeometrien, radStoffe, RAD_R } from "./wheelParts";
+import { baueZylinder, type ZylinderMasse } from "./zylinderParts";
+import {
+  auslegerLack,
+  auslegerLeuchten,
+  auslegerSchlauch,
+  auslegerStahl,
+  stielLack,
+  stielSchlauch,
+  stielStahl,
+} from "./armParts";
+import { oberwagenLack, oberwagenLeuchten, oberwagenStahl } from "./oberwagenParts";
+import { pratzeFuss, pratzeStempel, schildKoerper, schildSchneide } from "./schildParts";
+import { farbstoff } from "./bauteile";
+import {
+  fahrerhand,
+  joystick,
+  kabineGlas,
+  kabineLack,
+  kabineSitz,
+  kabineStahl,
+} from "./kabinenParts";
+import { unterwagenLack, unterwagenStahl } from "./unterwagenParts";
 import { BAGGER_STAND } from "../world/baggerstand";
 import {
   CLAW_COUNT,
@@ -85,6 +108,28 @@ const STICK_LEN = 4.0;
  */
 const BOOM_PIVOT = new THREE.Vector3(0, 2.95, 0.55); // relativ zum Chassis-Ursprung (Boden)
 const GRAPPLE_LINK = 0.55; // Abstand Stielspitze → Palm-Oberkante
+
+/*
+ * Anlenkpunkte der Arbeitszylinder — unverändert seit dem Prototyp, hier nur
+ * aus `buildHydraulics` herausgezogen.
+ *
+ * Sie stehen ab dem 15.09.2026 als Konstanten da, weil jetzt ZWEI Stellen sie
+ * brauchen: der Zylinder selbst und der Lagerbock, an dem er hängt
+ * (`armParts.ts`). Vorher hing jeder Zylinder an einem `Object3D` ohne Blech
+ * darum — er kam buchstäblich aus dem Nichts.
+ */
+/** Fußanker des rechten Hubzylinders, im Oberwagenframe (m). */
+const HUB_FUSS_R: [number, number, number] = [-0.52, 0.02, 1.05];
+/** Fußanker des linken Hubzylinders, im Oberwagenframe (m). */
+const HUB_FUSS_L: [number, number, number] = [0.52, 0.02, 1.05];
+/** Kopfanker des rechten Hubzylinders, im Auslegerframe (m). */
+const HUB_KOPF_R: [number, number, number] = [-0.28, -0.2, 2.6];
+/** Kopfanker des linken Hubzylinders, im Auslegerframe (m). */
+const HUB_KOPF_L: [number, number, number] = [0.28, -0.2, 2.6];
+/** Fußanker des Stielzylinders, im Auslegerframe (m). */
+const STIEL_ZYL_FUSS: [number, number, number] = [0, 0.34, 3.4];
+/** Kopfanker des Stielzylinders, im Stielframe (m). */
+const STIEL_ZYL_KOPF: [number, number, number] = [0, 0.2, 0.35];
 
 // Räumschild vorn am Unterwagen
 const BLADE_W = 2.9; // Schildbreite (SW) — deckt die Spur der Maschine ab
@@ -180,6 +225,21 @@ const DRIVE_RAMP_TIME = 0.7; // s bis Endtempo (= 4,6 m/s², wie vor E-010)
  * 0,35 * 0,7 = 0,245 rad/s = 14 °/s auf der Stelle. Das ist unveraendert.
  */
 const STEER_RATE = 0.7; // rad/s
+
+/** Radstand (m) — Abstand Vorder- zu Hinterachse, aus `RAD_ECKEN`. */
+const RADSTAND = 3.0;
+/**
+ * Größter Lenkeinschlag der Vorderräder (rad).
+ *
+ * Nicht gesetzt, sondern GERECHNET: Bei Vollgas und vollem Ausschlag fährt die
+ * Maschine einen Kreis mit `wenderadius()` = 3,2 / 0,7 = 4,57 m. Eine gelenkte
+ * Vorderachse mit 3,00 m Radstand braucht dafür atan(3,00 / 4,57) = 33,3°.
+ * Stünde hier eine eigene Zahl, liefe das Rad irgendwann anders als die
+ * Maschine — man sähe es sofort, weil das Rad dann quer zur Bahn stünde.
+ */
+const LENK_MAX = Math.atan(RADSTAND / (DRIVE_MAX / STEER_RATE));
+/** Zeit, in der die Lenkung von Anschlag zu Anschlag läuft (s). SW. */
+const LENK_ZEIT = 0.35;
 /*
  * Drehwerk.
  *
@@ -511,6 +571,18 @@ export class Excavator {
     barrel: THREE.Mesh;
     rod: THREE.Mesh;
     barrelLen: number;
+    /**
+     * true = alte Streckbauweise (`rod.scale.y`), false = echter Zylinder mit
+     * fester Rohr- und Stangenlänge (`zylinderParts.ts`).
+     *
+     * Gestreckt wird nur noch, was mechanisch gar nicht anders geht: die
+     * beiden Kabinenhubzylinder. Sie verlangen ein Hubverhältnis von 5,18 : 1
+     * (Ankerabstand 0,650 → 3,368 m) — das kann kein einstufiger Zylinder.
+     * E-025, Befund 2; die Lösung ist das Parallelogramm und ein eigenes,
+     * LETZTES Paket. Bis dahin bleiben sie unverändert, statt sie mit einer
+     * halben Maßnahme kaputter zu machen.
+     */
+    gestreckt: boolean;
   }> = [];
 
   private world!: RAPIER.World;
@@ -526,9 +598,14 @@ export class Excavator {
   }
 
   /**
-   * Sichtbare Hydraulik (Design-Wunsch): Hubzylinder Kabine→Ausleger (2×),
-   * Stielzylinder auf dem Ausleger, dazu Schläuche entlang der Arm-Oberseite.
-   * Zylinder = Rohr + Kolbenstange, die sich zwischen zwei Ankern längt/kürzt.
+   * Sichtbare Hydraulik: Hubzylinder Oberwagen→Ausleger (2×), Stielzylinder auf
+   * dem Ausleger, zwei Kabinenhubzylinder, dazu das Schlauchpaket am Arm.
+   *
+   * SEIT DEM 15.09.2026 (E-029, Paket 5 aus E-025) ist ein Zylinder ein
+   * Zylinder: Rohr und Kolbenstange behalten ihre Länge, die Stange taucht ins
+   * Rohr ein. Vorher wurde die Stange zwischen den Ankern GEDEHNT — am
+   * Hubzylinder von 0,97 auf 2,21 m, also um 128 %. Der Aufbau steht Teil für
+   * Teil in `zylinderParts.ts`.
    */
   private buildHydraulics(scene: THREE.Scene): void {
     /*
@@ -544,15 +621,14 @@ export class Excavator {
     });
     const barrelMat = new THREE.MeshStandardMaterial({ color: 0x2b2e31, roughness: 0.6 });
     const rodMat = new THREE.MeshStandardMaterial({ color: 0xb8bec4, roughness: 0.25, metalness: 0.8 });
-    const addCyl = (
+    /** Die beiden Anker eines Zylinders anlegen — Fuß am einen Teil, Kopf am anderen. */
+    const anker = (
       name: string,
       parentA: THREE.Object3D,
       la: [number, number, number],
       parentB: THREE.Object3D,
-      lb: [number, number, number],
-      barrelLen: number,
-      rBarrel: number
-    ): void => {
+      lb: [number, number, number]
+    ): { a: THREE.Object3D; b: THREE.Object3D } => {
       const a = new THREE.Object3D();
       a.position.set(...la);
       a.name = `${name}_FUSS`;
@@ -561,45 +637,93 @@ export class Excavator {
       b.position.set(...lb);
       b.name = `${name}_KOPF`;
       parentB.add(b);
-      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(rBarrel, rBarrel, 1, 10), barrelMat);
-      const rod = new THREE.Mesh(new THREE.CylinderGeometry(rBarrel * 0.55, rBarrel * 0.55, 1, 8), rodMat);
+      return { a, b };
+    };
+
+    /**
+     * Ein echter Zylinder: Rohr und Stange mit FESTER Länge.
+     *
+     * `kurz` und `lang` sind die gemessenen Ankerabstände über den ganzen
+     * Bewegungsbereich (`npx vite-node tools/zylinderhub.ts`, 14.09.2026).
+     * Aus ihnen folgt alles Weitere in `zylinderParts.ts`.
+     */
+    const addCyl = (
+      name: string,
+      parentA: THREE.Object3D,
+      la: [number, number, number],
+      parentB: THREE.Object3D,
+      lb: [number, number, number],
+      masse: ZylinderMasse
+    ): void => {
+      const { a, b } = anker(name, parentA, la, parentB, lb);
+      const form = baueZylinder(masse);
+      const barrel = new THREE.Mesh(form.rohr, barrelMat);
+      const rod = new THREE.Mesh(form.stange, rodMat);
       barrel.castShadow = true;
       barrel.name = `${name}_ROHR`;
       rod.name = `${name}_STANGE`;
       scene.add(barrel);
       scene.add(rod);
-      this.hydraulics.push({ a, b, barrel, rod, barrelLen });
+      this.hydraulics.push({ a, b, barrel, rod, barrelLen: form.auge + form.rohrLaenge, gestreckt: false });
     };
+
+    /**
+     * Ein GESTRECKTER Zylinder — die alte Bauweise, nur noch für den
+     * Kabinenhub. Begründung steht am Feld `gestreckt` oben.
+     */
+    const addStretchCyl = (
+      name: string,
+      parentA: THREE.Object3D,
+      la: [number, number, number],
+      parentB: THREE.Object3D,
+      lb: [number, number, number],
+      barrelLen: number,
+      rBarrel: number
+    ): void => {
+      const { a, b } = anker(name, parentA, la, parentB, lb);
+      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(rBarrel, rBarrel, 1, 10), barrelMat);
+      const rod = new THREE.Mesh(
+        new THREE.CylinderGeometry(rBarrel * 0.55, rBarrel * 0.55, 1, 8),
+        rodMat
+      );
+      barrel.castShadow = true;
+      barrel.name = `${name}_ROHR`;
+      rod.name = `${name}_STANGE`;
+      scene.add(barrel);
+      scene.add(rod);
+      this.hydraulics.push({ a, b, barrel, rod, barrelLen, gestreckt: true });
+    };
+
     // Hubzylinder des Auslegers: sitzen tief am Oberwagen-Deck links und rechts
     // neben dem Auslegerfuß (nicht an der Kabine) und greifen nach oben an den
     // Ausleger — so sieht es an echten Umschlagbaggern aus.
-    addCyl("07_ZYLINDER_HUB_R", this.cabGroup, [-0.52, 0.02, 1.05], this.boomGroup, [-0.28, -0.2, 2.6], 1.7, 0.1);
-    addCyl("07_ZYLINDER_HUB_L", this.cabGroup, [0.52, 0.02, 1.05], this.boomGroup, [0.28, -0.2, 2.6], 1.7, 0.1);
-    // Kabinenhub: zwei kleine Zylinder unten links und rechts an der Kabine
-    addCyl("06_ZYLINDER_KABINE_A", this.cabGroup, [-1.5, 0.3, 0.1], this.cabLiftGroup, [-1.5, 0.95, 0.1], 1.1, 0.055);
-    addCyl("06_ZYLINDER_KABINE_B", this.cabGroup, [-0.6, 0.3, 0.1], this.cabLiftGroup, [-0.6, 0.95, 0.1], 1.1, 0.055);
+    // Gemessen: Ankerabstand 2,518 … 3,757 m (Hub 1,239 m, Verhältnis 1,49).
+    const HUB_MASS: ZylinderMasse = { kurz: 2.518, lang: 3.757, rRohr: 0.1 };
+    addCyl("07_ZYLINDER_HUB_R", this.cabGroup, HUB_FUSS_R, this.boomGroup, HUB_KOPF_R, HUB_MASS);
+    addCyl("07_ZYLINDER_HUB_L", this.cabGroup, HUB_FUSS_L, this.boomGroup, HUB_KOPF_L, HUB_MASS);
+    // Kabinenhub: zwei kleine Zylinder unten links und rechts an der Kabine.
+    // Verlangt 5,18 : 1 — mechanisch unmöglich, siehe `gestreckt`. Paket 8.
+    addStretchCyl("06_ZYLINDER_KABINE_A", this.cabGroup, [-1.5, 0.3, 0.1], this.cabLiftGroup, [-1.5, 0.95, 0.1], 1.1, 0.055);
+    addStretchCyl("06_ZYLINDER_KABINE_B", this.cabGroup, [-0.6, 0.3, 0.1], this.cabLiftGroup, [-0.6, 0.95, 0.1], 1.1, 0.055);
     // Stielzylinder: Ausleger-Oberseite → Stiel-Anlenkung
-    addCyl("07_ZYLINDER_STIEL", this.boomGroup, [0, 0.34, 3.4], this.stickGroup, [0, 0.2, 0.35], 1.2, 0.08);
+    // Gemessen: Ankerabstand 1,809 … 2,235 m (Hub 0,426 m, Verhältnis 1,24).
+    addCyl("07_ZYLINDER_STIEL", this.boomGroup, STIEL_ZYL_FUSS, this.stickGroup, STIEL_ZYL_KOPF, {
+      kurz: 1.809,
+      lang: 2.235,
+      rRohr: 0.08,
+    });
 
-    // Hydraulikschläuche oben auf dem Ausleger (2×) + Bogen über das Stielgelenk
+    /*
+     * Schlauchpaket: EIN Netz auf dem Ausleger (zwei Schläuche plus vier
+     * Klemmschellen), EIN Netz auf dem Stiel (Schlauch plus zwei Schellen).
+     * Vorher waren es drei Netze ohne Schellen, die frei über dem Kasten
+     * schwebten.
+     */
     const hoseMat = new THREE.MeshStandardMaterial({ color: 0x1c1e20, roughness: 0.9 });
-    for (const hx of [-0.07, 0.07]) {
-      const curve = new THREE.CatmullRomCurve3([
-        new THREE.Vector3(hx, 0.38, 0.25),
-        new THREE.Vector3(hx, 0.52, 1.8),
-        new THREE.Vector3(hx, 0.46, 3.6),
-        new THREE.Vector3(hx, 0.32, BOOM_LEN - 0.15),
-      ]);
-      const hose = new THREE.Mesh(new THREE.TubeGeometry(curve, 24, 0.028, 6), hoseMat);
-      hose.name = `07_SCHLAUCH_AUSLEGER_${hx > 0 ? "L" : "R"}`;
-      this.boomGroup.add(hose);
-    }
-    const stickCurve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(0, 0.34, -0.45),
-      new THREE.Vector3(0, 0.3, 0.1),
-      new THREE.Vector3(0, 0.24, 0.9),
-    ]);
-    const stickHose = new THREE.Mesh(new THREE.TubeGeometry(stickCurve, 16, 0.028, 6), hoseMat);
+    const hose = new THREE.Mesh(auslegerSchlauch(BOOM_LEN), hoseMat);
+    hose.name = "07_SCHLAUCH_AUSLEGER";
+    this.boomGroup.add(hose);
+    const stickHose = new THREE.Mesh(stielSchlauch(), hoseMat);
     stickHose.name = "07_SCHLAUCH_STIEL";
     this.stickGroup.add(stickHose);
   }
@@ -644,6 +768,21 @@ export class Excavator {
       const dist = Math.max(this.tmpDir.length(), 0.2);
       this.tmpDir.normalize();
       const q = new THREE.Quaternion().setFromUnitVectors(Excavator.UP, this.tmpDir);
+      if (!h.gestreckt) {
+        /*
+         * Der echte Zylinder: Beide Netze sind um IHREN Anker herum gebaut
+         * (Rohr um den Fuß nach +Y, Stange um den Kopf nach −Y). Es bleibt
+         * nichts zu tun, als jedem seinen Ankerpunkt und dieselbe Drehung zu
+         * geben. Kein `scale` — genau das ist der Unterschied zu vorher, und
+         * `test/zylinder.test.ts` wacht darüber.
+         */
+        h.barrel.position.copy(this.tmpA);
+        h.barrel.quaternion.copy(q);
+        h.rod.position.copy(this.tmpB);
+        h.rod.quaternion.copy(q);
+        continue;
+      }
+      // Alte Streckbauweise — nur noch Kabinenhub, siehe Feld `gestreckt`.
       h.barrel.position.copy(this.tmpA).addScaledVector(this.tmpDir, h.barrelLen / 2);
       h.barrel.quaternion.copy(q);
       h.barrel.scale.set(1, h.barrelLen, 1);
@@ -663,12 +802,26 @@ export class Excavator {
     // Greifer-Farbgebung nach Vorbild: dunkle Hardox-Schalen, fast schwarze Kanten
     const glass = new THREE.MeshStandardMaterial({ color: 0x9fc4d8, roughness: 0.2 });
 
-    // Chassis + 4 Räder
-    const chassis = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.9, 4.4), machineBlue);
-    chassis.position.y = 1.15;
+    /*
+     * UNTERWAGEN (Paket 2 aus E-025, Frage 1 von Patrick bejaht).
+     *
+     * Bis zum 15.09.2026 war das EIN Quader 2,40 × 0,90 × 4,40 bei y 1,15 —
+     * und in ihm steckten die obersten 54 cm jedes Rades. Jetzt: schmaler
+     * Mittelträger, Seitenwangen ab der Radoberkante (1,24 m), sichtbare
+     * Achsbrücken darunter, Kotflügel darüber. Teil für Teil in
+     * `unterwagenParts.ts`; der Drehkranzring liegt jetzt im Stahl-Netz.
+     *
+     * Der KOLLIDER bleibt unverändert (Quader 2,4 × 1,5 × 4,4, Mitte y 1,15).
+     * Er war noch nie deckungsgleich mit dem sichtbaren Kasten.
+     */
+    const chassis = new THREE.Mesh(unterwagenLack(), machineBlue);
     chassis.castShadow = true;
-    chassis.name = "01_UNTERWAGEN";
+    chassis.name = "01_UNTERWAGEN_LACK";
     this.root.add(chassis);
+    const chassisStahl = new THREE.Mesh(unterwagenStahl(), dark);
+    chassisStahl.castShadow = true;
+    chassisStahl.name = "01_UNTERWAGEN_STAHL";
+    this.root.add(chassisStahl);
     /*
      * Räder: Reifen, Felge, Nabe — drei Bauteile je Rad statt eines Zylinders
      * mit 20 Ecken. Die Form steht in `wheelParts.ts`, samt Begründung für
@@ -678,63 +831,117 @@ export class Excavator {
      * und welche Seite außen ist. Die Geometrie wird EINMAL gebaut und von
      * allen vier Rädern geteilt; nur die Drehung unterscheidet links von
      * rechts, damit Felgenscheibe und Nabenkappe nach außen zeigen.
+     *
+     * NEU AM 15.09.2026, und es kostet kein einziges Netz: Die Räder DREHEN
+     * sich beim Fahren, und die vorderen LENKEN mit. Vorher rutschte die
+     * Maschine bei 3,2 m/s auf vier stillstehenden Klötzen über den Platz —
+     * im ganzen Quelltext gab es keine Zeile, die je eine Radgruppe drehte.
+     *
+     * Die Drehreihenfolge `YXZ` ist dafür der ganze Trick: Three rechnet dann
+     * R = RY · RX · RZ. RZ stellt das Rad auf seine Seite (wie bisher), RX
+     * dreht es um die Achse (das Rollen), RY schwenkt den Achsschenkel (das
+     * Lenken). In der voreingestellten Reihenfolge XYZ säße das Lenken INNEN
+     * und drehte das Rad um seine eigene Achse statt um die Hochachse.
      */
     const radGeo = radGeometrien();
     const radSt = radStoffe(machineBlue);
     for (const [x, z, ecke] of RAD_ECKEN) {
       const rad = baueRad(radGeo, radSt, ecke, x > 0);
       rad.position.set(x, RAD_R, z);
+      rad.rotation.order = "YXZ";
       this.root.add(rad);
+      this.wheelGroups.push({ gruppe: rad, vorn: z > 0, seite: x > 0 ? 1 : -1 });
     }
 
     // Oberwagen: verglaste Hochkabine + Gegengewicht
     this.cabGroup.position.set(0, 1.6, 0);
     this.cabGroup.name = "05_OBERWAGEN";
     this.root.add(this.cabGroup);
-    const deck = new THREE.Mesh(new THREE.BoxGeometry(2.9, 0.35, 3.2), dark);
-    deck.position.y = 0.18;
+    /*
+     * OBERWAGEN (Paket 3 aus E-025, Frage 2 von Patrick bejaht).
+     *
+     * Vorher: 10 Netze für 120 Dreiecke — Motorhaube 12, Gegengewicht 12, acht
+     * Lüftungsschlitze à 12. Jetzt drei Netze für 29 Teile, mit gestufter
+     * Haube, Wartungsklappe, umlaufendem Geländer, Auspuff, Laufblech,
+     * Hydrauliktank und Leuchten. Teil für Teil in `oberwagenParts.ts`.
+     *
+     * Das Stahl-Netz heißt weiter `04_DREHKRANZ`: Darin steckt der
+     * Drehkranzdeckel, und die Deckplatte des Oberwagens gehört dazu.
+     */
+    const deck = new THREE.Mesh(
+      oberwagenStahl([HUB_FUSS_R, HUB_FUSS_L]),
+      dark
+    );
+    deck.castShadow = true;
     deck.name = "04_DREHKRANZ";
     this.cabGroup.add(deck);
     this.buildCabin(machineBlue, dark, glass);
-    // Motorhaube mit Lüftungsgittern + Gegengewicht (wie am Umschlagbagger)
-    const hood = new THREE.Mesh(new THREE.BoxGeometry(2.5, 1.0, 1.7), machineBlue);
-    hood.position.set(0, 0.85, -1.0);
-    hood.castShadow = true;
-    hood.name = "05_MOTORHAUBE";
-    this.cabGroup.add(hood);
-    const louver = new THREE.MeshStandardMaterial({ color: 0x1f2224, roughness: 0.8 });
-    for (const sx of [-1.27, 1.27]) {
-      for (let i = 0; i < 4; i++) {
-        const slot = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.5, 0.12), louver);
-        slot.position.set(sx, 0.9, -1.55 + i * 0.32);
-        slot.name = `05_LUEFTUNGSGITTER_${sx > 0 ? "L" : "R"}${i + 1}`;
-        this.cabGroup.add(slot);
-      }
-    }
-    const counterweight = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.75, 0.7), dark);
-    counterweight.position.set(0, 0.5, -2.0);
-    counterweight.castShadow = true;
-    counterweight.name = "05_GEGENGEWICHT";
-    this.cabGroup.add(counterweight);
+    const haube = new THREE.Mesh(oberwagenLack(), machineBlue);
+    haube.castShadow = true;
+    haube.name = "05_MOTORHAUBE";
+    this.cabGroup.add(haube);
+    const heckLicht = new THREE.Mesh(
+      oberwagenLeuchten(),
+      new THREE.MeshStandardMaterial({
+        color: 0xfff3d0,
+        emissive: 0xffe9a8,
+        emissiveIntensity: 0.55, // SW: etwas schwächer als am Ausleger
+        roughness: 0.3,
+      })
+    );
+    heckLicht.name = "05_LEUCHTEN";
+    this.cabGroup.add(heckLicht);
     this.buildOutriggers(machineBlue, dark);
 
     // Ausleger
     this.boomGroup.position.copy(BOOM_PIVOT).sub(new THREE.Vector3(0, 1.6, 0)); // relativ zum Oberwagen
     this.boomGroup.name = "07_AUSLEGER";
     this.cabGroup.add(this.boomGroup);
-    const boom = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.62, BOOM_LEN), machineBlue);
+    /*
+     * Ausleger: verjüngter Kastenträger statt eines Quaders mit 12 Dreiecken.
+     * Teil für Teil in `armParts.ts` (Paket 6 aus E-025).
+     *
+     * Das Lack-Netz bleibt bei `z = BOOM_LEN / 2` — an IHM hängt der
+     * Arm-Kollider (`armShapes`, `syncMeshes`). Reichweite, Drehpunkt und
+     * Kollider-Halbmaße sind unverändert.
+     */
+    const boom = new THREE.Mesh(auslegerLack(BOOM_LEN), machineBlue);
     boom.position.z = BOOM_LEN / 2;
     boom.castShadow = true;
     boom.name = "07_AUSLEGER_KASTEN";
     this.boomGroup.add(boom);
     this.boomMesh = boom;
+    const boomStahl = new THREE.Mesh(
+      auslegerStahl(
+        BOOM_LEN,
+        { y: STIEL_ZYL_FUSS[1], z: STIEL_ZYL_FUSS[2] },
+        { x: HUB_KOPF_L[0], y: HUB_KOPF_L[1], z: HUB_KOPF_L[2] }
+      ),
+      dark
+    );
+    boomStahl.name = "07_AUSLEGER_STAHL";
+    this.boomGroup.add(boomStahl);
+    /*
+     * Arbeitsscheinwerfer am Auslegerfuß. Der Kipper hat Scheinwerfer,
+     * Rückleuchten und Dachleuchten — der Bagger hatte kein einziges Licht.
+     * Eigenes Material, weil es als einziges am Arm selbst leuchtet.
+     */
+    const leuchtMat = new THREE.MeshStandardMaterial({
+      color: 0xfff3d0,
+      emissive: 0xffe9a8,
+      emissiveIntensity: 0.65, // SW: sichtbar, ohne die Nachtstimmung zu kippen
+      roughness: 0.3,
+    });
+    const leuchten = new THREE.Mesh(auslegerLeuchten(), leuchtMat);
+    leuchten.name = "07_AUSLEGER_LEUCHTEN";
+    this.boomGroup.add(leuchten);
     this.buildBoomLogo();
 
     // Stiel
     this.stickGroup.position.z = BOOM_LEN;
     this.stickGroup.name = "07_STIEL";
     this.boomGroup.add(this.stickGroup);
-    const stick = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.45, STICK_LEN), machineBlue);
+    const stick = new THREE.Mesh(stielLack(STICK_LEN), machineBlue);
     stick.position.z = STICK_LEN / 2;
     stick.castShadow = true;
     stick.name = "07_STIEL_KASTEN";
@@ -745,49 +952,28 @@ export class Excavator {
     this.stickGroup.add(this.stickTip);
 
     /*
-     * BEFESTIGUNG AM AUSLEGER (Ansage 13.09.2026: „Greifer braucht Befestigung
-     * am Ausleger").
+     * STAHL AM STIEL — Fußlaschen, Lagerbock des Stielzylinders und die
+     * BEFESTIGUNG DES GREIFERS (Ansage 13.09.2026: „Greifer braucht
+     * Befestigung am Ausleger").
      *
-     * Vorher endete der Stiel stumpf und die Spinne hing daran, ohne dass am
-     * Stiel etwas zu sehen war. Jetzt sitzt dort ein Gusskopf, aus dem zwei
-     * Laschen herauswachsen, dazu der Bolzen und zwei Sicherungsscheiben.
+     * Der Gusskopf, die beiden Laschen, der Bolzen und die zwei
+     * Sicherungsscheiben sind Teil für Teil erhalten geblieben — sie stehen
+     * jetzt in `armParts.ts` unter `stielStahl()` statt hier als acht einzelne
+     * Meshes. Im Szenengraph ist daraus EIN Netz geworden; auffindbar bleiben
+     * sie über die benannten Funktionen im Quelltext (E-025, „der Preis des
+     * Verschmelzens").
      *
      * Der Halter haengt im Stielframe und kippt deshalb mit dem Stiel mit —
-     * genau wie beim Vorbild, wo darunter das Pendelgelenk sitzt. Er ist
-     * beim Rueckbau auf die Sichelkralle am 13.09.2026 stehen geblieben: Er
+     * genau wie beim Vorbild, wo darunter das Pendelgelenk sitzt. Er
      * gehoert zum Stiel, nicht zur Spinne, und haengt an keiner ihrer Formen.
      */
-    const halter = new THREE.Group();
-    halter.position.z = STICK_LEN;
-    halter.name = "07_GREIFERHALTER";
-    this.stickGroup.add(halter);
-    const kopf = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.52, 0.36), dark);
-    kopf.position.z = -0.1;
-    kopf.castShadow = true;
-    kopf.name = "07_HALTER_GUSSKOPF";
-    halter.add(kopf);
-    for (const sx of [-1, 1]) {
-      const lasche = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.3, 0.2), dark);
-      lasche.position.set(sx * 0.16, -0.22, 0);
-      lasche.castShadow = true;
-      lasche.name = `07_HALTER_LASCHE_${sx > 0 ? "L" : "R"}`;
-      halter.add(lasche);
-    }
-    const halterBolzen = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.05, 0.05, 0.44, 10),
+    const stickStahl = new THREE.Mesh(
+      stielStahl(STICK_LEN, { y: STIEL_ZYL_KOPF[1], z: STIEL_ZYL_KOPF[2] }),
       dark
     );
-    halterBolzen.rotation.z = Math.PI / 2;
-    halterBolzen.position.y = -0.32;
-    halterBolzen.name = "07_HALTER_BOLZEN";
-    halter.add(halterBolzen);
-    for (const sx of [-0.21, 0.21]) {
-      const scheibe = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.03, 10), dark);
-      scheibe.rotation.z = Math.PI / 2;
-      scheibe.position.set(sx, -0.32, 0);
-      scheibe.name = `07_HALTER_SCHEIBE_${sx > 0 ? "L" : "R"}`;
-      halter.add(scheibe);
-    }
+    stickStahl.castShadow = true;
+    stickStahl.name = "07_STIEL_STAHL";
+    this.stickGroup.add(stickStahl);
 
     // Kardan-Aufhängung: zwei ineinandergreifende Gelenkgabeln (90° verdreht)
     // zwischen Stielspitze und Spinne — statt eines schlichten Zylinders.
@@ -852,6 +1038,19 @@ export class Excavator {
   setFirstPerson(active: boolean): void {
     for (const o of this.driverBody) o.visible = !active;
   }
+  /**
+   * Die vier Radgruppen — sie rollen beim Fahren, die vorderen lenken mit.
+   *
+   * Bis zum 15.09.2026 gab es diese Liste nicht, und im ganzen Quelltext auch
+   * keine Zeile, die je ein Rad gedreht hätte: Bei 3,2 m/s rutschte die
+   * Maschine auf vier stillstehenden Klötzen über den Platz (E-025, Befund 1).
+   */
+  private wheelGroups: Array<{ gruppe: THREE.Group; vorn: boolean; seite: number }> = [];
+  /** Aufgelaufener Rollwinkel der Räder (rad) = Fahrstrecke / Radhalbmesser. */
+  private wheelSpin = 0;
+  /** Lenkeinschlag der Vorderräder (rad), geglättet gegen `LENK_MAX`. */
+  private steerAngle = 0;
+
   /** Abstützpratzen: eingefahren (0) bis ausgefahren (1), Taste O */
   private outriggerGroups: THREE.Group[] = [];
   /*
@@ -885,7 +1084,7 @@ export class Excavator {
 
   private buildCabin(
     frameMat: THREE.MeshStandardMaterial,
-    darkMat: THREE.MeshStandardMaterial,
+    _darkMat: THREE.MeshStandardMaterial,
     glassBase: THREE.MeshStandardMaterial
   ): void {
     // Kabine deutlich weiter nach links gesetzt, damit der Ausleger nicht ins
@@ -921,183 +1120,66 @@ export class Excavator {
       side: THREE.DoubleSide,
     });
 
-    // Boden: hinten Blech, vorn eine Glasscheibe im Fußbereich — so sieht der
-    // Fahrer senkrecht nach unten auf den Greifer (Design-Wunsch 2026-08-29)
-    const floor = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.07, 0.75), darkMat);
-    floor.position.set(cx, 0.58, cz - 0.33);
-    floor.name = "06_BODENBLECH";
-    this.cabLiftGroup.add(floor);
-    // Fußscheibe: schräg eingesetzt, sie schließt vorn an die Frontscheibe an.
-    // Rahmen: eine dünne Querstrebe in der Mitte, dazu zwei Randstreben, die
-    // den Übergang zur Frontscheibe bilden.
-    const footPane = new THREE.Group();
-    footPane.position.set(cx, 0.6, cz + 0.36);
-    footPane.rotation.x = -0.42; // Vorderkante höher, Anschluss an die Frontscheibe
-    footPane.name = "06_FUSSSCHEIBE";
-    this.cabLiftGroup.add(footPane);
-    const footGlass = new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.035, 0.7), glass);
-    footGlass.name = "06_FUSSSCHEIBE_GLAS";
-    footPane.add(footGlass);
-    const crossBar = new THREE.Mesh(new THREE.BoxGeometry(1.04, 0.028, 0.045), darkMat);
-    crossBar.position.y = 0.03;
-    crossBar.name = "06_FUSSSCHEIBE_QUERSTREBE";
-    footPane.add(crossBar);
-    for (const sx of [-0.5, 0.5]) {
-      const edge = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.045, 0.72), darkMat);
-      edge.position.set(sx, 0.02, 0);
-      edge.name = `06_FUSSSCHEIBE_RANDSTREBE_${sx > 0 ? "L" : "R"}`;
-      footPane.add(edge);
-    }
-    // Dach: hinten Blech, vorn eine Querscheibe zum Blick nach oben auf den
-    // Ausleger (Design-Wunsch 2026-08-29)
-    const roof = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.09, 0.85), frameMat);
-    roof.position.set(cx, 2.1, cz - 0.32);
-    roof.castShadow = true;
-    roof.name = "06_DACH";
-    this.cabLiftGroup.add(roof);
-    // Vordere Dachscheibe um ~40° nach unten geneigt: sie führt vom Dach zur
-    // Frontscheibe und gibt den Blick nach oben auf den Ausleger frei
-    const roofGlass = new THREE.Mesh(new THREE.BoxGeometry(1.06, 0.04, 0.78), glass);
-    roofGlass.position.set(cx, 1.98, cz + 0.42);
-    roofGlass.rotation.x = THREE.MathUtils.degToRad(40);
-    roofGlass.name = "06_DACHSCHEIBE";
-    this.cabLiftGroup.add(roofGlass);
-    const roofBar = new THREE.Mesh(new THREE.BoxGeometry(1.16, 0.05, 0.06), frameMat);
-    roofBar.position.set(cx, 2.06, cz + 0.3);
-    roofBar.name = "06_DACHSTREBE";
-    this.cabLiftGroup.add(roofBar);
-    for (const [px, pz] of [
-      [-0.52, -0.66],
-      [0.52, -0.66],
-      [-0.52, 0.66],
-      [0.52, 0.66],
-    ]) {
-      const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.45, 0.08), frameMat);
-      pillar.position.set(cx + px, 1.33, cz + pz);
-      pillar.castShadow = true;
-      pillar.name = `06_SAEULE_${ecke(px!, pz!)}`;
-      this.cabLiftGroup.add(pillar);
-    }
-    // Glas: Front (bis in den Fußbereich hinunter), Heck, links, rechts
-    const panes: Array<[number, number, number, number, number, number, string]> = [
-      // [x, y, z, sx, sy, sz, Name]
-      [cx, 1.28, cz + 0.69, 1.0, 1.52, 0.03, "FRONT"],
-      [cx, 1.33, cz - 0.69, 1.0, 1.42, 0.03, "HECK"],
-      // −X ist rechts (siehe RAD_ECKEN), +X links
-      [cx - 0.54, 1.33, cz, 0.03, 1.42, 1.3, "RECHTS"],
-      [cx + 0.54, 1.33, cz, 0.03, 1.42, 1.3, "LINKS"],
-    ];
-    for (const [x, y, z, sx, sy, sz, wo] of panes) {
-      const pane = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), glass);
-      pane.position.set(x, y, z);
-      pane.name = `06_SCHEIBE_${wo}`;
-      this.cabLiftGroup.add(pane);
-    }
+    /*
+     * KABINE (Paket 7 aus E-025). Fünf Netze statt 25, Teil für Teil in
+     * `kabinenParts.ts`.
+     *
+     * KEIN MASS WANDERT. Dach, Säulen, Scheiben, Sitz, Konsolen und Display
+     * liegen, wo sie lagen — die Kabinenansicht ist Patricks Arbeitsplatz beim
+     * Sortieren. Neu sind nur Anbauteile, die der Kipper längst hat: Tür mit
+     * Rahmen, Scharnieren und Griff, Trittstufe, zwei Außenspiegel,
+     * Scheibenwischer, Sonnenblende, Regenrinne, zwei Armlehnen, Gurt.
+     */
+    const kabineBlech = new THREE.Mesh(kabineLack(cx, cz), frameMat);
+    kabineBlech.castShadow = true;
+    kabineBlech.name = "06_KABINE_LACK";
+    this.cabLiftGroup.add(kabineBlech);
+    const kabineStahlMesh = new THREE.Mesh(kabineStahl(cx, cz), farbstoff(0.7, 0.2));
+    kabineStahlMesh.name = "06_KABINE_STAHL";
+    this.cabLiftGroup.add(kabineStahlMesh);
+    /*
+     * Alle sechs Scheiben in EINEM Netz. `side: DoubleSide` bleibt: Der Fahrer
+     * sitzt hinter ihnen und sähe sonst durch sie hindurch ins Leere.
+     */
+    const scheiben = new THREE.Mesh(kabineGlas(cx, cz), glass);
+    scheiben.name = "06_SCHEIBEN";
+    this.cabLiftGroup.add(scheiben);
 
     // Bordinstrument rechts vorn an der Säule — zeigt Achswinkel, Hydraulik
-    // und Greiferstatus, wie das Display in der echten Maschine
+    // und Greiferstatus, wie das Display in der echten Maschine.
+    // Sein GEHÄUSE liegt im Stahl-Netz oben; hier hängt nur die Leinwand.
     this.instruments = new InstrumentPanel(this.cabLiftGroup, cx, cz);
     this.instruments.draw(this.readout());
 
-    // Sitz + Konsolen
-    const seatMat = new THREE.MeshStandardMaterial({ color: 0x24272a, roughness: 0.9 });
-    const seat = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.12, 0.5), seatMat);
-    seat.position.set(cx, 0.95, cz - 0.2);
-    seat.name = "06_SITZ";
-    this.cabLiftGroup.add(seat);
-    const backrest = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.62, 0.1), seatMat);
-    backrest.position.set(cx, 1.3, cz - 0.48);
-    backrest.name = "06_SITZ_LEHNE";
-    this.cabLiftGroup.add(backrest);
-    // Kopfstütze
-    const headrest = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.22, 0.12), seatMat);
-    headrest.position.set(cx, 1.76, cz - 0.47);
-    headrest.castShadow = true;
-    headrest.name = "06_SITZ_KOPFSTUETZE";
-    this.cabLiftGroup.add(headrest);
-    for (const sx of [-0.09, 0.09]) {
-      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.13, 8), darkMat);
-      post.position.set(cx + sx, 1.63, cz - 0.47);
-      post.name = `06_SITZ_KOPFSTUETZE_STAB_${sx > 0 ? "L" : "R"}`;
-      this.cabLiftGroup.add(post);
-    }
-    for (const side of [-1, 1]) {
+    const sitz = new THREE.Mesh(kabineSitz(cx, cz), farbstoff(0.9));
+    sitz.castShadow = true;
+    sitz.name = "06_SITZ";
+    this.cabLiftGroup.add(sitz);
+
+    /*
+     * Die beiden ISO-Joysticks. Sie kippen mit der Achseingabe und sind
+     * deshalb eigene Starrkörper — aber je Seite EIN Netz statt sieben, und
+     * die Hand daran eines statt drei. Vorher: 20 Netze und 40 Zeichenrufe für
+     * zwei Hebel von 40 cm Höhe.
+     */
+    const joyGeo = joystick();
+    const joyStoff = farbstoff(0.6);
+    const armStoff = new THREE.MeshStandardMaterial({ color: 0xe3b18c, roughness: 0.8 });
+    for (const side of [-1, 1] as const) {
       const seite = side > 0 ? "L" : "R";
-      const console = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.28, 0.44), darkMat);
-      console.position.set(cx + side * 0.36, 1.02, cz + 0.02);
-      console.name = `06_KONSOLE_${seite}`;
-      this.cabLiftGroup.add(console);
-      // Moderner Kreuzhebel: Faltenbalg, ergonomischer Griff mit Daumentaste
-      // und Vorderfinger-Wippe — statt Kugelknauf (Design-Wunsch 2026-08-29).
       const pivot = new THREE.Group();
       pivot.position.set(cx + side * 0.36, 1.16, cz + 0.1);
       pivot.name = `06_JOYSTICK_${seite}`;
-      const rubber = new THREE.MeshStandardMaterial({ color: 0x17191b, roughness: 0.95 });
-      const gripMat = new THREE.MeshStandardMaterial({ color: 0x24282c, roughness: 0.45 });
-      const accent = new THREE.MeshStandardMaterial({
-        color: 0xd97a1f,
-        roughness: 0.35,
-        emissive: 0x3a1f00,
-      });
-      // Faltenbalg (drei Wülste)
-      for (let b = 0; b < 3; b++) {
-        const bellow = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.055 - b * 0.006, 0.062 - b * 0.006, 0.035, 12),
-          rubber
-        );
-        bellow.position.y = 0.03 + b * 0.037;
-        bellow.name = `06_JOYSTICK_${seite}_BALG_${b + 1}`;
-        pivot.add(bellow);
-      }
-      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.021, 0.025, 0.12, 10), gripMat);
-      shaft.position.y = 0.18;
-      shaft.name = `06_JOYSTICK_${seite}_SCHAFT`;
-      pivot.add(shaft);
-      // Griff: leicht nach hinten geneigter, abgerundeter Körper
-      const grip = new THREE.Mesh(new THREE.CapsuleGeometry(0.048, 0.1, 4, 12), gripMat);
-      grip.position.set(0, 0.29, -0.012);
-      grip.rotation.x = -0.22;
-      grip.castShadow = true;
-      grip.name = `06_JOYSTICK_${seite}_GRIFF`;
-      pivot.add(grip);
-      // Daumentaste oben
-      const thumb = new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.019, 0.014, 10), accent);
-      thumb.position.set(0, 0.365, 0.012);
-      thumb.rotation.x = -0.22;
-      thumb.name = `06_JOYSTICK_${seite}_DAUMENTASTE`;
-      pivot.add(thumb);
-      // Wippe für den Zeigefinger vorn
-      const trigger = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.032, 0.018), accent);
-      trigger.position.set(0, 0.285, 0.05);
-      trigger.rotation.x = 0.25;
-      trigger.name = `06_JOYSTICK_${seite}_WIPPE`;
-      pivot.add(trigger);
-
-      // Unterarm und Hand hängen am Hebel: Sie kippen mit ihm mit und liegen
-      // AUSSEN am Griff, nicht zwischen Fahrer und Joystick.
-      const armSkin = new THREE.MeshStandardMaterial({ color: 0xe3b18c, roughness: 0.8 });
-      // Nach Fotoreferenz: Unterarm läuft schräg von hinten-unten heran, die
-      // Faust liegt oben auf dem Griff und umschließt ihn.
-      const forearm = new THREE.Mesh(new THREE.CapsuleGeometry(0.054, 0.34, 4, 10), armSkin);
-      forearm.position.set(side * 0.06, 0.28, -0.28);
-      forearm.rotation.set(1.28, 0, side * 0.18);
-      forearm.castShadow = true;
-      forearm.name = `06_FAHRER_UNTERARM_${seite}`;
-      pivot.add(forearm);
-      // Faust: ein liegender, abgerundeter Block um den Griff, davor der
-      // Daumen — einfache Formen, aber anatomisch plausibel
-      const fist = new THREE.Mesh(new THREE.CapsuleGeometry(0.052, 0.075, 4, 10), armSkin);
-      fist.position.set(0, 0.315, -0.01);
-      fist.rotation.set(Math.PI / 2, 0, 0);
-      fist.castShadow = true;
-      fist.name = `06_FAHRER_FAUST_${seite}`;
-      pivot.add(fist);
-      const thumbFinger = new THREE.Mesh(new THREE.CapsuleGeometry(0.02, 0.055, 4, 8), armSkin);
-      thumbFinger.position.set(-side * 0.042, 0.318, 0.035);
-      thumbFinger.rotation.set(1.35, 0, side * 0.35);
-      thumbFinger.name = `06_FAHRER_DAUMEN_${seite}`;
-      pivot.add(thumbFinger);
-
+      const hebel = new THREE.Mesh(joyGeo, joyStoff);
+      hebel.castShadow = true;
+      hebel.name = `06_JOYSTICK_${seite}_HEBEL`;
+      pivot.add(hebel);
+      // Unterarm, Faust und Daumen hängen am Hebel und kippen mit ihm mit.
+      // Sie bleiben in der Kabinenansicht sichtbar.
+      const hand = new THREE.Mesh(fahrerhand(side), armStoff);
+      hand.castShadow = true;
+      hand.name = `06_FAHRER_HAND_${seite}`;
+      pivot.add(hand);
       this.cabLiftGroup.add(pivot);
       if (side < 0) this.joyLeft = pivot;
       else this.joyRight = pivot;
@@ -1134,6 +1216,14 @@ export class Excavator {
     });
     this.buildBlade(darkMat, frameMat, rodMat);
 
+    /*
+     * Die Geometrie eines Pratzenfußes wird EINMAL gebaut und von allen vier
+     * Füßen geteilt — wie beim Rad. Das spart Speicher, nicht Zeichenrufe:
+     * Die kostet jedes Netz einzeln, gleich welche Geometrie darin steckt.
+     */
+    const pratzenGeo = { fuss: pratzeFuss(), stempel: pratzeStempel() };
+    const pratzenStoff = farbstoff(0.7);
+
     const UP = new THREE.Vector3(0, 1, 0);
     for (const [sx, sz] of [
       [-1, 1],
@@ -1153,17 +1243,14 @@ export class Excavator {
        * ueber die Kante, und sie folgen der Laengsachse statt ins Kreuz zu
        * gehen.
        */
-      const from = new THREE.Vector3(sx * 1.05, 0.85, sz * 1.35);
+      /*
+       * Der AUSLEGER der Pratze steht seit dem 15.09.2026 nicht mehr hier: Er
+       * bewegt sich nicht und liegt deshalb im Netz des Unterwagens
+       * (`unterwagenParts.ts`, Funktion `pratzenausleger`). Das sparte vier
+       * Netze und acht Zeichenrufe. Nur der FUSS fährt aus — der bleibt.
+       */
       const to = new THREE.Vector3(sx * 1.8, 0.7, sz * 1.35);
-      const dir = to.clone().sub(from);
-      const len = dir.length();
       const e = ecke(sx, sz);
-      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.34, len + 0.3), darkMat);
-      arm.position.copy(from).addScaledVector(dir.clone().normalize(), len / 2);
-      arm.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir.clone().normalize());
-      arm.castShadow = true;
-      arm.name = `03_PRATZE_${e}_AUSLEGER`;
-      this.root.add(arm);
       // Stempel + Tellerfuß in einer Gruppe — fahren gemeinsam ein und aus
       const foot = new THREE.Group();
       foot.position.set(to.x, 0, to.z);
@@ -1177,21 +1264,23 @@ export class Excavator {
        * angeschweisstem Stahl aussehen, also ein schlankes Kastenprofil, das
        * nach unten leicht zulaeuft.
        */
-      const cyl = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.5, 0.26), frameMat);
-      cyl.position.y = 0.42;
-      cyl.castShadow = true;
-      cyl.name = `03_PRATZE_${e}_KASTEN`;
-      foot.add(cyl);
-      const rod = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.35, 0.17), rodMat);
-      rod.position.y = 0.14;
-      rod.name = `03_PRATZE_${e}_STEMPEL`;
-      foot.add(rod);
-      const pad = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.14, 0.62), darkMat);
-      pad.position.y = 0.07;
-      pad.castShadow = true;
-      pad.name = `03_PRATZE_${e}_TELLER`;
-      foot.add(pad);
+      /*
+       * ZWEI Netze je Fuß statt drei (Konzept 03): Kasten, Teller, Lagerböcke,
+       * Bolzen und Schläuche fahren gemeinsam aus und liegen deshalb in einem
+       * bunten Netz; nur der blanke Stempel bleibt eigen, weil blanker Stahl
+       * eine andere Oberfläche hat und nicht nur eine andere Farbe.
+       * Teil für Teil in `schildParts.ts`.
+       */
+      const fuss = new THREE.Mesh(pratzenGeo.fuss, pratzenStoff);
+      fuss.castShadow = true;
+      fuss.name = `03_PRATZE_${e}_FUSS`;
+      foot.add(fuss);
+      const stempel = new THREE.Mesh(pratzenGeo.stempel, rodMat);
+      stempel.name = `03_PRATZE_${e}_STEMPEL`;
+      foot.add(stempel);
       void UP;
+      void frameMat;
+      void darkMat;
     }
   }
 
@@ -1260,13 +1349,25 @@ export class Excavator {
       polygonOffset: true,
       polygonOffsetFactor: -2,
     });
+    /*
+     * Beide Flanken tragen dieselbe Wortmarke auf derselben Leinwand — also
+     * EIN Netz statt zwei (E-025, Budgetregel). Die Spiegelung steckt in der
+     * Geometrie: Jede Fläche wird vor dem Verschmelzen an ihren Platz gedreht,
+     * die UV-Koordinaten bleiben dabei unberührt, und das Logo steht auf
+     * beiden Seiten richtig herum.
+     */
+    const flaechen: THREE.BufferGeometry[] = [];
     for (const side of [-1, 1] as const) {
-      const plane = new THREE.Mesh(new THREE.PlaneGeometry(2.7, 0.52), mat);
-      plane.position.set(side * 0.216, 0.03, BOOM_LEN * 0.46);
-      plane.rotation.y = (side * Math.PI) / 2;
-      plane.name = `08_LOGO_AUSLEGER_${side > 0 ? "L" : "R"}`;
-      this.boomGroup.add(plane);
+      const g = new THREE.PlaneGeometry(2.7, 0.52);
+      g.rotateY((side * Math.PI) / 2);
+      g.translate(side * 0.216, 0.03, BOOM_LEN * 0.46);
+      flaechen.push(g);
     }
+    const logo = mergeGeometries(flaechen, false);
+    if (!logo) throw new Error("Auslegerlogo liess sich nicht verschmelzen");
+    const plane = new THREE.Mesh(logo, mat);
+    plane.name = "08_LOGO_AUSLEGER";
+    this.boomGroup.add(plane);
   }
 
   private buildBodies(world: RAPIER.World): void {
@@ -1474,6 +1575,15 @@ export class Excavator {
       const speedFactor = THREE.MathUtils.clamp(Math.abs(this.driveVel) / DRIVE_MAX, 0.35, 1);
       this.heading -= steer * STEER_RATE * speedFactor * dir * dt;
     }
+    /*
+     * Lenkung (E-025, Befund 1): Der Ausschlag folgt der Lenkeingabe mit einer
+     * eigenen kleinen Rampe — eine Achse schlägt nicht in einem Bild ein.
+     * Das Rollen steht weiter unten, es hängt an der wirklich gefahrenen
+     * Strecke.
+     */
+    const lenkZiel = locked ? 0 : -steer * LENK_MAX;
+    this.steerAngle = ramp(this.steerAngle, lenkZiel, (LENK_MAX / LENK_ZEIT) * dt);
+
     const naechstesX = this.position.x + Math.sin(this.heading) * this.driveVel * dt;
     const naechstesZ = this.position.z + Math.cos(this.heading) * this.driveVel * dt;
     /*
@@ -1650,6 +1760,24 @@ export class Excavator {
       this.armBlocked = false;
       col.armFree = true;
     }
+
+    /*
+     * Räder rollen — nach der Kollisionsprüfung, und aus der WIRKLICH
+     * gefahrenen Strecke: Winkel = Strecke / Radhalbmesser.
+     *
+     * Der erste Versuch am 15.09.2026 rechnete mit `driveVel · dt`. Das ist
+     * fast immer dasselbe, aber eben nicht immer: Stösst das Fahrwerk an, wird
+     * `position` oben auf den Stand vor dem Schritt zurückgenommen — die Räder
+     * hätten sich dann weitergedreht, obwohl die Maschine steht. Gemessen war
+     * das über zwei Sekunden Fahrt ein Fehler von 5,8 cm; an einer Wand wäre
+     * daraus ein durchdrehendes Rad geworden.
+     *
+     * Gestutzt auf einen Umlauf, damit der Wert in einer langen Schicht nicht
+     * ins Grobe wächst und die Drehung anfängt zu springen.
+     */
+    const gefahren = Math.hypot(this.position.x - prevPos.x, this.position.z - prevPos.z);
+    this.wheelSpin =
+      (this.wheelSpin + (Math.sign(this.driveVel) * gefahren) / RAD_R) % (Math.PI * 2);
 
     this.integratePendulum(dt);
     this.syncBodies();
@@ -2134,6 +2262,15 @@ export class Excavator {
     // Kabine fährt am Ausleger nach oben UND ein Stück nach vorn
     this.cabLiftGroup.position.y = this.cabLift;
     this.cabLiftGroup.position.z = this.cabLift * 0.34;
+    /*
+     * Räder: rollen (X) und lenken (Y). Die Seitenlage (Z) steht seit dem Bau
+     * fest. Die Drehreihenfolge `YXZ` ist dafür Voraussetzung — sie wird beim
+     * Anlegen gesetzt, siehe `buildMeshes`.
+     */
+    for (const w of this.wheelGroups) {
+      w.gruppe.rotation.x = this.wheelSpin;
+      w.gruppe.rotation.y = w.vorn ? this.steerAngle : 0;
+    }
     for (const g of this.outriggerGroups) {
       g.position.y = (1 - this.outriggerDown) * 0.72; // eingefahren = angehoben
     }
@@ -2408,46 +2545,23 @@ export class Excavator {
     this.root.add(g);
     this.bladeGroup = g;
 
-    // Schildblatt: leicht nach vorn geneigt, mit umlaufender Kante
-    const blade = new THREE.Mesh(new THREE.BoxGeometry(BLADE_W, 0.72, 0.16), dark);
-    blade.position.set(0, 0.42, 0);
-    blade.rotation.x = -0.22;
-    blade.castShadow = true;
-    blade.name = "01_RAEUMSCHILD_BLATT";
-    g.add(blade);
-    // Schneide unten, hell abgesetzt wie angeschliffener Stahl
-    const edge = new THREE.Mesh(
-      new THREE.BoxGeometry(BLADE_W, 0.14, 0.2),
-      new THREE.MeshStandardMaterial({ color: 0x9aa2a8, roughness: 0.4, metalness: 0.9 })
-    );
-    edge.position.set(0, 0.07, 0.03);
-    edge.name = "01_RAEUMSCHILD_SCHNEIDE";
-    g.add(edge);
-    // Seitenwangen, damit das Material nicht seitlich wegläuft
-    for (const s of [-1, 1]) {
-      const wing = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.62, 0.5), dark);
-      wing.position.set((s * BLADE_W) / 2, 0.4, 0.22);
-      wing.name = `01_RAEUMSCHILD_WANGE_${s > 0 ? "L" : "R"}`;
-      g.add(wing);
-    }
-    // Verstrebungen zum Fahrgestell samt Hubzylinder
-    for (const s of [-1, 1]) {
-      const seite = s > 0 ? "L" : "R";
-      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.9), frame);
-      arm.position.set(s * 0.7, 0.5, -0.45);
-      arm.name = `01_RAEUMSCHILD_STREBE_${seite}`;
-      g.add(arm);
-      const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.5, 8), frame);
-      cyl.position.set(s * 0.42, 0.78, -0.3);
-      cyl.rotation.x = 0.9;
-      cyl.name = `01_RAEUMSCHILD_ZYLINDER_${seite}`;
-      g.add(cyl);
-      const piston = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.34, 8), rod);
-      piston.position.set(s * 0.42, 0.55, -0.16);
-      piston.rotation.x = 0.9;
-      piston.name = `01_RAEUMSCHILD_STANGE_${seite}`;
-      g.add(piston);
-    }
+    /*
+     * Schild und Schneide — ZWEI Netze für 16 Teile (Konzept 01x).
+     *
+     * Vorher waren es zehn: Blatt, Schneide, zwei Wangen, zwei Streben, zwei
+     * Zylinder, zwei Kolbenstangen. Alle schwenken gemeinsam auf und ab; keins
+     * bewegt sich gegen ein anderes. Neu sind vier Augen und zwei Bolzen an
+     * den Anlenkpunkten. Teil für Teil in `schildParts.ts`.
+     */
+    const blatt = new THREE.Mesh(schildKoerper(BLADE_W), farbstoff(0.8));
+    blatt.castShadow = true;
+    blatt.name = "01_RAEUMSCHILD_BLATT";
+    g.add(blatt);
+    const schneide = new THREE.Mesh(schildSchneide(BLADE_W), rod);
+    schneide.name = "01_RAEUMSCHILD_SCHNEIDE";
+    g.add(schneide);
+    void dark;
+    void frame;
   }
 
   /** Zustand fürs Bordinstrument zusammenstellen. */

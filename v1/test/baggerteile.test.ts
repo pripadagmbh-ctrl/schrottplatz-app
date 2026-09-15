@@ -123,21 +123,33 @@ describe("Positionsliste des Baggers", () => {
      * muessen deshalb da sein — an ihnen haengen Kollider, Kamera und Kinematik.
      */
     for (const name of [
-      "01_UNTERWAGEN",
+      "01_UNTERWAGEN_LACK",
+      "01_UNTERWAGEN_STAHL",
       "01_RAEUMSCHILD_BLATT",
       "02_RAD_VL",
       "02_RAD_VR",
       "02_RAD_HL",
       "02_RAD_HR",
-      "03_PRATZE_VL_TELLER",
+      "03_PRATZE_VL_FUSS",
+      "03_PRATZE_VL_STEMPEL",
+      "01_RAEUMSCHILD_SCHNEIDE",
       "04_DREHKRANZ",
       "05_MOTORHAUBE",
-      "05_GEGENGEWICHT",
+      "05_LEUCHTEN",
       "06_SITZ",
-      "06_SCHEIBE_FRONT",
+      "06_SCHEIBEN",
+      "06_KABINE_LACK",
+      "06_DISPLAY_BILD",
       "07_AUSLEGER_KASTEN",
+      "07_AUSLEGER_STAHL",
       "07_STIEL_KASTEN",
-      "07_HALTER_BOLZEN",
+      /*
+       * Der Greiferhalter hiess bis zum 15.09.2026 `07_HALTER_BOLZEN` und war
+       * eines von acht Meshes am Stiel. Seit E-029 liegt er samt Gusskopf,
+       * Laschen und Scheiben im verschmolzenen Stahl-Netz des Stiels; jedes
+       * Teil steht weiterhin als benannte Funktion in `armParts.ts`.
+       */
+      "07_STIEL_STAHL",
     ]) {
       expect(scene.getObjectByName(name), `${name} nicht gefunden`).toBeDefined();
     }
@@ -159,9 +171,41 @@ describe("Positionsliste des Baggers", () => {
      *
      * Davor, bei der reinen Benennung: 117 + 12 = 129, 9 980 Dreiecke,
      * 167 Zeichenrufe.
+     *
+     * Stand 15.09.2026 nach E-029 (Zylinder, Drehkranz, Ausleger/Stiel):
+     *   133 Netze, 19 212 Dreiecke, 188 Zeichenrufe.
+     * Die Rechnung dahinter: Stiel 8 → 3, Ausleger 5 → 5 (bei sechsmal so viel
+     * Inhalt), Auslegerschlauch 2 → 1, Logo 2 → 1, Drehkranz 1 → 2 (der Ring
+     * ist bis zum Unterwagen-Paket ein eigenes Netz). Macht −4.
+     *
+     * Stand 15.09.2026 nach dem Fahrer-Paket: 119 Netze, 17 772 Dreiecke,
+     * 162 Zeichenrufe. Daniel kostete 16 Netze und 4 648 Dreiecke und kostet
+     * jetzt zwei Netze — Haut und Kleidung.
+     *
+     * Stand 15.09.2026 nach dem Unterwagen-Paket: 115 Netze, 19 236 Dreiecke,
+     * 155 Zeichenrufe. Der Unterwagen wurde von 1 auf 2 Netze (Lack, Stahl);
+     * dafuer sind der Drehkranzring und die vier Pratzenausleger darin
+     * aufgegangen.
+     *
+     * Stand 15.09.2026 nach dem Oberwagen-Paket: 107 Netze, 20 388 Dreiecke,
+     * 147 Zeichenrufe. Zehn Netze (Haube, acht Lueftungsschlitze,
+     * Gegengewicht) plus die Deckplatte wurden drei: Lack, Stahl, Leuchten.
+     * `05_GEGENGEWICHT` heisst deshalb nicht mehr so — es liegt im Stahl-Netz
+     * `04_DREHKRANZ`, wo auch der Drehkranzdeckel steckt.
+     *
+     * Stand 15.09.2026 nach Raeumschild und Pratzen: 95 Netze, 21 072
+     * Dreiecke, 131 Zeichenrufe. Das Schild ging von 10 auf 2, die vier
+     * Pratzenfuesse von 12 auf 8 — in beiden Faellen bewegt sich innerhalb der
+     * Gruppe nichts gegeneinander.
+     *
+     * Stand 15.09.2026 nach dem Kabinen-Paket: 59 Netze, 20 120 Dreiecke,
+     * 89 Zeichenrufe. Die Kabine ging von 25 Netzen auf fuenf, die beiden
+     * Joysticks von 14 auf 2, die Unterarme von 6 auf 2. Das Zielbild aus
+     * E-025 nennt 57 — die letzten zwei fallen mit dem Kabinenhub, wenn aus
+     * zwei gestreckten Zylindern einer wird.
      */
     const meshes = baggerMeshes();
-    expect(meshes.length, "Bauteilzahl am Bagger").toBe(137);
+    expect(meshes.length, "Bauteilzahl am Bagger").toBe(59);
   });
 });
 
