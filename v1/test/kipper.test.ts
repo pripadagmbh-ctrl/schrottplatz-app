@@ -22,7 +22,10 @@ import { initPhysics } from "../src/physics/physicsWorld";
 import { VehicleManager } from "../src/delivery/vehicles";
 import { ItemManager } from "../src/world/scrapItems";
 import { CompositeManager } from "../src/dismantle/composites";
+import { EventBus } from "../src/core/events";
 import type { CustomerProfile } from "../src/delivery/customers";
+import { ladeVolumen } from "../src/delivery/fuellgrad";
+import { ladungsDichte } from "../src/materials/schuettdichte";
 import { lagerMuldeFuer } from "../src/world/containers";
 
 /**
@@ -33,14 +36,35 @@ import { lagerMuldeFuer } from "../src/world/containers";
  * vor dem Bagger. Ein gewuerfelter Kunde entschied damit auch, welcher der
  * beiden Faelle geprueft wird — beide gehoeren geprueft.
  */
+/** Anteil Stoerstoff in der Pruefladung — ein Startwert, aber ueberall derselbe. */
+const STOER = 0.06; // SW
+
 function kunde(sortenrein: string | null): CustomerProfile {
+  const massKg = 5000;
+  /*
+   * Vier Felder — `vehicle`, `aufbau`, `fuellgrad`, `dichte` — gehoeren seit
+   * dem Fuellgrad-Umbau zum Kunden und fehlten hier. Gefunden am 15.09.2026
+   * von der neuen Typpruefung fuer `test/` (E-038). Folge war still: Ohne
+   * `vehicle` fiel `vehicleForCustomer` in seinen `??`-Zweig und WUERFELTE das
+   * Fahrzeug — in einem Waechter, dessen einziger Zweck der Kipper ist.
+   *
+   * Die Zahlen sind nicht geschaetzt, sondern aus denselben Funktionen
+   * gerechnet, die das Spiel benutzt: Schuettdichte aus `ladungsDichte`,
+   * Laderaum aus `ladeVolumen`, Fuellgrad = Masse / (Raum × Dichte).
+   */
+  const dichte = ladungsDichte(sortenrein, STOER);
+  const fuellgrad = Math.min(1, massKg / (ladeVolumen("kipper", "flach") * dichte));
   return {
     group: "haendler",
     name: "Pruefstand",
     subtitle: "Test",
-    massKg: 5000,
+    massKg,
+    vehicle: "kipper",
+    aufbau: "flach",
+    fuellgrad,
+    dichte,
     sortedMaterial: sortenrein,
-    contaminantShare: 0.06,
+    contaminantShare: STOER,
     hardness: 1,
     greeting: "",
   };
@@ -79,7 +103,13 @@ function kippen(sortenrein: string | null = null, saat = 20260913): {
     boden
   );
   const items = new ItemManager(scene, world);
-  const m = new VehicleManager(scene, world, items, new CompositeManager(scene, world, items));
+  // EventBus als viertes Argument — fehlte bis 15.09.2026 (E-038).
+  const m = new VehicleManager(
+    scene,
+    world,
+    items,
+    new CompositeManager(scene, world, items, new EventBus())
+  );
   m.spawnNow("kipper", kunde(sortenrein));
   const mulde = lagerMuldeFuer(sortenrein);
   const v = (m as unknown as { active: Record<string, unknown> }).active;

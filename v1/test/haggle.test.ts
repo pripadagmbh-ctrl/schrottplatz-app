@@ -1,13 +1,27 @@
 import { describe, it, expect } from "vitest";
 import { haggle, leavesOnRefusal, OFFER_FACTOR, type Offer } from "../src/economy/haggle";
 import type { CustomerProfile, CustomerGroup } from "../src/delivery/customers";
+import { ladeVolumen } from "../src/delivery/fuellgrad";
+import { ladungsDichte } from "../src/materials/schuettdichte";
 
 function kunde(group: CustomerGroup, hardness = 3): CustomerProfile {
+  /*
+   * `vehicle`, `aufbau`, `fuellgrad` und `dichte` fehlten hier, seit der
+   * Fuellgrad-Umbau sie zum Kunden gelegt hat; gemeldet von der Typpruefung
+   * fuer `test/` (E-038). `haggle` liest sie nicht — deshalb hat auch nichts
+   * geknallt. Sie stehen trotzdem hier: Ein Pruefstueck, das kein gueltiger
+   * Kunde ist, wird beim naechsten Umbau still falsch.
+   */
+  const dichte = ladungsDichte(null, 0.1);
   return {
     group,
     name: "Test",
     subtitle: "Test",
     massKg: 1000,
+    vehicle: "pritsche",
+    aufbau: "flach",
+    fuellgrad: Math.min(1, 1000 / (ladeVolumen("pritsche", "flach") * dichte)),
+    dichte,
     sortedMaterial: null,
     contaminantShare: 0.1,
     hardness,

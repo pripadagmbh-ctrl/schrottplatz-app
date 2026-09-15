@@ -24,13 +24,24 @@ import type { CustomerProfile } from "../src/delivery/customers";
 import { BAGGER_STAND } from "../src/world/baggerstand";
 import { setBaggerOrt } from "../src/delivery/routes";
 import { STATIC_OBSTACLES } from "../src/world/obstacles";
+import { EventBus } from "../src/core/events";
+import { ladeVolumen, type Fahrzeugart } from "../src/delivery/fuellgrad";
+import { ladungsDichte } from "../src/materials/schuettdichte";
 
-function kunde(sortenrein: string | null): CustomerProfile {
+function kunde(sortenrein: string | null, kind: DeliveryKind): CustomerProfile {
+  // Die vier Ladefelder fehlten hier; gemeldet von der Typpruefung fuer
+  // `test/` und `tools/` (E-038). Gerechnet statt geschaetzt.
+  const art: Fahrzeugart = kind === "abholer" ? "kipper" : kind;
+  const dichte = ladungsDichte(sortenrein, 0.06);
   return {
     group: "haendler",
     name: "Pruefstand",
     subtitle: "Messfahrt",
     massKg: 4000,
+    vehicle: art,
+    aufbau: "flach",
+    fuellgrad: Math.min(1, 4000 / (ladeVolumen(art, "flach") * dichte)),
+    dichte,
     sortedMaterial: sortenrein,
     contaminantShare: 0.06,
     hardness: 1,
@@ -49,7 +60,13 @@ function fuhre(
   const boden = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
   world.createCollider(RAPIER.ColliderDesc.cuboid(400, 0.5, 400).setTranslation(0, -0.5, 0), boden);
   const items = new ItemManager(scene, world);
-  const m = new VehicleManager(scene, world, items, new CompositeManager(scene, world, items));
+  // EventBus als viertes Argument — fehlte bis 15.09.2026 (E-038).
+  const m = new VehicleManager(
+    scene,
+    world,
+    items,
+    new CompositeManager(scene, world, items, new EventBus())
+  );
   /*
    * Der Bagger steht auf seinem Platz — oder eben nicht. Beides gehoert
    * gemessen: Ein Fahrzeug, das nur durchkommt, solange die Maschine weg ist,
@@ -59,7 +76,7 @@ function fuhre(
     m.getExcavatorPos = () => new THREE.Vector3(BAGGER_STAND.x, 0, BAGGER_STAND.z);
   }
   setBaggerOrt(() => BAGGER_STAND);
-  m.spawnNow(kind, kunde(sortenrein));
+  m.spawnNow(kind, kunde(sortenrein, kind));
   const v = (m as unknown as { active: { phase: string; group: THREE.Group } | null }).active;
   const dt = 1 / 60;
   let letzte = "";

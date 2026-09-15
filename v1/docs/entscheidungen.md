@@ -1537,6 +1537,7 @@ Grundriss vorher/nachher: `docs/messungen/2026-09-15_silos-l-form.svg`.
    Warteplätzen, und laufen die wartenden Fahrer zu ihr, ohne über den
    Arbeitsbereich zu müssen?
 
+
 ---
 
 ### E-029 — Der Kipper verliert seine eigene Spur, Batterien bekommen ein Ziel, die Presse einen Deckel weniger (15.09.2026)
@@ -2086,6 +2087,9 @@ Grundriss vorher/nachher: `docs/messungen/2026-09-15_eine-mulde.svg`.
    ABFALL-Silo an der Südmauer?
 ---
 
+---
+
+---
 ### E-035 — Die Sortierregel bekommt einen Wächter; der Abstand zwischen Schild und Kasse wird gemessen, nicht geschlossen (15.09.2026)
 
 **Entscheidung.** Drei Dinge, alle in `test/`, `tools/` und `docs/` — **kein
@@ -2157,7 +2161,6 @@ der Ladung, und bei Gleichstand die zuerst geladene.
    du im Spiel erlebst?
 
 ---
-
 ---
 
 ### E-041 — Der Müllcontainer steht morgens neben der Buntmetall-Mulde (15.09.2026)
@@ -2285,3 +2288,132 @@ Grundriss nachgezogen: `docs/messungen/2026-09-15_eine-mulde.svg`.
    das ist der Preis dafür, dass er neben der Mulde steht.
 3. **Den Container greifen und woandershin stellen:** Bleibt er dort stehen,
    und ist der Weg nach vorn danach wieder zu?
+
+---
+
+### E-038 — `tsc` sieht ab jetzt auch `test/` und `tools/` an (15.09.2026)
+
+**Entscheidung.** Drei Dinge, alle in `test/`, `tools/`, `docs/` und den
+Konfigurationsdateien — **kein Produktivcode angefasst**:
+
+1. **Neue Datei `v1/tsconfig.test.json`** prüft `test/` und `tools/`. Sie erbt
+   `tsconfig.json` und ergänzt nur die Node-Typen (`"types": ["vite/client",
+   "node"]`), die Tests und Werkzeuge für `node:fs` und `__dirname` brauchen.
+   Neue Abhängigkeit: `@types/node` (devDependency).
+2. **Sie läuft bei `npm test` mit**, über das npm-Skript `pretest`. Schlägt die
+   Typprüfung fehl, startet Vitest gar nicht erst. Nachgewiesen: Der
+   ursprüngliche Fehler `bayApproach(c.z)` wieder eingesetzt, `npm test`
+   gestartet — der Lauf bricht vor dem ersten Test ab mit
+   `test/fahrumriss.test.ts(147,61): error TS2345: Argument of type 'number' is
+   not assignable to parameter of type 'ContainerConfig'.`
+3. **Neue Helferdatei `test/zahl.ts`** mit zwei Funktionen: `endlich(...)`
+   prüft, dass Eingaben endliche Zahlen sind; `mindestens(...)` prüft, dass ein
+   Wächter überhaupt Fälle geprüft hat. Im Einsatz in `test/fahrumriss.test.ts`
+   und `test/fahrstrecke.test.ts` — genau den beiden Dateien, in denen der
+   Fehler saß.
+
+**Begründung.** `tsconfig.json` sammelte nur `"include": ["src"]`, und Vitest
+prüft keine Typen — es wirft sie mit esbuild weg. `test/` und `tools/` hat
+deshalb **nie jemand** angesehen. Am 15.09.2026 hat das an einem einzigen Tag
+dreimal zugeschlagen, jedes Mal nach demselben Muster: Ein Wächter war grün,
+weil seine Eingaben `NaN` waren — und **jeder Vergleich mit `NaN` ist falsch**,
+also meldet `expect(x).toBeLessThan(y)` nichts.
+
+| # | Datei | Was | Folge |
+|---|---|---|---|
+| 1 | `test/fahrumriss.test.ts` | `bayApproach(c.z)` statt `bayApproach(c)` | Zwei Stunden lang „null Durchdringungen" — von null geprüften Strecken. Genau der Wächter, der LKW davon abhält, durch Mauern zu fahren. |
+| 2 | `test/fahrstrecke.test.ts` | derselbe Aufruf ein zweites Mal | dieselbe stille Blindheit |
+| 3 | `test/platzinventar.test.ts` | rechnete gegen `KIPP_SPUR_X`, am selben Abend gelöscht | dieselbe stille Blindheit |
+
+Alle drei wären in einer Sekunde aufgefallen. Beim ersten Hinsehen fielen
+**221 Fehler** heraus; 166 davon waren „Node-Typen nicht eingerichtet", also
+kein Befund, sondern eine fehlende Zeile Konfiguration. Es blieben **55 echte
+Fehler**, darunter **fünf Aufrufe mit zu wenigen Argumenten**, **neun Zugriffe
+auf gelöschte Exporte** und **drei unvollständige Prüfdatensätze**. Vier
+Werkzeuge ließen sich überhaupt nicht mehr starten.
+
+**Warum getrennte Datei und nicht `"include": ["src","test","tools"]`.** Zwei
+Gründe:
+
+- **Der Bau bleibt schnell.** `npm run build` ist `tsc --noEmit && vite build`;
+  Patrick wartet bei jedem Livegang darauf. Der Umfang von `tsconfig.json`
+  ändert sich mit dieser Entscheidung **nicht**, also kann der Bau nicht
+  langsamer geworden sein. Gemessen auf dem Dev-PC am 15.09.2026, ruhige
+  Maschine: `tsc` über `src` 8,0 / 8,1 s, `vite build` 6,7 s, `npm run build`
+  im Ganzen 16,3 / 18,9 s. Die neue Prüfung über `test`+`tools` kostet 13,2 s
+  unter denselben Bedingungen und hängt an `npm test` (44,9 s), nicht am Bau.
+  Der Gegenversuch — alles in **eine** Prüfung — wurde später am Tag gemessen,
+  als fünf weitere Agentenprozesse liefen; die Zahlen schwanken deshalb stark
+  und taugen nur als Richtung, aber die Richtung war in jeder der drei Runden
+  dieselbe: `src` allein 29,4 / 58,5 / 38,6 s gegen `src+test+tools` 56,5 /
+  62,9 / 54,3 s.
+- **`src/` soll Node nicht kennen.** `src/` ist Browsercode. Stünden die
+  Node-Typen in `tsconfig.json`, ginge ein versehentliches `process.env` in
+  `src/` durch und fiele erst auf dem iPad auf. Getrennte Dateien halten diese
+  Grenze.
+
+**Warum `tools/` mitgeprüft wird, obwohl dort datierte Einmal-Werkzeuge
+liegen.** Weil ein Werkzeug, das nicht mehr läuft, ein Befund ist und keine
+Ausnahme rechtfertigt. Die Prüfung hat genau das gefunden: **vier Werkzeuge
+brachen beim Start ab** — `tools/platzplan.ts` (in
+`docs/messungen/2026-09-14_platzumbau.md` als laufendes Werkzeug geführt, das
+`docs/platz.svg` erzeugt), `tools/grundriss-abend.ts`,
+`tools/plan-2026-09-15.ts` und `tools/befunde-2026-09-14.ts`. Alle vier laufen
+wieder; die drei erstgenannten sind nachgeführt auf E-028/E-029 (eigene
+Kipperspur entfallen, `bayApproach` nimmt den Datensatz), das vierte auf E-028
+(`HALLEN_X` ist heute EINE Zahl und `HALLEN_Z` DREI — vorher war es umgekehrt).
+
+**Nebenbefund, der zum selben Muster gehört.** Zwei der vier Werkzeugabstürze
+kamen nicht vom Typ, sondern vom Ausrufezeichen:
+`CONFIGS.find((c) => c.id === "r_cable")!` sagt dem Prüfer „ist bestimmt da",
+und genau dort war nichts. Ein `!` schaltet die Prüfung ab, die wir gerade
+eingeschaltet haben.
+
+**Verworfene Alternative.** (a) `"include": ["src","test","tools"]` in
+`tsconfig.json` — der einfachste Weg, aber er verlängert jeden Bau und nimmt
+`src/` die Trennung von Node. (b) Ein zweiter `tsc`-Schritt in `build` — gleiche
+Verlangsamung, und Regel 9 (keine `&&`-Ketten in Skripten) wird dabei noch
+länger gebrochen. (c) `tools/` per `exclude` aussparen — hätte genau die vier
+kaputten Werkzeuge weiter verdeckt. (d) Die Typprüfung nur in den
+Pages-Workflow hängen — der ruft für v1 nur `npm run build` und nie `npm test`;
+sie liefe dann nie auf dem Rechner, auf dem jemand den Fehler auch beheben kann.
+
+**Widerspruch zu älteren Einträgen, benannt und nicht aufgelöst.** Das Log ist
+am 15.09.2026 mit unaufgelösten Konfliktmarken (`<<<<<<< HEAD`, `=======`,
+`>>>>>>> worktree-agent-a7711447ab574db2a`) eingecheckt worden (Commit
+`f20900b`). Beide Seiten sind erhalten, E-034 steht jetzt vor E-035 — aber:
+**Die Nummern E-036 und E-037 fehlen im Log.** Commit `bbeeb44` nennt E-036 im
+Betreff, ein Eintrag dazu steht nirgends. Das gehört gesichtet, bevor jemand
+eine Nummer zweimal vergibt; hier wird es nur benannt.
+
+**Abnahmekriterium.** `npm test` grün: **774 Tests in 69 Dateien**, unverändert
+zum Stand davor (kein Wächter ist weggefallen). `npm run build` grün.
+`npx tsc -p tsconfig.test.json --noEmit` meldet **0 Fehler** (vorher 221, ohne
+die fehlenden Node-Typen 55). Die Wächter `collision`, `customers`, `haggle`,
+`purity`, `save`, `shift`, `tutorial`, `upgradeEffects`, `upgrades` bleiben
+grün. Die beiden neuen Helfer sind **scheitern gesehen worden**, nicht nur
+eingebaut:
+
+| Eingriff | Meldung |
+|---|---|
+| `bayApproach(c)` → `bayApproach(c.z)` | `npm test` bricht im `pretest` ab, `error TS2345` |
+| Route zur Laufzeit mit `NaN` versehen | `Silo KUPFER-LAGER Anfahrt: keine endliche Zahl … Jeder Vergleich damit ist falsch, der Waechter prueft also nichts.` |
+| Silo-Liste auf null Einträge gekürzt | `Fahrstrecken im Umrissbild: nur 14 Faelle geprueft, erwartet mindestens 20.` |
+| Silo-Anfahrt auf einen Punkt gekürzt | `Anfahrt KUPFER-LAGER: Wegpunkte: nur 1 Faelle geprueft, erwartet mindestens 2.` |
+
+Danach jeweils zurückgestellt und wieder grün.
+
+**Auf dem Gerät zu prüfen.** Nichts am Spiel: Dieses Paket ändert keine Zeile,
+die auf dem iPad läuft — `src/` ist unberührt. Zwei Dinge gehören trotzdem auf
+den Schirm:
+
+1. **`docs/platz.svg` auf dem iPhone** unter `/v1/plaene/` öffnen. Das Blatt ist
+   zum ersten Mal seit E-034 wieder aus dem gebauten Platz erzeugt worden
+   (vorher lief das Werkzeug nicht). Stimmt, was daraufsteht, mit dem überein,
+   was du auf dem Hof siehst — vor allem die vier Ziele MISCHSCHROTT
+   (7,91 m), STAHLSCHROTT (6,96 m), BUNT + VA (7,60 m) und MUELL (7,46 m),
+   alle im Schwenkband 5,8–9,2 m?
+2. **Die datierten Zeichnungen unter `docs/messungen/`** wurden **nicht** neu
+   erzeugt, obwohl die Werkzeuge wieder laufen. Sie halten den Stand ihres
+   Datums fest; neu gezeichnet wären sie eine Fälschung des Protokolls. Wer ein
+   aktuelles Blatt braucht, erzeugt es unter neuem Datum.

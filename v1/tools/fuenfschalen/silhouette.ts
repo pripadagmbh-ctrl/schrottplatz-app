@@ -10,7 +10,7 @@
  */
 import { writeFileSync } from "node:fs";
 import * as THREE from "three";
-import { MASS, stoffe } from "../../src/fuenfschalen/teile";
+import { stoffe } from "../../src/fuenfschalen/teile";
 import { baueGreifer, huelle } from "../../src/fuenfschalen/rig";
 import { blatt, feld, type Feld } from "../riss";
 

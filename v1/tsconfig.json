@@ -13,5 +13,19 @@
     "isolatedModules": true,
     "noEmit": true
   },
+  /*
+   * NUR `src` — und das ist Absicht, keine Luecke.
+   *
+   * `test/` und `tools/` werden von `tsconfig.test.json` geprueft, das dieselbe
+   * Grundlage erbt und zusaetzlich die Node-Typen mitbringt. Grund fuer die
+   * Trennung: `src/` ist Browsercode und soll `process`, `node:fs` und
+   * `__dirname` NICHT kennen — stuenden die Node-Typen hier, ginge ein
+   * versehentliches `process.env` in `src/` durch und fiele erst auf dem iPad
+   * auf.
+   *
+   * Wer hier `"test"` oder `"tools"` ergaenzt, verlangsamt `npm run build` um
+   * rund fuenf Sekunden (gemessen 15.09.2026) und nimmt `src/` die Trennung von
+   * Node. Die Pruefung laeuft stattdessen bei `npm test` mit (Skript `pretest`).
+   */
   "include": ["src"]
 }

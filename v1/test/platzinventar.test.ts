@@ -29,6 +29,7 @@ import {
 } from "../src/world/platzinventar";
 import { abstandVomStand, SCHWENK_INNEN, SCHWENK_AUSSEN } from "../src/world/baggerstand";
 import { ABLADE_SPUR_X } from "../src/delivery/routes";
+import { getMaterial } from "../src/materials/catalog";
 
 beforeAll(async () => {
   await initPhysics();
@@ -191,7 +192,9 @@ describe("Inhalt ins Abfall-Silo, Hülle bleibt", () => {
       items.spawnScrap(
         materialId,
         40,
-        { kind: "box", dims: [0.5, 0.4, 0.5] },
+        // Farbe gehoert zur Form (ScrapShape.color) und fehlte hier — von der
+        // Typpruefung von test/ gemeldet (E-038).
+        { kind: "box", dims: [0.5, 0.4, 0.5], color: getMaterial(materialId).color },
         new THREE.Vector3(
           MUELL.x - 1.2 + (i % 3) * 1.2,
           0.6,

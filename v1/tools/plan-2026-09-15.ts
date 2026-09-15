@@ -52,13 +52,11 @@ import {
   ABLADE_HALT_Z,
   VERLADE_SPUR_X,
   MULDEN_GASSE_X,
-  KIPP_SPUR_X,
-  KIPP_HALT_Z,
   routeApproach,
+  routeInRev,
   pickupApproach,
   pickupInRev,
   bayApproach,
-  TIP_APPROACH,
 } from "../src/delivery/routes";
 
 const M = 9; // Pixel je Meter
@@ -253,10 +251,18 @@ export function zeichnePlan(): string {
     ["Rückfahrspur", [[ABLADE_SPUR_X, -10], [ABLADE_SPUR_X, ABLADE_HALT_Z]], "#2f6f8f"],
     ["Abholer → Verladeplatz", pickupApproach(), "#2f8f5f"],
     ["Abholer rückwärts", pickupInRev(), "#2f8f5f"],
-    ["sortenrein → Silo", bayApproach(CONFIGS.find((c) => c.id === "c_alu_lager")!.z), "#7f5f2f"],
+    /*
+     * Nachgezogen am 15.09.2026 (E-038). Vorher stand hier
+     * `bayApproach(...!.z)` — seit E-028 nimmt die Funktion den ganzen
+     * Muldendatensatz, weil die Anfahrt an der Ausrichtung haengt. Und die
+     * eigene Kipperspur (`TIP_APPROACH`, `KIPP_SPUR_X`, `KIPP_HALT_Z`) ist mit
+     * E-029 entfallen: Gemischte Kipper fahren die Anlieferungsstrecke und
+     * kippen am Abladeplatz quer aus. Dieses Werkzeug liess sich bis dahin gar
+     * nicht mehr ausfuehren.
+     */
+    ["sortenrein → Silo", bayApproach(CONFIGS.find((c) => c.id === "c_alu_lager")!), "#7f5f2f"],
     ["Silo-Gasse", [[MULDEN_GASSE_X, 0.8], [MULDEN_GASSE_X, 23.8]], "#7f5f2f"],
-    ["Kipper → Abkippen", TIP_APPROACH, "#8f2f6f"],
-    ["Kipperspur", [[KIPP_SPUR_X, -7], [KIPP_SPUR_X, KIPP_HALT_Z]], "#8f2f6f"],
+    ["Kipper (seit E-029 dieselbe Spur)", routeInRev(), "#8f2f6f"],
   ];
   for (const [, pts, farbe] of spuren) o.push(linie(pts, farbe, 1.5, "7 4"));
   // Zufahrt zu den Hallen (keine Route, nur die freie Linie)

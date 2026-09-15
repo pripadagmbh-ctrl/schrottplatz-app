@@ -1,0 +1,42 @@
+/*
+ * Typprüfung für `test/` und `tools/`.
+ *
+ * WARUM ES DIESE DATEI GIBT — bitte vor dem Löschen lesen.
+ *
+ * `tsconfig.json` sammelt nur `"include": ["src"]`. Vitest führt Tests aus,
+ * prüft aber keine Typen (esbuild wirft sie weg). Damit sah bis zum 15.09.2026
+ * NIEMAND die Ordner `test/` und `tools/` an. Am 15.09.2026 hat das an einem
+ * einzigen Tag dreimal zugeschlagen, jedes Mal nach demselben Muster: Ein
+ * Wächter war grün, weil seine Eingaben `NaN` waren — und jeder Vergleich mit
+ * `NaN` ist falsch, also meldet `expect(...).toBeLessThan(x)` nichts.
+ *
+ *   1. `test/fahrumriss.test.ts` rief `bayApproach(c.z)`, nachdem die Funktion
+ *      auf einen Datensatz umgestellt worden war. Der Wächter prüfte zwei
+ *      Stunden lang null Durchdringungen auf null Strecken — genau der
+ *      Wächter, der LKW davon abhalten soll, durch Mauern zu fahren.
+ *   2. `test/fahrstrecke.test.ts` hatte denselben Aufruf ein zweites Mal.
+ *   3. `test/platzinventar.test.ts` rechnete gegen `KIPP_SPUR_X`, eine
+ *      Konstante, die am selben Abend gelöscht worden war.
+ *
+ * Alle drei hätte `tsc` in einer Sekunde gemeldet. Wer diese Datei „zum
+ * Aufräumen" entfernt, schaltet genau diese Meldung wieder ab.
+ *
+ * Getrennt von `tsconfig.json` aus zwei Gründen:
+ *   - `src/` ist Browsercode und darf KEINE Node-Globals kennen. Hier ist
+ *     `"types": ["node"]` nötig (`node:fs`, `__dirname` in Tests und
+ *     Werkzeugen); stünde es in `tsconfig.json`, würde ein versehentliches
+ *     `process.env` in `src/` durchgehen und erst auf dem iPad auffallen.
+ *   - `npm run build` bleibt so schnell wie vorher. Patrick wartet bei jedem
+ *     Livegang darauf; die Prüfung hängt deshalb an `npm test` (Skript
+ *     `pretest` in `package.json`), nicht am Bau.
+ *
+ * `src/` steht bewusst nicht in `include`: Die Dateien kommen über die Importe
+ * der Tests ohnehin mit und werden mitgeprüft.
+ */
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["vite/client", "node"]
+  },
+  "include": ["test", "tools"]
+}

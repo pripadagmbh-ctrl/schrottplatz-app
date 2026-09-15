@@ -28,6 +28,7 @@ import { StaffManager } from "../src/world/people";
 import { CONFIGS } from "../src/world/containers";
 import { WEIGH_X, WEIGH_Z, KAFFEE_POS } from "../src/world/yard";
 import { BAGGER_STAND } from "../src/world/baggerstand";
+import { getMaterial } from "../src/materials/catalog";
 
 beforeAll(async () => {
   await initPhysics();
@@ -60,7 +61,10 @@ function platz(stueck: number): {
     items.spawnScrap(
       "copper",
       30,
-      { kind: "box", dims: [0.5, 0.4, 0.5] },
+      // Farbe gehoert zur Form (ScrapShape.color) und fehlte hier — die
+      // Typpruefung von test/ hat es am 15.09.2026 gemeldet (E-038). Ohne sie
+      // baut ItemManager ein Material mit `color: undefined`.
+      { kind: "box", dims: [0.5, 0.4, 0.5], color: getMaterial("copper").color },
       new THREE.Vector3(
         KUPFERBOX.x + (i % 2) * 0.7,
         0.6 + i * 0.4,
