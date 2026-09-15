@@ -131,13 +131,21 @@ describe("Positionsliste des Baggers", () => {
       "02_RAD_HR",
       "03_PRATZE_VL_TELLER",
       "04_DREHKRANZ",
+      "04_DREHKRANZ_RING",
       "05_MOTORHAUBE",
       "05_GEGENGEWICHT",
       "06_SITZ",
       "06_SCHEIBE_FRONT",
       "07_AUSLEGER_KASTEN",
+      "07_AUSLEGER_STAHL",
       "07_STIEL_KASTEN",
-      "07_HALTER_BOLZEN",
+      /*
+       * Der Greiferhalter hiess bis zum 15.09.2026 `07_HALTER_BOLZEN` und war
+       * eines von acht Meshes am Stiel. Seit E-029 liegt er samt Gusskopf,
+       * Laschen und Scheiben im verschmolzenen Stahl-Netz des Stiels; jedes
+       * Teil steht weiterhin als benannte Funktion in `armParts.ts`.
+       */
+      "07_STIEL_STAHL",
     ]) {
       expect(scene.getObjectByName(name), `${name} nicht gefunden`).toBeDefined();
     }
@@ -159,9 +167,15 @@ describe("Positionsliste des Baggers", () => {
      *
      * Davor, bei der reinen Benennung: 117 + 12 = 129, 9 980 Dreiecke,
      * 167 Zeichenrufe.
+     *
+     * Stand 15.09.2026 nach E-029 (Zylinder, Drehkranz, Ausleger/Stiel):
+     *   133 Netze, 19 212 Dreiecke, 188 Zeichenrufe.
+     * Die Rechnung dahinter: Stiel 8 → 3, Ausleger 5 → 5 (bei sechsmal so viel
+     * Inhalt), Auslegerschlauch 2 → 1, Logo 2 → 1, Drehkranz 1 → 2 (der Ring
+     * ist bis zum Unterwagen-Paket ein eigenes Netz). Macht −4.
      */
     const meshes = baggerMeshes();
-    expect(meshes.length, "Bauteilzahl am Bagger").toBe(137);
+    expect(meshes.length, "Bauteilzahl am Bagger").toBe(133);
   });
 });
 
