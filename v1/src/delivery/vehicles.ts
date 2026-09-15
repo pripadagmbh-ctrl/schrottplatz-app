@@ -26,7 +26,14 @@ const LADE_RAND = 0.2;
 const FAHRER_TEMPO = 1.5;
 /** Rechenhilfe fuer boxen() — kein neuer Vektor je Bild. */
 const BOX_TMP = new THREE.Vector3();
-import { hitsObstacle } from "../world/obstacles";
+import { alleHindernisse } from "../world/obstacles";
+import {
+  fahrzeugUmriss,
+  anhaengerUmriss,
+  poseAuf,
+  tiefsteDurchdringung,
+  UMRISS_TOLERANZ,
+} from "./umriss";
 import { BAGGER_STAND } from "../world/baggerstand";
 import { lagerMuldeFuer, type ContainerConfig } from "../world/containers";
 import { rollCustomer, vehicleForCustomer, type CustomerProfile } from "./customers";
@@ -485,42 +492,21 @@ class DeliveryVehicle {
      * Die Standflaeche sitzt NICHT auf dem Ursprung, sondern dort, wo der
      * Wagen wirklich steht (15.09.2026).
      *
-     * Der Ursprung liegt in der Mitte der Ladeflaeche (`vehicleModel.ts`:
-     * `bedGroup.position.z = −bedLen/2`). Nach hinten reicht der Wagen bis zum
-     * Unterfahrschutz auf lokal −bedLen/2 − 0,14, nach vorn bis zur Kabine auf
-     * rund +bedLen/2 + 1,90. Er ist also 2,04 m laenger als die Ladeflaeche —
-     * aber nicht symmetrisch: 1,76 m davon liegen VORN.
-     *
-     * Bis heute stand hier ein symmetrischer Kasten von ± (bedLen/2 + 1,6) um
-     * den Ursprung. Gemessen war er hinten 1,46 m zu lang und vorn 0,30 m zu
-     * kurz. Genau das hat Patrick am Abladeplatz gesehen: „Die fahren ja durch
-     * die Wand, halb durch die Mulde" — der Wagen stand mit einer Flaeche in
-     * der Muellmulde, in der er gar nicht steht, und liess dafuer seine Kabine
-     * frei.
+     * Gerechnet wird sie seit E-054 in `umriss.ts` — von derselben Funktion,
+     * mit der `isBlockedByBuilding` nach vorn schaut und mit der
+     * `test/fahrumriss.test.ts` jede Strecke abfaehrt. Vorher stand die Figur
+     * dreimal da und war dreimal eine andere.
      */
-    const vorn = this.bedLen / 2 + 1.9;
-    const hinten = -(this.bedLen / 2 + 0.14);
-    const mitte = (vorn + hinten) / 2;
-    const rot = this.group.rotation.y;
-    out.push({
-      x: p.x + Math.sin(rot) * mitte,
-      z: p.z + Math.cos(rot) * mitte,
-      hw: 1.55,
-      hd: (vorn - hinten) / 2,
-      rot,
-    });
+    out.push(
+      fahrzeugUmriss({ x: p.x, z: p.z, rot: this.group.rotation.y }, this.bedLen)
+    );
     if (this.trailer) {
       const w = this.trailer.getWorldPosition(BOX_TMP);
       // Der Anhänger hängt hinter der Kupplung; sein Mittelpunkt liegt eine
       // halbe Ladeflächenlänge dahinter.
-      const rot = this.group.rotation.y + this.trailerYawRel;
-      out.push({
-        x: w.x - Math.sin(rot) * (this.bedLen / 2),
-        z: w.z - Math.cos(rot) * (this.bedLen / 2),
-        hw: 1.35,
-        hd: this.bedLen / 2 + 0.5,
-        rot,
-      });
+      out.push(
+        anhaengerUmriss(w.x, w.z, this.group.rotation.y + this.trailerYawRel, this.bedLen)
+      );
     }
   }
 
@@ -1464,23 +1450,12 @@ class DeliveryVehicle {
   }
 
   private placeAt(route: Array<[number, number]>, s: number, reverse = false): void {
-    // Punkt + Richtung entlang der Polylinie bei Bogenlänge s
-    let rest = s;
-    for (let i = 0; i < route.length - 1; i++) {
-      const [ax, az] = route[i];
-      const [bx, bz] = route[i + 1];
-      const segLen = Math.hypot(bx - ax, bz - az);
-      if (rest <= segLen || i === route.length - 2) {
-        const t = Math.min(rest / segLen, 1);
-        const x = ax + (bx - ax) * t;
-        const z = az + (bz - az) * t;
-        this.group.position.set(x, 0, z);
-        // Kabine (+Z) zeigt in Fahrtrichtung — rückwärts: Heck voran
-        this.group.rotation.y = Math.atan2(bx - ax, bz - az) + (reverse ? Math.PI : 0);
-        return;
-      }
-      rest -= segLen;
-    }
+    // Punkt + Richtung entlang der Polylinie bei Bogenlänge s. Gerechnet in
+    // `umriss.ts`, damit der Waechter dieselbe Bahn abfaehrt wie der Wagen.
+    const p = poseAuf(route, s, reverse);
+    this.group.position.set(p.x, 0, p.z);
+    // Kabine (+Z) zeigt in Fahrtrichtung — rückwärts: Heck voran
+    this.group.rotation.y = p.rot;
   }
 
   private routeLength(route: Array<[number, number]>): number {
@@ -1495,22 +1470,54 @@ class DeliveryVehicle {
    * Steht der Bagger (oder etwas anderes Blockierendes) auf dem nächsten
    * Streckenabschnitt? Dann hält der Fahrer an und hupt — er fährt nie hindurch.
    */
+  /** Rechenhilfe fuer die Bauwerkspruefung — kein neues Feld je Bild. */
+  private umrissCache: Box[] = [];
+
   /**
    * Steht ein festes Bauwerk im Weg? Das gilt immer — anders als loser Schrott
    * laesst es sich nicht wegraeumen, und hindurchfahren darf niemand.
+   *
+   * SEIT E-054 MIT DEM ECHTEN UMRISS. Vorher tastete diese Stelle mit einem
+   * PUNKT und 1,40 m Radius auf der Mittellinie ab, an vier Stellen zwischen
+   * 1,2 und 4,0 m VORAUS. Zwei Loecher steckten darin, und beide passen auf
+   * „es klemmt beim Zuruecksetzen" (Befund E-051):
+   *
+   *  1. Der Korridor war schmaler als der Wagen (1,40 gegen 1,55 m
+   *     Halbbreite) — die aeusseren 15 cm jeder Flanke wurden nie geprueft,
+   *     die Ecken eines schraeg stehenden Wagens deutlich mehr.
+   *  2. Beim Rueckwaertsfahren fuehrt das HECK, 3,14 m hinter dem Ursprung.
+   *     Abgetastet wurde aber die Lage des Ursprungs — das Teil, das zuerst
+   *     irgendwo hineinfaehrt, kam im Korridor gar nicht vor. Und die eigene
+   *     Standflaeche schon gar nicht: Die Abtastung begann 1,20 m davor.
+   *
+   * Jetzt sind es Rechtecke: die AKTUELLE Standflaeche (samt Anhaenger, mit
+   * seinem wirklichen Knickwinkel) und drei Lagen voraus bis `aheadS`. Ein
+   * Rechteck ist 7,4 bis 8,0 m lang, die Lagen liegen 1,3 m auseinander —
+   * dazwischen bleibt keine Luecke.
+   *
+   * DIE FLUCHTREGEL. Eine Wand ist nur dann eine Wand, wenn man in sie
+   * hineinfaehrt: Blockiert wird nur, wenn die Lage VORAUS tiefer im Bauwerk
+   * steckt als die jetzige. Ohne diese Regel stuende ein Wagen, dem jemand
+   * einen Muellcontainer an die Flanke stellt, fuer immer — feste Bauten
+   * kennen keine Aufgeben-Regel, und der Platz waere zu.
    */
   private isBlockedByBuilding(
     route: Array<[number, number]>,
     aheadS: number,
     reverse: boolean
   ): boolean {
-    const ax = this.group.position.x;
-    const az = this.group.position.z;
-    const probe = this.probePoint(route, aheadS, reverse);
-    for (let t = 0.3; t <= 1.001; t += 0.235) {
-      if (hitsObstacle(ax + (probe.x - ax) * t, az + (probe.z - az) * t, 1.4)) return true;
+    const hind = alleHindernisse();
+    this.umrissCache.length = 0;
+    this.boxen(this.umrissCache);
+    const tiefeJetzt = tiefsteDurchdringung(this.umrissCache, hind);
+    this.umrissCache.length = 0;
+    const von = this.routeS;
+    for (let i = 1; i <= 3; i++) {
+      const s = von + ((aheadS - von) * i) / 3;
+      this.umrissCache.push(fahrzeugUmriss(poseAuf(route, s, reverse), this.bedLen));
     }
-    return false;
+    const tiefeVoraus = tiefsteDurchdringung(this.umrissCache, hind);
+    return tiefeVoraus > UMRISS_TOLERANZ && tiefeVoraus > tiefeJetzt;
   }
 
   private isBlocked(route: Array<[number, number]>, aheadS: number, reverse: boolean): boolean {

@@ -435,6 +435,23 @@ export function setBuildingObstacles(list: Obstacle[]): void {
 }
 
 /**
+ * ALLE Bauwerke, bewegliche zuerst — fuer alles, was mit Flaechen statt mit
+ * Punkten rechnet.
+ *
+ * `hitsObstacle` beantwortet „liegt DIESER Punkt drin?"; die Fahrzeuge
+ * brauchen seit E-054 „schneidet DIESES Rechteck eines davon?", und dafuer
+ * muessen sie die Liste selbst sehen. Genau dieselbe Liste, in genau
+ * derselben Reihenfolge — sonst prueft der Waechter wieder etwas anderes als
+ * die Fahrt. Der versetzbare Muellcontainer steht in `dynamicObstacles` und
+ * ist damit eingeschlossen.
+ */
+export function alleHindernisse(): readonly Obstacle[] {
+  return dynamicObstacles.length === 0
+    ? STATIC_OBSTACLES
+    : [...dynamicObstacles, ...STATIC_OBSTACLES];
+}
+
+/**
  * Liegt (x,z) in einem festen Bauwerk? `pad` erweitert es um einen
  * Sicherheitsrand. Mit `y` wird die Höhe geprüft: Der Baggerarm darf über
  * eine Mauer schwenken, nur eben nicht hindurch.

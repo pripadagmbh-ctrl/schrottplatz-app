@@ -1,0 +1,262 @@
+/**
+ * DER UMRISS EINES FAHRZEUGS — eine Quelle fuer Fahrt und Waechter.
+ *
+ * Bis zum 15.09.2026 gab es zwei Figuren fuer denselben Wagen, und sie waren
+ * nicht dieselbe (Befund E-051):
+ *
+ *   | was          | Waechter (`test/fahrumriss.test.ts`) | Fahrt (`vehicles.ts`) |
+ *   |--------------|--------------------------------------|-----------------------|
+ *   | Figur        | Rechteck ±1,55 m breit, ~8 m lang    | Punkt, Radius 1,40 m  |
+ *   | Stellen      | alle 50 cm, ganze Strecke            | vier Punkte 1,2–4,0 m |
+ *   |              |                                      | VORAUS                |
+ *
+ * Zwei Loecher, die beide auf „es klemmt beim Zuruecksetzen" passen:
+ *
+ *  1. Der Pruefkorridor war SCHMALER als der Wagen — 1,40 m Radius gegen
+ *     1,55 m Halbbreite. Die aeusseren 15 cm jeder Flanke wurden nie
+ *     geprueft, die Ecken eines schraeg stehenden Wagens deutlich mehr: Ein
+ *     Rechteck von 1,55 x 3,72 m ragt in der Diagonale 4,03 m aus seiner
+ *     Mitte, der Kreis nur 1,40 m.
+ *  2. Beim Rueckwaertssetzen wurde das FALSCHE ENDE geprueft. Abgetastet
+ *     wurde die Lage des Fahrzeug-URSPRUNGS vier Meter weiter; beim
+ *     Rueckwaertsfahren fuehrt aber das Heck, 3,14 m dahinter. Das Teil, das
+ *     zuerst irgendwo hineinfaehrt, wurde nie abgetastet. Und der eigene
+ *     Standplatz gar nicht: Die Abtastung begann erst 1,20 m vor dem
+ *     Ursprung.
+ *
+ * Seitdem steht die Figur genau einmal da — hier. `vehicles.ts` baut damit
+ * seine Standflaechen (`boxen`), prueft damit auf Bauwerke
+ * (`isBlockedByBuilding`), und `test/fahrumriss.test.ts` faehrt damit jede
+ * Strecke ab. Wer die Figur aendert, aendert beide.
+ */
+
+import type { Box } from "../world/boxen";
+
+/**
+ * Halbe Fahrzeugbreite (m).
+ *
+ * Gelesen aus `vehicleModel.ts`: Die Ladeflaeche ist 2,70 m breit, die
+ * Bordwaende und Kotfluegel stehen darueber hinaus. 1,55 m ist das Mass, mit
+ * dem `vehicles.boxen()` seit dem 11.09.2026 baut und gegen das der Bagger
+ * seine Ausweichbewegung rechnet.
+ */
+export const UMRISS_HALB_B = 1.55;
+/**
+ * Wie weit der Wagen VOR die Mitte der Ladeflaeche reicht (m) — die Kabine.
+ *
+ * Der Ursprung liegt in der Mitte der Ladeflaeche (`vehicleModel.ts`:
+ * `bedGroup.position.z = −bedLen/2`). Nach vorn kommen Kabine und Motor.
+ */
+export const UMRISS_VORN = 1.9;
+/** Und wie weit dahinter: der Unterfahrschutz (m). */
+export const UMRISS_HINTEN = 0.14;
+
+/** Halbe Breite eines Anhaengers (m) — schmaler als das Zugfahrzeug. */
+export const ANHAENGER_HALB_B = 1.35;
+/** Wie weit der Anhaenger ueber seine Ladeflaechenmitte hinausragt (m). */
+export const ANHAENGER_UEBERSTAND = 0.5;
+
+/** Ab dieser Durchdringung steckt Blech in Beton; darunter ist es Rundung (m). */
+export const UMRISS_TOLERANZ = 0.01;
+
+/** Eine Lage auf einer Strecke: Ort und Blickrichtung. */
+export interface Pose {
+  x: number;
+  z: number;
+  /** Drehung um die Hochachse (three.js `rotation.y`) */
+  rot: number;
+}
+
+/** Ein achsparalleles Bauwerk, wie es in `obstacles.ts` steht. */
+export interface Rechteck {
+  x: number;
+  z: number;
+  hw: number;
+  hd: number;
+}
+
+/**
+ * Die Standflaeche des Zugfahrzeugs an dieser Lage.
+ *
+ * Sie sitzt NICHT auf dem Ursprung: Der Wagen ist 2,04 m laenger als seine
+ * Ladeflaeche, und davon liegen 1,90 m vorn. Ein symmetrischer Kasten um den
+ * Ursprung war hinten 1,46 m zu lang und vorn 0,30 m zu kurz — genau das hat
+ * Patrick am Abladeplatz gesehen („die fahren halb durch die Mulde").
+ */
+export function fahrzeugUmriss(p: Pose, bedLen: number): Box {
+  const vorn = bedLen / 2 + UMRISS_VORN;
+  const hinten = -(bedLen / 2 + UMRISS_HINTEN);
+  const mitte = (vorn + hinten) / 2;
+  return {
+    x: p.x + Math.sin(p.rot) * mitte,
+    z: p.z + Math.cos(p.rot) * mitte,
+    hw: UMRISS_HALB_B,
+    hd: (vorn - hinten) / 2,
+    rot: p.rot,
+  };
+}
+
+/**
+ * Die Standflaeche eines Anhaengers, gemessen an seiner Kupplungslage.
+ *
+ * `wx`/`wz` ist der Weltpunkt der Anhaengergruppe, `rot` ihre Weltdrehung —
+ * sie knickt gegen das Zugfahrzeug ab und steht deshalb anders.
+ */
+export function anhaengerUmriss(wx: number, wz: number, rot: number, bedLen: number): Box {
+  return {
+    x: wx - Math.sin(rot) * (bedLen / 2),
+    z: wz - Math.cos(rot) * (bedLen / 2),
+    hw: ANHAENGER_HALB_B,
+    hd: bedLen / 2 + ANHAENGER_UEBERSTAND,
+    rot,
+  };
+}
+
+/**
+ * Welche Lage ein Fahrzeug bei Bogenlaenge `s` auf dieser Strecke einnimmt.
+ *
+ * Dieselbe Rechnung, die `vehicles.placeAt` fuer die Fahrt benutzt — sie steht
+ * hier, damit der Waechter nicht seine eigene Abschrift fuehrt. Rueckwaerts
+ * heisst: dieselbe Bahn, Kabine um 180 Grad gedreht, Heck voran.
+ */
+export function poseAuf(route: Array<[number, number]>, s: number, reverse: boolean): Pose {
+  let rest = s;
+  for (let i = 0; i < route.length - 1; i++) {
+    const [ax, az] = route[i]!;
+    const [bx, bz] = route[i + 1]!;
+    const segLen = Math.hypot(bx - ax, bz - az);
+    if (rest <= segLen || i === route.length - 2) {
+      const t = segLen > 1e-9 ? Math.min(rest / segLen, 1) : 0;
+      return {
+        x: ax + (bx - ax) * t,
+        z: az + (bz - az) * t,
+        rot: Math.atan2(bx - ax, bz - az) + (reverse ? Math.PI : 0),
+      };
+    }
+    rest -= segLen;
+  }
+  const [ax, az] = route[0]!;
+  return { x: ax, z: az, rot: reverse ? Math.PI : 0 };
+}
+
+/** Laenge einer Polylinie (m). */
+export function streckenLaenge(route: Array<[number, number]>): number {
+  let len = 0;
+  for (let i = 0; i < route.length - 1; i++) {
+    len += Math.hypot(route[i + 1]![0] - route[i]![0], route[i + 1]![1] - route[i]![1]);
+  }
+  return len;
+}
+
+/**
+ * Kern der Pruefung, mit schon ausgerechnetem Sinus und Cosinus.
+ *
+ * Getrennt, weil `tiefsteDurchdringung` sie je Umriss EINMAL ausrechnet und
+ * dann gegen alle 52 Bauwerke haelt. Das ist gemessen, nicht vermutet: mit
+ * Winkelfunktion je Paar 0,070 ms fuer einen Fahrzeugtakt, ohne 0,025 ms.
+ */
+function ueberlappungMitTrig(
+  b: Box,
+  o: Rechteck,
+  cr: number,
+  sr: number,
+  c: number,
+  s: number
+): number {
+  const dx = b.x - o.x;
+  const dz = b.z - o.z;
+  /*
+   * Auf jeder Achse: Die Ueberlappung zweier Strecken ist die Summe ihrer
+   * halben Laengen minus dem Abstand der Mitten — HOECHSTENS aber die ganze
+   * Laenge der kuerzeren. Der Deckel fehlte am 15.09.2026 in der ersten
+   * Fassung, und bei tiefer Ueberdeckung kam 4,05 statt 3,10 m heraus
+   * (gegengerechnet gegen die Eckenfassung ueber 500.000 Zufallslagen).
+   */
+  const ueb = (extA: number, extB: number, d: number): number =>
+    Math.min(extA + extB - Math.abs(d), 2 * extA, 2 * extB);
+
+  // Achse (1,0) und (0,1) — die des Bauwerks.
+  const uebX = ueb(b.hw * c + b.hd * s, o.hw, dx);
+  if (uebX <= 0) return 0;
+  const uebZ = ueb(b.hw * s + b.hd * c, o.hd, dz);
+  if (uebZ <= 0) return 0;
+  // Die beiden Achsen des gedrehten Rechtecks: (cos, −sin) und (sin, cos).
+  const uebU = ueb(b.hw, o.hw * c + o.hd * s, dx * cr - dz * sr);
+  if (uebU <= 0) return 0;
+  const uebV = ueb(b.hd, o.hw * s + o.hd * c, dx * sr + dz * cr);
+  if (uebV <= 0) return 0;
+  return Math.min(uebX, uebZ, uebU, uebV);
+}
+
+/**
+ * Wie tief dieser Umriss in ein achsparalleles Bauwerk steckt (m); 0 = frei.
+ *
+ * Trennachsensatz ueber vier Achsen: die beiden des Bauwerks und die beiden
+ * des gedrehten Rechtecks. Findet sich eine Achse ohne Ueberlappung, beruehren
+ * sie sich nicht.
+ */
+export function umrissUeberlappung(b: Box, o: Rechteck): number {
+  /*
+   * Ohne eine einzige Zwischenliste gerechnet, und das ist gemessen: Die
+   * Fassung mit vier Eckenfeldern je Paar kostete 0,142 ms fuer einen
+   * Fahrzeugtakt gegen 52 Bauwerke, diese hier 0,025 ms. Bei bis zu vier
+   * Fahrzeugen je Bild ist das der Unterschied zwischen 0,57 und 0,10 ms —
+   * auf dem iPhone mini spuerbar.
+   *
+   * Ein gedrehtes Rechteck gegen ein achsparalleles: Auf jeder der vier
+   * Achsen wird die halbe Ausdehnung beider Figuren addiert und mit dem
+   * Abstand der Mitten verglichen. Ist der Abstand groesser, liegt eine
+   * Trennachse vor und die beiden beruehren sich nicht.
+   */
+  const cr = Math.cos(b.rot);
+  const sr = Math.sin(b.rot);
+  return ueberlappungMitTrig(b, o, cr, sr, Math.abs(cr), Math.abs(sr));
+}
+
+/** Tiefste Durchdringung dieser Umrisse in dieser Hindernisliste (m). */
+export function tiefsteDurchdringung(
+  umrisse: readonly Box[],
+  hindernisse: readonly Rechteck[]
+): number {
+  let tief = 0;
+  for (const u of umrisse) {
+    // Sinus und Cosinus EINMAL je Umriss, nicht einmal je Bauwerk.
+    const cr = Math.cos(u.rot);
+    const sr = Math.sin(u.rot);
+    const c = Math.abs(cr);
+    const s = Math.abs(sr);
+    for (const o of hindernisse) {
+      const d = ueberlappungMitTrig(u, o, cr, sr, c, s);
+      if (d > tief) tief = d;
+    }
+  }
+  return tief;
+}
+
+/**
+ * Alle Fahrzeuglagen entlang einer Strecke, im festen Raster.
+ *
+ * `schritt` 0,5 m ist gemessen und nicht gegriffen: Der schmalste Pfosten auf
+ * dem Platz ist 0,30 m breit; wer weiter springt, kann daran vorbeizielen.
+ */
+export function umrisseEntlang(
+  route: Array<[number, number]>,
+  bedLen: number,
+  reverse: boolean,
+  schritt = 0.5
+): Box[] {
+  const out: Box[] = [];
+  for (let i = 0; i < route.length - 1; i++) {
+    const [ax, az] = route[i]!;
+    const [bx, bz] = route[i + 1]!;
+    const rot = Math.atan2(bx - ax, bz - az) + (reverse ? Math.PI : 0);
+    const len = Math.hypot(bx - ax, bz - az);
+    for (let t = 0; t <= 1.0001; t += schritt / Math.max(len, 0.001)) {
+      const tt = Math.min(1, t);
+      out.push(
+        fahrzeugUmriss({ x: ax + (bx - ax) * tt, z: az + (bz - az) * tt, rot }, bedLen)
+      );
+    }
+  }
+  return out;
+}
