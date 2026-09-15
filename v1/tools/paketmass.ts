@@ -31,6 +31,8 @@ scene.traverse((o) => {
 });
 
 const GRUPPEN: Array<[string, RegExp]> = [
+  ["Kabine + Fahrer (06)", /^06_/],
+  ["Kleinteile (08)", /^08_/],
   ["Drehkranz (04)", /^04_/],
   ["Ausleger", /^(07_AUSLEGER|08_LOGO_AUSLEGER|07_SCHLAUCH_AUSLEGER)/],
   ["Stiel", /^(07_STIEL|07_HALTER|07_SCHLAUCH_STIEL|07_KARDAN)/],

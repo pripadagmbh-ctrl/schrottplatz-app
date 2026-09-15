@@ -42,15 +42,48 @@ function stelle(boomGrad: number, stickGrad: number): void {
   (bagger as unknown as { updateHydraulics(): void }).updateHydraulics();
 }
 
-/** Ausgewählte Meshes in eine Hilfsgruppe kopieren, in Weltlage. */
+/**
+ * Ausgewählte Meshes in eine Hilfsgruppe kopieren, in Weltlage.
+ *
+ * BUNTE NETZE werden dabei in ihre Farbflächen zerlegt — nur fürs Bild. Der
+ * Rasterer liest `material.color`, und das ist bei einem Netz mit Eckfarben
+ * absichtlich WEISS (siehe `bauteile.ts`); ohne diese Zerlegung wäre die halbe
+ * Maschine im Riss weiß. Im Spiel bleibt es EIN Netz mit einem Zeichenruf.
+ */
 function nur(namen: string[]): THREE.Object3D {
   const g = new THREE.Group();
   for (const n of namen) {
     const o = finde(n) as THREE.Mesh;
     o.updateWorldMatrix(true, false);
-    const k = new THREE.Mesh(o.geometry, o.material);
-    k.applyMatrix4(o.matrixWorld);
-    g.add(k);
+    const geo = o.geometry as THREE.BufferGeometry;
+    const col = geo.getAttribute("color") as THREE.BufferAttribute | undefined;
+    if (!col) {
+      const k = new THREE.Mesh(geo, o.material);
+      k.applyMatrix4(o.matrixWorld);
+      g.add(k);
+      continue;
+    }
+    const idx = geo.getIndex()!;
+    const gruppen = new Map<string, number[]>();
+    for (let i = 0; i < idx.count; i += 3) {
+      const a = idx.getX(i);
+      const s = `${col.getX(a).toFixed(4)},${col.getY(a).toFixed(4)},${col.getZ(a).toFixed(4)}`;
+      const liste = gruppen.get(s) ?? [];
+      liste.push(idx.getX(i), idx.getX(i + 1), idx.getX(i + 2));
+      gruppen.set(s, liste);
+    }
+    for (const [s, liste] of gruppen) {
+      const teil = new THREE.BufferGeometry();
+      teil.setAttribute("position", geo.getAttribute("position"));
+      teil.setAttribute("normal", geo.getAttribute("normal"));
+      teil.setIndex(liste);
+      const [r, gr, b] = s.split(",").map(Number) as [number, number, number];
+      const c = new THREE.Color();
+      c.setRGB(r, gr, b, THREE.LinearSRGBColorSpace);
+      const k = new THREE.Mesh(teil, new THREE.MeshStandardMaterial({ color: c }));
+      k.applyMatrix4(o.matrixWorld);
+      g.add(k);
+    }
   }
   return g;
 }
@@ -195,3 +228,33 @@ const OBERWAGEN = ["04_DREHKRANZ", "05_MOTORHAUBE", "05_LEUCHTEN"];
 feld(b5, nur(OBERWAGEN), new THREE.Vector3(0.8, 0.3, 1), 10, 10, ZB, 620);
 feld(b5, nur(OBERWAGEN), new THREE.Vector3(1, 0.12, 0.05), 20 + ZB, 10, ZB, 620);
 b5.schreibe("docs/messungen/2026-09-15-bagger/05-oberwagen.png");
+
+/*
+ * Blatt 6 — die KABINE gross.
+ *
+ * Glas wird vom Rasterer als deckende Flaeche gemalt (er kennt keine
+ * Durchsichtigkeit). Deshalb zwei Felder: eins mit Glas — so sieht man die
+ * Silhouette —, eins ohne, damit Sitz, Konsolen, Joysticks und Display
+ * sichtbar sind.
+ */
+const b6 = new Blatt(BREITE, 700);
+const KABINE_AUSSEN = [
+  "06_KABINE_LACK",
+  "06_KABINE_STAHL",
+  "06_SCHEIBEN",
+  "08_NAMENSSCHILD",
+];
+const KABINE_INNEN = [
+  "06_KABINE_LACK",
+  "06_KABINE_STAHL",
+  "06_SITZ",
+  "06_JOYSTICK_R_HEBEL",
+  "06_JOYSTICK_L_HEBEL",
+  "06_FAHRER_HAND_R",
+  "06_FAHRER_HAND_L",
+  "06_FAHRER_HAUT",
+  "06_FAHRER_KLEIDUNG",
+];
+feld(b6, nur(KABINE_AUSSEN), new THREE.Vector3(-0.9, 0.25, 1), 10, 10, ZB, 680);
+feld(b6, nur(KABINE_INNEN), new THREE.Vector3(-0.9, 0.25, 1), 20 + ZB, 10, ZB, 680);
+b6.schreibe("docs/messungen/2026-09-15-bagger/06-kabine.png");

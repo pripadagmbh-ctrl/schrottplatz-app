@@ -87,10 +87,15 @@ describe("Fahrer Daniel", () => {
     const teile = fahrerTeile();
     bagger.setFirstPerson(true);
     for (const m of teile) expect(m.visible, `${m.name} in der Kabinensicht`).toBe(false);
-    // Die Unterarme an den Joysticks gehören zur Kabine und bleiben sichtbar
+    /*
+     * Unterarm, Faust und Daumen hängen am Joystick und liegen seit dem
+     * Kabinen-Paket in EINEM Netz je Seite (`06_FAHRER_HAND_R/L`). Sie stehen
+     * nicht in der Liste und bleiben in der Kabinenansicht sichtbar — sonst
+     * hätte der Fahrer keine Hände an den Hebeln.
+     */
     for (const s of ["R", "L"]) {
-      const arm = scene.getObjectByName(`06_FAHRER_UNTERARM_${s}`)!;
-      expect(arm.visible, `Unterarm ${s} verschwunden`).toBe(true);
+      const arm = scene.getObjectByName(`06_FAHRER_HAND_${s}`)!;
+      expect(arm.visible, `Hand ${s} verschwunden`).toBe(true);
     }
     bagger.setFirstPerson(false);
     for (const m of teile) expect(m.visible, `${m.name} von außen`).toBe(true);

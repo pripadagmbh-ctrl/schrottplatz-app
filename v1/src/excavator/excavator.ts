@@ -21,6 +21,14 @@ import {
 import { oberwagenLack, oberwagenLeuchten, oberwagenStahl } from "./oberwagenParts";
 import { pratzeFuss, pratzeStempel, schildKoerper, schildSchneide } from "./schildParts";
 import { farbstoff } from "./bauteile";
+import {
+  fahrerhand,
+  joystick,
+  kabineGlas,
+  kabineLack,
+  kabineSitz,
+  kabineStahl,
+} from "./kabinenParts";
 import { unterwagenLack, unterwagenStahl } from "./unterwagenParts";
 import { BAGGER_STAND } from "../world/baggerstand";
 import {
@@ -1076,7 +1084,7 @@ export class Excavator {
 
   private buildCabin(
     frameMat: THREE.MeshStandardMaterial,
-    darkMat: THREE.MeshStandardMaterial,
+    _darkMat: THREE.MeshStandardMaterial,
     glassBase: THREE.MeshStandardMaterial
   ): void {
     // Kabine deutlich weiter nach links gesetzt, damit der Ausleger nicht ins
@@ -1112,183 +1120,66 @@ export class Excavator {
       side: THREE.DoubleSide,
     });
 
-    // Boden: hinten Blech, vorn eine Glasscheibe im Fußbereich — so sieht der
-    // Fahrer senkrecht nach unten auf den Greifer (Design-Wunsch 2026-08-29)
-    const floor = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.07, 0.75), darkMat);
-    floor.position.set(cx, 0.58, cz - 0.33);
-    floor.name = "06_BODENBLECH";
-    this.cabLiftGroup.add(floor);
-    // Fußscheibe: schräg eingesetzt, sie schließt vorn an die Frontscheibe an.
-    // Rahmen: eine dünne Querstrebe in der Mitte, dazu zwei Randstreben, die
-    // den Übergang zur Frontscheibe bilden.
-    const footPane = new THREE.Group();
-    footPane.position.set(cx, 0.6, cz + 0.36);
-    footPane.rotation.x = -0.42; // Vorderkante höher, Anschluss an die Frontscheibe
-    footPane.name = "06_FUSSSCHEIBE";
-    this.cabLiftGroup.add(footPane);
-    const footGlass = new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.035, 0.7), glass);
-    footGlass.name = "06_FUSSSCHEIBE_GLAS";
-    footPane.add(footGlass);
-    const crossBar = new THREE.Mesh(new THREE.BoxGeometry(1.04, 0.028, 0.045), darkMat);
-    crossBar.position.y = 0.03;
-    crossBar.name = "06_FUSSSCHEIBE_QUERSTREBE";
-    footPane.add(crossBar);
-    for (const sx of [-0.5, 0.5]) {
-      const edge = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.045, 0.72), darkMat);
-      edge.position.set(sx, 0.02, 0);
-      edge.name = `06_FUSSSCHEIBE_RANDSTREBE_${sx > 0 ? "L" : "R"}`;
-      footPane.add(edge);
-    }
-    // Dach: hinten Blech, vorn eine Querscheibe zum Blick nach oben auf den
-    // Ausleger (Design-Wunsch 2026-08-29)
-    const roof = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.09, 0.85), frameMat);
-    roof.position.set(cx, 2.1, cz - 0.32);
-    roof.castShadow = true;
-    roof.name = "06_DACH";
-    this.cabLiftGroup.add(roof);
-    // Vordere Dachscheibe um ~40° nach unten geneigt: sie führt vom Dach zur
-    // Frontscheibe und gibt den Blick nach oben auf den Ausleger frei
-    const roofGlass = new THREE.Mesh(new THREE.BoxGeometry(1.06, 0.04, 0.78), glass);
-    roofGlass.position.set(cx, 1.98, cz + 0.42);
-    roofGlass.rotation.x = THREE.MathUtils.degToRad(40);
-    roofGlass.name = "06_DACHSCHEIBE";
-    this.cabLiftGroup.add(roofGlass);
-    const roofBar = new THREE.Mesh(new THREE.BoxGeometry(1.16, 0.05, 0.06), frameMat);
-    roofBar.position.set(cx, 2.06, cz + 0.3);
-    roofBar.name = "06_DACHSTREBE";
-    this.cabLiftGroup.add(roofBar);
-    for (const [px, pz] of [
-      [-0.52, -0.66],
-      [0.52, -0.66],
-      [-0.52, 0.66],
-      [0.52, 0.66],
-    ]) {
-      const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.45, 0.08), frameMat);
-      pillar.position.set(cx + px, 1.33, cz + pz);
-      pillar.castShadow = true;
-      pillar.name = `06_SAEULE_${ecke(px!, pz!)}`;
-      this.cabLiftGroup.add(pillar);
-    }
-    // Glas: Front (bis in den Fußbereich hinunter), Heck, links, rechts
-    const panes: Array<[number, number, number, number, number, number, string]> = [
-      // [x, y, z, sx, sy, sz, Name]
-      [cx, 1.28, cz + 0.69, 1.0, 1.52, 0.03, "FRONT"],
-      [cx, 1.33, cz - 0.69, 1.0, 1.42, 0.03, "HECK"],
-      // −X ist rechts (siehe RAD_ECKEN), +X links
-      [cx - 0.54, 1.33, cz, 0.03, 1.42, 1.3, "RECHTS"],
-      [cx + 0.54, 1.33, cz, 0.03, 1.42, 1.3, "LINKS"],
-    ];
-    for (const [x, y, z, sx, sy, sz, wo] of panes) {
-      const pane = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), glass);
-      pane.position.set(x, y, z);
-      pane.name = `06_SCHEIBE_${wo}`;
-      this.cabLiftGroup.add(pane);
-    }
+    /*
+     * KABINE (Paket 7 aus E-025). Fünf Netze statt 25, Teil für Teil in
+     * `kabinenParts.ts`.
+     *
+     * KEIN MASS WANDERT. Dach, Säulen, Scheiben, Sitz, Konsolen und Display
+     * liegen, wo sie lagen — die Kabinenansicht ist Patricks Arbeitsplatz beim
+     * Sortieren. Neu sind nur Anbauteile, die der Kipper längst hat: Tür mit
+     * Rahmen, Scharnieren und Griff, Trittstufe, zwei Außenspiegel,
+     * Scheibenwischer, Sonnenblende, Regenrinne, zwei Armlehnen, Gurt.
+     */
+    const kabineBlech = new THREE.Mesh(kabineLack(cx, cz), frameMat);
+    kabineBlech.castShadow = true;
+    kabineBlech.name = "06_KABINE_LACK";
+    this.cabLiftGroup.add(kabineBlech);
+    const kabineStahlMesh = new THREE.Mesh(kabineStahl(cx, cz), farbstoff(0.7, 0.2));
+    kabineStahlMesh.name = "06_KABINE_STAHL";
+    this.cabLiftGroup.add(kabineStahlMesh);
+    /*
+     * Alle sechs Scheiben in EINEM Netz. `side: DoubleSide` bleibt: Der Fahrer
+     * sitzt hinter ihnen und sähe sonst durch sie hindurch ins Leere.
+     */
+    const scheiben = new THREE.Mesh(kabineGlas(cx, cz), glass);
+    scheiben.name = "06_SCHEIBEN";
+    this.cabLiftGroup.add(scheiben);
 
     // Bordinstrument rechts vorn an der Säule — zeigt Achswinkel, Hydraulik
-    // und Greiferstatus, wie das Display in der echten Maschine
+    // und Greiferstatus, wie das Display in der echten Maschine.
+    // Sein GEHÄUSE liegt im Stahl-Netz oben; hier hängt nur die Leinwand.
     this.instruments = new InstrumentPanel(this.cabLiftGroup, cx, cz);
     this.instruments.draw(this.readout());
 
-    // Sitz + Konsolen
-    const seatMat = new THREE.MeshStandardMaterial({ color: 0x24272a, roughness: 0.9 });
-    const seat = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.12, 0.5), seatMat);
-    seat.position.set(cx, 0.95, cz - 0.2);
-    seat.name = "06_SITZ";
-    this.cabLiftGroup.add(seat);
-    const backrest = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.62, 0.1), seatMat);
-    backrest.position.set(cx, 1.3, cz - 0.48);
-    backrest.name = "06_SITZ_LEHNE";
-    this.cabLiftGroup.add(backrest);
-    // Kopfstütze
-    const headrest = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.22, 0.12), seatMat);
-    headrest.position.set(cx, 1.76, cz - 0.47);
-    headrest.castShadow = true;
-    headrest.name = "06_SITZ_KOPFSTUETZE";
-    this.cabLiftGroup.add(headrest);
-    for (const sx of [-0.09, 0.09]) {
-      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.13, 8), darkMat);
-      post.position.set(cx + sx, 1.63, cz - 0.47);
-      post.name = `06_SITZ_KOPFSTUETZE_STAB_${sx > 0 ? "L" : "R"}`;
-      this.cabLiftGroup.add(post);
-    }
-    for (const side of [-1, 1]) {
+    const sitz = new THREE.Mesh(kabineSitz(cx, cz), farbstoff(0.9));
+    sitz.castShadow = true;
+    sitz.name = "06_SITZ";
+    this.cabLiftGroup.add(sitz);
+
+    /*
+     * Die beiden ISO-Joysticks. Sie kippen mit der Achseingabe und sind
+     * deshalb eigene Starrkörper — aber je Seite EIN Netz statt sieben, und
+     * die Hand daran eines statt drei. Vorher: 20 Netze und 40 Zeichenrufe für
+     * zwei Hebel von 40 cm Höhe.
+     */
+    const joyGeo = joystick();
+    const joyStoff = farbstoff(0.6);
+    const armStoff = new THREE.MeshStandardMaterial({ color: 0xe3b18c, roughness: 0.8 });
+    for (const side of [-1, 1] as const) {
       const seite = side > 0 ? "L" : "R";
-      const console = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.28, 0.44), darkMat);
-      console.position.set(cx + side * 0.36, 1.02, cz + 0.02);
-      console.name = `06_KONSOLE_${seite}`;
-      this.cabLiftGroup.add(console);
-      // Moderner Kreuzhebel: Faltenbalg, ergonomischer Griff mit Daumentaste
-      // und Vorderfinger-Wippe — statt Kugelknauf (Design-Wunsch 2026-08-29).
       const pivot = new THREE.Group();
       pivot.position.set(cx + side * 0.36, 1.16, cz + 0.1);
       pivot.name = `06_JOYSTICK_${seite}`;
-      const rubber = new THREE.MeshStandardMaterial({ color: 0x17191b, roughness: 0.95 });
-      const gripMat = new THREE.MeshStandardMaterial({ color: 0x24282c, roughness: 0.45 });
-      const accent = new THREE.MeshStandardMaterial({
-        color: 0xd97a1f,
-        roughness: 0.35,
-        emissive: 0x3a1f00,
-      });
-      // Faltenbalg (drei Wülste)
-      for (let b = 0; b < 3; b++) {
-        const bellow = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.055 - b * 0.006, 0.062 - b * 0.006, 0.035, 12),
-          rubber
-        );
-        bellow.position.y = 0.03 + b * 0.037;
-        bellow.name = `06_JOYSTICK_${seite}_BALG_${b + 1}`;
-        pivot.add(bellow);
-      }
-      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.021, 0.025, 0.12, 10), gripMat);
-      shaft.position.y = 0.18;
-      shaft.name = `06_JOYSTICK_${seite}_SCHAFT`;
-      pivot.add(shaft);
-      // Griff: leicht nach hinten geneigter, abgerundeter Körper
-      const grip = new THREE.Mesh(new THREE.CapsuleGeometry(0.048, 0.1, 4, 12), gripMat);
-      grip.position.set(0, 0.29, -0.012);
-      grip.rotation.x = -0.22;
-      grip.castShadow = true;
-      grip.name = `06_JOYSTICK_${seite}_GRIFF`;
-      pivot.add(grip);
-      // Daumentaste oben
-      const thumb = new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.019, 0.014, 10), accent);
-      thumb.position.set(0, 0.365, 0.012);
-      thumb.rotation.x = -0.22;
-      thumb.name = `06_JOYSTICK_${seite}_DAUMENTASTE`;
-      pivot.add(thumb);
-      // Wippe für den Zeigefinger vorn
-      const trigger = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.032, 0.018), accent);
-      trigger.position.set(0, 0.285, 0.05);
-      trigger.rotation.x = 0.25;
-      trigger.name = `06_JOYSTICK_${seite}_WIPPE`;
-      pivot.add(trigger);
-
-      // Unterarm und Hand hängen am Hebel: Sie kippen mit ihm mit und liegen
-      // AUSSEN am Griff, nicht zwischen Fahrer und Joystick.
-      const armSkin = new THREE.MeshStandardMaterial({ color: 0xe3b18c, roughness: 0.8 });
-      // Nach Fotoreferenz: Unterarm läuft schräg von hinten-unten heran, die
-      // Faust liegt oben auf dem Griff und umschließt ihn.
-      const forearm = new THREE.Mesh(new THREE.CapsuleGeometry(0.054, 0.34, 4, 10), armSkin);
-      forearm.position.set(side * 0.06, 0.28, -0.28);
-      forearm.rotation.set(1.28, 0, side * 0.18);
-      forearm.castShadow = true;
-      forearm.name = `06_FAHRER_UNTERARM_${seite}`;
-      pivot.add(forearm);
-      // Faust: ein liegender, abgerundeter Block um den Griff, davor der
-      // Daumen — einfache Formen, aber anatomisch plausibel
-      const fist = new THREE.Mesh(new THREE.CapsuleGeometry(0.052, 0.075, 4, 10), armSkin);
-      fist.position.set(0, 0.315, -0.01);
-      fist.rotation.set(Math.PI / 2, 0, 0);
-      fist.castShadow = true;
-      fist.name = `06_FAHRER_FAUST_${seite}`;
-      pivot.add(fist);
-      const thumbFinger = new THREE.Mesh(new THREE.CapsuleGeometry(0.02, 0.055, 4, 8), armSkin);
-      thumbFinger.position.set(-side * 0.042, 0.318, 0.035);
-      thumbFinger.rotation.set(1.35, 0, side * 0.35);
-      thumbFinger.name = `06_FAHRER_DAUMEN_${seite}`;
-      pivot.add(thumbFinger);
-
+      const hebel = new THREE.Mesh(joyGeo, joyStoff);
+      hebel.castShadow = true;
+      hebel.name = `06_JOYSTICK_${seite}_HEBEL`;
+      pivot.add(hebel);
+      // Unterarm, Faust und Daumen hängen am Hebel und kippen mit ihm mit.
+      // Sie bleiben in der Kabinenansicht sichtbar.
+      const hand = new THREE.Mesh(fahrerhand(side), armStoff);
+      hand.castShadow = true;
+      hand.name = `06_FAHRER_HAND_${seite}`;
+      pivot.add(hand);
       this.cabLiftGroup.add(pivot);
       if (side < 0) this.joyLeft = pivot;
       else this.joyRight = pivot;

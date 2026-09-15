@@ -137,7 +137,9 @@ describe("Positionsliste des Baggers", () => {
       "05_MOTORHAUBE",
       "05_LEUCHTEN",
       "06_SITZ",
-      "06_SCHEIBE_FRONT",
+      "06_SCHEIBEN",
+      "06_KABINE_LACK",
+      "06_DISPLAY_BILD",
       "07_AUSLEGER_KASTEN",
       "07_AUSLEGER_STAHL",
       "07_STIEL_KASTEN",
@@ -195,9 +197,15 @@ describe("Positionsliste des Baggers", () => {
      * Dreiecke, 131 Zeichenrufe. Das Schild ging von 10 auf 2, die vier
      * Pratzenfuesse von 12 auf 8 — in beiden Faellen bewegt sich innerhalb der
      * Gruppe nichts gegeneinander.
+     *
+     * Stand 15.09.2026 nach dem Kabinen-Paket: 59 Netze, 20 120 Dreiecke,
+     * 89 Zeichenrufe. Die Kabine ging von 25 Netzen auf fuenf, die beiden
+     * Joysticks von 14 auf 2, die Unterarme von 6 auf 2. Das Zielbild aus
+     * E-025 nennt 57 — die letzten zwei fallen mit dem Kabinenhub, wenn aus
+     * zwei gestreckten Zylindern einer wird.
      */
     const meshes = baggerMeshes();
-    expect(meshes.length, "Bauteilzahl am Bagger").toBe(95);
+    expect(meshes.length, "Bauteilzahl am Bagger").toBe(59);
   });
 });
 

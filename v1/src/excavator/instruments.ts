@@ -26,6 +26,30 @@ export interface InstrumentReadout {
 /** Auffrischrate: viermal je Sekunde reicht, Zeichnen kostet sonst unnötig */
 const REFRESH_S = 0.25;
 
+/**
+ * Lage des Bordinstruments in der Kabine — relativ zur Kabinenmitte (cx, cz).
+ *
+ * Sie steht hier und nicht mehr nur im Quelltext des Halters, weil seit dem
+ * 15.09.2026 ZWEI Stellen sie brauchen: die Leinwand hier und das Gehäuse im
+ * Stahl-Netz der Kabine (`kabinenParts.ts`). Zwei Kopien derselben Zahl wären
+ * genau die Art Fehler, die erst auffällt, wenn der Rahmen neben dem Bild
+ * hängt.
+ *
+ * Werte unverändert seit dem Prototyp.
+ */
+export const DISPLAY_LAGE = {
+  /** Versatz gegen die Kabinenmitte in x (m) — rechts neben dem Fahrer. */
+  dx: -0.42,
+  /** Höhe in der Kabine (m). */
+  y: 1.16,
+  /** Versatz gegen die Kabinenmitte in z (m) — vorn im Blickfeld. */
+  dz: 0.46,
+  /** Drehung um die Hochachse (rad) — Bildfläche zum Fahrer. */
+  ry: 2.55,
+  /** Neigung nach hinten (rad) — wie im Armaturenbrett. */
+  rx: -0.3,
+};
+
 export class InstrumentPanel {
   private canvas: HTMLCanvasElement;
   private texture: THREE.CanvasTexture;
@@ -43,26 +67,31 @@ export class InstrumentPanel {
     this.texture = new THREE.CanvasTexture(this.canvas);
     this.texture.colorSpace = THREE.SRGBColorSpace;
 
-    const frame = new THREE.Mesh(
-      new THREE.BoxGeometry(0.36, 0.26, 0.02),
-      new THREE.MeshStandardMaterial({ color: 0x121416, roughness: 0.7 })
-    );
+    /*
+     * NUR DIE LEINWAND steht hier. Das GEHÄUSE (`06_DISPLAY_RAHMEN`) ist am
+     * 15.09.2026 in das Stahl-Netz der Kabine gewandert (`kabinenParts.ts`,
+     * Funktion `kabineStahl`): Es bewegt sich nicht gegen die Kabine und
+     * kostete als eigenes Mesh zwei Zeichenrufe (E-025, Budgetregel).
+     *
+     * Die Leinwand kann NICHT mitverschmelzen — sie trägt eine eigene Textur,
+     * die viermal je Sekunde neu gezeichnet wird, und ein `MeshBasicMaterial`,
+     * damit die Anzeige unabhängig vom Licht lesbar bleibt.
+     */
     const screen = new THREE.Mesh(
       new THREE.PlaneGeometry(0.33, 0.23),
       new THREE.MeshBasicMaterial({ map: this.texture })
     );
     screen.position.z = 0.012;
     // Namen nach dem Muster der Baggerteile (siehe excavator.ts, Baugruppe 06)
-    frame.name = "06_DISPLAY_RAHMEN";
     screen.name = "06_DISPLAY_BILD";
     const holder = new THREE.Group();
     holder.name = "06_DISPLAY";
-    holder.add(frame, screen);
+    holder.add(screen);
     // Rechts neben dem Fahrer: er blickt in +Z, seine rechte Seite ist −X.
     // Tief genug, dass das Display nicht in die Arbeitssicht ragt.
-    holder.position.set(cx - 0.42, 1.16, cz + 0.46);
-    holder.rotation.y = 2.55; // Bildfläche zum Fahrer gedreht
-    holder.rotation.x = -0.3; // leicht nach hinten gekippt, wie im Armaturenbrett
+    holder.position.set(cx + DISPLAY_LAGE.dx, DISPLAY_LAGE.y, cz + DISPLAY_LAGE.dz);
+    holder.rotation.y = DISPLAY_LAGE.ry; // Bildfläche zum Fahrer gedreht
+    holder.rotation.x = DISPLAY_LAGE.rx; // leicht nach hinten gekippt
     parent.add(holder);
   }
 
