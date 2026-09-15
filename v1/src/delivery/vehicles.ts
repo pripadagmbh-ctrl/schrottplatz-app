@@ -208,6 +208,29 @@ class DeliveryVehicle {
    *    Ist das positiv, steht der Bagger LINKS — dann schwenkt der Kran nach
    *    rechts, also mit positivem Winkel.
    */
+  /**
+   * STEHT DER KRAN AUS DEM WEG? Erst dann darf die Mulde steigen (E-076).
+   *
+   * Der Ausleger liegt im Transportzustand ÜBER der Ladeflaeche. Hebt sich
+   * die Mulde, waehrend er dort noch liegt, faehrt ihr Boden mitten durch ihn
+   * — gemessen mit `tools/fahrzeug-durchdringung.ts` 12,0 cm bei 20 Grad
+   * Kippwinkel. Genau das war Patricks Befund vom 13.09.2026 („dass die
+   * Ladeflaeche durch den Kran laeuft").
+   *
+   * Die Zeiten passten bis heute nicht zusammen: Der Schwenk um 78 Grad
+   * dauert bei 0,5 rad/s ganze 2,7 s, die Pause vor dem Abladen aber nur
+   * 1,2 s. Der Wagen fing also IMMER an zu kippen, waehrend der Kran noch
+   * unterwegs war. Jetzt beginnt der Schwenk schon beim Zuruecksetzen, und
+   * gekippt wird erst, wenn er steht.
+   *
+   * Wagen ohne Kran antworten sofort mit `true` — fuer sie aendert sich nichts.
+   */
+  private get kranSteht(): boolean {
+    if (!this.crane) return true;
+    // 0,02 rad = 1,1 Grad: der Schwenk laeuft in Schritten von dt x 0,5 rad/s
+    return Math.abs(this.craneSwing) >= CRANE_SWING - 0.02;
+  }
+
   private get craneSide(): 1 | -1 {
     const dx = BAGGER_STAND.x - this.group.position.x;
     const dz = BAGGER_STAND.z - this.group.position.z;
@@ -1934,7 +1957,8 @@ class DeliveryVehicle {
         // Kipper braucht das nicht (er kippt), der Container bleibt zu.
         if (this.kind === "pritsche" || this.kind === "wrack") this.sideOpenTarget = 1;
         if (!this.isPickup) this.releaseCargo();
-        if (this.phaseT > 1.2) {
+        // Gekippt wird erst, wenn der Ladekran aus dem Weg ist (`kranSteht`)
+        if (this.phaseT > 1.2 && (this.kind !== "kipper" || this.isPickup || this.kranSteht)) {
           this.phase = this.isPickup ? "waitLoad" : this.kind === "kipper" ? "tipping" : "waitUnload";
           // Der Abholer funkt, sobald er steht — hier und nirgends sonst
           // (E-056). Einmal je Fuhre, danach ist der Kanal wieder still.
@@ -2136,6 +2160,10 @@ class DeliveryVehicle {
     // der Ladeflaeche haengt und dem Baggerfahrer die Sicht und den Weg nimmt.
     if (this.crane) {
       const amPlatz =
+        // Schon beim Zuruecksetzen: Der Schwenk braucht 2,7 s, die Pause vor
+        // dem Abladen dauert 1,2 s. Ein Fahrer dreht seinen Kran auch nicht
+        // erst, wenn er steht (E-076).
+        this.phase === "reverseIn" ||
         this.phase === "pauseBeforeUnload" ||
         this.phase === "waitUnload" ||
         this.phase === "waitLoad" ||

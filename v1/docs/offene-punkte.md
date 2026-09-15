@@ -533,8 +533,32 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
       *Stand: wird skizziert, nicht gebaut — auf seinen Blick am Bild.*
 - [ ] **Zahn hängt offen 12° nach innen** — der Preis von E-069. Stört das beim
       Einstechen in den Haufen? *Wartet auf sein Urteil am Gerät.*
-- [ ] **Kran fährt durch die Ladefläche** — gemeldet am 13.09., seitdem
-      unangetastet. Eigenes Paket, noch nicht begonnen.
+- [ ] **Kran fährt durch die Ladefläche** — **gebaut, wartet auf sein Urteil am
+      Gerät** (E-076). Gemessen mit `tools/fahrzeug-durchdringung.ts`: Bock
+      12,0 cm im Muldenboden, Säule 25,5 cm in der Kabine, beim Kippen 12,0 cm
+      Muldenboden durch die Säule, Ausleger 91 bis 182 cm IN der Fuhre. Ursache:
+      `sockelZ = bedLen/2 + 0,05` in `vehicleModel.ts` — zwischen Mulde und
+      Kabine lagen 11 cm, der Bock ist 70 cm tief. Jetzt kurzes Nahverkehrshaus
+      (1,00 statt 1,50 m), Bock auf `+0,33`, Säule als Achtkant, Auslegerhöhe
+      nach der Ladung, und der Kipper hebt erst, wenn der Kran ausgeschwenkt
+      ist. Alle Paare frei, 29 cm Luft über der Fuhre; bewacht von
+      `test/fahrzeugteile.test.ts`.
+- [ ] **`test/kipper.test.ts` misst zu einem Fünftel den Zufall** — gefunden in
+      E-076, nicht von ihm gemeldet. Jedes `THREE.Object3D` zieht beim Anlegen
+      vier Zufallszahlen (`MathUtils.generateUUID`); ein Netz mehr oder weniger
+      am LKW würfelt deshalb 24 andere Ladungen. Über 96 frische Saaten reisst
+      eine zufällige Reihe von 24 die Schranken **in 21 % der Fälle** — auch
+      beim alten Stand. Dabei sind alter und neuer Stand ununterscheidbar
+      (Mittel 30 gegen 31, Median 22 gegen 21). Zu tun: entweder nach Mittel
+      und Median urteilen (so steht es schon im Kommentar der Datei, der Code
+      urteilt aber auch nach dem Höchstwert) oder mit mehr Saaten messen.
+      Gehört zum Kipper-Paket, nicht zum Kran.
+- [ ] **Innerer Zwillingsreifen steckt 30 cm im Rahmen** — gemessen in E-076.
+      Der Rahmen ist ein Quader von 2,20 m Breite (x ±1,10), der innere
+      Hinterreifen liegt bei x 0,52 … 0,82 und damit ganz darin. Ein echtes
+      Fahrgestell ist ein Leiterrahmen mit zwei Trägern auf ±0,43, dazwischen
+      läuft das Rad frei. Von aussen sieht man den Reifen über und unter dem
+      Rahmenblech herausstehen. Kein Kranbefund, deshalb liegengelassen.
 - [ ] **Greifer komplett zur Seite kippen** — zum Kehren und Schleudern.
       Vorgemessen (E-065), zurückgestellt bis die Säulenfrage entschieden ist,
       weil die Kollisionsrechnung sonst zweimal gemacht werden müsste.

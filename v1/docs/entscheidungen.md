@@ -5883,3 +5883,169 @@ entfallen. Das Blatt dazu liegt vor: `docs/abfallmulde-2026-09-16.svg`
 3. **Den Verdienst über einen Tag vergleichen.** Er soll sich nicht anders
    anfühlen als gestern: Der Abfallanteil einer Fuhre ist unverändert. Fällt
    dir das Gegenteil auf, ist die Messung falsch und nicht dein Gefühl.
+### E-080 — Der Kran stand in der Mulde: gemessen, versetzt, und ab jetzt bewacht (15.09.2026)
+
+**Entscheidung.** Der Ladekran der Händler bekommt seinen Platz da, wo er auf
+einem echten Kranwagen sitzt: **auf dem Rahmen zwischen Fahrerhaus und Mulde**.
+Dafür wird die Kabine der Kranwagen von 1,50 auf **1,00 m Tiefe** verkürzt (ein
+Nahverkehrshaus) — die Schnauze bleibt, wo sie war. Der Bock rückt von
+`bedLen/2 + 0,05` auf **`bedLen/2 + 0,33`** und wird von 0,70 auf 0,50 m flacher,
+die Säule wird vom Quader zum **Achtkant**, und die Auslegerhöhe richtet sich
+nicht mehr nach einer festen Zahl, sondern nach der **Ladung**. Der eingeklappte
+Knickarm zeigt nicht mehr nach unten in die Fuhre, sondern nach vorn auf den
+Hauptarm. Und der Kipper hebt seine Mulde erst, **wenn der Kran ausgeschwenkt
+ist**.
+
+**Der Befund ist von Patrick, wörtlich, vom 13.09.2026:** „Also ich habe mir
+nochmal den Kipper angeguckt. Die Ladefläche geht … durch. … dass die Ladefläche
+durch den Kran läuft, wenn es einen Kran gibt." Er stand zwei Tage in
+`docs/offene-punkte.md`.
+
+**Warum ihn niemand gefunden hat: Es gab nichts, was gesucht hätte.** Am LKW war
+kein einziger Wächter über die Geometrie. Die tiefste Überschneidung liegt
+ausserdem **unter** dem Muldenblech — sichtbar wird sie erst, wenn der Kipper
+kippt. Deshalb steht am Anfang dieses Pakets ein Messgerät und nicht eine
+Korrektur: `tools/fahrzeug-durchdringung.ts` baut jede Bauart auf, zerlegt jedes
+tragende Teil in seine Ecken und misst mit dem Trennachsensatz jedes Paar — im
+Stand, über den ganzen Schwenkweg und beim Kipper über die ganze Kippbewegung.
+
+**Die Ursache ist eine Zahl, und sie steht in `vehicleModel.ts`:** `sockelZ =
+bedLen / 2 + 0,05`. Die Ladefläche reicht bis `bedLen/2`, der Bock war 0,70 m
+tief — er begann also **0,30 m innerhalb** der Mulde. Für den Kran war schlicht
+kein Platz vorgesehen: Zwischen Muldenstirn (`+0,04`) und Kabinenrückwand
+(`+0,15`) lagen **elf Zentimeter**.
+
+**Gemessen, vorher und nachher** (tiefste Durchdringung je Paar, über 1.674
+Stellungen je Kipper):
+
+| Paar | vorher | nachher |
+|---|---|---|
+| Fahrerhaus × Kransäule | **25,5 cm** (Schwenk 45°) | frei |
+| Fahrerhaus × Kranbock | **25,0 cm** | frei |
+| Ladefläche × Kranbock | **12,0 cm** (Stand) | frei |
+| Ladefläche × Kransäule | **12,0 cm** (Kippwinkel 20°) | frei |
+| Bordwand × Kransäule | **10,0 cm** | frei |
+| Stirnwand × Kransäule | **8,0 cm** | frei |
+| Stirnwand × Kranbock | **8,0 cm** | frei |
+| Kran über der Ladung | **−91,5 cm** flach, **−182,5 cm** Koffer | **+29,0 cm** überall |
+| Auspuff × oberes Haus | 4,5 cm | frei |
+| Auspuff × Stirnwand | 4,3 cm | frei |
+| Auspuff × Vorderrad | 4,2 cm | frei |
+| Fahrerhaus × Vorderrad | 2,8 cm | frei |
+
+Die letzten vier Zeilen sind **Nachbarschaden des Umbaus**, in derselben Messung
+gefunden: Das Auspuffrohr stand auf x 1,02 in derselben 11-cm-Lücke und steckte
+im oberen Haus wie in der Muldenstirn. Es sitzt jetzt **aussen neben dem Haus**
+(x 1,18 — das Haus ist 2,16 m breit, das Rohr misst 0,085 m im Halbmesser, ab
+1,175 ist es frei) und beginnt auf y 1,10 statt 0,75, also über Radscheitel
+(0,96) und Rahmenoberkante (0,90). Die Kabine ist um 4 cm angehoben (1,28 →
+1,32), weil ihre Unterkante auf 0,92 lag und der Radscheitel auf 0,96 — ein
+Radhaus hat dieser Quader nicht.
+
+**Drei Überschneidungen bleiben, mit Zahl und Grund:**
+
+| Paar | Tiefe | warum es bleibt |
+|---|---|---|
+| Rad × Rahmen | 30,0 cm | Der innere Zwillingsreifen (x 0,52 … 0,82) liegt im Rahmenquader (±1,10). Der Rahmen ist eine Platte, kein Leiterrahmen; ein echter hat zwei Träger auf ±0,43. |
+| Ladefläche × Kotflügel | 6,5 cm | Zwischen Radscheitel (0,96) und Muldenunterkante (0,97) liegt **ein Zentimeter**. Der Kotflügel liegt ganz unter der Mulde; von aussen ist keine Kante davon zu sehen. |
+| Ladefläche × Stirnwand | 4,0 cm | Die Wand steht auf dem Bodenblech und ragt mit ihrer hinteren Hälfte darüber — so ist eine angeschweisste Wand gebaut. |
+
+Jede dieser drei steht mit einer **Obergrenze** in `tools/fahrzeugteile.ts`
+(`ERLAUBTE_PAARE`). Sie sind erlaubt, aber sie dürfen nicht wachsen.
+
+**Warum die Kabine kürzer wird und nicht die Mulde.** Die Mulde zu kürzen
+hiesse, `BED_LEN` zu ändern — daran hängen Abkippzone, Ladevolumen, Fuhrmasse
+und jede Streckenprüfung. Den Wagen nach vorn zu verlängern hiesse, `UMRISS_VORN`
+(1,90 m) zu ändern — dann müsste jede Route neu geprüft werden. Die Kabine nach
+hinten zu kürzen ändert **nichts davon**: Die Schnauze steht, wo sie stand, der
+Umriss ist derselbe, und der Kran bekommt 0,58 m Lücke. Gerechnet:
+
+    Bockplatte 0,50 m + 2 × 0,04 m Luft         =  0,58 m Lückenbedarf
+    Lücke = (Kabine hinten − 0,03) − 0,04       =  Kabine hinten − 0,07
+    Kabine hinten ≥ 0,65  →  Tiefe ≤ 1,65 − 0,65 = 1,00 m
+
+**Die Säule ist rund, weil sie sich dreht.** Ein Quader von 0,46 m Kante
+braucht beim Schwenken seine Diagonale (0,65 m), ein Rundturm immer nur seinen
+Durchmesser. Das allein spart 19 cm Lücke — und genau daran wäre die Rechnung
+sonst gescheitert.
+
+**Der Kipper wartet jetzt auf seinen Kran.** Der Schwenk um 78° dauert bei
+0,5 rad/s **2,7 s**, die Pause vor dem Abladen aber nur 1,2 s: Der Wagen fing
+also **immer** an zu kippen, während der Ausleger noch über der Mulde lag. Das
+ist der Teil des Befunds, den man am Gerät sieht. Jetzt beginnt der Schwenk
+schon beim Zurücksetzen, und `kranSteht` hält die Mulde unten, bis er steht. Die
+Schwenkregel aus E-044 („immer vom Bagger weg") ist unangetastet.
+
+**Was NICHT entschieden wurde.** Ob ein Kofferaufbau überhaupt einen Kran haben
+soll. Ein geschlossener Kasten wird durch die Hecktür beladen, nicht von oben;
+dafür spräche, ihn wegzulassen. Dagegen spricht, dass er jetzt sauber misst
+(+29 cm über der Ladung) und dass es eine Geschmacksfrage ist — der Kran wird
+beim Koffer allerdings **4,4 m hoch**, weil er die 1,55-m-Wand samt Überstand
+überfahren muss. Liegt bei Patrick.
+
+**Verworfene Alternative.** Den Kran auf die Ladefläche stellen (er hätte dort
+0,74 m Ladelänge gekostet — und damit `ladeVolumen` und die Fuhrmasse jedes
+Händlers um 15 %, also die Wirtschaft). Oder ihn ganz streichen: „mit Aufbau,
+mit Ladekran" ist Patricks eigenes Bild vom Händler (14.09.2026).
+
+**Wächter.** `test/fahrzeugteile.test.ts` (neu, 25 Fälle): für jede gebaute
+Bauart kein Paar über seiner Erlaubnis; die **Nullprobe** (ein Wagen ohne Kran
+meldet kein Kranteil und keinen Kranbefund); zwei **Gegenproben** (ein um 40 cm
+zurückversetzter Kran — genau der Stand von gestern — MUSS gemeldet werden, und
+1 cm Versatz reicht schon, während 3,8 cm Abstand still bleiben); der Ausleger
+über der Ladung; die Vollzähligkeit der Baugruppen (22 Radnetze, zwei
+Bordwände); und die Regel „erst schwenken, dann kippen" am echten Ablauf, nicht
+nur im Messraster.
+
+**Ein Fund nebenbei, der wichtiger ist als er aussieht: `test/kipper.test.ts`
+ist eine Stolperdraht-Messung.** Jedes `THREE.Object3D`, jede Geometrie und
+jedes Material zieht beim Anlegen vier Zufallszahlen (`MathUtils.generateUUID`).
+Ein Netz mehr oder weniger am LKW verschiebt damit den ganzen Zufallsstrom — und
+der Wächter würfelt **24 andere Ladungen**. Gemessen: Der erste Entwurf dieses
+Pakets (ein Netz weniger, eine Gruppe mehr) liess ihn mit „Mittel 52 / Höchst
+272 km/h" rot werden, obwohl sich an der Physik nichts geändert hatte. Über
+**96 frische Saaten** gemessen sind beide Stände ununterscheidbar:
+
+| Stand | Mittel | Median | Höchst | durchgefallen |
+|---|---|---|---|---|
+| vor diesem Paket | 30 | 22 | 227 | 0 % |
+| nach diesem Paket | 31 | 21 | 166 | 0 % |
+
+Und eine zufällige Reihe von 24 aus diesen 96 reisst die Schranken des Wächters
+**in 21 % der Fälle** — auch beim alten Stand. Der Wächter misst also zu einem
+Fünftel den Zufall und nicht den Kipper. Konsequenz für dieses Paket: Der Umbau
+hält die **Zahl der three-Objekte gleich** (der Dachspoiler bleibt am Kranwagen
+und rückt nur nach vorn, der Kranbock hängt ohne eigene Gruppe am Fahrzeug),
+damit dieselben 24 Ladungen gefahren werden und der Vergleich gilt. Die 24
+Zahlen sind danach **auf die Stelle genau dieselben** wie vorher — der Beweis,
+dass an der Physik nichts angefasst wurde. Dass die Schranke des Wächters
+selbst zu eng steht, ist ein eigener Punkt und steht in `docs/offene-punkte.md`.
+
+**Zum Rangierknick (E-073), mitgemessen, nicht angefasst.** Dasselbe Werkzeug
+tastet die Fahrstrecken ab. Der schärfste Knick steht **nicht** beim Kipper,
+sondern bei der Ausfahrt des Abholers am Müllcontainer: **119,9° in einem
+Rechenschritt**, dabei springt die weiteste Umrissecke **10,75 m**. Neun weitere
+Strecken knicken um 90°. Die Ursache ist dieselbe wie in E-073: `placeAt` setzt
+`rotation.y` hart auf die Richtung des Streckenstücks, und an einer Ecke
+wechselt diese Richtung zwischen zwei Bildern. Das ist ein eigenes Paket — es
+ändert das Fahrbild.
+
+**Zum Platzinventar-Fenster (E-070), mitgeprüft.** Der Verdacht war, ein
+Behälter **neben** dem Wagen könnte durch die Schranke „lokal y > −0,20"
+fälschlich als aufgeladen gelten. Er ist unbegründet: Die Ladefläche sitzt
+1,05 m über dem Boden, und ein Absetzcontainer meldet seinen Körperursprung am
+**Boden** (`containers.ts`: `setTranslation(x, 0, z)`). Zwischen beiden liegen
+**85 cm**. Steht jetzt als Zahl im Wächter.
+
+**Auf dem Gerät zu prüfen.**
+
+1. **Warte auf einen Händler mit Kipper und sieh ihm beim Abkippen zu:** Steht
+   der Kran wirklich neben der Mulde, bevor sie sich hebt — oder wartet der
+   Wagen jetzt zu lange herum, bevor etwas passiert?
+2. **Sieh dir den Kranwagen von der Seite an:** Die Kabine ist 50 cm kürzer als
+   bei den anderen. Sieht er dadurch nach Kranwagen aus, oder nach abgesägtem
+   LKW?
+3. **Ein randvoller Händler mit Rungenaufbau:** Liegt der Ausleger sichtbar
+   ÜBER der Fuhre (29 cm Luft), oder steckt noch etwas darin?
+
+---
