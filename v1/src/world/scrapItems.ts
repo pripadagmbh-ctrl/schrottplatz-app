@@ -778,7 +778,9 @@ export const SPECS: PileSpec[] = [
   { materialId: "alu", massKg: 11, kind: "cyl", dims: [0.3, 0.2], name: "Alu-Ronde" },
   { materialId: "copper", massKg: 12, kind: "cyl", dims: [0.05, 0.8], bau: "buendel", name: "Kupferrohr" },
   { materialId: "copper", massKg: 18, kind: "torus", dims: [0.14, 0.05], name: "Kupferbund" },
-  { materialId: "brass", massKg: 15, kind: "box", dims: [0.3, 0.25, 0.3], bau: "maschine", name: "Messingarmaturen" },
+  // E-063: war `maschine` — mit Bedienpult und Lackverkleidung. Eine Armatur
+  // ist ein Ventilkoerper mit Flanschen und Handrad, und zwar in Messing.
+  { materialId: "brass", massKg: 15, kind: "box", dims: [0.3, 0.25, 0.3], bau: "armatur", name: "Messingarmaturen" },
   { materialId: "cable", massKg: 9, kind: "torus", dims: [0.18, 0.07], name: "Kabelring" },
   { materialId: "cable", massKg: 7, kind: "torus", dims: [0.15, 0.06], name: "Kabelrest" },
   { materialId: "cable", massKg: 12, kind: "torus", dims: [0.2, 0.08], name: "Kabelrolle" },
@@ -801,11 +803,15 @@ export const SPECS: PileSpec[] = [
   { materialId: "steel", massKg: 14, kind: "box", dims: [0.5, 0.7, 1.6], bau: "einspurig", name: "Mopedrahmen" },
   { materialId: "steel", massKg: 120, kind: "box", dims: [1.1, 0.35, 0.9], bau: "schaufel", name: "Pflugschar", massiv: true }, // E-042: die Schar ist gehaertetes Verschleissblech, gerechnet nur 4,5 mm
   { materialId: "steel", massKg: 85, kind: "cyl", dims: [0.34, 1.7], bau: "trommel", name: "Eggenwalze" },
-  { materialId: "steel", massKg: 160, kind: "box", dims: [0.5, 0.5, 1.4], bau: "motor", name: "Traktor-Frontgewicht" },
+  // E-063: war `motor` — ein Frontgewicht hat weder Zylinderkopf noch Kruemmer.
+  { materialId: "steel", massKg: 160, kind: "box", dims: [0.5, 0.5, 1.4], bau: "klotz", name: "Traktor-Frontgewicht" },
   { materialId: "steel", massKg: 95, kind: "box", dims: [2.1, 0.25, 0.35], bau: "ausleger", name: "Heuwender-Ausleger" },
   { materialId: "steel", massKg: 210, kind: "cyl", dims: [0.16, 2.2], bau: "achse", name: "LKW-Achse" },
-  { materialId: "steel", massKg: 130, kind: "box", dims: [0.8, 0.7, 0.9], bau: "motor", name: "LKW-Getriebe" },
-  { materialId: "steel", massKg: 75, kind: "box", dims: [0.9, 0.75, 0.12], bau: "maschine", name: "LKW-Kuehler" },
+  // E-063: Getriebe ist kein Motor (kein Zylinderkopf, keine Kruemmer); der
+  // Kuehler ist ein Lamellenblock und damit naeher an `platte` als an einer
+  // Maschine mit Bedienpult.
+  { materialId: "steel", massKg: 130, kind: "box", dims: [0.8, 0.7, 0.9], bau: "maschine", name: "LKW-Getriebe" },
+  { materialId: "steel", massKg: 75, kind: "box", dims: [0.9, 0.75, 0.12], bau: "platte", name: "LKW-Kuehler" },
   { materialId: "steel", massKg: 46, kind: "cyl", dims: [0.28, 0.32], name: "LKW-Felge", massiv: true }, // E-042, Patrick 15.09.2026: "LKW-Felge, sind gehaerteter Stahl und daher auf massiv setzen."
   { materialId: "alu", massKg: 16, kind: "box", dims: [0.7, 0.5, 0.15], bau: "motor", name: "Motorradmotor" },
   { materialId: "copper", massKg: 22, kind: "box", dims: [0.45, 0.4, 0.35], bau: "elektromotor", name: "Elektromotor", trennbar: true, zusammensetzung: [{ materialId: "steel", anteil: 0.58 }, { materialId: "copper", anteil: 0.38 }, { materialId: "alu", anteil: 0.04 }] },
@@ -831,7 +837,8 @@ const HUGE_SPECS: PileSpec[] = [
   { materialId: "steel", massKg: 1400, kind: "cyl", dims: [1.2, 3.1], bau: "tank", name: "Lagertank" },
   { materialId: "steel", massKg: 1100, kind: "cyl", dims: [0.9, 2.0], bau: "tank", name: "Turbinengehäuse" },
   { materialId: "steel", massKg: 900, kind: "box", dims: [2.2, 1.9, 1.8], bau: "karosserie", name: "LKW-Fahrerhaus" },
-  { materialId: "steel", massKg: 1600, kind: "box", dims: [2.8, 1.2, 1.1], bau: "motor", name: "Pressenrahmen" },
+  // E-063: ein Rahmen ist ein Traegerwerk, kein Motorblock.
+  { materialId: "steel", massKg: 1600, kind: "box", dims: [2.8, 1.2, 1.1], bau: "traeger", name: "Pressenrahmen" },
   { materialId: "va", massKg: 950, kind: "cyl", dims: [1.0, 2.8], bau: "tank", name: "VA-Prozesstank" },
   { materialId: "va", massKg: 700, kind: "box", dims: [2.6, 0.9, 1.2], bau: "tank", name: "VA-Behälter" },
   { materialId: "alu", massKg: 700, kind: "box", dims: [3.5, 0.35, 1.6], bau: "platte", name: "Tragflächenstück" },
@@ -848,8 +855,18 @@ const BIG_SPECS: PileSpec[] = [
   { materialId: "steel", massKg: 160, kind: "cyl", dims: [0.22, 2.6], bau: "rohrFlansch", name: "dickes Rohr", massiv: true }, // E-042: die Wand eines 440-mm-Rohres ist 8-12 mm, gerechnet nur 5,2 mm
   { materialId: "steel", massKg: 140, kind: "box", dims: [1.2, 0.9, 0.75], bau: "tank", name: "Kessel" },
   { materialId: "steel", massKg: 95, kind: "box", dims: [0.75, 1.5, 0.7], bau: "weisseWare", name: "Waschmaschine", zusammensetzung: [{ materialId: "steel", anteil: 0.62 }, { materialId: "rubble", anteil: 0.18 }, { materialId: "copper", anteil: 0.08 }, { materialId: "plastic", anteil: 0.12 }] },
-  { materialId: "steel", massKg: 420, kind: "box", dims: [0.9, 0.7, 0.95], bau: "motor", name: "Maschinenblock" },
+  // E-063: ein „Block" ist ein Klotz, kein Verbrennungsmotor.
+  { materialId: "steel", massKg: 420, kind: "box", dims: [0.9, 0.7, 0.95], bau: "klotz", name: "Maschinenblock" },
   { materialId: "steel", massKg: 300, kind: "cyl", dims: [0.6, 0.9], bau: "trommel", name: "Schwungrad" },
+  /*
+   * E-063: Dieser Eintrag ist unveraendert — und genau das ist die Aenderung.
+   *
+   * 1,50 x 1,10 x 0,80 m erfuellte die alte Polsterbedingung von `moebel`
+   * (`h < w*0,75 && d > h*0,7`) auf zwei Zentimeter genau, und ein Stahlschrank
+   * stand als Sofa auf dem Platz. `moebel` hat den Zweig nicht mehr; der
+   * Schrank ist jetzt ein Korpus mit Tuerfronten, ohne dass hier etwas
+   * umgestellt werden musste.
+   */
   { materialId: "steel", massKg: 260, kind: "box", dims: [1.5, 1.1, 0.8], bau: "moebel", name: "Stahlschrank" },
   { materialId: "steel", massKg: 195, kind: "box", dims: [2.4, 0.9, 0.12], bau: "platte", name: "Stahltür/Tor" },
   { materialId: "steel", massKg: 240, kind: "cyl", dims: [0.75, 1.9], bau: "tank", name: "Öltank/Boiler" },
@@ -882,7 +899,9 @@ const BIG_SPECS: PileSpec[] = [
   { materialId: "copper", massKg: 48, kind: "torus", dims: [0.45, 0.16], bau: "buendel", name: "Kupferrohr-Bund" },
   { materialId: "cable", massKg: 55, kind: "torus", dims: [0.55, 0.22], name: "Kabelbund" },
   { materialId: "cable", massKg: 120, kind: "cyl", dims: [0.85, 0.9], bau: "trommel", name: "Kabeltrommel", trennbar: true, zusammensetzung: [{ materialId: "cable", anteil: 0.62 }, { materialId: "wood", anteil: 0.38 }] },
-  { materialId: "wood", massKg: 90, kind: "box", dims: [1.4, 0.5, 0.9], bau: "moebel", name: "Holzkiste" },
+  // E-063: stand als Polstersofa da (1,40 x 0,50 x 0,90 erfuellte den alten
+  // Massenzweig). Eine Kiste ist Bretterwand mit Eckleisten — eigener Bau.
+  { materialId: "wood", massKg: 90, kind: "box", dims: [1.4, 0.5, 0.9], bau: "kiste", name: "Holzkiste" },
   { materialId: "rubble", massKg: 130, kind: "box", dims: [1.1, 1.1, 1.1], bau: "beton", name: "Betonblock" },
 
   // Erweiterung 12.09.2026 — siehe world/objektkatalog.ts
@@ -1331,7 +1350,9 @@ export class ItemManager {
     let glasGeo: THREE.BufferGeometry | null = null;
     if (shape.bau) {
       geo.dispose();
-      const bauteil = baueGeometrie(shape.bau, shape.dims, shape.kind);
+      // Die Fraktion geht mit: Blanke Bauteile bekommen daraus ihren
+      // Metallton (E-063). Fuer Stahl und Mischschrott aendert das nichts.
+      const bauteil = baueGeometrie(shape.bau, shape.dims, shape.kind, materialId);
       geo = bauteil.koerper;
       glasGeo = bauteil.glas;
       /*

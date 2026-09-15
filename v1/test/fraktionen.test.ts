@@ -110,7 +110,7 @@ describe("Was der Katalog daraus macht", () => {
    * Zahlen halten den Stand fest. Wandern sie, hat jemand den Katalog
    * umgebaut, und dann gehört die Bestandsaufnahme nachgezogen.
    */
-  it("280 erreichbare Einträge, davon 55 mit Stückliste", () => {
+  it("313 erreichbare Einträge, davon 55 mit Stückliste", () => {
     // 271 waren es bis E-042; neun massive Kleinteile sind dazugekommen
     // (Bremsscheibe, Bahnschwelle, Schienenabschnitt, Kurbelwelle …), weil
     // Patricks eigene Premium-Beispiele im Katalog fehlten.
@@ -120,7 +120,13 @@ describe("Was der Katalog daraus macht", () => {
     // kein VA" (Patrick, 15.09.2026). Eine Stückliste, die aus Sperrmüll eine
     // Fraktion macht, die Geld bringt, ist rechnerisch richtig und sachlich
     // falsch.
-    expect(ALLE.length).toBe(280);
+    //
+    // 280 waren es bis E-063. Dreiunddreissig sind dazugekommen: sechs Kupfer,
+    // sechs Messing, fuenf Kabel, sechs VA, vier Zink, vier Batterien und zwei
+    // Polstermoebel („Auffuellen, mindestens acht je Fraktion", 15.09.2026).
+    // Keiner davon hat eine Stueckliste — es sind sortenreine Einzelteile, und
+    // genau deshalb bleibt die zweite Zahl stehen.
+    expect(ALLE.length).toBe(313);
     expect(ALLE.filter((s) => s.zusammensetzung).length).toBe(55);
   });
 
@@ -291,12 +297,20 @@ describe("Die Farbe trägt die Fraktion nicht", () => {
     expect(d, "über 10 wäre eine klar andere Farbe").toBeLessThan(10);
   });
 
-  it("BEFUND: nur 18 von 280 Teilen tragen die Fraktionsfarbe überhaupt", () => {
-    // Alles mit `bau` wird nach Zweck gefärbt (objektbau.ts:22-30).
-    // 16 waren es bis E-042; Bremsscheibe und Großzahnrad sind absichtlich
-    // ohne `bau` dazugekommen — zwei Stücke mehr, an denen man die
-    // Fraktionsfarbe überhaupt sieht.
-    expect(ALLE.filter((s) => !s.bau).length).toBe(18);
+  it("21 von 313 Teilen tragen die Fraktionsfarbe unmittelbar", () => {
+    /*
+     * Alles mit `bau` wird nach Zweck gefärbt (objektbau.ts:22-30).
+     * 16 waren es bis E-042; Bremsscheibe und Großzahnrad sind absichtlich
+     * ohne `bau` dazugekommen — zwei Stücke mehr, an denen man die
+     * Fraktionsfarbe überhaupt sieht. 21 seit E-063: die drei neuen
+     * Kupfer- und Kabelringe.
+     *
+     * Der BEFUND daran ist seit E-063 entschärft, aber nicht durch diese Zahl:
+     * Buntmetall zeigt seine Farbe jetzt auch DURCH den Bau (`metallton` in
+     * `objektbau.ts`). Ein Kupferkessel ist kupfern, obwohl er `bau: "tank"`
+     * trägt. Was dieser Wächter zählt, ist nur noch der unmittelbare Weg.
+     */
+    expect(ALLE.filter((s) => !s.bau).length).toBe(21);
   });
 
   it("Aluminium ist nicht mehr mit Edelstahl zu verwechseln (E-042)", () => {
@@ -316,26 +330,47 @@ describe("Die Farbe trägt die Fraktion nicht", () => {
     expect(hell(alu)).toBeLessThan(hell(MATERIALS.zinc!.color));
   });
 
-  it("BEFUND B-3: drei Bauten liefern ein Netz mit NaN-Ecken", () => {
+  it("B-3 behoben: kein Bau liefert mehr ein Netz mit NaN-Ecken (E-063)", () => {
     /*
-     * `baueGeometrie` liest dims[1] und dims[2]; bei `kind: "wire"` hat dims
-     * nur einen Wert. Der Kollider fängt das ab (scrapItems.ts:1019-1028), das
-     * Netz nicht. Die Liste darf nicht LÄNGER werden; wird sie kürzer, ist der
-     * Befund behoben und dieser Wächter gehört angepasst.
+     * BEFUND bis E-063: `baueGeometrie` las `dims[1]` und `dims[2]`; bei
+     * `kind: "wire"` hat `dims` aber nur EINEN Wert — den Kugelradius. Drei
+     * Haufen (Ankerkette, Reifenhaufen, Stahlteile-Haufen) bekamen dadurch
+     * `undefined` als Kantenlänge und ein Netz voller NaN. Der Kollider fing
+     * das ab, das Netz nicht.
+     *
+     * Behoben, weil der neue „Datenkabel-Verhau" denselben Weg geht — und weil
+     * ein Gegenstand, den man nicht sieht, die schärfste Form von „Aussehen und
+     * Name gehen auseinander" ist. Bei `wire` ist die Kantenlänge jetzt der
+     * Durchmesser.
      */
     const kaputt: string[] = [];
+    let geprueft = 0;
     for (const s of ALLE) {
       if (!s.bau) continue;
+      geprueft++;
       const t = baueGeometrie(s.bau, s.dims, s.kind);
       const p = t.koerper.getAttribute("position").array as Float32Array;
       if (!p.every((v) => Number.isFinite(v))) kaputt.push(s.name ?? "(ohne Namen)");
       t.koerper.dispose();
       t.glas?.dispose();
     }
-    expect(kaputt.sort()).toEqual([
-      "Ankerkette (Haufen)",
-      "Reifenhaufen",
-      "Stahlteile-Haufen",
-    ]);
+    // Ohne diese Zeile wäre der Wächter grün, wenn die Schleife nichts fände.
+    expect(geprueft).toBeGreaterThan(250);
+    expect(kaputt.sort()).toEqual([]);
+  });
+
+  it("die Gegenprobe: ein `wire` mit einer einzigen Kante ergibt einen Würfel", () => {
+    /*
+     * Beweist, dass die Behebung wirkt und nicht bloß der Zufall. Ein Ballen
+     * mit Radius 0,55 m muss 1,10 m Kantenlänge bekommen — und keine NaN.
+     */
+    const t = baueGeometrie("haufen", [0.55], "wire");
+    const p = t.koerper.getAttribute("position").array as Float32Array;
+    expect(p.every((v) => Number.isFinite(v))).toBe(true);
+    let max = 0;
+    for (let i = 0; i < p.length; i += 3) max = Math.max(max, Math.abs(p[i]!));
+    expect(max).toBeGreaterThan(0.2);
+    expect(max).toBeLessThan(0.75);
+    t.koerper.dispose();
   });
 });

@@ -62,6 +62,30 @@ export type BauId =
   | "beton"
   | "trommel"
   | "fensterflaeche"
+  /* --- E-063, 15.09.2026: sieben Bauten, damit Name und Anblick decken ---
+   *
+   * Vorher entschieden bei `moebel` die ABMESSUNGEN, ob ein Stueck in Stoff
+   * bezogen dasteht — und ein Stahlschrank in den richtigen Massen wurde zur
+   * Couch. Ein Bau, den man nicht am Katalogeintrag ablesen kann, ist ein Bau,
+   * den niemand pruefen kann. Seither traegt jeder Gegenstand seinen Bau
+   * selbst, und `moebel` hat nur noch einen Zweig.
+   */
+  /** Polstermoebel: Couch, Sessel, Sitzbank. Traegt nur, wer wirklich eins ist. */
+  | "polster"
+  /** Holzkiste, Transportkiste: Bretterwaende mit Eckleisten. */
+  | "kiste"
+  /** Massiver Guss- oder Schmiedekoerper: Gegengewicht, Amboss, Poller, Puffer. */
+  | "klotz"
+  /** Bleiakku: Kasten mit Polen, Zellenstopfen und Traggriff. */
+  | "batterie"
+  /** Bootsrumpf: Steven, Scheuerleiste, Spanten, Duchten. */
+  | "boot"
+  /** Armatur: Ventilkoerper mit Flanschen und Handrad. */
+  | "armatur"
+  /** Schiffsschraube, Luftschraube: Nabe mit angestellten Fluegeln. */
+  | "propeller"
+  /** Stockanker: Schaft, Stock, zwei Flunken, Ring. */
+  | "anker"
   /** Der Kehrbesen aus zusammengequetschtem Maschendraht (E-031, 15.09.2026). */
   | "besen";
 
@@ -272,6 +296,75 @@ const LACK_GRUEN = 0x3f6b34;
 const LACK_GELB = 0xb8912a;
 const LACK_BLAU = 0x2f5a86;
 const LACK_ROT = 0x8d3128;
+/*
+ * Buntmetall am Objekt (E-063, 15.09.2026).
+ *
+ * Dieselben Toene wie die Fraktionen in `materials/catalog.ts` — Messing
+ * 0xc9a227, Kupfer 0xc7622b —, nur um einen Hauch abgedunkelt: Ein
+ * ausgebautes Ventil ist angelaufen, kein poliertes Schaustueck. Wer die
+ * Messing-Mulde kennt, erkennt die Armatur trotzdem wieder.
+ */
+const MESSING = 0xb08c26;
+const MESSING_DUNKEL = 0x84681c;
+/** Rohes Nadelholz, ungestrichen — Kistenbretter und Paletten. */
+const HOLZ_ROH = 0xa8895e;
+const HOLZ_ROH_DUNKEL = 0x7d6543;
+/** Polsterstoff: gedeckte Wohnzimmertoene, nie knallig. */
+const STOFF = [0x5c6a58, 0x6b5a52, 0x47506a, 0x7a6a58];
+/** Bleiakku: schwarzer Kasten, heller Deckel, blanke Pole. */
+const AKKU_KASTEN = 0x23262a;
+const AKKU_DECKEL = 0x5a6069;
+const BLEI = 0x8d9099;
+
+/**
+ * Buntmetall zeigt seine Farbe, Eisen bleibt Eisen (E-063, 15.09.2026).
+ *
+ * Bis dahin war der Grundton eines blanken Bauteils immer `STAHL` — ein
+ * Kupferboiler, ein VA-Tank und ein Alu-Kessel standen in demselben Grau da.
+ * Das widerspricht direkt der Absicht dieses Moduls („Unlackiertes bleibt
+ * unlackiert … behalten ihren Metallton"): Der Metallton von Kupfer ist
+ * kupfern.
+ *
+ * Nur Buntmetall steht in dieser Tabelle. Stahl, Mischschrott und die
+ * Abfallfraktionen bekommen weiterhin `STAHL`, und damit aendert sich an rund
+ * zweihundert Eintraegen **kein Pixel** — gemessen `tools/metallton.ts`:
+ * Stahl-Fraktion zu STAHL ist ΔE2000 = 8,8, ein sichtbarer Unterschied, den
+ * niemand bestellt hat. Fuer Kupfer (25,1), Messing (31,7), VA (37,1), Zink
+ * (23,0), Kabel (22,2) und Alu (13,6) ist genau dieser Unterschied der Sinn
+ * der Sache.
+ *
+ * Die Werte sind dieselben wie in `materials/catalog.ts` — wer die Mulde
+ * kennt, erkennt das Stueck wieder. Sie stehen hier als Kopie, weil
+ * `world/objektbau.ts` sonst von `materials/` abhaengt; `test/bauart.test.ts`
+ * haelt die beiden Listen zusammen.
+ */
+const BUNTTON: Record<string, number> = {
+  va: 0xdfe6ea,
+  alu: 0x928d85,
+  copper: 0xc7622b,
+  brass: 0xc9a227,
+  zinc: 0x9aa6ad,
+  cable: 0xb0682a,
+};
+
+/** Der Grundton eines blanken Bauteils: Buntmetall nach Fraktion, sonst Stahl. */
+export function metallton(materialId?: string): number {
+  return BUNTTON[materialId ?? ""] ?? STAHL;
+}
+
+/**
+ * Derselbe Ton, nur dunkler — fuer Schatten, Fugen und angelaufene Stellen.
+ *
+ * Ein Bund aus lauter gleich hellen Rohren sieht aus wie ein Klotz; die
+ * Abstufung ist es, die die einzelnen Rohre sichtbar macht. Gerechnet je
+ * Kanal, damit der Farbton bleibt und nur die Helligkeit sinkt.
+ */
+function dunkler(hex: number, f: number): number {
+  const r = Math.round(((hex >> 16) & 255) * f);
+  const g = Math.round(((hex >> 8) & 255) * f);
+  const b = Math.round((hex & 255) * f);
+  return (r << 16) | (g << 8) | b;
+}
 
 /**
  * Lackton aus einer Palette wählen — fest an den Maßen, nicht zufällig.
@@ -401,8 +494,8 @@ function maschine(w: number, h: number, d: number): Bauteil {
 }
 
 /** Tank, Kessel, Behälter: liegender Zylinder mit Sattel und Stutzen. */
-function tank(r: number, len: number): Bauteil {
-  z(r, len * 0.92, STAHL, "z", 0, 0, 0, 16);
+function tank(r: number, len: number, ton = STAHL): Bauteil {
+  z(r, len * 0.92, ton, "z", 0, 0, 0, 16);
   for (const sz of [-1, 1]) z(r * 0.99, len * 0.04, STAHL_DUNKEL, "z", 0, 0, sz * len * 0.46, 16); // Böden
   for (const sz of [-1, 1]) q(r * 1.7, r * 0.5, r * 0.5, STAHL_DUNKEL, 0, -r * 0.85, sz * len * 0.3); // Sattel
   z(r * 0.3, r * 0.5, STAHL_DUNKEL, "y", 0, r * 0.95, -len * 0.2, 10); // Domdeckel
@@ -430,22 +523,24 @@ function traeger(w: number, h: number, d: number): Bauteil {
 }
 
 /** Rohr mit Flanschen an beiden Enden. */
-function rohrFlansch(r: number, len: number): Bauteil {
-  z(r * 0.82, len, STAHL, "z", 0, 0, 0, 14);
+function rohrFlansch(r: number, len: number, ton = STAHL): Bauteil {
+  z(r * 0.82, len, ton, "z", 0, 0, 0, 14);
   for (const sz of [-1, 1]) z(r * 1.15, len * 0.05, ROST, "z", 0, 0, sz * len * 0.48, 14);
   z(r * 0.9, len * 0.06, STAHL_DUNKEL, "z", 0, 0, 0, 14);
   return fertig();
 }
 
 /** Bund: mehrere Stäbe oder Rohre, mit Spanngurten zusammengehalten. */
-function buendel(w: number, h: number, d: number): Bauteil {
+function buendel(w: number, h: number, d: number, ton = STAHL): Bauteil {
   const lang = Math.max(w, h, d);
   const r = Math.min(w, h) * 0.16;
+  // Bei Buntmetall rostet nichts — ein Kupferrohr setzt Patina an, keinen Rost.
+  const zweit = ton === STAHL ? ROST : dunkler(ton, 0.68);
   let i = 0;
   for (let sx = -1; sx <= 1; sx++) {
     for (let sy = -1; sy <= 1; sy++) {
       const versatz = (i % 3) * 0.03 - 0.03;
-      z(r, lang * (0.9 + (i % 4) * 0.03), i % 3 === 0 ? ROST : STAHL, lang === d ? "z" : "x",
+      z(r, lang * (0.9 + (i % 4) * 0.03), i % 3 === 0 ? zweit : ton, lang === d ? "z" : "x",
         lang === d ? sx * r * 2.1 : versatz * 4,
         sy * r * 2.1,
         lang === d ? versatz * 4 : sx * r * 2.1,
@@ -461,14 +556,18 @@ function buendel(w: number, h: number, d: number): Bauteil {
 }
 
 /** Stapel: mehrere Platten übereinander, leicht versetzt. */
-function stapel(w: number, h: number, d: number): Bauteil {
-  const lack = lackton([STAHL, ROST, LACK_ROT, LACK_BLAU], w, h, d);
+function stapel(w: number, h: number, d: number, ton = STAHL): Bauteil {
+  // Buntmetall wird nicht lackiert — ein Stapel Lagerschalen ist durchgehend
+  // Messing, mit Schatten zwischen den Lagen statt roter und blauer Bleche.
+  const bunt = ton !== STAHL;
+  const lack = bunt ? ton : lackton([STAHL, ROST, LACK_ROT, LACK_BLAU], w, h, d);
+  const zweit = bunt ? dunkler(ton, 0.6) : STAHL_DUNKEL;
   const n = Math.max(3, Math.min(7, Math.round(h / 0.12)));
   const dicke = h / n;
   for (let i = 0; i < n; i++) {
     const vx = (((i * 37) % 11) / 11 - 0.5) * w * 0.12;
     const vz = (((i * 53) % 13) / 13 - 0.5) * d * 0.12;
-    q(w * 0.96, dicke * 0.82, d * 0.96, i % 2 ? lack : STAHL_DUNKEL, vx, -h / 2 + dicke * (i + 0.5), vz);
+    q(w * 0.96, dicke * 0.82, d * 0.96, i % 2 ? lack : zweit, vx, -h / 2 + dicke * (i + 0.5), vz);
   }
   return fertig();
 }
@@ -502,8 +601,8 @@ function achse(w: number, h: number, d: number): Bauteil {
 }
 
 /** Blech, Tafel, Wandelement: Platte mit umgekanteten Rändern. */
-function platte(w: number, h: number, d: number): Bauteil {
-  const lack = lackton([STAHL, ROST, ALU], w, h, d);
+function platte(w: number, h: number, d: number, ton = STAHL): Bauteil {
+  const lack = ton === STAHL ? lackton([STAHL, ROST, ALU], w, h, d) : ton;
   const duenn = Math.min(w, h, d);
   const flach = duenn === h;
   const a = flach ? w : w;
@@ -612,8 +711,11 @@ function gitterturm(w: number, h: number, d: number): Bauteil {
 }
 
 /** Loser Haufen: viele kleine Brocken durcheinander. */
-function haufen(w: number, h: number, d: number): Bauteil {
-  const toene = [STAHL, ROST, STAHL_DUNKEL, GUSS];
+function haufen(w: number, h: number, d: number, ton = STAHL): Bauteil {
+  const toene =
+    ton === STAHL
+      ? [STAHL, ROST, STAHL_DUNKEL, GUSS]
+      : [ton, dunkler(ton, 0.72), dunkler(ton, 0.55), dunkler(ton, 0.85)];
   for (let i = 0; i < 26; i++) {
     const f = (k: number) => (((i * 7919 + k * 104729) % 1000) / 1000 - 0.5) * 2;
     const s2 = 0.12 + Math.abs(f(3)) * 0.22;
@@ -726,25 +828,230 @@ function kufenRaupe(w: number, h: number, d: number): Bauteil {
   return fertig();
 }
 
-/** Sofa, Schrank, Kuechenzeile: Korpus mit Front und Fuessen. */
+/**
+ * Schrank, Kuechenzeile, Theke: Korpus mit Front und Fuessen — **nur noch
+ * das** (E-063, 15.09.2026).
+ *
+ * Bis zum 15.09.2026 hatte diese Funktion zwei Zweige, und welcher griff,
+ * entschieden die Abmessungen: `h < w * 0,75 && d > h * 0,7` hiess „Polster".
+ * Daran hingen vier Gegenstaende, die keine Polstermoebel sind — Stahlschrank,
+ * Holzkiste, Kuechenzeile und (ueber E-061 schon geheilt) der Gastro-Spueltisch
+ * —, und sie standen als Sofa auf dem Platz.
+ *
+ * Patrick, 15.09.2026: „Wenn etwas wie eine Couch aussieht, dass es auch eine
+ * Couch ist." Ein Bau, der sich nach Kantenlaengen aussucht, kann das nicht
+ * halten: Jeder neue Eintrag in den falschen Massen rutscht wieder hinein.
+ * Polstermoebel tragen darum jetzt `bau: "polster"` und sonst niemand.
+ */
 function moebel(w: number, h: number, d: number): Bauteil {
   const holz = lackton([0x7a5a3a, 0x8d7250, 0xbdb5a6, 0x4c4a46], w, h, d);
-  const polster = lackton([0x5c6a58, 0x6b5a52, 0x47506a], w, h, d);
-  const weich = h < w * 0.75 && d > h * 0.7;
-  if (weich) {
-    q(w, h * 0.45, d, polster, 0, -h * 0.22);
-    q(w, h * 0.55, d * 0.3, polster, 0, h * 0.22, -d * 0.34);
-    for (const sx of [-1, 1]) q(w * 0.1, h * 0.5, d, polster, sx * w * 0.45, h * 0.05, 0);
-  } else {
-    q(w, h * 0.92, d, holz, 0, h * 0.04);
-    const n = Math.max(2, Math.round(h / 0.55));
-    for (let i = 0; i < n; i++) {
-      q(w * 0.92, (h * 0.86) / n - 0.03, 0.03, STAHL_DUNKEL, 0, -h * 0.42 + ((i + 0.5) * h * 0.86) / n, d / 2);
-      q(w * 0.12, 0.03, 0.04, CHROM, w * 0.3, -h * 0.42 + ((i + 0.5) * h * 0.86) / n, d / 2 + 0.02);
-    }
+  q(w, h * 0.92, d, holz, 0, h * 0.04);
+  const n = Math.max(2, Math.round(h / 0.55));
+  for (let i = 0; i < n; i++) {
+    q(w * 0.92, (h * 0.86) / n - 0.03, 0.03, STAHL_DUNKEL, 0, -h * 0.42 + ((i + 0.5) * h * 0.86) / n, d / 2);
+    q(w * 0.12, 0.03, 0.04, CHROM, w * 0.3, -h * 0.42 + ((i + 0.5) * h * 0.86) / n, d / 2 + 0.02);
   }
   for (const sx of [-1, 1])
     for (const sz of [-1, 1]) q(0.07, h * 0.1, 0.07, STAHL_DUNKEL, sx * (w / 2 - 0.06), -h * 0.47, sz * (d / 2 - 0.06));
+  return fertig();
+}
+
+/**
+ * Polstermoebel: Sitzflaeche, Rueckenlehne, zwei Armlehnen, Kissenfugen.
+ *
+ * Die Laenge liegt auf der groessten waagerechten Kante — eine Couch von
+ * 2,10 x 0,90 x 0,95 m steht damit richtig herum, egal wie der Katalog die
+ * Masse sortiert hat.
+ */
+function polster(w: number, h: number, d: number): Bauteil {
+  const stoff = lackton(STOFF, w, h, d);
+  const dunkel = lackton([0x4a5548, 0x564741, 0x3a4155, 0x615345], w, h, d);
+  // Sitz und Lehne
+  q(w, h * 0.44, d, stoff, 0, -h * 0.23);
+  q(w, h * 0.56, d * 0.28, stoff, 0, h * 0.22, -d * 0.35);
+  // Armlehnen
+  for (const sx of [-1, 1]) q(w * 0.09, h * 0.46, d * 0.96, stoff, sx * (w / 2 - w * 0.045), h * 0.06, 0);
+  // Kissenfugen — daran erkennt man Polster und nicht einen Quader in Grau
+  const kissen = Math.max(2, Math.round(w / 0.75));
+  for (let i = 1; i < kissen; i++)
+    q(0.03, h * 0.42, d * 0.8, dunkel, -w / 2 + (i * w) / kissen, -h * 0.2, d * 0.06);
+  q(w * 0.82, 0.03, d * 0.78, dunkel, 0, -h * 0.01, d * 0.06); // Fuge Sitz/Lehne
+  // Fuesse: kurze Holzkegel, kein Stahlrahmen
+  for (const sx of [-1, 1])
+    for (const sz of [-1, 1])
+      q(0.06, h * 0.12, 0.06, HOLZ_ROH_DUNKEL, sx * (w / 2 - 0.09), -h * 0.48, sz * (d / 2 - 0.09));
+  return fertig();
+}
+
+/** Transportkiste: Bretterwaende mit Eckleisten und Deckelfuge. */
+function kiste(w: number, h: number, d: number): Bauteil {
+  q(w * 0.98, h * 0.94, d * 0.98, HOLZ_ROH, 0, -h * 0.02);
+  // Bretterfugen laengs
+  const n = Math.max(3, Math.round(h / 0.16));
+  for (let i = 1; i < n; i++)
+    for (const sz of [-1, 1])
+      q(w * 0.99, 0.015, 0.03, HOLZ_ROH_DUNKEL, 0, -h / 2 + (i * h) / n, sz * (d / 2 - 0.01));
+  // Eckleisten
+  for (const sx of [-1, 1])
+    for (const sz of [-1, 1]) q(0.06, h, 0.06, HOLZ_ROH_DUNKEL, sx * (w / 2 - 0.03), 0, sz * (d / 2 - 0.03));
+  // Deckel mit Spannband
+  q(w, h * 0.06, d, HOLZ_ROH_DUNKEL, 0, h * 0.47);
+  for (const sx of [-1, 1]) q(0.04, h * 1.02, d * 1.02, STAHL_DUNKEL, sx * w * 0.28, 0, 0);
+  return fertig();
+}
+
+/**
+ * Massiver Guss- oder Schmiedekoerper: Gegengewicht, Amboss, Poller, Puffer.
+ *
+ * Diese Stuecke standen bis E-063 als `motor` da — mit Zylinderkopf, Kruemmern
+ * und Lichtmaschine. Ein Staplergegengewicht hat nichts davon: Es ist ein
+ * Klotz mit Gussnaht, abgeschraegten Kanten und einer Kranoese. Genau daran
+ * erkennt man auf dem Platz, dass es schwer ist.
+ */
+function klotz(w: number, h: number, d: number): Bauteil {
+  q(w * 0.94, h * 0.9, d * 0.94, GUSS);
+  // Abschraegungen oben: ein Gussklotz ist nie scharfkantig
+  q(w * 0.7, h * 0.12, d * 0.7, GUSS, 0, h * 0.47);
+  q(w * 0.99, h * 0.14, d * 0.99, STAHL_DUNKEL, 0, -h * 0.45); // Standflaeche
+  // Gussnaht rundherum
+  q(w * 1.01, h * 0.035, d * 1.01, STAHL_DUNKEL, 0, h * 0.02);
+  // Kranoese und zwei Anschlagpunkte
+  z(Math.min(w, d) * 0.1, h * 0.14, ROST, "y", 0, h * 0.56, 0, 10);
+  for (const sx of [-1, 1]) q(0.08, h * 0.1, 0.08, ROST, sx * w * 0.32, h * 0.53, 0);
+  // Tragetaschen in der Flanke, damit die Flaeche nicht leer wirkt
+  for (const sz of [-1, 1]) q(w * 0.5, h * 0.3, 0.04, STAHL_DUNKEL, 0, -h * 0.1, sz * (d / 2 + 0.01));
+  return fertig();
+}
+
+/** Bleiakku: schwarzer Kasten, heller Deckel, zwei Pole, Zellenstopfen. */
+function batterie(w: number, h: number, d: number): Bauteil {
+  q(w, h * 0.86, d, AKKU_KASTEN, 0, -h * 0.07);
+  q(w * 0.99, h * 0.14, d * 0.99, AKKU_DECKEL, 0, h * 0.43);
+  // Pole: der Pluspol dicker als der Minuspol, so wie am echten Akku
+  z(Math.min(w, d) * 0.09, h * 0.12, BLEI, "y", -w * 0.34, h * 0.55, d * 0.22, 10);
+  z(Math.min(w, d) * 0.075, h * 0.12, BLEI, "y", w * 0.34, h * 0.55, d * 0.22, 10);
+  // Zellenstopfen — so viele, wie die Breite hergibt (6 Zellen je 12 V)
+  const zellen = Math.max(2, Math.min(8, Math.round(w / 0.055)));
+  for (let i = 0; i < zellen; i++)
+    z(Math.min(w / zellen, d) * 0.22, h * 0.05, AKKU_DECKEL, "y", -w / 2 + (w * (i + 0.5)) / zellen, h * 0.52, -d * 0.12, 8);
+  // Traggriff und Beschriftungsfeld
+  q(w * 0.34, h * 0.03, d * 0.1, STAHL_DUNKEL, 0, h * 0.53, -d * 0.36);
+  q(w * 0.6, h * 0.3, 0.02, WEISS_GRAU, 0, -h * 0.05, d / 2 + 0.005);
+  return fertig();
+}
+
+/**
+ * Bootsrumpf: spitzer Bug, Scheuerleiste, Spanten, Duchten.
+ *
+ * Fuenf Boote standen bis E-063 als `tank` da — liegender Zylinder mit Sattel
+ * und Domdeckel. Die Laenge liegt hier auf der groessten Kante; der Bug
+ * verjuengt sich in drei Stufen, damit ein Rumpf entsteht und kein Quader.
+ */
+function boot(w: number, h: number, d: number): Bauteil {
+  const rumpf = lackton([WEISS_GRAU, LACK_BLAU, ALU, LACK_GRUEN], w, h, d);
+  const lang = Math.max(w, d);
+  const laengsZ = lang === d;
+  const breit = laengsZ ? w : d;
+  const setze = (bw: number, bh: number, bl: number, farbe: number, ql: number, y: number) =>
+    laengsZ ? q(bw, bh, bl, farbe, 0, y, ql) : q(bl, bh, bw, farbe, ql, y, 0);
+  // Mittschiffs der volle Querschnitt, nach vorn in drei Stufen schlanker
+  setze(breit, h * 0.78, lang * 0.56, rumpf, -lang * 0.14, -h * 0.08);
+  setze(breit * 0.82, h * 0.72, lang * 0.2, rumpf, lang * 0.24, -h * 0.05);
+  setze(breit * 0.56, h * 0.64, lang * 0.12, rumpf, lang * 0.4, -h * 0.02);
+  setze(breit * 0.24, h * 0.56, lang * 0.08, rumpf, lang * 0.47, h * 0.02); // Steven
+  setze(breit, h * 0.14, lang * 0.04, STAHL_DUNKEL, -lang * 0.42, -h * 0.1); // Spiegel
+  // Scheuerleiste am Dollbord, rundherum eine Kante tiefer
+  for (const s of [-1, 1])
+    laengsZ
+      ? q(0.06, h * 0.1, lang * 0.86, STAHL_DUNKEL, s * breit * 0.48, h * 0.3, -lang * 0.04)
+      : q(lang * 0.86, h * 0.1, 0.06, STAHL_DUNKEL, -lang * 0.04, h * 0.3, s * breit * 0.48);
+  // Duchten (Sitzbaenke) quer
+  for (let i = 0; i < 3; i++)
+    setze(breit * 0.9, h * 0.06, lang * 0.07, HOLZ_ROH, -lang * 0.28 + i * lang * 0.24, h * 0.22);
+  return fertig();
+}
+
+/** Armatur: Ventilkoerper mit zwei Flanschen, Spindel und Handrad. */
+function armatur(w: number, h: number, d: number, ton = MESSING): Bauteil {
+  // Eine Armatur aus Stahl gibt es auch — dann ist der Ton eben Stahl. Der
+  // Standardwert ist Messing, weil der Katalog heute nur messingene kennt.
+  const koerper = ton === STAHL ? MESSING : ton;
+  const kante = ton === STAHL ? MESSING_DUNKEL : dunkler(ton, 0.68);
+  const r = Math.min(w, d) * 0.3;
+  q(w * 0.52, h * 0.44, d * 0.52, koerper, 0, -h * 0.14); // Gehaeuse
+  z(r, w * 0.98, koerper, "x", 0, -h * 0.14, 0, 10); // Durchgang
+  for (const sx of [-1, 1]) z(r * 1.5, w * 0.07, kante, "x", sx * w * 0.45, -h * 0.14, 0, 12); // Flansche
+  z(r * 0.36, h * 0.44, CHROM, "y", 0, h * 0.18, 0, 8); // Spindel
+  q(w * 0.34, h * 0.08, d * 0.34, kante, 0, h * 0.06); // Bruecke
+  // Handrad: Kranz aus acht Stummeln und ein Speichenkreuz
+  const rr = Math.min(w, d) * 0.34;
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    z(rr * 0.16, rr * 0.8, kante, "y", Math.cos(a) * rr, h * 0.42, Math.sin(a) * rr, 6);
+  }
+  q(rr * 2, h * 0.04, 0.05, kante, 0, h * 0.42, 0);
+  q(0.05, h * 0.04, rr * 2, kante, 0, h * 0.42, 0);
+  return fertig();
+}
+
+/**
+ * Schiffsschraube und Luftschraube: Nabe mit angestellten Fluegeln.
+ *
+ * Die Zahl der Fluegel haengt am Verhaeltnis von Dicke zu Durchmesser: Ein
+ * flacher Propeller (Flugzeug) bekommt zwei lange Blaetter, ein gedrungener
+ * (Schiff) vier kurze. Beides steht im Katalog, beides sah bis E-063 aus wie
+ * ein Blech mit umgekanteten Raendern.
+ */
+function propeller(w: number, h: number, d: number, ton = STAHL): Bauteil {
+  // Schiffsschraube ist Rotguss (Messing), Luftschraube meist Alu — beides
+  // kommt ueber die Fraktion herein, ohne dass der Bau raten muss.
+  const bronze = ton;
+  const dick = Math.min(w, h, d);
+  const rad = Math.max(w, h, d) / 2;
+  // Die Nabe steht auf der duennsten Achse
+  const achseDick: "x" | "y" | "z" = dick === w ? "x" : dick === h ? "y" : "z";
+  z(rad * 0.22, dick * 1.4, bronze, achseDick, 0, 0, 0, 12);
+  z(rad * 0.13, dick * 2.1, STAHL_DUNKEL, achseDick, 0, 0, 0, 10); // Wellenstumpf
+  const fluegel = dick < rad * 0.4 ? 2 : 4;
+  for (let i = 0; i < fluegel; i++) {
+    const a = (i / fluegel) * Math.PI * 2;
+    const cx = Math.cos(a) * rad * 0.56;
+    const cy = Math.sin(a) * rad * 0.56;
+    const bl = rad * 0.9;
+    const bb = rad * 0.34;
+    // Ein Blatt je Richtung, quer zur Nabenachse — als flacher Quader mit
+    // Steigung: das vordere Ende sitzt eine Blattdicke hoeher.
+    if (achseDick === "y") {
+      q(Math.abs(Math.cos(a)) * bl + bb * 0.4, dick * 0.5, Math.abs(Math.sin(a)) * bl + bb * 0.4, bronze, cx, 0, cy);
+      q(bb * 0.5, dick * 0.9, bb * 0.5, bronze, cx * 1.3, dick * 0.2, cy * 1.3);
+    } else if (achseDick === "x") {
+      q(dick * 0.5, Math.abs(Math.cos(a)) * bl + bb * 0.4, Math.abs(Math.sin(a)) * bl + bb * 0.4, bronze, 0, cx, cy);
+      q(dick * 0.9, bb * 0.5, bb * 0.5, bronze, dick * 0.2, cx * 1.3, cy * 1.3);
+    } else {
+      q(Math.abs(Math.cos(a)) * bl + bb * 0.4, Math.abs(Math.sin(a)) * bl + bb * 0.4, dick * 0.5, bronze, cx, cy, 0);
+      q(bb * 0.5, bb * 0.5, dick * 0.9, bronze, cx * 1.3, cy * 1.3, dick * 0.2);
+    }
+  }
+  return fertig();
+}
+
+/** Stockanker: Schaft, Stock quer, zwei Flunken, Ring. */
+function anker(w: number, h: number, d: number): Bauteil {
+  const r = Math.min(w, d) * 0.09;
+  z(r, h * 0.82, ROST, "y", 0, -h * 0.02, 0, 10); // Schaft
+  q(w * 0.9, r * 2.2, r * 2.2, ROST, 0, h * 0.3, 0); // Stock quer
+  // Arme und Flunken unten
+  for (const sx of [-1, 1]) {
+    draht(
+      new THREE.Vector3(0, -h * 0.34, 0),
+      new THREE.Vector3(sx * w * 0.42, -h * 0.06, 0),
+      r * 1.8,
+      ROST
+    );
+    q(w * 0.26, r * 1.2, d * 0.5, ROST, sx * w * 0.42, -h * 0.05, 0); // Flunke
+  }
+  q(w * 0.2, r * 2.4, d * 0.4, ROST, 0, -h * 0.38, 0); // Kruz
+  z(r * 2.6, r * 1.4, ROST, "z", 0, h * 0.44, 0, 10); // Rorring
   return fertig();
 }
 
@@ -762,10 +1069,14 @@ function beton(w: number, h: number, d: number): Bauteil {
 }
 
 /** Kabeltrommel, Seiltrommel: zwei Scheiben mit Wickel dazwischen. */
-function trommel(r: number, len: number): Bauteil {
-  for (const s2 of [-1, 1]) z(r, len * 0.12, 0x6b5433, "x", s2 * len * 0.44, 0, 0, 18);
-  z(r * 0.72, len * 0.72, 0x3a3330, "x", 0, 0, 0, 18);
-  z(r * 0.26, len * 1.02, 0x6b5433, "x", 0, 0, 0, 12);
+function trommel(r: number, len: number, ton = STAHL): Bauteil {
+  // Wangen aus Holz, wenn nichts Buntes gewickelt ist (Kabeltrommel); sonst
+  // zeigt der Wickel selbst das Metall — eine Rolle Kupferband ist kupfern.
+  const wange = ton === STAHL ? 0x6b5433 : dunkler(ton, 0.62);
+  const wickel = ton === STAHL ? 0x3a3330 : ton;
+  for (const s2 of [-1, 1]) z(r, len * 0.12, wange, "x", s2 * len * 0.44, 0, 0, 18);
+  z(r * 0.72, len * 0.72, wickel, "x", 0, 0, 0, 18);
+  z(r * 0.26, len * 1.02, wange, "x", 0, 0, 0, 12);
   return fertig();
 }
 
@@ -1235,11 +1546,31 @@ export function punkteBis(geo: THREE.BufferGeometry, y0: number, y1: number): Fl
  * Geometrie für einen Bau. `dims` ist dasselbe wie im Katalog:
  * box = [w,h,d], cyl = [r,len].
  */
-export function baueGeometrie(bau: BauId, dims: number[], kind: string): Bauteil {
+export function baueGeometrie(
+  bau: BauId,
+  dims: number[],
+  kind: string,
+  /**
+   * Fraktion des Stuecks — bestimmt den Grundton blanker Bauteile (E-063).
+   * Ohne Angabe bleibt alles wie vorher: Stahlgrau.
+   */
+  materialId?: string
+): Bauteil {
   const [a, b, c] = dims;
-  const w = kind === "cyl" ? a * 2 : a;
-  const h = kind === "cyl" ? a * 2 : b;
-  const d = kind === "cyl" ? b : c;
+  /*
+   * `wire` hat nur EINEN Wert in `dims` — den Kugelradius (purity.ts,
+   * `aussenflaeche`). Bis E-063 las diese Funktion trotzdem `dims[1]` und
+   * `dims[2]`, bekam `undefined` und gab ein Netz mit NaN-Ecken zurueck: die
+   * Ankerkette, der Reifenhaufen und der Stahlteile-Haufen waren im Spiel
+   * unsichtbar oder entartet (BEFUND B-3, `test/fraktionen.test.ts`).
+   *
+   * Der Kollider fing das schon ab (`scrapItems.ts`, `sauber`) — das Netz
+   * nicht. Ein Ballen ist rund: Kantenlaenge = Durchmesser.
+   */
+  const w = kind === "cyl" || kind === "wire" ? a * 2 : a;
+  const h = kind === "cyl" ? a * 2 : kind === "wire" ? a * 2 : b;
+  const d = kind === "cyl" ? b : kind === "wire" ? a * 2 : c;
+  const ton = metallton(materialId);
   teile.length = 0;
   switch (bau) {
     case "weisseWare":
@@ -1255,21 +1586,21 @@ export function baueGeometrie(bau: BauId, dims: number[], kind: string): Bauteil
     case "maschine":
       return maschine(w, h, d);
     case "tank":
-      return tank(kind === "cyl" ? a : Math.min(w, h) / 2, kind === "cyl" ? b : d);
+      return tank(kind === "cyl" ? a : Math.min(w, h) / 2, kind === "cyl" ? b : d, ton);
     case "traeger":
       return traeger(w, h, d);
     case "rohrFlansch":
-      return rohrFlansch(kind === "cyl" ? a : Math.min(w, h) / 2, kind === "cyl" ? b : d);
+      return rohrFlansch(kind === "cyl" ? a : Math.min(w, h) / 2, kind === "cyl" ? b : d, ton);
     case "buendel":
-      return buendel(w, h, d);
+      return buendel(w, h, d, ton);
     case "stapel":
-      return stapel(w, h, d);
+      return stapel(w, h, d, ton);
     case "elektromotor":
       return elektromotor(w, h, d);
     case "achse":
       return achse(w, h, d);
     case "platte":
-      return platte(w, h, d);
+      return platte(w, h, d, ton);
     case "karosserie":
       return karosserie(w, h, d);
     case "fahrgestell":
@@ -1281,7 +1612,7 @@ export function baueGeometrie(bau: BauId, dims: number[], kind: string): Bauteil
     case "gitterturm":
       return gitterturm(w, h, d);
     case "haufen":
-      return haufen(w, h, d);
+      return haufen(w, h, d, ton);
     case "kleinfahrzeug":
       return kleinfahrzeug(w, h, d);
     case "einspurig":
@@ -1292,10 +1623,26 @@ export function baueGeometrie(bau: BauId, dims: number[], kind: string): Bauteil
       return kufenRaupe(w, h, d);
     case "moebel":
       return moebel(w, h, d);
+    case "polster":
+      return polster(w, h, d);
+    case "kiste":
+      return kiste(w, h, d);
+    case "klotz":
+      return klotz(w, h, d);
+    case "batterie":
+      return batterie(w, h, d);
+    case "boot":
+      return boot(w, h, d);
+    case "armatur":
+      return armatur(w, h, d, ton);
+    case "propeller":
+      return propeller(w, h, d, ton);
+    case "anker":
+      return anker(w, h, d);
     case "beton":
       return beton(w, h, d);
     case "trommel":
-      return trommel(kind === "cyl" ? a : Math.min(w, h) / 2, kind === "cyl" ? b : d);
+      return trommel(kind === "cyl" ? a : Math.min(w, h) / 2, kind === "cyl" ? b : d, ton);
     case "fensterflaeche":
       return fensterflaeche(w, h, d) as Bauteil;
     case "besen":
