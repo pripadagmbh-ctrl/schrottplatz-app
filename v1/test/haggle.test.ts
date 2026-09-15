@@ -3,6 +3,7 @@ import { haggle, leavesOnRefusal, OFFER_FACTOR, type Offer } from "../src/econom
 import type { CustomerProfile, CustomerGroup } from "../src/delivery/customers";
 import { ladeVolumen } from "../src/delivery/fuellgrad";
 import { ladungsDichte } from "../src/materials/schuettdichte";
+import { AUSSEHEN_NEUTRAL } from "../src/delivery/aussehen";
 
 function kunde(group: CustomerGroup, hardness = 3): CustomerProfile {
   /*
@@ -26,6 +27,11 @@ function kunde(group: CustomerGroup, hardness = 3): CustomerProfile {
     contaminantShare: 0.1,
     hardness,
     greeting: "Moin.",
+    /*
+     * Neutrale Figur (`aussehen.ts`). Prueflaeufe messen nicht das
+     * Aussehen, und eine gewuerfelte Statur wuerde hier nur streuen.
+     */
+    aussehen: AUSSEHEN_NEUTRAL,
   };
 }
 

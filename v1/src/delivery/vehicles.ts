@@ -8,7 +8,8 @@ import {
 } from "../world/scrapItems";
 import type { CompositeManager, CarComposite } from "../dismantle/composites";
 import { WEIGH_Z, KAFFEE_THEKE } from "../world/yard";
-import { buildPerson, type PersonParts } from "../world/people";
+import { baueKundenfigur, baueHund, type Kundenfigur } from "../world/kundenfigur";
+import { AUSSEHEN_NEUTRAL } from "./aussehen";
 import type { Box } from "../world/boxen";
 import { packeLadung, stueckMass } from "./ladung";
 
@@ -350,15 +351,23 @@ class DeliveryVehicle {
    */
   private steigeAus(): void {
     if (!this.fahrer) {
-      this.fahrer = buildPerson({ shirt: 0x3c4f63, trousers: 0x2b2f33, hair: 0x4a3a2e });
+      /*
+       * DIE FIGUR GEHOERT DEM KUNDEN (15.09.2026).
+       *
+       * Hier stand `buildPerson({ shirt: 0x3c4f63, ... })` — drei feste
+       * Farben, also stieg aus jedem Wagen derselbe Mann. Jetzt kommt das
+       * Aussehen aus `this.customer.aussehen`, und das steht in
+       * `customers.ts` am Namen: Willi Baering ist immer Willi Baering.
+       *
+       * Der Abholer Achim hat keinen Kundendatensatz (er ist keine
+       * Anlieferung) und bekommt das neutrale Aussehen — bis er ein eigenes
+       * bekommt, siehe offene Frage im Log.
+       *
+       * Der Becher hing hier als EIGENES Netz an der Figur. Er steckt jetzt
+       * im Kleidungsnetz (`kundenfigur.ts`) und kostet keinen Zeichenruf mehr.
+       */
+      this.fahrer = baueKundenfigur(this.customer?.aussehen ?? AUSSEHEN_NEUTRAL);
       this.scene.add(this.fahrer.group);
-      // Becher in der Hand
-      const becher = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.045, 0.04, 0.1, 8),
-        new THREE.MeshStandardMaterial({ color: 0xe8e2d5, roughness: 0.6 })
-      );
-      becher.position.set(0.2, 1.02, 0.18);
-      this.fahrer.group.add(becher);
     }
     // Fahrerseite: links neben der Kabine, in Fahrtrichtung gesehen
     const seite = new THREE.Vector3(-1.9, 0, 1.6).applyAxisAngle(
@@ -396,25 +405,25 @@ class DeliveryVehicle {
       g.position.x += (dx / d) * schritt;
       g.position.z += (dz / d) * schritt;
       g.rotation.y = Math.atan2(dx, dz);
-      this.fahrerPhase += dt * 7;
-      const swing = Math.sin(this.fahrerPhase) * 0.45;
-      f.legLeft.rotation.x = swing;
-      f.legRight.rotation.x = -swing;
-      f.armLeft.rotation.x = -swing * 0.5;
+      /*
+       * HIER SCHWANGEN BIS HEUTE ARME UND BEINE. Die Figur hat keine
+       * beweglichen Glieder mehr — vier Schwingteile sind vier zusaetzliche
+       * Netze, und Netze sind der gemessene Engpass (E-025). Sie wippt und
+       * wiegt sich jetzt als Ganzes; die Rechnung dazu steht in
+       * `kundenfigur.schritt`.
+       */
+      f.schritt(dt, true);
       return;
     }
-    f.legLeft.rotation.x = 0;
-    f.legRight.rotation.x = 0;
+    f.schritt(dt, false);
     if (this.fahrerState === "raus") {
       this.fahrerState = "kaffee";
-      // zur Theke schauen und den Becher heben
+      // zur Theke schauen; der Becher ist ohnehin in der Hand
       const zx = KAFFEE_THEKE.x - g.position.x;
       const zz = KAFFEE_THEKE.z + 1.2 - g.position.z;
       g.rotation.y = Math.atan2(zx, zz);
-      f.armRight.rotation.x = -1.35;
     } else if (this.fahrerState === "rein") {
       this.fahrerState = "drin";
-      f.armRight.rotation.x = 0;
       g.visible = false;
     }
   }
@@ -440,9 +449,8 @@ class DeliveryVehicle {
    * Der Fahrer. Er entsteht erst, wenn er gebraucht wird — also beim ersten
    * Halt auf dem Warteplatz. Fuer die meisten Fuhren gibt es ihn nie.
    */
-  private fahrer: PersonParts | null = null;
+  private fahrer: Kundenfigur | null = null;
   private fahrerState: "drin" | "raus" | "kaffee" | "rein" = "drin";
-  private fahrerPhase = 0;
   /** Pause schon gemacht? Sonst steigt er endlos wieder aus. */
   private kaffeeGehabt = false;
   private readonly fahrerTuer = new THREE.Vector3();
@@ -805,6 +813,30 @@ class DeliveryVehicle {
     this.crane = teile.crane;
     this.trailer = teile.trailer;
     this.raeder = teile.raeder;
+    /*
+     * DER HUND AUF DEM BEIFAHRERSITZ (15.09.2026).
+     *
+     * Er haengt am WAGEN, nicht an der Figur: Er sitzt schon da, wenn der
+     * Kipper durchs Tor rollt, und er bleibt sitzen, wenn sein Herrchen zum
+     * Kaffeewagen geht. Er wird nicht simuliert, hat keinen Koerper und kein
+     * Verhalten — er ist ein Netz, ohne Schatten (`kundenfigur.baueHund`).
+     *
+     * Der Platz ist der Beifahrersitz, gespiegelt zum sitzenden Fahrer in
+     * `vehicleModel.ts` (x −0,45 / y 1,62 / z bedLen/2 + 0,75). Er sitzt
+     * tiefer, weil seine Pfoten auf dem Sitz stehen.
+     *
+     * NUR IM LKW-FAHRERHAUS. Der PKW hat ein eigenes, in sich gerechnetes
+     * Gehaeuse (`buildCarAndTrailer`), und das gehoert einem anderen Paket.
+     * Ein Privatmann mit Hund faehrt deshalb heute ohne — offene Frage 2 im
+     * Log.
+     */
+    const hund = this.kind === "pkw" ? null : baueHund(this.customer?.aussehen ?? AUSSEHEN_NEUTRAL);
+    if (hund) {
+      hund.position.set(0.45, 1.3, this.bedLen / 2 + 0.72);
+      hund.scale.setScalar(0.95);
+      hund.rotation.y = -0.22; // schaut leicht zur Tuer, nicht stur geradeaus
+      this.group.add(hund);
+    }
     this.federung = new Federung(federungsDatenFuer(this.kind, this.bedLen));
     /*
      * WER SICH SENKT. Beim LKW die ganze gefederte Einheit: Rahmen,

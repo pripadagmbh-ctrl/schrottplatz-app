@@ -5547,3 +5547,221 @@ orange eingefärbt, alles Unveränderte bleibt grau.
    ruhig am Kopf stehen, während die Schalen laufen? Berührt sie nie etwas?
 3. Einen Träger vom Haufen greifen: Fühlt sich das Zupacken genauso an wie
    vorher? (Es muss — die Verkleidung hat keinen Kollider.)
+### E-078 — Der Kunde bekommt ein Gesicht: 23 Figuren, jede zwei Netze (15.09.2026)
+
+**Entscheidung.** Wie ein Kunde aussieht, steht ab sofort **am Kunden** — als
+Feld `aussehen` in `FAMILIES`, `TRADES` und der neuen Liste `PRIVATLEUTE`
+(`src/delivery/customers.ts`), nicht in einer zweiten Tabelle daneben. Gebaut
+wird daraus eine Figur mit **genau zwei Netzen** (`src/world/kundenfigur.ts`),
+und ein Wächter rechnet nach, dass aus dem Aussehen weder die Gruppe noch das
+Verhandlungsverhalten abzulesen ist (`src/delivery/aussehen.ts`,
+`test/kundenaussehen.test.ts`).
+
+**Anlass.** Patricks Gerätetest, in `docs/offene-punkte.md` unter „Leute und
+Stimmung":
+
+> Schrotthändler sehen verschieden aus — gepflegt bis ölig, klein und dick bis
+> lang und dünn, Wiedererkennungsmerkmale (Goldkette, dicke Uhr, Schäferhund).
+> Insgesamt mehr Detailtiefe als Playmobil.
+
+Am Gerät stieg aus **jedem** Wagen dieselbe Figur: `buildPerson({ shirt:
+0x3c4f63, trousers: 0x2b2f33, hair: 0x4a3a2e })`, drei feste Farben, seit dem
+Prototyp unverändert — egal ob Willi Bäring kam oder Frau Öztürk. Die Namen
+und Eigenheiten der 23 Kunden gab es längst; sichtbar war davon nichts.
+
+---
+
+**Was gezählt wurde, bevor gebaut wurde.** Die Kundschaft besteht aus **23
+Personen**: 8 Händlerfamilien (`FAMILIES`, Härtegrad 3–5), 7 Betriebe
+(`TRADES`, Härtegrad 2), 8 Privatleute (Härtegrad 1). Je Kunde standen schon
+da: Name, Untertitel, Härtegrad, Sprüche, Materialvorliebe bzw. Beifang. Gefehlt
+hat **das Aussehen** — und das ist dort hinzugekommen, wo der Rest steht. Die
+Privatleute waren bis heute eine nackte Namensliste (`PRIVAT_NAMEN`); daraus
+sind Datensätze geworden, **die Namen Wort für Wort unverändert**.
+
+Sechs Spalten je Kunde, alle mit Herkunft:
+
+| Spalte | Bedeutung | Spanne |
+|---|---|---|
+| `groesse` | Körperhöhe in Metern | 1,58 – 1,92 (SW) |
+| `fuelle` | 0 = lang und dünn, 1 = klein und dick | 0,20 – 0,85 |
+| `pflege` | 0 = ölig, 1 = frisch | 0,15 – 0,90 |
+| `haut` | Index in `HAUTTOENE` (4 Töne, der erste ist der bisherige 0xe3b18c) | 0–3 |
+| `haar` | Index in `HAARTOENE` (5) | 0–4 |
+| `jacke` | Index in `JACKENTOENE` (5, der erste ist der bisherige 0x3c4f63) | 0–4 |
+| `weste` | Warnweste ja/nein | — |
+| `merkmal` | genau **eines**: keins, Goldkette, Uhr, Mütze, Bauchtasche, Hund | — |
+
+**Begründung für „am Kunden, nicht daneben".** Eine zweite Liste „Aussehen je
+Name" wäre genau die Fehlerklasse, die am 15.09. fünfmal aufgeflogen ist: zwei
+Stellen, die dasselbe wissen sollen, und sie wissen es verschieden (E-044,
+E-056, E-062). `test/kundenaussehen.test.ts` hält den Weg fest: 400 Ziehungen
+aus `rollCustomer()`, und jedes Profil muss **dasselbe** Aussehen tragen wie
+sein Datensatz. Nebenbei ist dabei eine kleine Abschrift verschwunden: Der
+Härtegrad von Gewerbe und Privat stand als nackte `2` bzw. `1` mitten in
+`rollGewerbe`/`rollPrivat` und heißt jetzt `HAERTE_GEWERBE`/`HAERTE_PRIVAT`.
+
+---
+
+**Die Ton-Leitplanke, als Rechenvorschrift.** Projektregel 7 („Milieu aus
+Beruf, Familie, Geschäft — nie aus Herkunft") ist bei Sprüchen lesbar. Bei
+Figuren nicht: Ob über 23 Kunden hinweg alle Öligen zufällig auch die Harten
+sind, sieht beim Durchscrollen kein Mensch. Deshalb gilt hier eine Regel, die
+man nachrechnen kann, und `aussehensBefunde()` rechnet sie nach:
+
+1. **Kein stufenloses Merkmal hängt am Härtegrad.** Pearson-Korrelation
+   ≤ 0,30. (Grenze hergeleitet: Bei n = 23 liegt die 5-%-Schranke für „kein
+   Zusammenhang" bei |r| ≈ 0,41.)
+2. **Keine Gruppe hat einen anderen Mittelwert** (≤ 0,12 auf der Achse 0–1,
+   bei der Körperhöhe also 4 cm) — **und keine deckt nur die Mitte ab**
+   (≥ 70 % der Gesamtspanne). Der zweite Teil ist wichtig: Eine Gruppe, in der
+   alle mittelgroß sind, hätte denselben Mittelwert und wäre trotzdem sofort
+   erkennbar.
+3. **Kein Hautton, keine Haarfarbe, keine Jacke und kein Merkmal** ist auf
+   eine Gruppe beschränkt oder verschiebt den mittleren Härtegrad um mehr als
+   0,6 Stufen.
+
+Gemessen an der gebauten Kundschaft — die Spalte „gemessen" ist der schlechteste
+Fall über alle Achsen bzw. alle Ausprägungen:
+
+| Prüfung | Grenze | gemessen |
+|---|---|---|
+| r(Merkmal, Härtegrad) | 0,30 | **0,046** |
+| Abstand Gruppenmittel | 0,12 | **0,050** |
+| Spannenabdeckung je Gruppe | 0,70 | **0,82** |
+| Abstand mittlerer Härtegrad je Ausprägung | 0,60 | **0,39** |
+| Gruppen je Hautton / Haarfarbe / Jacke / Merkmal | ≥ 2 | **3 von 3, ausnahmslos** |
+
+Man sieht es an den beiden Enden der Händlerliste: **Willi Bäring** (Härte 5)
+ist ölig und trägt die Goldkette; **Heiner Prieser** (Härte 5) ist der
+gepflegteste Mann auf dem Hof. Beide drücken gleich hart. Umgekehrt ist
+**Manni Adorf** (Härte 3, der Umgänglichste) sauber und trägt eine Uhr.
+
+**Und die Gegenprobe**, sechsfach — ein Wächter, der nie rot werden kann,
+bewacht nichts (Lehre aus E-062). Jede dieser absichtlich verdorbenen
+Kundschaften **muss** gemeldet werden, mit dem richtigen Merkmal und dem
+richtigen Bezug:
+
+- Pflegegrad = Härtegrad („wer ölig aussieht, feilscht") → |r| = 1,00
+- alle Händler dick, alle anderen dünn
+- alle Privatleute gleich groß (Mittelwert stimmt, Spanne nicht)
+- ein Hautton nur bei einer Gruppe → „Gruppenabzeichen"
+- Goldkette nur bei Härtegrad ≥ 4
+- Warnweste als Gewerbeabzeichen
+
+**Verworfene Alternative — und das ist die wichtigste Zeile dieses Eintrags.**
+Naheliegend wäre gewesen, die Arbeitskleidung dem Beruf folgen zu lassen:
+Gewerbe in Warnweste, Händler in Arbeitsjacke, Privat in Freizeitkleidung. Das
+wäre „Milieu aus Beruf" und wäre nicht falsch — aber der Härtegrad hängt in
+diesem Spiel an der Gruppe (Privat 1, Gewerbe 2, Händler 3–5). Was mit der
+Gruppe korreliert, korreliert damit **zwangsläufig auch mit dem
+Verhandlungsverhalten**, und dann liest man dem Mann am Tor an der Weste ab,
+wie hart er drückt. Deshalb: **Die Gruppe zeigt das Fahrzeug, nicht der
+Mensch.** Ladekran heißt Händler, Firmenwagen heißt Betrieb, PKW mit Anhänger
+heißt Privat — das steht schon im Spiel (`vehicles.ts`, `withCrane`,
+`bodyStyle`) und ist die ehrliche Stelle dafür. Der Abbruchunternehmer sieht
+anders aus als der Privatmann, weil er ein anderer Mensch ist und einen anderen
+Wagen fährt, nicht weil „Abbruchunternehmer so aussehen".
+
+---
+
+**Der Preis, und warum er gefallen ist.** Gemessen auf Patricks Gerät am
+14.09.2026: 1322 Zeichenrufe, 240.000 Dreiecke, 21,0 ms je Bild. Dreiecke sind
+fast gratis, **Netze sind der Engpass**, und jedes schattenwerfende Netz wird
+zweimal gezeichnet. Aus demselben Grund wurde der Baggerfahrer Daniel am
+14.09. von 16 Netzen auf zwei zusammengelegt (E-025).
+
+Die Kundenfigur macht es genauso — `KUNDE_HAUT` und `KUNDE_KLEIDUNG`, die
+sieben Farben der Kleidung stehen an den Eckpunkten (`verschmelzeBunt` aus
+`excavator/bauteile.ts`, keine zweite Umsetzung):
+
+| | vorher (`buildPerson` + Becher) | nachher |
+|---|---|---|
+| Netze je Figur | 10 | **2** |
+| davon mit Schatten | 10 | **1** |
+| Zeichenrufe je Figur | **20** | **3** |
+| Eckpunkte je Figur | 1 809 | 664 – 853 (Mittel 761) |
+| Dreiecke je Figur | 2 972 | 1 328 – 1 706 |
+| **drei Figuren zugleich** | **60 Zeichenrufe** | **9** |
+
+Drei ist die reale Obergrenze: Es gibt drei Warteplätze, also höchstens drei
+Fahrer an der Theke. Die Ersparnis von 51 Zeichenrufen ist knapp 4 % des
+gemessenen Gesamtbudgets — für eine Verbesserung, keine Verschlechterung.
+
+**Der Hund kostet genau ein Netz** (240 Eckpunkte, 120 Dreiecke) und **wirft
+keinen Schatten**, weil er hinter getöntem Glas sitzt. Damit ist er ein
+Zeichenruf. Er hängt am **Wagen**, nicht an der Figur: Er sitzt schon da, wenn
+der Kipper durchs Tor rollt, und er bleibt sitzen, wenn sein Herrchen zum
+Kaffeewagen geht. Drei von 23 Kunden haben einen; der Wächter deckelt es bei
+jedem Fünften.
+
+**Was dafür aufgegeben wurde — und das gehört Patrick zur Abnahme vorgelegt:**
+Die Figur hat **keine beweglichen Arme und Beine mehr**. Vier Schwingteile
+wären vier zusätzliche Netze, also acht Zeichenrufe, und der Engpass ist
+gemessen genau dort. Sie wippt und wiegt sich jetzt als Ganzes im Schritttakt;
+auf den 15 bis 30 m, aus denen man einen Kunden über den Hof laufen sieht,
+liest sich das als Gehen. Was fehlt, ist das Scherenspiel der Beine aus der
+Nähe und die Geste, mit der der Fahrer den Becher zum Mund hob — der Becher ist
+jetzt fest in der Hand und kostet dafür kein eigenes Netz mehr.
+
+**`buildPerson` bleibt unverändert stehen.** Mario, Janine, Lambert und die
+beiden Polizisten schwingen damit weiter Arme und Beine (`world/people.ts`,
+`world/police.ts`); ihnen die Gliedmaßen wegzunehmen wäre ein zweiter Umbau in
+einem fremden Paket.
+
+---
+
+**Abnahmekriterium.** Zwei neue Wächter mit zusammen **31 Prüfungen**:
+
+- `test/kundenaussehen.test.ts` (16) — Vollzähligkeit, „keine zweite Liste",
+  die drei Unabhängigkeitsprüfungen, **sechs Gegenproben**, und die Kehrseite:
+  Die Kundschaft muss trotzdem bunt sein (jeder Ton der Tafel kommt vor, es
+  gibt Kleine und Lange, höchstens 45 % ohne Merkmal).
+- `test/kundenfigur.test.ts` (15) — zwei Netze bei **jedem** Merkmal, nur die
+  Kleidung wirft Schatten, Eckfarben statt Materialfarben, Obergrenze 1 000
+  Eckpunkte, „derselbe Bau in jeder Statur" (gleiche Eckpunktzahl bei 1,58 m
+  dick wie bei 1,92 m dünn), die Figur steht auf dem Boden, der Hund ist ein
+  Netz ohne Schatten, und drei Figuren sind neun Zeichenrufe.
+
+1 117 bestehende Prüfungen bleiben grün (jetzt **1 148 in 100 Dateien**),
+darunter „zehn Fuhren in Folge — keine bleibt stecken"
+(`federungAmWagen.test.ts`, 86,6 s). `npm run build` sauber.
+
+**Unangetastet.** `src/excavator/`, `src/fuenfschalen/`, `src/physics/`,
+`src/delivery/vehicleModel.ts` (dort arbeitet das Kran-Paket),
+`src/world/people.ts`, `src/world/police.ts`. In `vehicles.ts` sind es drei
+Stellen: der Bau der Figur, der Gehschritt und der Hund im Fahrerhaus.
+
+**Offen.**
+
+1. **Man sieht die Figur selten.** Sie entsteht erst, wenn ein Wagen auf einem
+   Warteplatz steht und eine Kaffeepause macht. Wer zügig abarbeitet, bekommt
+   keinen Kunden zu Gesicht. *Empfehlung:* eigenes Paket — der Kunde steigt
+   auch beim Verhandeln aus und steht an seinem Wagen.
+2. **Der Privatmann mit Hund fährt ohne.** Der Hund sitzt im
+   LKW-Fahrerhaus; der PKW hat ein eigenes, in sich gerechnetes Gehäuse
+   (`buildCarAndTrailer` in `vehicleModel.ts`), und das gehört dem Kran-Paket.
+   Betrifft einen von 23 Kunden. *Empfehlung:* beim nächsten Anfassen von
+   `vehicleModel.ts` mitnehmen.
+3. **Achim Kurtenbach sieht neutral aus.** Der Abholer hat kein
+   Kundenprofil und bekommt deshalb `AUSSEHEN_NEUTRAL`. Er hat seit E-066
+   Namen, Tochter und Meinung zur A61 — ein Gesicht hätte er verdient.
+   *Empfehlung:* ein `aussehen` an `ABHOLFAHRER`, drei Zeilen.
+4. **`verschmelzeBunt` liegt in `excavator/bauteile.ts`.** Es ist ein
+   allgemeines Werkzeug und wird jetzt auch von `world/` benutzt. Abschreiben
+   wäre der schlechtere Weg gewesen. *Empfehlung:* irgendwann nach `core/`
+   verschieben, nicht heute.
+
+**Auf dem Gerät zu prüfen.**
+
+1. **Warte, bis zwei Wagen gleichzeitig am Kaffeewagen stehen.** Sind es
+   erkennbar zwei verschiedene Menschen — einer kleiner und breiter, einer
+   länger und dünner, verschiedene Jacken?
+2. **Lass Willi Bäring anliefern und schau ihn dir aus der Nähe an** (er ist
+   klein, ölig, mit Goldkette). Ist die Kette auf Spielentfernung überhaupt zu
+   sehen, oder ist sie verschenkte Arbeit?
+3. **Der Gang ohne schwingende Beine:** Sieht das Wippen von deiner üblichen
+   Kameraentfernung nach Gehen aus — oder nach Gleiten? Wenn es stört, kostet
+   der Rückbau vier Netze je Figur, und das sagen wir dann bewusst.
+4. **Rudi Hardwig bringt seinen Schäferhund mit.** Ist der Hund durch die
+   Seitenscheibe zu erkennen, und sitzt er richtig (nicht im Armaturenbrett)?

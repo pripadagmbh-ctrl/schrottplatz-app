@@ -38,6 +38,7 @@ import { MINDEST_FUHRE_KG } from "../src/delivery/customers";
 import { ladeVolumen, NUTZLAST } from "../src/delivery/fuellgrad";
 import { ladungsDichte } from "../src/materials/schuettdichte";
 import { pruefKunde, fuhrenAbweichung, erwarteteDichte, PRUEF_STOER } from "./pruefkunde";
+import { AUSSEHEN_NEUTRAL } from "../src/delivery/aussehen";
 
 /**
  * Wie weit darf es auseinanderliegen? Ein Prozent.
@@ -158,6 +159,8 @@ describe("Kundenprofil: die Fuhre stimmt in sich", () => {
       contaminantShare: 0.06,
       hardness: 1,
       greeting: "",
+      // Das Aussehen ist hier belanglos; die Fuhre ist der Gegenstand.
+      aussehen: AUSSEHEN_NEUTRAL,
     };
     const ab = fuhrenAbweichung(falsch);
     expect(ab, `Abweichung ${(ab * 100).toFixed(0)} %`).toBeGreaterThan(0.15);

@@ -27,6 +27,7 @@ import {
   LADUNG_UEBERSTAND,
   type Aufbau,
 } from "../src/delivery/fuellgrad";
+import { AUSSEHEN_NEUTRAL } from "../src/delivery/aussehen";
 
 beforeAll(async () => {
   await initPhysics();
@@ -46,6 +47,11 @@ function kunde(over: Partial<CustomerProfile>): CustomerProfile {
     contaminantShare: 0.06,
     hardness: 1,
     greeting: "",
+    /*
+     * Neutrale Figur (`aussehen.ts`). Prueflaeufe messen nicht das
+     * Aussehen, und eine gewuerfelte Statur wuerde hier nur streuen.
+     */
+    aussehen: AUSSEHEN_NEUTRAL,
     ...over,
   };
 }

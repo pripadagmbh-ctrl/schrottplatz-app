@@ -27,6 +27,7 @@ import { STATIC_OBSTACLES } from "../src/world/obstacles";
 import { EventBus } from "../src/core/events";
 import { ladeVolumen, type Fahrzeugart } from "../src/delivery/fuellgrad";
 import { ladungsDichte } from "../src/materials/schuettdichte";
+import { AUSSEHEN_NEUTRAL } from "../src/delivery/aussehen";
 
 function kunde(sortenrein: string | null, kind: DeliveryKind): CustomerProfile {
   // Die vier Ladefelder fehlten hier; gemeldet von der Typpruefung fuer
@@ -46,6 +47,11 @@ function kunde(sortenrein: string | null, kind: DeliveryKind): CustomerProfile {
     contaminantShare: 0.06,
     hardness: 1,
     greeting: "",
+    /*
+     * Neutrale Figur (`aussehen.ts`). Prueflaeufe messen nicht das
+     * Aussehen, und eine gewuerfelte Statur wuerde hier nur streuen.
+     */
+    aussehen: AUSSEHEN_NEUTRAL,
   };
 }
 
