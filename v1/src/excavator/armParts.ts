@@ -48,6 +48,28 @@ export const AUSLEGER_H_FUSS = 0.62;
  */
 export const AUSLEGER_H_KOPF = 0.44;
 
+/**
+ * DER AUSLEGERFUSS — die beiden Laschen am Drehpunkt, in Zahlen.
+ *
+ * Sie standen bis zum 15.09.2026 als nackte Argumente in `auslegerStahl`
+ * (`laschenpaar(0, 0, 0.245, AUSLEGER_H_FUSS * 0.42, 0.06)`). Jetzt stehen sie
+ * hier, weil ein ZWEITES Bauteil sie braucht: der Auslegerbock auf dem
+ * Oberwagen (E-050) muss wissen, wie breit der Fuß ist, den er zwischen seine
+ * Wangen nimmt, und wie groß dessen Lasche ist, die in sein Lagerauge sitzt.
+ * Die Maße sind unverändert; sie haben nur einen Namen bekommen.
+ */
+export const AUSLEGER_FUSS = {
+  /** Halber Wangenabstand der beiden Fußlaschen (m). */
+  halb: 0.245,
+  /** Dicke einer Fußlasche (m). */
+  dicke: 0.06,
+  /** Radius einer Fußlasche (m) = halbe Bauhöhe des Kastens am Fuß. */
+  r: AUSLEGER_H_FUSS * 0.42,
+} as const;
+
+/** Äußerste Fläche des Auslegerfußes (m) — dort endet der Arm in der Breite. */
+export const AUSLEGER_FUSS_AUSSEN = AUSLEGER_FUSS.halb + AUSLEGER_FUSS.dicke / 2;
+
 /** Breite des Stielkastens (m) — unverändert. */
 export const STIEL_BREITE = 0.32;
 /** Höhe des Stielkastens am Fuß (m) — unverändert (Kollider 2 × 0,225). */
@@ -210,7 +232,7 @@ export function auslegerStahl(
 ): THREE.BufferGeometry {
   const teile: THREE.BufferGeometry[] = [
     // 2 Fußlaschen mit Bolzen — der Auslegerdrehpunkt selbst
-    ...laschenpaar(0, 0, 0.245, AUSLEGER_H_FUSS * 0.42, 0.06),
+    ...laschenpaar(0, 0, AUSLEGER_FUSS.halb, AUSLEGER_FUSS.r, AUSLEGER_FUSS.dicke),
     // 2 Kopflaschen mit Bolzen — das Stielgelenk
     ...laschenpaar(laenge, 0, 0.2, AUSLEGER_H_KOPF * 0.46, 0.055),
     // 2 Lagerböcke für den Stielzylinder, oben auf dem Kasten

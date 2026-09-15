@@ -1,4 +1,6 @@
 import * as THREE from "three";
+import { mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { AUSLEGER_FUSS, AUSLEGER_FUSS_AUSSEN } from "./armParts";
 import { verschmelze } from "./bauteile";
 import { drehkranzDeckel, PLATTE_UNTEN } from "./drehkranzParts";
 
@@ -351,6 +353,301 @@ function hubLagerboecke(anker: Array<[number, number, number]>): THREE.BufferGeo
   return teile;
 }
 
+/* ------------------------------------------------------ DER AUSLEGERBOCK */
+
+/**
+ * DER AUSLEGERBOCK (E-050) — das Gelenk, an dem die ganze Last hängt.
+ *
+ * BEFUND vom 15.09.2026 (Patrick am Gerät: „Keine Verbindung des Arms am
+ * Turm"), nachgemessen mit `npx vite-node tools/auslegerbock.ts`: Der tiefste
+ * Punkt des Auslegerfußes liegt auf y 2,691 über Grund, das nächste Bauteil
+ * darunter ist die Deckplatte auf y 1,955. Dazwischen standen über die ganze
+ * Breite **0,736 m nichts**. Der Arm schwebte über dem Aufbau.
+ *
+ * WAS HIER GEBAUT WIRD, Teil für Teil wie am Vorbild (Umschlagmaschine):
+ *   zwei LAGERWANGEN aus dickem Blech, auf die Deckplatte geschweißt,
+ *   dazwischen der Auslegerfuß, ein durchgehender BOLZEN mit SICHERUNG,
+ *   dazu Schmiernippel, zwei Querbleche und die Fußflansche der Wangen.
+ *
+ * DER DREHPUNKT WANDERT NICHT. Die Achse des Lagerauges wird von außen
+ * hereingereicht (`oberwagenStahl(hubAnker, bockAchse)`) und kommt in
+ * `excavator.ts` aus `BOOM_PIVOT` selbst — es gibt keine zweite Zahl, die
+ * auseinanderlaufen könnte. `test/auslegerbock.test.ts` prüft es zusätzlich an
+ * der gebauten Maschine.
+ *
+ * DIE BREITE ist von beiden Seiten eingeklemmt und deshalb gemessen, nicht
+ * geschätzt (alle Werte im Oberwagen-Frame, Ursprung y 1,60):
+ *
+ *   0,275  äußere Fläche der Auslegerfußlasche  (`AUSLEGER_FUSS_AUSSEN`)
+ *   0,305  Innenfläche der Wange                 → 30 mm Luft zum Arm
+ *   0,365  Außenfläche der Wange                 (60 mm Blech)
+ *   0,385  Außenfläche des Lagerauges
+ *   0,405  Bolzenende
+ *   0,443  äußerster Punkt (Kopf der Sicherungsschraube)
+ *   0,490  nächster Punkt der KABINE im Bockfenster — gemessen
+ *
+ * Es bleiben also 47 mm zur Kabine und 30 mm zum Arm. Beide Zahlen sind das
+ * Ergebnis der Abtastung, nicht ihre Vorgabe.
+ */
+export const BOCK = {
+  /** Innenfläche einer Lagerwange (m). 30 mm Luft zum Auslegerfuß. */
+  xInnen: AUSLEGER_FUSS_AUSSEN + 0.03,
+  /** Dicke des Wangenblechs (m). SW: so dick wie der Auslegerfuß selbst. */
+  dicke: 0.06,
+  /**
+   * Radius des Lagerauges (m). 40 mm größer als die Fußlasche des Auslegers
+   * (0,260) — nur dadurch SITZT der Fuß sichtbar IM Bock, statt daneben.
+   */
+  augeR: AUSLEGER_FUSS.r + 0.04,
+  /** Dicke des Lagerauges (m) — es steht 20 mm über die Wange hinaus. */
+  augeDicke: 0.08,
+  /** Radius des durchgehenden Bolzens (m). Fußbolzen des Auslegers: 0,099. */
+  bolzenR: 0.1,
+} as const;
+
+/** Mitte des Wangenblechs (m) — Bezugsebene für Auge, Flansch und Sicherung. */
+const BOCK_X_MITTE = BOCK.xInnen + BOCK.dicke / 2;
+/** Außenfläche des Lagerauges (m). */
+const BOCK_X_AUGE = BOCK.xInnen + BOCK.augeDicke;
+/** Ende des Bolzens (m) — er steht 20 mm über das Auge hinaus. */
+const BOCK_X_BOLZEN = BOCK_X_AUGE + 0.02;
+
+/**
+ * Der UMRISS einer Lagerwange in der y-z-Ebene, gegen den Drehpunkt gerechnet.
+ *
+ * Jede Zahl hat eine Kante, an die sie stößt:
+ *   hinten  z −0,14  →  10 mm vor der Vorderwand der Motorhaube (`HAUBE_VORN`
+ *                       = −0,15); weiter hinten stünde die Wange in der Haube.
+ *   vorn    z  1,05  →  die Lotrechte über dem Fuß des rechten und linken
+ *                       HUBZYLINDERS. Der erste Entwurf reichte bis 1,20 und
+ *                       wurde gemessen verworfen: Das Zylinderrohr streifte die
+ *                       vordere Ecke des Fußflansches um 9 mm (bei 47°
+ *                       Auslegerwinkel, `tools/auslegerbock.ts`). Mit 1,05
+ *                       bleiben dort 0,10 m.
+ *   oben    y  1,35  →  die Achse selbst; die Oberkante des Blechs liegt auf
+ *                       Achshöhe, darüber schaut nur noch das runde Auge
+ *                       heraus. Genau so sieht ein Auslegerbock aus.
+ *   Kante oben  z 0,35 … 0,75  →  der HALS, 0,40 m breit. Er ist SCHMALER als
+ *                       das Lagerauge (0,60 m): Das Auge tritt zu beiden Seiten
+ *                       0,10 m hervor und liest sich dadurch als runder Kopf.
+ *                       Im ersten Entwurf war der Hals genau so breit wie das
+ *                       Auge — im Riss ergab das eine glatte Kuppe, an der man
+ *                       das Lager nicht mehr fand.
+ *   Schulter y 0,85  →  Mitte zwischen Deck (0,355) und Achse (1,35); dort
+ *                       knickt der Umriss von der breiten Basis in den
+ *                       schmalen Hals. Ohne den Knick liest sich die Wange als
+ *                       Dreieck statt als Schweißteil.
+ */
+/** Vorderkante des Bockfußes (m) — über dem Fuß der Hubzylinder, siehe oben. */
+const BOCK_Z_VORN = 1.05;
+/** Hinterkante des Bockfußes (m) — 10 mm vor der Motorhaube. */
+const BOCK_Z_HINTEN = HAUBE_VORN + 0.01;
+/** Halbe Breite des Halses (m) — zwei Drittel des Lagerauges. */
+const BOCK_HALS = 0.2;
+/** Halbe Breite der Wange auf Schulterhöhe (m). */
+const BOCK_SCHULTER = 0.34;
+
+function bockUmriss(yAuge: number, zAuge: number): Array<[number, number]> {
+  const yDeck = DECK_OBEN;
+  const ySchulter = (yDeck + yAuge) / 2;
+  return [
+    [BOCK_Z_HINTEN, yDeck],
+    [BOCK_Z_VORN, yDeck],
+    [zAuge + BOCK_SCHULTER, ySchulter],
+    [zAuge + BOCK_HALS, yAuge],
+    [zAuge - BOCK_HALS, yAuge],
+    [zAuge - BOCK_SCHULTER, ySchulter],
+  ];
+}
+
+/**
+ * Ein Blech, dessen Umriss in der y-z-Ebene liegt und das in x ausgezogen ist.
+ *
+ * `ExtrudeGeometry` baut in der x-y-Ebene und zieht nach +z aus. Die Drehung um
+ * −90° um Y legt den Umriss in die y-z-Ebene der Maschine: (u, v, d) wird zu
+ * (−d, v, u), also u → z, v → y, Dicke → x.
+ */
+function blechInYZ(umriss: Array<[number, number]>, xMitte: number, dicke: number): THREE.BufferGeometry {
+  const form = new THREE.Shape();
+  form.moveTo(umriss[0]![0], umriss[0]![1]);
+  for (let i = 1; i < umriss.length; i++) form.lineTo(umriss[i]![0], umriss[i]![1]);
+  form.closePath();
+  const roh = new THREE.ExtrudeGeometry(form, { depth: dicke, bevelEnabled: false });
+  /*
+   * `ExtrudeGeometry` liefert als einzige Form hier ein UNINDIZIERTES Netz;
+   * `mergeGeometries` verlangt aber, dass alle Teile denselben Aufbau haben —
+   * entweder alle mit Index oder alle ohne. `mergeVertices` indiziert es.
+   * (Ohne diesen Schritt bricht der Bau des ganzen Oberwagens ab; gemessen
+   * 15.09.2026: „failed with geometry at index 53".)
+   */
+  const g = mergeVertices(roh);
+  g.rotateY(-Math.PI / 2);
+  g.translate(xMitte + dicke / 2, 0, 0);
+  g.computeVertexNormals();
+  return g;
+}
+
+/**
+ * EIN BAUTEIL DES BOCKS — in Maßen, nicht in Dreiecken.
+ *
+ * WARUM ES DIESE ZWISCHENSTUFE GIBT. Ein Freigang lässt sich an einem
+ * verschmolzenen Netz nur noch abtasten, und abtasten heißt raten mit
+ * Rasterweite. An einem Quader, einer Walze und einem Blech mit Umriss
+ * rechnet man den Abstand dagegen EXAKT aus. `tools/auslegerbock.ts` misst
+ * deshalb gegen diese Liste — gegen dieselben Zahlen, aus denen auch die
+ * Dreiecke entstehen. Es gibt keine zweite Beschreibung des Bauteils, die
+ * stillschweigend davonlaufen könnte (der Fehler, den `tools/kabinenhub-bahn.ts`
+ * noch machen musste: dort stehen die Hindernisse ein zweites Mal im Werkzeug).
+ *
+ * Alle Achsen zeigen wie am Bagger: x quer, y hoch, z nach vorn.
+ */
+export type BockTeil =
+  | { art: "quader"; name: string; x: [number, number]; y: [number, number]; z: [number, number] }
+  /** Walze mit Achse in x-Richtung — Lagerauge, Bolzen, Schraubenkopf. */
+  | { art: "walze"; name: string; x: [number, number]; y: number; z: number; r: number }
+  /** Blech: Umriss in der y-z-Ebene (Paare z|y), Dicke in x. */
+  | { art: "blech"; name: string; x: [number, number]; umriss: Array<[number, number]> };
+
+/**
+ * DER AUSLEGERBOCK, Bauteil für Bauteil.
+ *
+ * @param yAuge Höhe der Lagerachse im Oberwagen-Frame (m)
+ * @param zAuge Lage der Lagerachse in Fahrtrichtung (m)
+ */
+export function auslegerbockTeile(yAuge: number, zAuge: number): BockTeil[] {
+  const umriss = bockUmriss(yAuge, zAuge);
+  const ySchulter = (DECK_OBEN + yAuge) / 2;
+  const teile: BockTeil[] = [];
+
+  for (const s of [-1, 1]) {
+    const seite = s < 0 ? "R" : "L"; // −X ist rechts (siehe RAD_ECKEN in excavator.ts)
+    const spanne = (a: number, b: number): [number, number] =>
+      s < 0 ? [-b, -a] : [a, b];
+    teile.push({
+      art: "blech",
+      name: `LAGERWANGE_${seite}`,
+      x: spanne(BOCK.xInnen, BOCK.xInnen + BOCK.dicke),
+      umriss,
+    });
+    // Lagerauge: der runde Kopf der Wange, 20 mm nach außen vorstehend
+    teile.push({
+      art: "walze",
+      name: `LAGERAUGE_${seite}`,
+      x: spanne(BOCK.xInnen, BOCK_X_AUGE),
+      y: yAuge,
+      z: zAuge,
+      r: BOCK.augeR,
+    });
+    /*
+     * Fußflansch: das Blech, mit dem die Wange auf der Deckplatte steht. Er
+     * ist das, was „eingeschweißt" von „danebengestellt" unterscheidet.
+     *
+     * Er steht nur 20 mm je Seite über die Wange hinaus. Mit 40 mm (erster
+     * Entwurf) blieben dem Rohr des Hubzylinders bei 70° Auslegerwinkel nur
+     * 9 mm — gemessen, nicht geschätzt.
+     */
+    teile.push({
+      art: "quader",
+      name: `WANGENFLANSCH_${seite}`,
+      x: spanne(BOCK_X_MITTE - (BOCK.dicke + 0.04) / 2, BOCK_X_MITTE + (BOCK.dicke + 0.04) / 2),
+      y: [DECK_OBEN, DECK_OBEN + 0.03],
+      z: [BOCK_Z_HINTEN, BOCK_Z_VORN],
+    });
+    /*
+     * BOLZENSICHERUNG: ein Flachstahl über dem Bolzenende, mit zwei Schrauben
+     * an das Lagerauge geschraubt. Ohne sie wäre der Bolzen nur ein Zapfen.
+     */
+    teile.push({
+      art: "quader",
+      name: `BOLZENSICHERUNG_${seite}`,
+      x: spanne(BOCK_X_BOLZEN, BOCK_X_BOLZEN + 0.023),
+      y: [yAuge - 0.15, yAuge + 0.15],
+      z: [zAuge - 0.045, zAuge + 0.045],
+    });
+    for (const dy of [-0.12, 0.12]) {
+      teile.push({
+        art: "walze",
+        name: `SICHERUNGSSCHRAUBE_${seite}`,
+        x: spanne(BOCK_X_BOLZEN + 0.023, BOCK_X_BOLZEN + 0.038),
+        y: yAuge + dy,
+        z: zAuge,
+        r: 0.024,
+      });
+    }
+    // Schmiernippel am Lagerauge — an jedem Bolzen sitzt einer
+    teile.push({
+      art: "walze",
+      name: `SCHMIERNIPPEL_${seite}`,
+      x: spanne(BOCK_X_AUGE, BOCK_X_AUGE + 0.04),
+      y: yAuge + 0.21,
+      z: zAuge,
+      r: 0.02,
+    });
+  }
+
+  /*
+   * DER DURCHGEHENDE BOLZEN. Er gehört zum Bock, nicht zum Ausleger: Am
+   * Vorbild ist er gegen den Bock gesichert, und der Arm dreht sich auf ihm.
+   * Mit r = 0,10 umschließt er den (unveränderten) Fußbolzen des Auslegers
+   * (r = 0,099) vollständig — es ist also kein zweiter Bolzen zu sehen.
+   *
+   * Er ist das EINZIGE Teil des Bocks, das den Arm berühren DARF: Er steckt in
+   * dessen Bohrung. `tools/auslegerbock.ts` nimmt ihn deshalb von der
+   * Freigangsmessung aus, und nur ihn.
+   */
+  teile.push({
+    art: "walze",
+    name: "BOLZEN",
+    x: [-BOCK_X_BOLZEN, BOCK_X_BOLZEN],
+    y: yAuge,
+    z: zAuge,
+    r: BOCK.bolzenR,
+  });
+
+  /*
+   * ZWEI QUERBLECHE zwischen den Wangen, vorn und hinten. Sie schließen den
+   * Bock zu einem U — von schräg hinten sieht man sonst zwischen den Wangen
+   * hindurch auf das Deck. Beide enden auf Schulterhöhe und bleiben damit
+   * innerhalb des Wangenumrisses; der Arm streicht nur durch die Kreisscheibe
+   * r ≤ 0,31 um den Drehpunkt, also weit darüber.
+   */
+  for (const [name, zMitte] of [["QUERBLECH_HINTEN", 0.13], ["QUERBLECH_VORN", 0.79]] as const) {
+    teile.push({
+      art: "quader",
+      name,
+      x: [-BOCK.xInnen, BOCK.xInnen],
+      y: [DECK_OBEN, ySchulter],
+      z: [zMitte - 0.07, zMitte + 0.07],
+    });
+  }
+
+  return teile;
+}
+
+/** Aus einem Maß ein Netzteil machen. */
+function bockForm(t: BockTeil): THREE.BufferGeometry {
+  const mitte = (a: [number, number]): number => (a[0] + a[1]) / 2;
+  if (t.art === "blech") return blechInYZ(t.umriss, mitte(t.x), t.x[1] - t.x[0]);
+  if (t.art === "walze") {
+    const seiten = t.r > 0.05 ? 16 : 6; // Schraubenköpfe und Nippel sind Sechskant
+    const g = new THREE.CylinderGeometry(t.r, t.r, t.x[1] - t.x[0], seiten);
+    g.rotateZ(Math.PI / 2);
+    g.translate(mitte(t.x), t.y, t.z);
+    return g;
+  }
+  const g = new THREE.BoxGeometry(t.x[1] - t.x[0], t.y[1] - t.y[0], t.z[1] - t.z[0]);
+  g.translate(mitte(t.x), mitte(t.y), mitte(t.z));
+  return g;
+}
+
+/**
+ * Der Auslegerbock als Netzteile — er liegt im Stahl-Netz des Oberwagens und
+ * kostet deshalb KEINEN zusätzlichen Zeichenruf.
+ */
+export function auslegerbock(yAuge: number, zAuge: number): THREE.BufferGeometry[] {
+  return auslegerbockTeile(yAuge, zAuge).map(bockForm);
+}
+
 /** Das LACK-Netz des Oberwagens (grün). */
 export function oberwagenLack(): THREE.BufferGeometry {
   return verschmelze(
@@ -363,7 +660,11 @@ export function oberwagenLack(): THREE.BufferGeometry {
  * Das STAHL-Netz des Oberwagens (anthrazit) — es heißt weiter `04_DREHKRANZ`,
  * weil der Drehkranzdeckel darin steckt.
  */
-export function oberwagenStahl(hubAnker: Array<[number, number, number]>): THREE.BufferGeometry {
+export function oberwagenStahl(
+  hubAnker: Array<[number, number, number]>,
+  bockAchse: { y: number; z: number },
+  ohneBock = false
+): THREE.BufferGeometry {
   return verschmelze(
     [
       drehkranzDeckel(DECK_B, DECK_T, DECK_OBEN),
@@ -372,6 +673,7 @@ export function oberwagenStahl(hubAnker: Array<[number, number, number]>): THREE
       ...gelaender(),
       ...auspuff(),
       ...hubLagerboecke(hubAnker),
+      ...(ohneBock ? [] : auslegerbock(bockAchse.y, bockAchse.z)),
     ],
     "Oberwagen-Stahl"
   );

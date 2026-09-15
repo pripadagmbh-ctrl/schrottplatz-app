@@ -860,8 +860,14 @@ export class Excavator {
      * Das Stahl-Netz heißt weiter `04_DREHKRANZ`: Darin steckt der
      * Drehkranzdeckel, und die Deckplatte des Oberwagens gehört dazu.
      */
+    /*
+     * Die Achse des AUSLEGERBOCKS (E-050) kommt aus `BOOM_PIVOT` selbst, nur
+     * in den Frame des Oberwagens umgerechnet (dessen Ursprung liegt auf
+     * y 1,60). So gibt es keine zweite Zahl für den Drehpunkt, die davonlaufen
+     * könnte: Wer BOOM_PIVOT ändert, verschiebt den Bock mit.
+     */
     const deck = new THREE.Mesh(
-      oberwagenStahl([HUB_FUSS_R, HUB_FUSS_L]),
+      oberwagenStahl([HUB_FUSS_R, HUB_FUSS_L], { y: BOOM_PIVOT.y - 1.6, z: BOOM_PIVOT.z }),
       dark
     );
     deck.castShadow = true;
