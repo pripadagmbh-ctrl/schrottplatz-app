@@ -386,6 +386,27 @@ const KOLLIDER_REIHEN = 1;
 const KOLLIDER_ABSTAND = 0.30; // rad — Seitenversatz der aeusseren Kollider-Reihen
 
 const SCHNAPP_AB = 0.93;
+/**
+ * Rechnet der Bodenanschlag gegen den GANZEN Schliessweg (true) oder gegen die
+ * Momentanstellung der Schalen (false)? — E-046, 15.09.2026.
+ *
+ * Die eine Zeile zum Zurueckdrehen. Was daran haengt:
+ *
+ * Die geschlossene Kralle reicht 2,95 m tief, die offene nur 2,44 m
+ * (`clawGeometry`, mit Zahnkegel). Wer gegen die Momentanstellung rechnet,
+ * setzt die offene Spinne so tief ab, dass sie beim Zudruecken in den Beton
+ * geraten wuerde — also hebt der Anschlag den Arm waehrend des Schliessens
+ * nach. Gemessen (kopflos, Arm abgesetzt, dann zupacken): Die Spinne steigt
+ * dabei um **0,548 m** und wandert 0,513 m zur Seite. Sie zieht sich in genau
+ * den Bildern unter dem Teil weg, in denen sie zufassen soll.
+ *
+ * Mit `true` steht der Anschlag ueber den ganzen Weg fest: `CLAW_MAX_DEPTH`,
+ * die groesste Tiefe, die ein gezeichneter Krallenpunkt in IRGENDEINER
+ * Stellung erreicht. Der Preis ist bekannt und gewollt (Ansage Patrick
+ * 15.09.2026): Die offene Spinne haengt beim Absetzen rund 0,56 m hoeher —
+ * dafuer steht sie still, waehrend sie greift.
+ */
+const BODEN_UEBER_SCHLIESSWEG = true;
 /** Bis hierher gilt eine Kralle als am Teil anliegend (m) */
 const KONTAKT_NAH = 0.14;
 /** So tief duerfen die Spitzen in Material beissen, bevor der Arm anhaelt (m) */
@@ -2143,7 +2164,7 @@ export class Excavator {
     // Spitzentiefe direkt aus der Krallengeometrie — so bleibt der Bodenanschlag
     // richtig, auch wenn sich Form oder Öffnungswinkel ändern.
     const splay = this.currentSplay();
-    const tipDepth = clawTipDepth(splay);
+    const tipDepth = BODEN_UEBER_SCHLIESSWEG ? CLAW_MAX_DEPTH : clawTipDepth(splay);
     // Gemessene Fläche statt angenommener Ebene: darauf setzt die Spinne auf.
     const flaeche = this.surfaceUnderClaws(splay);
     // tipY() rechnet ab der Maschinenbasis; steht die Maschine aufgebockt,

@@ -18,7 +18,28 @@ import {
  * Abrutschen (8 %/s unter Last) kommt in M1 — M0 hält, was gegriffen ist.
  */
 
-const MAX_ITEMS = 5; // (SW)
+/**
+ * Notnagel gegen Ausreisser — KEIN Auswahlmittel mehr (E-045, 15.09.2026).
+ *
+ * Bis heute stand hier 5, und weil `candidates` nach Gewicht sortiert war,
+ * entschied der Deckel mit: Im dichten Nest aus Kleinteilen erfuellten 7 bis
+ * 12 Koerper die Greifbedingung, die fuenf schwersten kamen mit, das
+ * anvisierte 8-kg-Teil nie (gemessen: 0 von 5 Versuchen, in JEDEM Bild des
+ * Greiffensters vom vollen Korb abgewiesen).
+ *
+ * Ansage Patrick 15.09.2026: „Worauf du zielst, das bekommst du: Alles
+ * mitnehmen, was in der Spinne liegt und wo der Greifer sich festkrallt oder
+ * was verkantet ist. Nicht nach Gewicht gehen."
+ *
+ * Die Zahl hat jetzt eine gemessene Herkunft statt einer gegriffenen: Im
+ * echten Starthaufen (150 gewuerfelte Teile, drei Saaten) erfuellen je Griff
+ * 2 bis 4 Koerper die Bedingung; im kuenstlich dichten Nest aus lauter
+ * Kleinteilen waren es hoechstens 12. 24 ist das Doppelte des je Gemessenen —
+ * hoch genug, dass der Deckel nie auswaehlt, und niedrig genug, dass ein
+ * Fehler (etwa eine Sensorkugel, die zu gross wird) nicht unbemerkt den
+ * halben Platz anhaengt. Die echte Grenze ist das Gewicht, siehe unten.
+ */
+const MAX_ITEMS = 24;
 const MAX_TOTAL_KG = 3500; // (SW) — eine ganze Karosse muss hochgehen
 // Greif-Fenster: solange die Spinne schließt und noch nicht ganz zu ist, wird
 // kontinuierlich zugepackt — so lassen sich fallende Objekte auffangen.
@@ -311,19 +332,45 @@ export class GripSystem {
     }
   }
 
+  /**
+   * Wie viele Koerper beim letzten Zupacken die Bedingung erfuellt haben —
+   * unabhaengig davon, wie viele davon Platz fanden.
+   *
+   * Steht hier, weil die Frage „ist der Deckel der Engpass?" sonst nur zu
+   * schaetzen waere: Ein Waechter kann die Zahl abfragen, statt die Bedingung
+   * im Test nachzubauen (Auftrag 15.09.2026).
+   */
+  private letzteKandidatenZahl = 0;
+  get letzteKandidaten(): number {
+    return this.letzteKandidatenZahl;
+  }
+
   private tryGrab(sensorPos: THREE.Vector3): void {
     // Liegt eine abreißbare Baugruppe im Greifbereich, hat sie Vorrang: Wer
     // einen Motor herausreißen will, soll nicht stattdessen das Blech davor
     // fassen, das dann alles Weitere blockiert (Design-Fix 02.09.2026).
     if (this.partResolver?.(sensorPos)) return;
-    const candidates: RAPIER.RigidBody[] = [];
+    /**
+     * Kandidat mit Haltwert: wie sicher die Spinne ihn hat.
+     *
+     * 2 = der Schwerpunkt liegt im Korb, das Teil liegt also wirklich drin.
+     * 1 = es ist zwischen den Schalen gefasst oder verkantet, haengt aber mit
+     * der Masse ausserhalb. Feinunterschied: wie weit der naechste Punkt
+     * seiner Oberflaeche von der Sensormitte entfernt ist.
+     *
+     * Beides faellt im Durchlauf unten ohnehin an — die Ordnung kostet keine
+     * einzige zusaetzliche Abfrage.
+     */
+    const candidates: Array<{ body: RAPIER.RigidBody; halt: number }> = [];
     this.world.intersectionsWithShape(
       { x: sensorPos.x, y: sensorPos.y, z: sensorPos.z },
       { x: 0, y: 0, z: 0, w: 1 },
       this.sensorShape,
       (collider) => {
         const body = collider.parent();
-        if (body && body.isDynamic() && !candidates.includes(body)) {
+        if (body && body.isDynamic() && !candidates.some((k) => k.body.handle === body.handle)) {
+          /** Abstand des naechsten Oberflaechenpunkts zur Sensormitte (m) */
+          let abstand = SENSOR_RADIUS;
           // Nur fassen, was wirklich zwischen den Schalen liegt. Geprüft wird
           // der nächstgelegene Punkt der Oberfläche, nicht der Schwerpunkt:
           // bei einem Auto liegt der in der Fahrzeugmitte und damit nie im
@@ -336,7 +383,10 @@ export class GripSystem {
             if (!proj) return true;
             this.probe.set(proj.point.x, proj.point.y, proj.point.z);
             if (!this.insideGrapple(this.probe)) return true;
+            abstand = this.probe.distanceTo(sensorPos);
           }
+          /** wie sicher die Spinne das Teil hat — siehe oben */
+          let halt = 1 - Math.min(abstand / SENSOR_RADIUS, 1) * 0.5;
           /*
            * Kontaktbedingung: Eine Kiste, die mit einer Ecke in den Korb
            * ragt, bestand die Pruefung oben — und hing dann halb neben der
@@ -353,18 +403,34 @@ export class GripSystem {
               this.insideGrapple?.(this.probe.set(mitte.x, mitte.y, mitte.z)) ?? false;
             const noetig = mittig ? 0 : this.noetigeKrallen(body);
             if (noetig > 0 && this.krallenKontakte(body) < noetig) return true;
+            if (mittig) halt += 1;
           }
-          candidates.push(body);
+          candidates.push({ body, halt });
         }
         return true; // weitersuchen
       }
     );
 
-    // Schwerstes zuerst greifen — wer in einen Haufen greift, bekommt das große Teil sicher.
-    candidates.sort((a, b) => b.mass() - a.mass());
+    /*
+     * NICHT nach Gewicht (E-045, Ansage Patrick 15.09.2026: „Worauf du zielst,
+     * das bekommst du … Nicht nach Gewicht gehen.").
+     *
+     * Hier stand `candidates.sort((a, b) => b.mass() - a.mass())` mit der
+     * Begruendung „wer in einen Haufen greift, bekommt das grosse Teil
+     * sicher". Zusammen mit dem Deckel von fuenf Stueck hiess das: Das
+     * anvisierte Kleinteil lag im Korb, erfuellte die Bedingung — und wurde
+     * von schwereren Nachbarn verdraengt (gemessen 0 von 5).
+     *
+     * Sortiert wird jetzt danach, wie sicher das Teil gehalten wird. Das
+     * entscheidet nichts mehr darueber, WAS mitkommt (es kommt alles mit),
+     * sondern nur noch, wen die Traglastgrenze abschneidet, wenn sie greift:
+     * Dann bleibt liegen, was ohnehin am lockersten sass.
+     */
+    candidates.sort((a, b) => b.halt - a.halt);
 
+    this.letzteKandidatenZahl = candidates.length;
     let added = 0;
-    for (const body of candidates) {
+    for (const { body } of candidates) {
       if (this.attachBody(body)) added++;
     }
     if (added > 0) this.onGrabbed?.(this.grippedBodies);

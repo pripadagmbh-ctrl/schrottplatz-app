@@ -2800,3 +2800,126 @@ Ursache der verbleibenden Fehlgriffe.
    liegen zwei Wege bereit.
 3. Gegenprobe: nur an die **Kante** einer großen Kiste fahren und zupacken. Sie
    darf **nicht** mitkommen.
+
+### E-045 — Worauf du zielst, das bekommst du: die Auswahl geht nicht mehr nach Gewicht (15.09.2026)
+
+**Entscheidung.** `candidates.sort((a, b) => b.mass() - a.mass())` fällt weg. Es
+kommt **alles** mit, was die Greifbedingung erfüllt — was im Korb liegt, was von
+den Schalen gefasst ist, was verkantet ist. `MAX_ITEMS` steigt von **5 auf 24**
+und ist damit kein Auswahlmittel mehr, sondern ein Notnagel. Sortiert wird nur
+noch danach, **wie sicher ein Teil gehalten wird** (Schwerpunkt im Korb schlägt
+„nur gefasst", Feinunterschied: Abstand zur Sensormitte); das entscheidet nichts
+darüber, *was* mitkommt, sondern nur, wen die Traglastgrenze abschneidet, wenn
+sie greift. `MAX_TOTAL_KG` (3.500 kg) bleibt unangetastet — das ist
+Tragfähigkeit, keine Auswahl.
+
+**Begründung.** Ansage Patrick 15.09.2026: „Worauf du zielst, das bekommst du:
+Alles mitnehmen, was in der Spinne liegt und wo der Greifer sich festkrallt oder
+was verkantet ist. **Nicht nach Gewicht gehen.**" Der offene Punkt aus E-043 ist
+damit entschieden, und die Messung dazu war eindeutig: Im dichten Nest erfüllten
+**7 bis 12** Körper je Griff die Bedingung, fünf hatten Platz, die fünf
+schwersten bekamen ihn.
+
+| Zielteil, dichtes Nest (30 Nachbarn je 20–50 kg) | vorher | nachher |
+|---|---|---|
+| Kleinteil 0,10 m, 8 kg | 0 von 5 | **5 von 5** |
+| Messingarmatur 0,30 m, 15 kg | 0 von 5 | **5 von 5** |
+| Motorblock 0,40 m, 110 kg | 4 von 5 | **5 von 5** |
+| Kleinteil im normalen Haufen, 0,40 m daneben | 2 von 5 | **5 von 5** |
+
+**Der Kommentar „wer in einen Haufen greift, bekommt das große Teil sicher" ist
+damit überholt** und steht nicht mehr im Code. Wer blind hineinlangt, bekommt
+jetzt, was wirklich zwischen den Schalen liegt — auch das Kleine.
+
+**Woher die 24 kommt.** Gemessen, nicht gegriffen: Im **echten** Starthaufen
+(`spawnPile`, 150 gewürfelte Teile mit den Formen des Objektkatalogs, drei
+Saaten) erfüllen je Griff nur **2 bis 4** Körper die Bedingung — es kommen 2 bis
+4 Teile mit, 160 bis 250 kg. Echter Schrott ist größer als ein 25-cm-Würfel, es
+passt schlicht weniger in den Korb. Nur im künstlich dichten Nest aus lauter
+Kleinteilen waren es bis zu 12. 24 ist das Doppelte des je Gemessenen: hoch
+genug, dass der Deckel nie auswählt, niedrig genug, dass ein künftiger Fehler
+nicht unbemerkt den halben Platz anhängt.
+
+**Verworfene Alternative.** Den Deckel ganz streichen (dann gäbe es gegen einen
+Fehler in der Sensorkugel keine Bremse mehr); den Deckel bei 5 lassen und nur
+das anvisierte Teil vorziehen (wäre wieder eine Auswahl, nur eine andere — und
+Patricks Ansage sagt ausdrücklich „alles mitnehmen").
+
+**Abnahmekriterium.** `npm test` grün: **74 Dateien, 840 Tests**, darunter drei
+neue Wächter in `test/greifhaufen.test.ts` („nimmt das leichte Teil mit",
+„der Deckel wählt nicht mehr aus", „die Physik bleibt ruhig") und einer am
+echten Starthaufen („es kommt kein halber Haufen mit": höchstens 8 Teile je
+Griff, gemessen 2 bis 4). Mit zurückgesetzter Auswahl sind alle drei rot.
+Gemessen bleibt der schnellste lose Körper bei 6–7,5 m/s (Spieldeckel 28),
+keiner sackt durch den Beton, ein gefasstes Teil wandert höchstens 0,030 m
+(Saug-Schwelle 0,05).
+
+**Auf dem Gerät zu prüfen.**
+
+1. In eine **dichte** Stelle greifen, in der ein kleines Teil zwischen großen
+   liegt: Kommt das Kleine jetzt mit?
+2. Wie voll fühlt sich ein Griff an? Es hängt **mehr** in der Spinne als vorher
+   — ist das die Handvoll, die man erwartet, oder zu viel?
+3. Gegenprobe: nur an die **Kante** einer großen Kiste fahren. Sie darf weiter
+   **nicht** mitkommen.
+
+### E-046 — Der Bodenanschlag rechnet über den ganzen Schließweg (15.09.2026)
+
+**Entscheidung.** `resolveGroundClamp` nimmt nicht mehr die Spitzentiefe der
+**Momentanstellung** (`clawTipDepth(currentSplay())`), sondern die größte Tiefe
+über den **ganzen** Schließweg (`CLAW_MAX_DEPTH`). Eine Zeile zum Zurückdrehen:
+`BODEN_UEBER_SCHLIESSWEG` in `excavator.ts`.
+
+**Begründung.** Die geschlossene Kralle reicht 2,95 m tief, die offene nur
+2,44 m. Wer gegen die Momentanstellung rechnet, setzt die offene Spinne so tief
+ab, dass sie beim Zudrücken in den Beton geriete — also **hob der Anschlag den
+Arm während des Schließens nach**. Gemessen am kopflosen Bagger:
+
+| beim Zupacken | vorher | nachher |
+|---|---|---|
+| Spinne steigt | **0,548 m** | **0,000 m** |
+| Spinne wandert zur Seite | **0,513 m** | **0,000 m** |
+| Höhe der Spinnenmitte beim Absetzen | 2,461 m | 3,012 m |
+| Spitzen der **offenen** Spinne über dem Beton | 0,018 m | **0,570 m** |
+| tiefster Punkt einer Spitze **während** des Griffs | 0,008 m | 0,013 m |
+
+Der Arm zog sich in genau den Bildern unter dem Teil weg, in denen er zufassen
+soll. Jetzt steht er still.
+
+**Der Preis, und er ist sichtbar.** Die **offene** Spinne hängt beim „Aufsetzen"
+gut einen halben Meter über dem Beton — genau den Unterschied zwischen offener
+und tiefster Stellung (0,557 m, gerechnet). Beim Schließen fahren die Schalen
+weiter bis 1,3 cm an den Beton heran, vom Boden aufgenommen wird also
+unverändert alles (`test/greiffenster.test.ts`, sieben Größen von 0,10 m bis
+1,10 m, grün). Aber wer die offene Spinne absetzt, sieht eine Lücke, wo vorher
+die Zähne auflagen. Das ist Patricks Urteil am Gerät; deshalb die eine Zeile.
+
+**Was die Änderung ausdrücklich NICHT bringt.** Die Vermutung aus dem
+E-043-Bericht — das Anheben sei die Ursache der verbleibenden Fehlgriffe am
+Korbrand — ist **gemessen und widerlegt**: über vier Größen und sechs
+Zufallssaaten am Korbrand (0,80 m neben der Achse) **22 von 24 vorher, 21 von 24
+nachher**, also gleich innerhalb der Streuung. Die letzten Fehlgriffe kommen
+nicht vom steigenden Arm, sondern davon, dass die schließende Schale ein
+leichtes Teil am Rand auch mal aus dem Korb schiebt, bevor sie es fasst. Wer
+daran etwas ändern will, muss an der Schale ansetzen, nicht am Anschlag — und
+das wäre ein eigener Schritt.
+
+**Verworfene Alternative.** Den vollen Anschlag nur während des Schließens
+gelten lassen (dann steht die offene Spinne wieder am Boden — aber der Arm
+springt im Moment des Zupackens um dieselben 0,55 m, also genau der Fehler);
+`surfaceUnderClaws` ebenfalls auf die tiefste Stellung umstellen (unnötig, der
+Messkreis unter den Krallen hat mit der Tiefe nichts zu tun).
+
+**Abnahmekriterium.** `npm test` grün: **75 Dateien, 843 Tests**, darunter
+`test/bodenanschlag.test.ts` mit drei Prüfungen (Hub < 0,05 m; die Spitzen
+kommen beim Schließen trotzdem bis 5 cm an den Beton; der halbe Meter
+Absetzhöhe steht als Zahl im Wächter). Mit `BODEN_UEBER_SCHLIESSWEG = false`
+sind zwei davon rot, mit den gemessenen Zahlen 0,548 m und 0,018 m.
+
+**Auf dem Gerät zu prüfen.**
+
+1. Arm absetzen und zupacken: Bleibt die Spinne jetzt **stehen**, statt beim
+   Zudrücken hochzugehen? Das ist die eigentliche Frage.
+2. Offene Spinne auf den Beton absetzen und hinsehen: Der halbe Meter Luft
+   unter den Zähnen — stört er, oder fällt er nicht auf?
+3. Ein flaches Teil (Blech) vom Beton aufnehmen: Kommt es weiter mit?
