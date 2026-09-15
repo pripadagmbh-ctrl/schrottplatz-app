@@ -112,7 +112,28 @@ export const KATALOG_SPECS: PileSpec[] = [
   { materialId: "steel", massKg: 40, kind: "box", dims: [1.45, 0.35, 2.05], bau: "rahmenbox", name: "Doppelbett-Gestell" },
   { materialId: "wood", massKg: 48, kind: "box", dims: [0.95, 0.45, 2.0], bau: "stapel", name: "Lattenrost-Stapel" },
   { materialId: "plastic", massKg: 55, kind: "box", dims: [1.4, 0.7, 2.0], bau: "stapel", name: "Matratzenstapel" },
-  { materialId: "plastic", massKg: 70, kind: "box", dims: [2.1, 0.9, 0.95], bau: "moebel", name: "Sofa (Dreisitzer)", zusammensetzung: [{ materialId: "plastic", anteil: 0.55 }, { materialId: "wood", anteil: 0.3 }, { materialId: "steel", anteil: 0.15 }] },
+  /*
+   * E-061: Eine Couch ist Muell, kein Mischschrott.
+   *
+   * Patrick, 15.09.2026: „Wenn etwas wie eine Couch aussieht, dass es auch
+   * eine Couch ist. Und dann ist es Muell, dann ist es kein VA."
+   *
+   * Vorher stand hier eine Stueckliste (55 % Kunststoff, 30 % Holz, 15 %
+   * Stahl). Rechnerisch war das korrekt und machte das Sofa zu Mischschrott —
+   * einer Fraktion, die GELD BRINGT (0,16 €/kg). Genau das ist der
+   * Widerspruch: Kein Schrotthaendler zahlt fuer eine Couch, er laesst sich
+   * die Entsorgung bezahlen. Ohne Stueckliste bleibt die Vorgabe stehen, und
+   * `plastic` (Kunststoff, −0,06 €/kg) ist die Entsorgungsfraktion, in die
+   * Polstermoebel gehoeren.
+   *
+   * Der Stahl im Rahmen geht dabei nicht verloren — er ist nur nichts wert,
+   * solange niemand die Couch zerlegt. Das ist dieselbe Logik wie beim
+   * Kuehlschrank, nur andersherum.
+   *
+   * Nebenwirkung, gewollt: Die Griff-Info schweigt jetzt bei der Couch. Abfall
+   * braucht keine Materialangabe (`src/ui/hud.ts`, `STOFFWORT`).
+   */
+  { materialId: "plastic", massKg: 70, kind: "box", dims: [2.1, 0.9, 0.95], bau: "moebel", name: "Couch (Dreisitzer)" },
   { materialId: "wood", massKg: 65, kind: "box", dims: [1.0, 2.0, 0.6], bau: "moebel", name: "Schrankwand-Segment", zusammensetzung: [{ materialId: "wood", anteil: 0.88 }, { materialId: "steel", anteil: 0.08 }, { materialId: "plastic", anteil: 0.04 }] },
   { materialId: "alu", massKg: 26, kind: "box", dims: [0.9, 1.9, 0.12], bau: "fensterflaeche", name: "Duschkabine" },
   { materialId: "alu", massKg: 42, kind: "cyl", dims: [0.28, 1.5], bau: "rohrFlansch", name: "Rollladenpanzer (aufgerollt)" },

@@ -62,6 +62,64 @@ export const SCHUETTDICHTE: Record<string, number> = {
   plastic: 90,
 };
 
+/**
+ * **Feststoffdichte** in kg/m³ — was der reine Werkstoff wiegt, ohne Luft.
+ *
+ * Nicht dasselbe wie die Schüttdichte oben, und für etwas ganz anderes da:
+ * Die Schüttdichte sagt, was eine LADUNG wiegt; die Feststoffdichte sagt, was
+ * ein EINZELNES Stück höchstens wiegen kann. Ein Kasten von einem halben
+ * Kubikmeter kann nie mehr als einen halben Kubikmeter Vollmaterial wiegen —
+ * das ist keine Balancing-Frage, sondern eine Obergrenze aus der Physik.
+ *
+ * Anlass (Patrick, 15.09.2026): „Ganz oft sind Aluminium-Sachen, die haben
+ * dann zwei Tonnen. Aber Aluminium ist ja leicht, das ist ja die Eigenschaft
+ * von Aluminium." Damit ist das Gewicht einer von drei Kanälen, an denen er
+ * Aluminium erkennen will — neben Farbe und Zusammensetzung. Ein Maß dafür
+ * gab es bisher nicht; jetzt gibt es eins, und `test/bauart.test.ts` prüft
+ * jeden Katalogeintrag dagegen.
+ *
+ * Die Werte sind **Obergrenzen**, wo eine Spanne existiert: Eiche statt
+ * Fichte, Beton statt Ziegel. Ein Wächter soll nur das anschlagen, was
+ * wirklich unmöglich ist, nicht das Ungewöhnliche.
+ */
+export const FESTSTOFFDICHTE: Record<string, number> = {
+  // Baustahl — dieselbe Zahl wie `STAHL_KG_M3` in `purity.ts`.
+  steel: 7850,
+  // Austenitischer Edelstahl 1.4301.
+  va: 7900,
+  alu: 2700,
+  copper: 8960,
+  // Messing CuZn37 (8400–8700), Obergrenze.
+  brass: 8700,
+  zinc: 7140,
+  // Bleiakku als Gerät, nicht als reines Blei: Gehäuse, Säure, Platten.
+  // Ein 60-Ah-Akku wiegt 16 kg bei rund 7,6 Litern — knapp 2100 kg/m³.
+  battery: 2100,
+  // Kabel als Ganzes: Kupferseele plus Mantel, dicht gewickelt.
+  cable: 2500,
+  // Hartholz (Eiche, Buche), feucht — die schwerste Sorte, die anfällt.
+  wood: 900,
+  // Duroplaste und GFK liegen bei 1500–1900; PVC bei 1400. Obergrenze.
+  plastic: 1900,
+  // Gummimischung mit Stahlcord.
+  tires: 1300,
+  // Stahlbeton.
+  rubble: 2500,
+  /*
+   * Mischschrott hat keine eigene Dichte — er ist ein Gemisch. Als Obergrenze
+   * gilt Stahl: Was mehr wiegt als ein gleich großer Stahlklotz, kann kein
+   * Gemisch aus Blech, Kunststoff und Kupfer sein.
+   */
+  mixed: 7850,
+};
+
+/** Feststoffdichte einer Fraktion; ohne Eintrag gilt Stahl als Obergrenze. */
+export function feststoffdichte(id: string): number {
+  return (
+    FESTSTOFFDICHTE[id] ?? FESTSTOFFDICHTE[normalizeMaterialId(id)] ?? FESTSTOFFDICHTE.steel
+  );
+}
+
 /** Fallwert für eine Fraktion ohne Eintrag — so schwer wie Mischschrott. SW. */
 const STANDARD_DICHTE = 620;
 

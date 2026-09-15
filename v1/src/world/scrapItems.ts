@@ -77,6 +77,21 @@ export interface ScrapShape {
    */
   zusammensetzung?: Anteil[];
   /**
+   * Massiv trotz duennem Huellmass — die Uebersteuerung aus E-042.
+   *
+   * Sie stand bis zum 15.09.2026 nur im Katalog (`PileSpec`) und ging beim
+   * Bauen des Stuecks verloren. Solange niemand die Fraktion nachrechnet, ist
+   * das harmlos: `materialId` traegt das Ergebnis schon. Aber acht Stuecke —
+   * LKW-Felge, Felgenstapel, Pflugschar, dickes Rohr, drei Schaufeln,
+   * Seecontainer — waeren beim naechsten Nachrechnen still von Stahlschrott zu
+   * Mischschrott gerutscht, und niemand haette gesehen, woran es lag.
+   *
+   * Sie wandert darum mit der Form. Das kostet ein Feld im Spielstand und
+   * macht ein Stueck zu dem, was es ist, statt es von seiner Herkunft abhaengen
+   * zu lassen. Gefunden hat es der Waechter in `test/bauart.test.ts`.
+   */
+  massiv?: boolean;
+  /**
    * Platzinventar statt Ware.
    *
    * Eine Gattung, keine Ausnahme fuer ein einzelnes Stueck: Der Kehrbesen ist
@@ -544,8 +559,35 @@ const PRESSPROFIL: Record<string, Pressprofil> = {
   mixed: { dichte: 1050, fransen: [10, 17], lang: 0.55, dick: 0.06, beule: 0.15, rauheit: 0.95, glanz: 0.25 },
   // Edelstahl ist stur: bleibt sperrig, spreizt lange Zipfel ab
   va: { dichte: 1150, fransen: [9, 15], lang: 0.6, dick: 0.04, beule: 0.12, rauheit: 0.55, glanz: 0.7 },
-  // Alu geht weich zusammen: dicht, klein, fast glatt
-  alu: { dichte: 1450, fransen: [3, 6], lang: 0.3, dick: 0.045, beule: 0.07, rauheit: 0.5, glanz: 0.55 },
+  /*
+   * Alu geht weich zusammen — aber es bleibt Alu (E-061, 15.09.2026).
+   *
+   * Hier stand 1450, mehr als bei Stahl (1250). Das ist physikalisch verkehrt
+   * herum: Aluminium wiegt ein Drittel von Stahl (2700 gegen 7850 kg/m³). Ein
+   * Alupaket von 1,8 t kam damit auf 1,24 m³ heraus — ein Wuerfel von gut
+   * einem Meter Kante, der 1,8 Tonnen wiegt.
+   *
+   * Das ist genau Patricks Befund vom 15.09.2026: „Ganz oft sind
+   * Aluminium-Sachen, die haben dann zwei Tonnen. Aber Aluminium ist ja
+   * leicht, das ist ja die Eigenschaft von Aluminium. Und dann wirkt das nicht
+   * sehr authentisch, wenn so ein kleines Aluminiumteil nachher 1,8 Tonnen
+   * hat." Und es zerstoert den Kanal, ueber den er Alu erkennen will: „an der
+   * Farbe, an der Zusammensetzung, am Gewicht".
+   *
+   * Der neue Wert ist abgeleitet, nicht geraten — nach derselben Rechnung wie
+   * `SCHUETTDICHTE.alu` (E-033):
+   *
+   *     Stahlpaket 1250 × (2700 / 7850) = 430 kg/m³
+   *
+   * Damit presst Alu auf denselben ANTEIL seines Feststoffs wie Stahl (16 %);
+   * vorher waren es 54 %, und kein anderes Metall in dieser Tabelle liegt ueber
+   * 21 %. Dasselbe Paket ist jetzt 4,2 statt 1,24 m³ gross — Alu nimmt Platz
+   * weg und wiegt wenig, und das sieht man ihm endlich an.
+   *
+   * Die Masse aendert sich dabei nicht, nur das Volumen: am Verkaufserloes und
+   * am Ankauf aendert dieser Wert **null Euro**.
+   */
+  alu: { dichte: 430, fransen: [3, 6], lang: 0.3, dick: 0.045, beule: 0.07, rauheit: 0.5, glanz: 0.55 },
   // Kupfer noch dichter — das schwerste Paket bei gleichem Volumen
   copper: { dichte: 1900, fransen: [3, 7], lang: 0.28, dick: 0.05, beule: 0.06, rauheit: 0.45, glanz: 0.65 },
   brass: { dichte: 1800, fransen: [3, 6], lang: 0.26, dick: 0.055, beule: 0.05, rauheit: 0.4, glanz: 0.7 },
@@ -710,29 +752,41 @@ export function besenForm(): ScrapShape {
 export const SPECS: PileSpec[] = [
   { materialId: "steel", massKg: 60, kind: "box", dims: [0.15, 0.15, 1.3], bau: "buendel", name: "Profilstahl" },
   { materialId: "steel", massKg: 45, kind: "cyl", dims: [0.09, 1.1], bau: "rohrFlansch", name: "Rohr" },
-  { materialId: "steel", massKg: 35, kind: "box", dims: [0.12, 0.12, 0.9] },
+  /*
+   * E-061: Die namenlosen Stuecke haben Namen bekommen.
+   *
+   * Solange die Griff-Info die Fraktion nannte, hatte ein Stueck ohne Namen
+   * immer noch etwas zu lesen — "Mischschrott". Seit die Sortierklasse dort
+   * nicht mehr steht (E-061), stuende bei diesen elf Eintraegen gar nichts
+   * oder ein Platzhalter. Ein Name ist billiger als ein Platzhalter und sagt
+   * mehr: Der Spieler sieht ein Ding und liest, was es ist.
+   *
+   * Die Namen beschreiben die Form, nicht die Sortierklasse — "Vierkantstahl"
+   * ist ein Gegenstand, "Stahlschrott" ein Muldenschild.
+   */
+  { materialId: "steel", massKg: 35, kind: "box", dims: [0.12, 0.12, 0.9], name: "Vierkantstahl" },
   { materialId: "steel", massKg: 55, kind: "box", dims: [0.7, 0.06, 0.9], bau: "platte", name: "Blech" },
   { materialId: "steel", massKg: 90, kind: "box", dims: [0.7, 0.5, 0.15], bau: "platte", name: "Heizkörper (früher Guss)" },
   { materialId: "steel", massKg: 110, kind: "box", dims: [0.4, 0.4, 0.4], bau: "motor", name: "Motorblock-Rest", zusammensetzung: [{ materialId: "steel", anteil: 0.82 }, { materialId: "alu", anteil: 0.14 }, { materialId: "copper", anteil: 0.04 }] },
-  { materialId: "steel", massKg: 70, kind: "box", dims: [0.18, 0.18, 1.1] },
+  { materialId: "steel", massKg: 70, kind: "box", dims: [0.18, 0.18, 1.1], name: "Stahlknüppel" },
   { materialId: "va", massKg: 26, kind: "box", dims: [0.9, 0.18, 0.6], bau: "weisseWare", name: "Spülbecken" },
   { materialId: "va", massKg: 34, kind: "cyl", dims: [0.34, 0.8], bau: "tank", name: "VA-Behälter" },
   { materialId: "va", massKg: 18, kind: "box", dims: [0.06, 0.06, 1.5], bau: "buendel", name: "VA-Geländerrohr" },
   { materialId: "alu", massKg: 12, kind: "cyl", dims: [0.32, 0.22], name: "Felge" },
   { materialId: "alu", massKg: 8, kind: "box", dims: [0.08, 0.08, 1.4], name: "Profil" },
   { materialId: "alu", massKg: 10, kind: "box", dims: [0.6, 0.04, 0.8], bau: "platte", name: "Tafel" },
-  { materialId: "alu", massKg: 11, kind: "cyl", dims: [0.3, 0.2] },
+  { materialId: "alu", massKg: 11, kind: "cyl", dims: [0.3, 0.2], name: "Alu-Ronde" },
   { materialId: "copper", massKg: 12, kind: "cyl", dims: [0.05, 0.8], bau: "buendel", name: "Kupferrohr" },
   { materialId: "copper", massKg: 18, kind: "torus", dims: [0.14, 0.05], name: "Kupferbund" },
   { materialId: "brass", massKg: 15, kind: "box", dims: [0.3, 0.25, 0.3], bau: "maschine", name: "Messingarmaturen" },
-  { materialId: "cable", massKg: 9, kind: "torus", dims: [0.18, 0.07] },
-  { materialId: "cable", massKg: 7, kind: "torus", dims: [0.15, 0.06] },
-  { materialId: "cable", massKg: 12, kind: "torus", dims: [0.2, 0.08] },
-  { materialId: "wood", massKg: 14, kind: "box", dims: [0.12, 0.12, 1.2] },
-  { materialId: "plastic", massKg: 8, kind: "box", dims: [0.5, 0.05, 0.9] },
+  { materialId: "cable", massKg: 9, kind: "torus", dims: [0.18, 0.07], name: "Kabelring" },
+  { materialId: "cable", massKg: 7, kind: "torus", dims: [0.15, 0.06], name: "Kabelrest" },
+  { materialId: "cable", massKg: 12, kind: "torus", dims: [0.2, 0.08], name: "Kabelrolle" },
+  { materialId: "wood", massKg: 14, kind: "box", dims: [0.12, 0.12, 1.2], name: "Kantholz" },
+  { materialId: "plastic", massKg: 8, kind: "box", dims: [0.5, 0.05, 0.9], name: "Kunststoffplatte" },
   // Maschendraht-Bündel: sperrig + leicht — eignet sich als „Kehrbesen" zum
   // Freischieben von Pritsche und Boden (Design-Wunsch 2026-08-27)
-  { materialId: "steel", massKg: 22, kind: "wire", dims: [0.55] },
+  { materialId: "steel", massKg: 22, kind: "wire", dims: [0.55], name: "Maschendraht-Ballen" },
 
   // Was auf einem Schrottplatz sonst noch liegt (Wunsch 10.09.2026). Vorher
   // war das Sortiment sehr nach Baustelle: Profile, Rohre, Bleche. Ein Platz
@@ -802,7 +856,23 @@ const BIG_SPECS: PileSpec[] = [
   { materialId: "steel", massKg: 150, kind: "wire", dims: [1.15], bau: "haufen", name: "Drahtballen" },
   { materialId: "va", massKg: 210, kind: "cyl", dims: [0.7, 1.8], bau: "tank", name: "VA-Tank" },
   { materialId: "va", massKg: 130, kind: "box", dims: [1.8, 0.1, 1.1], bau: "platte", name: "VA-Tafel" },
-  { materialId: "va", massKg: 95, kind: "box", dims: [1.2, 0.85, 0.7], bau: "moebel", name: "Gastro-Spültisch" },
+  /*
+   * E-061: war `bau: "moebel"` — und stand damit als POLSTERSOFA auf dem Platz.
+   *
+   * `moebel` waehlt seinen Zweig nach den Massen (objektbau.ts): flach und
+   * tief genug (`h < w*0,75 && d > h*0,7`) heisst Polster, sonst Korpus.
+   * 1,20 x 0,85 x 0,70 m erfuellt beides — der Spueltisch wurde in Stoff
+   * bezogen. Zusammen mit der duennen VA-Auswahl (zehn erreichbare Eintraege)
+   * war er in einer sortenreinen VA-Fuhre das HAEUFIGSTE Stueck, gemessen
+   * 12,7 % von 3000 Zuegen: eine Couch, zu der die Waage "sortenrein
+   * Edelstahl" sagte (Patricks Befund 15.09.2026).
+   *
+   * `weisseWare` ist der Bau, den die drei anderen VA-Geraete schon tragen
+   * (Spuelbecken, Dunstabzugshaube, Krankenhaus-Sterilisator): Korpus mit
+   * Tuerfront und dunklem Sockel. Kein neuer Bau, keine geaenderten Masse —
+   * Fraktion, Pressbarkeit und Packmass bleiben, wie sie waren.
+   */
+  { materialId: "va", massKg: 95, kind: "box", dims: [1.2, 0.85, 0.7], bau: "weisseWare", name: "Gastro-Spültisch" },
   { materialId: "va", massKg: 70, kind: "box", dims: [0.14, 0.14, 2.6], bau: "buendel", name: "VA-Rohrbündel" },
   { materialId: "alu", massKg: 60, kind: "box", dims: [0.3, 0.3, 2.8], bau: "buendel", name: "Profilbündel" },
   { materialId: "alu", massKg: 45, kind: "box", dims: [1.6, 0.06, 1.2], bau: "platte", name: "Alutafel" },
@@ -903,6 +973,7 @@ export function randomCargo(
         bau: spec.bau,
         name: spec.name,
         zusammensetzung: spec.zusammensetzung,
+        massiv: spec.massiv,
         trennbar: spec.trennbar,
         nurWerkzeug: spec.nurWerkzeug,
       },
@@ -1670,8 +1741,25 @@ export class ItemManager {
      * Streuung soll zwei Pakete derselben Fuhre unterscheiden, nicht die
      * Materialien vertauschen. Jetzt rund plus/minus fuenfzehn Prozent aufs
      * Volumen, waehrend die Dichten von 540 bis 1900 reichen.
+     *
+     * **Der Deckel auf 1,8 m³ war die zweite Haelfte des Alu-Fehlers**
+     * (E-061, 15.09.2026). Er ist keine Dichte, er ist eine Abschneidekante:
+     * Ueber 2250 kg Stahl (und, mit der alten Zahl, ueber 2610 kg Alu) sah
+     * jedes Paket gleich gross aus, egal wie schwer es war. Ein Alupaket von
+     * 1,8 t — das `consolidate()` aus vierzig Kleinteilen ohne weiteres baut —
+     * kam damit als Wuerfel von 1,2 m Kante heraus. Genau das Stueck, das
+     * Patrick gemeldet hat.
+     *
+     * Der neue Deckel 4,5 m³ ist an einem Gegenstand gemessen, nicht geraten:
+     * Es ist die Kantenlaenge, ab der ein Paket kein Paket mehr ist. Bei
+     * 4,5 m³ misst es 2,06 × 1,40 × 1,65 m — so gross wie ein Ballen aus einer
+     * grossen Schrottschere, und immer noch kleiner als der Seecontainer
+     * (2,4 × 2,6 × 4,8 m), der im Katalog steht und den die Spinne bewegt.
+     *
+     * Was das in Kilogramm heisst: Erst ab 5625 kg Stahl bzw. 1935 kg Alu
+     * greift er ueberhaupt noch. Darunter folgt die Groesse jetzt der Masse.
      */
-    const vol = THREE.MathUtils.clamp(massKg / (profil.dichte * (1 + streu(0.05))), 0.1, 1.8);
+    const vol = THREE.MathUtils.clamp(massKg / (profil.dichte * (1 + streu(0.05))), 0.1, 4.5);
     const w = Math.cbrt(vol);
     const dims: [number, number, number] = [
       w * (1.25 + streu(0.06)),
