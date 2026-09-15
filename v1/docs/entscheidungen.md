@@ -4418,3 +4418,159 @@ Zeile im HUD (`shift.statusText`), für die Zahlungsunfähigkeit nichts;
 3. Ob ein Anlieferer, der nie abgeladen wird, nach einer Standzeit selbst
    abfährt. `waitUnload` hat keine Frist; im kopflosen Lauf stand eine Pritsche
    10 Minuten und hielt eine vorgemerkte Abholung auf.
+
+---
+
+### E-071 — Zwei Blätter statt einer Behauptung: was E-069 gebaut hat, und was die Mittelsäule kostet (15.09.2026)
+
+**Entscheidung.** Zwei Zeichnungen und ein Wächter. **Am Spielcode ist keine
+Zeile geändert** — `src/` ist unberührt, der Fünfschalengreifer und die
+Sichelkralle stehen, wie sie standen. Die Mittelsäule wird **nicht** weggebaut;
+was ihr Wegfall kostet, steht als Zahl auf dem zweiten Blatt und geht als
+Entscheidung an Patrick zurück.
+
+    docs/f5-zahn-vorher-nachher-2026-09-15.svg   was E-069 wirklich gebaut hat
+    docs/f5-mittelsaeule-2026-09-15.svg          was es kostet, die Säule wegzunehmen
+
+**Anlass, wörtlich.** Patrick am Gerät, 15.09.2026: „Also, wir sind uns doch
+einig, dass die Zacken direkt an der Traverse sein sollen. Und das ist aktuell
+nicht der Fall. Deshalb weiß ich überhaupt nicht, woran der Agent gearbeitet
+hat. Zeigt mir einen Vorher-Nachher-Vergleich."
+
+**Er hat in beiden Punkten recht, und beide Punkte sind verschiedene Dinge.**
+
+---
+
+#### 1. Was E-069 gebaut hat — und warum man es kaum sieht
+
+Gebaut wurde **eine Zahl**: In `zahnAnstellung` ist der Term
+`+ zahnEigenwinkel()` weggefallen. Der Zahn sitzt seither tangential auf dem
+Schalenende. Das ist richtig gebaut, es ist gemessen, und es ist **klein**:
+
+| gemessen am gebauten Netz | vorher | nachher |
+|---|---|---|
+| Zahn gegen das Schalenende | −12,15° | **0,00°** |
+| Schwebehöhe geschlossen | 23,8 cm | **19,4 cm** |
+| Maulweite offen | 3,176 m | 3,095 m |
+| Korbtiefe geschlossen | 0,9792 m | 0,9792 m (unverändert) |
+| Zahnwinkel bei Bodenkontakt | 34,2° | 23,5° |
+
+**Die ehrliche Größe des Unterschieds**, und sie steht so auf dem Blatt: Die
+**Zahnspitze wandert 41 mm**. Vom ganzen Greifer sind **98,5 % deckungsgleich**
+mit vorher (offen; geschlossen 99,9 %). **Vom Zahn allein nur 21,5 %** — dort
+ist es ein großer Unterschied, nur ist der Zahn 25 cm an einem 3,2-m-Gerät.
+
+Das Blatt zeigt deshalb drei Spalten: VORHER, NACHHER und **ÜBEREINANDER**. In
+der dritten liegt das Gemeinsame hell im Hintergrund, und nur was sich
+unterscheidet, ist dunkel bzw. blau. Der erste Entwurf legte die beiden Risse
+halbdurchsichtig übereinander — die später gezeichnete Form deckte die frühere
+zu, und der Unterschied **verschwand**. Genau das wäre das geschönte Blatt
+gewesen, das den Verdacht bestätigt statt ihn auszuräumen.
+
+---
+
+#### 2. Die Mittelsäule — gerechnet, nicht gebaut
+
+**Das Maß, um das es geht:** `TRAVERSE_Y` = −0,865, `STEMPEL_AUGE.y` = −1,5335,
+dazwischen **66,9 cm**. Davon sind **26 cm der Stempelkörper** (er trägt die
+fünf Ausleger, `MASS.stempel.hoehe`) und **40,9 cm das Säulenrohr `09_SAEULE`**.
+
+**Der Korb ändert sich NICHT.** Er hängt am Bolzen und geht mit ihm mit —
+gemessen, nicht behauptet, am gebauten Netz mit angehobenem Schalengelenk:
+
+| unter dem Bolzen gemessen | heute | ohne Säule |
+|---|---|---|
+| Tiefe geschlossen | 0,9792 m | 0,9792 m |
+| Schwebehöhe | 0,1943 m | 0,1943 m |
+| Maulweite offen | 3,0946 m | 3,0946 m |
+| Hüllkreis | 3,2262 m | 3,2262 m |
+
+**Die Bauhöhe fällt von 2,707 auf 2,039 m** — der Greifer wird 66,9 cm kürzer.
+**Die Reichweite kostet das nichts:** Am kopflos gebauten Bagger abgetastet
+(Ausleger 5…70°, Stiel −140…−25°, je 0,5°) kommt der Zahn in beiden Fällen
+zwischen **2,9 und 9,5 m** auf den Beton.
+
+**Was bricht, ist die ANLENKUNG.** Der Zylinder greift von der Traverse aus an
+der Schale an; rückt der Bolzen zur Traverse, sitzen Angriffspunkt und
+Drehpunkt praktisch auf derselben Höhe:
+
+| Bolzen steigt um | Neigung max | Hebelarm min | Zylinder zu → offen | Wächter |
+|---|---|---|---|---|
+| 0 cm (heute) | 24,42° | 118 mm | 1,046 → 0,670 m | hält |
+| 2 cm | 24,98° | 120 mm | — | hält |
+| 3 cm | 25,27° | 121 mm | — | **reißt** |
+| 66,9 cm (an der Traverse) | **89,7°** | 96 mm | 0,483 → **0,179 m** | reißt |
+
+**Der Bolzen darf 2,0 cm steigen — 3 % der Säule.** Dann reißt „Neigung unter
+25°", der engere der beiden Wächter, die E-039 erkämpft hat. **Die Wächter sind
+nicht nachgezogen worden**; sie stehen unverändert auf 25° und 0,115 m. Ganz
+oben wäre der Zylinder offen **0,179 m** lang — sein Rohr allein misst 0,420 m.
+So ein Zylinder lässt sich nicht bauen.
+
+**Zwei weitere Kosten, gemessen:**
+
+- **Der Schlund wird zugebaut.** In der Ebene 5 cm über den Bolzen versperrt
+  der Kopf heute **3.822 cm²** (Stempelkörper Ø 0,46 + fünf Ausleger); mit dem
+  Bolzen an der Traverse **5.265 cm²**, weil dort dann die Traverse Ø 0,95
+  steht — das 1,38-fache. **Genau dieses Maß war am 14.09.2026 der Grund, die
+  Säule zu KÜRZEN.** Der Umbau macht es wieder größer.
+- **Die Schalen kommen der Traverse auf 6 mm nahe** statt auf 86 mm
+  (3-cm-Punktraster, engste Stelle bei 95 % Öffnung — Größenordnung, nicht
+  Millimeter). **Untereinander** ändert sich dagegen **nichts**: Alle fünf
+  steigen um denselben Betrag, ihr Sektor bleibt 26,3° von 36°.
+
+**Die offene Frage, die nur Patrick beantworten kann.** Soll statt des Bolzens
+die **Traverse zum Bolzen herunter**? Dann bleibt die Anlenkung, wie sie ist,
+der Greifer wird trotzdem kürzer — und der Kopf wandert in den Korb hinein. Das
+ist ein eigenes Blatt und eine eigene Rechnung.
+
+---
+
+**Verworfene Alternative.** Die Säule wegnehmen und die Wächter nachziehen. Das
+ist der Weg, auf dem eine erkämpfte Zahl still verschwindet: E-039 hat die
+Traverse umgebaut, um 0,118 m Hebelarm und 24,4° zu bekommen; ein nachgezogener
+Wächter hätte den Verlust nicht gemeldet, sondern zugedeckt.
+
+**Werkzeuge.** `tools/schattenriss.ts` (Riss, Flächenvergleich, Dreiteilung in
+„nur A / nur B / beides") und `tools/fuenfschalen/zahnformen.ts` (die drei
+Formen A/B/C und ihre Messung) sind aus `zahnknick.ts` **herausgelöst**, damit
+das neue Blatt aus derselben Quelle rechnet. **Gegenprobe zur Herauslösung:**
+`zahnknick.ts` erzeugt danach eine **Byte für Byte identische** Datei (390.417
+Zeichen, verglichen).
+
+**Abnahmekriterium.** `test/mittelsaeule.test.ts`, 7 Prüfungen, **jede
+Zahlenschranke mit Gegenprobe, die meldet** (nachgestellt):
+
+- Zahnspitze wandert 41 mm (Fenster 35…47 mm). Gegenprobe: ein halber Knick
+  liefert 20,2 mm und fällt durch; dieselbe Form gegen sich selbst liefert 0.
+- Die Anlenkungsrechnung trifft `rig.ts` auf 5,6e−17. Gegenprobe: 1 mm
+  Bolzenversatz ergibt 9,1e−5 — die Prüfung ist nicht blind.
+- Heute halten beide E-039-Wächter; an der Traverse reißen sie (89,7° > 25°,
+  Zylinder kürzer als sein Rohr).
+- Der Bolzen darf zwischen 1,5 und 3,0 cm steigen (gemessen 2,0).
+- Der Korb ist unter dem Bolzen unverändert. Gegenprobe: die **Welthöhe** muss
+  sich um genau 0,6685 m ändern — sonst hätte das Heben gar nicht gewirkt und
+  die fünf Zeilen darüber wären trivial gleich.
+
+1.080 bestehende Prüfungen bleiben grün (jetzt **1.087 in 96 Dateien**).
+`npm run build` sauber.
+
+**Unangetastet.** `src/` vollständig. Sichelkralle und Fünfschalengreifer in
+Form und Verhalten, Griff-Kern (Sensorkugel + Fixed Joint), Pendel, Rotator,
+Kamera, Bodenanschlag. Die Mittelsäule steht.
+
+**Zurückgestellt.** Das Seitwärtskippen des Greifers („zum Kehren und
+Schleudern", E-065) — die Freigangmessung auf Dreiecksebene muss neu gemacht
+werden, falls die Säule doch fällt.
+
+**Auf dem Gerät zu prüfen.**
+
+1. `docs/f5-zahn-vorher-nachher-2026-09-15.svg` aufrufen, **die dritte Spalte
+   ansehen**: Erkennst du, was sich bewegt hat — und ist es wenig genug, dass
+   der Eindruck „da ist nichts passiert" verständlich war?
+2. `docs/f5-mittelsaeule-2026-09-15.svg`, die beiden Seitenrisse nebeneinander:
+   Sieht der rechte (Bolzen an der Traverse) **richtiger** aus als der linke —
+   obwohl Zylinder und Säule darin nachweislich falsch stehen?
+3. Antwort auf die eine Frage: Bolzen hinauf zur Traverse (dann muss die ganze
+   Anlenkung neu gerechnet werden) oder **Traverse herunter zum Bolzen** (dann
+   bleibt die Anlenkung und der Kopf wandert in den Korb)?
