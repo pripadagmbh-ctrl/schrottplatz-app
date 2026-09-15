@@ -359,9 +359,9 @@ function oesenUndSchutz(): THREE.BufferGeometry[] {
  * Mittellinie vermuten lässt.
  *
  * Im Knie ist beides gerade: Der Kragarm liegt waagerecht auf Wangenhöhe
- * (y 1,36), also über dem Kotflügel und unter dem Deck; der Stiel steht
- * senkrecht 55 cm vor dem Rad und hat dort nichts mehr neben sich. Das ist
- * zugleich die Form, die ein Umschlagbagger an dieser Stelle wirklich hat.
+ * (y 1,40), also über dem Kotflügel und unter dem Deck; der Stiel steht
+ * senkrecht vor dem Rad und hat dort nichts mehr neben sich. Das ist zugleich
+ * die Form, die ein Umschlagbagger an dieser Stelle wirklich hat.
  */
 /** Fußmitte in x (m) — gemessen, siehe oben. */
 export const PRATZE_X = 1.9;
@@ -370,28 +370,30 @@ export const PRATZE_Z = 2.45;
 /**
  * Anlenkpunkt des Kragarms an der Seitenwange (m).
  *
- * x 1,16 liegt im Wangenblech (1,14 … 1,20). y 1,36 ist die Höhe, in der der
- * Kragarm zwischen Kotflügel und Deckplatte durchpasst: Sein Profil reicht
- * damit von 1,23 bis 1,49, der Kotflügel liegt bei z ≥ 2,05 unter y 1,08, die
- * Deckplatte streicht bei 1,61 darüber. z 2,05 ist das vordere Ende der Wange
- * (sie endet bei ±2,10) — weiter vorn gäbe es kein Blech mehr zum Anschweissen.
+ * x 1,16 liegt im Wangenblech (1,14 … 1,20) — dort steckt der Kragarm drin
+ * statt davorzuhängen.
+ *
+ * y 1,40 ist die Höhe, in der er zwischen Kotflügel und Deckplatte durchpasst:
+ * Sein Profil reicht damit von 1,27 bis 1,53. Die Deckplatte des Oberwagens
+ * streicht beim Schwenken bei 1,61 darüber hinweg (8 cm Luft), die Spitze des
+ * Kotflügelbogens liegt bei z 1,91 auf y 1,23 (5,6 cm Luft). Beides gemessen
+ * mit `tools/pratzenfreigang.ts`, nicht abgeschätzt.
+ *
+ * z 2,08 liegt knapp vor dem Ende der Wange (sie reicht bis ±2,10). Weiter
+ * hinten schiebt sich die hintere Kante des Profils über den Kotflügel — bei
+ * z 1,95 kreuzte sie ihn.
  */
 const AUSLEGER_ANKER = { x: 1.16, y: 1.4, z: 2.08 };
 /**
  * Kantenlänge des Auslegerprofils (m).
  *
- * 0,30 statt 0,34. Zwei Gründe, und beide sind gemessen:
- *
- *  - Der Kragarm muss zwischen Kotflügel und Deckplatte durch. Bei y 1,36
- *    reicht sein Profil von 1,21 bis 1,51; die Deckplatte streicht bei 1,61
- *    darüber hinweg.
- *  - Der Stiel ist das ROHR, in dem der Pratzenkasten steckt. Der Kasten misst
- *    0,26 (`pratzeFuss` in `schildParts.ts`), also muss der Stiel WEITER sein
- *    — bei gleichem Mass lägen beide Mäntel deckungsgleich, und der
- *    Tiefenpuffer kann zwischen zwei deckungsgleichen Flächen nicht
- *    entscheiden (derselbe Befund wie an Reifen und Felge, 14.09.2026).
- *    2 cm Luft je Seite: eingefahren verschwindet der Kasten im Stiel,
- *    ausgefahren fährt er unten heraus.
+ * 0,30 statt 0,34, und das Mass kommt vom Fuß, nicht vom Augenmaß: Der Stiel
+ * ist das ROHR, in dem der Pratzenkasten steckt. Der Kasten misst 0,26
+ * (`pratzeFuss` in `schildParts.ts`), also muss der Stiel WEITER sein — bei
+ * gleichem Mass lägen beide Mäntel deckungsgleich, und der Tiefenpuffer kann
+ * zwischen zwei deckungsgleichen Flächen nicht entscheiden (derselbe Befund
+ * wie an Reifen und Felge, 14.09.2026). 2 cm Luft je Seite: eingefahren
+ * verschwindet der Kasten im Stiel, ausgefahren fährt er unten heraus.
  */
 const AUSLEGER_DICKE = 0.3;
 /**
