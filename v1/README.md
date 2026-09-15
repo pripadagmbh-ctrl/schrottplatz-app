@@ -8,8 +8,8 @@ Stand: **M1 gebaut, Gerätetest offen. M2 Phase A gebaut, Gerätetest offen.** Z
 breiter Ring an der Spinne (E-007), Rückwände raus an den vier Sortiermulden (E-006),
 Kommentar-Regel für Messwerte (E-008), der Fünfschalengreifer als Vorschaumodell (E-009),
 Platzumbau auf die L-Silos und die Mulde „BUNT + VA" (E-026 bis E-028), Bestandsaufnahme
-der Sortierung (E-029). Prüfkette grün: `npm test` **570 Tests in 52 Dateien**,
-`npm run build` sauber. Abgenommen ist nichts davon vor Patricks Gerätetest — die
+der Sortierung (E-029), Typprüfung für `test/` und `tools/` (E-038). Prüfkette grün:
+`npm test` **774 Tests in 69 Dateien**, `npm run build` sauber. Abgenommen ist nichts davon vor Patricks Gerätetest — die
 Handgriffe stehen bei E-006, E-007, E-009 und E-029 im Log.
 
 **Offen und gemessen, nicht behoben (E-029, `docs/fraktionen.md`):** Das Schild an einer
@@ -40,6 +40,20 @@ npm run dev -- --host
 Vite nennt dann eine Adresse der Form `http://<PC-IP>:5173` — die im Safari des Geräts
 öffnen. `npm run build` erzeugt den Produktions-Build in `dist/`, `npm test` fährt die
 Wächter. Beide müssen vor jeder Übergabe grün sein (Regel 8).
+
+**Zwei Typprüfungen, nicht eine** (E-038). `npm run build` prüft `src/` — Browsercode,
+ohne Node-Typen. `npm test` prüft davor `test/` und `tools/` gegen
+`tsconfig.test.json` (npm-Skript `pretest`); schlägt das fehl, startet Vitest gar nicht
+erst. Grund: Vitest prüft keine Typen, und bis zum 15.09.2026 sah `tsc` diese beiden
+Ordner nie an — an einem einzigen Tag waren deshalb dreimal Wächter grün, deren Eingaben
+`NaN` waren. Einzeln aufrufbar mit `npm run typecheck:test`. Kosten auf dem Dev-PC:
+`tsc` über `src` 8,0 s, über `test`+`tools` 13,2 s, `vite build` 6,7 s (gemessen
+15.09.2026, ruhige Maschine). Der Bau ist dadurch **nicht** langsamer geworden — sein
+Umfang hat sich nicht geändert.
+
+Die Werkzeuge unter `tools/` laufen mit `npx vite-node tools/<name>.ts`. Sie werden seit
+E-038 mitgeprüft: Vier von ihnen ließen sich nicht mehr starten, ohne dass es jemandem
+aufgefallen wäre.
 
 Veröffentlicht wird v1 nach einem Merge auf `main` unter
 `pripadagmbh-ctrl.github.io/schrottplatz-app/v1/` (E-005). Der Merge braucht Patricks

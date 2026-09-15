@@ -21,7 +21,7 @@
  *
  *     npx vite-node tools/fraktionsblatt-schreiben.ts
  */
-import { MATERIALS, getMaterial } from "../src/materials/catalog";
+import { MATERIALS } from "../src/materials/catalog";
 import { SORTENREIN_AB } from "../src/materials/purity";
 import { SPECS } from "../src/world/scrapItems";
 import { KATALOG_BIG, KATALOG_HUGE, type PileSpec } from "../src/world/objektkatalog";

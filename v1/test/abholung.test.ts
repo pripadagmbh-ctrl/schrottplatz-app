@@ -19,6 +19,7 @@ import { initPhysics } from "../src/physics/physicsWorld";
 import { VehicleManager } from "../src/delivery/vehicles";
 import { ItemManager } from "../src/world/scrapItems";
 import { CompositeManager } from "../src/dismantle/composites";
+import { EventBus } from "../src/core/events";
 
 beforeAll(async () => {
   await initPhysics();
@@ -28,7 +29,11 @@ function bauePlatz(): VehicleManager {
   const scene = new THREE.Scene();
   const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
   const items = new ItemManager(scene, world);
-  const composites = new CompositeManager(scene, world, items);
+  // Der EventBus ist das vierte Argument und fehlte hier: `this.bus` war
+  // `undefined`, und jeder Riss an einer Karosse (`partTorn`, `glassShattered`,
+  // `crushed`) haette den Test mit einem TypeError beendet — nur erreicht ihn
+  // dieser Weg nicht. Von der Typpruefung gemeldet (E-038).
+  const composites = new CompositeManager(scene, world, items, new EventBus());
   return new VehicleManager(scene, world, items, composites);
 }
 

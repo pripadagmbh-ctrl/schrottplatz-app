@@ -26,11 +26,24 @@ import {
   bayOut,
 } from "../src/delivery/routes";
 import { CONFIGS } from "../src/world/containers";
+import { endlich, mindestens } from "./zahl";
 
 /** Derselbe Tastradius, mit dem die Fahrzeuge prüfen. */
 const TASTRADIUS = 1.4;
 
 function strecke(name: string, punkte: Array<[number, number]>): void {
+  /*
+   * Zwei Zeilen gegen den Waechter, der nichts prueft (E-038).
+   *
+   * Bei `punkte.length < 2` laeuft die Schleife unten NULL mal und der Test
+   * ist gruen — dasselbe Ergebnis wie bei einer Strecke, die tatsaechlich frei
+   * ist. Und bei `NaN` unter den Punkten ist jeder Vergleich falsch, also
+   * findet `hitsObstacle` nie etwas. Genau so war es hier am 15.09.2026.
+   */
+  endlich(punkte, `${name}: Wegpunkte`);
+  mindestens(punkte.length, 2, `${name}: Wegpunkte`);
+  /** Wieviele Tastpunkte wirklich gegen die Bauten gerechnet wurden. */
+  let getastet = 0;
   for (let i = 0; i < punkte.length - 1; i++) {
     const [ax, az] = punkte[i]!;
     const [bx, bz] = punkte[i + 1]!;
@@ -41,12 +54,14 @@ function strecke(name: string, punkte: Array<[number, number]>): void {
       const x = ax + (bx - ax) * t;
       const z = az + (bz - az) * t;
       const o = hitsObstacle(x, z, TASTRADIUS);
+      getastet++;
       expect(
         o,
         `${name}: bei (${x.toFixed(2)} | ${z.toFixed(2)}) steht ${o?.label} im Weg`
       ).toBeNull();
     }
   }
+  mindestens(getastet, 3, `${name}: Tastpunkte`);
 }
 
 describe("Jede Fahrstrecke ist auf ganzer Länge frei", () => {
@@ -82,14 +97,13 @@ describe("Jede Fahrstrecke ist auf ganzer Länge frei", () => {
        * `bayApproach(c.z)` — seit E-028 nimmt die Funktion den ganzen
        * Container. Eine Zahl hat kein `.facing` und kein `.z`, also kamen
        * Strecken mit `undefined`/`NaN` heraus, und jeder Vergleich mit NaN ist
-       * falsch: Der Wächter hat monatelang nichts geprüft. Die Tests laufen
-       * ohne `tsc` (tsconfig sammelt nur `src`), deshalb fängt das kein Typ ab.
+       * falsch: Der Wächter hat monatelang nichts geprüft. Seit dem
+       * 15.09.2026 sieht `tsc` auch `test/` an (E-038,
+       * `tsconfig.test.json`) und fängt genau diesen Aufruf.
        */
-      const an = bayApproach(c);
-      for (const [x, z] of an) expect(Number.isFinite(x) && Number.isFinite(z)).toBe(true);
+      const an = endlich(bayApproach(c), `Anfahrt ${c.label}`);
       strecke(`Anfahrt ${c.label}`, an.slice(0, an.length - 1));
-      const aus = bayOut(c);
-      for (const [x, z] of aus) expect(Number.isFinite(x) && Number.isFinite(z)).toBe(true);
+      const aus = endlich(bayOut(c), `Ausfahrt ${c.label}`);
       strecke(`Ausfahrt ${c.label}`, aus.slice(1));
       // Und das letzte Stück in die Mulde hinein steht wenigstens in der Spur
       expect(bayInRev(c).length).toBe(2);

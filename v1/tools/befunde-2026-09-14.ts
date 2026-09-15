@@ -20,23 +20,31 @@ import {
   KRONE_R,
   SCHILD_POS,
   SCHILD_B,
-  SCHILD_H,
   YARD_D,
   YARD_MIN_X,
   YARD_MAX_X,
   GATE_X,
-  BUCHT_X_VON,
-  BUCHT_X_BIS,
-  BUCHT_Z,
   TRENNSTEINE,
   TRENNSTEIN_X,
   TRENNSTEIN_L,
 } from "../src/world/yard";
 import { einmauern } from "../src/world/daylight";
-import { HALLEN_X, HALLEN_Z, HALLE_BREITE, HALLE_TIEFE } from "../src/world/office";
+import { hallenFootprints } from "../src/world/office";
 import { BAGGER_STAND } from "../src/world/baggerstand";
 import { baueGeometrie } from "../src/world/objektbau";
 import { feld, blatt, BLICK_SCHRAEG, BLICK_VORN } from "./riss";
+
+/*
+ * BEFUND 15.09.2026 (E-038): Hier stand zweimal
+ * `CONFIGS.find((c) => c.id === "r_cable")!`. Die Kabelmulde ist mit E-034
+ * abgerissen worden; das `!` hat dem Typpruefer versichert, sie sei da, und
+ * das Werkzeug brach beim Ausfuehren mit „Cannot read properties of
+ * undefined". Jetzt wird die erste Mulde mit Wand genommen, die es gibt —
+ * gezeigt wird ohnehin das Mauerwerk und nicht die Fraktion. Ohne `!`, mit
+ * einer Meldung, die sagt, was fehlt.
+ */
+const MULDE_BEISPIEL = CONFIGS.find((c) => c.kind === "bay" && c.lager !== true);
+if (!MULDE_BEISPIEL) throw new Error("Keine Mulde mit Wand in CONFIGS — Blatt 1 und 5 haetten nichts zu zeigen.");
 
 mkdirSync("docs/messungen", { recursive: true });
 
@@ -75,7 +83,7 @@ const kasten = (x: number, y: number, w: number, h: number, titel: string): stri
 
 /* ===================================================== 1 · Endsteine ===== */
 {
-  const cfg = CONFIGS.find((c) => c.id === "r_cable")!;
+  const cfg = MULDE_BEISPIEL;
   const [w, d] = cfg.size;
   const BL = MULDE_STEIN.laenge;
   const BH = MULDE_STEIN.hoehe;
@@ -146,7 +154,7 @@ const kasten = (x: number, y: number, w: number, h: number, titel: string): stri
   inhalt += t(
     24,
     H - 26,
-    "Mulde KABEL, Flanke 4,20 m, Stein 1,50 × 0,50 × 0,55 m · grün = Endstein, rot = Überstand",
+    `Mulde ${MULDE_BEISPIEL.label}, Stein 1,50 × 0,50 × 0,55 m · grün = Endstein, rot = Überstand`,
     12,
     F.blass
   );
@@ -272,27 +280,30 @@ const kasten = (x: number, y: number, w: number, h: number, titel: string): stri
     `<rect x="${px(x0)}" y="${py(z1)}" width="${((x1 - x0) * S).toFixed(1)}" height="${((z1 - z0) * S).toFixed(1)}" fill="${F.bau}" fill-opacity="0.75" stroke="${F.steinKante}"/>` +
     t((px(x0) + px(x1)) / 2, (py(z0) + py(z1)) / 2 + 4, name, 10, "#ffffff", "middle", 600);
   inhalt += bau(-39.6, -30.6, 22.4, 28.6, "BÜRO");
-  HALLEN_X.forEach((hx, i) =>
-    (inhalt += bau(
-      hx - HALLE_BREITE / 2,
-      hx + HALLE_BREITE / 2,
-      HALLEN_Z - HALLE_TIEFE / 2,
-      HALLEN_Z + HALLE_TIEFE / 2,
-      `HALLE ${i + 1}`
-    ))
-  );
+  /*
+   * BEFUND 15.09.2026 (E-038): Hier stand `HALLEN_X.forEach(...)` mit
+   * `HALLEN_Z` als Einzelzahl. Seit dem Umbau „Hallen zurueck ans Buero"
+   * (E-028) ist es genau andersherum — `HALLEN_X` ist EINE Zahl, `HALLEN_Z`
+   * sind DREI. Das Werkzeug liess sich seitdem nicht mehr ausfuehren; gesehen
+   * hat es niemand, weil `tools/` bis heute nie typgeprueft wurde. Jetzt aus
+   * `hallenFootprints()` gelesen, also aus derselben Quelle wie der Bau.
+   */
+  hallenFootprints().forEach(([hx, hz, halbX, halbZ], i) => {
+    inhalt += bau(hx - halbX, hx + halbX, hz - halbZ, hz + halbZ, `HALLE ${i + 1}`);
+  });
 
   // Kamera
   const kam = { x: BAGGER_STAND.x, z: BAGGER_STAND.z - Math.cos(0.42) * 11 };
   inhalt += `<circle cx="${px(kam.x)}" cy="${py(kam.z)}" r="6" fill="${F.gruen}"/>`;
   inhalt += t(px(kam.x) + 10, py(kam.z) + 4, "Startkamera", 11, F.gruen, "start", 600);
 
+  // Der Parameter `yText` wurde nie gelesen (beide Aufrufe uebergaben 0);
+  // gemeldet von der Typpruefung fuer `tools/` (E-038).
   const tafel = (
     cx: number,
     breite: number,
     farbe: string,
-    beschriftung: string,
-    yText: number
+    beschriftung: string
   ): string => {
     let s = `<rect x="${px(cx - breite / 2)}" y="${py(SCHILD_POS.z) - 4}" width="${(breite * S).toFixed(1)}" height="8" fill="${farbe}"/>`;
     for (const kante of [cx - breite / 2, cx + breite / 2]) {
@@ -301,8 +312,8 @@ const kasten = (x: number, y: number, w: number, h: number, titel: string): stri
     s += t(px(cx), py(SCHILD_POS.z) - 10, beschriftung, 11, farbe, "middle", 600);
     return s;
   };
-  inhalt += tafel(-10, 14, F.fehler, "VORHER 14 m — 40 % hinter den Hallen", 0);
-  inhalt += tafel(SCHILD_POS.x, SCHILD_B, F.gruen, `NACHHER ${zahl(SCHILD_B, 1)} m — frei`, 0);
+  inhalt += tafel(-10, 14, F.fehler, "VORHER 14 m — 40 % hinter den Hallen");
+  inhalt += tafel(SCHILD_POS.x, SCHILD_B, F.gruen, `NACHHER ${zahl(SCHILD_B, 1)} m — frei`);
   // Einfahrtsspur
   inhalt += `<rect x="${px(GATE_X - 1.55)}" y="${py(36)}" width="${(3.1 * S).toFixed(1)}" height="${(10 * S).toFixed(1)}" fill="${F.licht}" fill-opacity="0.2" stroke="${F.licht}" stroke-dasharray="4 4"/>`;
   inhalt += t(px(GATE_X), py(36) - 8, "LKW-Einfahrt", 10, F.licht, "middle", 600);
@@ -413,7 +424,7 @@ const kasten = (x: number, y: number, w: number, h: number, titel: string): stri
   inhalt += kasten(604, 96, 552, 380, "Was an den drei Metallmulden steht: gerade Wände");
   const mx2 = 880;
   const my2 = 400;
-  const cfg = CONFIGS.find((c) => c.id === "r_cable")!;
+  const cfg = MULDE_BEISPIEL;
   const [w] = cfg.size;
   const REIHEN = Math.max(2, Math.round(cfg.size[2] / MULDE_STEIN.hoehe));
   for (let r = 0; r < REIHEN; r++) {

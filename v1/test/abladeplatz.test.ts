@@ -17,6 +17,7 @@ import { initPhysics } from "../src/physics/physicsWorld";
 import { VehicleManager } from "../src/delivery/vehicles";
 import { ItemManager } from "../src/world/scrapItems";
 import { CompositeManager } from "../src/dismantle/composites";
+import { EventBus } from "../src/core/events";
 import { ABLADE_SPUR_X, ABLADE_HALT_Z } from "../src/delivery/routes";
 import { BAGGER_STAND, SCHWENK_AUSSEN } from "../src/world/baggerstand";
 
@@ -41,7 +42,13 @@ function fahreEineFuhre(): Fuhre {
     boden
   );
   const items = new ItemManager(scene, world);
-  const m = new VehicleManager(scene, world, items, new CompositeManager(scene, world, items));
+  // EventBus als viertes Argument — fehlte bis 15.09.2026 (E-038).
+  const m = new VehicleManager(
+    scene,
+    world,
+    items,
+    new CompositeManager(scene, world, items, new EventBus())
+  );
   m.spawnNow("pritsche");
   const v = (m as unknown as { active: { phase: string; group: THREE.Group } }).active;
   const dt = 1 / 60;

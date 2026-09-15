@@ -114,7 +114,7 @@ describe("Greifen", () => {
 
   it("meldet Greifstelle und Kraft fuers Schadensmodell", () => {
     // Phase 1.6: Die Spinne sagt, WO sie zupackt und WIE FEST.
-    const { world, grip, greifer } = aufbau();
+    const { world, grip } = aufbau();
     const b = teil(world, 0.3, 2.4, 0);
     let gemeldet = 0;
     grip.onKontakt = () => gemeldet++;
@@ -133,7 +133,7 @@ describe("Greifen", () => {
   });
 
   it("die Greifkraft waechst mit Schliessdruck und Gewalt", () => {
-    const { world, grip, greifer } = aufbau();
+    const { world, grip } = aufbau();
     const b = teil(world, 0, 2.4, 0);
     grip.attachBody(b);
     const sensor = new THREE.Vector3();

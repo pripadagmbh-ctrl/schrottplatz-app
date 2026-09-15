@@ -14,16 +14,17 @@
  * Aufruf:  npx vite-node tools/grundriss-abend.ts
  */
 import { writeFileSync, mkdirSync } from "node:fs";
-import { CONFIGS, MULDE_STEIN } from "../src/world/containers";
+/*
+ * Nur noch das, was hier auch gezeichnet wird. Die tote Einfuhr (MULDE_STEIN,
+ * YARD_D, YARD_MAX_X, BUCHT_*, ABKIPP_ZONE, VERLADE_SPUR_X, SCHILD_H) hat die
+ * Typpruefung fuer `tools/` am 15.09.2026 gemeldet (E-038); dieselbe Pruefung
+ * hat gezeigt, dass drei der Namen im Quelltext gar nicht mehr existieren.
+ */
+import { CONFIGS } from "../src/world/containers";
 import {
   mauerLaeufe,
   MAUER_STEIN,
-  YARD_D,
   YARD_MIN_X,
-  YARD_MAX_X,
-  BUCHT_X_VON,
-  BUCHT_X_BIS,
-  BUCHT_Z,
   TRENNSTEINE,
   TRENNSTEIN_X,
   TRENNSTEIN_L,
@@ -50,15 +51,9 @@ import {
   ABLADE_SPUR_X,
   ABLADE_HALT_Z,
   BED_HALF_W,
-  ABKIPP_ZONE,
-  KIPP_SPUR_X,
-  KIPP_HALT_Z,
   MULDEN_GASSE_X,
-  VERLADE_SPUR_X,
   routeApproach,
   routeInRev,
-  TIP_APPROACH,
-  TIP_IN_REV,
   pickupApproach,
   pickupInRev,
 } from "../src/delivery/routes";
@@ -175,8 +170,10 @@ const blatt = (b: number, h: number, titel: string, unter: string, inhalt: strin
     `<polyline points="${punkte.map(([x, z]) => `${px(x).toFixed(1)},${py(z).toFixed(1)}`).join(" ")}" fill="none" stroke="${farbe}" stroke-width="${dick}" ${strich ? `stroke-dasharray="${strich}"` : ""} stroke-linejoin="round"/>`;
   inhalt += spur(routeApproach(), F.spur, 2.2);
   inhalt += spur(routeInRev(), F.lkw, 2.6, "6 4");
-  inhalt += spur(TIP_APPROACH, F.spur, 1.6, "2 3");
-  inhalt += spur(TIP_IN_REV, F.lkw, 2.0, "6 4");
+  // Die eigene Kipperspur (`TIP_APPROACH`/`TIP_IN_REV`) ist mit E-029 entfallen
+  // — gemischte Kipper fahren die Anlieferungsstrecke, die zwei Zeilen darueber
+  // schon gezeichnet ist. Bis 15.09.2026 liess sich dieses Werkzeug deshalb
+  // nicht mehr ausfuehren (E-038).
   inhalt += spur(pickupApproach(), F.spur, 1.6, "2 3");
   inhalt += spur(pickupInRev(), F.lkw, 2.0, "6 4");
   inhalt += spur(

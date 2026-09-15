@@ -14,7 +14,6 @@
  * Aufruf: npx vite-node tools/platzlast.ts
  */
 import * as THREE from "three";
-import RAPIER from "@dimforge/rapier3d-compat";
 /*
  * Eigene Leinwand-Attrappe statt `leinwand-attrappe.ts`.
  *
@@ -79,8 +78,9 @@ async function main(): Promise<void> {
   new Yard(scene, world);
   new OfficeBuilding(scene, world);
   const items = new ItemManager(scene, world);
-  const composites = new CompositeManager(scene, world, items);
   const bus = new EventBus();
+  // EventBus als viertes Argument — fehlte bis 15.09.2026 (E-038).
+  const composites = new CompositeManager(scene, world, items, bus);
   new ContainerManager(scene, world, bus);
   new PressManager(scene, world, items, composites);
   const bauzeit = Date.now() - t0;

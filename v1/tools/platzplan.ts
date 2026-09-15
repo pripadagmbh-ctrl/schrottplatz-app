@@ -17,10 +17,9 @@ import {
   routeApproach,
   pickupApproach,
   pickupInRev,
+  routeInRev,
   bayApproach,
   bayInRev,
-  TIP_APPROACH,
-  TIP_IN_REV,
   ABKIPP_ZONE,
 } from "../src/delivery/routes";
 import {
@@ -274,18 +273,25 @@ s(
 
 /* ------------------------------------------------ Fahrspuren und Abkippen */
 /*
- * Die echten Strecken aus `delivery/routes.ts`, nicht gemalte. Der
- * Konzeptplan zeichnet daneben eine Abkippzone hinter dem Bagger; gebaut ist
- * sie VOR ihm, links neben der Maschine — hinter ihm kommt kein Fahrzeug
- * vorbei, solange sie auf ihrem Platz steht (siehe Kommentar bei
- * `KIPP_SPUR_X`). Wer die beiden Bilder nebeneinanderlegt, soll genau das
- * sehen.
+ * Die echten Strecken aus `delivery/routes.ts`, nicht gemalte.
+ *
+ * Nachgezogen am 15.09.2026 (E-038): Bis dahin zeichnete dieses Werkzeug eine
+ * eigene Kipperspur aus `TIP_APPROACH`/`TIP_IN_REV` und rief `bayApproach(-13)`
+ * mit einer blanken Zahl. Beide Namen gibt es seit E-029 bzw. E-028 nicht mehr
+ * — der Plan liess sich also gar nicht mehr erzeugen, und niemand hat es
+ * gemerkt, weil `tools/` nie typgeprueft wurde. Gemischte Kipper fahren seit
+ * E-029 die Anlieferungsstrecke; eine eigene Kipperlinie gibt es nicht mehr.
+ * Die Silo-Strecke braucht seit E-028 den ganzen Muldendatensatz, weil die
+ * Anfahrt von der Ausrichtung der Mulde abhaengt, nicht nur von ihrem z.
  */
+const SILO_BEISPIEL = CONFIGS.find((c) => c.lager === true)!;
 for (const [name, weg] of [
-  ["Anlieferung", routeApproach()],
-  ["Kipper", TIP_APPROACH.concat(TIP_IN_REV.slice(1))],
+  ["Anlieferung", routeApproach().concat(routeInRev().slice(1))],
   ["Abholer", pickupApproach().concat(pickupInRev().slice(1))],
-  ["sortenrein", bayApproach(-13).concat(bayInRev(-13).slice(1))],
+  [
+    "sortenrein",
+    bayApproach(SILO_BEISPIEL).concat(bayInRev(SILO_BEISPIEL).slice(1)),
+  ],
 ] as Array<[string, Array<[number, number]>]>) {
   const punkte = weg.map(([x, z]) => `${px(x).toFixed(1)},${py(z).toFixed(1)}`).join(" ");
   s(
@@ -312,9 +318,20 @@ beschriftung(ABKIPP_ZONE[0], ABKIPP_ZONE[1], "ABKIPPEN", "#b9563a", 10);
  */
 const abstand = (x: number, z: number): number =>
   Math.hypot(x - BAGGER_STAND.x, z - BAGGER_STAND.z);
+/*
+ * BEFUND 15.09.2026 (E-038): Hier stand eine feste Liste von Mulden-Kennungen
+ * — `r_alu`, `r_cable`, `r_copper`, `c_tires` —, abgeschlossen mit `!`. Vier
+ * davon gibt es seit E-034 nicht mehr, und `!` sagt dem Typpruefer genau das,
+ * was nicht stimmt: „ist bestimmt da". Der Plan brach beim Ausfuehren mit
+ * „Cannot read properties of undefined". Gemerkt hat es niemand, weil `tools/`
+ * bis dahin nie geprueft wurde UND niemand das Werkzeug gestartet hat.
+ *
+ * Jetzt ohne Liste: Alles, was der Spieler von seinem Stand aus selbst
+ * befuellt, also jede Mulde, die kein Lagersilo ist. Faellt eine weg oder kommt
+ * eine dazu, wandert die Tabelle mit.
+ */
 const ziele: Array<[string, number]> = [];
-for (const id of ["c_mixed", "c_steel", "r_alu", "r_cable", "r_copper", "r_rubble", "c_tires"]) {
-  const c = CONFIGS.find((k) => k.id === id)!;
+for (const c of CONFIGS.filter((k) => k.lager !== true)) {
   // Bei einer Halde zaehlt die vordere Kante, sonst die Mitte (E-010).
   const z = c.kind === "halde" ? c.z + c.size[1] / 2 : c.z;
   ziele.push([c.label, abstand(c.x, z)]);

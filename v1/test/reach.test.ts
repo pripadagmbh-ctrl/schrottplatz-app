@@ -11,8 +11,11 @@
  * verschiebt, muss dieses Fenster treffen; der Test sagt es sofort.
  */
 import { describe, it, expect } from "vitest";
-import * as THREE from "three";
-import { hoechsteKrallenspitze, tempoFaktor, anlaufZeit, CAB_MAX } from "../src/excavator/excavator";
+// Nur noch `hoechsteKrallenspitze`: `THREE`, `tempoFaktor`, `anlaufZeit` und
+// `CAB_MAX` wurden hier eingefuehrt, aber nie gelesen — gemeldet von der neuen
+// Typpruefung fuer `test/` (E-038). Wer das Fahrtempo wachen will, braucht
+// einen eigenen Waechter, keinen ungenutzten Import.
+import { hoechsteKrallenspitze } from "../src/excavator/excavator";
 import { CONFIGS } from "../src/world/containers";
 import {
   neueAbholstelle,
@@ -30,15 +33,16 @@ const SILO_KANTE_X = Math.min(
   ...CONFIGS.filter((c) => c.lager === true).map((c) => c.x - c.size[0] / 2)
 );
 
-/**
+/*
  * Standplatz des Baggers — aus `world/baggerstand.ts`, nicht abgeschrieben.
  *
  * Die Zahl stand hier als Kopie aus `excavator.ts`. Beim Platzumbau (E-010)
  * ist der Standplatz von (−2,5 | −19,5) auf (−0,5 | −22,5) gewandert; eine
  * Kopie wandert nicht mit, und der Test prueft dann Reichweiten von einer
- * Stelle aus, an der niemand steht.
+ * Stelle aus, an der niemand steht. Gelesen wird `BAGGER_STAND` seitdem
+ * direkt, siehe `LINIE` weiter unten; die Zwischenkopie `BAGGER` ist am
+ * 15.09.2026 mit dem toten Helfer `abstand()` weggefallen (E-038).
  */
-const BAGGER = { x: BAGGER_STAND.x, z: BAGGER_STAND.z };
 
 /**
  * Mulden, die der Spieler von seinem Standplatz aus selbst befüllt.
@@ -76,9 +80,9 @@ for (let t = 0; t <= 1.0001; t += 0.05)
 // Und zwei Meter nach links und rechts, fuer die beiden Halden nebenan.
 for (let t = -1; t <= 1.0001; t += 0.25) LINIE.push([BAGGER_STAND.x + t * 2, BAGGER_STAND.z]);
 
-function abstand(x: number, z: number): number {
-  return Math.hypot(x - BAGGER.x, z - BAGGER.z);
-}
+// Ein Helfer `abstand(x, z)` stand hier, ohne je gerufen zu werden — die
+// Schleife weiter unten rechnet ihren Abstand selbst. Entfernt am 15.09.2026,
+// gemeldet von der neuen Typpruefung fuer `test/` (E-038).
 
 describe("Reichweite des Arms", () => {
   it("der Arm hat eine tote Zone in Baggernähe", () => {

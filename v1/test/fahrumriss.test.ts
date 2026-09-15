@@ -20,7 +20,10 @@ import { describe, it, expect } from "vitest";/**
 
 import { STATIC_OBSTACLES } from "../src/world/obstacles";
 import { CONFIGS } from "../src/world/containers";
-import { BAGGER_STAND, VERLADE_STAND, abstandVomStand } from "../src/world/baggerstand";
+import { endlich, mindestens } from "./zahl";
+// Kein Import aus `world/baggerstand` mehr: Seit E-029 rechnet dieser Waechter
+// nicht mehr gegen den Baggerstand. Die drei Namen standen bis 15.09.2026 als
+// tote Einfuhr hier und wurden von der neuen Typpruefung gemeldet (E-038).
 import {
   routeApproach,
   routeInRev,
@@ -166,21 +169,27 @@ describe("Kein Fahrzeugumriss schneidet ein festes Bauwerk", () => {
      * Trennachsenpruefung nie eine Ueberschneidung. Ein Test, der wegen
      * kaputter Eingaben gruen ist, ist schlimmer als keiner.
      *
-     * Die Tests laufen ohne `tsc` (tsconfig sammelt nur `src`), deshalb faengt
-     * das kein Typ ab. Diese drei Zeilen tun es.
+     * Seit dem 15.09.2026 sieht `tsc` die Testordner an (E-038,
+     * `tsconfig.test.json`) und faengt genau diesen Aufruf. Die Pruefung hier
+     * bleibt trotzdem: Sie faengt, was erst zur Laufzeit `NaN` wird.
+     *
+     * Und die zweite Haelfte des Musters, die kein Typ faengt: Wieviele Faelle
+     * sind es ueberhaupt? Ein Waechter, dessen Schleife leer blieb, meldet
+     * dasselbe wie einer, der alles geprueft hat. Darum `mindestens(...)` —
+     * Stand 15.09.2026 sind es 13 feste Strecken, drei je Lagersilo und eine
+     * je Parkbucht.
      */
+    mindestens(strecken.length, 20, "Fahrstrecken im Umrissbild");
     for (const [name, route] of strecken) {
       expect(route.length, `${name}: leere Strecke`).toBeGreaterThan(1);
-      for (const [x, z] of route) {
-        expect(
-          Number.isFinite(x) && Number.isFinite(z),
-          `${name}: Wegpunkt (${x} | ${z}) ist keine Zahl`
-        ).toBe(true);
-      }
+      endlich(route, name);
     }
     const treffer = new Map<string, number>();
+    /** Wieviele Fahrzeugumrisse tatsaechlich gegen Bauten gerechnet wurden. */
+    let geprueft = 0;
     for (const [name, route, kind, rev] of strecken) {
       for (const r of fahre(route, kind, rev)) {
+        geprueft++;
         for (const o of STATIC_OBSTACLES) {
           const d = ueberlappung(r, o);
           if (d > 0.01) {
@@ -190,6 +199,9 @@ describe("Kein Fahrzeugumriss schneidet ein festes Bauwerk", () => {
         }
       }
     }
+    // Erst die Frage „wurde ueberhaupt gerechnet?", dann das Ergebnis. In der
+    // Reihenfolge, weil „null Durchdringungen" sonst zweierlei heissen kann.
+    mindestens(geprueft, 500, "gerechnete Fahrzeugumrisse");
     const zeilen = [...treffer.entries()]
       .sort((a, b) => b[1] - a[1])
       .map(([k, d]) => `${d.toFixed(2)} m  ${k}`);

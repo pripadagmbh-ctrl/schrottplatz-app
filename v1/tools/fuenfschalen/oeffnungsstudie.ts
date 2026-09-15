@@ -18,7 +18,7 @@
  * Aufruf:  npx vite-node tools/fuenfschalen/oeffnungsstudie.ts
  */
 import * as THREE from "three";
-import { STEMPEL_AUGE, stoffe } from "../../src/fuenfschalen/teile";
+import { stoffe } from "../../src/fuenfschalen/teile";
 import { FORM_BOGEN, Formsatz, baueGreifer, hebelarm } from "../../src/fuenfschalen/rig";
 
 const v = new THREE.Vector3();

@@ -1537,7 +1537,6 @@ Grundriss vorher/nachher: `docs/messungen/2026-09-15_silos-l-form.svg`.
    Warteplätzen, und laufen die wartenden Fahrer zu ihr, ohne über den
    Arbeitsbereich zu müssen?
 
-<<<<<<< HEAD
 
 ---
 
@@ -1878,76 +1877,6 @@ Stilattribut (`style="top: 56px; …"`). Ein Stilattribut schlägt jeden Selekto
    geändert haben außer der verschwundenen Ruhezeile.
 
 ---
-### E-035 — Die Sortierregel bekommt einen Wächter; der Abstand zwischen Schild und Kasse wird gemessen, nicht geschlossen (15.09.2026)
-
-**Entscheidung.** Drei Dinge, alle in `test/`, `tools/` und `docs/` — **kein
-Produktivcode angefasst**:
-
-1. `test/fraktionen.test.ts` (22 Prüfungen) wacht ab sofort über
-   `fraktionAus`/`SORTENREIN_AB`, über die abgeleiteten Fraktionen aller 271
-   erreichbaren Katalogeinträge und über die Frage, ob jede Fraktion ein Ziel
-   hat.
-2. `tools/farbabstand.ts` misst Farbabstände in ΔE2000 statt in RGB und prüft
-   sich dabei selbst gegen die Prüfdaten von Sharma/Wu/Dalal (2005).
-   `tools/fraktionsblatt.ts` zeichnet daraus `docs/fraktionen-2026-09-15.svg`.
-3. Der Abstand zwischen **Muldenschild** und **Kasse** wird als Befund
-   festgehalten (W-1 bis W-10 in `docs/fraktionen.md`), **nicht behoben**. Die
-   Wächter dazu sind grün und im Text mit „BEFUND" gekennzeichnet.
-
-**Begründung.** Patrick, 15.09.2026 nach dem Gerätetest: „Es ist nicht wirklich
-erkennbar, was Stahlschrott ist und was Mischschrott ist. Auch die
-Kategorisierung ist mir nicht ganz bewusst." Die Bestandsaufnahme dazu hat zwei
-Löcher gefunden:
-
-- `fraktionAus` entscheidet für **jedes** Teil im Spiel über die Fraktion und
-  hatte **keinen einzigen Test**. Gesucht am 15.09.2026 in allen 51
-  Testdateien: null Treffer für `fraktionAus`, `SORTENREIN_AB`, `istPressbar`.
-- Schild und Kasse rechnen verschieden, gemessen um Faktor **87** bei der Mulde
-  „BUNT + VA" (Schild 1742 €, Kasse 20 €) und um Faktor **6** bei KUPFER-LAGER
-  und ALU-LAGER. Das beantwortet zugleich Prüfpunkt 3 aus E-028 („stimmt der
-  Betrag am Container mit dem Schild am Silo überein?") — nein, und nicht knapp.
-
-Warum nicht behoben: Es gibt zwei Wege (die Kasse lernt `mitFraktionen`, oder
-das Schild zeigt den echten Erlös), und beide verändern das Spiel verschieden
-stark. Der eine nimmt die Entscheidung Kupfer/Messing aus dem Spiel, der andere
-lässt die HUD-Zahl „Sortierwert" deutlich fallen. Das ist Patricks Entscheidung,
-nicht meine (V-2 in `docs/fraktionen.md`).
-
-**Verworfene Alternative.** (a) Die Kasse gleich auf die Schild-Rechnung
-umstellen — die naheliegende Reparatur; sie nimmt zugleich den Anreiz, Kupfer von
-Messing zu trennen, und genau dieser Anreiz ist laut `materials/catalog.ts:19-23`
-der Sinn der eigenen Mulde. (b) Die Befunde nur in den Bericht schreiben und
-nicht in Tests gießen — dann wandern die Zahlen beim nächsten Umbau
-stillschweigend, und in vier Wochen misst sie jemand neu. (c) Die Farben in RGB
-vergleichen — RGB lügt: Stahl und Misch liegen dort in Grün 0 und in Blau 4
-Einheiten auseinander, und genau dort sieht das Auge am schärfsten.
-
-**Abnahmekriterium.** `npm test` grün: 570 Tests in 52 Dateien (vorher 548 in
-51), darunter `test/fraktionen.test.ts`. `npm run build` grün. Das Werkzeug
-prüft sich selbst: `pruefeDeltaE()` meldet größte Abweichung 0,000042 bei 16
-Prüfpaaren. Die Wächter `collision`, `customers`, `haggle`, `purity`, `save`,
-`shift`, `tutorial`, `upgradeEffects`, `upgrades` bleiben grün.
-
-**Widerspruch zu älteren Einträgen, benannt und nicht aufgelöst.** Der Kopf
-dieses Logs sagt „Neueste oben"; tatsächlich steht die neueste Entscheidung seit
-E-006 unten. Dieser Eintrag folgt der gelebten Reihenfolge, nicht dem Kopf.
-Zweitens: `src/world/containers.ts:96-99` beschreibt eine Abrechnungsregel
-(„wer Kupfer und Messing zusammen abgibt, bekommt für alles den Kupferpreis"),
-die `src/economy/account.ts` nicht hat — dort gewinnt die schwerste Fraktion in
-der Ladung, und bei Gleichstand die zuerst geladene.
-
-**Auf dem Gerät zu prüfen.**
-
-1. **Zwei weiße Geräte nebeneinander greifen** — Elektroherd und Waschmaschine:
-   Siehst du ohne die Greifanzeige einen Unterschied? Gemessen ΔE 0,18, also
-   nach der Farbmetrik keinen.
-2. **Vor die Trennsteine zwischen den beiden Halden fahren:** Weißt du ohne
-   Schild, auf welcher Seite du stehst? Das Schild blendet sich unter 4,5 m
-   Kameraabstand vollständig aus.
-3. **`docs/fraktionen-2026-09-15.svg` auf dem iPhone** unter `/v1/plaene/`
-   öffnen: ohne Zoom lesbar? Und stimmt, was daraufsteht, mit dem überein, was
-   du im Spiel erlebst?
-=======
 ### E-034 — Eine Mulde neben der Presse, der Müll wird ein versetzbarer Container (15.09.2026)
 
 **Entscheidung.** Rechts vom Bagger (−x) steht nur noch **ein** Behälter: die
@@ -2155,4 +2084,203 @@ Grundriss vorher/nachher: `docs/messungen/2026-09-15_eine-mulde.svg`.
 4. **Etwas Müll hineinwerfen und eine Nacht abwarten** (ein Tag dauert
    15 Minuten): Steht der Container morgens leer da, und liegt der Müll im
    ABFALL-Silo an der Südmauer?
->>>>>>> worktree-agent-a7711447ab574db2a
+
+
+---
+### E-035 — Die Sortierregel bekommt einen Wächter; der Abstand zwischen Schild und Kasse wird gemessen, nicht geschlossen (15.09.2026)
+
+**Entscheidung.** Drei Dinge, alle in `test/`, `tools/` und `docs/` — **kein
+Produktivcode angefasst**:
+
+1. `test/fraktionen.test.ts` (22 Prüfungen) wacht ab sofort über
+   `fraktionAus`/`SORTENREIN_AB`, über die abgeleiteten Fraktionen aller 271
+   erreichbaren Katalogeinträge und über die Frage, ob jede Fraktion ein Ziel
+   hat.
+2. `tools/farbabstand.ts` misst Farbabstände in ΔE2000 statt in RGB und prüft
+   sich dabei selbst gegen die Prüfdaten von Sharma/Wu/Dalal (2005).
+   `tools/fraktionsblatt.ts` zeichnet daraus `docs/fraktionen-2026-09-15.svg`.
+3. Der Abstand zwischen **Muldenschild** und **Kasse** wird als Befund
+   festgehalten (W-1 bis W-10 in `docs/fraktionen.md`), **nicht behoben**. Die
+   Wächter dazu sind grün und im Text mit „BEFUND" gekennzeichnet.
+
+**Begründung.** Patrick, 15.09.2026 nach dem Gerätetest: „Es ist nicht wirklich
+erkennbar, was Stahlschrott ist und was Mischschrott ist. Auch die
+Kategorisierung ist mir nicht ganz bewusst." Die Bestandsaufnahme dazu hat zwei
+Löcher gefunden:
+
+- `fraktionAus` entscheidet für **jedes** Teil im Spiel über die Fraktion und
+  hatte **keinen einzigen Test**. Gesucht am 15.09.2026 in allen 51
+  Testdateien: null Treffer für `fraktionAus`, `SORTENREIN_AB`, `istPressbar`.
+- Schild und Kasse rechnen verschieden, gemessen um Faktor **87** bei der Mulde
+  „BUNT + VA" (Schild 1742 €, Kasse 20 €) und um Faktor **6** bei KUPFER-LAGER
+  und ALU-LAGER. Das beantwortet zugleich Prüfpunkt 3 aus E-028 („stimmt der
+  Betrag am Container mit dem Schild am Silo überein?") — nein, und nicht knapp.
+
+Warum nicht behoben: Es gibt zwei Wege (die Kasse lernt `mitFraktionen`, oder
+das Schild zeigt den echten Erlös), und beide verändern das Spiel verschieden
+stark. Der eine nimmt die Entscheidung Kupfer/Messing aus dem Spiel, der andere
+lässt die HUD-Zahl „Sortierwert" deutlich fallen. Das ist Patricks Entscheidung,
+nicht meine (V-2 in `docs/fraktionen.md`).
+
+**Verworfene Alternative.** (a) Die Kasse gleich auf die Schild-Rechnung
+umstellen — die naheliegende Reparatur; sie nimmt zugleich den Anreiz, Kupfer von
+Messing zu trennen, und genau dieser Anreiz ist laut `materials/catalog.ts:19-23`
+der Sinn der eigenen Mulde. (b) Die Befunde nur in den Bericht schreiben und
+nicht in Tests gießen — dann wandern die Zahlen beim nächsten Umbau
+stillschweigend, und in vier Wochen misst sie jemand neu. (c) Die Farben in RGB
+vergleichen — RGB lügt: Stahl und Misch liegen dort in Grün 0 und in Blau 4
+Einheiten auseinander, und genau dort sieht das Auge am schärfsten.
+
+**Abnahmekriterium.** `npm test` grün: 570 Tests in 52 Dateien (vorher 548 in
+51), darunter `test/fraktionen.test.ts`. `npm run build` grün. Das Werkzeug
+prüft sich selbst: `pruefeDeltaE()` meldet größte Abweichung 0,000042 bei 16
+Prüfpaaren. Die Wächter `collision`, `customers`, `haggle`, `purity`, `save`,
+`shift`, `tutorial`, `upgradeEffects`, `upgrades` bleiben grün.
+
+**Widerspruch zu älteren Einträgen, benannt und nicht aufgelöst.** Der Kopf
+dieses Logs sagt „Neueste oben"; tatsächlich steht die neueste Entscheidung seit
+E-006 unten. Dieser Eintrag folgt der gelebten Reihenfolge, nicht dem Kopf.
+Zweitens: `src/world/containers.ts:96-99` beschreibt eine Abrechnungsregel
+(„wer Kupfer und Messing zusammen abgibt, bekommt für alles den Kupferpreis"),
+die `src/economy/account.ts` nicht hat — dort gewinnt die schwerste Fraktion in
+der Ladung, und bei Gleichstand die zuerst geladene.
+
+**Auf dem Gerät zu prüfen.**
+
+1. **Zwei weiße Geräte nebeneinander greifen** — Elektroherd und Waschmaschine:
+   Siehst du ohne die Greifanzeige einen Unterschied? Gemessen ΔE 0,18, also
+   nach der Farbmetrik keinen.
+2. **Vor die Trennsteine zwischen den beiden Halden fahren:** Weißt du ohne
+   Schild, auf welcher Seite du stehst? Das Schild blendet sich unter 4,5 m
+   Kameraabstand vollständig aus.
+3. **`docs/fraktionen-2026-09-15.svg` auf dem iPhone** unter `/v1/plaene/`
+   öffnen: ohne Zoom lesbar? Und stimmt, was daraufsteht, mit dem überein, was
+   du im Spiel erlebst?
+
+---
+### E-038 — `tsc` sieht ab jetzt auch `test/` und `tools/` an (15.09.2026)
+
+**Entscheidung.** Drei Dinge, alle in `test/`, `tools/`, `docs/` und den
+Konfigurationsdateien — **kein Produktivcode angefasst**:
+
+1. **Neue Datei `v1/tsconfig.test.json`** prüft `test/` und `tools/`. Sie erbt
+   `tsconfig.json` und ergänzt nur die Node-Typen (`"types": ["vite/client",
+   "node"]`), die Tests und Werkzeuge für `node:fs` und `__dirname` brauchen.
+   Neue Abhängigkeit: `@types/node` (devDependency).
+2. **Sie läuft bei `npm test` mit**, über das npm-Skript `pretest`. Schlägt die
+   Typprüfung fehl, startet Vitest gar nicht erst. Nachgewiesen: Der
+   ursprüngliche Fehler `bayApproach(c.z)` wieder eingesetzt, `npm test`
+   gestartet — der Lauf bricht vor dem ersten Test ab mit
+   `test/fahrumriss.test.ts(147,61): error TS2345: Argument of type 'number' is
+   not assignable to parameter of type 'ContainerConfig'.`
+3. **Neue Helferdatei `test/zahl.ts`** mit zwei Funktionen: `endlich(...)`
+   prüft, dass Eingaben endliche Zahlen sind; `mindestens(...)` prüft, dass ein
+   Wächter überhaupt Fälle geprüft hat. Im Einsatz in `test/fahrumriss.test.ts`
+   und `test/fahrstrecke.test.ts` — genau den beiden Dateien, in denen der
+   Fehler saß.
+
+**Begründung.** `tsconfig.json` sammelte nur `"include": ["src"]`, und Vitest
+prüft keine Typen — es wirft sie mit esbuild weg. `test/` und `tools/` hat
+deshalb **nie jemand** angesehen. Am 15.09.2026 hat das an einem einzigen Tag
+dreimal zugeschlagen, jedes Mal nach demselben Muster: Ein Wächter war grün,
+weil seine Eingaben `NaN` waren — und **jeder Vergleich mit `NaN` ist falsch**,
+also meldet `expect(x).toBeLessThan(y)` nichts.
+
+| # | Datei | Was | Folge |
+|---|---|---|---|
+| 1 | `test/fahrumriss.test.ts` | `bayApproach(c.z)` statt `bayApproach(c)` | Zwei Stunden lang „null Durchdringungen" — von null geprüften Strecken. Genau der Wächter, der LKW davon abhält, durch Mauern zu fahren. |
+| 2 | `test/fahrstrecke.test.ts` | derselbe Aufruf ein zweites Mal | dieselbe stille Blindheit |
+| 3 | `test/platzinventar.test.ts` | rechnete gegen `KIPP_SPUR_X`, am selben Abend gelöscht | dieselbe stille Blindheit |
+
+Alle drei wären in einer Sekunde aufgefallen. Beim ersten Hinsehen fielen
+**221 Fehler** heraus; 166 davon waren „Node-Typen nicht eingerichtet", also
+kein Befund, sondern eine fehlende Zeile Konfiguration. Es blieben **55 echte
+Fehler**, darunter **fünf Aufrufe mit zu wenigen Argumenten**, **neun Zugriffe
+auf gelöschte Exporte** und **drei unvollständige Prüfdatensätze**. Vier
+Werkzeuge ließen sich überhaupt nicht mehr starten.
+
+**Warum getrennte Datei und nicht `"include": ["src","test","tools"]`.** Zwei
+Gründe:
+
+- **Der Bau bleibt schnell.** `npm run build` ist `tsc --noEmit && vite build`;
+  Patrick wartet bei jedem Livegang darauf. Der Umfang von `tsconfig.json`
+  ändert sich mit dieser Entscheidung **nicht**, also kann der Bau nicht
+  langsamer geworden sein. Gemessen auf dem Dev-PC am 15.09.2026, ruhige
+  Maschine: `tsc` über `src` 8,0 / 8,1 s, `vite build` 6,7 s, `npm run build`
+  im Ganzen 16,3 / 18,9 s. Die neue Prüfung über `test`+`tools` kostet 13,2 s
+  unter denselben Bedingungen und hängt an `npm test` (44,9 s), nicht am Bau.
+  Der Gegenversuch — alles in **eine** Prüfung — wurde später am Tag gemessen,
+  als fünf weitere Agentenprozesse liefen; die Zahlen schwanken deshalb stark
+  und taugen nur als Richtung, aber die Richtung war in jeder der drei Runden
+  dieselbe: `src` allein 29,4 / 58,5 / 38,6 s gegen `src+test+tools` 56,5 /
+  62,9 / 54,3 s.
+- **`src/` soll Node nicht kennen.** `src/` ist Browsercode. Stünden die
+  Node-Typen in `tsconfig.json`, ginge ein versehentliches `process.env` in
+  `src/` durch und fiele erst auf dem iPad auf. Getrennte Dateien halten diese
+  Grenze.
+
+**Warum `tools/` mitgeprüft wird, obwohl dort datierte Einmal-Werkzeuge
+liegen.** Weil ein Werkzeug, das nicht mehr läuft, ein Befund ist und keine
+Ausnahme rechtfertigt. Die Prüfung hat genau das gefunden: **vier Werkzeuge
+brachen beim Start ab** — `tools/platzplan.ts` (in
+`docs/messungen/2026-09-14_platzumbau.md` als laufendes Werkzeug geführt, das
+`docs/platz.svg` erzeugt), `tools/grundriss-abend.ts`,
+`tools/plan-2026-09-15.ts` und `tools/befunde-2026-09-14.ts`. Alle vier laufen
+wieder; die drei erstgenannten sind nachgeführt auf E-028/E-029 (eigene
+Kipperspur entfallen, `bayApproach` nimmt den Datensatz), das vierte auf E-028
+(`HALLEN_X` ist heute EINE Zahl und `HALLEN_Z` DREI — vorher war es umgekehrt).
+
+**Nebenbefund, der zum selben Muster gehört.** Zwei der vier Werkzeugabstürze
+kamen nicht vom Typ, sondern vom Ausrufezeichen:
+`CONFIGS.find((c) => c.id === "r_cable")!` sagt dem Prüfer „ist bestimmt da",
+und genau dort war nichts. Ein `!` schaltet die Prüfung ab, die wir gerade
+eingeschaltet haben.
+
+**Verworfene Alternative.** (a) `"include": ["src","test","tools"]` in
+`tsconfig.json` — der einfachste Weg, aber er verlängert jeden Bau und nimmt
+`src/` die Trennung von Node. (b) Ein zweiter `tsc`-Schritt in `build` — gleiche
+Verlangsamung, und Regel 9 (keine `&&`-Ketten in Skripten) wird dabei noch
+länger gebrochen. (c) `tools/` per `exclude` aussparen — hätte genau die vier
+kaputten Werkzeuge weiter verdeckt. (d) Die Typprüfung nur in den
+Pages-Workflow hängen — der ruft für v1 nur `npm run build` und nie `npm test`;
+sie liefe dann nie auf dem Rechner, auf dem jemand den Fehler auch beheben kann.
+
+**Widerspruch zu älteren Einträgen, benannt und nicht aufgelöst.** Das Log ist
+am 15.09.2026 mit unaufgelösten Konfliktmarken (`<<<<<<< HEAD`, `=======`,
+`>>>>>>> worktree-agent-a7711447ab574db2a`) eingecheckt worden (Commit
+`f20900b`). Beide Seiten sind erhalten, E-034 steht jetzt vor E-035 — aber:
+**Die Nummern E-036 und E-037 fehlen im Log.** Commit `bbeeb44` nennt E-036 im
+Betreff, ein Eintrag dazu steht nirgends. Das gehört gesichtet, bevor jemand
+eine Nummer zweimal vergibt; hier wird es nur benannt.
+
+**Abnahmekriterium.** `npm test` grün: **774 Tests in 69 Dateien**, unverändert
+zum Stand davor (kein Wächter ist weggefallen). `npm run build` grün.
+`npx tsc -p tsconfig.test.json --noEmit` meldet **0 Fehler** (vorher 221, ohne
+die fehlenden Node-Typen 55). Die Wächter `collision`, `customers`, `haggle`,
+`purity`, `save`, `shift`, `tutorial`, `upgradeEffects`, `upgrades` bleiben
+grün. Die beiden neuen Helfer sind **scheitern gesehen worden**, nicht nur
+eingebaut:
+
+| Eingriff | Meldung |
+|---|---|
+| `bayApproach(c)` → `bayApproach(c.z)` | `npm test` bricht im `pretest` ab, `error TS2345` |
+| Route zur Laufzeit mit `NaN` versehen | `Silo KUPFER-LAGER Anfahrt: keine endliche Zahl … Jeder Vergleich damit ist falsch, der Waechter prueft also nichts.` |
+| Silo-Liste auf null Einträge gekürzt | `Fahrstrecken im Umrissbild: nur 14 Faelle geprueft, erwartet mindestens 20.` |
+| Silo-Anfahrt auf einen Punkt gekürzt | `Anfahrt KUPFER-LAGER: Wegpunkte: nur 1 Faelle geprueft, erwartet mindestens 2.` |
+
+Danach jeweils zurückgestellt und wieder grün.
+
+**Auf dem Gerät zu prüfen.** Nichts am Spiel: Dieses Paket ändert keine Zeile,
+die auf dem iPad läuft — `src/` ist unberührt. Zwei Dinge gehören trotzdem auf
+den Schirm:
+
+1. **`docs/platz.svg` auf dem iPhone** unter `/v1/plaene/` öffnen. Das Blatt ist
+   zum ersten Mal seit E-034 wieder aus dem gebauten Platz erzeugt worden
+   (vorher lief das Werkzeug nicht). Stimmt, was daraufsteht, mit dem überein,
+   was du auf dem Hof siehst — vor allem die vier Ziele MISCHSCHROTT
+   (7,91 m), STAHLSCHROTT (6,96 m), BUNT + VA (7,60 m) und MUELL (7,46 m),
+   alle im Schwenkband 5,8–9,2 m?
+2. **Die datierten Zeichnungen unter `docs/messungen/`** wurden **nicht** neu
+   erzeugt, obwohl die Werkzeuge wieder laufen. Sie halten den Stand ihres
+   Datums fest; neu gezeichnet wären sie eine Fälschung des Protokolls. Wer ein
+   aktuelles Blatt braucht, erzeugt es unter neuem Datum.

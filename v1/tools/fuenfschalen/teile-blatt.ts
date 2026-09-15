@@ -13,7 +13,6 @@ import * as THREE from "three";
 import {
   MASS,
   baueGreiferschale,
-  baueMitteltraverse,
   baueStempel,
   einzelteile,
   stoffe,
