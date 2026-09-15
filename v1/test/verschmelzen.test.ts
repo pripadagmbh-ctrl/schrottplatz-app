@@ -198,7 +198,7 @@ describe("Fünfschalen — die Formzahlen nach dem Zusammenlegen (E-039, E-048)"
   const g = baueGreifer(stoffe());
   const SCHRITTE = 40;
 
-  it("gräbt 2,7511 m tief, ist geschlossen 2,505 m hoch und dreht in Ø 3,2320 m", () => {
+  it("gräbt 2,7069 m tief, ist geschlossen 2,505 m hoch und dreht in Ø 3,2262 m", () => {
     let grabtiefe = 0;
     let huellkreis = 0;
     let hoch = 0;
@@ -236,12 +236,14 @@ describe("Fünfschalen — die Formzahlen nach dem Zusammenlegen (E-039, E-048)"
         tief = yMin;
       }
     }
-    expect(grabtiefe, "Grabtiefe").toBeCloseTo(2.7511, 4);
+    /* 2,7511 → 2,7069 mit E-069: Der Zahn sitzt tangential (siehe teile.ts). */
+    expect(grabtiefe, "Grabtiefe").toBeCloseTo(2.7069, 4);
     expect(hoch - tief, "Bauhöhe geschlossen").toBeCloseTo(2.505, 3);
-    expect(huellkreis, "größter gezeichneter Durchmesser über den Weg").toBeCloseTo(3.232, 3);
+    /* 3,232 → 3,2262: die Zahnspitze dreht nicht mehr nach aussen (E-069). */
+    expect(huellkreis, "größter gezeichneter Durchmesser über den Weg").toBeCloseTo(3.2262, 3);
   });
 
-  it("lässt die fünf Spitzen geschlossen 142,3 mm von der Achse zusammenkommen", () => {
+  it("lässt die fünf Spitzen geschlossen 137,6 mm von der Achse zusammenkommen", () => {
     /*
      * Die LETZTEN fünf Punkte des Zahnkörpers sind sein Spitzenring — so legt
      * `baueGreiferspitze` sie ab, genau für diese Messung. Gemessen wird ihr
@@ -260,7 +262,8 @@ describe("Fünfschalen — die Formzahlen nach dem Zusammenlegen (E-039, E-048)"
       }
       weit = Math.max(weit, Math.hypot(mitte.x / 5, mitte.z / 5));
     }
-    expect(weit * 1000, "Spitzenabstand von der Achse, geschlossen (mm)").toBeCloseTo(142.3, 1);
+    /* 142,3 → 137,6 mm mit E-069 — sie treffen sich naeher, nicht weiter. */
+    expect(weit * 1000, "Spitzenabstand von der Achse, geschlossen (mm)").toBeCloseTo(137.6, 1);
   });
 
   it("nutzt 26,34° seines 36°-Sektors", () => {

@@ -20,6 +20,8 @@ import {
   mittellinie,
   schalenStationen,
   schwenkFuer,
+  zahnAnstellung,
+  zahnEigenwinkel,
 } from "../src/fuenfschalen/teile";
 import {
   baueGreifer,
@@ -377,18 +379,27 @@ describe("Fünfschalen — Maße", () => {
   });
 
   /**
-   * Die Eigenschaft vom 14.09.2026: OFFEN STEHT DER ZAHN LOTRECHT.
+   * OFFEN HÄNGT DER ZAHN 12,15° NACH INNEN — und das ist so entschieden.
    *
-   * Auf der Herstellerzeichnung zeigt der Zahn bei offenem Greifer senkrecht
-   * nach unten, während die Schale weit aufgeschwenkt ist. Bei uns tat er das
-   * nicht: `OFFEN` stellt die TANGENTE des Schalenendes senkrecht, und der Zahn
-   * ist über seine 250 mm mit R 0,70 noch einmal in sich gebogen — gemessen
-   * stand er 12,15° schräg nach innen.
+   * Bis zum 15.09.2026 stand er dort lotrecht. `OFFEN` stellt die TANGENTE des
+   * Schalenendes senkrecht; der Zahn ist über seine 250 mm mit R 0,70 noch
+   * einmal in sich gebogen, seine ACHSE liegt also 12,15° dahinter, und genau
+   * um diese 12,15° wurde sein Sitz gegengedreht (Ansage 13.09.2026: „die
+   * Spitzen senkrecht").
    *
-   * Der Zahn wird dafür NICHT gegengedreht. Er ist starr angeschraubt; was
-   * schräg ist, ist sein Sitz (`zahnAnstellung`, eine feste Zahl). Deshalb
-   * prüft dieser Wächter beides: lotrecht am Anschlag, und starr dazwischen —
-   * die Achse dreht über den ganzen Weg genau so viel wie die Schale.
+   * DIESE GEGENDREHUNG WAR DER SICHTBARE KNICK. Patrick am 15.09.2026 vor dem
+   * Bild und einem Vorbildfoto: „dieser harte Knick im Zahn, den gibt es
+   * nicht. Das ist nicht so." Am Blatt `docs/f5-zahnknick-2026-09-15.svg` hat
+   * er Variante B gewählt (E-069): Der Zahn sitzt tangential, der Knick ist
+   * weg, und der Preis ist diese Schieflage bei voller Öffnung.
+   *
+   * Die Alternative C hätte beides gehalten — für den Preis, dass der
+   * Hebelarm des Zylinders ganz offen von 118 auf 47 mm fällt, also genau die
+   * Zahl, für die E-039 die Traverse umgebaut hat.
+   *
+   * Der Wächter prüft weiter dieselben zwei Dinge, nur mit dem neuen Sollwert:
+   * die Schieflage am Anschlag, und dass der Zahn dazwischen STARR mitdreht —
+   * eine laufende Korrektur wäre eine Animation, keine Anstellung.
    */
   const zahnachse = (g: ReturnType<typeof baueGreifer>): number => {
     g.wurzel.updateMatrixWorld(true);
@@ -399,11 +410,22 @@ describe("Fünfschalen — Maße", () => {
     return Math.atan2(d.x * aussen.x + d.z * aussen.y, -d.y);
   };
 
-  it("stellt den Zahn bei voller Öffnung lotrecht", () => {
+  it("hängt bei voller Öffnung genau um seine Eigenbiegung nach innen (E-069)", () => {
     const g = baueGreifer();
     g.setOeffnung(1);
     const grad = (zahnachse(g) * 180) / Math.PI;
-    expect(Math.abs(grad), `Zahnachse ${grad.toFixed(2)}° gegen die Senkrechte`).toBeLessThan(0.5);
+    /*
+     * Nicht „irgendwie schräg", sondern GENAU die Eigenbiegung des Zahns: Der
+     * Sitz ist tangential, also bleibt exakt der Winkel stehen, um den die
+     * Achse hinter ihrer Sitztangente liegt. Steht hier etwas anderes, ist
+     * entweder der Sitz wieder gedreht (der Knick) oder der Anschlag verschoben.
+     */
+    expect(grad, `Zahnachse ${grad.toFixed(2)}° gegen die Senkrechte`).toBeCloseTo(
+      (zahnEigenwinkel() * 180) / Math.PI,
+      1
+    );
+    /* Und tangential heißt: die Anstellung ist null. */
+    expect(zahnAnstellung() * 1000).toBeCloseTo(0, 6);
   });
 
   it("dreht den Zahn starr mit der Schale — keine laufende Korrektur", () => {
@@ -412,11 +434,16 @@ describe("Fünfschalen — Maße", () => {
       const t = s / 20;
       g.setOeffnung(t);
       /*
-       * Lotrecht bei `OFFEN`, starr dazwischen: Der gemessene Winkel (+ = Spitze
-       * nach aussen) ist genau `Schwenk − OFFEN`. Weicht er davon ab, dreht
-       * jemand den Zahn mit — und das wäre eine Animation, keine Anstellung.
+       * Der gemessene Winkel (+ = Spitze nach aussen) ist genau
+       * `Schwenk − OFFEN + Eigenbiegung`. Der erste Teil ist die Schale, der
+       * zweite die feste Schieflage des Zahns. Weicht er davon ab, dreht jemand
+       * den Zahn mit — und das wäre eine Animation, keine Anstellung.
+       *
+       * Bis E-069 stand hier `Schwenk − OFFEN` ohne den zweiten Teil, weil der
+       * Sitz die Eigenbiegung wegdrehte. Die Zusage ist dieselbe geblieben:
+       * über den GANZEN Weg genau eine Konstante Unterschied.
        */
-      const soll = ((schwenkFuer(t) - OFFEN) * 180) / Math.PI;
+      const soll = ((schwenkFuer(t) - OFFEN + zahnEigenwinkel()) * 180) / Math.PI;
       expect((zahnachse(g) * 180) / Math.PI, `Öffnung ${t.toFixed(2)}`).toBeCloseTo(soll, 1);
     }
   });

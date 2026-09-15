@@ -151,11 +151,16 @@ describe("Traversenblatt — die harten Bedingungen", () => {
       expect(m.grabtiefe, `${m.name} gräbt anders tief`).toBeCloseTo(gemessen[0]!.grabtiefe, 6);
     }
     /*
-     * Und sie liegt auf den Zehntelmillimeter dort, wo sie am 14.09. lag.
+     * Und sie liegt auf den Zehntelmillimeter dort, wo sie liegen soll.
      * `toBeGreaterThan(2.7)` stand hier und hätte jede Variante durchgelassen,
-     * die 4 cm tiefer gräbt — 2,7511 m ist die Zahl, die gilt.
+     * die 4 cm tiefer gräbt.
+     *
+     * Von 2,7511 auf 2,7069 mit E-069: Der Zahn sitzt seitdem tangential auf
+     * dem Schalenende statt um 12,15° gegengedreht, und damit waelzt seine
+     * Spitze auf halbem Schliessweg 4,4 cm weniger weit nach unten aus. Die
+     * Traverse hat damit nichts zu tun — genau das prueft die Schleife darueber.
      */
-    expect(gemessen[0]!.grabtiefe).toBeCloseTo(2.7511, 4);
+    expect(gemessen[0]!.grabtiefe).toBeCloseTo(2.7069, 4);
   });
 
   it("lässt die fünf Spitzen weiterhin zusammenlaufen", () => {
@@ -183,9 +188,16 @@ describe("Traversenblatt — die harten Bedingungen", () => {
     expect(gemessen[0]!.huellkreis).toBeLessThan(3.3805);
     /* Die fünf Unveränderlichen des Auftrags E-039, als Zahlen. */
     expect(gemessen[0]!.bauhoehe).toBeCloseTo(2.505, 3);
-    expect(gemessen[0]!.huellkreis).toBeCloseTo(3.232, 3);
+    /*
+     * Huellkreis 3,232 → 3,226 und Spitzenabstand 142,3 → 137,6 mm mit E-069:
+     * Der tangential sitzende Zahn dreht seine Spitze nicht mehr nach aussen.
+     * Beides ist eine VERBESSERUNG gegenueber dem Vertrag — der Huellkreis
+     * bleibt unter der Grenze 3,3805, und die fuenf Spitzen treffen sich
+     * geschlossen 4,7 mm naeher an der Achse.
+     */
+    expect(gemessen[0]!.huellkreis).toBeCloseTo(3.226, 3);
     expect(gemessen[0]!.breiteZu).toBeCloseTo(2.19, 3);
-    expect(gemessen[0]!.spitzenAufAchse * 1000).toBeCloseTo(142.3, 1);
+    expect(gemessen[0]!.spitzenAufAchse * 1000).toBeCloseTo(137.6, 1);
     expect(gemessen[0]!.sektor).toBeCloseTo(26.34, 2);
   });
 

@@ -4094,3 +4094,150 @@ Bild `docs/f5-zahnknick-2026-09-15.svg`:
    hängt statt lotrecht zu stehen? Das ist der ganze Preis von B.
 3. Zeile 3, geschlossen auf der Betonkante: Der graue Schatten ist die tiefste
    Stellung auf dem Schließweg. **Sie** hält den Arm oben, nicht die Traverse.
+
+### E-069 — Der Zahn sitzt jetzt tangential: Variante B ist gebaut (15.09.2026)
+
+**Entscheidung.** Patrick hat am Blatt `docs/f5-zahnknick-2026-09-15.svg` **Variante
+B** gewählt. Gebaut: `zahnAnstellung()` von **−12,15° auf 0,00°**, der Anschlag
+bleibt bei 96,25°. Der Zahn setzt das Schalenende tangential fort — am Übergang
+gibt es keinen Richtungssprung mehr. Dazu behoben: `FUENFSCHALEN.tiefe()` maß
+nur den Knoten `07_ZAHN` und lag damit 1,4 cm daneben.
+
+**Anlass.** Patrick am 15.09.2026, vor `docs/f5-greiferschale.png` und einem
+Vorbildfoto (`docs/f5-vorbild-aufnahme-patrick-2026-09-15.jpg`): „dieser harte
+Knick im Zahn, den gibt es nicht. Das ist nicht so." Und zur zweiten Frage:
+„Reicht, wenn der Zahn stimmt."
+
+**Der Preis, und er ist bewusst.** Bei voll geöffnetem Greifer hängt der Zahn
+jetzt **12,15° nach innen** statt lotrecht zu stehen. Das ist eine Entscheidung
+**gegen** Patricks eigene Ansage vom **13.09.2026** („wenn die Spinne offen ist,
+sollten die Schalen weiter offen gehen, sodass die Spitzen senkrecht stehen"),
+getroffen von ihm selbst am **15.09.2026** am Bild. **Bitte nicht reparieren.**
+Beide Daten stehen im Quelltext an `zahnAnstellung` und im Wächter
+`test/fuenfschalen.test.ts` („hängt bei voller Öffnung genau um seine
+Eigenbiegung nach innen").
+
+Die Alternative C hätte beides gehalten — für den Preis, dass der Hebelarm des
+Zylinders ganz offen von 118 auf 47 mm fällt. Das ist genau die Zahl, für die
+E-039 die Traverse umgebaut hat.
+
+**Vorhersage gegen Messung am gebauten Stand.** Vier Maße, vorher aus E-068
+gerechnet, jetzt am gebauten Netz nachgemessen:
+
+| | vorher (A) | vorhergesagt | **gemessen** |
+|---|---|---|---|
+| **Schwebehöhe geschlossen** | 23,8 cm | 19,4 cm | **19,4 cm** |
+| **Maulweite offen** | 3,176 m | 3,095 m | **3,095 m** |
+| **Korbtiefe geschlossen** | 0,9792 m | 0,9792 m | **0,9792 m** |
+| **Zahnwinkel bei Bodenkontakt** | 34,2° | 23,5° | **23,5°** |
+
+**Die Vorhersage trifft auf die letzte gedruckte Stelle.** Das ist kein Zufall:
+Beide Zahlenreihen kommen aus demselben Werkzeug
+(`tools/fuenfschalen/zahnknick.ts`), das vorher eine ausgetauschte Greiferspitze
+und jetzt den gebauten Stand vermisst.
+
+**Die beiden Wächter, an denen C gescheitert ist, sind NICHT nachgezogen** und
+laufen unverändert: Zylinderneigung offen **15,4°** / geschlossen 20,7° / größte
+24,4°, Hebelarm offen **118 mm** und über den ganzen Weg über 115 mm. B kostet
+davon nichts.
+
+**Was sich nebenbei verbessert hat** — beides, weil die Zahnspitze nicht mehr
+nach außen gedreht wird: Hüllkreis **3,232 → 3,226 m** (Grenze 3,3805), und die
+fünf Spitzen treffen sich geschlossen **142,3 → 137,6 mm** von der Achse, also
+näher. Sektor 26,34°, Bauhöhe 2,505 m, Breite 2,190 m, Nettokorb 1.525 l — alle
+unverändert.
+
+**Der Messfehler ist behoben, und er wirkt in dieselbe Richtung.**
+`FUENFSCHALEN.tiefe()` griff nur `07_ZAHN` ab; gemessen reicht der **Rücken des
+Zinken geschlossen 1,4 cm tiefer** als der Zahn. Jetzt zählt jedes Netz der
+Schale. Am Bodenanschlag ändert das zusammen mit der neuen Form:
+
+| | vorher | nachher |
+|---|---|---|
+| `tiefe(zu)` | 2,4988 m | **2,5127 m** (+1,4 cm) |
+| `maxTiefe` — daran setzt der Arm ab | 2,7511 m | **2,7071 m** (−4,4 cm) |
+| `sensorRadius` | 1,2511 m | **1,2289 m** |
+
+Der Arm setzt also **4,4 cm tiefer** ab, und der Korbboden von `imKorb` liegt
+geschlossen **1,4 cm tiefer**. Beides hilft beim selben: flach auf dem Beton
+Liegendes. Der Sensorradius fällt dabei zurück auf die Mittellinienrechnung aus
+E-048 (2,5489 + 0,18 − 1,50), weil 2,7071 − 1,50 = 1,2071 kleiner ist — die
+Formel nimmt das Maximum der beiden und folgt damit der Form, statt eine Zahl
+festzuhalten.
+
+**Und es kostet keine Rechenzeit.** `tiefe()` läuft in `imKorb` je Kandidat und
+Bild. Von „nur der Zahn" auf „die ganze Schale" wären das 1.296 statt rund 100
+Punkte gewesen; `tiefstenRand` kürzt sie vorher auf die, die überhaupt einmal
+der tiefste sein können — der Sieger über 2.000 Schwenkstellungen, doppelte
+weggelassen.
+
+**Die Schulter am Arm bleibt stehen — gemessen, ausgelaufen, zurückgenommen.**
+Patricks gelber Kringel auf dem Vorbildfoto liegt auf dem Übergang Schale →
+Lager, und dort sitzt seit dem 14.09.2026 ein absichtlicher Absatz
+(`SCHULTER_AB` 0,42 · `SCHULTER_BIS` 0,74 · `SCHULTER_VOR` 0,22). Er ist auch
+nach dem Zahnumbau da: Im stärksten Zehntel verliert der Arm das **3,79-fache**
+seines mittleren Dickenabfalls (`tools/fuenfschalen/kontur.ts`).
+
+Ihn auszulaufen ist gebaut, gemessen und **wieder zurückgenommen**. Eine einzige
+Glättung über die ganze Ferse (`w = t²·(3−2t)`) bringt den Absatz auf **1,68** —
+und kostet dem **Zylinderauge seinen Sitz im Guss**: Es steht danach **60 statt
+26 mm** vor dem `06_ZINKEN`. Genau diese Eigenschaft hat E-013 erkämpft, als die
+Konsole abgeschafft wurde („der Zinken und dieser Metallblock, das ist
+eigentlich EIN Gusselement"). Eine Entscheidung vom 14.09. aufzuheben und dabei
+eine vom 14.09. zu brechen ist kein Fortschritt. Die Schulter gehört in ein
+Paket mit der Anlenkung; beide Zahlen stehen jetzt im Quelltext.
+
+**Die Querschnittsstufe am Zahnsitz bleibt auch — und sie ist kein Knick.**
+Gemessen an der Aussenkontur über dem Schalenkreis läuft die Linie am Sitz mit
+**0,94°** durch; das ist das Eigenrauschen des Verfahrens. Die Stufe sitzt
+INNEN: Die Schale endet mit 98,5 mm (Blech plus Strebe), der Zahn beginnt mit
+38 mm. Das ist die Trennfuge eines auswechselbaren Verschleißteils, und E-013
+beschreibt sie selbst so („der Zahn wird abgeschraubt und ersetzt, wenn er
+runter ist"). Den Zahn auf den vollen Querschnitt zu setzen hieße, seine Spitze
+von 20 auf 51 mm zu verdicken — das widerspräche der Ansage vom 13.09.
+(„Kantenschutz, keine Schneide"). **Das ist eine Formfrage für Patrick, keine
+Reparatur.**
+
+**Der Wächter gegen den Knick.** Neu: `test/zahnkontur.test.ts`, 7 Prüfungen auf
+zwei Ebenen — an der Zahl (`zahnAnstellung()` ist null) und am gebauten Netz
+(Aussenkontur über dem Schalenkreis, Ausgleichsgeraden vor und hinter dem Sitz).
+Jede Schranke hat eine Gegenprobe, die MELDEN muss:
+
+| | gemessen |
+|---|---|
+| gebaut (tangential) | **0,94°** |
+| GEGENPROBE: Stand vor E-069 (−12,15°) | **11,90°** |
+| GEGENPROBE: doppelt gegengedreht (−24,29°) | **24,62°** |
+
+Die Schranke steht auf **4°**. Sie lässt den gebauten Stand mit gut dem
+Doppelten seines Rauschens durch und meldet den alten dreifach sicher. Und die
+Gegenprobe wächst MIT dem Knick, statt nur anzuschlagen — beide gemessenen Werte
+treffen den eingestellten Winkel auf ein Grad. *Die erste Fassung der Messung
+hat den Knick VERKEHRT HERUM gemeldet (8,46° für die glatte Form, 3,44° für die
+geknickte), weil sie längs der Zahnbahn maß — und die dreht sich mit. Der
+Schalenkreis steht fest; das ist der Bezug.*
+
+**Verworfene Alternative.** Variante C bauen und die beiden Wächter „Neigung
+unter 25°" und „Hebelarm > 0,115 über den ganzen Weg" nachziehen. Das ist der
+Fehler, vor dem diese Wächter selbst warnen: „Weit gesetzte Grenzen hätten den
+Umbau nicht bemerkt."
+
+**Abnahmekriterium.** `npm test` grün — **1.075 Tests in 94 Dateien** (vorher
+1.068 in 93). `npm run build` grün. **Die Sichelkralle ist nachweislich
+unangetastet:** Abdruck vor und nach dem Umbau, `tools/greifer-abdruck.ts` gegen
+`greifer-abdruck-vergleich.ts` — 112 Netze in gleicher Reihenfolge, **10.330
+Werte** (5.020 Bewegung, 110 Kollider, 5.200 Korb), **größter Unterschied
+0,000e+0**.
+
+**Auf dem Gerät zu prüfen.**
+
+1. Mit dem Fünfschalengreifer ein **flaches Blech vom Beton** aufnehmen. Er
+   setzt jetzt 4,4 cm tiefer ab und schließt 19,4 statt 25,2 cm über dem Boden,
+   und sein Korbboden reicht 1,4 cm weiter herunter. Geht es leichter als
+   heute Nachmittag — oder stört es immer noch?
+2. Den Greifer **ganz aufmachen** und von der Seite ansehen: Der Zahn hängt
+   jetzt 12° nach innen statt lotrecht. Stört das beim **Einstechen in den
+   Haufen**? Das ist der ganze Preis von B.
+3. Den Übergang **Schale → Zahn** ansehen (Vorschau `/greifer.html`, Greifer
+   offen): Ist der harte Knick weg? Die Kontur läuft jetzt durch; die
+   verbleibende Stufe innen ist die Trennfuge des auswechselbaren Zahns.
