@@ -3,6 +3,16 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import { BED_HALF_W } from "./routes";
 
 /**
+ * Oberkante des Ladeflächen-KOLLIDERS in Flächenkoordinaten.
+ *
+ * Abgeschrieben aus `vehicles.ts`: Der Quader hat Halbhöhe 0,30 und sitzt auf
+ * −0,26, seine Oberkante liegt also auf +0,04. Hier gespiegelt statt
+ * importiert, weil der Modellbau keine Zustandsmaschine mitziehen soll;
+ * `test/ladeflaeche.test.ts` hält beide Fassungen zusammen.
+ */
+export const FLAECHE_KOLLIDER_OBEN = 0.04;
+
+/**
  * Modellbau der Anlieferfahrzeuge.
  *
  * Hier entsteht, was man sieht: Fahrerhaus, Ladefläche, Bordwände,
@@ -671,7 +681,21 @@ export function buildVehicleModel(v: VehicleModelContext): VehicleModelParts {
   v.bedGroup.position.set(0, 1.05, -v.bedLen / 2); // schließt bündig mit dem Heck ab
   v.group.add(v.bedGroup);
   const floor = new THREE.Mesh(new THREE.BoxGeometry(bedW, 0.12, v.bedLen), bedMat);
-  floor.position.set(0, 0, v.bedLen / 2);
+  /*
+   * Die Oberkante des Blechs liegt auf der Oberkante des KOLLIDERS (+0,04),
+   * nicht zwei Zentimeter darueber (E-051).
+   *
+   * Vorher stand das Blech mittig auf 0 und damit mit seiner Oberkante auf
+   * +0,06 — alles, was auf der Flaeche lag, wurde grundsaetzlich zwei
+   * Zentimeter eingesunken gezeichnet. Bei 12 cm Blechdicke ist das ein
+   * Sechstel, und zusammen mit dem, was schwere Stapel zusaetzlich
+   * durchdruecken, schaute ein Stueck unten heraus.
+   *
+   * Angeglichen wird hier und nicht am Kollider: Den Quader dicker zu machen
+   * hat den Kipper-Katapult messbar verschlechtert (Mittel 122 → 160 km/h ueber
+   * 24 Saaten), weil seine Rueckwand am Kipplager hoeher wird.
+   */
+  floor.position.set(0, FLAECHE_KOLLIDER_OBEN - 0.06, v.bedLen / 2);
   floor.castShadow = true;
   v.bedGroup.add(floor);
   const isContainer = v.kind === "abholer";
