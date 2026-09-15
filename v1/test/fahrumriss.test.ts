@@ -113,8 +113,16 @@ function fahre(route: Array<[number, number]>, kind: string, reverse: boolean): 
   return out;
 }
 
-describe("Kein Fahrzeugumriss schneidet ein festes Bauwerk", () => {
-  it("auf keiner Route und in keinem Halt", () => {
+/**
+ * Alle Strecken, die auf dem Platz wirklich gefahren werden.
+ *
+ * Steht als eigene Funktion da, seit ein zweiter Waechter dieselbe Liste
+ * braucht (E-041, der Startplatz des Muellcontainers). Zwei Abschriften
+ * derselben Liste laufen auseinander, sobald eine Route dazukommt — und der
+ * zweite Waechter prueft dann eine Strecke weniger, ohne es zu sagen.
+ */
+function alleStrecken(): Array<[string, Array<[number, number]>, string, boolean]> {
+  {
     neueAbladestelle();
     neueAbholstelle();
     const lager = CONFIGS.filter((c) => c.lager === true);
@@ -156,6 +164,13 @@ describe("Kein Fahrzeugumriss schneidet ein festes Bauwerk", () => {
         true,
       ]);
     }
+    return strecken;
+  }
+}
+
+describe("Kein Fahrzeugumriss schneidet ein festes Bauwerk", () => {
+  it("auf keiner Route und in keinem Halt", () => {
+    const strecken = alleStrecken();
     /*
      * ERST PRUEFEN, OB DIE STRECKE EINE IST.
      *
@@ -196,4 +211,50 @@ describe("Kein Fahrzeugumriss schneidet ein festes Bauwerk", () => {
     expect(zeilen, ["Durchdringungen:", ...zeilen].join(" / ")).toEqual([]);
   });
 
+  it("und keiner faehrt durch den Startplatz des Muellcontainers", () => {
+    /*
+     * DER MUELLCONTAINER STEHT IN KEINER FESTEN LISTE (E-034) — er ist
+     * versetzbar und meldet seinen Umriss zur Laufzeit
+     * (`ContainerManager.hindernisse`). Der Waechter oben laeuft deshalb an
+     * ihm vorbei, ohne ihn je anzufassen: Bis E-041 stand in der Uebergabe
+     * „kein Fahrzeugumriss schneidet den Container", geprueft hatte das
+     * niemand.
+     *
+     * Hier wird er geprueft, und zwar nur an seinem STARTPLATZ. Wohin der
+     * Spieler ihn stellt, ist seine Sache — auch mitten in die Einfahrt; dann
+     * hupt der Fahrer, und das ist richtig so. Am Morgen aber soll kein Wagen
+     * durch ihn hindurchfahren.
+     *
+     * Gemessen am 15.09.2026: 3,62 m Luft, am naechsten kommt ihm der Kipper
+     * auf der Anfahrt.
+     */
+    const muell = CONFIGS.find((c) => c.id === "r_rubble")!;
+    expect(muell.kind, "der MUELL ist kein versetzbarer Container mehr").toBe("rolloff");
+    expect(
+      Number.isFinite(muell.x) && Number.isFinite(muell.z),
+      `Startplatz (${muell.x} | ${muell.z}) ist keine Koordinate`
+    ).toBe(true);
+    const platz = {
+      x: muell.x,
+      z: muell.z,
+      hw: muell.size[0] / 2,
+      hd: muell.size[1] / 2,
+      label: "MUELL Startplatz",
+    };
+    const treffer = new Map<string, number>();
+    let schritte = 0;
+    for (const [name, route, kind, rev] of alleStrecken()) {
+      for (const r of fahre(route, kind, rev)) {
+        schritte++;
+        const d = ueberlappung(r, platz);
+        if (d > 0.01) treffer.set(name, Math.max(treffer.get(name) ?? 0, d));
+      }
+    }
+    // Ohne diese Zeile waere der Test gruen, wenn die Streckenliste leer waere.
+    expect(schritte, "keine einzige Fahrzeuglage geprueft").toBeGreaterThan(500);
+    const zeilen = [...treffer.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([k, d]) => `${d.toFixed(2)} m  ${k}`);
+    expect(zeilen, ["Durchfahrten durch den Container:", ...zeilen].join(" / ")).toEqual([]);
+  });
 });

@@ -2156,3 +2156,131 @@ Grundriss vorher/nachher: `docs/messungen/2026-09-15_eine-mulde.svg`.
    15 Minuten): Steht der Container morgens leer da, und liegt der Müll im
    ABFALL-Silo an der Südmauer?
 >>>>>>> worktree-agent-a7711447ab574db2a
+
+---
+
+### E-041 — Der Müllcontainer steht morgens neben der Buntmetall-Mulde (15.09.2026)
+
+**Entscheidung.** Der Startplatz des Müllcontainers wandert von
+**(−2,8 | −15,4)** auf **(−3,79 | −14,11)**. Maße, Gewicht, Kennzeichen
+`platzinventar` und die Regel „kein Zuhause, kein Zurückschnappen" bleiben
+unverändert.
+
+Ansage Patrick auf die Frage, ob ihn der Container fünf Meter geradeaus vor
+dem Bagger stört: **„Direkt neben Buntmetall-Mulde."**
+
+**Begründung — die Koordinate ist gerechnet, nicht gegriffen.** Vier Schranken
+gelten gleichzeitig:
+
+| | |
+|---|---|
+| 1 Mitte im Schwenkband | 5,80 … 9,20 m vom Sitz (−0,5 \| −22,5) |
+| 2 kein Kontakt zur Mulde | Wände, Sockel (2 Lagen, 1,00 m), Schwellensteine bis x −4,95 |
+| 3 Fahrlinie nach vorn frei | \|x + 0,5\| ≥ 1,80 + 1,30 (`CHASSIS_PAD`) = 3,10 |
+| 4 Rückfahrspur frei | x + 1,80 ≤ 6,30 − 1,55 − 1,40 = 3,35 |
+
+Aus 3 und 4 zusammen folgt **x ≤ −3,60**: Nach Osten auszuweichen verlangte
+x ≥ 2,60, und das verbietet 4. Damit liegt die Westkante des Containers bei
+x ≤ −5,40, also hinter der Schwelle der Mulde (Außenkante −4,95). **Östlich
+der Mulde — dort, wo er stand — gibt es überhaupt keinen Platz mehr, der nicht
+in der Fahrlinie liegt.** Bleibt der Streifen nördlich von ihr; ihre Nordwand
+endet auf z −16,45.
+
+Im 5-cm-Raster über den ganzen Platz abgesucht (x −14 … 8, z −34 … −6, Umriss
+gegen Umriss statt Punktprobe) bleibt genau **eine** freie Tasche übrig:
+**x −4,67 … −3,60, z −14,30 … −13,84** (1,07 × 0,46 m). „Direkt neben der
+Mulde" ist damit keine Vorliebe, sondern das Einzige, was die vier Schranken
+zusammen noch zulassen.
+
+Genommen wird der **Mittelpunkt dieser Tasche** — der eine Punkt, der von
+allen drei engen Grenzen gleich weit weg ist. Mit s als diesem Abstand:
+x = −3,60 − s, z = −14,30 + s, hypot(3,10 + s; 8,20 + s) = 9,20 − s, also
+s² + 41 s − 7,79 = 0 → **s = 0,189 m**.
+
+| | |
+|---|---|
+| Mitte (−3,79 \| −14,11) | **9,01 m** vom Sitz (Band bis 9,20) |
+| Grundfläche | x −5,59 … −1,99, z −16,26 … −11,96 |
+| zur Mulde (Nordwand) | **0,19 m** — vorher 0,35 m zur Schwelle |
+| zur Fahrlinie | **0,19 m** — vorher **−0,80 m**, also mittendrin |
+| zur Rückfahrspur | **5,34 m** |
+| zum nächsten Fahrzeugumriss | **3,62 m** (Kipper auf der Anfahrt) |
+
+**Was es kostet, als Messung und nicht als Einwand.** Vom Sitz aus liegen noch
+**53 %** seiner Grundfläche im Schwenkband; vorher waren es 82 %. Erreichbar
+ist die **Südhälfte**, die zur Mulde hin — die Nordkante ist 11,04 m weg. Mehr
+geht an dieser Stelle nicht: Die Tasche ist nur 0,19 m „dick". Jeder
+Zentimeter nach Süden geht in die Mulde, jeder nach Osten in die Fahrlinie,
+jeder nach Norden aus dem Band. Der Container bleibt frei versetzbar; wer ihn
+lieber ganz in Reichweite hat, schiebt ihn und lebt damit, dass die Maschine
+nicht mehr geradeaus fahren kann.
+
+**Verworfene Alternativen.**
+
+- **Ihn östlich der Mulde lassen und nur nach Norden schieben** (näher an
+  Patricks Wortlaut): geht nicht, siehe oben — östlich der Mulde ist jeder
+  Platz in der Fahrlinie.
+- **Ihn quer stellen** (4,30 m in x, 3,60 m in z): bringt 58 % statt 53 % im
+  Band und eine größere Tasche, dreht aber beide Maße gegeneinander, deren
+  Herleitung im Datensatz steht. Vorschlag, keine stille Änderung — siehe
+  „Offen".
+- **Ihn dicht an die Mulde setzen, ohne Luft:** Er ist ein dynamischer Körper.
+  Wer ihn in eine Wand stellt, lässt ihn im ersten Physikschritt wegspringen
+  (v2 E-010).
+
+**Nebenbefunde, beide beim Nachrechnen aufgefallen.**
+
+1. **Die Punktprobe in `test/silos.test.ts` hat nie geprüft, was sie
+   behauptete.** Sie stach neun Stellen im Raster 0,5 m ab und fragte
+   `hitsObstacle`. Gegengerechnet: Ein Startplatz **mitten in der
+   Presskammer** kommt da glatt durch, weil die Kammer innen offen ist und
+   keine der neun Stellen in einer Wand liegt. Ersetzt durch Rechteck gegen
+   Rechteck über die ganze Hindernisliste, Schranke 0,15 m.
+2. **`test/fahrwerk.test.ts` war grün aus dem falschen Grund.** Er maß seit
+   gestern Abend rückwärts, mit dem Container als Begründung — jetzt wieder
+   vorwärts. Dabei kam heraus: Das Rad zeigt immer den Stand des **vorigen
+   Bildes**, weil `Excavator.update` erst `syncMeshes()` ruft und danach die
+   gefahrene Strecke auf `wheelSpin` rechnet. Bei 3,2 m/s sind das 5,3 cm oder
+   0,086 rad — das Vierfache der Toleranz. Rückwärts fiel es nicht auf, weil
+   die Maschine nach 5,30 m am ersten Trennstein steht und auf den letzten
+   Bildern gar nicht mehr fährt: Wer stillsteht, hat keinen Rückstand.
+
+**Abnahmekriterium.** 776 Prüfungen in 69 Dateien grün, darunter drei neue
+Wächter, jeder einmal absichtlich zum Scheitern gebracht:
+
+- `test/silos.test.ts` „steht nicht in der Fahrlinie des Baggers nach vorn" —
+  am alten Platz: „nur 2.30 m neben der Fahrlinie, nötig sind 3.10 m".
+- `test/silos.test.ts` „berührt die Buntmetall-Mulde nicht, auch den Sockel
+  nicht" — 2D statt nur x, mit Ober- UND Untergrenze („das ist nicht mehr
+  daneben" ab 2,00 m).
+- `test/fahrumriss.test.ts` „keiner fährt durch den Startplatz des
+  Müllcontainers" — 27 Strecken × echte Wagenumrisse gegen den Grundriss;
+  vorher stand der Container in keiner Liste und wurde von diesem Wächter nie
+  angesehen.
+
+Grundriss nachgezogen: `docs/messungen/2026-09-15_eine-mulde.svg`.
+
+**Offen.**
+
+1. **Die 53 % Reichweite.** Soll der Container quer gestellt werden (58 %)?
+   Das dreht die Maße 3,60/4,30 gegeneinander; die Sperre gegen die Presse
+   (4,30 > 4,20) und die lichte Weite (3,42 > 3,38 m Sichelkralle) halten
+   beide Lagen aus. Empfehlung: erst am Gerät ansehen, dann entscheiden.
+2. **`docs/entscheidungen.md` enthält seit dem Zusammenführen am 15.09. abends
+   echte Konfliktmarken** (`<<<<<<< HEAD` Zeile 1540, `=======` 1950,
+   `>>>>>>>` 2158). Beide Seiten tragen Inhalt. Nicht mein Paket, aber es
+   gehört aufgelöst, bevor jemand den Stand liest.
+3. **Der eine Rahmen-Befund aus Nebenbefund 2** — Rad und Maschine ein Bild
+   auseinander — gehört in `excavator/excavator.ts` und damit nicht in dieses
+   Paket. Sichtbar ist es nicht; der Test rechnet es jetzt sauber mit.
+
+**Auf dem Gerät zu prüfen.**
+
+1. **Einfach losfahren, ohne zu lenken:** Kommt die Maschine jetzt an dem
+   Container vorbei, oder schrammt sie ihn? Gerechnet sind 0,19 m zwischen
+   Container und Tastrand — an der Blechkante rund 0,3 m.
+2. **Vom Sitz aus Müll in den Container werfen:** Erreichst du seine vordere
+   Hälfte bequem? Die hintere Kante ist mit Absicht außer Reichweite (11,04 m),
+   das ist der Preis dafür, dass er neben der Mulde steht.
+3. **Den Container greifen und woandershin stellen:** Bleibt er dort stehen,
+   und ist der Weg nach vorn danach wieder zu?

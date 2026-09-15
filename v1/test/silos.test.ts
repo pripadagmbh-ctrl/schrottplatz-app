@@ -22,7 +22,7 @@ import {
 } from "../src/world/containers";
 import { MATERIALS } from "../src/materials/catalog";
 import { YARD_MAX_X, YARD_MIN_X, YARD_D } from "../src/world/yard";
-import { hitsObstacle } from "../src/world/obstacles";
+import { hitsObstacle, STATIC_OBSTACLES } from "../src/world/obstacles";
 import { BAGGER_STAND, SCHWENK_INNEN, SCHWENK_AUSSEN, abstandVomStand } from "../src/world/baggerstand";
 import {
   ABLADE_SPUR_X,
@@ -237,6 +237,48 @@ describe("Die Reihe steht als L an Westwand und Suedwand (E-028)", () => {
 describe("Der Müllcontainer steht morgens richtig", () => {
   const muell = CONFIGS.find((c) => c.id === "r_rubble")!;
 
+  /**
+   * Abstand zweier achsparalleler Rechtecke. Negativ = sie durchdringen sich.
+   *
+   * Vorher stand hier eine PUNKTPROBE: neun Stellen im Raster 0,5 m um den
+   * Container, jede gegen `hitsObstacle`. Die prüft nicht, was sie zu prüfen
+   * vorgibt — ein Kasten kann eine Wand schneiden, ohne dass eine der neun
+   * Stellen darin liegt, und umgekehrt schlägt sie Alarm, wo 20 cm Luft sind.
+   * Nachgerechnet am 15.09.2026: Ein Platz mitten in der PRESSKAMMER kam
+   * durch diese Probe glatt durch. Jetzt wird gerechnet, nicht gestochert.
+   */
+  function rechteckAbstand(
+    a: { x: number; z: number; hw: number; hd: number },
+    b: { x: number; z: number; hw: number; hd: number }
+  ): number {
+    const dx = Math.abs(a.x - b.x) - (a.hw + b.hw);
+    const dz = Math.abs(a.z - b.z) - (a.hd + b.hd);
+    if (dx >= 0 && dz >= 0) return Math.hypot(dx, dz);
+    if (dx >= 0) return dx;
+    if (dz >= 0) return dz;
+    return Math.max(dx, dz);
+  }
+
+  /** Der Grundriss des Containers an seinem Startplatz. */
+  const grundriss = () => ({
+    x: muell.x,
+    z: muell.z,
+    hw: muell.size[0] / 2,
+    hd: muell.size[1] / 2,
+  });
+
+  /**
+   * So viel Luft muss zu jedem Bauwerk bleiben.
+   *
+   * Keine Vorliebe, sondern eine Untergrenze mit Grund: Der Container ist ein
+   * DYNAMISCHER Körper. Steht er beim Spielstart in einer Wand, schiebt Rapier
+   * ihn im ersten Schritt heraus — er springt weg, bevor Patrick ihn gesehen
+   * hat (v2 E-010: Spawn ohne Überlappung). Ein Fingerbreit reicht dagegen.
+   * Mehr ist auch nicht zu haben: Die einzige freie Tasche auf dem Platz ist
+   * 0,19 m „dick" (E-041).
+   */
+  const MINDESTLUFT = 0.15;
+
   it("sein Startplatz liegt im Schwenkband — vierte Pflichtstation", () => {
     const d = abstandVomStand(muell.x, muell.z);
     expect(d, `MUELL ${d.toFixed(2)} m vom Sitz`).toBeGreaterThanOrEqual(SCHWENK_INNEN);
@@ -263,7 +305,7 @@ describe("Der Müllcontainer steht morgens richtig", () => {
     ).toBeLessThan(ABLADE_SPUR_X - spurHalb);
   });
 
-  it("er ist oben offen und von allen Seiten frei zugänglich", () => {
+  it("er ist oben offen und steht auf freiem Boden", () => {
     /*
      * Seit E-034 ist der MUELL ein Absetzcontainer, keine Betonlego-Mulde
      * mehr: oben offen, überall gleich hoch, und er steht in KEINER
@@ -272,37 +314,102 @@ describe("Der Müllcontainer steht morgens richtig", () => {
      * führen kann, der wandert.
      *
      * Geprüft wird deshalb die Kehrseite: An seinem Startplatz steht nichts
-     * Festes, weder in ihm noch dicht daneben. Ein Container, der beim
-     * Spielstart in einer Wand klemmt, drückt sich beim ersten Schritt heraus.
+     * Festes. Gerechnet gegen JEDES Bauwerk der Liste, als Rechteck gegen
+     * Rechteck.
      */
     expect(muell.kind, "der MUELL ist wieder eine feste Mulde").toBe("rolloff");
-    const [w, d] = muell.size;
-    for (const dx of [-w / 2 - 0.5, 0, w / 2 + 0.5]) {
-      for (const dz of [-d / 2 - 0.5, 0, d / 2 + 0.5]) {
-        expect(
-          hitsObstacle(muell.x + dx, muell.z + dz, 0),
-          `am Startplatz des MUELL steht etwas bei (${(muell.x + dx).toFixed(2)} | ${(
-            muell.z + dz
-          ).toFixed(2)})`
-        ).toBeNull();
+    const g = grundriss();
+    // Erst prüfen, ob die Zahlen Zahlen sind (sonst ist jeder Vergleich falsch).
+    expect(
+      Number.isFinite(g.x) && Number.isFinite(g.z) && Number.isFinite(g.hw) && Number.isFinite(g.hd),
+      `Startplatz (${g.x} | ${g.z}) ist keine Koordinate`
+    ).toBe(true);
+    expect(STATIC_OBSTACLES.length, "die Hindernisliste ist leer").toBeGreaterThan(10);
+    let engste = Infinity;
+    let wo = "";
+    for (const o of STATIC_OBSTACLES) {
+      const d = rechteckAbstand(g, o);
+      if (d < engste) {
+        engste = d;
+        wo = o.label;
       }
+    }
+    expect(
+      engste,
+      `der MUELL kommt ${engste.toFixed(2)} m an „${wo}" heran (Schranke ${MINDESTLUFT})`
+    ).toBeGreaterThanOrEqual(MINDESTLUFT);
+  });
+
+  it("und er berührt die Buntmetall-Mulde nicht — auch den Sockel nicht", () => {
+    /*
+     * Ansage Patrick 15.09.2026: „Direkt neben Buntmetall-Mulde." Direkt
+     * daneben heisst dicht dran und trotzdem frei.
+     *
+     * Vorher stand hier ein reiner x-Vergleich: „westliche Kante des MUELL
+     * östlich der Schwelle". Der galt nur, solange der Container ÖSTLICH der
+     * Mulde stand. Seit E-041 steht er nördlich von ihr — derselbe Vergleich
+     * hätte dort Alarm geschlagen, obwohl 0,19 m Luft sind, weil er die
+     * z-Richtung gar nicht kennt. Jetzt zählt der Abstand der Grundrisse.
+     *
+     * Mitgerechnet wird der SOCKEL: Die Schwellensteine stehen 0,55 m dick vor
+     * der Mulde (Aussenkante x −4,95) und sind seit E-034 zwei Lagen = 1,00 m
+     * hoch. In der Hindernisliste steht die Schwelle nur mit ±0,35 m um
+     * x −5,50 — wer nur gegen die Liste rechnet, misst 0,20 m zu viel.
+     */
+    const g = grundriss();
+    for (const c of CONFIGS.filter((x) => x.sortierbox === true)) {
+      const teile = [
+        ...STATIC_OBSTACLES.filter((o) => o.label.startsWith(c.label)),
+        {
+          x: c.x + c.size[0] / 2 + 0.275,
+          z: c.z,
+          hw: 0.275,
+          hd: c.size[1] / 2,
+          label: `${c.label} Schwellensteine`,
+        },
+      ];
+      expect(teile.length, `${c.label}: keine Wände in der Hindernisliste`).toBeGreaterThan(1);
+      let engste = Infinity;
+      let wo = "";
+      for (const o of teile) {
+        const d = rechteckAbstand(g, o);
+        if (d < engste) {
+          engste = d;
+          wo = o.label;
+        }
+      }
+      expect(
+        engste,
+        `${c.label}: der MUELL kommt ${engste.toFixed(2)} m an „${wo}" heran`
+      ).toBeGreaterThanOrEqual(MINDESTLUFT);
+      // ... und „direkt neben" heisst auch: nicht am anderen Ende des Platzes.
+      expect(engste, `${c.label}: ${engste.toFixed(2)} m — das ist nicht mehr „daneben"`).toBeLessThan(
+        2.0
+      );
     }
   });
 
-  it("und er steht nicht vor der Öffnung der Metallmulde", () => {
+  it("und er steht nicht in der Fahrlinie des Baggers nach vorn", () => {
     /*
-     * Die Schwelle der Buntmetall-Mulde ist die einzige Kante, die ihm nah
-     * kommt. Gerechnet gegen die STEINE (Aussenkante x −4,95), nicht gegen die
-     * Muldenmitte: Die Steinreihe steht 0,55 m dick vor der Mulde.
+     * DER ANLASS VON E-041. Der Bagger schaut nach +z; fährt er geradeaus los,
+     * prüft `ExcavatorCollision.chassisHits()` seinen Standpunkt mit
+     * `CHASSIS_PAD` = 1,30 m Rand gegen die Hindernisliste — und die trägt zur
+     * Laufzeit auch die beweglichen Behälter (`setBuildingObstacles` in
+     * `main.ts`). Am alten Startplatz (−2,8 | −15,4) lagen zwischen Mitte und
+     * Fahrlinie 2,30 m, nötig sind 1,80 + 1,30 = 3,10 — die Maschine stand
+     * nach 4,95 m.
+     *
+     * Geprüft wird nur die Linie GERADEAUS. Wohin der Spieler den Container
+     * danach schiebt, ist seine Sache; am Morgen soll der Weg frei sein.
      */
-    for (const c of CONFIGS.filter((x) => x.sortierbox === true)) {
-      const schwelleAussen = c.x + c.size[0] / 2 + 0.55;
-      const luft = muell.x - muell.size[0] / 2 - schwelleAussen;
-      expect(
-        luft,
-        `${c.label}: der MUELL steht ${(-luft).toFixed(2)} m in der Schwelle`
-      ).toBeGreaterThan(0.2);
-    }
+    const CHASSIS_PAD = 1.3; // excavator/collision.ts
+    const noetig = muell.size[0] / 2 + CHASSIS_PAD;
+    const seitlich = Math.abs(muell.x - BAGGER_STAND.x);
+    expect(Number.isFinite(seitlich), "Seitenabstand ist keine Zahl").toBe(true);
+    expect(
+      seitlich - noetig,
+      `nur ${seitlich.toFixed(2)} m neben der Fahrlinie, nötig sind ${noetig.toFixed(2)} m`
+    ).toBeGreaterThan(0);
   });
 
   it("und er passt nicht in die Presse — das ist die Sperre, nicht eine Abfrage", () => {
