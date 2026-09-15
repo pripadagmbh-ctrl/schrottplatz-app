@@ -16,15 +16,27 @@
  * Blätter neu zu ziehen, wird hier rot.
  */
 import { describe, expect, it } from "vitest";
-import { STEMPEL_AUGE, TRAVERSE_Y, MASS, zahnAnstellung, OFFEN } from "../src/fuenfschalen/teile";
+import {
+  MASS,
+  OFFEN,
+  STEMPEL_AUGE,
+  TRAVERSE_Y,
+  ZYLINDER_AUFNAHME,
+  zahnAnstellung,
+} from "../src/fuenfschalen/teile";
 import { FORMEN, baue, zahnspitze } from "../tools/fuenfschalen/zahnformen";
 import {
   SAEULE_HEUTE,
   SAEULENROHR,
+  anlenkungAus,
   anlenkungBei,
+  kopfHerunter,
   korbmass,
   probe,
-} from "../tools/fuenfschalen/mittelsaeule";
+} from "../tools/fuenfschalen/saeulenrechnung";
+
+/** Länge des Zylinderrohrs (m) — dieselbe Ableitung wie in `rig.stelleSchale`. */
+const ROHR = MASS.zylinder.laenge * 0.6;
 
 const GRAD = 180 / Math.PI;
 
@@ -128,5 +140,71 @@ describe("Blatt 2 — die Mittelsäule, gerechnet und nicht gebaut", () => {
      * darüber trivial gleich. Die Welthöhe MUSS sich um genau die Säule ändern.
      */
     expect(heute.tiefeWelt - ohne.tiefeWelt).toBeCloseTo(SAEULE_HEUTE, 9);
+  });
+});
+
+describe("Blatt 3 — die Anlenkung: passt der Zylinder? (E-073)", () => {
+  /*
+   * Patrick, 15.09.2026: „Ich bräuchte schon irgendwie ne Zeichnung, ob das
+   * passt." Das Blatt `docs/f5-anlenkung-2026-09-15.svg` zeigt drei Wege. Hier
+   * steht, was es behauptet.
+   */
+  const HEUTE = anlenkungAus(ZYLINDER_AUFNAHME.y, STEMPEL_AUGE.y);
+  const BOLZEN_HOCH = anlenkungAus(ZYLINDER_AUFNAHME.y, TRAVERSE_Y);
+  const TRAVERSE_RUNTER = anlenkungAus(ZYLINDER_AUFNAHME.y - SAEULE_HEUTE, STEMPEL_AUGE.y);
+
+  it("kennt nur den Abstand — Bolzen hinauf und Traverse herunter sind dieselbe Rechnung", () => {
+    /*
+     * Der Kern des Blattes, und keine Behauptung, sondern eine Identität: In
+     * `hebelarm` und `zylinderLaenge` stehen ausschliesslich DIFFERENZEN von
+     * Aufnahme und Bolzen. Wer den Abstand um denselben Betrag schliesst,
+     * bekommt dieselbe Anlenkung — egal, welches der beiden Teile wandert.
+     *
+     * NICHT bitgenau, und das ist ehrlich so aufgeschrieben: Die beiden Wege
+     * addieren dieselben Zahlen in anderer Reihenfolge, und das letzte Bit
+     * einer Fliesskommazahl haengt daran. Gemessen sind 5,6e−17 m bei den
+     * Laengen und 2,8e−14 Grad beim Winkel — unvorstellbar wenig, aber nicht
+     * null, und ein `toBe` waere an dieser Stelle eine Luege.
+     */
+    expect(TRAVERSE_RUNTER.laengeZu).toBeCloseTo(BOLZEN_HOCH.laengeZu, 12);
+    expect(TRAVERSE_RUNTER.laengeOffen).toBeCloseTo(BOLZEN_HOCH.laengeOffen, 12);
+    expect(TRAVERSE_RUNTER.neigungMax).toBeCloseTo(BOLZEN_HOCH.neigungMax, 12);
+    expect(TRAVERSE_RUNTER.hebelMin).toBeCloseTo(BOLZEN_HOCH.hebelMin, 12);
+    /*
+     * GEGENPROBE: Ein anderer Abstand muss ein anderes Ergebnis geben. Ohne
+     * sie bewiese der Block oben nur, dass die Funktion konstant ist.
+     */
+    const halb = anlenkungAus(ZYLINDER_AUFNAHME.y, STEMPEL_AUGE.y + SAEULE_HEUTE / 2);
+    expect(halb.laengeOffen).not.toBeCloseTo(BOLZEN_HOCH.laengeOffen, 3);
+  });
+
+  it("zeigt, dass die Stange nur heute in ihr Rohr passt", () => {
+    /* Das Rohr ist fest; der Augenabstand offen ist die Probe. */
+    expect(ROHR).toBeCloseTo(0.42, 9);
+    expect(HEUTE.laengeOffen, "heute schaut die Stange heraus").toBeGreaterThan(ROHR);
+    /*
+     * GEGENPROBE und Befund in einem: Bei beiden Umbauten läge das Auge der
+     * Kolbenstange INNERHALB des Rohrs. Meldet dieser Block nicht, zeichnet
+     * das Blatt einen Zylinder, den es nicht gibt.
+     */
+    expect(BOLZEN_HOCH.laengeOffen, "Umbau: Auge läge im Rohr").toBeLessThan(ROHR);
+    expect(ROHR - BOLZEN_HOCH.laengeOffen).toBeGreaterThan(0.2);
+    expect(TRAVERSE_RUNTER.laengeOffen).toBeLessThan(ROHR);
+  });
+
+  it("legt bei Variante 3 den Kopf in den Korb und reisst oben eine Lücke auf", () => {
+    const drei = kopfHerunter(SAEULE_HEUTE, false);
+    /* Der Kopf steht dann unter der Bolzenebene — also im Korb. */
+    expect(drei.unterBolzen, "Kopf unter der Bolzenebene").toBeGreaterThan(0.1);
+    expect(drei.freiZuSchale, "Kopf berührt die Schalen fast").toBeLessThan(0.02);
+    /* Die Säule ist nicht weg, sie ist umgezogen: oben klafft dieselbe Länge. */
+    expect(drei.luecke).toBeCloseTo(SAEULE_HEUTE, 9);
+    /*
+     * GEGENPROBE: Ohne Verschiebung steht der Kopf ÜBER der Bolzenebene und
+     * hat Luft zu den Schalen. Sonst misst der Block oben nur sich selbst.
+     */
+    const null0 = kopfHerunter(0, false);
+    expect(null0.unterBolzen, "unverschoben darf der Kopf nicht im Korb stehen").toBeLessThan(0);
+    expect(null0.freiZuSchale).toBeGreaterThan(0.05);
   });
 });
