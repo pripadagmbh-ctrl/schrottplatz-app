@@ -65,6 +65,7 @@ import {
   schwenkFuer,
   stoffe,
 } from "./teile";
+import { type Starrkoerper, verschmilz } from "./verschmelzen";
 
 /** Höhenlage jeder Baugruppe (Mitte, in Metern unter dem Aufhängepunkt). */
 export const LAGE = {
@@ -135,6 +136,26 @@ export interface Zylinder {
   stab: THREE.Mesh;
   auge: THREE.Mesh;
   gehoertZu: Schale;
+}
+
+/**
+ * Wie der Greifer gebaut wird.
+ *
+ * `verschmolzen` ist der Normalfall: ein Netz je Starrkörper und Werkstoff
+ * (E-053, siehe `verschmelzen.ts`) — 217 Netze werden zu 58. Wer den Greifer
+ * in EINZELTEILEN braucht, schaltet es ab. Das tun genau die Werkzeuge und
+ * Wächter, die ein Teil über seinen Knotennamen suchen (`06_ZINKEN`,
+ * `06_ZYLINDERAUGE`, `06_AUGENKONSOLE`) — im zusammengelegten Baum gibt es
+ * diese Knoten nicht mehr, weil sie im selben Guss stecken.
+ *
+ * Der Zahn `07_ZAHN` bleibt in BEIDEN Fassungen ein eigenes Netz: An ihm wird
+ * die Grabtiefe gemessen. Am 14.09.2026 ist an dieser Baugruppe ein
+ * Messwerkzeug weggeworfen worden, weil es „äußerster Punkt = Spitze" annahm —
+ * bei einer nach innen gekrümmten Schale ist das die Rückseite. Ein Zahn ohne
+ * eigenen Knoten wäre genau dieser Fehler von neuem.
+ */
+export interface Bauart {
+  verschmolzen?: boolean;
 }
 
 export interface Greifer {
@@ -211,7 +232,11 @@ function rund(x: number): number {
   return Math.round(x * 1e5) / 1e5;
 }
 
-export function baueGreifer(st: Stoffe = stoffe(), form: Formsatz = FORM_BOGEN): Greifer {
+export function baueGreifer(
+  st: Stoffe = stoffe(),
+  form: Formsatz = FORM_BOGEN,
+  bauart: Bauart = {}
+): Greifer {
   nahtStoff(st);
   /* Verschiebung der Schale gegen ihren Bolzen — null im Vorgabe-Formsatz. */
   const schub = form.versatz - DREHPUNKT.versatz;
@@ -256,6 +281,17 @@ export function baueGreifer(st: Stoffe = stoffe(), form: Formsatz = FORM_BOGEN):
 
   const schalen: Schale[] = [];
   const zylinder: Zylinder[] = [];
+  /*
+   * Die Starrkörper, die am Ende zusammengelegt werden — alles, was sich
+   * gegeneinander NICHT bewegt. Der Kopf ist einer davon: Rotator, Gehäuse,
+   * Mitteltraverse und Stempel sitzen fest aneinander und drehen gemeinsam
+   * unter der Aufhängung. Der Adapter gehört NICHT dazu, er bleibt beim
+   * Drehen stehen.
+   */
+  const koerper: Starrkoerper[] = [
+    { ziel: adapter, quellen: [adapter], marke: "ADAPTER" },
+    { ziel: traverse, quellen: [drehwerk, gehaeuse, traverse, stempel], marke: "GRAPPLE_HEAD" },
+  ];
 
   for (let i = 0; i < MASS.schalen; i++) {
     const nr = String(i + 1).padStart(2, "0");
@@ -274,6 +310,12 @@ export function baueGreifer(st: Stoffe = stoffe(), form: Formsatz = FORM_BOGEN):
     const schale = baueGreiferschale(st, form.versatz);
     schale.name = `SHELL_BODY_${nr}`;
     gelenk.add(schale);
+    /*
+     * Haut, Zinken, Lagerauge, Zylinderauge und Augenkonsole sind EIN Guss —
+     * sie schwenken gemeinsam um den Bolzen am Stempel. Der Zahn bleibt
+     * daneben stehen (`SHELL_TIP_nn`), siehe `Bauart`.
+     */
+    koerper.push({ ziel: schale, quellen: [schale], marke: `SHELL_${nr}` });
 
     /*
      * Greiferspitze am Ende der letzten Station, in Laufrichtung der Schale.
@@ -323,9 +365,18 @@ export function baueGreifer(st: Stoffe = stoffe(), form: Formsatz = FORM_BOGEN):
     auge.name = `CYL_ROD_EYE_${nr}`;
     zylGelenk.add(rohrTeil);
     zylGelenk.add(stange);
+    /*
+     * Das Rohr ist ein Starrkörper: Mantel, Boden, Kopf, oberes Auge, Naht und
+     * die beiden Anschlüsse sitzen fest daran. Die Kolbenstange darunter
+     * gehört NICHT dazu — `stab` wird gedehnt, `auge` wird gesetzt, und beide
+     * bewegen sich einzeln.
+     */
+    koerper.push({ ziel: rohrTeil, quellen: [rohrTeil], marke: `CYL_BARREL_${nr}` });
 
     zylinder.push({ gelenk: zylGelenk, rohr: rohrTeil, stange, stab, auge, gehoertZu: schaleRef });
   }
+
+  if (bauart.verschmolzen !== false) verschmilz(koerper);
 
   let stand = 0;
 
@@ -382,6 +433,20 @@ export function baueGreifer(st: Stoffe = stoffe(), form: Formsatz = FORM_BOGEN):
     setDrehung,
     oeffnung: () => stand,
   };
+}
+
+/**
+ * Der Greifer in EINZELTEILEN — jedes Bauteil ein eigener, benannter Knoten.
+ *
+ * Für Werkzeuge und Wächter, die ein Teil über seinen Namen suchen und
+ * getrennt vermessen wollen (`06_ZINKEN`, `06_ZYLINDERAUGE`,
+ * `06_AUGENKONSOLE`, `04_GRUNDKOERPER`, `09_SAEULE`, `10_AUSLEGER_nn`). Der
+ * gespielte und ausgelieferte Greifer ist der zusammengelegte; diese Fassung
+ * ist dieselbe Form, nur nicht zusammengelegt — `test/verschmelzen.test.ts`
+ * hält beide Eckpunkt für Eckpunkt gegeneinander.
+ */
+export function baueGreiferInTeilen(st: Stoffe = stoffe(), form: Formsatz = FORM_BOGEN): Greifer {
+  return baueGreifer(st, form, { verschmolzen: false });
 }
 
 /** Hüllmaße des Greifers bei gegebenem Öffnungsgrad (Durchmesser, Tiefe). */

@@ -39,7 +39,7 @@ import {
   baueGreiferschale,
   stoffe,
 } from "../src/fuenfschalen/teile";
-import { baueGreifer } from "../src/fuenfschalen/rig";
+import { baueGreiferInTeilen } from "../src/fuenfschalen/rig";
 
 /** Die Schale allein — in ihrem Frame liegt der Bolzen im Ursprung. */
 function schale(): THREE.Group {
@@ -196,7 +196,8 @@ describe("Fünfschalen — der Steg am Zylinderauge", () => {
      * mit der Schale mit. Die Grabtiefe des Greifers ist 2,7511 m (Knoten
      * `07_ZAHN`), der Steg bleibt gut einen Meter darüber.
      */
-    const greifer = baueGreifer(stoffe());
+    /* In Einzelteilen — der Steg wird über seinen Namen gesucht (E-053). */
+    const greifer = baueGreiferInTeilen(stoffe());
     let tiefster = 0;
     for (let i = 0; i <= 20; i++) {
       greifer.setOeffnung(i / 20);

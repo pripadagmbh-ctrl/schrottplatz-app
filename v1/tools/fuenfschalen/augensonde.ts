@@ -19,7 +19,7 @@ import {
   ZYLINDER_AUFNAHME,
   stoffe,
 } from "../../src/fuenfschalen/teile";
-import { baueGreifer } from "../../src/fuenfschalen/rig";
+import { baueGreiferInTeilen } from "../../src/fuenfschalen/rig";
 import { A, A_NACHGESTELLT, B, C } from "./traverse-varianten";
 
 type Dreieck = number[];
@@ -128,7 +128,7 @@ function schattenriss(
 /** Was der Steg an der Silhouette einer Schale wirklich hinzufuegt (cm²). */
 function silhouette(oeffnung: number): void {
   const bauen = (mitSteg: boolean): THREE.Object3D => {
-    const g = baueGreifer(stoffe());
+    const g = baueGreiferInTeilen(stoffe());
     g.setOeffnung(oeffnung);
     g.wurzel.updateMatrixWorld(true);
     const schale = g.schalen[0]!.gelenk;
@@ -173,7 +173,7 @@ function main(): void {
     (MASS.traverse as { tiefe: number }).tiefe = v.durchmesser;
     console.log(`Variante ${v.name}`);
   }
-  const g = baueGreifer(stoffe());
+  const g = baueGreiferInTeilen(stoffe());
   g.setOeffnung(0);
   g.wurzel.updateMatrixWorld(true);
   const gelenk = g.schalen[0]!.gelenk;
