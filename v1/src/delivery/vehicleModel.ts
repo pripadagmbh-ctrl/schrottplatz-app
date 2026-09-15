@@ -37,6 +37,26 @@ export interface VehicleModelContext {
   tailGate: { hinge: THREE.Group; mesh: THREE.Mesh; body: RAPIER.RigidBody } | null;
 }
 
+/**
+ * Ein Rad, so wie die Federung es braucht.
+ *
+ * Federt der Wagen ein, senkt sich die GEFEDERTE Masse — Rahmen, Haus,
+ * Fläche, Ladung —, die Räder aber bleiben auf dem Boden stehen. Im Modell
+ * hängen sie an derselben Gruppe wie alles andere; also hebt der Ablauf sie
+ * um genau die Einfederung an ihrer Längsstelle gegen. Dafür braucht er die
+ * Ausgangshöhe und die Längslage jedes Radteils.
+ *
+ * Kein neues Netz: Es sind dieselben Meshes, die ohnehin gebaut werden, nur
+ * eingesammelt statt vergessen.
+ */
+export interface Rad {
+  mesh: THREE.Object3D;
+  /** Ausgangshöhe in der Gruppe, zu der das Rad gehört */
+  y0: number;
+  /** Längslage in derselben Gruppe */
+  z: number;
+}
+
 /** Die beweglichen Teile, die der Ablauf danach ansteuert. */
 export interface VehicleModelParts {
   tailGate: { hinge: THREE.Group; mesh: THREE.Mesh; body: RAPIER.RigidBody } | null;
@@ -44,6 +64,11 @@ export interface VehicleModelParts {
   crane: THREE.Group | null;
   /** Anhänger des PKW — hängt gelenkig an der Kupplung und wird nachgeführt */
   trailer: THREE.Group | null;
+  /**
+   * Räder der gefederten Einheit — beim LKW in Fahrzeug-, beim Gespann in
+   * Anhängerkoordinaten (dort federt nur der Anhänger, nicht der Zugwagen).
+   */
+  raeder: Rad[];
 }
 
 /**
@@ -78,7 +103,9 @@ function baueRad(
   z: number,
   r: number,
   breite: number,
-  zwilling: boolean
+  zwilling: boolean,
+  /** Sammelstelle für die Federung — sie schiebt die Räder gegen die Einfederung */
+  raeder?: Rad[]
 ): void {
   const gummi = new THREE.MeshStandardMaterial({ color: 0x1d1f21, roughness: 0.95 });
   const felge = new THREE.MeshStandardMaterial({
@@ -101,14 +128,17 @@ function baueRad(
     rad.position.set(px, y, z);
     rad.castShadow = true;
     ziel.add(rad);
+    raeder?.push({ mesh: rad, y0: y, z });
   }
   // Felge und Nabe nur aussen: innen sieht sie ohnehin niemand
   const rim = new THREE.Mesh(scheibe, felge);
   rim.position.set(x + seite * breite * 0.36, y, z);
   ziel.add(rim);
+  raeder?.push({ mesh: rim, y0: y, z });
   const hub = new THREE.Mesh(nabe, felge);
   hub.position.set(x + seite * breite * 0.45, y, z);
   ziel.add(hub);
+  raeder?.push({ mesh: hub, y0: y, z });
 }
 
 /**
@@ -362,7 +392,8 @@ function buildCarAndTrailer(
   v: VehicleModelContext,
   _paint: THREE.MeshStandardMaterial,
   dark: THREE.MeshStandardMaterial,
-  bedMat: THREE.MeshStandardMaterial
+  bedMat: THREE.MeshStandardMaterial,
+  raeder: Rad[]
 ): THREE.Group {
   const farben = [0x35618f, 0x7a2f2a, 0x2f5c3a, 0x8a8f95, 0xb08a3a, 0x2b2f36];
   const lack = new THREE.MeshStandardMaterial({
@@ -525,7 +556,7 @@ function buildCarAndTrailer(
     anhaenger.add(wand);
   }
   for (const rx of [-0.98, 0.98]) {
-    baueRad(anhaenger, rx, 0.33, zu(v.bedLen / 2), 0.33, 0.2, false);
+    baueRad(anhaenger, rx, 0.33, zu(v.bedLen / 2), 0.33, 0.2, false, raeder);
     // Kotflügel — ein Anhänger ohne sie ist ein Brett auf Rollen
     const kotfluegel = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.06, 0.96), dark);
     kotfluegel.position.set(rx, 0.72, zu(v.bedLen / 2));
@@ -560,10 +591,10 @@ export function buildVehicleModel(v: VehicleModelContext): VehicleModelParts {
   const bedMat = new THREE.MeshStandardMaterial({ color: 0x5c6166, roughness: 0.7, metalness: 0.4 });
 
   // Was der Ablauf danach ansteuert, wird hier gesammelt und zurückgegeben
-  const teile: VehicleModelParts = { tailGate: null, crane: null, trailer: null };
+  const teile: VehicleModelParts = { tailGate: null, crane: null, trailer: null, raeder: [] };
 
   if (v.kind === "pkw") {
-    teile.trailer = buildCarAndTrailer(v, paint, dark, bedMat);
+    teile.trailer = buildCarAndTrailer(v, paint, dark, bedMat, teile.raeder);
     return teile;
   }
   const chassis = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.5, v.bedLen + 1.6), dark);
@@ -629,7 +660,7 @@ export function buildVehicleModel(v: VehicleModelContext): VehicleModelParts {
   ];
   for (const [z, zwilling] of achsen) {
     for (const x of [-1.0, 1.0]) {
-      baueRad(v.group, x, 0.48, z, 0.48, 0.3, zwilling);
+      baueRad(v.group, x, 0.48, z, 0.48, 0.3, zwilling, teile.raeder);
     }
   }
   baueFahrerhaus(v, paint, dark, windowMat);

@@ -103,6 +103,29 @@ describe("Kundschaft", () => {
     }
   });
 
+  it("sagt es, statt zu würfeln, wenn im Profil kein Fahrzeug steht", () => {
+    /*
+     * BEFUND 15.09.2026 (E-044). Hier stand `c.vehicle ?? rollFahrzeug(...)`.
+     * Ein Prüfstand, der von Hand ein Profil baut und „Kipper" meint, bekam
+     * damit gelegentlich eine Pritsche untergeschoben — und der Wächter blieb
+     * grün. Ein stiller Rückfall auf den Zufall ist schlimmer als ein
+     * Absturz: Er macht aus einem kaputten Profil ein anderes, plausibles.
+     *
+     * Ein Profil ohne Fahrzeug ist außerdem widersprüchlich, nicht nur
+     * unvollständig: Seine Kilogramm sind aus einem Laderaum gerechnet, den
+     * es angeblich nicht gibt.
+     */
+    const halb = { ...ziehe(1)[0]!, vehicle: undefined } as unknown as CustomerProfile;
+    expect(() => vehicleForCustomer(halb)).toThrow(/ohne Fahrzeug/);
+  });
+
+  it("und jedes gewürfelte Profil bringt sein Fahrzeug selbst mit", () => {
+    for (const c of ziehe(200)) {
+      expect(c.vehicle, `${c.name} kommt ohne Fahrzeug`).toBeTruthy();
+      expect(vehicleForCustomer(c)).toBe(c.vehicle);
+    }
+  });
+
   it("gibt jedem Kunden einen Namen und ein Wort", () => {
     for (const c of ziehe(200)) {
       expect(c.name.length).toBeGreaterThan(2);

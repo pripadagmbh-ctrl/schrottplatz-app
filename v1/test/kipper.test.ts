@@ -249,14 +249,52 @@ describe("Kipper", () => {
      * Die Schranken halten den GEMESSENEN Stand fest: Es darf besser werden,
      * nicht schlechter.
      */
-    const saaten = [20260913, 1, 2, 3, 4, 5, 6, 7];
+    /*
+     * UND ACHT SAATEN WAREN AUCH KEINE MESSUNG (Befund 15.09.2026, E-044).
+     *
+     * Der Absatz darueber hat am Morgen die eine Saat durch acht ersetzt und
+     * daraus „Mittel 109, Spitze 255" abgelesen. Ueber VIERUNDZWANZIG Saaten
+     * nachgerechnet ist derselbe Stand in Wahrheit Mittel 116 und Spitze 267 —
+     * die Schranke „Mittel unter 140" war also nur deshalb gruen, weil acht
+     * Wuerfe zufaellig die ruhigeren waren. Die Streuung ist riesig: 56 bis
+     * 267 km/h beim selben Quelltext, je nachdem, welche Ladung faellt.
+     *
+     * Ein Mittel aus acht Proben mit dieser Streuung hat einen Fehler von rund
+     * 25 km/h — es kann einen Unterschied von 20 % schlicht nicht sehen. Genau
+     * diesen Unterschied musste die Federung aber nachweisen. Also stehen hier
+     * jetzt 24 Saaten, und die Schranken sind an DER Messung festgemacht.
+     *
+     * VIER STAENDE, je 24 Saaten. Zwei Aenderungen von E-044 wirken hier,
+     * und sie muessen auseinandergehalten werden:
+     *
+     *   Stand vom 15.09. frueh                      Mittel 116   Hoechst 267
+     *   + schwerere Fuhren (Massenverteilung heil)  Mittel 120   Hoechst 244
+     *   + Federung, beim Kippen FREI                Mittel 158   Hoechst 546
+     *   + Federung, beim Kippen gesperrt (gebaut)   Mittel 123   Hoechst 283
+     *
+     * Zeile 2 ist der Preis dafuer, dass die Fuhren endlich das wiegen, was
+     * angekuendigt war (die Verteilung in `loadCargo` hat vorher bis zu 96 %
+     * der Ladung verschluckt): Schwerer schlaegt haerter auf. Zeile 3 ist der
+     * Fehler, den die Sperre in `vehicles.updateFederung` verhindert — eine
+     * Ladeflaeche, die sich unter der abrutschenden Fuhre hebt und senkt,
+     * schiebt Stuecke in den Schlitz am Kipplager. Zeile 4 ist gebaut: Die
+     * FEDERUNG selbst kostet gegenueber Zeile 2 noch +3 km/h im Mittel und
+     * liegt damit innerhalb der Streuung (Standardfehler des Mittels rund
+     * 11 km/h bei dieser Verteilung).
+     *
+     * Die Schranken lassen Luft fuer die Streuung, aber nicht fuer Zeile 3:
+     * Wer die Sperre wieder herausnimmt, faellt hier auf — an beiden Zahlen.
+     */
+    const saaten = [20260913, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
+      12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23];
     const werte = saaten.map((s) => kippen(null, s).vmax * 3.6);
     const mittel = werte.reduce((a, b) => a + b, 0) / werte.length;
     const hoechst = Math.max(...werte);
     const liste = werte.map((w) => w.toFixed(0)).join(" ");
-    expect(mittel, `Mittel ${mittel.toFixed(0)} km/h ueber acht Ladungen (${liste})`).toBeLessThan(
-      140
-    );
-    expect(hoechst, `Hoechstwert ${hoechst.toFixed(0)} km/h (${liste})`).toBeLessThan(300);
-  }, 180000);
+    expect(
+      mittel,
+      `Mittel ${mittel.toFixed(0)} km/h ueber 24 Ladungen (${liste})`
+    ).toBeLessThan(150);
+    expect(hoechst, `Hoechstwert ${hoechst.toFixed(0)} km/h (${liste})`).toBeLessThan(360);
+  }, 600000);
 });

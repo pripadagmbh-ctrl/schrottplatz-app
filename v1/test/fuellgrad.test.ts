@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
+  ANHAENGER_HALB_BREITE,
+  ANHAENGER_WAND,
   BED_LEN,
   FUELL_KLASSEN,
   FUELL_REIHE,
@@ -150,7 +152,33 @@ describe("Herkunft der Ladeflächenmaße", () => {
   it("die halbe Innenbreite folgt `routes.BED_HALF_W` minus Wandstärke", () => {
     expect(LKW_HALB_BREITE).toBeCloseTo(BED_HALF_W - 0.08, 10);
     // und `vehicles.ts` rechnet genauso
-    expect(quelle("vehicles.ts")).toContain("const halbBreite = BED_HALF_W - 0.08;");
+    expect(quelle("vehicles.ts")).toContain("BED_HALF_W - 0.08");
+  });
+
+  it("der PKW-Anhänger wird mit seinen eigenen Maßen gepackt, nicht mit LKW-Maßen", () => {
+    /*
+     * BEFUND 15.09.2026. `fuellgrad.ts` rechnete das Volumen des Anhängers
+     * längst richtig (1,74 m breit, 0,34 m Bordwand), `vehicles.ts` packte ihn
+     * aber weiter wie einen LKW: 2,54 m breit und bis 0,99 m hoch. Der
+     * Unterschied ist kein Detail — der LKW-Laderaum ist 2,1-mal so groß:
+     *
+     *   Anhänger  1,74 × 2,00 × 0,69 =  2,40 m³
+     *   LKW-Maße  2,54 × 2,00 × 0,99 =  5,03 m³
+     *
+     * Ein „voller" Anhänger bekam damit doppelt so viel Schrott zugeteilt, wie
+     * auf ihn passt, und die Hälfte stand neben ihm in der Luft.
+     *
+     * Bewacht wird, dass es keine zweite Zahlenreihe gibt: `vehicles.ts` liest
+     * die Anhängermaße aus dieser Datei.
+     */
+    const v = quelle("vehicles.ts");
+    expect(v, "vehicles.ts kennt die Anhängerbreite nicht").toContain("ANHAENGER_HALB_BREITE");
+    expect(v, "vehicles.ts kennt die Anhänger-Bordwand nicht").toContain("ANHAENGER_WAND");
+    // und die Maße hier stammen aus dem Modell (buildCarAndTrailer)
+    expect(ANHAENGER_HALB_BREITE).toBeCloseTo(0.9 - 0.03, 10);
+    expect(ANHAENGER_WAND).toBeCloseTo(0.34, 10);
+    // Der Anhänger fasst deutlich weniger als eine Pritsche gleicher Länge
+    expect(ladeVolumen("pkw")).toBeLessThan(ladeVolumen("pritsche") * 0.5);
   });
 
   it("die Ladeflächenlängen kommen aus der gemeinsamen Quelle, nicht aus einer Abschrift", () => {

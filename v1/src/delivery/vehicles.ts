@@ -29,7 +29,15 @@ const BOX_TMP = new THREE.Vector3();
 import { hitsObstacle } from "../world/obstacles";
 import { lagerMuldeFuer, type ContainerConfig } from "../world/containers";
 import { rollCustomer, vehicleForCustomer, type CustomerProfile } from "./customers";
-import { buildVehicleModel, wandHoehe } from "./vehicleModel";
+import { buildVehicleModel, wandHoehe, type Rad } from "./vehicleModel";
+import { Federung, federungsDatenFuer } from "./federung";
+import {
+  ANHAENGER_HALB_BREITE,
+  ANHAENGER_WAND,
+  WRACK_KG,
+  type Aufbau,
+} from "./fuellgrad";
+import type { PlatzinventarPort } from "./platzinventarAbholung";
 
 /**
  * Anlieferungen M3: Kundenfahrzeuge auf fester Route (kinematisch).
@@ -74,6 +82,8 @@ import {
   TIP_CREEP_M,
   TIP_CREEP_SPEED,
   CRANE_SWING,
+  ABLADE_SPUR_X,
+  ABLADE_HALT_Z,
 } from "./routes";
 
 type Phase =
@@ -134,6 +144,31 @@ class DeliveryVehicle {
   private senken = false;
   done = false;
   private bedLen: number;
+  /* ------------------------------------------------------- Federung ------ */
+  /**
+   * Die Federung dieses Wagens (siehe `federung.ts`).
+   *
+   * Sie bewegt nichts von sich aus. Der Ablauf füttert sie mit drei Dingen —
+   * der Last auf der Fläche, den Stößen aufgesetzter Teile und dem eigenen
+   * Tempo — und liest daraus zurück, wie tief der Wagen an welcher Längsstelle
+   * liegt. Dass die Ladung mitfedert, kostet keine Zeile: Sie hängt
+   * kinematisch an der Ladeflächengruppe und wird ohnehin jedes Bild aus deren
+   * Weltlage nachgeführt.
+   */
+  private federung: Federung;
+  /** Die Räder — sie bleiben stehen, wenn sich der gefederte Wagen senkt. */
+  private raeder: Rad[] = [];
+  /** Was die Federung senkt und neigt: der ganze LKW, beim Gespann der Anhänger. */
+  private federZiel: THREE.Object3D;
+  /** Hebt sich der Ursprung der gefederten Gruppe mit? (Beim Anhänger nicht — die Kupplung hält ihn.) */
+  private federHebt: boolean;
+  private federLetztePos = new THREE.Vector3();
+  /** Restzeit bis zur nächsten Lastmessung */
+  private lastProbeT = 0;
+  /** Körper, die bei der letzten Messung auf der Fläche lagen — für die Stoßerkennung */
+  private aufFlaeche = new Set<number>();
+  private readonly bedInv = new THREE.Matrix4();
+  private readonly probePos = new THREE.Vector3();
   private riding: RidingBody[] = [];
   private cargoReleased = false;
   private blockedT = 0;
@@ -335,12 +370,62 @@ class DeliveryVehicle {
   itemQuelle: ItemManager | null = null;
 
   /**
+   * Zugang zum Platzinventar — gesetzt, sobald es einen gibt.
+   *
+   * Ohne ihn verhält sich der Abholer wie bisher; mit ihm gibt er einen
+   * mitgenommenen Container zurück (siehe `gibPlatzinventarZurueck`).
+   */
+  platzinventar: PlatzinventarPort | null = null;
+
+  /**
+   * Was zuletzt zurückgegeben wurde — Kennung und was ins Silo ging.
+   *
+   * Nur zum Melden und Prüfen. Ein Euro steht hier nicht und wird hier nie
+   * stehen: Platzinventar ist unverkäuflich.
+   */
+  letzteRueckgabe: { id: string; kg: number; stueck: number; rest: number } | null = null;
+
+  /**
+   * Steht Platzinventar auf der Ladefläche? Dann leeren und beim Bagger absetzen.
+   *
+   * Ansage Patrick, 15.09.2026: „Wenn ein Abholer den Müllcontainer mitnimmt,
+   * dann bringt er ihn auch wieder und kippt ihn einfach bei mir ab" — „mit
+   * ohne Müll in dem Fall. Und der Müll landet natürlich bei uns im Silo."
+   *
+   * Gerufen wird das, BEVOR der Wagen losfährt und bevor die Fläche verriegelt
+   * wird. Danach ist der Container nicht mehr auf der Fläche, sein Inhalt
+   * liegt im ABFALL-Silo, und die Abrechnung des Abholers sieht ihn gar nicht
+   * erst — sie kann ihn also auch nicht versehentlich verkaufen.
+   *
+   * Erkannt wird er an der HÖHE über der Fläche: Ein Container auf dem Boden
+   * neben dem Wagen liegt in Flächenkoordinaten einen Meter tiefer, einer auf
+   * der Fläche knapp darüber. Das unterscheidet „aufgeladen" von „steht
+   * daneben" ohne jede weitere Abfrage.
+   */
+  private gibPlatzinventarZurueck(): void {
+    const port = this.platzinventar;
+    if (!port) return;
+    this.bedGroup.updateWorldMatrix(true, false);
+    this.bedInv.copy(this.bedGroup.matrixWorld).invert();
+    for (const st of port.stellungen()) {
+      if (!Number.isFinite(st.x) || !Number.isFinite(st.y) || !Number.isFinite(st.z)) continue;
+      this.probePos.set(st.x, st.y, st.z).applyMatrix4(this.bedInv);
+      if (Math.abs(this.probePos.x) > BED_HALF_W + 0.6) continue;
+      if (this.probePos.z < -0.8 || this.probePos.z > this.bedLen + 0.8) continue;
+      if (this.probePos.y < -0.2 || this.probePos.y > 3.0) continue;
+      const bericht = port.leeren(st.id);
+      port.absetzen(st.id, ABLADE_SPUR_X, ABLADE_HALT_Z);
+      this.letzteRueckgabe = { id: st.id, ...bericht };
+    }
+  }
+
+  /**
    * Aufbau der Ladeflaeche. Haendler fahren nicht alle denselben Wagen: mal
    * flache Bordwaende, mal Rungen, mal ein geschlossener Kasten. Gewerbe und
    * Privat bleiben flach — sie liefern kein Schuettgut. Die Ladung richtet
    * sich nach der Bordwandhoehe, deshalb steht der Aufbau als Feld.
    */
-  private readonly bodyStyleName: "flach" | "rungen" | "koffer";
+  private readonly bodyStyleName: Aufbau;
 
   /** Zugewiesener Warteplatz, null = fährt direkt vom Hof. */
   parkSpot: [number, number] | null = null;
@@ -558,10 +643,25 @@ class DeliveryVehicle {
     this.customer = kind === "abholer" ? null : (customer ?? rollCustomer());
     // Die Tabelle steht in routes.ts — dieselbe, gegen die die Waechter rechnen
     this.bedLen = bedLenFor(kind);
+    /*
+     * DER AUFBAU WIRD NUR EINMAL GEWUERFELT (15.09.2026).
+     *
+     * Bis heute stand er zweimal im Spiel: `customers.ts` zog ihn fuer die
+     * MASSE (Koffer fasst mehr als flach, also wiegt die Fuhre mehr), und
+     * hier wurde unabhaengig davon noch einmal gezogen fuer das MODELL.
+     * Statistisch war das dasselbe, im Einzelfall kam ein Kofferaufbau mit
+     * einer Flach-Masse an — man sah einen randvollen Kasten und die Waage
+     * sagte zwei Tonnen.
+     *
+     * Jetzt gilt, was am Kunden steht. Der Wurf hier bleibt nur als Rueckfall
+     * fuer den Abholer (der hat keinen Kunden) und fuer Pruefstaende, die ein
+     * Kundenprofil von Hand bauen.
+     */
     this.bodyStyleName =
-      this.customer?.group === "haendler"
+      this.customer?.aufbau ??
+      (this.customer?.group === "haendler"
         ? (["rungen", "rungen", "koffer", "flach"] as const)[Math.floor(Math.random() * 4)]
-        : "flach";
+        : "flach");
     const teile = buildVehicleModel({
       kind: this.kind,
       bedLen: this.bedLen,
@@ -585,6 +685,22 @@ class DeliveryVehicle {
     this.tailGate = teile.tailGate;
     this.crane = teile.crane;
     this.trailer = teile.trailer;
+    this.raeder = teile.raeder;
+    this.federung = new Federung(federungsDatenFuer(this.kind, this.bedLen));
+    /*
+     * WER SICH SENKT. Beim LKW die ganze gefederte Einheit: Rahmen,
+     * Fahrerhaus, Flaeche und Ladung — die Raeder bleiben stehen. Beim Gespann
+     * nur der Anhaenger, und der hebt sich nicht, sondern NICKT um seine
+     * Kupplung: Die haelt der Zugwagen fest.
+     *
+     * `YXZ` ist Pflicht und kein Geschmack. In der Vorgabe `XYZ` liegt die
+     * Nickachse in der WELT — ein Wagen, der nach Osten faehrt, wuerde damit
+     * nicht nicken, sondern sich zur Seite legen. Mit `YXZ` wird erst
+     * gegiert und dann um die eigene Querachse genickt.
+     */
+    this.federZiel = teile.trailer ?? this.group;
+    this.federHebt = teile.trailer === null;
+    this.federZiel.rotation.order = "YXZ";
     // Zu welcher Seite geschwenkt wird, entscheidet das Fahrzeug einmal —
     // sonst schwenken alle gleich und es sieht nach Choreografie aus.
     this.craneSide = Math.random() < 0.5 ? -1 : 1;
@@ -656,10 +772,146 @@ class DeliveryVehicle {
       );
     }
     this.placeAt(this.routeIn, 0);
+    this.wendeFederungAn();
+    this.federLetztePos.copy(this.group.position);
     // Kinematische Körper SOFORT an den Routenstart setzen. Ohne das stehen sie
     // einen Frame lang im Ursprung — mitten auf der Annahmefläche — und
     // schleudern den dort liegenden Schrott quer über den Platz.
     this.snapBodiesToPose();
+  }
+
+  /* ------------------------------------------------ Federung, Anwendung -- */
+
+  /**
+   * Die gerechnete Einfederung auf das Modell übertragen.
+   *
+   * Drei Zeilen Wirkung: Die gefederte Gruppe sinkt um die Einfederung an
+   * ihrem Ursprung, sie nickt um die Steigung zwischen den beiden Achsfedern,
+   * und jedes Radteil wird um genau das zurückgeschoben, was die Gruppe an
+   * seiner Längsstelle abgesunken ist — deshalb bleiben die Räder auf dem
+   * Boden.
+   *
+   * KEIN NEUES NETZ. Es sind dieselben Meshes wie vorher, nur um ein paar
+   * Zentimeter versetzt. Die Ladung braucht überhaupt keine Zeile: Sie hängt
+   * an der Ladeflächengruppe und wird ohnehin aus deren Weltlage nachgeführt.
+   */
+  private wendeFederungAn(): void {
+    const hub = this.federHebt ? -this.federung.einfederung(0) : 0;
+    const neigung = this.federung.neigung;
+    this.federZiel.position.y = hub;
+    this.federZiel.rotation.x = neigung;
+    for (const rad of this.raeder) {
+      rad.mesh.position.y = rad.y0 - hub + neigung * rad.z;
+    }
+  }
+
+  /**
+   * Was auf der Fläche liegt — Gewicht, Längsschwerpunkt, und wer neu
+   * dazugekommen ist.
+   *
+   * Nicht jedes Bild, sondern alle 50 ms: Die Feder schwingt mit höchstens
+   * 2,6 Hz, da reichen zwanzig Messungen je Sekunde, und die Schleife läuft
+   * über alle Teile des Platzes.
+   *
+   * Der Stoß entsteht aus dem Unterschied zur vorigen Messung: Ein Körper, der
+   * vorher nicht auf der Fläche lag und jetzt schon, überträgt seine
+   * Abwärtsgeschwindigkeit. Wer sanft absetzt, gibt fast nichts — genau das
+   * ist die „Kraftübertragung durch Bagger/Körper" aus der Ansage.
+   */
+  private messeLast(dt: number): void {
+    this.lastProbeT -= dt;
+    if (this.lastProbeT > 0) return;
+    this.lastProbeT = 0.05; // s (SW) — 20 Messungen je Sekunde
+    this.bedGroup.updateWorldMatrix(true, false);
+    this.bedInv.copy(this.bedGroup.matrixWorld).invert();
+    const reitend = new Set<number>();
+    for (const r of this.riding) {
+      if (r.body.isValid()) reitend.add(r.body.handle);
+    }
+    // Waehrend `settleCargo` faellt die frisch erzeugte Fuhre erst auf die
+    // Flaeche. Das ist kein Abladen, sondern das Entstehen des Wagens — es
+    // darf die Feder nicht anstossen.
+    const stoesseZaehlen = this.phase !== "settleCargo";
+    const neu = new Set<number>();
+    let kg = 0;
+    let moment = 0;
+    const pruefe = (body: RAPIER.RigidBody, massKg: number): void => {
+      if (!body.isValid() || !Number.isFinite(massKg) || massKg <= 0) return;
+      // In der Spinne haengende Teile traegt der Bagger, nicht der LKW.
+      // Mitfahrende Ladung ist ebenfalls kinematisch, zaehlt aber sehr wohl.
+      if (!body.isDynamic() && !reitend.has(body.handle)) return;
+      const p = body.translation();
+      if (!Number.isFinite(p.x) || !Number.isFinite(p.y) || !Number.isFinite(p.z)) return;
+      this.probePos.set(p.x, p.y, p.z).applyMatrix4(this.bedInv);
+      if (Math.abs(this.probePos.x) > BED_HALF_W + 0.35) return;
+      if (this.probePos.z < -0.4 || this.probePos.z > this.bedLen + 0.4) return;
+      if (this.probePos.y < -0.4 || this.probePos.y > 3.4) return;
+      // Ladeflaechen-z in Fahrzeug-z: der Versatz der Flaeche in ihrer Gruppe
+      const z = this.bedGroup.position.z + this.probePos.z;
+      kg += massKg;
+      moment += massKg * z;
+      neu.add(body.handle);
+      if (stoesseZaehlen && !this.aufFlaeche.has(body.handle)) {
+        this.federung.stoss(massKg, -body.linvel().y, z);
+      }
+    };
+    const quelle = this.itemQuelle?.items ?? this.cargo.items;
+    for (const it of quelle) pruefe(it.body, it.massKg);
+    if (this.cargo.car) pruefe(this.cargo.car.body, WRACK_KG);
+    this.aufFlaeche = neu;
+    this.federung.setzeLast(kg, kg > 0 ? moment / kg : 0);
+  }
+
+  /**
+   * Ein Federschritt: Tempo melden, Last messen, rechnen, anwenden.
+   *
+   * Die Reihenfolge ist Absicht. Erst das Tempo (daraus wird das Nicken beim
+   * Anfahren und Bremsen), dann die Last, dann der Zeitschritt — und erst ganz
+   * zuletzt das Modell versetzen, damit die Körper, die gleich danach
+   * nachgeführt werden, die neue Lage schon sehen.
+   */
+  private updateFederung(dt: number): void {
+    if (!Number.isFinite(dt) || dt <= 0) return;
+    /*
+     * ANGEHOBENE MULDE FEDERT NICHT — und das ist keine Ausrede, sondern die
+     * einzige Zahl in diesem Paket, die richtig weh getan hat.
+     *
+     * Ist die Mulde gekippt, steht sie auf dem Kipplager und dem Hubzylinder;
+     * sie liegt nicht mehr frei auf dem Rahmen. Die Federung hält deshalb
+     * ihre Stellung, bis die Mulde wieder unten ist.
+     *
+     * DIE MESSUNG (24 Zufallssaaten, Spitzentempo der Ladung beim Abkippen):
+     *
+     *   ohne Federung (Stand vorher)        Mittel 116   Höchst 267 km/h
+     *   Federung auch beim Kippen frei      Mittel 158   Höchst 546 km/h
+     *   Federung beim Kippen gesperrt       Mittel 111   Höchst 231 km/h
+     *
+     * Die mittlere Zeile ist der Grund für diese drei Zeilen Code. Eine
+     * Ladefläche, die sich unter der abrutschenden Fuhre auch noch senkt und
+     * hebt, schiebt Stücke in den bekannten Schlitz am Kipplager — und dort
+     * befreit der Löser sie mit einem einzigen sehr großen Stoß, weil zwei
+     * kinematische Körper für ihn unendliche Masse haben (E-029,
+     * `docs/offene-punkte.md`). Gesperrt ist es besser als vorher.
+     */
+    if (this.tip > 0.02) {
+      this.wendeFederungAn();
+      return;
+    }
+    const dx = this.group.position.x - this.federLetztePos.x;
+    const dz = this.group.position.z - this.federLetztePos.z;
+    const yaw = this.group.rotation.y;
+    /*
+     * Beim Wechsel der Route springt der Wagen gelegentlich ein Stueck (neue
+     * Bogenlaenge auf einer anderen Polylinie). Ungedeckelt wuerde daraus eine
+     * Beschleunigung von hundert m/s² und die Feder schluege an.
+     */
+    const roh = (Math.sin(yaw) * dx + Math.cos(yaw) * dz) / dt;
+    const deckel = SPEED * 1.2;
+    this.federung.meldeTempo(Math.min(Math.max(roh, -deckel), deckel), dt);
+    this.federLetztePos.copy(this.group.position);
+    this.messeLast(dt);
+    this.federung.schritt(dt);
+    this.wendeFederungAn();
   }
 
   /** Chassis + Ladefläche hart auf die aktuelle Mesh-Pose setzen (kein Interpolieren). */
@@ -735,21 +987,52 @@ class DeliveryVehicle {
     // Drehgestell. Dann passt weniger daneben, das ist gewollt.
     const schwer = !klein && !this.sortedMaterial && Math.random() < 0.28;
     /*
-     * Zielfuellung der Ladeflaeche. Der Haendler kommt voll — er faehrt nicht
-     * zweimal fuer dieselbe Strecke. Privatleute bringen einen Kofferraum,
-     * aber auch die nie weniger als knapp ein Drittel: Wer mit fast leerem
-     * Anhaenger vorfaehrt, haette zu Hause bleiben koennen.
+     * DER FUELLGRAD KOMMT VOM KUNDEN (15.09.2026, E-033 zu Ende gebracht).
+     *
+     * Seit E-033 wird die angekuendigte Menge aus dem Fuellgrad gerechnet:
+     * Masse = Fuellgrad × Laderaum × Schuettdichte. Diese Stelle hier wusste
+     * nichts davon und wuerfelte ihre EIGENE Zielfuellung — also sah man die
+     * ganze Aenderung nur auf der Waage und nie auf dem Wagen. Ein Haendler,
+     * der laut Papier halb voll ankam, stand randvoll vor der Tuer.
+     *
+     * Jetzt gilt eine Zahl fuer beides. Der alte Wurf bleibt als Rueckfall
+     * fuer Pruefstaende, die ein Kundenprofil von Hand bauen.
      */
     const MINDEST_FUELLUNG = 0.3;
-    const zielFuellung = klein
-      ? MINDEST_FUELLUNG + Math.random() * 0.3
-      : c?.group === "gewerbe"
-        ? 0.68 + Math.random() * 0.24
-        : 0.78 + Math.random() * 0.18;
+    const zielFuellung =
+      c && Number.isFinite(c.fuellgrad) && c.fuellgrad > 0
+        ? Math.min(1, c.fuellgrad)
+        : klein
+          ? MINDEST_FUELLUNG + Math.random() * 0.3
+          : c?.group === "gewerbe"
+            ? 0.68 + Math.random() * 0.24
+            : 0.78 + Math.random() * 0.18;
+    /*
+     * Die Mindestfuellung darf das Ziel nicht ueberholen.
+     *
+     * Sie stand als feste 0,3 in der Abbruchbedingung weiter unten. Mit einem
+     * gewuerfelten Ziel von 0,78 aufwaerts fiel das nie auf; mit dem Fuellgrad
+     * des Kunden schon: Eine viertelvolle Fuhre (0,22 bis 0,38, rund jede 30.)
+     * waere von der alten Schranke wieder auf 0,3 hochgeladen worden — genau
+     * die Fuhre, die selten sein SOLL, haette es nie gegeben.
+     */
+    const mindestFuellung = Math.min(MINDEST_FUELLUNG, zielFuellung);
 
-    const halbBreite = BED_HALF_W - 0.08;
+    /*
+     * DER PKW-ANHAENGER IST KEIN LKW (15.09.2026).
+     *
+     * Gepackt wurde er bis heute mit LKW-Massen: 2,54 m breit und bis 0,99 m
+     * hoch. In Wirklichkeit ist er 1,74 m breit (Boden 1,86, Bordwaende 0,06
+     * bei x = ±0,90) und hat 0,34 m Bordwand. Die Volumenrechnung in
+     * `fuellgrad.ts` nimmt die echten Masse — diese Stelle noch nicht, und
+     * damit standen die Teile eines „vollen" Anhaengers zur Haelfte neben ihm.
+     * Beide lesen jetzt dieselben Konstanten.
+     */
+    const anhaenger = this.kind === "pkw";
+    const halbBreite = anhaenger ? ANHAENGER_HALB_BREITE : BED_HALF_W - 0.08;
     const nutzLaenge = this.bedLen - 2 * LADE_RAND;
-    const maxHoehe = wandHoehe(this.kind, this.bodyStyleName) + LADUNG_UEBERSTAND;
+    const maxHoehe =
+      (anhaenger ? ANHAENGER_WAND : wandHoehe(this.kind, this.bodyStyleName)) + LADUNG_UEBERSTAND;
     const raum = halbBreite * 2 * nutzLaenge * maxHoehe;
 
     type Spec = { materialId: string; massKg: number; shape: ScrapShape };
@@ -767,8 +1050,20 @@ class DeliveryVehicle {
     let leerlauf = 0;
     for (let runde = 0; runde < 12 && fuellung < zielFuellung; runde++) {
       const erste = runde === 0;
+      /*
+       * Die erste Runde richtet sich nach dem ZIEL, nicht nach der Bauart.
+       *
+       * Sie warf bisher immer acht Brocken auf die Flaeche (vier beim
+       * Privatmann) und pruefte erst danach, ob das Ziel schon ueberschritten
+       * ist. Bei einer randvollen Fuhre faellt das nicht auf; bei einer
+       * viertelvollen schon: Gemessen kam sie mit 43 % statt 25 % an — der
+       * erste Wurf allein war groesser als die ganze Bestellung. Damit war
+       * gerade die seltene, kleine Fuhre die einzige, die man nicht zu sehen
+       * bekam.
+       */
+      const brocken = Math.max(2, Math.round((klein ? 4 : 8) * zielFuellung));
       const nachschub = randomCargo(
-        erste ? (klein ? 4 : 8) : 6,
+        erste ? brocken : Math.max(2, Math.round(6 * zielFuellung)),
         erste ? 0.5 : 0.08,
         erste && schwer ? 0.55 : 0,
         this.sortedMaterial ?? undefined
@@ -800,7 +1095,7 @@ class DeliveryVehicle {
        */
       if (!erste && dazu < 0.01) {
         leerlauf++;
-        if (leerlauf >= 2 && fuellung >= MINDEST_FUELLUNG) break;
+        if (leerlauf >= 2 && fuellung >= mindestFuellung) break;
         if (leerlauf >= 5) break;
       } else {
         leerlauf = 0;
@@ -849,10 +1144,36 @@ class DeliveryVehicle {
     const gewicht = new Map<number, number>();
     for (const i of draufIdx) gewicht.set(i, specs[i]!.massKg);
     if (c && summeDrauf > 0) {
+      /*
+       * DAS UMLEGEN HAT DIE FUHRE AUFGEFRESSEN (Befund 15.09.2026, E-044).
+       *
+       * Gemeint war: erst die Kundenmenge proportional auf die liegenden
+       * Stuecke verteilen, dann das, was am Dichte-Deckel haengengeblieben
+       * ist, auf die Stuecke mit Luft umlegen. Der zweite Durchgang hat aber
+       * `gewicht.set(i, neu2)` geschrieben statt dazugezaehlt — er ERSETZTE
+       * also die volle Zuteilung aus dem ersten Durchgang durch den Anteil am
+       * kleinen Restbetrag.
+       *
+       * Gemessen an zwanzig gewuerfelten Fuhren: Ein Haendler kuendigte 8500
+       * kg an und lieferte 105 kg; einer mit 9500 kg brachte 821. Rund jede
+       * vierte Fuhre verlor auf diesem Weg mehr als die Haelfte, und zwar
+       * ausgerechnet die vollen — je mehr Stuecke am Deckel haengen, desto
+       * kleiner der Rest, mit dem der zweite Durchgang die anderen ueberschrieb.
+       *
+       * Das ist genau der Fehler, den E-033 schon einmal beseitigen sollte
+       * („gemessen kam ein Haendler mit 1,7 t an statt mit 2,5 bis 9 t") — er
+       * sass nur eine Stufe tiefer und ist erst aufgefallen, seit die Waage
+       * und der Anblick des Wagens dieselbe Zahl benutzen.
+       *
+       * Jetzt wird AUFGEFUELLT statt ueberschrieben: Jede Runde legt oben
+       * drauf, der Deckel kappt, und was nicht untergebracht ist, geht in die
+       * naechste Runde. Vier Runden reichen; danach haengt praktisch alles am
+       * Deckel, und was dann noch offen ist, kann der Wagen wirklich nicht
+       * tragen.
+       */
+      for (const i of draufIdx) gewicht.set(i, 0);
       let rest = c.massKg;
-      // Zwei Durchgaenge: erst proportional verteilen, dann das, was am
-      // Deckel haengengeblieben ist, auf die Stuecke mit Luft umlegen.
-      for (let runde = 0; runde < 2 && rest > 0; runde++) {
+      for (let runde = 0; runde < 4 && rest > 1; runde++) {
         const offen = draufIdx.filter((i) => gewicht.get(i)! < grenze(i) - 1);
         if (offen.length === 0) break;
         const basis = offen.reduce((a2, i) => a2 + specs[i]!.massKg, 0) || 1;
@@ -860,9 +1181,10 @@ class DeliveryVehicle {
         rest = 0;
         for (const i of offen) {
           const anteil = (specs[i]!.massKg / basis) * zuVerteilen;
-          const neu2 = Math.min(anteil, grenze(i));
+          const roh = gewicht.get(i)! + anteil;
+          const neu2 = Math.min(roh, grenze(i));
           gewicht.set(i, neu2);
-          rest += anteil - neu2;
+          rest += roh - neu2;
         }
       }
       // Was die Flaeche wirklich traegt, ist die Wahrheit — die Waage sagt es
@@ -1010,6 +1332,15 @@ class DeliveryVehicle {
       this.lockToBed(it.body);
       it.mesh.visible = true; // jetzt liegt sie sauber — ab hier sichtbar
     }
+    /*
+     * Die Federung an der fertigen Fuhre ausrichten und in ihre Ruhelage
+     * springen lassen. Eine volle Fuhre steht am Tor, als waere sie laengst
+     * geladen — sie soll nicht vor den Augen des Spielers erst durchsacken.
+     */
+    this.lastProbeT = 0;
+    this.messeLast(0);
+    this.federung.setzeRuhe();
+    this.wendeFederungAn();
   }
 
   private lockToBed(body: RAPIER.RigidBody): void {
@@ -1281,6 +1612,8 @@ class DeliveryVehicle {
         // die Abfahrt freigibt (Taste V) — oder bis die Standzeit abläuft.
         if (this.releaseRequested || this.phaseT > 240) {
           this.justDeparted = true; // Container wird jetzt abgerechnet
+          // Zuerst das Platzinventar: Es faehrt nicht mit und wird nie bezahlt
+          this.gibPlatzinventarZurueck();
           this.verriegeleLadeflaeche();
           this.phase = "out";
           this.routeS = 0;
@@ -1450,6 +1783,9 @@ class DeliveryVehicle {
     }
     if (this.tailGate) this.tailGate.hinge.rotation.x = this.sideOpen * (Math.PI / 2);
 
+    // Federung: senkt und neigt den Wagen, bevor die Körper nachgeführt werden
+    this.updateFederung(dt);
+
     // Kinematische Körper nachführen
     this.group.updateWorldMatrix(true, true);
     const cq = new THREE.Quaternion();
@@ -1564,6 +1900,12 @@ export class VehicleManager {
   /** Abhol-LKW fährt los → Containerinhalt abrechnen */
   onPickupDepart: ((truck: DeliveryVehicle) => void) | null = null;
 
+  /**
+   * Zugang zum Platzinventar (Müllcontainer). Bleibt er null, verhält sich
+   * alles wie vorher — der Abholer gibt dann nichts zurück.
+   */
+  platzinventar: PlatzinventarPort | null = null;
+
   constructor(
     private scene: THREE.Scene,
     private world: RAPIER.World,
@@ -1622,6 +1964,7 @@ export class VehicleManager {
       c
     );
     this.active.itemQuelle = this.items;
+    this.active.platzinventar = this.platzinventar;
     if (c) this.onCustomerArrived?.(c);
     // Händler bleiben gern noch auf einen Kaffee; Gewerbe hat es eilig.
     // Nur freie Plätze vergeben, sonst stünde einer im anderen.
