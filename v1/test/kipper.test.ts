@@ -24,57 +24,61 @@ import { ItemManager } from "../src/world/scrapItems";
 import { CompositeManager } from "../src/dismantle/composites";
 import { EventBus } from "../src/core/events";
 import type { CustomerProfile } from "../src/delivery/customers";
-import { ladeVolumen } from "../src/delivery/fuellgrad";
-import { ladungsDichte } from "../src/materials/schuettdichte";
 import { lagerMuldeFuer } from "../src/world/containers";
+import { pruefKunde } from "./pruefkunde";
 
 /**
- * Kundschaft fest vorgeben statt wuerfeln.
+ * Kundschaft fest vorgeben statt wuerfeln — aber aus EINER Quelle.
  *
  * Seit dem 13.09.2026 haengt die ROUTE an der Ladung: Wer sortenrein
  * anliefert, faehrt an die Muldenreihe an der Ostwand, alle anderen kippen
  * vor dem Bagger. Ein gewuerfelter Kunde entschied damit auch, welcher der
  * beiden Faelle geprueft wird — beide gehoeren geprueft.
+ *
+ * DAS PROFIL WIRD NICHT MEHR HIER GETIPPT (15.09.2026, E-062). Es stand als
+ * Objektliteral in diesem Waechter, in `kran.test.ts` und in einem dritten,
+ * weggeworfenen Messgeraet — und in der dritten Abschrift standen
+ * `fuellgrad: 0.85` neben `massKg: 5000`, was der Spielregel
+ * (Masse = Fuellgrad x Laderaum x Schuettdichte) um 42 % widerspricht. Genau
+ * daran haben sich zwei Geraete ueber denselben Vorgang um den Faktor zwei
+ * gestritten. `test/pruefkunde.ts` laesst diese Angabe gar nicht mehr zu:
+ * Man nennt die Masse ODER den Fuellgrad, nie beides.
+ *
+ * Die Zahlen dieses Waechters sind dadurch unveraendert — nachgerechnet ueber
+ * dieselben 24 Saaten Zeichen fuer Zeichen dieselbe Reihe.
  */
-/** Anteil Stoerstoff in der Pruefladung — ein Startwert, aber ueberall derselbe. */
-const STOER = 0.06; // SW
-
 function kunde(sortenrein: string | null): CustomerProfile {
-  const massKg = 5000;
   /*
-   * Vier Felder — `vehicle`, `aufbau`, `fuellgrad`, `dichte` — gehoeren seit
-   * dem Fuellgrad-Umbau zum Kunden und fehlten hier. Gefunden am 15.09.2026
-   * von der neuen Typpruefung fuer `test/` (E-038). Folge war still: Ohne
-   * `vehicle` fiel `vehicleForCustomer` in seinen `??`-Zweig und WUERFELTE das
-   * Fahrzeug — in einem Waechter, dessen einziger Zweck der Kipper ist.
+   * 5.000 kg Mischschrott im flachen Kipper. Daraus folgt der Fuellgrad:
+   * 5000 / (14,08 m3 x 594,65 kg/m3) = 0,60 — ein gut halb voller Wagen.
    *
-   * Die Zahlen sind nicht geschaetzt, sondern aus denselben Funktionen
-   * gerechnet, die das Spiel benutzt: Schuettdichte aus `ladungsDichte`,
-   * Laderaum aus `ladeVolumen`, Fuellgrad = Masse / (Raum × Dichte).
+   * ACHTUNG, das ist eine MILDE Fuhre. Der Haendler des Spiels kommt im Mittel
+   * mit 0,74 Fuellgrad und 6.229 kg (24 Wuerfe, `rollFuellgrad("haendler")`),
+   * und derselbe Messapparat kommt damit auf Mittel 159 / Hoechst 585 km/h
+   * statt auf 149 / 463. Die Schranken unten halten also den Katapult einer
+   * festen Pruefladung fest, nicht den schlimmsten Fall des Spiels. Das ist
+   * als Rueckschritt-Waechter richtig und als Aussage ueber das Spiel zu
+   * wenig — der offene Punkt steht in `docs/offene-punkte.md`.
    */
-  const dichte = ladungsDichte(sortenrein, STOER);
-  const fuellgrad = Math.min(1, massKg / (ladeVolumen("kipper", "flach") * dichte));
-  return {
-    group: "haendler",
-    name: "Pruefstand",
-    subtitle: "Test",
-    massKg,
-    /*
-     * Fahrzeug, Aufbau und Fuellgrad stehen seit E-033/E-044 im Profil und sind
-     * PFLICHT. Sie hier wegzulassen war zweimal teuer: `vehicleForCustomer`
-     * wuerfelte das Fahrzeug still, und der Fuellgrad fiel auf den alten Wurf
-     * zurueck — der Waechter mass damit nicht die Fuhre, die in seinem Namen
-     * steht.
-     */
-    vehicle: "kipper",
-    aufbau: "flach",
-    fuellgrad,
-    dichte,
-    sortedMaterial: sortenrein,
-    contaminantShare: STOER,
-    hardness: 1,
-    greeting: "",
-  };
+  /*
+   * SORTENREIN WIRD UEBER DEN FUELLGRAD BESTELLT, NICHT UEBER DIE MASSE.
+   *
+   * Vorher stand hier fuer beide Faelle `massKg: 5000`, und fuer Alu war das
+   * unmoeglich: 5.000 kg Alu sind bei 246,85 kg/m3 rund 20,3 m3, der flache
+   * Kipper fasst 14,08. Der alte `Math.min(1, ...)`-Deckel machte daraus
+   * `fuellgrad: 1` neben `massKg: 5000` — 44 % auseinander, dieselbe
+   * Unvereinbarkeit, wegen der am 15.09.2026 ein Messgeraet weggeworfen wurde.
+   * Aufgefallen ist es erst, als beide Waechter durch dieselbe Quelle gingen.
+   *
+   * 0,85 ist der Fuellgrad, mit dem ein Haendler am haeufigsten kommt
+   * (`FUELL_GEWICHTE.haendler`: 68 % randvoll, 0,8 bis 1,0). Daraus folgen
+   * 2.954 kg Alu — genau das Bild aus `schuettdichte.ts`: „Eine Fuhre Alu
+   * tuermt sich ueber die Bordwand und wiegt zwei Tonnen."
+   */
+  if (sortenrein) {
+    return pruefKunde({ fuellgrad: 0.85, sortenrein, vehicle: "kipper", aufbau: "flach" });
+  }
+  return pruefKunde({ massKg: 5000, sortenrein, vehicle: "kipper", aufbau: "flach" });
 }
 
 beforeAll(async () => {
@@ -356,6 +360,44 @@ describe("Kipper", () => {
      * heben ist die ehrlichere Wahl als sie zu umgehen: Der Waechter soll
      * zeigen, wenn es noch schlimmer wird, und nicht taeglich aus einem
      * bekannten Grund rot sein.
+     *
+     * NACHGEPRUEFT AM 15.09.2026 (E-062) — die Schranken bleiben, die
+     * Begruendung wird genauer.
+     *
+     * Zwei Messgeraete hatten sich ueber genau diese Reihe um den Faktor zwei
+     * gestritten. Aufgeloest mit EINEM Laufapparat, bei dem immer nur ein
+     * Schalter umgelegt wurde: Messfenster (5,2 s gegen „bis zur Abfahrt"),
+     * Filter auf dynamische Koerper und Solver-Einstellungen aendern die Reihe
+     * NICHT — die ersten beiden Zeichen fuer Zeichen gar nicht. Der einzige
+     * wirksame Unterschied war die Fuhre; das andere Geraet hatte eine in sich
+     * unmoegliche geladen und ist verworfen (`test/pruefkunde.ts`).
+     *
+     * DREI FUHREN, dieselben 24 Saaten, derselbe Apparat:
+     *
+     *   diese hier (5.000 kg, Fuellgrad 0,60)   Mittel 149  Hoechst 463 km/h
+     *   randvoll konsistent (Fuellgrad 0,90)    Mittel 118  Hoechst 276 km/h
+     *   wie das Spiel wuerfelt (Haendler)       Mittel 159  Hoechst 585 km/h
+     *
+     * Die letzte Zeile ist der offene Punkt: Der Katapult des SPIELS ist
+     * schlimmer als der dieser Pruefladung, und zwar ueber der Schranke von
+     * 500. Dieser Waechter haelt einen Rueckschritt an einer festen Fuhre
+     * fest — er sagt NICHT, dass im Spiel nichts fliegt. Ob er auf die
+     * gewuerfelte Haendlerfuhre umgestellt wird (und die Schranken damit auf
+     * einen schlechteren, aber wahren Stand), ist eine Entscheidung fuers
+     * Kipper-Paket und steht in `docs/offene-punkte.md`.
+     *
+     * UND DIE BODENDICKE, weil die Frage zweimal gestellt wurde: Der
+     * Muldenboden-Kollider ist 0,60 m dick (`vehicles.ts`: cuboid(halfW, 0.3,
+     * …) auf −0,26, Oberkante +0,04). Mit 0,16 m gemessen, Oberkante gleich,
+     * dieselbe Ladung Stueck fuer Stueck:
+     *
+     *   0,60 m  Mittel 149  Hoechst 463 km/h   Median 118
+     *   0,16 m  Mittel  94  Hoechst 226 km/h   Median  84
+     *
+     * Paarweise −55 ± 19 km/h, in 18 von 24 Ladungen besser. Das ist ein
+     * HINWEIS, keine Anweisung: Warum ein dickerer Quader schlechter ist,
+     * gehoert verstanden, bevor er duenner wird (der Rahmen darunter endet
+     * 4 cm unter dem Muldenboden — da ist Platz, aber kein Nachweis).
      *
      * Die Reparatur ist ein eigenes Paket und steht in `docs/offene-punkte.md`:
      * der Schlitz am Kipplager selbst, dazu die Kollideroberkante (liegt 2 cm

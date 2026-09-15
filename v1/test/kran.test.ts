@@ -21,6 +21,7 @@ import { CompositeManager } from "../src/dismantle/composites";
 import { EventBus } from "../src/core/events";
 import { VehicleManager, type DeliveryKind } from "../src/delivery/vehicles";
 import type { CustomerProfile } from "../src/delivery/customers";
+import { pruefKunde } from "./pruefkunde";
 import { BAGGER_STAND } from "../src/world/baggerstand";
 import { CRANE_SWING } from "../src/delivery/routes";
 
@@ -33,20 +34,21 @@ beforeAll(async () => {
  * Kipper und Pritsche.
  */
 function haendler(sortenrein: string | null = null): CustomerProfile {
-  return {
-    group: "haendler",
-    name: "Pruefstand",
-    subtitle: "Test",
-    massKg: 5000,
-    vehicle: "kipper",
-    aufbau: "flach",
-    fuellgrad: 0.85,
-    dichte: 500,
-    sortedMaterial: sortenrein,
-    contaminantShare: 0.06,
-    hardness: 1,
-    greeting: "",
-  };
+  /*
+   * DAS PROFIL KOMMT AUS `test/pruefkunde.ts` (15.09.2026, E-062).
+   *
+   * Hier stand es als Objektliteral, und darin `fuellgrad: 0.85` neben
+   * `massKg: 5000` und `dichte: 500`. Alle drei zusammen sind unvereinbar:
+   * Die Spielregel seit E-033 lautet Masse = Fuellgrad x Laderaum x
+   * Schuettdichte, und 0,85 voll sind im flachen Kipper 7.118 kg, nicht 5.000.
+   * `dichte: 500` gehoert ausserdem zu keinem Material (Mischschrott mit 6 %
+   * Stoerstoff: 594,65 kg/m3).
+   *
+   * Fuer DIESEN Waechter ist das folgenlos — er misst den Kran, nicht die
+   * Ladung. Die Abschrift ist trotzdem weg: Sie war die Vorlage, von der das
+   * weggeworfene Messgeraet abgeschrieben hat.
+   */
+  return pruefKunde({ fuellgrad: 0.85, sortenrein, vehicle: "kipper", aufbau: "flach" });
 }
 
 interface Innen {

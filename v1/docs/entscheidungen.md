@@ -3321,3 +3321,140 @@ Kasten teleskopiert) und gehört einzeln abgenommen.
    dass etwas durch den Reifen oder durch das Räumschild wandert?
 3. **Oberwagen einmal ganz herumdrehen**, Pratzen eingefahren: Streift das
    Gegengewicht irgendwo an einem Kragarm?
+
+---
+
+### E-062 — Zwei Messgeräte, ein Vorgang, Faktor zwei: es war die Fuhre (15.09.2026)
+
+**Entscheidung.** Von den zwei Geräten, die den Kipper-Katapult gemessen haben,
+behält **`test/kipper.test.ts` recht**; das zweite (`test/zz-mess.test.ts` im
+Arbeitsbaum `agent-a2b4fd9faf32d7293`, inzwischen gelöscht) ist **verworfen**,
+samt aller vier Zahlen, die es in Entscheidungen geschrieben hat. Jede
+Prüf-Kundschaft geht ab sofort durch **eine** Quelle, `test/pruefkunde.ts`, die
+Füllgrad **oder** Masse entgegennimmt und die jeweils andere Zahl rechnet.
+Bewacht von `test/kundenprofil.test.ts`. Das Messgerät selbst steht als
+`tools/kipper-messreihe.ts` und führt vor jeder Reihe eine **Nullprobe**.
+
+**Begründung — was wirklich verschieden war.** Beide Geräte waren
+deterministisch, benutzten dieselben 24 Saaten, denselben Zufallsgenerator und
+dasselbe Kundenprofil dem Namen nach. Nachgemessen mit **einem** Laufapparat,
+bei dem immer nur **ein** Schalter umgelegt wurde und alles andere Zeichen für
+Zeichen gleich blieb (8 Saaten je Zeile):
+
+| Schalter | Mittel | Höchst |
+|---|---|---|
+| Grundstand (= `kipper.test.ts`) | 147 | 328 |
+| nur Messfenster lang (bis zur Abfahrt statt 5,2 s) | **147** | **328** |
+| nur Filter auf dynamische Körper | **147** | **328** |
+| nur Solver-Werte wie im Spiel | 138 | 358 |
+| **nur die Fuhre des zweiten Geräts** | **117** | **157** |
+| alle drei Schalter des zweiten Geräts zusammen | 117 | 157 |
+
+Messfenster und Körperfilter ändern die Reihe **auf die letzte Stelle gar
+nicht** — die drei vom Vorgänger ausgeschlossenen Verdächtigen sind damit
+belegt ausgeschlossen, nicht vermutet. Der Solver verschiebt die Bahn, nicht die
+Höhe. Die letzten beiden Zeilen sind identisch: Die Fuhre war der **einzige**
+wirksame Unterschied.
+
+**Warum die Fuhre des zweiten Geräts falsch ist.** Es setzte von Hand
+`fuellgrad: 0.85`, `dichte: 500` **und** `massKg: 5000`. Seit E-033 gilt aber
+eine Regel (`fuellgrad.baueFuhre`): *Masse = Füllgrad × Laderaum ×
+Schüttdichte*. Der flache Kipper fasst 14,08 m³, Mischschrott mit 6 % Störstoff
+wiegt 594,65 kg/m³ — 0,85 voll sind **7.118 kg**, nicht 5.000. `dichte: 500`
+gehört zu keinem Material. `vehicles.ts` liest die beiden Zahlen an zwei
+getrennten Stellen: `c.fuellgrad` bestimmt Zahl und Größe der Brocken
+(`buildCargo`, Zielfüllung und Rundengröße), `c.massKg` bestimmt das Gewicht je
+Stück. Das Gerät packte den Wagen also 0,85 voll und schrieb die Ladung danach
+auf 5.000 kg herunter: mehr Stücke, jedes um 42 % zu leicht. `c.dichte` wird von
+`vehicles.ts` überhaupt nie gelesen — deshalb fiel nichts auf.
+
+**Die wahren Zahlen.** Derselbe Apparat, dieselben 24 Saaten, dieselbe Ladung
+Stück für Stück (die Bodendicke wird am fertigen Kollider gestellt, nicht im
+Quelltext — ein Quelltexteingriff verschiebt den Zufallsstrom und vergleicht
+Rauschen):
+
+| Fuhre | Boden 0,60 m | Boden 0,16 m | paarweise |
+|---|---|---|---|
+| **Prüfladung 5.000 kg, Füllgrad 0,60 (gebaut)** | **149 / 463** | **94 / 226** | −55 ± 19, besser in 18 von 24 |
+| Fuhre des verworfenen Geräts | 122 / 228 | 112 / 449 | −10 ± 19, besser in 17 von 24 |
+| wie das Spiel würfelt (Händler, 0,74 / 6.229 kg) | 159 / 585 | 112 / 337 | −46 ± 27, besser in 15 von 24 |
+
+Die Umkehrung, an der sich der Streit entzündet hat, steckt **nur im
+Höchstwert** — der schwächsten Zahl der Reihe. Im Mittel und im Median sagen
+alle drei Fuhren dasselbe: Der dünne Boden ist besser. Beim verworfenen Gerät
+ging der Höchstwert bei 0,16 auf einen einzigen Ausreißer zurück (449 km/h bei
+einer von 24 Ladungen); sein Median fiel von 119 auf 87.
+
+**Und ein zweiter Fund aus derselben Klasse, beim Umbau aufgedeckt.** Die alte
+`kunde()`-Funktion in `kipper.test.ts` deckelte den Füllgrad mit
+`Math.min(1, …)`. Für den sortenreinen Fall hieß das: 5.000 kg Alu sind bei
+246,85 kg/m³ rund 20,3 m³ und passen nicht in 14,08 — der Deckel machte daraus
+`fuellgrad: 1` neben `massKg: 5000`, **44 % auseinander**. Dieselbe
+Unvereinbarkeit, wegen der das andere Gerät weggeworfen wurde, nur von der
+anderen Seite. Der sortenreine Fall wird jetzt über den Füllgrad bestellt
+(0,85 → 2.954 kg Alu); die drei Schranken dieses Tests bleiben grün.
+
+**Verworfene Alternative.** *Beide Reihen stehen lassen und je nach Frage die
+passende zitieren* — genau das, was Patrick vor der nächsten Kipper-Änderung
+abgestellt haben wollte. *Die Schranken auf die Zahlen des zweiten Geräts
+senken*: hätte die Prüfung an die Messung angepasst, statt die Messung zu
+prüfen. *Das zweite Gerät spurlos löschen*: Seine Zahlen stehen in
+`ladeflaeche.test.ts` und damit in E-051 — sie mussten ersetzt, nicht
+verschwiegen werden.
+
+**Was mit E-051 passiert.** Die Begründung dort („Kollider 2 cm dicker treibt
+den Katapult von 122/228 auf 160/492") stammte von dem verworfenen Gerät und ist
+**falsch**. Nachgemessen mit stimmiger Fuhre: 0,60 m / Oberkante +0,04 ergibt
+149 / 463, der 2 cm dickere Quader 135 / 354 — paarweise **+14 ± 24 km/h**, also
+nicht messbar schlechter, eher unauffällig besser. Die **Entscheidung** von
+E-051 (Blech senken statt Kollider heben) **bleibt**, aber aus dem richtigen
+Grund: Sie kostet keine Physikänderung. Der Absatz in
+`test/ladeflaeche.test.ts` ist entsprechend berichtigt.
+
+**Das Muster, das dahintersteckt.** Fünf Fälle an einem Tag, alle mit derselben
+Gestalt — grün, und prüft nicht, was es zu prüfen vorgibt:
+
+1. `bayApproach(c.z)` statt `bayApproach(c)` → `NaN`, jeder Vergleich falsch
+2. dasselbe ein zweites Mal in `fahrstrecke.test.ts`
+3. Katapult-Wächter mit **einer** Zufallssaat
+4. Fahrumriss-Wächter prüft ein Rechteck, die Fahrt einen Punkt mit 1,4 m Radius
+5. dieser hier: zwei Geräte, zwei erfundene Fuhren
+
+Gemeinsam ist allen **nicht** die Sorglosigkeit, sondern die Bauform: Ein
+Prüfstück **schreibt eine Zahl ab**, die im Spiel schon steht, und die beiden
+laufen auseinander, ohne dass jemand etwas merkt. Die Typprüfung (E-038) fängt
+die Klasse, in der die Abschrift *nicht mehr übersetzt* (1, 2, 4). Diese
+Entscheidung fängt die Klasse, in der die Abschrift *noch übersetzt, aber nicht
+mehr stimmt*: Die Fuhre kann nicht mehr abgeschrieben werden, weil `pruefKunde`
+genau eine der beiden Zahlen entgegennimmt und die andere rechnet.
+
+**Abnahmekriterium.** `test/kundenprofil.test.ts`, sechs Prüfungen:
+
+- `pruefKunde` erfüllt *Masse = Füllgrad × Laderaum × Schüttdichte* auf 1 %,
+  egal welche der beiden Zahlen vorgegeben ist, und Hin- und Rückrechnung
+  treffen sich
+- die Dichte im Profil ist die des Materials, nie die gegriffene 500
+- beide Zahlen zusammen anzugeben **wirft** — der Fehler lässt sich nicht mehr
+  formulieren
+- `rollCustomer()` erfüllt dieselbe Regel über 400 Würfe, alle Gruppen,
+  Fahrzeuge und Aufbauten (Ausnahmen mit Namen: Wrack, `MINDEST_FUHRE_KG`)
+- die Nutzlastgrenze senkt den Füllgrad, statt die Masse zu kappen
+- **Gegenprobe:** dieselbe Prüfung, auf das Profil des verworfenen Geräts
+  angesetzt, meldet 42 % Abweichung. Ohne diese Zeile wüsste niemand, ob der
+  Wächter überhaupt etwas merkt.
+
+Dazu: `tools/kipper-messreihe.ts` besteht seine Nullprobe (Eingriff auf den
+gebauten Wert = kein Eingriff, Zeichen für Zeichen), und `test/kipper.test.ts`
+liefert nach dem Umbau dieselbe Reihe wie vorher — `dichte`, `fuellgrad` und
+`massKg` sind bitgleich nachgerechnet. 931 Tests in 84 Dateien grün (409 s),
+`npm run build` grün.
+
+**Auf dem Gerät zu prüfen.** Nichts. Diese Entscheidung ändert keine Zeile
+Produktivcode — sie ändert, welchen Zahlen man glauben darf. Was am Gerät offen
+**bleibt** und in `docs/offene-punkte.md` gehört: Der Katapult des **Spiels**
+(Mittel 159, Höchst 585 km/h mit der gewürfelten Händlerfuhre) ist schlimmer als
+der der Prüfladung und liegt **über** der Schranke von 500, die `kipper.test.ts`
+hält. Der Wächter hält einen Rückschritt an einer festen Fuhre fest; er sagt
+nicht, dass im Spiel nichts fliegt. Ob er auf die gewürfelte Fuhre umgestellt
+wird — und die Schranken damit auf einen schlechteren, aber wahren Stand —
+gehört ins Kipper-Paket und ist bewusst **nicht** hier entschieden.

@@ -12,13 +12,29 @@
  * 27 von 36 Stücken exakt auf der Kollideroberkante und sahen trotzdem
  * eingesunken aus; die übrigen neun drückten zusätzlich bis zu 8 cm ein.
  *
- * ANGEGLICHEN WURDE DAS BLECH, NICHT DER KOLLIDER, und das ist gemessen:
- * Den Quader zwei Zentimeter dicker zu machen, hat den Kipper-Katapult über
- * dieselben 24 Saaten von Mittel 122 / Höchst 228 auf 160 / 492 km/h getrieben
- * — seine Rückwand am Kipplager wird dadurch höher, und über genau diese Kante
- * rutscht die Fuhre. Das Blech tiefer zu setzen kostet keine einzige
- * Physikänderung: Dieselbe Messreihe kommt danach auf die letzte Stelle
- * genauso heraus (122 / 228, Streuung 2,08 m).
+ * ANGEGLICHEN WURDE DAS BLECH, NICHT DER KOLLIDER.
+ *
+ * ACHTUNG — DIE URSPRÜNGLICHE BEGRÜNDUNG WAR FALSCH GEMESSEN (E-062).
+ * Hier stand: „Den Quader zwei Zentimeter dicker zu machen, hat den
+ * Kipper-Katapult über dieselben 24 Saaten von Mittel 122 / Höchst 228 auf
+ * 160 / 492 km/h getrieben." Diese vier Zahlen stammen aus einem Messgerät,
+ * das eine in sich unmögliche Fuhre geladen hat (`fuellgrad: 0.85` neben
+ * `massKg: 5000`, siehe `test/pruefkunde.ts`), und sie sind am 15.09.2026
+ * verworfen worden.
+ *
+ * NACHGEMESSEN mit stimmiger Fuhre, denselben 24 Saaten und demselben
+ * Laufapparat — die Dicke wird dabei am fertigen Kollider gestellt, damit
+ * beide Stände Stück für Stück dieselbe Ladung tragen:
+ *
+ *   Kollider 0,60 m, Oberkante +0,04 (gebaut)   Mittel 149  Höchst 463 km/h
+ *   Kollider 0,62 m, Oberkante +0,06 (dicker)   Mittel 135  Höchst 354 km/h
+ *
+ * Paarweise gerechnet ist die Differenz +14 ± 24 km/h: Der dickere Quader ist
+ * NICHT messbar schlechter — eher unauffällig besser. Die Entscheidung, das
+ * Blech zu senken statt den Kollider zu heben, steht trotzdem: Sie kostet
+ * keine einzige Physikänderung und keine Messung, während die andere Richtung
+ * die Rückwand am Kipplager anfasst. Sie steht jetzt nur aus dem richtigen
+ * Grund da — „billiger und risikoärmer", nicht „sonst fliegt die Fuhre".
  *
  * Dieser Wächter hält die beiden Zahlen zusammen. Läuft eine weg, sieht man es
  * am Gerät als schwebenden oder versunkenen Schrott, und zwar erst Tage
