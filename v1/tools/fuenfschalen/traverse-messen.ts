@@ -43,7 +43,7 @@ import {
   mittellinie,
   stoffe,
 } from "../../src/fuenfschalen/teile";
-import { baueGreifer } from "../../src/fuenfschalen/rig";
+import { baueGreiferInTeilen } from "../../src/fuenfschalen/rig";
 import { Variante, traverseHoehe } from "./traverse-varianten";
 
 /* ------------------------------------------------------------- Dreieckssatz */
@@ -349,7 +349,7 @@ function imWerkstoff(teile: Dreieck[], x: number, y: number, z: number): boolean
  */
 export function miss(v: Variante, korb = true): Messung {
   stelleEin(v);
-  const g = baueGreifer(stoffe());
+  const g = baueGreiferInTeilen(stoffe());
   /*
    * Die Traverse rueckt mit ihrer Aufnahme. `TRAVERSE_Y` ist eine Konstante in
    * `teile.ts` und wird hier nicht angefasst; stattdessen wird die fertige

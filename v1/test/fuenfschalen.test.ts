@@ -21,7 +21,13 @@ import {
   schalenStationen,
   schwenkFuer,
 } from "../src/fuenfschalen/teile";
-import { baueGreifer, hebelarm, zylinderLaenge, zylinderNeigung } from "../src/fuenfschalen/rig";
+import {
+  baueGreifer,
+  baueGreiferInTeilen,
+  hebelarm,
+  zylinderLaenge,
+  zylinderNeigung,
+} from "../src/fuenfschalen/rig";
 
 /** Länge des Zylinderrohrs — dieselbe Rechnung wie in `baueZylinder`. */
 const ROHRLAENGE = MASS.zylinder.laenge * 0.6;
@@ -223,8 +229,15 @@ describe("Fünfschalen — Mittelsäule", () => {
    * Gekürzt wurde am 14.09.2026, weil die Säule den Schlund verengt. Was sie
    * dabei nicht verlieren darf, ist ihre Aufgabe: Sie hängt am Traversenkörper,
    * trägt den Stempel und bringt die fünf Bolzen an den Äquator.
+   *
+   * Gemessen am Greifer in EINZELTEILEN: Dieser Block sucht seine Bauteile
+   * über ihre Knotennamen, und im zusammengelegten Greifer (E-053) stecken
+   * Grundkörper, Oberflansch, Gabeln, Säule und Ausleger in EINEM Gussnetz —
+   * genau, weil sie sich nicht gegeneinander bewegen. Die Form ist dieselbe;
+   * `test/verschmelzen.test.ts` hält beide Fassungen Eckpunkt für Eckpunkt
+   * gegeneinander.
    */
-  const g = baueGreifer();
+  const g = baueGreiferInTeilen();
   g.wurzel.updateMatrixWorld(true);
   /* Box3.setFromObject aktualisiert nur nach unten — die Eltern müssen stehen. */
   const kasten = (name: string, wo: THREE.Object3D = g.wurzel): THREE.Box3 =>

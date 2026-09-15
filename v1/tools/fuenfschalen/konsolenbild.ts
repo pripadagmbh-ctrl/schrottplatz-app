@@ -21,7 +21,7 @@
  */
 import * as THREE from "three";
 import { stoffe } from "../../src/fuenfschalen/teile";
-import { baueGreifer } from "../../src/fuenfschalen/rig";
+import { baueGreiferInTeilen } from "../../src/fuenfschalen/rig";
 import { dreiecke } from "../riss";
 import { Blatt, farbe } from "./png";
 
@@ -39,7 +39,7 @@ const UMRISS = farbe("#33373b");
  * beide Felder dieselbe Baugruppe in derselben Stellung zeigen.
  */
 function ferse(mitSteg: boolean): THREE.Object3D {
-  const g = baueGreifer(stoffe());
+  const g = baueGreiferInTeilen(stoffe());
   g.setOeffnung(1);
   g.wurzel.updateMatrixWorld(true);
   const schale = g.schalen[0]!.gelenk;
