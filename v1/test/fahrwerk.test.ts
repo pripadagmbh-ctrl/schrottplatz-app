@@ -197,30 +197,53 @@ describe("Räder — sie rollen und lenken", () => {
 
   it("beim Fahren drehen sich alle vier Räder — und zwar passend zur Strecke", () => {
     /*
-     * RÜCKWÄRTS gemessen, nicht vorwärts — und das ist ein Befund, kein
-     * Kunstgriff: Seit dem Abend des 15.09.2026 steht der Müllcontainer
-     * (E-034) auf (−2,8 | −15,4). Der Bagger steht auf (−0,5 | −22,5) und
-     * schaut nach +z; sein Tastrand ist 1,3 m breit. Fährt er geradeaus los,
-     * berührt er den Container nach rund 4,95 m — die Maschine bremst, die
-     * Räder haben aber schon weitergerechnet, und der Vergleich Strecke gegen
-     * Rollwinkel schlägt fehl.
+     * WIEDER VORWÄRTS GEMESSEN (E-041, 15.09.2026).
      *
-     * Das ist im Spiel kein Fehler: Der Container ist versetzbar, und dass
-     * fünf Meter vor der Maschine etwas steht, gehört auf einen Schrottplatz.
-     * Es ist nur keine Strecke, auf der man Räder vermisst. Nach hinten ist
-     * bis zur Südmauer frei.
+     * Vom Abend des 15.09. bis heute stand hier „rückwärts", und der Grund
+     * war der Müllcontainer: Er stand auf (−2,8 | −15,4), also fünf Meter
+     * geradeaus vor der Maschine, und der Bagger tastet beim Fahren mit 1,3 m
+     * Rand. Seit E-041 steht er neben der Buntmetall-Mulde; geradeaus ist frei
+     * bis zur Nordwand. Eine Umgehung, deren Grund weg ist, ist nur noch eine
+     * Stelle, an der niemand mehr hinsieht — also zurückgedreht.
      *
-     * Sollte Patrick am Gerät sagen, dass der Container dort stört, ist das
-     * eine Koordinate in `containers.ts` — dieser Test hängt dann nicht mehr
-     * daran.
+     * Rückwärts war ausserdem nie so harmlos, wie es aussah: Nach 5,30 m steht
+     * dort der erste Trennstein (`STATIC_OBSTACLES`), die Maschine bremst auf
+     * den letzten Bildern ab — und AUSGERECHNET DAS hat den Test durchgehen
+     * lassen. Warum, steht gleich darunter.
      */
     const vorher = raeder().map((r) => r.rotation.x);
-    const input = tastatur(["KeyS"]);
-    let strecke = 0;
+    const input = tastatur(["KeyW"]);
     const start = bagger.position.clone();
-    for (let i = 0; i < 120; i++) bagger.update(1 / 60, input);
-    strecke = bagger.position.distanceTo(start);
+    /*
+     * DAS RAD ZEIGT IMMER DEN STAND DES VORIGEN BILDES.
+     *
+     * `Excavator.update` ruft erst `syncMeshes()` — dort wird
+     * `rotation.x = wheelSpin` geschrieben — und rechnet ERST DANACH die in
+     * diesem Bild gefahrene Strecke auf `wheelSpin` an. Nach n Bildern steht
+     * die Maschine also n Schritte weit, das Rad aber n−1. Bei 3,2 m/s und
+     * 60 Bildern je Sekunde sind das 5,3 cm, am Rad 0,053 / 0,62 = 0,086 rad —
+     * das Vierfache der Toleranz hier. Gemessen am 15.09.2026, vorwärts.
+     *
+     * Rückwärts fiel das nicht auf, weil die Maschine am Trennstein stand: Wer
+     * stillsteht, hat keinen Rückstand. Der alte Test war grün aus dem falschen
+     * Grund.
+     *
+     * Verglichen wird deshalb gegen die Strecke BIS ZUM VORLETZTEN Bild. Das
+     * ist kein Nachgeben: Ein Bild Versatz sieht niemand, und was hier bewacht
+     * werden soll, ist „das Rad dreht sich passend zur Strecke" — nicht „die
+     * Reihenfolge zweier Zeilen in `update`".
+     */
+    let bisVorletztes = 0;
+    for (let i = 0; i < 120; i++) {
+      if (i === 119) bisVorletztes = bagger.position.distanceTo(start);
+      bagger.update(1 / 60, input);
+    }
+    const strecke = bagger.position.distanceTo(start);
     expect(strecke, "die Messstrecke ist blockiert").toBeGreaterThan(3);
+    expect(
+      strecke - bisVorletztes,
+      "ein Bild Fahrt sollte rund 5 cm sein"
+    ).toBeLessThan(0.1);
     const nachher = raeder().map((r) => r.rotation.x);
     for (let i = 0; i < 4; i++) {
       expect(nachher[i], `Rad ${i} steht still`).not.toBeCloseTo(vorher[i]!, 4);
@@ -230,8 +253,7 @@ describe("Räder — sie rollen und lenken", () => {
      * Maschine gut 5 m zurück, das sind über 8 Umdrehungen — der Rollwinkel
      * wird auf einen Umlauf gestutzt, deshalb wird hier modulo verglichen.
      */
-    /* Rückwärts rollt das Rad andersherum — daher das Minus. */
-    const erwartet = ((-strecke / 0.62) % (Math.PI * 2)) + vorher[0]!;
+    const erwartet = ((bisVorletztes / 0.62) % (Math.PI * 2)) + vorher[0]!;
     const ist = nachher[0]!;
     const abweichung = Math.abs(
       Math.atan2(Math.sin(erwartet - ist), Math.cos(erwartet - ist))

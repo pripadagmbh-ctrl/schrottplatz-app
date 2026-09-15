@@ -434,26 +434,70 @@ export const CONFIGS: ContainerConfig[] = [
    * Es gibt kein Zurueckschnappen, kein „an die Sollposition". Wo der Spieler
    * ihn absetzt, bleibt er.
    *
-   * WO ER MORGENS STEHT — gesucht, nicht gegriffen. Frei im Schwenkband
-   * 5,8 bis 9,2 m ist nach dem Abriss der Streifen zwischen der Schwelle der
-   * Buntmetall-Mulde und der Kipperspur:
+   * WO ER MORGENS STEHT — GERECHNET, NICHT GEGRIFFEN (E-041, 15.09.2026).
    *
-   *   Schwelle BUNT + VA, Aussenkante   x −4,95  (Steinreihe, 0,55 m dick)
-   *   Kipperspur x 2,0, Wagenflanke     x  0,45  (halbe Breite 1,55 m)
-   *   Blockadepruefung tastet mit       1,40 m   (`routes.ts`, BED/Schranke)
-   *   → nutzbar bleiben 3,70 m Breite; der Container misst 3,60 m.
+   * Ansage Patrick auf die Frage, ob ihn der Container fuenf Meter geradeaus
+   * vor dem Bagger stoert: „Direkt neben Buntmetall-Mulde."
    *
-   *   Mitte (−2,8 | −15,4)   7,46 m vom Sitz — mitten im Band
-   *   Grundflaeche           x −4,60 … −1,00, z −17,55 … −13,25
-   *   Abstand zur Schwelle   0,35 m      Abstand zur Kipperflanke 1,45 m
-   *   82 % seiner Grundflaeche liegen im Schwenkband (mehr geht nicht: der
-   *   Ring ist 3,40 m breit, der Container 3,60 x 4,30 m).
+   * Der erste Platz (−2,8 | −15,4) stand in der Fahrlinie, und zwar messbar:
+   * Der Bagger schaut nach +z und tastet mit 1,30 m Rand (`CHASSIS_PAD` in
+   * `excavator/collision.ts`), der Container ist 1,80 m halbbreit — noetig
+   * waeren 3,10 m Seitenabstand, da waren 2,30 m. Wer geradeaus losfuhr,
+   * stand nach 4,95 m.
+   *
+   * VIER SCHRANKEN, alle zugleich:
+   *
+   *   1  Mitte im Schwenkband 5,80 … 9,20 m vom Sitz (−0,5 | −22,5)
+   *   2  kein Kontakt mit der Mulde — Waende, Sockel, Schwellensteine
+   *   3  Fahrlinie nach vorn frei:  |x + 0,5| ≥ 1,80 + 1,30 = 3,10
+   *   4  Rueckfahrspur frei:        x + 1,80 ≤ 6,30 − 1,55 − 1,40 = 3,35
+   *
+   * Aus 3 und 4 zusammen folgt x ≤ −3,60: Nach Osten auszuweichen verlangte
+   * x ≥ 2,60, und das verbietet 4. Damit liegt die Westkante des Containers
+   * bei x ≤ −5,40 — HINTER der Schwelle der Mulde (Aussenkante −4,95).
+   * Oestlich der Mulde, wo er bisher stand, gibt es also ueberhaupt keinen
+   * Platz mehr, der nicht in der Fahrlinie liegt. Bleibt der Streifen
+   * NOERDLICH von ihr; ihre Nordwand endet auf z −16,45.
+   *
+   * Abgesucht im 5-cm-Raster ueber den ganzen Platz (x −14 … 8, z −34 … −6)
+   * bleibt genau EINE freie Tasche uebrig:
+   *
+   *   x −4,67 … −3,60,  z −14,30 … −13,84   (1,07 x 0,46 m, Kontakt erlaubt)
+   *
+   * „Direkt neben der Mulde" ist damit keine Vorliebe, sondern das Einzige,
+   * was die vier Schranken zusammen noch zulassen.
+   *
+   * GENOMMEN WIRD DER MITTELPUNKT DIESER TASCHE — der eine Punkt, der von
+   * allen drei engen Grenzen gleich weit weg ist. Mit s als diesem Abstand:
+   *
+   *   x = −3,60 − s                            (Fahrlinie)
+   *   z = −14,30 + s                           (Nordwand der Mulde)
+   *   hypot(3,10 + s; 8,20 + s) = 9,20 − s     (Schwenkband)
+   *   → s² + 41 s − 7,79 = 0  →  s = 0,189 m
+   *
+   *   Mitte (−3,79 | −14,11)   9,01 m vom Sitz (Band bis 9,20)
+   *   Grundflaeche             x −5,59 … −1,99,  z −16,26 … −11,96
+   *   zur Mulde (Nordwand)     0,19 m     zur Fahrlinie          0,19 m
+   *   zur Rueckfahrspur        5,34 m     zum naechsten Fahrzeug 3,62 m
+   *
+   * WAS ES KOSTET — als Messung, nicht als Einwand: Vom Sitz aus liegen noch
+   * 53 % seiner Grundflaeche im Schwenkband (vorher 82 %). Erreichbar ist die
+   * SUEDLICHE Haelfte, die zur Mulde hin; die Nordkante ist 11,04 m weg. Mehr
+   * geht an dieser Stelle nicht — die Tasche ist nur 0,19 m „dick": Jeder
+   * Zentimeter nach Sueden geht in die Mulde, jeder nach Osten in die
+   * Fahrlinie, jeder nach Norden aus dem Band. Er bleibt versetzbar; wer ihn
+   * lieber voll in Reichweite haben will, schiebt ihn und lebt damit, dass
+   * die Maschine nicht mehr geradeaus fahren kann.
    *
    * MASSE — beide aus einer Schranke, nicht gewaehlt:
    *
-   *  - 3,60 m quer: das Breiteste, was zwischen Schwelle und Kipperspur passt.
-   *    Lichte Weite 3,42 m, die offene Sichelkralle misst 3,38 m
-   *    (`spinnenmass`) — man kommt hinein, aber knapp.
+   *  - 3,60 m quer: das Breiteste, was zwischen Schwelle und Kipperspur
+   *    passte — der Platz, an dem er bis E-041 stand. Das Mass BLEIBT, auch
+   *    wenn es dort nicht mehr steht: Daran haengt die lichte Weite von
+   *    3,42 m, und die offene Sichelkralle misst 3,38 m (`spinnenmass`) —
+   *    man kommt hinein, aber knapp. Schmaler ginge nicht, breiter auch
+   *    nicht (dann klemmt die Spinne bzw. der Kasten passt nirgends mehr
+   *    hin).
    *  - 4,30 m laengs: EIN DEZIMETER LAENGER ALS DIE PRESSKAMMER. Sie misst
    *    licht 4,20 x 4,05 m (`press.ts`, PRESS_INNER). 4,30 passt in keiner
    *    Lage hinein — der Container kann nicht gepresst werden, und zwar aus
@@ -484,7 +528,7 @@ export const CONFIGS: ContainerConfig[] = [
    * der Muell zum ersten Mal einen ganzen Weg: Wrack → Container → Silo.
    */
   { id: "r_rubble", fractionId: "rubble", mitFraktionen: ["tires", "wood", "plastic"],
-    label: "MUELL", kind: "rolloff", x: -2.8, z: -15.4, size: [3.6, 4.3, 0.8],
+    label: "MUELL", kind: "rolloff", x: -3.79, z: -14.11, size: [3.6, 4.3, 0.8],
     platzinventar: true },
 
   /*

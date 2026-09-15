@@ -1,13 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="630" height="779" viewBox="0 0 630 779">
 <defs><marker id="pf" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0,0 8,4 0,8" fill="#3f6b3a"/></marker></defs>
 <rect width="100%" height="100%" fill="#f7f5f0"/>
-<text x="26.0" y="28.0" font-family="Segoe UI,Arial" font-size="17" fill="#111" text-anchor="start">Rust'n'Reibach — eine Mulde neben der Presse, 15.09.2026 (E-034)</text>
+<text x="26.0" y="28.0" font-family="Segoe UI,Arial" font-size="17" fill="#111" text-anchor="start">Rust'n'Reibach — eine Mulde neben der Presse, 15.09.2026 (E-034, Nachtrag E-041)</text>
 <text x="26.0" y="50.0" font-family="Segoe UI,Arial" font-size="11.5" fill="#555" text-anchor="start">1  Alle Mulden rechts vom Bagger abgerissen — übrig bleibt EINE</text>
 <text x="26.0" y="66.0" font-family="Segoe UI,Arial" font-size="11.5" fill="#555" text-anchor="start">2  Sie rückt an die Presse, ihr Sockel wird zwei Lagen hoch (1,00 m)</text>
 <text x="26.0" y="82.0" font-family="Segoe UI,Arial" font-size="11.5" fill="#555" text-anchor="start">3  Der Müll wird ein Container, den der Spieler hinstellt, wo er will</text>
-<text x="26.0" y="101.0" font-family="Segoe UI,Arial" font-size="10.5" fill="#888" text-anchor="start">Maße in Metern · Norden oben · rot gestrichelt = Stand vom Vormittag</text>
+<text x="26.0" y="98.0" font-family="Segoe UI,Arial" font-size="11.5" fill="#2e5f86" text-anchor="start">4  E-041: sein Startplatz rückt neben die Mulde und aus der Fahrlinie</text>
+<text x="26.0" y="115.0" font-family="Segoe UI,Arial" font-size="10.5" fill="#888" text-anchor="start">Maße in Metern · Norden oben · rot gestrichelt = Stand vom Vormittag</text>
 <rect x="407.3" y="116.0" width="77.5" height="121.3" fill="#e9e5da" stroke="none" stroke-width="0"/>
-<text x="446.0" y="141.0" font-family="Segoe UI,Arial" font-size="9" fill="#9a917f" text-anchor="middle">KIPPERSPUR</text>
+<text x="446.0" y="141.0" font-family="Segoe UI,Arial" font-size="9" fill="#9a917f" text-anchor="middle">KIPPERSPUR (bis E-029)</text>
 <rect x="514.8" y="351.0" width="77.5" height="135.0" fill="#e9e5da" stroke="none" stroke-width="0"/>
 <text x="553.5" y="401.0" font-family="Segoe UI,Arial" font-size="9" fill="#9a917f" text-anchor="middle">ABLADE-</text>
 <text x="553.5" y="421.0" font-family="Segoe UI,Arial" font-size="9" fill="#9a917f" text-anchor="middle">PLATZ</text>
@@ -21,6 +22,9 @@
 <polyline points="581.0,611.0 581.0,661.0" fill="none" stroke="#7d7466" stroke-width="3"/>
 <text x="91.0" y="628.5" font-family="Segoe UI,Arial" font-size="9" fill="#9a917f" text-anchor="middle">SÜDMAUER</text>
 <text x="406.0" y="646.0" font-family="Segoe UI,Arial" font-size="9" fill="#9a917f" text-anchor="middle">AUSBUCHTUNG: MISCHSCHROTT · STAHLSCHROTT</text>
+<rect x="351.0" y="128.0" width="65.0" height="320.5" fill="#f0e2e0" stroke="#b03a2e" stroke-width="1" stroke-dasharray="3 3"/>
+<text x="383.5" y="146.0" font-family="Segoe UI,Arial" font-size="9" fill="#b03a2e" text-anchor="middle">FAHRLINIE</text>
+<text x="383.5" y="159.0" font-family="Segoe UI,Arial" font-size="9" fill="#b03a2e" text-anchor="middle">Tastrand 1,30 m</text>
 <circle cx="383.5" cy="448.5" r="145.0" fill="none" stroke="#c07b2a" stroke-width="1.2" stroke-dasharray="5 4"/>
 <circle cx="383.5" cy="448.5" r="230.0" fill="none" stroke="#c07b2a" stroke-width="1.2" stroke-dasharray="5 4"/>
 <text x="521.0" y="296.0" font-family="Segoe UI,Arial" font-size="9.5" fill="#c07b2a" text-anchor="middle">SCHWENKBAND</text>
@@ -33,20 +37,22 @@
 <text x="206.0" y="388.5" font-family="Segoe UI,Arial" font-size="9.5" fill="#3f6b3a" text-anchor="middle">4,2 × 6,0 m</text>
 <text x="206.0" y="406.0" font-family="Segoe UI,Arial" font-size="9.5" fill="#3f6b3a" text-anchor="middle">7,60 m</text>
 <polyline points="286.0,346.0 231.0,346.0" fill="none" stroke="#3f6b3a" stroke-width="1.8" marker-end="url(#pf)"/>
-<rect x="281.0" y="217.3" width="90.0" height="107.5" fill="#e2ebf2" stroke="#2e5f86" stroke-width="2"/>
-<text x="326.0" y="261.0" font-family="Segoe UI,Arial" font-size="13" fill="#17364e" text-anchor="middle" font-weight="bold">MUELL</text>
-<text x="326.0" y="281.0" font-family="Segoe UI,Arial" font-size="9.5" fill="#2e5f86" text-anchor="middle">3,6 × 4,3 m</text>
-<text x="326.0" y="298.5" font-family="Segoe UI,Arial" font-size="9.5" fill="#2e5f86" text-anchor="middle">7,46 m</text>
+<rect x="256.25" y="185.0" width="90.0" height="107.5" fill="#e2ebf2" stroke="#2e5f86" stroke-width="2"/>
+<text x="301.25" y="228.75" font-family="Segoe UI,Arial" font-size="13" fill="#17364e" text-anchor="middle" font-weight="bold">MUELL</text>
+<text x="301.25" y="248.75" font-family="Segoe UI,Arial" font-size="9.5" fill="#2e5f86" text-anchor="middle">3,6 × 4,3 m</text>
+<text x="301.25" y="266.25" font-family="Segoe UI,Arial" font-size="9.5" fill="#2e5f86" text-anchor="middle">9,01 m</text>
 <rect x="153.5" y="291.0" width="105.0" height="150.0" fill="none" stroke="#c0392b" stroke-width="1.4" stroke-dasharray="7 5"/>
 <text x="206.0" y="297.3" font-family="Segoe UI,Arial" font-size="9" fill="#c0392b" text-anchor="middle">alt</text>
 <rect x="271.0" y="221.0" width="90.0" height="60.0" fill="none" stroke="#c0392b" stroke-width="1.4" stroke-dasharray="7 5"/>
 <text x="282.3" y="229.8" font-family="Segoe UI,Arial" font-size="9" fill="#c0392b" text-anchor="middle">alt</text>
+<rect x="281.0" y="217.3" width="90.0" height="107.5" fill="none" stroke="#c0392b" stroke-width="1.4" stroke-dasharray="7 5"/>
+<text x="326.0" y="320.0" font-family="Segoe UI,Arial" font-size="9" fill="#c0392b" text-anchor="middle">bis E-041: 0,80 m in der Fahrlinie</text>
 <polyline points="206.0,464.8 206.0,474.8" fill="none" stroke="#b03a2e" stroke-width="2.2"/>
 <text x="231.0" y="486.0" font-family="Segoe UI,Arial" font-size="9.5" fill="#b03a2e" text-anchor="middle">0,40 m zur Presse</text>
-<polyline points="272.3,376.0 281.0,376.0" fill="none" stroke="#b03a2e" stroke-width="2.2"/>
-<text x="288.5" y="384.8" font-family="Segoe UI,Arial" font-size="9.5" fill="#b03a2e" text-anchor="start">0,35 m</text>
-<polyline points="371.0,204.8 407.3,204.8" fill="none" stroke="#b03a2e" stroke-width="2.2"/>
-<text x="388.5" y="191.0" font-family="Segoe UI,Arial" font-size="9.5" fill="#b03a2e" text-anchor="middle">1,45 m</text>
+<polyline points="301.25,292.5 301.25,299.1" fill="none" stroke="#b03a2e" stroke-width="2.2"/>
+<text x="306.0" y="303.0" font-family="Segoe UI,Arial" font-size="9.5" fill="#b03a2e" text-anchor="start">0,19 m zur Mulde</text>
+<polyline points="346.25,238.75 351.0,238.75" fill="none" stroke="#b03a2e" stroke-width="2.2"/>
+<text x="356.0" y="234.0" font-family="Segoe UI,Arial" font-size="9.5" fill="#b03a2e" text-anchor="start">0,19 m zur Fahrlinie</text>
 <text x="288.5" y="359.8" font-family="Segoe UI,Arial" font-size="9.5" fill="#8a5310" text-anchor="start">← Sockel, 2 Lagen = 1,00 m</text>
 <text x="288.5" y="342.3" font-family="Segoe UI,Arial" font-size="9.5" fill="#3f6b3a" text-anchor="start">offen zum Bagger</text>
 <circle cx="383.5" cy="448.5" r="9" fill="#c07b2a"/>
@@ -55,8 +61,8 @@
 <text x="397.5" y="465.5" font-family="Segoe UI,Arial" font-size="10" fill="#8a5310" text-anchor="start">Blick nach Norden</text>
 <text x="26.0" y="685.0" font-family="Segoe UI,Arial" font-size="10.5" fill="#444" text-anchor="start">SOCKEL: zwei Lagen Betonlego = 1,00 m. Vom Fahrersitz bleiben dann 48 % (vorn) bis 21 % (hinten) des Muldenbodens sichtbar;</text>
 <text x="26.0" y="702.0" font-family="Segoe UI,Arial" font-size="10.5" fill="#444" text-anchor="start">über einer Lage waren es 79 bis 68 %. Die Mulde ist zum Bagger hin offen — über dem Sockel steht nichts.</text>
-<text x="26.0" y="719.0" font-family="Segoe UI,Arial" font-size="10.5" fill="#444" text-anchor="start">MUELL-CONTAINER: kein fester Behälter mehr. Er steht morgens hier und danach dort, wo der Spieler ihn absetzt. Leer 1781 kg,</text>
-<text x="26.0" y="736.0" font-family="Segoe UI,Arial" font-size="10.5" fill="#444" text-anchor="start">also gerade noch zu heben. Nachts wandert sein Inhalt ins ABFALL-Silo, die leere Hülle bleibt stehen. Er ist nichts wert.</text>
-<text x="26.0" y="753.0" font-family="Segoe UI,Arial" font-size="10.5" fill="#444" text-anchor="start">Er ist 4,30 m lang — einen Dezimeter länger als die Presskammer (4,20 m). In die Presse passt er nicht.</text>
+<text x="26.0" y="719.0" font-family="Segoe UI,Arial" font-size="10.5" fill="#444" text-anchor="start">MUELL-CONTAINER (E-041): Startplatz (−3,79 | −14,11) — 9,01 m vom Sitz, 0,19 m zur Mulde, 0,19 m neben der Fahrlinie,</text>
+<text x="26.0" y="736.0" font-family="Segoe UI,Arial" font-size="10.5" fill="#444" text-anchor="start">5,34 m zur Rückfahrspur. Das ist der Mittelpunkt der EINZIGEN freien Tasche des Platzes (1,07 × 0,46 m). 53 % seiner</text>
+<text x="26.0" y="753.0" font-family="Segoe UI,Arial" font-size="10.5" fill="#444" text-anchor="start">Grundfläche liegen im Schwenkband (vorher 82 %), erreichbar ist die Südhälfte. Er bleibt frei versetzbar — kein Zuhause.</text>
 <text x="26.0" y="774.0" font-family="Segoe UI,Arial" font-size="9.5" fill="#999" text-anchor="start">Im Plan ist +x rechts; aus dem Fahrersitz ist das LINKS. Der Bagger schaut nach oben ins Bild.</text>
 </svg>

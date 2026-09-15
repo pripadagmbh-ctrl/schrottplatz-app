@@ -28,15 +28,19 @@ const ORDNER = ["src", "test", "tools", "docs"];
 const EINZELN = ["index.html", "README.md", "package.json", "tsconfig.json"];
 
 /**
- * Die drei Marker, die Git hinterlässt.
+ * Die drei Marker, die Git hinterlässt — am Zeilenanfang.
  *
- * Zusammengesetzt, damit diese Datei sich nicht selbst meldet — sonst wäre der
- * Wächter beim ersten Lauf rot und würde als kaputt abgetan.
+ * Zusammengesetzt, damit diese Datei sich nicht selbst meldet.
+ *
+ * Der Zeilenanfang ist nicht Zierde, sondern die Unterscheidung: Beim ersten
+ * Lauf hat der Wächter das Entscheidungslog gemeldet, weil dort ein Eintrag
+ * die Marker *erwähnt* — in Anführungszeichen, mitten im Satz, als Bericht
+ * über genau diesen Fehler. Git schreibt sie immer allein und linksbündig.
  */
 const MARKER = [
-  "<".repeat(7) + " ",
-  "=".repeat(7) + "\n",
-  ">".repeat(7) + " ",
+  new RegExp("^" + "<".repeat(7) + " ", "m"),
+  new RegExp("^" + "=".repeat(7) + "$", "m"),
+  new RegExp("^" + ">".repeat(7) + " ", "m"),
 ];
 
 /** Was ein Mensch liest. Bilder und Schriften interessieren nicht. */
@@ -73,8 +77,9 @@ describe("Kein Konfliktmarker kommt durch", () => {
     for (const datei of dateien) {
       const text = readFileSync(datei, "utf8");
       for (const m of MARKER) {
-        if (!text.includes(m)) continue;
-        const zeile = text.slice(0, text.indexOf(m)).split("\n").length;
+        const fund = m.exec(text);
+        if (!fund) continue;
+        const zeile = text.slice(0, fund.index).split("\n").length;
         treffer.push(`${datei.slice(wurzel.length + 1)}:${zeile}`);
         break;
       }
