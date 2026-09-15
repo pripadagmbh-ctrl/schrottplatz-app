@@ -3321,3 +3321,163 @@ Kasten teleskopiert) und gehört einzeln abgenommen.
    dass etwas durch den Reifen oder durch das Räumschild wandert?
 3. **Oberwagen einmal ganz herumdrehen**, Pratzen eingefahren: Streift das
    Gegengewicht irgendwo an einem Kragarm?
+
+---
+
+### E-063 — Der Fünfschalengreifer kommt nicht herunter: es ist nicht die Traverse, es ist die Anlenkung (15.09.2026)
+
+**Entscheidung.** Gemessen statt gebaut. Zwei Messwerkzeuge kommen dazu
+(`tools/fuenfschalen-tiefgang.ts`, `tools/greifer-kippen.ts`) und ein Wächter
+(`test/tiefgang.test.ts`). **Am Spielcode ist keine Zeile geändert.** Die
+Formfrage geht als Auswahl an Patrick zurück, weil Gestalterisches am Bild
+entschieden wird und nicht am Messwert (Projektregel 6).
+
+**Anlass.** Patrick am Gerät: „der neue greifer fühlt sich zäh, falsch
+konstruiert an und senkt nicht weit genug runter, weil die traverse stört."
+
+**Das Symptom stimmt. Die Ursache stimmt nicht.**
+
+Gemessen am kopflos gebauten Bagger, in einer echten Rapier-Welt, aus derselben
+Armstellung für beide Formen:
+
+| aufgesetzt, Arm 28–30° / Stiel −69,5° | Sichelkralle | Fünfschalen |
+|---|---|---|
+| Aufhängung steht auf | y 3,016 m | y 2,766 m |
+| OFFEN, tiefster Punkt über Beton | 57,3 cm | 54,9 cm |
+| **ZU, tiefster Punkt über Beton** | **6,7 cm** | **25,4 cm** |
+
+**Der Arm wird nicht zurückgehalten — er kommt mit dem Fünfschalengreifer sogar
+25 cm TIEFER.** Was oben bleibt, sind die Schalen.
+
+**Die Traverse ist freigesprochen, und zwar mit einer Zahl.** Welche Bauteile
+„nicht mitschwenken" wird gemessen, nicht am Namen erkannt: Das Modell wird zu
+und offen gestellt, und nur Netze zählen, deren Weltmatrix sich dabei nicht
+rührt (15 von 65). Ihr tiefster Punkt ist `GRAPPLE_HEAD_SCHWEISSNAHT` auf
+**1,6518 m** unter der Aufhängung. Aufgesetzt sind das **1,10 m Luft zum
+Beton**. Die Traverse berührt den Boden nie, in keiner Stellung.
+
+*Die erste Fassung dieser Messung sagte das Gegenteil* — sie sortierte die
+Bauteile am Namen aus, kannte „SCHALE" und nicht „SHELL", hielt damit alle fünf
+Schalen für Traverse und meldete eine Traverse auf 2,90 m. Deshalb steht die
+Bewegungsprobe jetzt an ihrer Stelle, im Werkzeug **und** im Wächter.
+
+**Woran es wirklich hängt: die Schale schwenkt, statt sich einzurollen.**
+
+Die Schale ist EIN starrer Körper an EINEM Bolzen (`STEMPEL_AUGE`, r 0,59 /
+y −1,5335). Ihr Zahn sitzt im Bolzenrahmen auf (−A / −B), also gilt für die
+Tiefe beim Schwenk `s`
+
+    T(s) = |y_Bolzen| + A·cos s + B·sin s
+
+Eine Sinuswelle: Scheitel bei `sqrt(A² + B²)`, Randwert `A` bei geschlossen.
+Der Greifer schwebt also um **sqrt(A² + B²) − A**. Zurückgerechnet aus der
+gebauten Form: A = 0,9653 m, B = 0,7422 m, Scheitel bei 39 % des Schließweges.
+**Probe: 25,2 cm gerechnet gegen 25,2 cm gemessen.**
+
+Der Bodenanschlag rechnet seit E-046 über den ganzen Schließweg und muss den
+Scheitel respektieren — sonst pflügt der Greifer auf halbem Schließweg
+25 cm in den Beton. Die 25 cm sind also **keine Fehlrechnung, sondern die
+Anlenkung selbst.** B ist der Weg, den der Zahn vom Bolzen bis auf die Achse
+zurücklegen muss; er liegt zwangsläufig in der Größenordnung des Bolzenkreises.
+
+**Die Sichelkralle hat das Problem nicht**, weil ihre Kralle kein starrer Körper
+an einem Bolzen ist, sondern eine Kette aus acht Segmenten: Sie **rollt sich
+ein**, statt zu schwenken, und ihre Spitze bleibt dabei unten — 5,1 cm.
+
+**Was eine Formänderung bringen würde** (gerechnet, nicht gebaut):
+
+| Bolzenkreis B | schwebt | Stempelauge r |
+|---|---|---|
+| 0,742 m (heute) | 25,2 cm | 0,59 m |
+| 0,550 m | 14,6 cm | 0,44 m |
+| 0,450 m | 10,0 cm | 0,36 m |
+| 0,350 m | 6,1 cm | 0,28 m |
+
+Die Schale länger zu machen wirkt viel schwächer: 1,20 m → 21,1 cm,
+2,50 m → 10,8 cm. **Der Bolzenkreis ist der Hebel, nicht die Schalenlänge.**
+
+**Zu „zäh": am Schließen liegt es nicht.** Beide Formen haben denselben
+Spielraum zwischen Befehl und Schalenrate (**1,591**), dieselbe Schließzeit
+(0,4 s), praktisch dieselbe Schalenlücke (0,6293 gegen 0,5954 m) und damit
+dieselben Schwellen von E-043. Der einzige Unterschied, der im Spiel ankommt,
+sind die 25 cm: Was flach auf dem Beton liegt, ist beim Zupacken außerhalb des
+Korbbodens.
+
+**Zum Seitwärtskippen (Wunsch „komplett zur Seite kippen, zum Kehren und
+Schleudern") — gemessen, nicht gebaut.** Heute kippt der Greifer **gar nicht
+gesteuert**; es gibt nur das Pendel, gedeckelt auf 17° je Achse (`PENDEL_MAX`),
+hart geschwenkt erreicht wurden **20,7°** (beide Achsen zugleich, rechnerischer
+Anschlag 23,9°). Begrenzt wird es von dieser einen Konstante — nicht von einem
+Gelenk und nicht von einer Kollision.
+
+Bei 90° liefern die drei bekannten Stellen Unsinn, und zwar messbar: Die
+wirkliche senkrechte Ausladung fällt von 3,00 m auf **1,77 m** — der Arm bliebe
+also **1,23 m zu hoch** stehen, Kehren wäre unmöglich. Der Messstrahl von
+`surfaceUnderClaws` geht senkrecht aus der Greifermitte nach unten; die Schalen
+lägen dann **2,44 m** daneben. (Fünfschalengreifer: 1,62 m statt 2,75 m,
+Strahl 2,05 m daneben.)
+
+**Die Kollisionsfrage ist NICHT beantwortet, und das ist ein Befund über die
+Messung, nicht über den Bagger.** Gerechnet wurden 30 Armstellungen × 19
+Kippwinkel × 13 Rotatorstellungen × 6.677 Greiferpunkte = 192,9 Mio. Abstände,
+gegen die Kästen von Ausleger- und Stielkasten. Die **Nullgrad-Zeile ist die
+Eichung**: Dort hängt der Greifer nachweislich frei, die Messung meldet aber
+**−0,071 m**. Das ist ihr Eigenfehler — Kästen um verschmolzene Netze sind
+größer als die Netze (der Stielkasten enthält den seitlich abstehenden
+Zylinderkopf). Absolute Zahlen sind damit unbrauchbar. *Die erste Fassung hatte
+das nicht gesehen und 47 cm Durchdringung ins Räumschild gemeldet — bei
+Kippwinkel 0.*
+
+Verwendbar ist allein der **Zuwachs gegenüber lotrecht**: 30° → 0,153 m,
+45° → 0,172 m, 60° → 0,168 m, 75° → 0,242 m, **90° → 0,267 m**. So viel näher
+kommt der gekippte Greifer dem Arm. Ob das reicht, um ihn zu berühren, kann nur
+ein Test auf Dreiecksebene sagen. Das ist ein eigenes Paket und muss vor dem
+Kippen kommen.
+
+**Der Besen passt.** 2,70 × 0,80 × 1,12 m, 680 kg. Der geschlossene Korb misst
+1,297 m im größten Durchmesser, die Rolle ragt also 0,70 m je Seite heraus —
+gefasst wird ihre Mitte. Deren kleinste Kante (0,80 m) ist größer als die
+Schalenlücke (0,629 m), zwei Schalen können sie also berühren und das
+Greiffenster von E-043 ist offen. Patricks „breite so lassen, ich kann die
+spinne ja drehen damit es passt" trägt.
+
+**Verworfene Alternative.** Den Bodenanschlag für den Fünfschalengreifer auf die
+Momentanstellung umstellen. Das ist genau die Krankheit von E-046: Beim
+Schließen von offen auf den Scheitel würde der Arm um 53 cm nach oben
+nachgeregelt — er zöge sich in den Bildern weg, in denen er zufassen soll.
+
+**Unangetastet.** Die Sichelkralle in Form und Verhalten — es ist keine Zeile
+Spielcode geändert, also ist der Abdruck aus `tools/greifer-abdruck.ts`
+trivialerweise derselbe. Griff-Kern (Sensorkugel + Fixed Joint), Pendel,
+Rotator, Kamera, Bodenanschlagshöhe beider Formen.
+
+**Abnahmekriterium.** `test/tiefgang.test.ts`, 6 Prüfungen, **jede
+Zahlenschranke mit Gegenprobe**: Die Sichelkralle schließt unter 8 cm (Gegenprobe:
+eine um 30 cm angehobene Kralle meldet); die Traverse hält über 0,50 m Luft
+(Gegenprobe: eine um 1,20 m abgesenkte Traverse meldet); die Schwebeformel
+trifft die Messung auf 1 mm (Gegenprobe: ein um 44 cm falscher Bolzenkreis
+meldet). 1.004 bestehende Prüfungen bleiben grün.
+
+**Offen — Patrick entscheidet, weil es Gestaltung ist.** Soll der
+Fünfschalengreifer den Bolzenkreis von 0,59 auf etwa 0,36 m einziehen (dann
+schließt er auf 10 cm statt 25 cm, sieht aber schlanker und anders aus)? Oder
+bleibt die Form, wie sie gezeichnet ist, und die 25 cm sind der Preis dieser
+Bauart — dann ist der Fünfschalengreifer der Greifer für den Haufen und die
+Sichelkralle der fürs Kehren vom Beton?
+
+**Offen — technisch, kommt vor dem Kippen.** Ein Freigangstest auf
+Dreiecksebene. Ohne ihn lässt sich nicht sagen, ob der Greifer 90° zur Seite
+kann, ohne in Stiel oder Ausleger zu fahren; der Kastentest hier kann es
+nachweislich nicht (er meldet schon bei 0° eine Berührung, die es nicht gibt).
+
+**Auf dem Gerät zu prüfen.**
+
+1. Mit dem **Fünfschalengreifer** ein flaches Teil vom Beton nehmen und dabei
+   **von der Seite** zusehen: Setzt der Greifer auf der Traverse auf — oder
+   fahren die Schalen bis auf den Boden hinunter und kommen beim letzten Stück
+   des Schließens wieder hoch? Gemessen ist das Zweite.
+2. Dasselbe Teil mit der **Sichelkralle**: Kommt sie sichtbar tiefer herunter?
+   Wenn ja, ist das der Unterschied 6,7 gegen 25,4 cm.
+3. Mit dem Fünfschalengreifer in einen **Haufen** greifen statt auf den Beton:
+   Fühlt er sich dort auch zäh an, oder nur auf der flachen Fläche? Die Antwort
+   sagt, ob die 25 cm die ganze Beanstandung erklären.
