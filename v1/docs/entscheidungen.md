@@ -3752,3 +3752,139 @@ nachweislich nicht (er meldet schon bei 0° eine Berührung, die es nicht gibt).
 3. Mit dem Fünfschalengreifer in einen **Haufen** greifen statt auf den Beton:
    Fühlt er sich dort auch zäh an, oder nur auf der flachen Fläche? Die Antwort
    sagt, ob die 25 cm die ganze Beanstandung erklären.
+
+### E-068 — Der Knick im Zahn: er ist da, er kostet 4,4 cm, und er ist nicht umsonst wegzunehmen (15.09.2026)
+
+**Entscheidung.** Gemessen und gezeichnet, **nicht gebaut**. `src/` ist Zeile für
+Zeile unverändert. Neu sind ein Messwerkzeug (`tools/fuenfschalen/zahnknick.ts`)
+und ein Blatt (`docs/f5-zahnknick-2026-09-15.svg`) mit drei Formen. Patrick
+entscheidet am Bild, weil die Wahl zwischen zwei seiner eigenen Ansagen liegt
+und nicht zwischen zwei Messwerten.
+
+**Anlass.** Patrick am 15.09.2026, vor `docs/f5-greiferschale.png` und vor einem
+Vorbildfoto (`docs/f5-vorbild-aufnahme-patrick-2026-09-15.jpg`, gelber Kringel
+auf dem Übergang Schale → Lager):
+
+> „dieser harte Knick im Zahn, den gibt es nicht. Das ist nicht so."
+> „das Problem ist ja die Aufnahme an dem Zahn. Der Zahn ist falsch gebogen,
+> weshalb du diese Abstände zur Traverse brauchst."
+
+**Der Knick ist eine Zahl, und sie steht seit dem 14.09.2026 im Quelltext.**
+`zahnAnstellung(offen) = offen − schalenEnde().th + zahnEigenwinkel()`
+(`teile.ts:1856`). Mit `OFFEN` = `schalenEnde().th` bleiben davon **−12,15°**
+übrig: um genau diesen Winkel ist der Zahn gegen das Schalenende verdreht.
+Eingebaut wurde er, damit der Zahn bei OFFENEM Greifer lotrecht steht (Ansage
+13.09.2026, Messprotokoll `docs/messungen/2026-09-14_fuenfschalen-zahnwinkel.md`
+Abschnitt 2). Patrick sieht heute die Folge davon. **Beide Ansagen sind seine,
+und mit diesem Anschlag schließen sie einander aus.**
+
+**Was der Knick wirklich kostet — die Zerlegung von A und B aus E-065.** Im
+Bolzenrahmen hat jeder Netzpunkt (a, b) = (tief unter dem Bolzen, weit nach
+innen), und beim Schwenk `s` liegt er `|y| + a·cos s + b·sin s` unter der
+Aufhängung. Damit ist `tiefe(zu)` = max a und `maxTiefe` = max hypot(a, b) —
+gemessen an 1.296 Netzpunkten der Schale 0:
+
+| | a | b | an welchem Bauteil |
+|---|---|---|---|
+| tiefster Punkt **geschlossen** | 0,9792 | 0,4535 | `06_ZINKEN` |
+| tiefster Punkt **über den Weg** | 0,9273 | 0,7891 | `07_ZAHN`, Scheitel bei 40,4 % |
+
+**B ist kein Punkt, sondern ein Rechenwert** — `sqrt(R² − A²)` aus zwei
+VERSCHIEDENEN Punkten. Und: **der Zahn bringt 0,0 cm Tiefe und 11,2 cm
+Scheitel.** Ohne ihn schwebte der Greifer 12,7 cm, mit ihm 23,8 cm. Patricks
+Lesart trifft also zu — aber nur zur Hälfte: Die andere Hälfte sitzt in der
+Schale selbst und ist mit keiner Zahnform zu holen.
+
+*Nebenbefund:* `FUENFSCHALEN.tiefe()` misst nur `07_ZAHN`
+(`greiferFuenfschalen.ts`). Der Rücken des Zinken reicht geschlossen 1,4 cm
+tiefer. Die im Spiel gerechneten 25,2 cm sind also 23,8 cm wirkliche
+Schwebehöhe. Nicht angefasst, hier notiert.
+
+**Die drei Formen, gemessen am gebauten Netz.**
+
+| | **A** heute | **B** Zahn tangential | **C** Zahn tangential, Anschlag folgt |
+|---|---|---|---|
+| Anschlag offen | 96,25° | 96,25° | **108,40°** |
+| Zahn gegen Schalenende | **−12,15°** | 0,00° | 0,00° |
+| **Schwebehöhe geschlossen** | 23,8 cm | **19,4 cm** | **19,4 cm** |
+| **Maulweite offen** | 3,176 m | 3,095 m | 3,313 m |
+| **Korbtiefe geschlossen** | 0,9792 m | 0,9792 m | 0,9792 m |
+| **Zahnwinkel bei Bodenkontakt** | 34,2° | 23,5° | 23,3° |
+| Zahn offen gegen die Senkrechte | **0,00°** | **12,15°** | 0,00° |
+| Hebelarm offen (Ziel > 100 mm) | **118 mm** | **118 mm** | **47 mm** |
+| Hüllkreis (Grenze 3,38 m) | 3,232 | 3,226 | 3,369 |
+| Sektor (Grenze 36°) | 26,34° | 26,34° | 26,34° |
+
+**Die Wahl in einem Satz:** **B** nimmt den Knick weg und lässt jeden Kennwert
+stehen — der Preis ist, dass der Zahn offen 12° schief steht. **C** hält beides,
+und der Hebelarm ganz offen fällt von 118 auf 47 mm — **genau das, was E-039
+erkämpft hat**, und an der Stelle, die E-039 die gefährlichste nennt („die, in
+der man in den Haufen sticht").
+
+**C ist mit der heutigen Traverse nicht zu retten.** Abgerastert bei festem
+Aufnahmeradius 0,465 und fester Höhe −0,635: **null** Anlenkungen halten
+Vertrag und Hebelarm > 0,115 m. Erst wenn die Aufnahme auf −0,730 zurückgeht
+(die Höhe VOR E-039), findet sich mit Ay −0,12 / Az 0,270 wieder 0,1178 m. Auch
+Ø 0,70 trägt dann (Ay −0,08 / Az 0,285 → 0,1172 m) — das wäre Patricks „A, wenn
+die Traverse kürzer ist", aber mit 37,9° Zylinderneigung statt 24,4°.
+
+**Der Winkelhebel ist schon gebaut.** Patrick beschreibt eine Schale, die mit
+EINEM Bolzen direkt am Kopf sitzt und über den Bolzen hinaus den Zylinder
+aufnimmt. Nachgesehen: Genau so ist es. Die Schale hängt an `STEMPEL_AUGE`
+(`teile.ts:328`, `rig.ts:307`), der Zylinder greift direkt an `06_ZYLINDERAUGE`
+an (`rig.ts:421`) — **kein Lenker, kein Zwischenglied.** Der Unterschied liegt
+woanders: `OBERE_ANBINDUNG` (`teile.ts:371`) sitzt bei (−0,08 / 0,245), also
+8 cm **unter** und 24,5 cm **außerhalb** des Bolzens. Beim Vorbild reicht der
+Hebel nach **oben innen**. Das umzudrehen kehrt die Wirkrichtung des Zylinders
+um (heute fährt er zum Schließen AUS) und wirft die ganze Anlenkung aus E-039
+neu auf — ein eigenes Paket, keine Nebenarbeit.
+
+**Was am Übergang außer dem Knick noch steht.** Die Sichtprobe zeigt bei B eine
+verbleibende **Querschnittsstufe** am Sitz: Der Zahn sitzt auf der Außenhaut
+(`zahnZ0()` = Wölbung + Blech), die innere Strebe endet davor. Dazu der
+**Schulterabsatz** am Arm, der am 14.09.2026 absichtlich gebaut wurde
+(`SCHULTER_AB` 0,42 · `SCHULTER_BIS` 0,74 · `SCHULTER_VOR` 0,22; Messprotokoll
+Abschnitt 3: „Der Arm bleibt über 42 % der Ferse satt und fällt dann über ein
+Drittel ab. Das ist der Absatz, sowohl in der Rücken- als auch in der
+Draufsichtlinie"). **Patricks Kringel auf dem Vorbildfoto liegt genau dort.**
+Beides ist gemessen und nicht angefasst — es ist das nächste Paket.
+
+**Verworfene Alternative.** C bauen und die beiden Wächter „Neigung bleibt unter
+25°" und „Hebelarm über den ganzen Weg > 0,115" auf den neuen Stand nachziehen.
+Das ist genau der Fehler, vor dem diese Wächter selbst warnen: „Weit gesetzte
+Grenzen hätten den Umbau nicht bemerkt." Ein Wächter, der nachgibt, sobald er
+meldet, ist keiner.
+
+**Ebenfalls verworfen (Rechnung liegt bei, falls sie wiederkommt).** Der
+Bolzenkreis als Hebel für die Schwebehöhe (E-065). Gerechnet am gebauten Netz,
+mit `drehpunktR + versatz = 0,89` konstant, damit die geschlossene Form Punkt
+für Punkt dieselbe bleibt:
+
+| Bolzenkreis B | Bolzen r | schwebt | Maulweite offen | Sektor (Grenze 36°) | Hebelarm kleinster |
+|---|---|---|---|---|---|
+| 0,742 (heute) | 0,590 | 25,2 cm | 3,18 m | 26,3° | 118 mm |
+| 0,550 | 0,413 | 14,6 cm | 2,78 m | **39,8°** | **17 mm** |
+| 0,450 | 0,325 | 10,0 cm | 2,59 m | **46,2°** | **1 mm** |
+| 0,350 | 0,242 | 6,1 cm | 2,40 m | **56,4°** | **0 mm** |
+
+**Alle drei verkleinerten Varianten scheitern zweifach:** Die fünf Schalen
+überschneiden sich (fünf Körper von 0,40 m Breite passen erst ab r 0,318 m
+nebeneinander), und der Zylinder bekommt einen Totpunkt. Geschlossene Form,
+Korbtiefe und Korbvolumen blieben dabei rechnerisch unverändert — die
+Mittellinie ist in allen vier Zahl für Zahl dieselbe. *Die Spalte „Stempelauge r"
+in E-065 (0,44 / 0,36 / 0,28) ist zu groß: Sie skaliert r proportional zu B, die
+gebaute Kinematik verlangt aber `r = B − 0,152`.*
+
+**Abnahmekriterium.** `npm test` grün (**1023 Tests in 91 Dateien**, unverändert),
+`npm run build` grün. **Sichelkralle nachweislich unangetastet:** `git diff`
+über `src/` ist leer — es ist keine Zeile Spielcode geändert, an keinem Greifer.
+
+**Auf dem Gerät zu prüfen.** Nichts am Spiel — es hat sich nichts geändert. Am
+Bild `docs/f5-zahnknick-2026-09-15.svg`:
+
+1. Zeile 1, die drei Übergänge Schale → Zahn nebeneinander: Ist der Absatz bei
+   **A** das, was du gemeint hast — und ist **B** das, was du willst?
+2. Zeile 2, Greifer offen: Stört es, dass der Zahn bei **B** 12° nach innen
+   hängt statt lotrecht zu stehen? Das ist der ganze Preis von B.
+3. Zeile 3, geschlossen auf der Betonkante: Der graue Schatten ist die tiefste
+   Stellung auf dem Schließweg. **Sie** hält den Arm oben, nicht die Traverse.
