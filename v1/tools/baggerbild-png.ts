@@ -43,48 +43,65 @@ function stelle(boomGrad: number, stickGrad: number): void {
 }
 
 /**
- * Ausgewählte Meshes in eine Hilfsgruppe kopieren, in Weltlage.
+ * Ein Mesh in Weltlage kopieren — BUNTE Netze dabei in ihre Farbflächen
+ * zerlegen.
  *
- * BUNTE NETZE werden dabei in ihre Farbflächen zerlegt — nur fürs Bild. Der
- * Rasterer liest `material.color`, und das ist bei einem Netz mit Eckfarben
- * absichtlich WEISS (siehe `bauteile.ts`); ohne diese Zerlegung wäre die halbe
- * Maschine im Riss weiß. Im Spiel bleibt es EIN Netz mit einem Zeichenruf.
+ * Der Rasterer liest `material.color`, und das ist bei einem Netz mit
+ * Eckfarben absichtlich WEISS (siehe `bauteile.ts`): Three multipliziert
+ * Material- und Eckfarbe, und mit Weiß kommt die Eckfarbe heraus. Ohne diese
+ * Zerlegung wären Räumschild, Pratzen, Kabine und Fahrer im Riss weiß —
+ * genau das war im ersten Blatt vom 15.09.2026 zu sehen.
+ *
+ * Im Spiel bleibt jedes davon EIN Netz mit einem Zeichenruf; hier wird nur
+ * fürs Bild aufgeteilt.
  */
+function farbtreu(o: THREE.Mesh, ziel: THREE.Group): void {
+  o.updateWorldMatrix(true, false);
+  const geo = o.geometry as THREE.BufferGeometry;
+  const col = geo.getAttribute("color") as THREE.BufferAttribute | undefined;
+  if (!col) {
+    const k = new THREE.Mesh(geo, o.material);
+    k.applyMatrix4(o.matrixWorld);
+    ziel.add(k);
+    return;
+  }
+  const idx = geo.getIndex()!;
+  const gruppen = new Map<string, number[]>();
+  for (let i = 0; i < idx.count; i += 3) {
+    const a = idx.getX(i);
+    const s = `${col.getX(a).toFixed(4)},${col.getY(a).toFixed(4)},${col.getZ(a).toFixed(4)}`;
+    const liste = gruppen.get(s) ?? [];
+    liste.push(idx.getX(i), idx.getX(i + 1), idx.getX(i + 2));
+    gruppen.set(s, liste);
+  }
+  for (const [s, liste] of gruppen) {
+    const teil = new THREE.BufferGeometry();
+    teil.setAttribute("position", geo.getAttribute("position"));
+    teil.setAttribute("normal", geo.getAttribute("normal"));
+    teil.setIndex(liste);
+    const [r, g, b] = s.split(",").map(Number) as [number, number, number];
+    const c = new THREE.Color();
+    c.setRGB(r, g, b, THREE.LinearSRGBColorSpace);
+    const k = new THREE.Mesh(teil, new THREE.MeshStandardMaterial({ color: c }));
+    k.applyMatrix4(o.matrixWorld);
+    ziel.add(k);
+  }
+}
+
+/** Ausgewählte Meshes in eine Hilfsgruppe kopieren, in Weltlage. */
 function nur(namen: string[]): THREE.Object3D {
   const g = new THREE.Group();
-  for (const n of namen) {
-    const o = finde(n) as THREE.Mesh;
-    o.updateWorldMatrix(true, false);
-    const geo = o.geometry as THREE.BufferGeometry;
-    const col = geo.getAttribute("color") as THREE.BufferAttribute | undefined;
-    if (!col) {
-      const k = new THREE.Mesh(geo, o.material);
-      k.applyMatrix4(o.matrixWorld);
-      g.add(k);
-      continue;
-    }
-    const idx = geo.getIndex()!;
-    const gruppen = new Map<string, number[]>();
-    for (let i = 0; i < idx.count; i += 3) {
-      const a = idx.getX(i);
-      const s = `${col.getX(a).toFixed(4)},${col.getY(a).toFixed(4)},${col.getZ(a).toFixed(4)}`;
-      const liste = gruppen.get(s) ?? [];
-      liste.push(idx.getX(i), idx.getX(i + 1), idx.getX(i + 2));
-      gruppen.set(s, liste);
-    }
-    for (const [s, liste] of gruppen) {
-      const teil = new THREE.BufferGeometry();
-      teil.setAttribute("position", geo.getAttribute("position"));
-      teil.setAttribute("normal", geo.getAttribute("normal"));
-      teil.setIndex(liste);
-      const [r, gr, b] = s.split(",").map(Number) as [number, number, number];
-      const c = new THREE.Color();
-      c.setRGB(r, gr, b, THREE.LinearSRGBColorSpace);
-      const k = new THREE.Mesh(teil, new THREE.MeshStandardMaterial({ color: c }));
-      k.applyMatrix4(o.matrixWorld);
-      g.add(k);
-    }
-  }
+  for (const n of namen) farbtreu(finde(n) as THREE.Mesh, g);
+  return g;
+}
+
+/** Die ganze Maschine, farbtreu — ohne die Spinne, die hier nicht zur Sache gehört. */
+function ganzeMaschine(): THREE.Object3D {
+  const g = new THREE.Group();
+  scene.traverse((o) => {
+    if (!(o instanceof THREE.Mesh)) return;
+    farbtreu(o, g);
+  });
   return g;
 }
 
@@ -139,11 +156,11 @@ const SCHRAEG = new THREE.Vector3(0.75, 0.32, 1);
 // Blatt 1 — die ganze Maschine, Arbeits- und Ruhestellung
 const b1 = new Blatt(BREITE, HOEHE);
 stelle(58, -35);
-feld(b1, scene, SEITE, 10, 10, ZB, ZH);
-feld(b1, scene, SCHRAEG, 20 + ZB, 10, ZB, ZH);
+feld(b1, ganzeMaschine(), SEITE, 10, 10, ZB, ZH);
+feld(b1, ganzeMaschine(), SCHRAEG, 20 + ZB, 10, ZB, ZH);
 stelle(8, -132);
-feld(b1, scene, SEITE, 10, 20 + ZH, ZB, ZH);
-feld(b1, scene, VORN, 20 + ZB, 20 + ZH, ZB, ZH);
+feld(b1, ganzeMaschine(), SEITE, 10, 20 + ZH, ZB, ZH);
+feld(b1, ganzeMaschine(), VORN, 20 + ZB, 20 + ZH, ZB, ZH);
 b1.schreibe("docs/messungen/2026-09-15-bagger/01-maschine.png");
 
 // Blatt 2 — die drei Baugruppen einzeln
