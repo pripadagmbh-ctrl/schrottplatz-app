@@ -67,3 +67,38 @@ export const START_AUTOS: Array<{ x: number; z: number }> = [
 
 /** Streuschrott ringsum: zehn Teile auf einem Kreis um den Haufen. */
 export const START_STREU = { x: 4.0, z: -32.0, radius: 2.9, teile: 10 };
+
+/**
+ * Wo der eine Kehrbesen liegt (E-031, 15.09.2026).
+ *
+ * Entscheidung Patrick: „Es gibt genau einen Besen, und der liegt dauerhaft
+ * auf dem Platz." Er wird also gesetzt, nicht angeliefert — und dann muss der
+ * Ort begruendet sein, nicht gewaehlt.
+ *
+ * **Gesucht, nicht gegriffen.** Das Schwenkband um den Sitz (−0,5 | −22,5)
+ * wurde in Halbmeterschritten abgesucht und jeder Punkt gegen alles gerechnet,
+ * was ihn verbieten wuerde: jede Mulde und Halde aus `containers.ts`, die
+ * Presskammer, den Starthaufen samt Streuung, die Abladespur und die
+ * Hindernisliste. Es bleiben genau zwei freie Flecken uebrig — der Vorplatz
+ * um (1,5 | −15,5) und die Schuerze um (5,0 | −27,0).
+ *
+ * Der Vorplatz faellt aus, obwohl er der freieste ist: Dort kippt der
+ * Selbstabkipper ab (`routes.ts`, `ABKIPP_ZONE` = (2,0 | −15,5)). Ein Werkzeug
+ * unter einer frisch gekippten Fuhre waere genau das, was es nicht sein soll.
+ *
+ * Bleibt **(5,0 | −27,0)**: die freie Schuerze zwischen Baggerstand und
+ * Mischschrotthalde, oestlich. Nachgerechnet in `test/besen.test.ts`:
+ * - 7,11 m vom Sitz — mitten im Schwenkband 5,8 bis 9,2 m.
+ * - 2,0 m Abstand zur naechsten Mulden- oder Haldenkante, also liegt er in
+ *   keiner Zone und wird nie als sortiertes Material gezaehlt.
+ * - 7,00 m von der Starthaufenmitte bei 2,9 m Streuung.
+ * - ausserhalb der Presskammer und ausserhalb jeder Fahrspur: Der suedlichste
+ *   Halt eines Fahrzeugs ist der Abladeplatz auf (6,3 | −23,0), vier Meter
+ *   noerdlich davon.
+ *
+ * `gier` ist die Drehung um die Hochachse, nachdem der Besen flach auf seine
+ * Flanke gelegt wurde: 0 heisst, die Schleppkante liegt quer (Ost–West) und
+ * der Wulst zeigt nach Norden, also zum Bagger. Wer ihn holen will, greift das
+ * naechstliegende Ende — und das ist der Griff.
+ */
+export const BESEN_PLATZ = { x: 5.0, z: -27.0, gier: 0 };

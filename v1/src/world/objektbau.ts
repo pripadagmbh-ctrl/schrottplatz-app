@@ -61,7 +61,9 @@ export type BauId =
   | "moebel"
   | "beton"
   | "trommel"
-  | "fensterflaeche";
+  | "fensterflaeche"
+  /** Der Kehrbesen aus zusammengequetschtem Maschendraht (E-031, 15.09.2026). */
+  | "besen";
 
 /* ------------------------------------------------------------------------ */
 /* Werkzeug                                                                   */
@@ -89,6 +91,40 @@ function q(w: number, h: number, d: number, farbe: number, x = 0, y = 0, z = 0):
   const geo = new THREE.BoxGeometry(Math.max(w, 0.01), Math.max(h, 0.01), Math.max(d, 0.01));
   geo.translate(x, y, z);
   (farbe === GLAS ? scheiben : teile).push({ geo, farbe });
+}
+
+/**
+ * Ein Draht von A nach B — fuer Geflechte, die nicht achsparallel laufen.
+ *
+ * `q()` setzt nur achsparallele Quader; ein Maschendraht laeuft aber schraeg.
+ * Der Stab wird als duenner Quader entlang der eigenen Z-Achse gebaut, in die
+ * Richtung gedreht und auf die Mitte der Strecke gesetzt. Ein Draht kostet
+ * damit dasselbe wie ein Quader: 12 Dreiecke, und alles verschmilzt am Ende
+ * zu einer einzigen Geometrie.
+ */
+const DRAHT_ACHSE = new THREE.Vector3(0, 0, 1);
+function draht(
+  a: THREE.Vector3,
+  b: THREE.Vector3,
+  dick: number,
+  farbe: number
+): void {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const dz = b.z - a.z;
+  const len = Math.hypot(dx, dy, dz);
+  // Zu kurze Stuecke ergeben entartete Dreiecke — und die haben schon einmal
+  // NaN in die konvexe Huelle getragen (scrapItems.ts, `sauber`).
+  if (!Number.isFinite(len) || len < 0.006) return;
+  const geo = new THREE.BoxGeometry(dick, dick, len);
+  geo.applyQuaternion(
+    new THREE.Quaternion().setFromUnitVectors(
+      DRAHT_ACHSE,
+      new THREE.Vector3(dx / len, dy / len, dz / len)
+    )
+  );
+  geo.translate((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2);
+  teile.push({ geo, farbe });
 }
 
 /** Zylinder, wahlweise liegend. */
@@ -149,6 +185,21 @@ function faerbeUndVerschmelze(liste: Teil[]): THREE.BufferGeometry | null {
 export interface Bauteil {
   koerper: THREE.BufferGeometry;
   glas: THREE.BufferGeometry | null;
+  /**
+   * Mehrere konvexe Huellen statt einer — fuer Formen mit Taille.
+   *
+   * `scrapItems.ts` baut den Kollider sonst als EINE konvexe Huelle um alle
+   * Eckpunkte. Das trifft die meisten Objekte gut, versagt aber bei allem, was
+   * eingeschnuert ist: Eine konvexe Huelle kennt keine Taille, sie ueberbrueckt
+   * sie. Beim Kehrbesen waere der schmale Hals dadurch 0,61 m dick statt
+   * 0,22 m, und die Schalen der Spinne wuerden sichtbar neben dem Draht
+   * schliessen.
+   *
+   * Wer hier mehrere Punktwolken liefert, bekommt mehrere Kollider an einem
+   * Koerper. Die Masse wird nach dem Rauminhalt ihrer Huellquader aufgeteilt —
+   * so sitzt der Schwerpunkt dort, wo das Material ist.
+   */
+  huellen?: Float32Array[];
 }
 
 function fertig(): Bauteil {
@@ -168,6 +219,16 @@ const GUSS = 0x55514c;
 const ALU = 0xa8adb2;
 const CHROM = 0xc2c7cb;
 const ROST = 0x7a4a2c;
+/**
+ * Verzinkter Draht — matt, hellgrau, ein Hauch blaeulich.
+ *
+ * Kein neuer Ton, sondern derselbe wie die Fraktion Zink in
+ * `materials/catalog.ts` (0x9aa6ad). Wer den Besen sieht, sieht dieselbe Farbe
+ * wie an der Zink-Mulde.
+ */
+const VERZINKT = 0x9aa6ad;
+/** Wo der Draht schon Flugrost angesetzt hat — ein Zaun steht draussen. */
+const VERZINKT_ALT = 0x7e7368;
 /** Lackiert. */
 const WEISS = 0xe6e4de;
 const WEISS_GRAU = 0xcfcdc7;
@@ -711,6 +772,256 @@ function fensterflaeche(w: number, h: number, d: number): THREE.BufferGeometry |
 }
 
 /* ------------------------------------------------------------------------ */
+/* Der Kehrbesen aus Maschendraht                                             */
+/* ------------------------------------------------------------------------ */
+
+/**
+ * Wie der Besen aufgeteilt ist — Anteile der Gesamthoehe.
+ *
+ * Steht als Tabelle und nicht verstreut im Code, weil `test/besen.test.ts`
+ * dieselben Zahlen braucht: Der Waechter rechnet nach, dass die Huelle des
+ * Kolliders unten breit und oben schmal ist, und muss dafuer wissen, wo
+ * „unten" aufhoert.
+ */
+export const BESEN_TEILUNG = {
+  /** Anteil der Hoehe, den Hals und Wulst oben einnehmen. */
+  kopf: 0.36,
+  /** Mitte der runden Ausbuchtung, gemessen von oben als Anteil der Hoehe. */
+  wulstVonOben: 0.11,
+  /** Hoehe der Ausbuchtung als Anteil der Gesamthoehe. */
+  wulstHoehe: 0.185,
+  /** Halbmesser der Ausbuchtung quer/laengs, als Anteil von Breite/Tiefe. */
+  wulstBreit: 0.146,
+  wulstTief: 0.395,
+  /** Halbmesser des zusammengequetschten Halses, als Anteil von Breite/Tiefe. */
+  halsBreit: 0.092,
+  halsTief: 0.224,
+  /** Drahtstaerke (m). */
+  draht: 0.022,
+} as const;
+
+/**
+ * Der Kehrbesen: ein Stueck Maschendrahtzaun, oben zusammengequetscht, unten
+ * breit aufgefaechert.
+ *
+ * Beschreibung Patrick, 15.09.2026: „ein Maschendrahtzaun, der quasi oben
+ * schon gequetscht ist und unten breit ist, der quasi wie ein Besen fungiert
+ * ... da ist quasi aus dem Maschendrahtzaun wie so eine runde Ausbuchtung.
+ * Und unten ist es flach, auch ründlich, aber halt breit."
+ *
+ * ## Die Form als Rechnung
+ *
+ * Der Koerper ist ein Trichter: Bei jeder Hoehe `v` (0 = Schleppkante,
+ * 1 = Hals) liegt der Umriss auf einer **Superellipse**
+ *
+ *     |x/rx|^p + |z/rz|^p = 1
+ *
+ * mit `p = 4` ganz unten und `p = 2` oben. p = 2 ist der Kreis — das ist die
+ * runde Ausbuchtung. p = 4 ist die „Squircle": lange gerade Flanken mit
+ * gerundeten Ecken, also genau „flach, auch ründlich, aber halt breit". Der
+ * praktische Unterschied liegt in der Schleppkante: Eine Ellipse waere vorn
+ * gewoelbt und wuerde Kleinteile nach aussen wegschieben, statt sie
+ * zusammenzukehren. Die gerade Flanke sammelt.
+ *
+ * Die Halbmesser laufen mit `(1 - v)^1.6` auf: unten schnell breit, oben lange
+ * schmal. Die Vorderflaeche steht damit fast senkrecht (rund 6 Grad nach
+ * hinten geneigt) — sie schiebt, statt aufzusteigen und ueber ein Teil
+ * hinwegzugleiten.
+ *
+ * ## Das Geflecht
+ *
+ * Zwei Scharen schraeger Draehte laufen gegenlaeufig um den Trichter und
+ * kreuzen sich — das ist die Rautenmasche eines Maschendrahtzauns. Dazu
+ * Ringe, die den Umriss halten, und unten ein doppelt dicker Saum: die
+ * Schleppkante. Alles sind Quader und verschmilzt zu **einer** Geometrie mit
+ * Farbe in den Eckpunkten, also ein Zeichenruf.
+ */
+function besen(w: number, h: number, d: number): Bauteil {
+  const T = BESEN_TEILUNG;
+  const DICK = T.draht;
+  /** Saum unten, doppelt gelegt — der Teil, der ueber den Boden schleift. */
+  const SAUM = DICK * 2.0;
+  const yOben = h / 2;
+  const yUnten = -h / 2;
+  /** Oberkante des Faechers = Unterkante des Halses. */
+  const yHals = yOben - h * T.kopf;
+  /** Mittellinie der Schleppkante: der Saum soll genau auf -h/2 aufliegen. */
+  const ySaum = yUnten + SAUM / 2;
+  const halsRx = w * T.halsBreit;
+  const halsRz = d * T.halsTief;
+  const wulstRx = w * T.wulstBreit;
+  const wulstRz = d * T.wulstTief;
+
+  /**
+   * Halbmesser des Faechers auf Hoehe v (0 = Saum, 1 = Hals).
+   *
+   * Gerechnet wird auf die MITTELLINIE des Drahts, darum unten `w/2 - DICK`:
+   * Der Saum ist doppelt gelegt und steht mit seiner halben Staerke (= DICK)
+   * nach aussen. So misst der fertige Besen unten genau `w` und nicht `w`
+   * plus Drahtstaerke — die Kollider-Huelle soll den Katalogmassen
+   * entsprechen, und `test/besen.test.ts` rechnet das nach.
+   */
+  const rxBei = (v: number): number => halsRx + (w / 2 - DICK - halsRx) * Math.pow(1 - v, 1.6);
+  const rzBei = (v: number): number => halsRz + (d / 2 - DICK - halsRz) * Math.pow(1 - v, 1.6);
+  /** Superellipsen-Exponent: unten 4 (flach-breit), oben 2 (rund). */
+  const pBei = (v: number): number => 4 - 2 * v;
+
+  const pkt = (theta: number, v: number, out = new THREE.Vector3()): THREE.Vector3 => {
+    const e = 2 / pBei(v);
+    const c = Math.cos(theta);
+    const s = Math.sin(theta);
+    return out.set(
+      rxBei(v) * Math.sign(c) * Math.pow(Math.abs(c), e),
+      ySaum + v * (yHals - ySaum),
+      rzBei(v) * Math.sign(s) * Math.pow(Math.abs(s), e)
+    );
+  };
+
+  /** Draehte altern unregelmaessig — fest an der Nummer, nicht zufaellig. */
+  const ton = (i: number): number => ((i * 7) % 5 === 0 ? VERZINKT_ALT : VERZINKT);
+
+  /* --- Rautenmasche: zwei Scharen gegenlaeufig um den Trichter ------------ */
+  /*
+   * 13 Straenge je Schar, 5 Stufen je Strang — 130 Draehte je Richtung.
+   *
+   * Weniger las sich aus der Kabine wie ein Gestaenge, nicht wie ein Geflecht
+   * (Blattprobe 15.09.2026). Mehr waere Rauschen: Ein Besen von 1,30 m ist auf
+   * dem Schirm kaum handhoch. Dreiecke sind billig, Netze nicht — und alles
+   * hier bleibt EIN Netz.
+   */
+  const STRAENGE = 13; // je Schar
+  const STUFEN = 5; // Teilstuecke je Strang
+  /** Wie weit ein Strang ueber die volle Hoehe um den Trichter wandert (rad). */
+  const DRALL = 0.62;
+  const a = new THREE.Vector3();
+  const b = new THREE.Vector3();
+  for (let s = 0; s < STRAENGE; s++) {
+    const theta0 = (s / STRAENGE) * Math.PI * 2;
+    for (const richtung of [1, -1]) {
+      for (let k = 0; k < STUFEN; k++) {
+        const v0 = k / STUFEN;
+        const v1 = (k + 1) / STUFEN;
+        pkt(theta0 + richtung * DRALL * v0, v0, a);
+        pkt(theta0 + richtung * DRALL * v1, v1, b);
+        draht(a, b, DICK, ton(s + k + (richtung > 0 ? 0 : 3)));
+      }
+    }
+  }
+
+  /* --- Ringe: sie halten den Umriss und lesen sich als Maschenreihen ------ */
+  const RING_ECKEN = 14;
+  for (const [i, v] of [0, 0.34, 0.68].entries()) {
+    const dickRing = v === 0 ? SAUM : DICK;
+    for (let e = 0; e < RING_ECKEN; e++) {
+      pkt((e / RING_ECKEN) * Math.PI * 2, v, a);
+      pkt(((e + 1) / RING_ECKEN) * Math.PI * 2, v, b);
+      draht(a, b, dickRing, v === 0 ? VERZINKT : ton(e + i));
+    }
+  }
+
+  /* --- Hals: das zusammengequetschte Stueck zwischen Faecher und Wulst ---- */
+  const yWulst = yOben - h * T.wulstVonOben;
+  const wulstH = h * T.wulstHoehe;
+  const yWulstUnten = yWulst - wulstH / 2;
+  const HALS_DRAEHTE = 8;
+  for (let s = 0; s < HALS_DRAEHTE; s++) {
+    const th = (s / HALS_DRAEHTE) * Math.PI * 2;
+    a.set(halsRx * Math.cos(th), yHals, halsRz * Math.sin(th));
+    b.set(halsRx * 0.8 * Math.cos(th), yWulstUnten, halsRz * 0.8 * Math.sin(th));
+    draht(a, b, DICK, ton(s));
+  }
+  for (const yr of [yHals + (yWulstUnten - yHals) * 0.35, yHals + (yWulstUnten - yHals) * 0.75]) {
+    for (let e = 0; e < 8; e++) {
+      const t0 = (e / 8) * Math.PI * 2;
+      const t1 = ((e + 1) / 8) * Math.PI * 2;
+      a.set(halsRx * 0.9 * Math.cos(t0), yr, halsRz * 0.9 * Math.sin(t0));
+      b.set(halsRx * 0.9 * Math.cos(t1), yr, halsRz * 0.9 * Math.sin(t1));
+      draht(a, b, DICK * 1.3, VERZINKT_ALT);
+    }
+  }
+
+  /* --- Die runde Ausbuchtung: der aufgerollte Wulst ganz oben ------------- */
+  /*
+   * Fuenf Ringe uebereinander, deren Halbmesser einem Kugelschnitt folgen —
+   * das liest sich als zusammengerollter Draht und nicht als Kugel. Der
+   * oberste und der unterste Ring sind eng, der mittlere steht am weitesten
+   * heraus: Genau diese Kante ist es, unter die die Schalen der Spinne
+   * greifen, damit der Besen beim Ziehen nicht durchrutscht.
+   */
+  const WULST_RINGE = 5;
+  const WULST_ECKEN = 10;
+  for (let j = 0; j < WULST_RINGE; j++) {
+    const t = (j - (WULST_RINGE - 1) / 2) / ((WULST_RINGE - 1) / 2); // -1 .. 1
+    const f = Math.sqrt(Math.max(1 - t * t * 0.86, 0.04));
+    const yr = yWulst + (t * wulstH) / 2;
+    for (let e = 0; e < WULST_ECKEN; e++) {
+      const t0 = (e / WULST_ECKEN) * Math.PI * 2;
+      const t1 = ((e + 1) / WULST_ECKEN) * Math.PI * 2;
+      a.set(wulstRx * f * Math.cos(t0), yr, wulstRz * f * Math.sin(t0));
+      b.set(wulstRx * f * Math.cos(t1), yr, wulstRz * f * Math.sin(t1));
+      draht(a, b, DICK * 1.15, ton(j + e));
+    }
+  }
+  // Der Draht, der den Wulst zusammenhaelt: ein paar Windungen laengs darueber
+  for (let s = 0; s < 6; s++) {
+    const th = (s / 6) * Math.PI * 2;
+    a.set(wulstRx * 0.5 * Math.cos(th), yWulst - wulstH / 2, wulstRz * 0.5 * Math.sin(th));
+    b.set(wulstRx * 0.5 * Math.cos(th + 0.5), yWulst + wulstH / 2, wulstRz * 0.5 * Math.sin(th + 0.5));
+    draht(a, b, DICK, VERZINKT_ALT);
+  }
+  // Scheitel: damit die Huelle oben wirklich bei +h/2 endet und nicht darueber
+  q(wulstRx * 0.7, DICK, wulstRz * 0.7, VERZINKT, 0, yOben - DICK / 2, 0);
+
+  const fertigesTeil = fertig();
+  /*
+   * Zwei Huellen statt einer: Faecher und Kopf.
+   *
+   * Eine einzige konvexe Huelle um den ganzen Besen waere ein Kegel von der
+   * Schleppkante bis zum Wulst — gemessen 0,61 m breit auf Halshoehe, wo der
+   * Draht nur 0,22 m misst. Die Taille verschwaende, und die Spinne griffe ins
+   * Leere neben dem Geflecht. Getrennt an der Halsunterkante bleibt die Taille
+   * erhalten, und der Wulst wird zu dem, was er sein soll: eine Kante, unter
+   * die die Schalen fassen.
+   *
+   * Die beiden Wolken ueberlappen um zwei Zentimeter, sonst klaffte zwischen
+   * den Huellen ein Spalt.
+   */
+  const UEBERLAPP = 0.02;
+  fertigesTeil.huellen = [
+    punkteBis(fertigesTeil.koerper, -Infinity, yHals + UEBERLAPP),
+    punkteBis(fertigesTeil.koerper, yHals - UEBERLAPP, Infinity),
+  ];
+  return fertigesTeil;
+}
+
+/**
+ * Alle Eckpunkte einer Geometrie zwischen zwei Hoehen — fuer Teilhuellen.
+ *
+ * Doppelte werden auf den Millimeter genau aussortiert. Das ist kein
+ * Schoenheitsfehler, sondern Rechenzeit: Ein `BoxGeometry` bringt 24
+ * Eckpunkte fuer 8 Ecken mit (je Flaeche eigene, wegen der Normalen), und der
+ * Besen besteht aus rund 200 solchen Quadern. Gemessen 15.09.2026 sank der
+ * Bau des Kolliders dadurch von 54 auf 20 ms — einmalig beim Setzen, aber
+ * einmalig an der Stelle, an der das Spiel startet.
+ */
+function punkteBis(geo: THREE.BufferGeometry, y0: number, y1: number): Float32Array {
+  const pos = geo.getAttribute("position") as THREE.BufferAttribute;
+  const out: number[] = [];
+  const gesehen = new Set<string>();
+  for (let i = 0; i < pos.count; i++) {
+    const y = pos.getY(i);
+    if (y < y0 || y > y1) continue;
+    const x = pos.getX(i);
+    const z = pos.getZ(i);
+    const schluessel = `${Math.round(x * 1000)},${Math.round(y * 1000)},${Math.round(z * 1000)}`;
+    if (gesehen.has(schluessel)) continue;
+    gesehen.add(schluessel);
+    out.push(x, y, z);
+  }
+  return new Float32Array(out);
+}
+
+/* ------------------------------------------------------------------------ */
 
 /**
  * Geometrie für einen Bau. `dims` ist dasselbe wie im Katalog:
@@ -779,6 +1090,8 @@ export function baueGeometrie(bau: BauId, dims: number[], kind: string): Bauteil
       return trommel(kind === "cyl" ? a : Math.min(w, h) / 2, kind === "cyl" ? b : d);
     case "fensterflaeche":
       return fensterflaeche(w, h, d) as Bauteil;
+    case "besen":
+      return besen(w, h, d);
     default:
       return { koerper: new THREE.BoxGeometry(w, h, d), glas: null };
   }

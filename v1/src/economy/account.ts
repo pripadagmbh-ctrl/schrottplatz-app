@@ -85,16 +85,38 @@ export class Account {
     /** Bestellte Fraktion; null = der Abnehmer nimmt, was dominiert */
     order?: string | null
   ): SaleResult {
-    if (loaded.length === 0) return { eur: 0, massKg: 0, purity: 1, dominant: "" };
+    const ware = loaded;
+    if (ware.length === 0) return { eur: 0, massKg: 0, purity: 1, dominant: "" };
     const massByMaterial = new Map<string, number>();
     let totalKg = 0;
-    for (const it of loaded) {
+    for (const it of ware) {
       // Presspakete bringen ihre Zusammensetzung mit: ein gemischt gepresstes
       // Paket gilt weiterhin als Mischung, nicht als sortenreine Ladung
       for (const c of it.composition ?? [{ materialId: it.materialId, massKg: it.massKg }]) {
         massByMaterial.set(c.materialId, (massByMaterial.get(c.materialId) ?? 0) + c.massKg);
         totalKg += c.massKg;
       }
+    }
+    /*
+     * Null Kilo heisst null Euro — und zwar bevor irgendetwas gerechnet wird.
+     *
+     * Das kommt seit dem 15.09.2026 wirklich vor: Platzinventar (der Besen,
+     * spaeter der Muellcontainer) traegt die Zusammensetzung
+     * `[{ materialId, massKg: 0 }]` und wiegt fuer die Wirtschaft nichts.
+     * Faehrt der Abholer NUR damit los, bleibt hier eine leere Massentabelle
+     * uebrig; ohne diese Zeile suchte `getMaterial("")` weiter unten eine
+     * Fraktion, die es nicht gibt, und das Spiel bliebe stehen.
+     *
+     * Entfernt werden die Stuecke trotzdem — was auf dem Wagen liegt, faehrt
+     * mit. Das Inventar ist am naechsten Tag wieder da
+     * (`ItemManager.inventarNachtragen`).
+     */
+    if (totalKg <= 0) {
+      for (const it of ware) {
+        const wasCar = composites.despawnByBody(it.body);
+        items.remove(it, !wasCar);
+      }
+      return { eur: 0, massKg: 0, purity: 1, dominant: "" };
     }
     // Wurde für eine Fraktion bestellt, zählt genau die — alles andere ist
     // Verunreinigung, auch wenn es zufällig mehr wiegt.
@@ -135,7 +157,7 @@ export class Account {
     const eur = wertKg * price * purity * purity * purity + magnetEur;
     this.moneyEur += eur;
 
-    for (const it of loaded) {
+    for (const it of ware) {
       const wasCar = composites.despawnByBody(it.body);
       items.remove(it, !wasCar);
     }
