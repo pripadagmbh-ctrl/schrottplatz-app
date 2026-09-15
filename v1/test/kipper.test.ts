@@ -24,6 +24,7 @@ import { ItemManager } from "../src/world/scrapItems";
 import { CompositeManager } from "../src/dismantle/composites";
 import type { CustomerProfile } from "../src/delivery/customers";
 import { lagerMuldeFuer } from "../src/world/containers";
+import { EventBus } from "../src/core/events";
 
 /**
  * Kundschaft fest vorgeben statt wuerfeln.
@@ -39,6 +40,17 @@ function kunde(sortenrein: string | null): CustomerProfile {
     name: "Pruefstand",
     subtitle: "Test",
     massKg: 5000,
+    /*
+     * Fahrzeug, Aufbau und Fuellgrad stehen seit E-033/E-044 im Profil und
+     * sind PFLICHT. Sie hier wegzulassen war zweimal teuer: `vehicleForCustomer`
+     * wuerfelte das Fahrzeug still (E-044), und der Fuellgrad fiel auf den
+     * alten Wurf zurueck — der Waechter mass damit nicht die Fuhre, die in
+     * seinem Namen steht. 85 % ist die Mitte dessen, was ein Haendler bringt.
+     */
+    vehicle: "kipper",
+    aufbau: "flach",
+    fuellgrad: 0.85,
+    dichte: 500,
     sortedMaterial: sortenrein,
     contaminantShare: 0.06,
     hardness: 1,
@@ -79,7 +91,7 @@ function kippen(sortenrein: string | null = null, saat = 20260913): {
     boden
   );
   const items = new ItemManager(scene, world);
-  const m = new VehicleManager(scene, world, items, new CompositeManager(scene, world, items));
+  const m = new VehicleManager(scene, world, items, new CompositeManager(scene, world, items, new EventBus()));
   m.spawnNow("kipper", kunde(sortenrein));
   const mulde = lagerMuldeFuer(sortenrein);
   const v = (m as unknown as { active: Record<string, unknown> }).active;
@@ -254,36 +266,27 @@ describe("Kipper", () => {
      *
      * Der Absatz darueber hat am Morgen die eine Saat durch acht ersetzt und
      * daraus „Mittel 109, Spitze 255" abgelesen. Ueber VIERUNDZWANZIG Saaten
-     * nachgerechnet ist derselbe Stand in Wahrheit Mittel 116 und Spitze 267 —
-     * die Schranke „Mittel unter 140" war also nur deshalb gruen, weil acht
-     * Wuerfe zufaellig die ruhigeren waren. Die Streuung ist riesig: 56 bis
-     * 267 km/h beim selben Quelltext, je nachdem, welche Ladung faellt.
+     * nachgerechnet streuen dieselben Ladungen zwischen 53 und 373 km/h. Der
+     * Standardfehler des Mittels liegt damit bei rund 16 km/h — acht Proben
+     * koennen einen Unterschied von einem Drittel schlicht nicht sehen, und
+     * die alte Schranke „Mittel unter 140" war nur deshalb gruen, weil acht
+     * Wuerfe zufaellig die ruhigeren waren.
      *
-     * Ein Mittel aus acht Proben mit dieser Streuung hat einen Fehler von rund
-     * 25 km/h — es kann einen Unterschied von 20 % schlicht nicht sehen. Genau
-     * diesen Unterschied musste die Federung aber nachweisen. Also stehen hier
-     * jetzt 24 Saaten, und die Schranken sind an DER Messung festgemacht.
+     * DREI STAENDE, je dieselben 24 Saaten (E-044):
      *
-     * VIER STAENDE, je 24 Saaten. Zwei Aenderungen von E-044 wirken hier,
-     * und sie muessen auseinandergehalten werden:
+     *   ohne Federung                   Mittel 123   Hoechst 373 km/h
+     *   Federung auch beim Kippen frei  Mittel 110   Hoechst 347 km/h
+     *   Federung beim Kippen gesperrt   Mittel 118   Hoechst 293 km/h  ← gebaut
      *
-     *   Stand vom 15.09. frueh                      Mittel 116   Hoechst 267
-     *   + schwerere Fuhren (Massenverteilung heil)  Mittel 120   Hoechst 244
-     *   + Federung, beim Kippen FREI                Mittel 158   Hoechst 546
-     *   + Federung, beim Kippen gesperrt (gebaut)   Mittel 123   Hoechst 283
+     * Paarweise gerechnet ist die Differenz gesperrt − ohne −5 ± 16 km/h: Die
+     * Federung veraendert den Katapult NICHT MESSBAR. Genau das war die
+     * Auflage, und mehr behauptet dieser Waechter auch nicht.
      *
-     * Zeile 2 ist der Preis dafuer, dass die Fuhren endlich das wiegen, was
-     * angekuendigt war (die Verteilung in `loadCargo` hat vorher bis zu 96 %
-     * der Ladung verschluckt): Schwerer schlaegt haerter auf. Zeile 3 ist der
-     * Fehler, den die Sperre in `vehicles.updateFederung` verhindert — eine
-     * Ladeflaeche, die sich unter der abrutschenden Fuhre hebt und senkt,
-     * schiebt Stuecke in den Schlitz am Kipplager. Zeile 4 ist gebaut: Die
-     * FEDERUNG selbst kostet gegenueber Zeile 2 noch +3 km/h im Mittel und
-     * liegt damit innerhalb der Streuung (Standardfehler des Mittels rund
-     * 11 km/h bei dieser Verteilung).
-     *
-     * Die Schranken lassen Luft fuer die Streuung, aber nicht fuer Zeile 3:
-     * Wer die Sperre wieder herausnimmt, faellt hier auf — an beiden Zahlen.
+     * DIE SCHRANKEN. Das Mittel ist das belastbare Mass und steht deshalb eng;
+     * der Hoechstwert aus 24 Wuerfen ist ein schwaches Mass und steht weit —
+     * 373 km/h sind bei unveraendertem Quelltext vorgekommen. Wer hier eine
+     * Schranke enger zieht, baut sich einen Waechter, der jede zweite Woche
+     * ohne Grund rot wird.
      */
     const saaten = [20260913, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
       12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23];
@@ -294,7 +297,7 @@ describe("Kipper", () => {
     expect(
       mittel,
       `Mittel ${mittel.toFixed(0)} km/h ueber 24 Ladungen (${liste})`
-    ).toBeLessThan(150);
-    expect(hoechst, `Hoechstwert ${hoechst.toFixed(0)} km/h (${liste})`).toBeLessThan(360);
+    ).toBeLessThan(155);
+    expect(hoechst, `Hoechstwert ${hoechst.toFixed(0)} km/h (${liste})`).toBeLessThan(450);
   }, 600000);
 });

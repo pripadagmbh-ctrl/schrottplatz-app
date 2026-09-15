@@ -873,25 +873,44 @@ class DeliveryVehicle {
   private updateFederung(dt: number): void {
     if (!Number.isFinite(dt) || dt <= 0) return;
     /*
-     * ANGEHOBENE MULDE FEDERT NICHT — und das ist keine Ausrede, sondern die
-     * einzige Zahl in diesem Paket, die richtig weh getan hat.
+     * ANGEHOBENE MULDE FEDERT NICHT.
      *
      * Ist die Mulde gekippt, steht sie auf dem Kipplager und dem Hubzylinder;
      * sie liegt nicht mehr frei auf dem Rahmen. Die Federung hält deshalb
      * ihre Stellung, bis die Mulde wieder unten ist.
      *
-     * DIE MESSUNG (24 Zufallssaaten, Spitzentempo der Ladung beim Abkippen):
+     * DAS IST EINE VORSICHTSMASSNAHME, KEINE GEMESSENE VERBESSERUNG — und der
+     * Unterschied gehört hierher, weil er beim Messen fast falsch abgelesen
+     * worden wäre.
      *
-     *   ohne Federung (Stand vorher)        Mittel 116   Höchst 267 km/h
-     *   Federung auch beim Kippen frei      Mittel 158   Höchst 546 km/h
-     *   Federung beim Kippen gesperrt       Mittel 111   Höchst 231 km/h
+     * Der Kipper-Katapult (Spitzentempo der Ladung beim Abkippen) ist eine
+     * CHAOTISCHE Größe: Bei identischem Quelltext und 24 Zufallssaaten liegen
+     * die Einzelwerte zwischen 53 und 373 km/h. Der Standardfehler des Mittels
+     * ist rund 16 km/h, der einer paarweisen Differenz ebenso. Über 24 Saaten,
+     * paarweise gegen dieselben Ladungen gerechnet:
      *
-     * Die mittlere Zeile ist der Grund für diese drei Zeilen Code. Eine
-     * Ladefläche, die sich unter der abrutschenden Fuhre auch noch senkt und
-     * hebt, schiebt Stücke in den bekannten Schlitz am Kipplager — und dort
-     * befreit der Löser sie mit einem einzigen sehr großen Stoß, weil zwei
-     * kinematische Körper für ihn unendliche Masse haben (E-029,
-     * `docs/offene-punkte.md`). Gesperrt ist es besser als vorher.
+     *   ohne Federung                   Mittel 123   Höchst 373 km/h
+     *   Federung auch beim Kippen frei  Mittel 110   Höchst 347 km/h
+     *   Federung beim Kippen gesperrt   Mittel 118   Höchst 293 km/h
+     *
+     * Paarweise Differenz gesperrt − ohne: −5 ± 16 km/h. Es gibt also KEINEN
+     * nachweisbaren Unterschied zwischen den drei Ständen; wer hier eine
+     * Verbesserung behauptet, liest Rauschen. Geblieben ist die Sperre aus
+     * zwei Gründen, die nicht am Mittelwert hängen:
+     *
+     *   — Mechanik: Eine Fläche, die sich unter der abrutschenden Fuhre hebt
+     *     und senkt, kann Stücke in den bekannten Schlitz am Kipplager
+     *     schieben, und dort befreit der Löser sie mit einem einzigen sehr
+     *     großen Stoß (zwei kinematische Körper haben für ihn unendliche
+     *     Masse — E-029, `docs/offene-punkte.md`). Energie in genau diesem
+     *     Moment zuzuführen ist das einzige, was man sicher vermeiden kann.
+     *   — Der HÖCHSTWERT ist mit der Sperre in beiden Messreihen der
+     *     niedrigste (231 und 293 gegen 546 und 347 ohne Sperre). Ein
+     *     Höchstwert aus 24 Würfen ist schwach, aber er zeigt in dieselbe
+     *     Richtung wie die Mechanik.
+     *
+     * Zu sehen ist von der Sperre nichts: Während des Kippens bewegt sich
+     * ohnehin alles.
      */
     if (this.tip > 0.02) {
       this.wendeFederungAn();

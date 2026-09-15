@@ -207,16 +207,18 @@ describe("Die Federung kommt am Modell an", () => {
 
   it("die angehobene Mulde federt nicht — sie steht auf dem Kipplager", () => {
     /*
-     * Die teuerste Zeile dieses Pakets, und die einzige, die eine Messung
-     * erzwungen hat. Eine Ladefläche, die sich unter der abrutschenden Fuhre
-     * auch noch hebt und senkt, schiebt Stücke in den bekannten Schlitz am
-     * Kipplager — und dort befreit der Löser sie mit einem einzigen sehr
-     * großen Stoß (E-029). Gemessen über 24 Zufallssaaten, Spitzentempo der
-     * Ladung beim Abkippen:
+     * Die Mulde steht im gekippten Zustand auf dem Kipplager und dem
+     * Hubzylinder, nicht mehr frei auf dem Rahmen — sie federt deshalb nicht.
      *
-     *   ohne Federung                   Mittel 116   Höchst 267 km/h
-     *   Federung auch beim Kippen frei   Mittel 158   Höchst 546 km/h
-     *   Federung beim Kippen gesperrt    Mittel 111   Höchst 231 km/h
+     * Es ist eine Vorsichtsmaßnahme, keine gemessene Verbesserung: Über 24
+     * Zufallssaaten ist die paarweise Differenz zum Stand ohne Federung
+     * −5 ± 16 km/h, also nicht unterscheidbar. Der Grund ist Mechanik — eine
+     * Fläche, die sich unter der abrutschenden Fuhre hebt und senkt, kann
+     * Stücke in den bekannten Schlitz am Kipplager schieben, und dort befreit
+     * der Löser sie mit einem einzigen sehr großen Stoß (E-029). Die
+     * Höchstwerte zeigen in dieselbe Richtung (231 und 293 km/h mit Sperre
+     * gegen 546 und 347 ohne), sind aber als Maß zu schwach, um allein zu
+     * tragen.
      *
      * `test/kipper.test.ts` hält die Zahlen fest. HIER wird die Eigenschaft
      * geprüft, damit man beim Lesen sieht, warum es sie gibt.
