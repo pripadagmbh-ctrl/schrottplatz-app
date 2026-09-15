@@ -34,6 +34,7 @@
  * Bewacht von `test/kundenprofil.test.ts`.
  */
 import type { CustomerProfile, CustomerGroup } from "../src/delivery/customers";
+import { rollCustomer } from "../src/delivery/customers";
 import { ladeVolumen, type Aufbau, type Fahrzeugart } from "../src/delivery/fuellgrad";
 import { ladungsDichte } from "../src/materials/schuettdichte";
 
@@ -125,6 +126,31 @@ export function pruefKunde(w: PruefKundeWunsch = {}): CustomerProfile {
     hardness: w.hardness ?? 1,
     greeting: "",
   };
+}
+
+/**
+ * Eine Fuhre, wie das SPIEL sie würfelt — Händler mit Kipper.
+ *
+ * Kein Gegenentwurf zu `pruefKunde`, sondern die Ergänzung dazu: `pruefKunde`
+ * baut eine FESTE Fuhre für Rückschritt-Wächter, `spielFuhre` nimmt die, mit
+ * der der Spieler es wirklich zu tun hat. Gewürfelt wird mit `rollCustomer()`,
+ * also aus derselben Quelle wie im Spiel — von Hand gebaut wird hier gar
+ * nichts (das war der Fehler aus E-062).
+ *
+ * Gewürfelt wird, bis ein Händler mit Kipper kommt; alles andere fährt einen
+ * anderen Wagen und gehört nicht in eine Kipper-Messung. Über die 24 Saaten
+ * von `tools/kipper-messreihe.ts` ergibt das im Mittel Füllgrad 0,70 und
+ * 8.479 kg — deutlich mehr als die 0,60 / 5.000 kg der festen Prüfladung.
+ *
+ * Verbraucht Zufall. Wer eine Saat setzt, muss das wissen: Zwei Aufrufe
+ * hintereinander liefern verschiedene Fuhren.
+ */
+export function spielFuhre(): CustomerProfile {
+  for (let i = 0; i < 2000; i++) {
+    const c = rollCustomer();
+    if (c.group === "haendler" && c.vehicle === "kipper") return c;
+  }
+  throw new Error("spielFuhre: in 2000 Wuerfen kein Haendler mit Kipper");
 }
 
 /**

@@ -406,6 +406,55 @@ Alle Zeichnungen liegen unter `/v1/plaene/` und sind auf dem Telefon aufrufbar.
     Patrick hat am 15.09.2026 entschieden, dass der Kipper **weiter kippt**
     (statt seitlich leergegriffen zu werden) — das Kippen ist der einzige Weg,
     auf dem Material ohne Spielerarbeit auf den Platz kommt.
+
+    **ERLEDIGT AM 15.09.2026 ABENDS (E-071).** Alles darüber ist Geschichte und
+    bleibt nur als Lehrstück stehen. Der Fehler war weder die Bodendicke noch
+    der Schlitz am Kipplager: **Die ganze Fuhre fiel beim Kippen durch die
+    Brücke hindurch** — im freien Fall, Bild für Bild genau 9,81 m/s², durch
+    einen 0,60 m dicken, eingeschalteten Kollider. Rapier verlor die Paarung
+    zwischen Muldenkollider und Ladung, weil sie entstanden war, während beide
+    Körper kinematisch waren (die Fuhre fährt an der Mulde verriegelt mit). Was
+    auf dem Weg nach unten wieder gefasst wurde, drückte der Löser mit einem
+    einzigen Stoß heraus — gemessen 65,7 m/s. Der „Katapult" war die
+    Entdurchdringung, nicht das Kippen.
+
+    Die Energierechnung, die das vorher hätte zeigen können: Die Kippbewegung
+    kann einem Stück höchstens 12,4 m/s (45 km/h, 60 J/kg) mitgeben. Gemessen
+    waren 585 km/h — 13.200 J/kg, Faktor 220.
+
+    Reparatur: zehn Zeilen (`vehicles.meldeMuldeNeuAn`, beim Freigeben der
+    Ladung). Gewürfelte Händlerfuhre, 24 Saaten: Mittel 147 → **29** km/h,
+    Median 123 → **19**, Höchst 430 → **106**, Durchfall 86 % → **0 %**,
+    weitestes Stück 27,0 → **5,8 m**. Der Wächter fährt jetzt die gewürfelte
+    Fuhre und prüft vier Eigenschaften mit je einer Gegenprobe.
+
+    Offen bleibt aus diesem Paket: **31 % der Fuhre bleiben auf der Brücke
+    liegen.** Reibung 2,2 gegen tan 58° = 1,60 — eine ruhende Fuhre rutscht auf
+    dieser Neigung rechnerisch gar nicht. Steiler kippen (über 65,6°) oder
+    weniger Reibung; beides ist eine Gestaltungsfrage.
+
+12b. **Der LKW knickt seine Ausrichtung, statt zu lenken — und wirft dabei
+    liegenden Schrott über den Platz.** Gemessen 15.09.2026 (E-071), Befund
+    Patrick: „beim Kippen sind Teile ganz woanders gelandet."
+
+    `placeAt` setzt `group.rotation.y` hart auf die Richtung des
+    Streckenabschnitts. Am Wechsel `shiftPause` → `reverseIn` sind das
+    **168,7° in EINEM Rechenschritt**, an jeder Ecke der Fahrstrecke 45–65°.
+    Ein an die Mulde verriegeltes Stück in 3 m Abstand legt dabei rund 6 m in
+    einem Bild zurück; Rapier leitet daraus über 1.000 km/h ab. Ist der Weg
+    frei, bleibt es folgenlos — liegt schon etwas da, wird es getroffen:
+
+    | zweiter Kipper über die Fuhre des ersten, 12 Saaten | |
+    |---|---|
+    | Höchsttempo an schon liegendem Schrott | **6.596 km/h** |
+    | weiteste Verschiebung eines ruhenden Stücks | **9,3 m** |
+    | Spitze fällt in | `reverseIn` 7/12, `settleCargo` 5/12 |
+
+    Zu tun: Der Wagen muss in die neue Richtung **einlenken** statt zu
+    springen — beim Rangieren während der halben Sekunde `shiftPause`, an den
+    Ecken mit einer Grenze für die Drehrate. Das ändert, wie das Fahren
+    aussieht, und gehört deshalb Patrick vorgelegt. Der Anteil aus
+    `settleCargo` ist noch nicht eingegrenzt.
 13. **Die Hallen sind leer.** Es gibt keine Route hinein, keine Funk-Einweisung,
     keine Kapazität. Baulich steht alles: Tore zeigen auf den Platz, die Luftlinie
     von der Waage ist frei. Was fehlt, ist der Ablauf aus E-011 — Händler fährt
