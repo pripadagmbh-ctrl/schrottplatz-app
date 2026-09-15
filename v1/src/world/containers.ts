@@ -369,8 +369,16 @@ export const CONFIGS: ContainerConfig[] = [
    *                              1,69 m Halbmass — „ich greife in die Wand".
    *
    * DIE NEUE STELLE ist gesucht, nicht gegriffen. Frei im Schwenkband 5,8 bis
-   * 9,2 m ist nach dem Umbau nur noch der Streifen zwischen der Kabel-Mulde
-   * (Ostkante x −5,5) und der Kipperspur (x 2,0, Wagenflanke x 0,45):
+   * 9,2 m war am Vormittag des 15.09.2026 nur noch der Streifen zwischen der
+   * Kabel-Mulde (Ostkante x −5,5) und der Kipperspur (x 2,0, Wagenflanke
+   * x 0,45).
+   *
+   * NACHTRAG E-029, denselben Tag: Die Kipperspur gibt es nicht mehr — der
+   * Kipper faehrt an den Abladeplatz. Oestlich der Muellmulde ist damit bis
+   * zur Abladespur (x 6,3, Wagenflanke 4,75) alles frei. Die Mulde bleibt
+   * stehen, wo sie steht; die Zahlen unten sind die Rechnung, mit der sie
+   * dorthin kam, und die Schranke zur Spur ist seitdem nur groesser
+   * geworden.
    *
    *   Mitte (−3,2 | −14,6)   8,35 m vom Sitz — im Band
    *   Westkante x −5,0       0,50 m bis zur Kabel-Mulde
@@ -388,7 +396,8 @@ export const CONFIGS: ContainerConfig[] = [
    * Oeffnung schaute 0,5 m weit auf die Flanke des Nachbarn.
    *
    * Sie liegt damit WESTLICH der Rueckfahrspur zum Abladeplatz (x 6,3) und
-   * ausserhalb jeder Wagenflaeche. Vierte Pflichtstation (Ansage: „vor allem
+   * ausserhalb jeder Wagenflaeche — seit E-029 ist das die einzige Spur, die
+   * hier noch laeuft. Vierte Pflichtstation (Ansage: „vor allem
    * an Mischschrott drankommen, an die Presse, an Stahlschrott und an den
    * Muell") — geprueft in `test/platz.test.ts`.
    */
