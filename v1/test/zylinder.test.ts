@@ -26,6 +26,7 @@ import { leinwandAttrappe } from "../tools/leinwand-attrappe";
 import { Excavator } from "../src/excavator/excavator";
 import { initPhysics } from "../src/physics/physicsWorld";
 import { baueZylinder, rohrLaenge, stangeLaenge } from "../src/excavator/zylinderParts";
+import { HUB_MAX, ZYL_MASSE } from "../src/excavator/kabinenhubParts";
 import {
   drehkranzRing,
   DREHKRANZ_D,
@@ -40,18 +41,31 @@ const STICK_MIN = THREE.MathUtils.degToRad(-140);
 const STICK_MAX = THREE.MathUtils.degToRad(-25);
 
 /**
- * Die Zylinder mit fester Rohr- und Stangenlänge.
+ * ALLE Zylinder der Maschine — seit E-040 ohne Ausnahme.
  *
- * Der Kabinenhub (`06_ZYLINDER_KABINE_A/B`) fehlt hier mit Absicht: Er
- * verlangt ein Hubverhältnis von 5,18 : 1 (Ankerabstand 0,650 → 3,368 m), und
- * das kann kein einstufiger Zylinder. Er bleibt bis zum letzten Paket
- * (Kabinenhub als Parallelogramm, E-025 Frage 3) auf der alten Streckbauweise.
- * Der Test unten hält fest, dass das die EINZIGE Ausnahme ist.
+ * BIS ZUM 15.09.2026 STAND HIER EINE AUSNAHME, und sie ist der Grund, warum
+ * diese Liste jetzt vollständig ist: Der Kabinenhub (`06_ZYLINDER_KABINE_A/B`)
+ * verlangte ein Hubverhältnis von **5,18 : 1** (Ankerabstand 0,650 → 3,368 m).
+ * Das kann kein einstufiger Zylinder — sein Rohr war mit 1,10 m sogar länger
+ * als der Spalt von 0,65 m, in dem es stand, und ragte durch den Kabinenboden.
+ * Deshalb blieb er auf der alten Streckbauweise, und dieser Wächter musste ihn
+ * ausnehmen.
+ *
+ * Eine Ausnahme in einem Wächter ist eine offene Tür: Sie schützt nicht vor
+ * dem Fehler, sie beschreibt ihn nur. Seit E-040 gibt es sie nicht mehr — der
+ * Kabinenhub ist ein Schwenkwerk mit Hebel geworden, aus 5,18 : 1 sind
+ * **1,47 : 1** geworden, und aus ZWEI unmöglichen Zylindern EINER, der gebaut
+ * werden könnte. Er wird hier ab jetzt geprüft wie jeder andere.
+ *
+ * Die Maße des Kabinenhubzylinders werden nicht abgeschrieben, sondern aus
+ * `kabinenhubParts.ts` geholt: Sie folgen dort aus Hebellänge und Fußabstand
+ * und wären als Kopie beim nächsten Handgriff still falsch.
  */
 const ECHTE_ZYLINDER = [
   { name: "07_ZYLINDER_HUB_R", kurz: 2.518, lang: 3.757, rRohr: 0.1 },
   { name: "07_ZYLINDER_HUB_L", kurz: 2.518, lang: 3.757, rRohr: 0.1 },
   { name: "07_ZYLINDER_STIEL", kurz: 1.809, lang: 2.235, rRohr: 0.08 },
+  { name: "06_ZYLINDER_KABINE", ...ZYL_MASSE },
 ];
 
 let bagger: Excavator;
@@ -82,20 +96,29 @@ function baggerMeshes(): THREE.Mesh[] {
 }
 
 /**
- * Den Arm in eine Stellung bringen und die Hydraulik nachziehen.
+ * Die Maschine in eine Stellung bringen und die Hydraulik nachziehen.
  *
- * `step` rechnet die ganze Kinematik; hier genügt es, die Winkel zu setzen und
- * `updateHydraulics` über den öffentlichen Weg auszulösen — das tut
- * `syncMeshes`, das von `step` aufgerufen wird. Deshalb wird hier direkt an den
- * Gruppen gedreht und anschliessend die Hydraulik über einen Schritt
- * nachgezogen.
+ * SEIT E-040 GEHÖRT DER KABINENHUB DAZU. Vorher genügte es, Ausleger und Stiel
+ * zu drehen — der Kabinenhubzylinder war ja ausgenommen. Jetzt fährt auch die
+ * Kabine mit: Ohne das bliebe ihr Zylinder in jeder Prüfung auf derselben
+ * Länge stehen, und „die Stange fährt sichtbar aus" wäre keine Aussage,
+ * sondern eine Höflichkeit.
+ *
+ * `step` rechnet die ganze Kinematik; hier genügen die Winkel und
+ * `syncMeshes`, das `step` ohnehin ruft.
  */
-function stelle(boom: number, stick: number): void {
+function stelle(boom: number, stick: number, hub = 0): void {
+  const b = bagger as unknown as {
+    cabLift: number;
+    syncMeshes(): void;
+    updateHydraulics(): void;
+  };
+  b.cabLift = hub;
+  b.syncMeshes();
   finde("07_AUSLEGER").rotation.x = -boom;
   finde("07_STIEL").rotation.x = -stick;
   bagger.root.updateWorldMatrix(true, true);
-  // `updateHydraulics` ist privat; sie hängt an `syncMeshes`, das `step` ruft.
-  (bagger as unknown as { updateHydraulics(): void }).updateHydraulics();
+  b.updateHydraulics();
 }
 
 /** Länge des Rohrs, wie sie im Bild zu messen wäre: Weltabstand der Endpunkte. */
@@ -130,7 +153,7 @@ describe("Hydraulikzylinder — Stange schiebt, Rohr dehnt sich nicht", () => {
     for (let i = 0; i <= 12; i++) {
       const b = BOOM_MIN + ((BOOM_MAX - BOOM_MIN) * i) / 12;
       for (let j = 0; j <= 12; j++) {
-        stelle(b, STICK_MIN + ((STICK_MAX - STICK_MIN) * j) / 12);
+        stelle(b, STICK_MIN + ((STICK_MAX - STICK_MIN) * j) / 12, (HUB_MAX * j) / 12);
         for (const z of ECHTE_ZYLINDER) {
           for (const teil of ["ROHR", "STANGE"]) {
             const m = finde(`${z.name}_${teil}`);
@@ -151,7 +174,7 @@ describe("Hydraulikzylinder — Stange schiebt, Rohr dehnt sich nicht", () => {
       for (let i = 0; i <= 8; i++) {
         const b = BOOM_MIN + ((BOOM_MAX - BOOM_MIN) * i) / 8;
         for (let j = 0; j <= 8; j++) {
-          stelle(b, STICK_MIN + ((STICK_MAX - STICK_MIN) * j) / 8);
+          stelle(b, STICK_MIN + ((STICK_MAX - STICK_MIN) * j) / 8, (HUB_MAX * j) / 8);
           werte.push(rohrLaengeGemessen(rohr));
         }
       }
@@ -182,7 +205,7 @@ describe("Hydraulikzylinder — Stange schiebt, Rohr dehnt sich nicht", () => {
       for (let i = 0; i <= 10; i++) {
         const bw = BOOM_MIN + ((BOOM_MAX - BOOM_MIN) * i) / 10;
         for (let j = 0; j <= 10; j++) {
-          stelle(bw, STICK_MIN + ((STICK_MAX - STICK_MIN) * j) / 10);
+          stelle(bw, STICK_MIN + ((STICK_MAX - STICK_MIN) * j) / 10, (HUB_MAX * j) / 10);
           a.getWorldPosition(pa);
           b.getWorldPosition(pb);
           const d = pa.distanceTo(pb);
@@ -207,7 +230,7 @@ describe("Hydraulikzylinder — Stange schiebt, Rohr dehnt sich nicht", () => {
       for (let i = 0; i <= 10; i++) {
         const bw = BOOM_MIN + ((BOOM_MAX - BOOM_MIN) * i) / 10;
         for (let j = 0; j <= 10; j++) {
-          stelle(bw, STICK_MIN + ((STICK_MAX - STICK_MIN) * j) / 10);
+          stelle(bw, STICK_MIN + ((STICK_MAX - STICK_MIN) * j) / 10, (HUB_MAX * j) / 10);
           a.getWorldPosition(pa);
           b.getWorldPosition(pb);
           const kolben = pa.distanceTo(pb) - sl; // Abstand Kolbenboden vom Fußanker
@@ -231,30 +254,61 @@ describe("Hydraulikzylinder — Stange schiebt, Rohr dehnt sich nicht", () => {
       }
     }
     const alle = baggerMeshes().filter((m) => /^0[67]_ZYLINDER_/.test(m.name));
-    expect(alle.length, "Zylinder-Netze am Bagger (5 Zylinder × 2)").toBe(10);
+    expect(alle.length, "Zylinder-Netze am Bagger (4 Zylinder × 2)").toBe(8);
   });
 
-  it("gestreckt wird nur noch der Kabinenhub — und der begründet", () => {
+  it("es wird gar nichts mehr gestreckt — die letzte Ausnahme ist weg", () => {
     /*
-     * Der Kabinenhub verlangt 5,18 : 1. `baueZylinder` weigert sich zu Recht,
-     * dafür ein Rohr zu bauen: Bei 0,650 m Ankerabstand und 2 × 0,0605 m Auge
-     * bliebe ein Rohr von 0,529 m — die Stange müsste 2,85 m lang sein und
-     * stünde eingefahren 2,2 m hinten heraus. Deshalb bleibt er bis zum
-     * letzten Paket (Parallelogramm) auf der alten Bauweise.
+     * HIER STAND BIS ZUM 15.09.2026 DAS GEGENTEIL: „gestreckt wird nur noch
+     * der Kabinenhub — und der begründet". Der Test ERLAUBTE genau zwei
+     * gedehnte Kolbenstangen. Er hielt einen Fehler fest, statt ihn zu
+     * verbieten.
+     *
+     * Die Begründung war richtig und ist es immer noch: `baueZylinder`
+     * weigerte sich zu Recht, für 0,650 m Ankerabstand ein Rohr zu bauen — bei
+     * 2 × 0,0605 m Auge blieben 0,529 m Rohr, die Stange hätte 2,85 m lang
+     * sein und eingefahren 2,2 m hinten herausstehen müssen. Nur war die
+     * Antwort darauf nicht „dann strecken wir eben", sondern: die MECHANIK
+     * ändern. Seit E-040 sitzt der Zylinder an einem Hebel auf der
+     * Lenkerwelle; aus 5,18 : 1 sind 1,47 : 1 geworden.
+     *
+     * Deshalb steht hier jetzt eine leere Liste und keine Ausnahme. Wer wieder
+     * streckt, fällt auf — an welchem Zylinder auch immer.
      */
-    stelle(BOOM_MIN, STICK_MIN);
+    stelle(BOOM_MIN, STICK_MIN, HUB_MAX / 2);
     const gestreckt = baggerMeshes().filter(
-      (m) => /_STANGE$/.test(m.name) && Math.abs(m.scale.y - 1) > 1e-9
+      (m) => /_(STANGE|ROHR)$/.test(m.name) && m.scale.toArray().some((v) => Math.abs(v - 1) > 1e-9)
     );
+    expect(gestreckt.map((m) => m.name).sort(), "gestreckte Zylinderteile").toEqual([]);
+    /*
+     * Und die Kabine hängt auch nicht mehr an gedehnten Lenkern: Deren
+     * Ankerabstand wuchs von 0,647 auf 3,139 m — Faktor 4,8. Jetzt ist es EIN
+     * Netz mit fester Länge, das sich dreht.
+     */
+    const lenker = baggerMeshes().filter((m) => /KABINENLENKER/.test(m.name));
+    expect(lenker.length, "Netze für die Kabinenlenker (vorher zwei gedehnte)").toBe(1);
     expect(
-      gestreckt.map((m) => m.name).sort(),
-      "gestreckte Kolbenstangen ausser dem Kabinenhub"
-    ).toEqual(["06_ZYLINDER_KABINE_A_STANGE", "06_ZYLINDER_KABINE_B_STANGE"]);
+      lenker[0]!.scale.toArray(),
+      "der Kabinenlenker wird gedehnt — genau das war der alte Fehler"
+    ).toEqual([1, 1, 1]);
   });
 
   it("ein unmöglicher Zylinder wird nicht still gebaut, sondern gemeldet", () => {
-    // Der Kabinenhub als echter Zylinder: 0,650 m Ankerabstand, Rohrradius 0,4
+    // Der ALTE Kabinenhub als echter Zylinder: 0,650 m Ankerabstand, Rohrradius 0,4
     expect(() => baueZylinder({ kurz: 0.65, lang: 3.368, rRohr: 0.4 })).toThrow(/E-025/);
+  });
+
+  it("der neue Kabinenhubzylinder ist kein Sonderfall mehr", () => {
+    /*
+     * Die Probe, dass der Umbau die Sache gelöst und nicht nur verschoben hat:
+     * Sein Hubverhältnis liegt zwischen denen der beiden anderen Zylinder
+     * (1,24 und 1,49) — also im Bereich des Gewöhnlichen.
+     */
+    const v = ZYL_MASSE.lang / ZYL_MASSE.kurz;
+    expect(v, "Hubverhältnis des Kabinenhubs").toBeGreaterThan(1.24);
+    expect(v, "Hubverhältnis des Kabinenhubs").toBeLessThan(1.6);
+    expect(rohrLaenge(ZYL_MASSE), "Rohrlänge").toBeGreaterThan(0.5);
+    expect(stangeLaenge(ZYL_MASSE), "Stangenlänge").toBeGreaterThan(ZYL_MASSE.lang - ZYL_MASSE.kurz);
   });
 });
 

@@ -203,9 +203,17 @@ describe("Positionsliste des Baggers", () => {
      * Joysticks von 14 auf 2, die Unterarme von 6 auf 2. Das Zielbild aus
      * E-025 nennt 57 — die letzten zwei fallen mit dem Kabinenhub, wenn aus
      * zwei gestreckten Zylindern einer wird.
+     *
+     * Stand 15.09.2026 nach dem Kabinenhub (E-040, letztes Paket): **57**
+     * Netze. Genau die vorhergesagte Rechnung, nur an einer Stelle anders
+     * verteilt:
+     *   − 2 Kabinenlenker (gestreckte Kaesten)   + 1 `06_KABINENLENKER`
+     *   − 4 Kabinenhubzylinder (2 x Rohr/Stange) + 2 `06_ZYLINDER_KABINE_*`
+     *                                            + 1 `06_KABINENMAST`
+     * Macht 59 − 6 + 4 = 57. Das Zielbild aus E-025 ist damit erreicht.
      */
     const meshes = baggerMeshes();
-    expect(meshes.length, "Bauteilzahl am Bagger").toBe(59);
+    expect(meshes.length, "Bauteilzahl am Bagger").toBe(57);
   });
 });
 

@@ -42,20 +42,43 @@ const DECK_T = 3.2;
 export const DECK_OBEN = 0.355;
 
 /** Vorderkante der Motorhaube (m, im Oberwagen-Frame). Unverändert. */
-const HAUBE_VORN = -0.15;
+export const HAUBE_VORN = -0.15;
 /** Hinterkante der Motorhaube (m). Unverändert. */
-const HAUBE_HINTEN = -1.85;
+export const HAUBE_HINTEN = -1.85;
 /** Halbe Breite der Motorhaube unten (m). Unverändert. */
-const HAUBE_HALB = 1.25;
+export const HAUBE_HALB = 1.25;
 /** Oberkante der Motorhaube (m). Unverändert — die Silhouette bleibt. */
-const HAUBE_OBEN = 1.355;
+export const HAUBE_OBEN = 1.355;
 /**
  * Höhe der unteren Haubenstufe (m). Konzept 05.2: unten 0,72 hoch, oben 1,00.
  *
  * Die Stufe ist der ganze Unterschied zwischen „Kiste" und „Motorraum": Unten
  * sitzt der Block, oben nur noch der Aufbau mit den Gittern.
  */
-const HAUBE_STUFE = DECK_OBEN + 0.72;
+export const HAUBE_STUFE = DECK_OBEN + 0.72;
+
+/**
+ * DIE AUSSPARUNG für das Kabinenhubwerk (E-040, Paket 8 aus E-025).
+ *
+ * Der Mast hinter der Kabine steht mit seiner inneren Säule bei x −0,63,
+ * z −0,894 — mitten in der Motorhaube. Und nicht nur der Fuß: In der
+ * UNTERSTEN Kabinenstellung steht der Lenker so steil, dass er die
+ * Haubenvorderkante (z −0,15) auf y 0,567 durchstößt. Eine Bohrung für die
+ * Säule allein reicht deshalb nicht — die Aussparung muss nach VORN offen
+ * sein.
+ *
+ * Gemessen, nicht geschätzt (`npx vite-node tools/kabinenhub-bahn.ts`):
+ * Der Lenker läuft nur zwischen 49,1° und 65,7° Neigung überhaupt in die
+ * Haube und reicht dabei nie hinter z −0,507. Die Tiefe von z −1,06 kommt
+ * allein von der Mastsäule, die Breite von 0,34 m vom Lenkerkasten (0,14)
+ * plus 10 cm Luft je Seite.
+ *
+ * WAS SIE KOSTET: 0,29 m³ von 3,91 m³ Haubenvolumen, also **7,4 %**. Die
+ * Flanke bei x −1,25 bleibt stehen — dort sitzen die fünf Lüftungslamellen,
+ * und auf ihrer Schulter steht der vordere Geländerpfosten (x −1,08). Eine
+ * Aussparung bis zur Flanke („echte Ecke") hätte beide mitgenommen.
+ */
+export const NISCHE = { xVon: -0.8, xBis: -0.46, zHinten: -1.06 };
 
 /** Höhe des Handlaufs über dem Deck (m). Konzept 05.4. SW nach Riss. */
 const GELAENDER_H = 0.9;
@@ -117,12 +140,33 @@ function motorhaube(): THREE.BufferGeometry[] {
   const teile: THREE.BufferGeometry[] = [];
   const mitteZ = (HAUBE_VORN + HAUBE_HINTEN) / 2;
   const laenge = HAUBE_VORN - HAUBE_HINTEN;
-  const unten = new THREE.BoxGeometry(HAUBE_HALB * 2, HAUBE_STUFE - DECK_OBEN, laenge);
-  unten.translate(0, (DECK_OBEN + HAUBE_STUFE) / 2, mitteZ);
-  teile.push(unten);
-  const oben = new THREE.BoxGeometry(HAUBE_HALB * 2 - 0.34, HAUBE_OBEN - HAUBE_STUFE, laenge - 0.3);
-  oben.translate(0, (HAUBE_STUFE + HAUBE_OBEN) / 2, mitteZ - 0.06);
-  teile.push(oben);
+
+  /**
+   * Eine Stufe der Haube als drei Quader um die Aussparung herum: linkes
+   * Band, rechter Teil, hinteres Stück. Vorher war jede Stufe EIN Quader —
+   * die Aussparung ist der einzige Grund für die Teilung.
+   */
+  const stufe = (halb: number, yVon: number, yBis: number, zVon: number, zBis: number): void => {
+    const felder: Array<[number, number, number, number]> = [
+      [-halb, NISCHE.xVon, zVon, zBis],
+      [NISCHE.xBis, halb, zVon, zBis],
+      [NISCHE.xVon, NISCHE.xBis, zVon, Math.min(zBis, NISCHE.zHinten)],
+    ];
+    for (const [x0, x1, z0, z1] of felder) {
+      if (x1 - x0 < 1e-6 || z1 - z0 < 1e-6) continue;
+      const q = new THREE.BoxGeometry(x1 - x0, yBis - yVon, z1 - z0);
+      q.translate((x0 + x1) / 2, (yVon + yBis) / 2, (z0 + z1) / 2);
+      teile.push(q);
+    }
+  };
+  stufe(HAUBE_HALB, DECK_OBEN, HAUBE_STUFE, HAUBE_HINTEN, HAUBE_VORN);
+  stufe(
+    HAUBE_HALB - 0.17,
+    HAUBE_STUFE,
+    HAUBE_OBEN,
+    mitteZ - 0.06 - (laenge - 0.3) / 2,
+    mitteZ - 0.06 + (laenge - 0.3) / 2
+  );
   // Wartungsklappe links (+X), leicht vorstehend, mit Scharnieren und Verschluss
   const klappe = new THREE.BoxGeometry(0.035, 0.5, 0.92);
   klappe.translate(HAUBE_HALB + 0.01, DECK_OBEN + 0.36, mitteZ);
@@ -143,15 +187,22 @@ function motorhaube(): THREE.BufferGeometry[] {
  *
  * Sie stehen zwischen Haube und Geländer und füllen den Streifen, der sonst
  * leeres Blech wäre. Beim Vorbild sitzt dort genau das.
+ *
+ * SEIT E-040 SITZEN SIE WEITER HINTEN und sind 23 cm kürzer: Sie standen bei
+ * x ±1,32 genau da, wo jetzt die äußere Mastsäule des Kabinenhubs auf dem
+ * Deck steht (x −1,47, z −0,894), und der äußere Lenker streifte in der
+ * untersten Stellung ihren Deckel. Gemessen bleiben jetzt 4,6 cm Luft zur
+ * Säule und 17 cm zum Schwenkraum des Lenkers. Alle x-Maße sind unverändert.
  */
 function tankUndKuehler(): THREE.BufferGeometry[] {
   const teile: THREE.BufferGeometry[] = [];
+  const mitteZ = -1.45;
   for (const sx of [-1, 1]) {
-    const kasten = new THREE.BoxGeometry(0.16, 0.44, 0.95);
-    kasten.translate(sx * 1.32, DECK_OBEN + 0.22, -0.75);
+    const kasten = new THREE.BoxGeometry(0.16, 0.44, 0.72);
+    kasten.translate(sx * 1.32, DECK_OBEN + 0.22, mitteZ);
     teile.push(kasten);
-    const deckel = new THREE.BoxGeometry(0.2, 0.04, 0.99);
-    deckel.translate(sx * 1.32, DECK_OBEN + 0.46, -0.75);
+    const deckel = new THREE.BoxGeometry(0.2, 0.04, 0.76);
+    deckel.translate(sx * 1.32, DECK_OBEN + 0.46, mitteZ);
     teile.push(deckel);
   }
   return teile;

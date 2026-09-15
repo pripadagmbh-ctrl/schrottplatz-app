@@ -43,16 +43,25 @@ function oberwagenNetze(): string[] {
 }
 
 describe("Oberwagen", () => {
-  it("besteht aus genau drei Netzen", () => {
+  it("besteht aus genau drei Netzen — plus dem Mast des Kabinenhubs", () => {
     /*
      * Lack (Haube, Laufblech, Tank), Stahl (Deckplatte, Drehkranzdeckel,
      * Gitter, Gegengewicht, Geländer, Auspuff) und Leuchten. Vorher waren es
      * zehn plus die Deckplatte.
+     *
+     * SEIT E-040 hängt hier ein viertes Netz: `06_KABINENMAST`. Es gehört zur
+     * Baugruppe 06 (Kabine) und steht trotzdem hier, weil es zum Oberwagen
+     * GEHÖRT — es bewegt sich nie gegen ihn. Zum Lack-Netz der Haube
+     * verschmolzen wäre es einen Zeichenruf billiger gewesen, aber dann hieße
+     * es nicht mehr so und wäre nicht mehr messbar (`test/kabinenhub.test.ts`
+     * sucht es über seinen Namen). Das Netzbudget aus E-025 (57) ist auch so
+     * erreicht.
      */
     expect(oberwagenNetze(), "Netze direkt am Oberwagen").toEqual([
       "04_DREHKRANZ",
       "05_LEUCHTEN",
       "05_MOTORHAUBE",
+      "06_KABINENMAST",
     ]);
   });
 

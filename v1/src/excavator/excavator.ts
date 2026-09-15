@@ -30,6 +30,17 @@ import {
   kabineStahl,
 } from "./kabinenParts";
 import { unterwagenLack, unterwagenStahl } from "./unterwagenParts";
+import {
+  DREHPUNKT as HUB_DREHPUNKT,
+  HUB_MAX as CAB_LIFT_MAX,
+  ZYL_FUSS as CAB_ZYL_FUSS,
+  ZYL_KOPF as CAB_ZYL_KOPF,
+  ZYL_MASSE as CAB_ZYL_MASSE,
+  hubVersatz,
+  hubWinkel,
+  kabinenlenker,
+  kabinenmast,
+} from "./kabinenhubParts";
 import { BAGGER_STAND } from "../world/baggerstand";
 import {
   CLAW_COUNT,
@@ -426,7 +437,11 @@ const OPEN_TIME = 0.3; // s (SW)
  * darin, dass der Hebel erst mal nichts tut. 0,3 s.
  */
 const RAMP_TIME = 0.3;
-const CAB_LIFT_MAX = 2.6; // m Kabinenhub für besseren Überblick (SW)
+/*
+ * CAB_LIFT_MAX (2,60 m) steht seit E-040 in `kabinenhubParts.ts`: Dort hängt
+ * die ganze Geometrie des Schwenkwerks daran, und zwei Kopien derselben Zahl
+ * wären zwei Wahrheiten über dieselbe Sache.
+ */
 const CAB_LIFT_SPEED = 0.75; // m/s (SW)
 
 export class Excavator {
@@ -499,6 +514,12 @@ export class Excavator {
   private cabinEye = new THREE.Object3D();
   /** Hubschlitten der Fahrerkabine (Taste X) */
   private cabLiftGroup = new THREE.Group();
+  /**
+   * Die Lenkerwelle des Kabinenhubs (E-040). Sie dreht um die x-Achse durch
+   * den Drehpunkt; an ihr hängen beide Lenker, der Hebel und damit der
+   * Kopfanker des Kabinenhubzylinders.
+   */
+  private cabPivot = new THREE.Group();
   private cabLift = 0; // aktuelle Hubhöhe in m
   private cabLiftTarget = 0;
   // letzte Achseingaben (-1..1) für die Joystick-Animation in der Kabine
@@ -571,18 +592,6 @@ export class Excavator {
     barrel: THREE.Mesh;
     rod: THREE.Mesh;
     barrelLen: number;
-    /**
-     * true = alte Streckbauweise (`rod.scale.y`), false = echter Zylinder mit
-     * fester Rohr- und Stangenlänge (`zylinderParts.ts`).
-     *
-     * Gestreckt wird nur noch, was mechanisch gar nicht anders geht: die
-     * beiden Kabinenhubzylinder. Sie verlangen ein Hubverhältnis von 5,18 : 1
-     * (Ankerabstand 0,650 → 3,368 m) — das kann kein einstufiger Zylinder.
-     * E-025, Befund 2; die Lösung ist das Parallelogramm und ein eigenes,
-     * LETZTES Paket. Bis dahin bleiben sie unverändert, statt sie mit einer
-     * halben Maßnahme kaputter zu machen.
-     */
-    gestreckt: boolean;
   }> = [];
 
   private world!: RAPIER.World;
@@ -608,17 +617,6 @@ export class Excavator {
    * Teil in `zylinderParts.ts`.
    */
   private buildHydraulics(scene: THREE.Scene): void {
-    /*
-     * Kabinen-Lenker leben in Weltkoordinaten — sie haengen deshalb NICHT unter
-     * `root`, sondern direkt in der Szene. Genau darum brauchen sie Namen: Im
-     * Szenengraph sind sie sonst von Platzobjekten nicht zu unterscheiden.
-     */
-    this.cabLinks.forEach((l, i) => {
-      l.mesh.geometry.dispose();
-      l.mesh.geometry = new THREE.BoxGeometry(0.14, 1, 0.16);
-      l.mesh.name = `06_KABINENLENKER_${i === 0 ? "R" : "L"}`;
-      scene.add(l.mesh);
-    });
     const barrelMat = new THREE.MeshStandardMaterial({ color: 0x2b2e31, roughness: 0.6 });
     const rodMat = new THREE.MeshStandardMaterial({ color: 0xb8bec4, roughness: 0.25, metalness: 0.8 });
     /** Die beiden Anker eines Zylinders anlegen — Fuß am einen Teil, Kopf am anderen. */
@@ -664,34 +662,7 @@ export class Excavator {
       rod.name = `${name}_STANGE`;
       scene.add(barrel);
       scene.add(rod);
-      this.hydraulics.push({ a, b, barrel, rod, barrelLen: form.auge + form.rohrLaenge, gestreckt: false });
-    };
-
-    /**
-     * Ein GESTRECKTER Zylinder — die alte Bauweise, nur noch für den
-     * Kabinenhub. Begründung steht am Feld `gestreckt` oben.
-     */
-    const addStretchCyl = (
-      name: string,
-      parentA: THREE.Object3D,
-      la: [number, number, number],
-      parentB: THREE.Object3D,
-      lb: [number, number, number],
-      barrelLen: number,
-      rBarrel: number
-    ): void => {
-      const { a, b } = anker(name, parentA, la, parentB, lb);
-      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(rBarrel, rBarrel, 1, 10), barrelMat);
-      const rod = new THREE.Mesh(
-        new THREE.CylinderGeometry(rBarrel * 0.55, rBarrel * 0.55, 1, 8),
-        rodMat
-      );
-      barrel.castShadow = true;
-      barrel.name = `${name}_ROHR`;
-      rod.name = `${name}_STANGE`;
-      scene.add(barrel);
-      scene.add(rod);
-      this.hydraulics.push({ a, b, barrel, rod, barrelLen, gestreckt: true });
+      this.hydraulics.push({ a, b, barrel, rod, barrelLen: form.auge + form.rohrLaenge });
     };
 
     // Hubzylinder des Auslegers: sitzen tief am Oberwagen-Deck links und rechts
@@ -701,10 +672,20 @@ export class Excavator {
     const HUB_MASS: ZylinderMasse = { kurz: 2.518, lang: 3.757, rRohr: 0.1 };
     addCyl("07_ZYLINDER_HUB_R", this.cabGroup, HUB_FUSS_R, this.boomGroup, HUB_KOPF_R, HUB_MASS);
     addCyl("07_ZYLINDER_HUB_L", this.cabGroup, HUB_FUSS_L, this.boomGroup, HUB_KOPF_L, HUB_MASS);
-    // Kabinenhub: zwei kleine Zylinder unten links und rechts an der Kabine.
-    // Verlangt 5,18 : 1 — mechanisch unmöglich, siehe `gestreckt`. Paket 8.
-    addStretchCyl("06_ZYLINDER_KABINE_A", this.cabGroup, [-1.5, 0.3, 0.1], this.cabLiftGroup, [-1.5, 0.95, 0.1], 1.1, 0.055);
-    addStretchCyl("06_ZYLINDER_KABINE_B", this.cabGroup, [-0.6, 0.3, 0.1], this.cabLiftGroup, [-0.6, 0.95, 0.1], 1.1, 0.055);
+    /*
+     * Kabinenhub (E-040): EIN Zylinder statt zwei — er drückt nicht mehr die
+     * Kabine, sondern einen Hebel auf der Lenkerwelle. Dadurch fällt das
+     * unmögliche Hubverhältnis von 5,18 : 1 auf 1,47 : 1, und der Zylinder
+     * darf endlich einer sein. Rechnung in `kabinenhubParts.ts`.
+     */
+    addCyl(
+      "06_ZYLINDER_KABINE",
+      this.cabGroup,
+      [CAB_ZYL_FUSS.x, CAB_ZYL_FUSS.y, CAB_ZYL_FUSS.z],
+      this.cabPivot,
+      CAB_ZYL_KOPF,
+      CAB_ZYL_MASSE
+    );
     // Stielzylinder: Ausleger-Oberseite → Stiel-Anlenkung
     // Gemessen: Ankerabstand 1,809 … 2,235 m (Hub 0,426 m, Verhältnis 1,24).
     addCyl("07_ZYLINDER_STIEL", this.boomGroup, STIEL_ZYL_FUSS, this.stickGroup, STIEL_ZYL_KOPF, {
@@ -765,31 +746,21 @@ export class Excavator {
       h.a.getWorldPosition(this.tmpA);
       h.b.getWorldPosition(this.tmpB);
       this.tmpDir.copy(this.tmpB).sub(this.tmpA);
-      const dist = Math.max(this.tmpDir.length(), 0.2);
       this.tmpDir.normalize();
       const q = new THREE.Quaternion().setFromUnitVectors(Excavator.UP, this.tmpDir);
-      if (!h.gestreckt) {
-        /*
-         * Der echte Zylinder: Beide Netze sind um IHREN Anker herum gebaut
-         * (Rohr um den Fuß nach +Y, Stange um den Kopf nach −Y). Es bleibt
-         * nichts zu tun, als jedem seinen Ankerpunkt und dieselbe Drehung zu
-         * geben. Kein `scale` — genau das ist der Unterschied zu vorher, und
-         * `test/zylinder.test.ts` wacht darüber.
-         */
-        h.barrel.position.copy(this.tmpA);
-        h.barrel.quaternion.copy(q);
-        h.rod.position.copy(this.tmpB);
-        h.rod.quaternion.copy(q);
-        continue;
-      }
-      // Alte Streckbauweise — nur noch Kabinenhub, siehe Feld `gestreckt`.
-      h.barrel.position.copy(this.tmpA).addScaledVector(this.tmpDir, h.barrelLen / 2);
+      /*
+       * Beide Netze sind um IHREN Anker herum gebaut (Rohr um den Fuß nach
+       * +Y, Stange um den Kopf nach −Y). Es bleibt nichts zu tun, als jedem
+       * seinen Ankerpunkt und dieselbe Drehung zu geben.
+       *
+       * KEIN `scale` — und seit E-040 gibt es dafür auch keine Ausnahme mehr.
+       * Der Kabinenhub war die letzte; er ist jetzt ein Schwenkwerk mit
+       * Hebel, und `test/zylinder.test.ts` prüft ihn wie jeden anderen.
+       */
+      h.barrel.position.copy(this.tmpA);
       h.barrel.quaternion.copy(q);
-      h.barrel.scale.set(1, h.barrelLen, 1);
-      const rodLen = Math.max(dist - h.barrelLen + 0.15, 0.15);
-      h.rod.position.copy(this.tmpB).addScaledVector(this.tmpDir, -rodLen / 2);
+      h.rod.position.copy(this.tmpB);
       h.rod.quaternion.copy(q);
-      h.rod.scale.set(1, rodLen, 1);
     }
   }
 
@@ -1027,7 +998,6 @@ export class Excavator {
    * Rahmen + Glasflächen, Sitz, zwei Konsolen mit ISO-Joysticks, die die
    * Achseingaben live mitbewegen. Kabinenzentrum lokal (-0.6, *, 0.6).
    */
-  private cabLinks: Array<{ a: THREE.Object3D; b: THREE.Object3D; mesh: THREE.Mesh }> = [];
   /** Alles am Fahrer außer Unterarmen/Händen — in der Ego-Sicht unsichtbar */
   private driverBody: THREE.Object3D[] = [];
 
@@ -1091,23 +1061,30 @@ export class Excavator {
     // Blickfeld ragt (Design-Fix 2026-08-29)
     const cx = -1.05;
     const cz = 0.6;
-    // Kabinenausleger (wie am Vorbild): zwei Parallelogramm-Lenker heben die
-    // Kabine nach vorn-oben; sie bleibt dabei waagerecht.
-    for (const rx of [-0.42, 0.42]) {
-      const seite = rx > 0 ? "L" : "R";
-      const base = new THREE.Object3D();
-      base.position.set(cx + rx, 0.35, cz - 1.35);
-      base.name = `06_KABINENLENKER_${seite}_FUSS`;
-      this.cabGroup.add(base);
-      const tip = new THREE.Object3D();
-      tip.position.set(cx + rx, 0.5, cz - 0.72);
-      tip.name = `06_KABINENLENKER_${seite}_KOPF`;
-      this.cabLiftGroup.add(tip);
-      // Lenker liegt in Weltkoordinaten (wird in buildHydraulics zur Szene gehängt)
-      const link = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.16, 1), frameMat);
-      link.castShadow = true;
-      this.cabLinks.push({ a: base, b: tip, mesh: link });
-    }
+    /*
+     * DAS KABINENHUBWERK (E-040, Paket 8 und letztes aus E-025).
+     *
+     * Vorher: zwei „Lenker", deren Ankerabstand von 0,65 auf 3,14 m gedehnt
+     * wurde, und zwei Zylinder, deren Rohr länger war als der Spalt, in dem
+     * sie standen. Jetzt: ein Mast hinter der Kabine mit einer Welle, zwei
+     * Lenkern von 1,88 m und einem Hebel, an dem EIN echter Zylinder zieht.
+     *
+     * Der Mast steht fest am Oberwagen, die Lenkergruppe dreht darin. Teil
+     * für Teil in `kabinenhubParts.ts`; dort steht auch, warum der Drehpunkt
+     * genau bei y 2,213 | z −0,894 liegen MUSS und nirgends sonst.
+     */
+    const mast = new THREE.Mesh(kabinenmast(), frameMat);
+    mast.castShadow = true;
+    mast.name = "06_KABINENMAST";
+    this.cabGroup.add(mast);
+
+    this.cabPivot.position.set(0, HUB_DREHPUNKT.y, HUB_DREHPUNKT.z);
+    this.cabPivot.name = "06_KABINENHUBWERK";
+    this.cabGroup.add(this.cabPivot);
+    const lenker = new THREE.Mesh(kabinenlenker(), frameMat);
+    lenker.castShadow = true;
+    lenker.name = "06_KABINENLENKER";
+    this.cabPivot.add(lenker);
     // Alles Weitere sitzt im Hubschlitten und fährt mit der Kabine hoch
     this.cabLiftGroup.name = "06_KABINE";
     this.cabGroup.add(this.cabLiftGroup);
@@ -2259,9 +2236,17 @@ export class Excavator {
     this.root.position.copy(this.position);
     this.root.rotation.y = this.heading;
     this.cabGroup.rotation.y = this.cabYaw;
-    // Kabine fährt am Ausleger nach oben UND ein Stück nach vorn
-    this.cabLiftGroup.position.y = this.cabLift;
-    this.cabLiftGroup.position.z = this.cabLift * 0.34;
+    /*
+     * Kabine: hoch UND ein Stück nach vorn — seit E-040 auf einem Kreisbogen
+     * um die Lenkerwelle statt auf einer Geraden.
+     *
+     * `hubVersatz` liefert in `y` exakt die Hubhöhe zurück; unten und ganz
+     * oben steht die Kabine deshalb auf den Millimeter da, wo sie stand.
+     * Nur dazwischen läuft sie den Bogen (bis 0,60 m Abweichung, E-025
+     * Frage 3, von Patrick mitentschieden).
+     */
+    this.cabLiftGroup.position.copy(hubVersatz(this.cabLift, this.tmpA));
+    this.cabPivot.rotation.x = -hubWinkel(this.cabLift);
     /*
      * Räder: rollen (X) und lenken (Y). Die Seitenlage (Z) steht seit dem Bau
      * fest. Die Drehreihenfolge `YXZ` ist dafür Voraussetzung — sie wird beim
@@ -2278,19 +2263,6 @@ export class Excavator {
     if (this.bladeGroup) {
       this.bladeGroup.position.y = (1 - this.bladeDown) * BLADE_UP_Y;
       this.bladeGroup.rotation.x = (1 - this.bladeDown) * 0.35; // gehoben angewinkelt
-    }
-    // Kabinen-Lenker zwischen Oberwagen und Kabinenschlitten ausrichten
-    for (const l of this.cabLinks) {
-      l.a.updateWorldMatrix(true, false);
-      l.b.updateWorldMatrix(true, false);
-      l.a.getWorldPosition(this.tmpA);
-      l.b.getWorldPosition(this.tmpB);
-      this.tmpDir.copy(this.tmpB).sub(this.tmpA);
-      const len = Math.max(this.tmpDir.length(), 0.2);
-      this.tmpDir.normalize();
-      l.mesh.position.copy(this.tmpA).addScaledVector(this.tmpDir, len / 2);
-      l.mesh.quaternion.setFromUnitVectors(Excavator.UP, this.tmpDir);
-      l.mesh.scale.set(1, len, 1);
     }
     this.boomGroup.rotation.x = -this.boomAngle;
     this.stickGroup.rotation.x = -this.stickAngle;
@@ -2671,15 +2643,17 @@ export class Excavator {
    *
    * Die Selbsterkennung des Zwischenbilds nimmt nur Baugruppen mit eigenen
    * Kindern; einzelne Netze bleiben aussen vor, sonst wuerde jedes Schrottteil
-   * einen Eintrag kosten. Hydraulikzylinder und Kabinenlenker rechnen aber in
+   * einen Eintrag kosten. Die Hydraulikzylinder rechnen aber in
    * Weltkoordinaten und haengen darum als einzelne Netze direkt in der Szene
    * (siehe buildHydraulics). Ohne diese Liste blieben genau sie ruckelig,
    * waehrend der Rest der Maschine glatt laeuft — die Zylinder wuerden
    * sichtbar neben ihren Ankerpunkten zittern.
+   *
+   * Die Kabinenlenker stehen seit E-040 NICHT mehr hier: Sie haengen als
+   * gedrehte Gruppe unter `root` und laufen damit ueber dessen Eintrag mit.
    */
   bildwurzeln(): THREE.Object3D[] {
     const raus: THREE.Object3D[] = [this.root, this.grappleGroup];
-    for (const l of this.cabLinks) raus.push(l.mesh);
     for (const h of this.hydraulics) raus.push(h.barrel, h.rod);
     return raus;
   }
