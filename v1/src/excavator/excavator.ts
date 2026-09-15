@@ -277,8 +277,19 @@ const LENK_ZEIT = 0.35;
  * Das frueher gemeldete "zu langsam" galt nicht dem Grundtempo, sondern der
  * Last: "alles bis vier, fuenf Tonnen sollte kein Problem sein". Dafuer
  * sorgt tempoFaktor, nicht CAB_MAX.
+ *
+ * NACHTRAG 15.09.2026: 28 -> 33 Grad je Sekunde. Patrick am Geraet: "Oberturm
+ * etwas schneller machen." Das ist die Umkehr seines eigenen Befunds vom
+ * 11.09. ("das Drehwerk ist zu schnell, das merke ich doch") — und sie gilt,
+ * nach derselben Regel wie damals: Wer faehrt, hat recht.
+ *
+ * "Etwas" ist ernst genommen: +18 %, nicht zurueck auf die 36 oder 45, die er
+ * zweimal abgelehnt hat. Die Spitze laeuft damit auf 8 m Radius mit 4,6 statt
+ * 3,8 m/s, also 17 statt 14 km/h. Faellt es wieder zu hastig aus, ist der
+ * naechste Schritt 30 oder 31 — und nicht zurueck auf 28, denn der Wunsch
+ * nach "schneller" bleibt ja bestehen.
  */
-export const CAB_MAX = THREE.MathUtils.degToRad(28);
+export const CAB_MAX = THREE.MathUtils.degToRad(33);
 const BOOM_RATE = THREE.MathUtils.degToRad(19);
 const STICK_RATE = THREE.MathUtils.degToRad(24);
 const ROTATOR_STEP = THREE.MathUtils.degToRad(15); // pro Mausrad-Raste
