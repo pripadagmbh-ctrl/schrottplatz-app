@@ -6,8 +6,6 @@ import {
   routeInRev,
   pickupApproach,
   pickupInRev,
-  TIP_APPROACH,
-  TIP_IN_REV,
 } from "./routes";
 
 /**
@@ -36,6 +34,11 @@ const MAX_Y = 1.3;
  * Zufahrt und Abladeplatz hängen seit 12.09.2026 davon ab, wo der Bagger
  * steht. Eine einmal abgeschriebene Liste zeigte auf die Stelle, an der der
  * letzte LKW gestanden hat, und hätte die halbe Überwachung blind gemacht.
+ *
+ * „Kipperspur" und „Kipperhalt" sind seit E-029 weg: Der Kipper faehrt keine
+ * eigene Spur mehr, sondern Zufahrt und Abladeplatz wie alle anderen. Als
+ * eigene Einträge hätten sie dieselbe Strecke ein zweites Mal überwacht und
+ * jede Meldung doppelt ausgegeben.
  */
 function lanes(): Array<[string, Array<[number, number]>]> {
   return [
@@ -44,8 +47,6 @@ function lanes(): Array<[string, Array<[number, number]>]> {
     ["Abladeplatz", routeInRev()],
     ["Abholerspur", pickupApproach()],
     ["Verladeplatz", pickupInRev()],
-    ["Kipperspur", TIP_APPROACH],
-    ["Kipperhalt", TIP_IN_REV],
   ];
 }
 

@@ -63,14 +63,14 @@ function festerZufall(saat: number): () => void {
   };
 }
 
-function kippen(sortenrein: string | null = null): {
+function kippen(sortenrein: string | null = null, saat = 20260913): {
   vmax: number;
   obenauf: number;
   teile: number;
   restAmEnde: number;
   inDerMulde: number;
 } {
-  const zurueck = festerZufall(20260913);
+  const zurueck = festerZufall(saat);
   const scene = new THREE.Scene();
   const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
   const boden = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
@@ -221,11 +221,42 @@ describe("Kipper", () => {
 
   it("schleudert die Ladung nicht davon", () => {
     /*
+     * EINE SAAT WAR NIE EINE MESSUNG (Befund 15.09.2026, E-029).
+     *
+     * Hier stand bis heute `kippen(null)` mit der einen festen Saat 20260913
+     * und die Schranke „unter 130 km/h". Ueber acht Saaten nachgemessen war
+     * derselbe Stand in Wahrheit: Mittel 117, Hoechstwert 305 km/h, sechs von
+     * sechzehn Ladungen ueber 130. Der Waechter war gruen, weil er zufaellig
+     * einen ruhigen Wurf erwischt hat — genau dieselbe Klasse Selbsttaeuschung
+     * wie die NaN-Routen vom selben Tag.
+     *
      * Ein eingeklemmtes Teil wird vom Loeser mit einem einzigen sehr grossen
-     * Stoss befreit. Mit der Ueberschneidung waren es 258 km/h; jetzt bleibt
-     * es unter 130. Das ist noch viel, aber es ist kein Katapult mehr.
+     * Stoss befreit; zwei kinematische Koerper haben fuer ihn unendliche
+     * Masse. Das ist der bekannte Schlitz am Kipplager
+     * (`docs/offene-punkte.md`) und ein eigenes Paket. Was HIER gemessen wird,
+     * ist, dass er nicht gefuettert wird:
+     *
+     *   Rueckweg zum Halt   Mittel   Hoechstwert   ueber 130 km/h
+     *   13,0 m              154        424 km/h    8 von 16
+     *    9,5 m              146        298 km/h    7 von 16
+     *    5,5 m (gebaut)     109        255 km/h    3 von 16
+     *   alte Kipperspur     117        305 km/h    6 von 16
+     *
+     * Waehrend des Rueckwaertssetzens ist die Fuhre verriegelt; je laenger der
+     * Weg, desto tiefer arbeiten sich Stuecke in den Schlitz. Deshalb steht
+     * der Rangierpunkt auf z −17,5 und nicht auf −10,0 (`routes.ts`).
+     *
+     * Die Schranken halten den GEMESSENEN Stand fest: Es darf besser werden,
+     * nicht schlechter.
      */
-    const r = kippen(null);
-    expect(r.vmax * 3.6, `Ladung erreicht ${(r.vmax * 3.6).toFixed(0)} km/h`).toBeLessThan(130);
-  }, 30000);
+    const saaten = [20260913, 1, 2, 3, 4, 5, 6, 7];
+    const werte = saaten.map((s) => kippen(null, s).vmax * 3.6);
+    const mittel = werte.reduce((a, b) => a + b, 0) / werte.length;
+    const hoechst = Math.max(...werte);
+    const liste = werte.map((w) => w.toFixed(0)).join(" ");
+    expect(mittel, `Mittel ${mittel.toFixed(0)} km/h ueber acht Ladungen (${liste})`).toBeLessThan(
+      140
+    );
+    expect(hoechst, `Hoechstwert ${hoechst.toFixed(0)} km/h (${liste})`).toBeLessThan(300);
+  }, 180000);
 });

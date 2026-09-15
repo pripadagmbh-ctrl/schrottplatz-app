@@ -49,9 +49,6 @@ import {
   pickupApproach,
   pickupInRev,
   pickupOut,
-  TIP_APPROACH,
-  TIP_IN_REV,
-  TIP_OUT,
 } from "../src/delivery/routes";
 
 /**
@@ -202,10 +199,8 @@ describe("Feste Bauten", () => {
       ["Abholer-Anfahrt", pickupApproach()],
       ["Abholer-Rangieren", pickupInRev()],
       ["Abholer-Ausfahrt", pickupOut()],
-      ["Kipper-Anfahrt", TIP_APPROACH],
-      ["Kipper-Rangieren", TIP_IN_REV],
-      ["Kipper-Ausfahrt", TIP_OUT],
     ];
+    // Der Kipper faehrt seit E-029 dieselben drei Strecken wie die Pritsche.
     for (const [name, punkte] of routen) {
       for (const [x, z] of punkte) {
         // 1,4 m ist der Sicherheitsabstand, mit dem die LKW prüfen
@@ -234,8 +229,6 @@ describe("Feste Bauten", () => {
       ["Rangieren", routeInRev()],
       ["Abholer", pickupApproach()],
       ["Abholer-Rangieren", pickupInRev()],
-      ["Kipper", TIP_APPROACH],
-      ["Kipper-Rangieren", TIP_IN_REV],
     ];
     for (const c of SORTIERMULDEN) {
       const [w, d] = c.size;

@@ -53,9 +53,6 @@ import {
   pickupApproach,
   pickupInRev,
   pickupOut,
-  TIP_APPROACH,
-  TIP_IN_REV,
-  TIP_OUT,
   bayApproach,
   bayInRev,
   bayOut,
@@ -71,6 +68,8 @@ import {
   BED_HALF_W,
   WORK_ZONES,
   BLOCK_GIVEUP_S,
+  bedLenFor,
+  faehrtInsSilo,
   TIP_ANGLE,
   TIP_CREEP_M,
   TIP_CREEP_SPEED,
@@ -448,8 +447,13 @@ class DeliveryVehicle {
   private get isPickup(): boolean {
     return this.kind === "abholer";
   }
-  /** Fährt selbst ab: dann geht es direkt auf den Stahlschrotthaufen. */
-  private get isSelfTipping(): boolean {
+  /**
+   * Kippt selbst ab — der Einzige, der Material ohne Spielerarbeit auf den
+   * Platz bringt. Seit E-029 sagt das nichts mehr ueber seinen WEG (er faehrt
+   * dieselbe Strecke wie die Pritschen), nur noch ueber das, was am
+   * Abladeplatz passiert.
+   */
+  get isSelfTipping(): boolean {
     return this.kind === "kipper";
   }
 
@@ -465,15 +469,15 @@ class DeliveryVehicle {
   }
 
   /**
-   * Die Mulde an der Ostwand, in die diese Fuhre gehoert — oder null.
+   * Das Lagersilo, in das diese Fuhre gehoert — oder null.
    *
-   * Nur fuer Kipper: Wer nicht selbst kippen kann, wird vom Bagger entladen
-   * und muss dafuer vor der Maschine stehen. Und nur, wenn es die Fraktion
-   * dort ueberhaupt gibt; sonst bleibt es beim Mischschrott.
+   * Die Regel steht in `routes.ts` (`faehrtInsSilo`), damit sie kopflos zu
+   * pruefen ist: Nur wer SELBST kippen kann und eine Fraktion mit Lagersilo
+   * bringt, faehrt die Gasse hinunter. Alles andere haelt am Abladeplatz.
    */
   private get zielMulde(): ContainerConfig | null {
-    if (!this.isSelfTipping) return null;
-    return lagerMuldeFuer(this.sortedMaterial);
+    const lager = lagerMuldeFuer(this.sortedMaterial);
+    return faehrtInsSilo(this.kind, lager) ? lager : null;
   }
   private get routeIn(): Array<[number, number]> {
     return this.isPickup ? PICKUP_IN_FWD : ROUTE_IN_FWD;
@@ -509,25 +513,31 @@ class DeliveryVehicle {
     this.meineAusfahrt = routeOut();
   }
 
+  /*
+   * ZWEI WEGE, EINE REGEL (E-029).
+   *
+   * Bis zum 15.09.2026 gab es DREI: Silo-Gasse, eigene Kipperspur vor dem
+   * Bagger, Abladeplatz. Die mittlere ist weg — Patricks Ansage „Kipper
+   * fahren die falsche Spur. Die sollen auch, wie die anderen LKWs, seitlich
+   * von mir abgeladen werden." Was bleibt, entscheidet `faehrtInsSilo`:
+   * sortenrein mit Lagersilo ins Lager, alles andere an den Abladeplatz.
+   */
   private get routeApproach(): Array<[number, number]> {
     if (this.isPickup) return this.meineAnfahrt ?? pickupApproach();
     const mulde = this.zielMulde;
     if (mulde) return bayApproach(mulde);
-    if (this.isSelfTipping) return TIP_APPROACH;
     return this.meineAnfahrt ?? routeApproach();
   }
   private get routeRev(): Array<[number, number]> {
     if (this.isPickup) return this.meinRueckweg ?? pickupInRev();
     const mulde = this.zielMulde;
     if (mulde) return bayInRev(mulde);
-    if (this.isSelfTipping) return TIP_IN_REV;
     return this.meinRueckweg ?? routeInRev();
   }
   private get routeOut(): Array<[number, number]> {
     if (this.isPickup) return this.meineAusfahrt ?? pickupOut();
     const mulde = this.zielMulde;
     if (mulde) return bayOut(mulde);
-    if (this.isSelfTipping) return TIP_OUT;
     return this.meineAusfahrt ?? routeOut();
   }
 
@@ -546,8 +556,8 @@ class DeliveryVehicle {
     customer: CustomerProfile | null = null
   ) {
     this.customer = kind === "abholer" ? null : (customer ?? rollCustomer());
-    // Der PKW-Anhänger ist kurz — ein Kofferraum voll, keine Fuhre
-    this.bedLen = kind === "pkw" ? 2.4 : kind === "wrack" ? 5.4 : kind === "kipper" ? 6.0 : 5.4;
+    // Die Tabelle steht in routes.ts — dieselbe, gegen die die Waechter rechnen
+    this.bedLen = bedLenFor(kind);
     this.bodyStyleName =
       this.customer?.group === "haendler"
         ? (["rungen", "rungen", "koffer", "flach"] as const)[Math.floor(Math.random() * 4)]
@@ -1216,7 +1226,8 @@ class DeliveryVehicle {
         if (this.weighedIn && !this.awaitingDeal) {
           // Jetzt, kurz vor dem Losfahren, steht fest, wo der Bagger ist —
           // und damit, wo dieser Wagen abkippt.
-          if (!this.isSelfTipping) this.legeAbladestelleFest();
+          // Seit E-029 auch fuer den Kipper: Er haelt am selben Abladeplatz.
+          this.legeAbladestelleFest();
           this.phase = "approach";
           this.phaseT = 0;
           this.routeS = 0;
