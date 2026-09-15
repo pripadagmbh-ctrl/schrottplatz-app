@@ -1,6 +1,12 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import type { TearTarget } from "../dismantle/composites";
+import {
+  CLAW_CLOSED_SPLAY,
+  CLAW_OPEN_SPLAY,
+  CLAW_SEGMENTS,
+  clawPoint,
+} from "../excavator/clawGeometry";
 
 /**
  * Greifsystem nach Briefing Kap. 6.2:
@@ -17,7 +23,57 @@ const MAX_TOTAL_KG = 3500; // (SW) — eine ganze Karosse muss hochgehen
 // kontinuierlich zugepackt — so lassen sich fallende Objekte auffangen.
 const GRAB_WINDOW_START = 0.6;
 const GRAB_WINDOW_END = 0.98;
-const SENSOR_RADIUS = 1.05; // m (SW) — Wirkradius der größeren Spinne
+/**
+ * Abstand vom Ursprung der Spinne bis zur Sensormitte (m).
+ *
+ * Spiegelt `GRAPPLE_LINK + 0.2 + PALM_TO_SENSOR` aus `excavator.ts`. Die Zahl
+ * steht hier nur, weil der Bagger sie nicht ausgibt; `test/greiffenster.test.ts`
+ * misst sie am echten Bagger nach (`getSensorPosition` gegen die Spinnenmitte)
+ * und faellt um, sobald sie dort anders wird.
+ */
+export const SENSOR_UNTER_SPINNE = 1.5;
+/**
+ * Luft, die `isInsideGrapple` (excavator.ts) unter die Spitzen legt. Bis dorthin
+ * gilt ein Punkt noch als „im Korb", also muss die Sensorkugel so weit reichen.
+ */
+const KORB_LUFT_UNTEN = 0.18;
+/**
+ * Radius der Sensorkugel (m) — GERECHNET, nicht gewaehlt.
+ *
+ * Die Kugel ist nur der Vorfilter: Sie sammelt ein, was danach genau geprueft
+ * wird (`insideGrapple`, Krallenkontakte). Sie darf deshalb nichts entscheiden
+ * — und genau das tat sie.
+ *
+ * Befund 15.09.2026 (Messlauf in der echten Rapier-Welt, Bagger kopflos
+ * gebaut): Die Kugel hing mit 1,05 m Radius 1,50 m unter der Spinne, reichte
+ * also bis 2,55 m Tiefe. Die geschlossenen Schalen reichen aber 2,83 m tief,
+ * mit der Luft von `isInsideGrapple` sogar 3,05 m. Die untersten 46 cm des
+ * Korbs — genau der Boden, auf dem das Material liegt — waren blind.
+ *
+ * Dazu kommt die Bewegung: Beim Schliessen haengt die Spinne tiefer als offen
+ * (2,44 m offen, bis 3,00 m auf halbem Weg), und der Bodenanschlag hebt den
+ * Arm entsprechend an. Gemessen steigt die Spinne beim Zupacken um 0,548 m.
+ * Die Unterkante der alten Kugel stand damit im ganzen Greiffenster
+ * (Schliessgrad 0,6 bis 0,98) 0,459 m ueber dem Beton. Alles, was flacher als
+ * 46 cm auf dem Platz lag, war fuer den Sensor nicht vorhanden — auch dann
+ * nicht, wenn alle fuenf Schalen daran anlagen (gemessen: 5 Krallenkontakte
+ * bei null Sensortreffern).
+ *
+ * Die Regel lautet jetzt: Die Kugel reicht so tief, wie die Schalen in
+ * IRGENDEINER Stellung reichen. In der Breite bleibt sie Vorfilter wie bisher.
+ * Ergibt 2,875 + 0,18 − 1,50 = 1,555 m.
+ */
+export const SENSOR_RADIUS: number = (() => {
+  const p = new THREE.Vector3();
+  let tiefste = 0;
+  // Abtasten statt die beiden Endlagen vergleichen: Der tiefste Punkt liegt
+  // weder ganz offen noch ganz zu, sondern dazwischen (clawGeometry.ts).
+  for (let i = 0; i <= 200; i++) {
+    const splay = CLAW_CLOSED_SPLAY + ((CLAW_OPEN_SPLAY - CLAW_CLOSED_SPLAY) * i) / 200;
+    tiefste = Math.max(tiefste, -clawPoint(0, splay, CLAW_SEGMENTS, p).y);
+  }
+  return tiefste + KORB_LUFT_UNTEN - SENSOR_UNTER_SPINNE;
+})();
 /** So lange muss die Spinne ganz zu gehalten werden, bis das Teil nachgibt */
 const CRUSH_TIME = 1.1;
 /**
