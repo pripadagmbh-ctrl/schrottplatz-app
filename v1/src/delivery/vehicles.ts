@@ -26,10 +26,23 @@ const LADE_RAND = 0.2;
 const FAHRER_TEMPO = 1.5;
 /** Rechenhilfe fuer boxen() — kein neuer Vektor je Bild. */
 const BOX_TMP = new THREE.Vector3();
-import { hitsObstacle } from "../world/obstacles";
+import { alleHindernisse } from "../world/obstacles";
+import {
+  fahrzeugUmriss,
+  anhaengerUmriss,
+  poseAuf,
+  tiefsteDurchdringung,
+  UMRISS_TOLERANZ,
+} from "./umriss";
 import { BAGGER_STAND } from "../world/baggerstand";
 import { lagerMuldeFuer, type ContainerConfig } from "../world/containers";
-import { rollCustomer, vehicleForCustomer, type CustomerProfile } from "./customers";
+import {
+  rollCustomer,
+  vehicleForCustomer,
+  abholerFunk,
+  ABHOLER_FUNKNAME,
+  type CustomerProfile,
+} from "./customers";
 import { buildVehicleModel, wandHoehe, type Rad } from "./vehicleModel";
 import { Federung, federungsDatenFuer } from "./federung";
 import {
@@ -59,6 +72,8 @@ import {
   routeOut,
   PICKUP_IN_FWD,
   neueAbholstelle,
+  abholPlatzFuer,
+  type AbholPlatz,
   pickupApproach,
   pickupInRev,
   pickupOut,
@@ -483,42 +498,21 @@ class DeliveryVehicle {
      * Die Standflaeche sitzt NICHT auf dem Ursprung, sondern dort, wo der
      * Wagen wirklich steht (15.09.2026).
      *
-     * Der Ursprung liegt in der Mitte der Ladeflaeche (`vehicleModel.ts`:
-     * `bedGroup.position.z = −bedLen/2`). Nach hinten reicht der Wagen bis zum
-     * Unterfahrschutz auf lokal −bedLen/2 − 0,14, nach vorn bis zur Kabine auf
-     * rund +bedLen/2 + 1,90. Er ist also 2,04 m laenger als die Ladeflaeche —
-     * aber nicht symmetrisch: 1,76 m davon liegen VORN.
-     *
-     * Bis heute stand hier ein symmetrischer Kasten von ± (bedLen/2 + 1,6) um
-     * den Ursprung. Gemessen war er hinten 1,46 m zu lang und vorn 0,30 m zu
-     * kurz. Genau das hat Patrick am Abladeplatz gesehen: „Die fahren ja durch
-     * die Wand, halb durch die Mulde" — der Wagen stand mit einer Flaeche in
-     * der Muellmulde, in der er gar nicht steht, und liess dafuer seine Kabine
-     * frei.
+     * Gerechnet wird sie seit E-054 in `umriss.ts` — von derselben Funktion,
+     * mit der `isBlockedByBuilding` nach vorn schaut und mit der
+     * `test/fahrumriss.test.ts` jede Strecke abfaehrt. Vorher stand die Figur
+     * dreimal da und war dreimal eine andere.
      */
-    const vorn = this.bedLen / 2 + 1.9;
-    const hinten = -(this.bedLen / 2 + 0.14);
-    const mitte = (vorn + hinten) / 2;
-    const rot = this.group.rotation.y;
-    out.push({
-      x: p.x + Math.sin(rot) * mitte,
-      z: p.z + Math.cos(rot) * mitte,
-      hw: 1.55,
-      hd: (vorn - hinten) / 2,
-      rot,
-    });
+    out.push(
+      fahrzeugUmriss({ x: p.x, z: p.z, rot: this.group.rotation.y }, this.bedLen)
+    );
     if (this.trailer) {
       const w = this.trailer.getWorldPosition(BOX_TMP);
       // Der Anhänger hängt hinter der Kupplung; sein Mittelpunkt liegt eine
       // halbe Ladeflächenlänge dahinter.
-      const rot = this.group.rotation.y + this.trailerYawRel;
-      out.push({
-        x: w.x - Math.sin(rot) * (this.bedLen / 2),
-        z: w.z - Math.cos(rot) * (this.bedLen / 2),
-        hw: 1.35,
-        hd: this.bedLen / 2 + 0.5,
-        rot,
-      });
+      out.push(
+        anhaengerUmriss(w.x, w.z, this.group.rotation.y + this.trailerYawRel, this.bedLen)
+      );
     }
   }
 
@@ -572,6 +566,25 @@ class DeliveryVehicle {
   private get isPickup(): boolean {
     return this.kind === "abholer";
   }
+
+  /**
+   * Fuer welche Fraktion dieser Abholer bestellt wurde (null = gemischt).
+   *
+   * Steht am FAHRZEUG und nicht nur am Fuhrpark: Der Halteplatz wird beim
+   * Losfahren von der Waage festgelegt, und bis dahin kann der Spieler laengst
+   * eine neue Abholung vorgemerkt haben. Der Wagen, der schon faehrt, faehrt
+   * zu dem Platz, fuer den er gerufen wurde.
+   */
+  bestellung: string | null = null;
+
+  /**
+   * Meldung des Abholers, sobald er an seinem Platz steht.
+   *
+   * Gesetzt vom `VehicleManager`, der daraus den Funkspruch baut. Am Fahrzeug
+   * steht nur der Zeitpunkt — WAS gesagt wird, ist Sache der Stimmen in
+   * `customers.ts`, und WO es erscheint, ist Sache des HUD.
+   */
+  onAngekommen: (() => void) | null = null;
   /**
    * Kippt selbst ab — der Einzige, der Material ohne Spielerarbeit auf den
    * Platz bringt. Seit E-029 sagt das nichts mehr ueber seinen WEG (er faehrt
@@ -626,7 +639,15 @@ class DeliveryVehicle {
    */
   private legeAbladestelleFest(): void {
     if (this.isPickup) {
-      neueAbholstelle();
+      /*
+       * WO DER ABHOLER HAELT, HAENGT AN DER BESTELLUNG (E-056).
+       *
+       * Stahlschrott und Mischschrott haben kein Lagersilo — sie werden an
+       * der Halde verladen, also kommt der Wagen zum Bagger. Alles mit
+       * Lagersilo faehrt an den Verladeplatz vor dem Schenkel dieses Silos.
+       * Die Rechnung steht in `routes.ts`, damit sie kopflos zu pruefen ist.
+       */
+      neueAbholstelle(this.bestellung);
       this.meineAnfahrt = pickupApproach();
       this.meinRueckweg = pickupInRev();
       this.meineAusfahrt = pickupOut();
@@ -1444,23 +1465,12 @@ class DeliveryVehicle {
   }
 
   private placeAt(route: Array<[number, number]>, s: number, reverse = false): void {
-    // Punkt + Richtung entlang der Polylinie bei Bogenlänge s
-    let rest = s;
-    for (let i = 0; i < route.length - 1; i++) {
-      const [ax, az] = route[i];
-      const [bx, bz] = route[i + 1];
-      const segLen = Math.hypot(bx - ax, bz - az);
-      if (rest <= segLen || i === route.length - 2) {
-        const t = Math.min(rest / segLen, 1);
-        const x = ax + (bx - ax) * t;
-        const z = az + (bz - az) * t;
-        this.group.position.set(x, 0, z);
-        // Kabine (+Z) zeigt in Fahrtrichtung — rückwärts: Heck voran
-        this.group.rotation.y = Math.atan2(bx - ax, bz - az) + (reverse ? Math.PI : 0);
-        return;
-      }
-      rest -= segLen;
-    }
+    // Punkt + Richtung entlang der Polylinie bei Bogenlänge s. Gerechnet in
+    // `umriss.ts`, damit der Waechter dieselbe Bahn abfaehrt wie der Wagen.
+    const p = poseAuf(route, s, reverse);
+    this.group.position.set(p.x, 0, p.z);
+    // Kabine (+Z) zeigt in Fahrtrichtung — rückwärts: Heck voran
+    this.group.rotation.y = p.rot;
   }
 
   private routeLength(route: Array<[number, number]>): number {
@@ -1475,22 +1485,54 @@ class DeliveryVehicle {
    * Steht der Bagger (oder etwas anderes Blockierendes) auf dem nächsten
    * Streckenabschnitt? Dann hält der Fahrer an und hupt — er fährt nie hindurch.
    */
+  /** Rechenhilfe fuer die Bauwerkspruefung — kein neues Feld je Bild. */
+  private umrissCache: Box[] = [];
+
   /**
    * Steht ein festes Bauwerk im Weg? Das gilt immer — anders als loser Schrott
    * laesst es sich nicht wegraeumen, und hindurchfahren darf niemand.
+   *
+   * SEIT E-054 MIT DEM ECHTEN UMRISS. Vorher tastete diese Stelle mit einem
+   * PUNKT und 1,40 m Radius auf der Mittellinie ab, an vier Stellen zwischen
+   * 1,2 und 4,0 m VORAUS. Zwei Loecher steckten darin, und beide passen auf
+   * „es klemmt beim Zuruecksetzen" (Befund E-051):
+   *
+   *  1. Der Korridor war schmaler als der Wagen (1,40 gegen 1,55 m
+   *     Halbbreite) — die aeusseren 15 cm jeder Flanke wurden nie geprueft,
+   *     die Ecken eines schraeg stehenden Wagens deutlich mehr.
+   *  2. Beim Rueckwaertsfahren fuehrt das HECK, 3,14 m hinter dem Ursprung.
+   *     Abgetastet wurde aber die Lage des Ursprungs — das Teil, das zuerst
+   *     irgendwo hineinfaehrt, kam im Korridor gar nicht vor. Und die eigene
+   *     Standflaeche schon gar nicht: Die Abtastung begann 1,20 m davor.
+   *
+   * Jetzt sind es Rechtecke: die AKTUELLE Standflaeche (samt Anhaenger, mit
+   * seinem wirklichen Knickwinkel) und drei Lagen voraus bis `aheadS`. Ein
+   * Rechteck ist 7,4 bis 8,0 m lang, die Lagen liegen 1,3 m auseinander —
+   * dazwischen bleibt keine Luecke.
+   *
+   * DIE FLUCHTREGEL. Eine Wand ist nur dann eine Wand, wenn man in sie
+   * hineinfaehrt: Blockiert wird nur, wenn die Lage VORAUS tiefer im Bauwerk
+   * steckt als die jetzige. Ohne diese Regel stuende ein Wagen, dem jemand
+   * einen Muellcontainer an die Flanke stellt, fuer immer — feste Bauten
+   * kennen keine Aufgeben-Regel, und der Platz waere zu.
    */
   private isBlockedByBuilding(
     route: Array<[number, number]>,
     aheadS: number,
     reverse: boolean
   ): boolean {
-    const ax = this.group.position.x;
-    const az = this.group.position.z;
-    const probe = this.probePoint(route, aheadS, reverse);
-    for (let t = 0.3; t <= 1.001; t += 0.235) {
-      if (hitsObstacle(ax + (probe.x - ax) * t, az + (probe.z - az) * t, 1.4)) return true;
+    const hind = alleHindernisse();
+    this.umrissCache.length = 0;
+    this.boxen(this.umrissCache);
+    const tiefeJetzt = tiefsteDurchdringung(this.umrissCache, hind);
+    this.umrissCache.length = 0;
+    const von = this.routeS;
+    for (let i = 1; i <= 3; i++) {
+      const s = von + ((aheadS - von) * i) / 3;
+      this.umrissCache.push(fahrzeugUmriss(poseAuf(route, s, reverse), this.bedLen));
     }
-    return false;
+    const tiefeVoraus = tiefsteDurchdringung(this.umrissCache, hind);
+    return tiefeVoraus > UMRISS_TOLERANZ && tiefeVoraus > tiefeJetzt;
   }
 
   private isBlocked(route: Array<[number, number]>, aheadS: number, reverse: boolean): boolean {
@@ -1650,6 +1692,9 @@ class DeliveryVehicle {
         if (!this.isPickup) this.releaseCargo();
         if (this.phaseT > 1.2) {
           this.phase = this.isPickup ? "waitLoad" : this.kind === "kipper" ? "tipping" : "waitUnload";
+          // Der Abholer funkt, sobald er steht — hier und nirgends sonst
+          // (E-056). Einmal je Fuhre, danach ist der Kanal wieder still.
+          if (this.isPickup) this.onAngekommen?.();
           this.phaseT = 0;
           this.routeS = 0;
         }
@@ -1960,6 +2005,14 @@ export class VehicleManager {
   onWeighOut: ((netKg: number) => void) | null = null;
   /** Abhol-LKW fährt los → Containerinhalt abrechnen */
   onPickupDepart: ((truck: DeliveryVehicle) => void) | null = null;
+  /**
+   * Der Abholer steht und funkt durch, wo (E-056).
+   *
+   * Eine Zeile, einmal je Fuhre, zum Ueberhoeren gedacht. Sie geht denselben
+   * Weg wie die Begruessung eines Haendlers (`onCustomerArrived`): Das
+   * Fahrzeugmodul sagt, WER was sagt — wo es steht, entscheidet das HUD.
+   */
+  onPickupFunk: ((wer: string, spruch: string) => void) | null = null;
 
   /**
    * Zugang zum Platzinventar (Müllcontainer). Bleibt er null, verhält sich
@@ -2026,6 +2079,22 @@ export class VehicleManager {
     );
     this.active.itemQuelle = this.items;
     this.active.platzinventar = this.platzinventar;
+    // Die Bestellung reist mit dem Wagen mit — daran haengt sein Halteplatz.
+    this.active.bestellung = k === "abholer" ? this.pickupOrder : null;
+    /*
+     * Und daran haengt auch, was er funkt, wenn er steht (E-056). Der Ort
+     * kommt aus dem Schild des Behaelters, an dem er haelt — dieselbe Quelle,
+     * aus der auch der Halteplatz gerechnet wird. Zwei Listen, eine fuer die
+     * Fahrt und eine fuer den Text, wuerden beim naechsten Umzug der Reihe
+     * auseinanderlaufen.
+     */
+    if (k === "abholer") {
+      const wagen = this.active;
+      wagen.onAngekommen = () => {
+        const ziel = abholPlatzFuer(wagen.bestellung).ziel;
+        this.onPickupFunk?.(ABHOLER_FUNKNAME, abholerFunk(ziel?.label ?? null));
+      };
+    }
     if (c) this.onCustomerArrived?.(c);
     // Händler bleiben gern noch auf einen Kaffee; Gewerbe hat es eilig.
     // Nur freie Plätze vergeben, sonst stünde einer im anderen.
@@ -2050,6 +2119,24 @@ export class VehicleManager {
    * bekommt den vollen Preis.
    */
   pickupOrder: string | null = null;
+
+  /**
+   * Wo ein Abholer fuer diese Bestellung halten wuerde.
+   *
+   * Fuers HUD: Seit E-056 steht er nicht mehr immer an derselben Stelle, und
+   * „wo ist er?" ist damit eine echte Frage. Gerechnet wird sie hier einmal,
+   * damit Anzeige und Fahrt nicht zweierlei sagen.
+   */
+  abholPlatz(order: string | null = this.pickupOrder): AbholPlatz {
+    return abholPlatzFuer(order);
+  }
+
+  /** Der Platz, an dem der Abholer gerade wirklich steht bzw. hinfaehrt. */
+  get aktuellerAbholPlatz(): AbholPlatz | null {
+    const a = this.active;
+    if (!a || a.kind !== "abholer") return null;
+    return abholPlatzFuer(a.bestellung);
+  }
 
   /**
    * Eine bestellte Abholung, die noch nicht fahren konnte.

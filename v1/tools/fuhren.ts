@@ -55,6 +55,11 @@ function fuhre(
   sortenrein: string | null,
   mitBagger: boolean
 ): { ok: boolean; dauer: number; letztePhase: string; ort: string } {
+  /*
+   * Beim Abholer ist `sortenrein` die BESTELLUNG und nicht die Ladung — seit
+   * E-056 haengt sein Halteplatz daran. Er kommt leer; was er mitnimmt,
+   * bestimmt der Spieler.
+   */
   const scene = new THREE.Scene();
   const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
   const boden = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
@@ -76,6 +81,7 @@ function fuhre(
     m.getExcavatorPos = () => new THREE.Vector3(BAGGER_STAND.x, 0, BAGGER_STAND.z);
   }
   setBaggerOrt(() => BAGGER_STAND);
+  if (kind === "abholer") m.pickupOrder = sortenrein;
   m.spawnNow(kind, kunde(sortenrein, kind));
   const v = (m as unknown as { active: { phase: string; group: THREE.Group } | null }).active;
   const dt = 1 / 60;
@@ -131,7 +137,17 @@ async function main(): Promise<void> {
     ["Pritsche mit Kran", "pritsche", null, true],
     ["Wrackanlieferung", "wrack", null, true],
     ["Privat-PKW", "pkw", null, true],
-    ["Abholer am Verladeplatz", "abholer", null, true],
+    /*
+     * JEDER HALTEPLATZ DES ABHOLERS (E-056) — sie sind neu, und ein
+     * Halteplatz, den niemand anfaehrt, ist eine Vermutung.
+     */
+    ["Abholer gemischt (Bagger)", "abholer", null, true],
+    ["Abholer Stahlschrott (Bagger)", "abholer", "steel", true],
+    ["Abholer Kupfer (West-Silos)", "abholer", "copper", true],
+    ["Abholer Kabel (West-Silos)", "abholer", "cable", true],
+    ["Abholer Alu (West-Silos)", "abholer", "alu", true],
+    ["Abholer Edelstahl (Sued-Silos)", "abholer", "va", true],
+    ["Abholer Batterien (Sued-Silos)", "abholer", "battery", true],
   ];
   /*
    * Wer auf den Spieler wartet, steckt nicht fest. Pritsche, Wrackwagen und

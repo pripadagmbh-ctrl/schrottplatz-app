@@ -20,6 +20,8 @@ import { VehicleManager } from "../src/delivery/vehicles";
 import { ItemManager } from "../src/world/scrapItems";
 import { CompositeManager } from "../src/dismantle/composites";
 import { EventBus } from "../src/core/events";
+import { verladeHaltFuer } from "../src/delivery/routes";
+import { CONFIGS } from "../src/world/containers";
 
 beforeAll(async () => {
   await initPhysics();
@@ -83,6 +85,36 @@ describe("Vorrang der Abholung", () => {
     m.raeumePlatz();
     m.update(0.016);
     expect(m.activeKind).toBe("abholer");
+  });
+
+  it("faehrt an den Platz der Bestellung und funkt von dort durch", () => {
+    /*
+     * DER GANZE WEG, NICHT NUR DIE RECHNUNG (E-056).
+     *
+     * `test/abholplatz.test.ts` prueft kopflos, WO der Halteplatz liegt.
+     * Hier faehrt ein Abholer wirklich hin: Er wird fuer Aluminium bestellt,
+     * und am Ende muss er vor dem Westschenkel der Silo-Reihe stehen und
+     * gemeldet haben, wo er ist.
+     *
+     * Ohne diesen Fall waere die Verdrahtung ungeprueft — der Halteplatz
+     * koennte richtig gerechnet und trotzdem nie benutzt werden.
+     */
+    const m = bauePlatz();
+    let gefunkt: string | null = null;
+    m.onPickupFunk = (_wer, spruch) => {
+      gefunkt = spruch;
+    };
+    m.requestPickup("alu");
+    expect(m.activeKind).toBe("abholer");
+    // Fuenf Minuten Spielzeit genuegen bei weitem; er braucht rund 45 s.
+    for (let i = 0; i < 60 * 300 && gefunkt === null; i++) m.update(1 / 60);
+    expect(gefunkt, "der Abholer hat nie durchgefunkt").not.toBeNull();
+    expect(gefunkt!, `„${gefunkt}"`).toContain("ALU-LAGER");
+    const halt = verladeHaltFuer(CONFIGS.find((c) => c.id === "c_alu_lager")!);
+    const p = m.pickupTruck!.group.position;
+    expect(Math.hypot(p.x - halt[0], p.z - halt[1]), "steht nicht am Verladeplatz").toBeLessThan(
+      0.5
+    );
   });
 
   it("merkt nur eine Abholung vor, nicht jede Bestellung einzeln", () => {

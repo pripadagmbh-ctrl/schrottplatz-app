@@ -1,7 +1,13 @@
 import * as THREE from "three";
 import { GATE_X, WEIGH_X } from "../world/yard";
-import { VERLADE_STAND } from "../world/baggerstand";
-import type { ContainerConfig } from "../world/containers";
+import { BAGGER_STAND, VERLADE_STAND } from "../world/baggerstand";
+import {
+  CONFIGS,
+  bayOeffnung,
+  bayVorderkante,
+  lagerMuldeFuer,
+  type ContainerConfig,
+} from "../world/containers";
 
 /**
  * Halteplatz auf der Brueckenwaage.
@@ -240,56 +246,239 @@ export const PICKUP_IN_FWD: Array<[number, number]> = [
  * Stands (−25,5). Der Abholer gehoert folglich nach Osten, auf −18,0. Mit dem
  * alten `− 7,5` waere er auf −33,0 gelandet, also mitten in der Silo-Reihe.
  */
-export const VERLADE_SPUR_X = VERLADE_STAND.x + 7.5;
+export const VERLADE_ABSTAND = 7.5;
+export const VERLADE_SPUR_X = VERLADE_STAND.x + VERLADE_ABSTAND;
 /**
- * Nordende der Verladespur — von hier setzt der Abholer nach SUEDEN zurueck.
+ * Wie weit der Abholer vor seinem Halt in der Verladespur anhaelt, bevor er
+ * zurueckstoesst. Dieselben 8,0 m wie seit E-010; ein Fahrer setzt nicht aus
+ * der Kurve heraus zurueck.
+ */
+export const VERLADE_RANGIER_M = 8.0;
+
+/* ------------------------------ DER ABHOLER HAELT DORT, WO DAS ZEUG IST -- */
+
+/*
+ * ZWEIERLEI ABHOLUNG (E-056, 15.09.2026).
  *
- * Der Verladeplatz liegt seit E-028 in der leeren Suedwesthaelfte (−25,5 |
- * −8,0), die Spur auf x −18,0. Der Wagen kommt von der Waage herunter, haelt
- * auf z 0,0 und setzt 8,0 m nach Sueden zurueck — dieselbe Strecke wie vorher,
- * nur andersherum. Noerdlich davon ist der Platz frei: Janines Kaffeewagen
- * steht seit heute an der Nordmauer, die Silo-Gasse liegt zehn Meter weiter
- * westlich.
+ * Ansage Patrick am Geraet: „Der Abholer ist in der falschen Spur. Wenn ich
+ * Stahlschrott oder Mischschrott beauftrage, soll er zu mir zum Baggerstand
+ * kommen. Und wenn ich ein sortenreines Metall zur Abholung ausrufe, soll er
+ * genau dahin fahren, wo die entsprechende Mulde ist."
+ *
+ * Die Regel dahinter ist keine Liste von Fraktionen, sondern EINE Frage, die
+ * der Platz selbst beantwortet: Gibt es fuer diese Fraktion ein LAGERSILO?
+ *
+ *   Lagersilo vorhanden  →  Verladeplatz vor dem Schenkel dieses Silos.
+ *                           Alu, Zink, Kupfer, Messing, Kabel, VA,
+ *                           Batterien, Abfall.
+ *   kein Lagersilo       →  ABLADEPLATZ beim Bagger (6,3 | −23,0).
+ *                           Stahlschrott und Mischschrott — sie haben mit
+ *                           E-010 ausdruecklich keins („Stahl entfaellt —
+ *                           Stahlschrott wird direkt an der Halde
+ *                           verladen"), und dasselbe gilt fuer eine
+ *                           Bestellung ohne Fraktion („Gemischt").
+ *
+ * Damit ist die Regel datengetrieben: Wer eines Tages ein Stahlsilo baut,
+ * bekommt den Abholer dorthin, ohne dass hier eine Zeile geaendert wird.
+ *
+ * WARUM DER ABLADEPLATZ UND KEIN EIGENER PLATZ. Nachgerechnet mit dem echten
+ * Umriss: Bei Halt (6,3 | −23,0) liegt die Ladeflaeche auf x 4,95 … 7,65 und
+ * z −25,70 … −20,30, ihre vier Ecken sind vom Sitz (−0,5 | −22,5)
+ * 5,88 · 6,32 · 8,44 · 8,76 m entfernt — alle vier im Schwenkband 5,80 bis
+ * 9,20 m (dieselbe Rechnung wie E-022/E-029). Ein zweiter Platz mit
+ * derselben Eigenschaft waere eine zweite Wahrheit; und die Halden liegen
+ * ohnehin genau dort: Stahlschrott 6,96 m, Mischschrott 7,91 m vom Sitz.
  */
-const ABHOL_RANGIER: [number, number] = [VERLADE_SPUR_X, 0.0];
 
-let abholStelle: [number, number] = [VERLADE_SPUR_X, VERLADE_STAND.z];
+/** Wohin diese Fuhre gehoert: das Lagersilo der bestellten Fraktion — oder keins. */
+export function abholZielSilo(order: string | null): ContainerConfig | null {
+  return lagerMuldeFuer(order);
+}
 
 /**
- * Halteposition des Abholers. Sie steht fest — der Verladeplatz ist ein Ort,
- * kein Abstand zum Bagger.
+ * Aus welcher Richtung der Abholer in die Verladespur eines Schenkels
+ * einfaehrt, als Einheitsvektor entlang der Spur.
+ *
+ * Gerechnet, nicht gegriffen — es gibt je Schenkel nur zwei Moeglichkeiten,
+ * und eine davon endet in einem Bauwerk:
+ *
+ *   WESTschenkel  Spur laeuft in z. Von Norden: Rangierpunkt (−18,0 | 0,0),
+ *                 freier Platz zwischen Waage und Silo-Gasse. Von Sueden
+ *                 laege er auf (−18,0 | −16,0) — dorthin fuehrt kein Weg,
+ *                 ohne die ganze Suedwesthaelfte zu queren.
+ *   SUEDschenkel  Spur laeuft in x. Von Osten: Rangierpunkt (−17,4 | −7,0),
+ *                 freies Feld. Von Westen laege er auf (−33,4 | −7,0) und
+ *                 damit MITTEN IM KABEL-LAGER (x −39,0 … −33,0, z −10,1 …
+ *                 −5,9).
  */
-export function neueAbholstelle(): [number, number] {
-  abholStelle = [VERLADE_SPUR_X, VERLADE_STAND.z];
-  return abholStelle;
+const SPUR_ANFAHRT: Record<string, [number, number]> = {
+  east: [0, 1],
+  north: [1, 0],
+};
+
+/**
+ * Das Leitsilo eines Schenkels: das MITTLERE.
+ *
+ * Von ihm aus greift der Arm ueber seine beiden Nachbarn hinweg — bei 7,5 m
+ * Seitenabstand reicht er in der Laengsrichtung noch
+ * sqrt(9,20² − 7,50²) = 5,33 m weit, der Achsabstand betraegt 4,60 m. Vom
+ * Rand des Schenkels aus waeren es hoechstens zwei. Deshalb steht der
+ * Verladeplatz vor dem mittleren Silo und nicht vor dem bestellten: Ein
+ * LKW, der vor dem Kupfersilo haelt, ist vom Stand aus mit seiner fernen
+ * Ladeflaechenecke 11,5 m weg — der Spieler muesste umsetzen.
+ */
+function leitSilo(c: ContainerConfig): ContainerConfig {
+  const o = bayOeffnung(c);
+  // Die Reihe steht quer zur Oeffnungsrichtung.
+  const laengs = (s: ContainerConfig): number => (o.x !== 0 ? s.z : s.x);
+  const schenkel = CONFIGS.filter((s) => s.lager === true && s.facing === c.facing).sort(
+    (a, b) => laengs(a) - laengs(b)
+  );
+  return schenkel[Math.floor((schenkel.length - 1) / 2)] ?? c;
 }
 
-/** Wo gerade verladen wird — fuer die Spurueberwachung. */
-export function abholstelle(): [number, number] {
-  return abholStelle;
+/** Wo der Bagger steht, wenn er aus diesem Schenkel in den Container laedt. */
+export function verladeStandFuer(c: ContainerConfig): { x: number; z: number } {
+  const leit = leitSilo(c);
+  const o = bayOeffnung(leit);
+  const k = bayVorderkante(leit);
+  return { x: k.x + o.x * VERLADE_ABSTAND, z: k.z + o.z * VERLADE_ABSTAND };
 }
 
-export function pickupApproach(): Array<[number, number]> {
+/** Wo der Abholer dazu haelt — noch einmal dieselben 7,5 m weiter. */
+export function verladeHaltFuer(c: ContainerConfig): [number, number] {
+  const leit = leitSilo(c);
+  const o = bayOeffnung(leit);
+  const k = bayVorderkante(leit);
+  return [k.x + o.x * VERLADE_ABSTAND * 2, k.z + o.z * VERLADE_ABSTAND * 2];
+}
+
+/** Von dort setzt er zurueck. */
+function verladeRangierFuer(c: ContainerConfig): [number, number] {
+  const halt = verladeHaltFuer(c);
+  const r = SPUR_ANFAHRT[c.facing ?? "west"] ?? [0, 1];
+  return [halt[0] + r[0] * VERLADE_RANGIER_M, halt[1] + r[1] * VERLADE_RANGIER_M];
+}
+
+/**
+ * Ein Halteplatz des Abholers samt seinen drei Strecken.
+ *
+ * Er wird als Ganzes festgelegt, wenn der Wagen von der Waage losfaehrt, und
+ * aendert sich danach nicht mehr: Ein Ziel, das unter dem rueckwaerts
+ * setzenden Fahrer wegrutscht, ist keine Strecke.
+ */
+export interface AbholPlatz {
+  /** Die bestellte Fraktion (null = gemischt). */
+  order: string | null;
+  /** Das Lagersilo dazu — null heisst: an der Halde beim Bagger. */
+  ziel: ContainerConfig | null;
+  /** Wie der Platz im HUD heisst. */
+  name: string;
+  /** Halteposition des Wagens (Wagenmitte). */
+  halt: [number, number];
+  /** Wo der Bagger dazu steht. */
+  stand: { x: number; z: number };
+  anfahrt: Array<[number, number]>;
+  rueckweg: Array<[number, number]>;
+  ausfahrt: Array<[number, number]>;
+}
+
+/** Der Halteplatz zu einer Bestellung. Reine Rechnung, ohne Nebenwirkung. */
+export function abholPlatzFuer(order: string | null): AbholPlatz {
+  const ziel = abholZielSilo(order);
+  if (!ziel) {
+    /*
+     * Beim Bagger. Er benutzt die Strecken der Anlieferer unveraendert —
+     * dieselbe Zufahrt, dieselbe Rangierstrecke, dieselbe Ausfahrt. Das ist
+     * moeglich, weil auf dem Platz immer nur EIN Fahrzeug unterwegs ist
+     * (einspurig seit E-029, `test/einspurig.test.ts`).
+     */
+    return {
+      order,
+      ziel: null,
+      name: "Abladeplatz beim Bagger",
+      halt: [ABLADE_SPUR_X, ABLADE_HALT_Z],
+      stand: { x: BAGGER_STAND.x, z: BAGGER_STAND.z },
+      anfahrt: routeApproach(),
+      rueckweg: [ABLADE_RANGIER, [ABLADE_SPUR_X, ABLADE_HALT_Z]],
+      ausfahrt: routeOut(),
+    };
+  }
+  const halt = verladeHaltFuer(ziel);
+  const rangier = verladeRangierFuer(ziel);
   /*
    * Von der Waage in die leere Suedwesthaelfte. Der Knick bei (−22 | 9) haelt
    * die Gerade oestlich der Hallenfront (x −30,6) und westlich der
    * Silo-Gasse; dazwischen steht auf dieser Haelfte des Platzes nichts.
    */
-  return [WAAGE_HALT, VERTEILER, [-22, 9], ABHOL_RANGIER];
+  const kopf: Array<[number, number]> = [WAAGE_HALT, VERTEILER, [-22, 9], rangier];
+  return {
+    order,
+    ziel,
+    name: `Verladeplatz ${ziel.label}`,
+    halt,
+    stand: verladeStandFuer(ziel),
+    anfahrt: kopf,
+    rueckweg: [rangier, halt],
+    ausfahrt: [
+      halt,
+      rangier,
+      [-22, 9],
+      VERTEILER,
+      WAAGE_HALT,
+      [GATE_X, 28],
+      [GATE_X, 40],
+    ],
+  };
+}
+
+/**
+ * Alle Halteplaetze, die es ueberhaupt geben kann — fuer die Waechter.
+ *
+ * Erst die beiden Faelle ohne Silo (keine Bestellung, Stahlschrott), dann
+ * einer je Lagersilo. Wer ein Silo dazustellt, bekommt seine Strecken
+ * automatisch mitgeprueft; eine abgeschriebene Liste im Test wuerde das nicht.
+ */
+export function alleAbholPlaetze(): AbholPlatz[] {
+  const out = [abholPlatzFuer(null), abholPlatzFuer("steel"), abholPlatzFuer("mixed")];
+  for (const c of CONFIGS.filter((s) => s.lager === true)) {
+    out.push(abholPlatzFuer(c.fractionId));
+  }
+  return out;
+}
+
+let abholPlatz: AbholPlatz | null = null;
+
+/** Der Platz, an dem gerade verladen wird. */
+export function aktuellerAbholPlatz(): AbholPlatz {
+  return (abholPlatz ??= abholPlatzFuer(null));
+}
+
+/**
+ * Halteplatz des Abholers zu dieser Bestellung festlegen.
+ *
+ * Bis zum 15.09.2026 stand hier EIN Ort fuer alles. Seit E-056 haengt er an
+ * der Bestellung — und damit auch die drei Strecken, die `pickupApproach`,
+ * `pickupInRev` und `pickupOut` liefern.
+ */
+export function neueAbholstelle(order: string | null = null): [number, number] {
+  abholPlatz = abholPlatzFuer(order);
+  return abholPlatz.halt;
+}
+
+/** Wo gerade verladen wird — fuer die Spurueberwachung. */
+export function abholstelle(): [number, number] {
+  return aktuellerAbholPlatz().halt;
+}
+
+export function pickupApproach(): Array<[number, number]> {
+  return aktuellerAbholPlatz().anfahrt;
 }
 export function pickupInRev(): Array<[number, number]> {
-  return [ABHOL_RANGIER, abholStelle];
+  return aktuellerAbholPlatz().rueckweg;
 }
 export function pickupOut(): Array<[number, number]> {
-  return [
-    abholStelle,
-    ABHOL_RANGIER,
-    [-22, 9],
-    VERTEILER,
-    WAAGE_HALT,
-    [GATE_X, 28],
-    [GATE_X, 40],
-  ];
+  return aktuellerAbholPlatz().ausfahrt;
 }
 
 /* ------------------------------------------- KIPPER: gemischte Ladung ---- */
@@ -531,6 +720,27 @@ export const HONK_AFTER_S = 10;
 /** Halbe Innenbreite der Ladefläche (SW) — größer als das breiteste Großteil */
 export const BED_HALF_W = 1.35;
 /**
+ * Je Silo-Schenkel eine Arbeitszone, mittig zwischen Bagger und Abholer.
+ *
+ * 3,5 m vom Stand in Richtung der Muldenoeffnung, Radius 11 m — dieselben
+ * Zahlen, mit denen der Westschenkel seit E-028 laeuft, nur nicht mehr
+ * abgeschrieben.
+ */
+function verladeZonen(): Array<[number, number, number]> {
+  const gesehen = new Set<string>();
+  const out: Array<[number, number, number]> = [];
+  for (const c of CONFIGS.filter((s) => s.lager === true)) {
+    const seite = c.facing ?? "west";
+    if (gesehen.has(seite)) continue;
+    gesehen.add(seite);
+    const stand = verladeStandFuer(c);
+    const o = bayOeffnung(c);
+    out.push([stand.x + o.x * 3.5, stand.z + o.z * 3.5, 11]);
+  }
+  return out;
+}
+
+/**
  * Arbeitszonen, in denen liegender Schrott NICHT als Blockade gilt: Genau
  * dorthin wird abgekippt bzw. verladen — dort muss das Fahrzeug hin.
  * [x, z, radius]
@@ -551,12 +761,16 @@ export const WORK_ZONES: Array<[number, number, number]> = [
    */
   [ABLADE_SPUR_X, ABLADE_HALT_Z, 9],
   /*
-   * Der Verladeplatz vor der Silo-Reihe: Dort steht der Abholer, und dort
-   * liegt zwangslaeufig Material, waehrend der Bagger ihn belaedt. Der
-   * Mittelpunkt liegt zwischen Bagger und LKW-Spur — seit E-028 also OESTLICH
-   * des Stands, weil die Silos nach Westen gewandert sind.
+   * Die Verladeplaetze vor den Silo-Schenkeln: Dort steht der Abholer, und
+   * dort liegt zwangslaeufig Material, waehrend der Bagger ihn belaedt. Der
+   * Mittelpunkt liegt jeweils zwischen Bagger und LKW-Spur.
+   *
+   * Seit E-056 sind es ZWEI — einer je Schenkel. Sie werden aus derselben
+   * Rechnung erzeugt wie die Halteplaetze selbst; eine abgeschriebene Zone
+   * bliebe beim naechsten Umzug der Reihe an der alten Stelle liegen, und
+   * dann haelt der Abholer vor seinem eigenen Verladeplatz an und hupt.
    */
-  [VERLADE_STAND.x + 3.5, VERLADE_STAND.z, 11],
+  ...verladeZonen(),
   /*
    * Die L-foermige Silo-Reihe samt Gasse. Dorthin kippt der sortenreine
    * Kipper; was dort liegt, ist Ziel und nicht Hindernis. Ein Kreis je
