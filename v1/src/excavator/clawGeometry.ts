@@ -272,14 +272,23 @@ export function naechsteSpreizung(
   ziel: number,
   schritt: number,
   blockiert: boolean,
-  reserve: number = NACHDRUECK_RESERVE
+  reserve: number = NACHDRUECK_RESERVE,
+  /**
+   * Womit die Reserve wieder aufgefuellt wird, sobald die Schale frei ist.
+   *
+   * Bis E-057 stand hier `NACHDRUECK_RESERVE` fest im Rumpf. Das war richtig,
+   * solange es einen Greifer gab; der Fuenfschalengreifer hat einen 67 %
+   * laengeren Schliessweg und damit eine andere Reserve (0,635 statt 0,38 rad).
+   * Vorgabe bleibt die der Sichelkralle — fuer sie aendert sich nichts.
+   */
+  vollerVorrat: number = NACHDRUECK_RESERVE
 ): { winkel: number; reserve: number } {
   // Öffnen: immer erlaubt, und der Druck ist damit weg
   if (ziel >= ist) {
-    return { winkel: Math.min(ziel, ist + schritt), reserve: NACHDRUECK_RESERVE };
+    return { winkel: Math.min(ziel, ist + schritt), reserve: vollerVorrat };
   }
   if (!blockiert) {
-    return { winkel: Math.max(ziel, ist - schritt), reserve: NACHDRUECK_RESERVE };
+    return { winkel: Math.max(ziel, ist - schritt), reserve: vollerVorrat };
   }
   if (reserve <= 0) return { winkel: ist, reserve: 0 };
   const drueck = Math.min(schritt * NACHDRUECK_TEMPO, reserve, ist - ziel);
