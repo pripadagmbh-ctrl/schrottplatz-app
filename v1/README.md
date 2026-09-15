@@ -97,50 +97,62 @@ und nirgendwo sonst.
 
 ```
                           EINFAHRT (x −22, Nordwand)
-   BÜRO   WAAGE      HALLE 1   HALLE 2   HALLE 3        (Nordwand, z 22)
+   BÜRO   WAAGE     [P] [P]      JANINE          ABFALL      (z 23,8)
  ┌──────────────────────────────────────────────────────┐
- │ E-MOTOREN                                            │
- │ BATTERIEN                                            │
- │ ALU · KABEL · KUPFER                                 │
- │ VA · HOLZ · BAUMISCH      KUPFER+MSG                 │
- │ KUNSTSTOFF                    KABEL         REIFEN   │
- │   Silo-Reihe    [B2]        ALU+ZINK   [B]   MÜLL    │
- │   x −36      Verladen                        PRESSE  │
+ │ HALLE 1  ▶                                 BATTERIEN │
+ │ HALLE 2  ▶                                 VA-LAGER  │
+ │ HALLE 3  ▶      [P]     [B2]               ALU       │
+ │                      Verladen              KUPFER    │
+ │                     (−4 | 5,4)             KABEL     │  Silo-Reihe
+ │          KUPFER+MSG                                  │  x +6,5
+ │          KABEL         MÜLL     ▏Kipper              │
+ │          ALU+ZINK   [B]         ▏          ABLADE-   │
+ │   PRESSE                                     PLATZ   │
  └──────────────────────┬──────────────────┬────────────┘
                         │  STAHL │ MISCH   │   Ausbuchtung
-                        └────────┴─────────┘   (z −29 … −38,5)
+                        └────────┴─────────┘   (z −29 … −35,5)
 ```
 
-**Acht Ziele im Schwenkbereich**, alle gemessen von `(−0,5 | −22,5)` — bei Halden
-zur vorderen Kante, bei Mulden und Containern zur Mitte:
+Stand 15.09.2026. `[B]` = Baggerstand, `[B2]` = Verladeplatz, `[P]` = Warteplatz,
+`▶` = Hallentor.
+
+**Vier Pflichtziele im Schwenkbereich** plus Abladeplatz, alle gemessen von
+`(−0,5 | −22,5)` — bei Halden zur vorderen Kante, bei Mulden zur Mitte:
 
 | Ziel | Abstand |
 |---|---|
-| Halde Mischschrott | 8,07 m |
-| Halde Stahlschrott | 7,15 m |
-| Presse | 7,40 m |
-| Müllcontainer | 8,81 m |
-| Reifencontainer | 6,72 m |
-| Mulde Alu + Zink | 8,55 m |
-| Mulde Kabel | 7,50 m |
-| Mulde Kupfer + Messing | 8,65 m |
+| Halde Mischschrott | 7,91 m |
+| Halde Stahlschrott | 6,96 m |
+| Presse | 8,28 m |
+| Müllmulde | 8,35 m |
+| Abladeplatz (Mitte der Ladefläche) | 6,82 m |
+| Mulde Alu + Zink | 7,28 m |
+| Mulde Kabel | 9,17 m |
+| Mulde Kupfer + Messing | 12,26 m — **nicht erreichbar**, offen seit E-024 |
 
 **Die Ausbuchtung** hinter dem Bagger wölbt sich nach Süden aus der Platzgrenze
 heraus, rundum mit 4,8 m hoher Wand. Darin die beiden Halden, getrennt durch eine
-Pyramide aus Betonlego — Lagen 1·2·4·4·2·1, also 0,6 bis 2,4 m hoch. Niedrig
-genug, dass der Zugriff von einer Halde zur anderen durchläuft.
+Pyramide aus Betonlego — 0,6 bis 2,4 m hoch. Niedrig genug, dass der Zugriff von
+einer Halde zur anderen durchläuft.
 
-**Die Silo-Reihe** an der Westwand, neun Stück: E-Motoren, Batterien, Alu, Kabel,
-Kupfer, VA, Holz, Baumisch, Kunststoff. Stahl entfällt — Stahlschrott wird direkt
-an der Halde verladen. Das E-Motoren-Silo steht als Hülle, die Fraktion fehlt noch.
+**Die Silo-Reihe** steht seit dem 15.09.2026 an der OSTwand (x +6,5), sechs
+Stück von Norden nach Süden: Abfall, Batterien, VA, Alu+Zink, Kupfer+Messing,
+Kabel. Stahl und Mischschrott haben bewusst kein Silo — sie werden direkt an der
+Halde verladen. Holz, Kunststoff und Baumisch sind zu einem ABFALL-Silo
+zusammengelegt: Alle vier Abfallsätze sind negativ (−0,02 bis −0,06 €/kg), sie
+werden entsorgt und nie bestellt. Das E-Motoren-Silo ist entfallen — es war eine
+Hülle ohne Fraktion.
 
-**Der Verladeplatz** liegt zwischen Silo-Reihe und LKW-Spur: 7,5 m zur einen,
-7,5 m zur anderen Seite. Der Bagger steht dazwischen und greift aus dem Silo in
-den Container, ohne umzusetzen.
+**Der Verladeplatz** (−4 | 5,4) liegt zwischen Silo-Reihe und LKW-Spur: 7,5 m zur
+einen, 7,5 m zur anderen Seite. Der Bagger steht dazwischen und greift aus dem
+Silo in den Container, ohne umzusetzen.
 
-**Die Hallen** an der Nordwand sind leere Hüllen. Was in ihnen passieren soll —
-Händler fahren selbst hinein, Lambert räumt sie in die Silos — steht in E-011 und
-ist noch nicht gebaut.
+**Die Hallen** stehen südlich ans Bürogebäude gebaut an derselben Wand, Tor nach
+Osten auf den Platz (`TOR_RICHTUNG` in `src/world/office.ts`). Sie sperren nur
+ihre Wände, nicht ihre Grundfläche — ein LKW fährt hinein. Zufahrt ist der freie
+Mittelplatz: von der Waage nach rechts und geradeaus. Was darin passieren soll —
+Händler laden selbst ab, Lambert räumt in die Silos — steht in E-011 und ist noch
+nicht gebaut.
 
 ### Geldkreislauf
 

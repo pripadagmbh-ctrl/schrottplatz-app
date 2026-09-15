@@ -355,12 +355,33 @@ class DeliveryVehicle {
    */
   boxen(out: Box[]): void {
     const p = this.group.position;
+    /*
+     * Die Standflaeche sitzt NICHT auf dem Ursprung, sondern dort, wo der
+     * Wagen wirklich steht (15.09.2026).
+     *
+     * Der Ursprung liegt in der Mitte der Ladeflaeche (`vehicleModel.ts`:
+     * `bedGroup.position.z = −bedLen/2`). Nach hinten reicht der Wagen bis zum
+     * Unterfahrschutz auf lokal −bedLen/2 − 0,14, nach vorn bis zur Kabine auf
+     * rund +bedLen/2 + 1,90. Er ist also 2,04 m laenger als die Ladeflaeche —
+     * aber nicht symmetrisch: 1,76 m davon liegen VORN.
+     *
+     * Bis heute stand hier ein symmetrischer Kasten von ± (bedLen/2 + 1,6) um
+     * den Ursprung. Gemessen war er hinten 1,46 m zu lang und vorn 0,30 m zu
+     * kurz. Genau das hat Patrick am Abladeplatz gesehen: „Die fahren ja durch
+     * die Wand, halb durch die Mulde" — der Wagen stand mit einer Flaeche in
+     * der Muellmulde, in der er gar nicht steht, und liess dafuer seine Kabine
+     * frei.
+     */
+    const vorn = this.bedLen / 2 + 1.9;
+    const hinten = -(this.bedLen / 2 + 0.14);
+    const mitte = (vorn + hinten) / 2;
+    const rot = this.group.rotation.y;
     out.push({
-      x: p.x,
-      z: p.z,
+      x: p.x + Math.sin(rot) * mitte,
+      z: p.z + Math.cos(rot) * mitte,
       hw: 1.55,
-      hd: this.bedLen / 2 + 1.6,
-      rot: this.group.rotation.y,
+      hd: (vorn - hinten) / 2,
+      rot,
     });
     if (this.trailer) {
       const w = this.trailer.getWorldPosition(BOX_TMP);

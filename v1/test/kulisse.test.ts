@@ -149,17 +149,23 @@ const KAM = {
   z: ZIEL.z + Math.cos(Math.PI) * Math.cos(0.42) * 11,
 };
 
-/** Dachhöhe der Hallen an dieser Stelle, −1 = dort steht keine. */
+/**
+ * Dachhöhe der Hallen an dieser Stelle, −1 = dort steht keine.
+ *
+ * Seit dem 15.09.2026 steht die Reihe an der Wand neben dem Buero: Die TIEFE
+ * liegt in x, die BREITE in z, und der First laeuft in x. Der Hoehenverlauf
+ * haengt deshalb am Abstand in z zur Hallenmitte, nicht mehr in x.
+ */
 function hallenHoehe(x: number, z: number): number {
   const TRAUFE = 5.0;
   const FIRST = 6.9;
-  for (const hx of HALLEN_X) {
+  for (const hz of HALLEN_Z) {
     if (
-      z >= HALLEN_Z - HALLE_TIEFE / 2 &&
-      z <= HALLEN_Z + HALLE_TIEFE / 2 &&
-      Math.abs(x - hx) <= HALLE_BREITE / 2
+      x >= HALLEN_X - HALLE_TIEFE / 2 &&
+      x <= HALLEN_X + HALLE_TIEFE / 2 &&
+      Math.abs(z - hz) <= HALLE_BREITE / 2
     ) {
-      return TRAUFE + (FIRST - TRAUFE) * (1 - Math.abs(x - hx) / (HALLE_BREITE / 2));
+      return TRAUFE + (FIRST - TRAUFE) * (1 - Math.abs(z - hz) / (HALLE_BREITE / 2));
     }
   }
   // Bürogebäude (office.ts): x −39,6 … −30,6, z 22,4 … 28,6, First 7,9 m
@@ -246,8 +252,18 @@ describe("Das Firmenschild ist in der Startansicht ganz zu sehen", () => {
     expect(SCHILD_POS.z).toBeGreaterThan(HZ);
   });
 
-  it("die alte Stelle wäre heute verdeckt — sonst prüft der Wächter nichts", () => {
-    const alt = { x: -10, y: 7.5, b: 14, h: 7 };
+  it("hinter der Hallenreihe wäre sie verdeckt — sonst prüft der Wächter nichts", () => {
+    /*
+     * Der Gegentest zum Waechter: Er muss an einer Stelle ANSCHLAGEN, sonst
+     * prueft er nichts.
+     *
+     * Bis zum 15.09.2026 war das die alte Schildstelle (−10 | 7,5): Dort
+     * standen die Sortierhallen davor. Die stehen jetzt an der Wand neben dem
+     * Buero, und das Fenster in der Einfahrtsachse ist entsprechend breiter
+     * geworden — die alte Stelle ist heute frei. Geprueft wird deshalb an der
+     * Stelle, an der heute Bauten stehen: hinter der Hallenreihe.
+     */
+    const alt = { x: HALLEN_X, y: 5.0, b: 14, h: 7 };
     let verdeckteEcken = 0;
     for (let i = 0; i <= 12; i++) {
       for (let j = 0; j <= 6; j++) {

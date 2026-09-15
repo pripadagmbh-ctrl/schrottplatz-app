@@ -14,7 +14,16 @@ import {
   hitsObstacle,
   slideAround,
 } from "../src/world/obstacles";
-import { OFFICE_X, OFFICE_Z, officeFootprints, hallenFootprints } from "../src/world/office";
+import {
+  OFFICE_X,
+  OFFICE_Z,
+  officeFootprints,
+  hallenFootprints,
+  hallenWaende,
+  HALLEN_X,
+  HALLE_TIEFE,
+  TOR_RICHTUNG,
+} from "../src/world/office";
 import { PRESS_CENTER } from "../src/world/press";
 import { BAGGER_STAND } from "../src/world/baggerstand";
 import { WEIGH_X, WEIGH_Z } from "../src/world/yard";
@@ -81,10 +90,15 @@ const SORTIERMULDEN = CONFIGS.filter((c) => c.sortierbox === true);
  */
 const BAGGER_X = BAGGER_STAND.x;
 const BAGGER_Z = BAGGER_STAND.z;
-/** Die Silos an der Ostwand, an denen der Abholer entlangfaehrt. */
-const SILOS = CONFIGS.filter((c) =>
-  ["c_wood", "c_rubble", "c_plastic", "c_va_lager"].includes(c.id)
-);
+/**
+ * Die Silo-Reihe, an der der Abholer entlangfaehrt.
+ *
+ * Aus dem Kennzeichen `lager` gelesen, nicht aus abgeschriebenen IDs: Am
+ * 15.09.2026 sind aus neun Silos sechs geworden (`c_wood` und `c_plastic`
+ * gingen im ABFALL auf), und eine Liste von Hand haette danach drei Behaelter
+ * geprueft, die es nicht mehr gibt.
+ */
+const SILOS = CONFIGS.filter((c) => c.lager === true);
 
 describe("Feste Bauten", () => {
   it("sperrt jedes eingetragene Bauwerk an seinem Platz", () => {
@@ -107,16 +121,35 @@ describe("Feste Bauten", () => {
     // Sie stehen von der ersten Sekunde an da — nicht erst nach einem Kauf.
     expect(hitsObstacle(OFFICE_X, OFFICE_Z, 0)?.label).toBe("Betriebsgebäude");
     /*
-     * Die beiden Werkstatthallen an der Westwand sind am 14.09.2026 zu den
-     * drei Sortierhallen an der Nordwand geworden (E-010); dort, wo sie
-     * standen, liegt jetzt die Silo-Reihe. Geprüft wird weiter dieselbe
-     * Eigenschaft — Hallen sperren von Anfang an —, nur an ihrem neuen Ort
-     * und aus ihrer eigenen Grundrissliste statt aus der des Büros.
+     * Die drei Sortierhallen sind am 15.09.2026 wieder an die Wand neben dem
+     * Buero gezogen; die Silo-Reihe, die dort im Weg lag, steht jetzt an der
+     * anderen Seite.
+     *
+     * Und sie sind nicht mehr massiv: Eine Halle sperrt ihre WAENDE, nicht
+     * ihre Grundflaeche. Als Vollrechteck war sie nicht anfahrbar — jeder LKW
+     * haelt 1,4 m vor einem Hindernis an, und der Weg aus E-011 („Haendler
+     * fahren ueber die Waage in ihre Halle und laden selbst ab") lief ins
+     * Leere. Geprueft wird deshalb beides: Die Waende sperren, das Tor nicht.
      */
     const hallen = hallenFootprints();
     expect(hallen.length, "es fehlen Hallen").toBe(3);
-    for (const [x, z] of hallen) {
-      expect(hitsObstacle(x, z, 0)?.label, `Halle bei (${x}|${z})`).toMatch(/^Halle /);
+    for (const w of hallenWaende()) {
+      /*
+       * Die Nordwand der ersten Halle steht buendig an der Suedwand des
+       * Bueros — dort meldet die Liste den Betriebshof, und das ist richtig:
+       * Gesperrt ist gesperrt, und zwei Steinreihen mit 20 cm Luft dazwischen
+       * waeren ein Baufehler.
+       */
+      expect(hitsObstacle(w.x, w.z, 0)?.label, `Halle ${w.nr} ${w.teil}`).toMatch(
+        /^(Halle |Betriebsgebäude)/
+      );
+    }
+    for (const [, z] of hallen) {
+      // Innenraum frei — dort steht der Haendler mit seinem Wagen
+      expect(hitsObstacle(HALLEN_X, z, 0), `Halleninnenraum bei z=${z}`).toBeNull();
+      // Und das Tor ist offen: einen Meter davor steht nichts
+      const torX = HALLEN_X + TOR_RICHTUNG.x * (HALLE_TIEFE / 2 + 1.0);
+      expect(hitsObstacle(torX, z, 0), `Tor der Halle bei z=${z} zugestellt`).toBeNull();
     }
   });
 
@@ -217,13 +250,27 @@ describe("Feste Bauten", () => {
   });
 
   it("lässt die Silos zum Platz hin offen", () => {
-    // Sie stehen an der Ostwand und oeffnen sich zum Platz. Waere die Oeffnung
-    // zugestellt, kaeme weder Radlader noch Abholer hinein.
+    /*
+     * Sie stehen an der Wand und oeffnen sich zum Platz. Waere die Oeffnung
+     * zugestellt, kaeme weder Radlader noch Abholer hinein.
+     *
+     * Seit dem 15.09.2026 liegt die Reihe an der gegenueberliegenden Wand und
+     * oeffnet sich nach WESTEN (Standardrichtung). Die Seite kommt deshalb aus
+     * `facing`, nicht mehr aus einem festen Vorzeichen — sonst prueft der
+     * Waechter beim naechsten Umzug die geschlossene Seite.
+     */
     for (const c of SILOS) {
       const [w] = c.size;
+      const auf = c.facing === "east" ? 1 : -1;
       expect(hitsObstacle(c.x, c.z, 0), `${c.label}: Innenraum frei`).toBeNull();
-      expect(hitsObstacle(c.x + w / 2 + 0.9, c.z, 0), `${c.label}: Öffnung frei`).toBeNull();
-      expect(hitsObstacle(c.x - w / 2, c.z, 0), `${c.label}: Rückwand sperrt`).not.toBeNull();
+      expect(
+        hitsObstacle(c.x + auf * (w / 2 + 0.9), c.z, 0),
+        `${c.label}: Öffnung frei`
+      ).toBeNull();
+      expect(
+        hitsObstacle(c.x - auf * (w / 2), c.z, 0),
+        `${c.label}: Rückwand sperrt`
+      ).not.toBeNull();
     }
   });
 
@@ -286,11 +333,17 @@ describe("Feste Bauten", () => {
     }
   });
 
-  it("die Westgrenze steht dicht hinter den Silos", () => {
-    // Der Sinn des Verkleinerns: keine Leere mehr zwischen letzter Mulde und
-    // Mauer. Frueher lagen dort ueber 30 m.
-    const hinterste = Math.min(...SILOS.map((c) => c.x - c.size[0] / 2));
-    const luft = hinterste - YARD_MIN_X;
+  it("die Platzgrenze steht dicht hinter den Silos", () => {
+    /*
+     * Der Sinn des Verkleinerns: keine Leere mehr zwischen letzter Mulde und
+     * Mauer. Frueher lagen dort ueber 30 m.
+     *
+     * Seit dem 15.09.2026 ist es die OSTgrenze — die Reihe hat die Wand
+     * gewechselt. Gemessen wird gegen die Wand, an der die Reihe steht, nicht
+     * gegen eine fest eingetragene.
+     */
+    const ruecken = Math.max(...SILOS.map((c) => c.x + c.size[0] / 2));
+    const luft = YARD_MAX_X - ruecken;
     expect(luft, `${luft.toFixed(1)} m Leere hinter der letzten Mulde`).toBeLessThan(4);
     expect(luft, "die Mauer steht auf der Mulde").toBeGreaterThan(0.8);
   });

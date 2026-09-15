@@ -43,28 +43,113 @@ const FIRST_HALLE = 1.9;
 export const OFFICE_X = WAND_X + TIEFE / 2;
 export const OFFICE_Z = WAND_Z - BUERO_B / 2;
 /**
- * Die drei Sortierhallen an der Nordwand (E-010, 14.09.2026).
+ * Die drei Sortierhallen — suedlich ans Buero an dieselbe Wand (15.09.2026).
  *
- * Bis dahin standen zwei Hallen an der Westwand, suedlich ans Buero gebaut.
- * Dort liegt jetzt die Silo-Reihe: Sie beginnt bei z +10, das zweite
- * Hallenschiff reichte bis z +15,2 — die beiden haetten sich ueberschnitten.
- * Und sie haben einen neuen Zweck: „Haendler fahren ueber die Waage in ihre
- * Halle und laden selbst ab" (E-011). Dafuer muessen sie hinter dem Tor
- * liegen, nicht hinter dem Betriebshof.
+ * Sie standen bis zum 14.09. hier, sind mit E-010 an die Nordwand gewandert
+ * (dort lag die Silo-Reihe im Weg) und kommen jetzt zurueck: Die Silo-Reihe
+ * zieht an die gegenueberliegende Wand, der Konflikt loest sich damit auf.
  *
- * Masse aus dem Konzeptplan: je 7,5 m breit (x) und 9,0 m tief (z), Mitte auf
- * z +22 — die Nordmauer steht innen bei +28,7, es bleiben also 2,2 m Luft.
- * Das Tor zeigt nach Sueden auf den Platz.
+ * Ansage Patrick 15.09.2026: „Die Hallen sind falsch gebaut. Die duerfen nicht
+ * bei Janin stehen. Die muessen wieder zur Ostwand, da wo die Silos sind." Und
+ * zur Zufahrt: „Erstmal ist ja ein super grosser Mittelplatz da. … Die koennen
+ * ja von der Waage rechts abbiegen und dann sind sie ja auch in der Halle."
+ *
+ * Masse unveraendert: je 7,5 m breit und 9,0 m tief. Neu ist nur, welche
+ * Weltachse was traegt — die TIEFE liegt jetzt in x (von der Wand zum Platz),
+ * die BREITE in z. Die Reihe schliesst buendig ans Buero an (dessen Suedkante
+ * liegt auf z +22,4) und laeuft von dort nach Sueden bis z −0,1.
  */
-export const HALLEN_Z = 22;
+/** Mitte der Hallenreihe in x — dieselbe Flucht wie das Buero. */
+export const HALLEN_X = OFFICE_X;
+/** Breite (die Seite mit dem Tor) und Tiefe (von der Wand zum Platz). */
 export const HALLE_BREITE = 7.5;
 export const HALLE_TIEFE = 9.0;
-export const HALLEN_X = [-14, -5, 4];
+/**
+ * Mitten der drei Hallen in z, buendig aneinander und ans Buero.
+ *
+ * Gerechnet, nicht gegriffen: Die Suedkante des Bueros liegt auf
+ * `OFFICE_Z − BUERO_B/2` = 22,4. Jede Halle ist 7,5 m breit, ihre Mitte also
+ * 3,75 m weiter suedlich als die Kante davor.
+ */
+export const HALLEN_Z = [0, 1, 2].map((i) => OFFICE_Z - BUERO_B / 2 - HALLE_BREITE * (i + 0.5));
 
-/** Grundflächen der drei Hallen: [x, z, halbeBreite, halbeTiefe]. */
+/**
+ * WOHIN DAS TOR ZEIGT — als Angabe, nicht als Nebenwirkung einer Drehung.
+ *
+ * Befund Patrick 15.09.2026: „Die Halleneingaenge sind ja falsch rum. Die sind
+ * ja zu den Aussengrenzen gedreht." Nachgerechnet stimmte das: Die Hallen
+ * wurden lokal mit der Front auf +x gebaut und dann mit `rotation.y = −π/2`
+ * gedreht. Bei θ = −π/2 gilt welt_x = −lokal_z und welt_z = +lokal_x — das Tor
+ * landete damit auf welt +z, also in der Nordmauer. Der Kommentar daneben
+ * behauptete das Gegenteil und hat den Fehler zugedeckt.
+ *
+ * Schlimmer noch: Der Kollider (und die Hindernisliste) setzten die Rueckwand
+ * im NORDEN an, also genau dort, wo das sichtbare Tor stand. Sichtbare
+ * Oeffnung und gesperrte Flaeche zeigten in entgegengesetzte Richtungen —
+ * dieselbe Klasse Fehler, die am 12.09.2026 als „unsichtbare Barriere"
+ * gemeldet wurde.
+ *
+ * Deshalb steht die Richtung jetzt als Vektor da. Bau, Kollider, Hindernisliste
+ * und `test/hallen.test.ts` lesen alle diese eine Zahl.
+ */
+export const TOR_RICHTUNG = { x: 1, z: 0 } as const;
+
+/** Grundflaechen der drei Hallen: [x, z, halbeBreite(x), halbeTiefe(z)]. */
 export function hallenFootprints(): Array<[number, number, number, number]> {
-  return HALLEN_X.map(
-    (x) => [x, HALLEN_Z, HALLE_BREITE / 2, HALLE_TIEFE / 2] as [number, number, number, number]
+  return HALLEN_Z.map(
+    (z) => [HALLEN_X, z, HALLE_TIEFE / 2, HALLE_BREITE / 2] as [number, number, number, number]
+  );
+}
+
+/**
+ * Die WAENDE der Hallen einzeln — Rueckwand und zwei Flanken, das Tor bleibt
+ * frei.
+ *
+ * Als Vollrechteck in der Hindernisliste (so stand es bis zum 15.09.2026) ist
+ * eine Halle nicht anfahrbar: Jeder LKW haelt 1,4 m davor an und hupt. Seit
+ * E-011 faehrt der Haendler aber selbst hinein und laedt selbst ab — ohne
+ * offenes Tor in der Hindernisliste ist dieser ganze Weg tot.
+ *
+ * Dieselbe Loesung wie bei den Sortiermulden (E-006): Waende ja, Stirn nein.
+ */
+export const HALLE_WAND_T = 0.25;
+export function hallenWaende(): Array<{
+  x: number;
+  z: number;
+  hw: number;
+  hd: number;
+  nr: number;
+  teil: string;
+}> {
+  const T = HALLE_WAND_T;
+  const out: Array<{ x: number; z: number; hw: number; hd: number; nr: number; teil: string }> = [];
+  HALLEN_Z.forEach((z, i) => {
+    // Rueckwand: der Tor-Richtung gegenueber
+    out.push({
+      x: HALLEN_X - TOR_RICHTUNG.x * (HALLE_TIEFE / 2),
+      z: z - TOR_RICHTUNG.z * (HALLE_BREITE / 2),
+      hw: T,
+      hd: HALLE_BREITE / 2,
+      nr: i + 1,
+      teil: "Rueck",
+    });
+    for (const sz of [-1, 1]) {
+      out.push({
+        x: HALLEN_X,
+        z: z + (sz * HALLE_BREITE) / 2,
+        hw: HALLE_TIEFE / 2,
+        hd: T,
+        nr: i + 1,
+        teil: sz > 0 ? "Nord" : "Sued",
+      });
+    }
+  });
+  return out;
+}
+/** Wo ein LKW vor dem Tor steht, bevor er rueckwaerts hineinsetzt. */
+export function hallenVorplatz(): Array<[number, number]> {
+  return HALLEN_Z.map(
+    (z) => [HALLEN_X + TOR_RICHTUNG.x * (HALLE_TIEFE / 2 + 4.0), z] as [number, number]
   );
 }
 /** Front des Komplexes (Ostseite) — davor ist freie Fläche. */
@@ -119,8 +204,9 @@ export class OfficeBuilding {
     });
 
     this.buildBuero(wand, sockel, dach, ziegel, glas, stahl);
-    // Die drei Sortierhallen stehen an der Nordwand, Tor nach Sueden (E-010).
-    for (const x of HALLEN_X) this.buildHalle(x, wellblech, dach, stahl);
+    // Die drei Sortierhallen stehen suedlich des Bueros an derselben Wand,
+    // Tor nach Osten auf den Platz (15.09.2026, `TOR_RICHTUNG`).
+    for (const z of HALLEN_Z) this.buildHalle(z, wellblech, dach, stahl);
     scene.add(this.group);
 
     if (world) this.buildCollider(world);
@@ -259,23 +345,25 @@ export class OfficeBuilding {
   }
 
   /**
-   * Offene Sortierhalle mit Satteldach, Tor nach SÜDEN zum Platz.
+   * Offene Sortierhalle mit Satteldach, Tor in `TOR_RICHTUNG` (Osten).
    *
-   * Gebaut wird sie wie vorher in lokalen Achsen (lokales +x ist die Front);
-   * die Drehung um −90° legt die Front auf −z. So bleibt der Bau derselbe und
-   * nur die Lage ist neu — eine zweite Wandlogik waere eine zweite Wahrheit.
+   * Gebaut wird in lokalen Achsen: lokales +x ist die Torseite, lokales z die
+   * Breite. Weil `TOR_RICHTUNG` nach +x zeigt, steht die Gruppe UNGEDREHT —
+   * lokale und Weltachsen fallen zusammen, und es gibt nichts mehr, was im
+   * Kopf umgerechnet werden muesste. Genau daran ist die alte Fassung
+   * gescheitert: Sie drehte um −90°, der Kommentar behauptete „Front auf −z",
+   * und tatsaechlich lag sie auf +z in der Nordmauer.
    */
   private buildHalle(
-    x: number,
+    z: number,
     wellblech: THREE.Material,
     dach: THREE.Material,
     stahl: THREE.Material
   ): void {
     const g = new THREE.Group();
-    g.position.set(x, 0, HALLEN_Z);
-    g.rotation.y = -Math.PI / 2;
-    const T = HALLE_TIEFE; // lokale x-Achse: Tiefe der Halle (Weltachse z)
-    const B = HALLE_BREITE; // lokale z-Achse: Breite (Weltachse x)
+    g.position.set(HALLEN_X, 0, z);
+    const T = HALLE_TIEFE; // lokale x-Achse: Tiefe der Halle (Weltachse x)
+    const B = HALLE_BREITE; // lokale z-Achse: Breite (Weltachse z)
     const rueck = new THREE.Mesh(new THREE.BoxGeometry(0.18, HALLE_H, B), wellblech);
     rueck.position.set(-T / 2, HALLE_H / 2, 0);
     rueck.castShadow = true;
@@ -314,15 +402,16 @@ export class OfficeBuilding {
     };
     quader(OFFICE_X, OFFICE_Z, TIEFE / 2, BUERO_H / 2, BUERO_B / 2);
     /*
-     * Die Sortierhallen: Rueckwand im Norden, zwei Seitenwaende. Vorn bleibt
-     * es offen — sonst stuende vor dem Tor eine unsichtbare Front, und der
-     * Haendler kaeme nicht hinein.
+     * Die Sortierhallen: Rueckwand gegenueber dem Tor, zwei Flanken. Vorn
+     * bleibt es offen — sonst stuende vor dem Tor eine unsichtbare Front, und
+     * der Haendler kaeme nicht hinein.
+     *
+     * Die Waende kommen aus `hallenWaende()`, derselben Quelle wie die
+     * Hindernisliste. Bis zum 15.09.2026 standen sie hier ein zweites Mal von
+     * Hand — und zeigten in die andere Richtung als das sichtbare Tor.
      */
-    for (const x of HALLEN_X) {
-      quader(x, HALLEN_Z + HALLE_TIEFE / 2, HALLE_BREITE / 2, HALLE_H / 2, 0.12);
-      for (const sx of [-1, 1]) {
-        quader(x + (sx * HALLE_BREITE) / 2, HALLEN_Z, 0.12, HALLE_H / 2, HALLE_TIEFE / 2);
-      }
+    for (const w of hallenWaende()) {
+      quader(w.x, w.z, w.hw, HALLE_H / 2, w.hd);
     }
   }
 

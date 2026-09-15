@@ -29,7 +29,12 @@ import {
   abstandVomStand,
 } from "../src/world/baggerstand";
 import { CONFIGS, type ContainerConfig } from "../src/world/containers";
-import { ABLADE_SPUR_X, ABLADE_HALT_Z, BED_HALF_W } from "../src/delivery/routes";
+import {
+  ABLADE_SPUR_X,
+  ABLADE_HALT_Z,
+  BED_HALF_W,
+  VERLADE_SPUR_X,
+} from "../src/delivery/routes";
 import { PRESS_CENTER, PRESS_FUSS, KLAPPE_WEG, KLAPPE_RICHTUNG } from "../src/world/press";
 import { STATIC_OBSTACLES, hitsObstacle } from "../src/world/obstacles";
 import {
@@ -112,30 +117,49 @@ describe("Die vier Pflichtziele liegen im Schwenkband", () => {
      * Ansage: „Ich haette gerne, dass ich LKWs nicht mehr von hinten, sondern
      * von der Seite ablade."
      *
-     * VORHER stand der Wagen radial vor dem Bagger: Seine Ladeflaeche lag von
-     * 8,0 bis 13,5 m, die hintere Haelfte war unerreichbar. JETZT steht er
-     * quer, und alle vier Ecken liegen im Band. Gemessen wird gegen die
-     * echten Masse aus `routes.ts` und `vehicles.ts`.
+     * DIE LADEFLAECHE LIEGT UM DEN HALTEPUNKT HERUM, nicht noerdlich davon.
+     * Bis zum 15.09.2026 rechnete dieser Waechter sie von `ABLADE_HALT_Z` bis
+     * +5,4 — das war falsch: Der Ursprung eines Fahrzeugs liegt in der MITTE
+     * der Ladeflaeche (`vehicleModel.ts`: `bedGroup.position.z = −bedLen/2`).
+     * Mit der falschen Annahme war der Test gruen, waehrend die vordere linke
+     * Ecke in Wahrheit 5,58 m vom Sitz lag — unter der inneren Grenze von
+     * 5,80 m. Genau das hat Patrick gemeldet: „Ich kann noch nicht mal die
+     * LKWs vollstaendig abladen."
      */
     const halbeBreite = BED_HALF_W; // 1,35 m
     const laenge = 5.4; // bedLen einer Pritsche (vehicles.ts)
     const ecken: Array<[number, number]> = [];
     for (const dx of [-halbeBreite, halbeBreite]) {
-      for (const dz of [0, laenge]) {
-        // Der Wagen setzt nach Sueden zurueck; die Ladeflaeche liegt
-        // NOERDLICH des Haltepunkts, quer zur Blickrichtung des Baggers.
+      for (const dz of [-laenge / 2, laenge / 2]) {
         ecken.push([ABLADE_SPUR_X + dx, ABLADE_HALT_Z + dz]);
       }
     }
     for (const [x, z] of ecken) {
       const d = abstandVomStand(x, z);
+      expect(d, `Ladeflächenecke (${x.toFixed(2)} | ${z.toFixed(2)}): ${d.toFixed(2)} m — zu nah`)
+        .toBeGreaterThanOrEqual(SCHWENK_INNEN);
       expect(d, `Ladeflächenecke (${x.toFixed(2)} | ${z.toFixed(2)}): ${d.toFixed(2)} m`)
         .toBeLessThanOrEqual(SCHWENK_AUSSEN);
     }
     // Und die Mitte der Fläche liegt sauber im Band.
-    const mitte = abstandVomStand(ABLADE_SPUR_X, ABLADE_HALT_Z + laenge / 2);
+    const mitte = abstandVomStand(ABLADE_SPUR_X, ABLADE_HALT_Z);
     expect(mitte).toBeGreaterThanOrEqual(SCHWENK_INNEN);
     expect(mitte).toBeLessThanOrEqual(SCHWENK_AUSSEN);
+  });
+
+  it("und die Mauer steht weit genug weg, dass der Greifer nicht hineinfasst", () => {
+    /*
+     * Befund Patrick 15.09.2026: „Ich greife in die Wand." Die offene Spinne
+     * misst 3,38 m, braucht also 1,69 m Halbmass um den Greifpunkt. Gemessen
+     * wird von der aeussersten Ladeflaechenecke zur Mauerinnenseite.
+     */
+    const SPINNE_HALB = 1.69;
+    const suedMauerInnen = -YARD_D / 2 + 0.3;
+    const ostMauerInnen = YARD_MAX_X - 0.3;
+    const zuSued = ABLADE_HALT_Z - 5.4 / 2 - suedMauerInnen;
+    const zuOst = ostMauerInnen - (ABLADE_SPUR_X + BED_HALF_W);
+    expect(zuSued, `${zuSued.toFixed(2)} m bis zur Südmauer`).toBeGreaterThan(SPINNE_HALB);
+    expect(zuOst, `${zuOst.toFixed(2)} m bis zur Ostmauer`).toBeGreaterThan(SPINNE_HALB);
   });
 
   it("und er steht quer, nicht mit dem Heck zum Bagger", () => {
@@ -179,16 +203,22 @@ describe("Die vier Pflichtziele liegen im Schwenkband", () => {
      * setzt rückwärts an, der Bagger steht dazwischen." Geprüft wird die
      * Symmetrie, nicht die Zahl 7,5 — verschiebt jemand die Silo-Reihe, muss
      * die Spur mitwandern.
+     *
+     * Seit dem 15.09.2026 steht die Reihe an der anderen Wand und oeffnet sich
+     * nach WESTEN: Die Vorderkante ist `x − w/2`, und der Abholer haelt
+     * westlich des Baggers statt oestlich. Gerechnet wird deshalb mit dem
+     * Betrag — die Eigenschaft ist die Symmetrie, nicht das Vorzeichen.
      */
-    const silo = cfg("c_va_lager");
-    const siloKante = silo.x + silo.size[0] / 2;
-    const zurSilo = VERLADE_STAND.x - siloKante;
+    const silo = cfg("c_copper_lager");
+    const siloKante = silo.x - silo.size[0] / 2;
+    const zurSilo = Math.abs(siloKante - VERLADE_STAND.x);
     expect(zurSilo, `${zurSilo.toFixed(2)} m zur Silo-Vorderkante`).toBeGreaterThanOrEqual(
       SCHWENK_INNEN
     );
     expect(zurSilo).toBeLessThanOrEqual(SCHWENK_AUSSEN);
     // Die LKW-Spur steht spiegelbildlich auf der anderen Seite.
     expect(zurSilo).toBeCloseTo(7.5, 6);
+    expect(Math.abs(VERLADE_SPUR_X - VERLADE_STAND.x)).toBeCloseTo(zurSilo, 6);
   });
 
   it("die Silo-Reihe steht bewusst außerhalb — dorthin wird gefahren", () => {

@@ -70,9 +70,30 @@ export const ROUTE_IN_FWD: Array<[number, number]> = [
  * also muessen zwischen Halt und Flanke mindestens 1,75 m liegen.
  */
 export const ABLADE_SPUR_X = 6.3;
-export const ABLADE_HALT_Z = -24.0;
+/*
+ * VON −24,0 AUF −23,0 (15.09.2026) — gemessen, nicht verschoben.
+ *
+ * Befund Patrick: „Ich kann noch nicht mal die LKWs vollstaendig abladen, weil
+ * ich in die Wand greife." Nachgerechnet mit dem echten Umriss aus
+ * `vehicles.ts` (Ursprung = Muldenmitte, Ladeflaeche ± bedLen/2 = ± 2,70 m,
+ * Standflaeche ± 4,30 m, Kipper ± 4,60 m):
+ *
+ *                              bei z −24,0        bei z −23,0
+ *   Ladeflaeche (z)            −26,70 … −21,30    −25,70 … −20,30
+ *   Suedkante bis Mauerinnen   2,00 m             3,00 m
+ *     (Spinne offen 3,38 m, also 1,69 m Halbmass + Luft)
+ *   Standflaeche Kipper bis Mauer  0,10 m         1,10 m
+ *   naechste Ladeflaechenecke  5,58 m  ZU NAH     5,88 m  im Band
+ *   fernste Ladeflaechenecke   9,17 m             8,76 m
+ *
+ * Bei −24,0 lag die vordere linke Ecke der Ladeflaeche mit 5,58 m UNTER der
+ * inneren Grenze von 5,80 m — der Arm bekommt dort den Ausleger nicht mehr eng
+ * genug zusammen. Ein Meter nach Norden bringt alle vier Ecken ins Band
+ * (5,88 · 8,44 · 6,32 · 8,76 m) und schafft zugleich die Luft zur Suedmauer.
+ */
+export const ABLADE_HALT_Z = -23.0;
 /** Nordende der Abladespur — von hier setzt der Wagen zurueck. */
-const ABLADE_RANGIER: [number, number] = [ABLADE_SPUR_X, -8.0];
+const ABLADE_RANGIER: [number, number] = [ABLADE_SPUR_X, -10.0];
 
 let abladeStelle: [number, number] = [ABLADE_SPUR_X, ABLADE_HALT_Z];
 let baggerOrt: (() => { x: number; z: number }) | null = null;
@@ -115,7 +136,19 @@ export function abladestelle(): [number, number] {
  * (x 2,0) — beide bleiben frei.
  */
 export function routeApproach(): Array<[number, number]> {
-  return [WAAGE_HALT, VERTEILER, [-21, 10], [-12, 4], [-2, 1], ABLADE_RANGIER];
+  /*
+   * Der letzte Knick vor der Abladespur ist flach, und das ist gerechnet:
+   * Ein LKW nimmt am Wegpunkt sofort die Richtung des naechsten Stuecks an —
+   * er dreht sich auf der Stelle. Steht er dabei quer zur Ostmauer, schwenkt
+   * seine Ecke darueber hinaus. Bei der alten Fuehrung (−4 | −2) → (6,3 | −8)
+   * stand er 60 Grad schraeg und ragte 0,49 m in die Mauer.
+   *
+   * Aus (4 | −4) heraus sind es nur noch 30 Grad: Seine aeusserste Ecke liegt
+   * dann auf x 9,93, die Mauer steht innen bei 10,20 — 0,27 m Luft. Und der
+   * Zwischenpunkt (−4 | −4) haelt ihn beim Ausschwenken nach Osten 1,55 m
+   * suedlich der Flanke des untersten Silos.
+   */
+  return [WAAGE_HALT, VERTEILER, [-21, 10], [-12, 4], [-4, -4], [4, -6], ABLADE_RANGIER];
 }
 export function routeInRev(): Array<[number, number]> {
   return [ABLADE_RANGIER, abladeStelle];
@@ -124,7 +157,8 @@ export function routeOut(): Array<[number, number]> {
   return [
     abladeStelle,
     ABLADE_RANGIER,
-    [-2, 1],
+    [4, -6],
+    [-4, -4],
     [-12, 4],
     [-21, 10],
     VERTEILER,
@@ -166,9 +200,18 @@ export const PICKUP_IN_FWD: Array<[number, number]> = [
  * wie die Silo-Vorderkante westlich davon liegt. Der Bagger steht in der
  * Mitte und dreht sich zwischen beiden — er muss nicht umsetzen.
  */
-export const VERLADE_SPUR_X = VERLADE_STAND.x + 7.5;
-/** Nordende der Verladespur — von hier setzt der Abholer zurueck. */
-const ABHOL_RANGIER: [number, number] = [VERLADE_SPUR_X, -2.0];
+export const VERLADE_SPUR_X = VERLADE_STAND.x - 7.5;
+/**
+ * Suedende der Verladespur — von hier setzt der Abholer nach NORDEN zurueck.
+ *
+ * Bis zum 15.09.2026 lag der Verladeplatz im Sueden und der Abholer kam von
+ * Norden. Jetzt ist es umgekehrt, und das ist kein Geschmack, sondern
+ * gemessen: Janines Kaffeewagen steht auf (−9,5 | 15,5) und belegt
+ * x −12,0 … −7,0, z +14,1 … +16,9. Die Spur laeuft auf x −11,5 mitten durch
+ * diesen Streifen — von Norden kommend faehrt der Wagen durch den Kaffeewagen.
+ * Von Sueden bleibt er 2,0 m darunter.
+ */
+const ABHOL_RANGIER: [number, number] = [VERLADE_SPUR_X, -1.0];
 
 let abholStelle: [number, number] = [VERLADE_SPUR_X, VERLADE_STAND.z];
 
@@ -187,7 +230,13 @@ export function abholstelle(): [number, number] {
 }
 
 export function pickupApproach(): Array<[number, number]> {
-  return [WAAGE_HALT, VERTEILER, [-19, 9], [VERLADE_SPUR_X, 2], ABHOL_RANGIER];
+  /*
+   * Von der Waage suedlich an Janines Kaffeewagen vorbei auf die Spur. Der
+   * Knick bei (−20 | 8) haelt die Sehne, mit der ein LKW vier Meter
+   * vorausschaut, aus dem Kaffeewagen heraus: Auf der Geraden von dort zum
+   * Rangierpunkt liegt sie bei x −12 auf z +0,6 — 13,5 m suedlich des Wagens.
+   */
+  return [WAAGE_HALT, VERTEILER, [-20, 8], ABHOL_RANGIER];
 }
 export function pickupInRev(): Array<[number, number]> {
   return [ABHOL_RANGIER, abholStelle];
@@ -196,8 +245,7 @@ export function pickupOut(): Array<[number, number]> {
   return [
     abholStelle,
     ABHOL_RANGIER,
-    [VERLADE_SPUR_X, 2],
-    [-19, 9],
+    [-20, 8],
     VERTEILER,
     WAAGE_HALT,
     [GATE_X, 28],
@@ -256,21 +304,36 @@ export const KIPP_HALT_Z = -12.5;
 /** Wo die Fuhre danach liegt — Ziel der Arbeitszonen und der Wegweiser. */
 export const ABKIPP_ZONE: [number, number] = [KIPP_SPUR_X, KIPP_HALT_Z - 3.0];
 
+/*
+ * Der Wendepunkt der Kipperspur ist am 15.09.2026 von z +2 auf −4 gerueckt.
+ *
+ * Gemessen, nicht verlegt: Die Silo-Reihe steht jetzt auf x +6,5 und reicht
+ * mit ihren Flanken bis x +3,5, die suedlichste Flanke bis z +0,825. Ein
+ * Kipper, der bei (2 | 2) aus der Kurve kommt, steht dort quer und liegt mit
+ * seiner Standflaeche mitten in der Flanke des suedlichsten Silos.
+ *
+ * Bei (2 | −7) steht er laengs zur Spur: Seine Flaeche reicht dann von
+ * z −11,14 bis −3,10 und bleibt 1,18 m suedlich der Silo-Flanke (die endet auf
+ * z −1,925). Zwischenstand (2 | −4) war nachgemessen 0,05 m zu weit noerdlich
+ * — genau die Groessenordnung, in der solche Fehler bisher durchgerutscht
+ * sind.
+ */
+const TIP_EINFAHRT: [number, number] = [KIPP_SPUR_X, -7];
 export const TIP_APPROACH: Array<[number, number]> = [
   WAAGE_HALT,
   VERTEILER,
   [-14, 9],
-  [-4, 3],
-  [KIPP_SPUR_X, 2],
+  [-6, 1],
+  TIP_EINFAHRT,
 ];
 export const TIP_IN_REV: Array<[number, number]> = [
-  [KIPP_SPUR_X, 2],
+  TIP_EINFAHRT,
   [KIPP_SPUR_X, KIPP_HALT_Z],
 ];
 export const TIP_OUT: Array<[number, number]> = [
   [KIPP_SPUR_X, KIPP_HALT_Z],
-  [KIPP_SPUR_X, 2],
-  [-4, 3],
+  TIP_EINFAHRT,
+  [-6, 1],
   [-14, 9],
   VERTEILER,
   WAAGE_HALT,
@@ -295,41 +358,47 @@ export const TIP_OUT: Array<[number, number]> = [
 /**
  * Gassenmitte, auf der die Anlieferer an der Silo-Reihe entlangfahren.
  *
- * Gesucht und dann NACHGEMESSEN (14.09.2026, `tools/fuhren.ts`): Die
- * Silo-Oeffnungen liegen bei x −33, ihre Flankensteine reichen bis −32,7.
+ * GESPIEGELT am 15.09.2026, weil die Reihe die Wand gewechselt hat — die
+ * Massverhaeltnisse sind uebernommen, nicht neu geraten. Die alte Reihe
+ * oeffnete sich auf x −33, die Gasse lag 5,0 m davor auf −28. Die neue Reihe
+ * oeffnet sich auf x +3,5; die Gasse liegt also auf −1,5.
  *
- * Mit der Gasse auf −30 blieb jeder dritte sortenreine Kipper beim Ausfahren
- * stehen — gemessen 275 s ohne einen Meter Fortschritt, dreimal an
- * verschiedenen Silos. Der Grund ist die Ecke: Ein LKW schaut vier Meter
- * voraus, und zwar auf der SEHNE von seinem Standort zum Vorausschaupunkt,
- * nicht der Strecke entlang. 2,8 m nach dem Silo lag dieser Punkt schon
- * hinter der Ecke, die Sehne schnitt sie ab und kam der Flanke des
- * Nachbarsilos auf 1,74 m nahe — die Schranke liegt bei 1,75 m. Ein
- * Zentimeter, und das Fahrzeug steht fuer immer: Feste Bauten kennen keine
- * Aufgeben-Regel.
- *
- * −28,0 macht die gerade Strecke aus dem Silo 7,6 m lang. Der
- * Vorausschaupunkt bleibt damit auf ihr, solange der Wagen noch zwischen den
- * Flanken steht, und die Sehne laeuft gerade heraus. Nachgemessen: 10 von 10
+ * Warum ausgerechnet 5,0 m: Ein LKW schaut vier Meter voraus, und zwar auf der
+ * SEHNE von seinem Standort zum Vorausschaupunkt, nicht der Strecke entlang.
+ * Mit einer Gasse dichter an der Reihe lag dieser Punkt schon hinter der Ecke,
+ * die Sehne schnitt sie ab und kam der Flanke des Nachbarsilos auf 1,74 m nahe
+ * — die Schranke liegt bei 1,75 m. Ein Zentimeter, und das Fahrzeug steht fuer
+ * immer (gemessen 14.09.2026: 275 s ohne einen Meter Fortschritt). Bei 5,0 m
+ * ist die gerade Strecke aus dem Silo 7,6 m lang; nachgemessen 10 von 10
  * Fuhren durch.
  */
-export const MULDEN_GASSE_X = -28.0;
+export const MULDEN_GASSE_X = -1.5;
 /**
  * Wie weit der Wagen in das Silo zurueckstoesst (Wagenmitte, x).
  *
- * Gesucht, nicht gegriffen. Nach hinten begrenzt ihn die Stirnwand: Sie steht
- * bei x −39,275 ± 0,275, ihre Innenseite also bei −39,0; das Heck liegt 3,0 m
- * hinter der Wagenmitte, bei −35,6 bleiben davon 0,4 m Luft. Nach vorn
- * begrenzt ihn die Ladung: Die Ladeflaeche reicht damit von −38,6 bis −32,6
- * und steht ganz ueber der Mulde (−39,0 bis −33,0).
+ * Auch das gespiegelt — aber mit dem RICHTIGEN Heckmass. Die Stirnwand steht
+ * innen bei x +9,15, und der Wagen reicht nicht 3,0 m nach hinten, sondern
+ * bedLen/2 + 0,14 = 3,14 m (Unterfahrschutz, `vehicleModel.ts`). Bei +5,9
+ * endet er auf 9,04 und bleibt 0,11 m vor der Wand. Die alte Rechnung an der
+ * Westwand nahm 3,0 m an und schickte den Wagen 0,70 m in die Stirnwand —
+ * gefunden hat das erst `test/fahrumriss.test.ts` am 15.09.2026.
+ *
+ * Nach vorn reicht die Ladeflaeche damit bis x +2,9; 0,6 m von ihr stehen vor
+ * der Muldenoeffnung (3,5).
  *
  * Die Blockadepruefung laesst das zu: Sie tastet mit 1,40 m Radius, die
  * Flanken stehen 2,375 m von der Mittellinie entfernt.
  */
-const MULDE_TIEFE_X = -35.6;
+const MULDE_TIEFE_X = 5.9;
 
 export function bayApproach(z: number): Array<[number, number]> {
-  return [WAAGE_HALT, VERTEILER, [MULDEN_GASSE_X, 13], [MULDEN_GASSE_X, z]];
+  /*
+   * Quer ueber den freien Mittelplatz auf die Gasse. Der Knick bei (−20 | 11)
+   * ist gesetzt, damit die Gerade suedlich an Janines Kaffeewagen vorbeilaeuft
+   * (er belegt x −12,0 … −7,0 auf z +14,1 … +16,9): Auf der Strecke von dort
+   * zum Gasseneingang liegt sie bei x −12 auf z +9,7 und bei x −7 auf z +8,9.
+   */
+  return [WAAGE_HALT, VERTEILER, [-20, 11], [MULDEN_GASSE_X, 8], [MULDEN_GASSE_X, z]];
 }
 export function bayInRev(z: number): Array<[number, number]> {
   return [
@@ -341,7 +410,8 @@ export function bayOut(z: number): Array<[number, number]> {
   return [
     [MULDE_TIEFE_X, z],
     [MULDEN_GASSE_X, z],
-    [MULDEN_GASSE_X, 13],
+    [MULDEN_GASSE_X, 8],
+    [-20, 11],
     VERTEILER,
     WAAGE_HALT,
     [GATE_X, 28],
@@ -350,25 +420,33 @@ export function bayOut(z: number): Array<[number, number]> {
 }
 
 /**
- * Warteplatz an der Innenseite der Nordwand, oestlich der Einfahrt: Nach dem
- * Abladen stellen sich vor allem die Händler dort ab und quatschen, bevor
- * sie fahren. Das hält Betrieb auf dem
- * Platz — und macht den Abladeplatz sofort für den Nächsten frei
- * (Wunsch 02.09.2026).
+ * Warteplaetze: nach dem Abladen stellen sich vor allem die Haendler dort ab
+ * und quatschen, bevor sie fahren. Das haelt Betrieb auf dem Platz — und macht
+ * den Abladeplatz sofort fuer den Naechsten frei (Wunsch 02.09.2026).
  *
- * Vorher lagen sie westlich der Einfahrt. Dort steht seit 11.09.2026 der
- * Betriebshof — die LKW haetten im Buero geparkt.
- */
-/*
- * Nachtrag 14.09.2026 (E-010): Die drei Warteplaetze liegen jetzt VOR den
- * Sortierhallen, nicht mehr an der Nordwand — dort stehen seit heute die
- * Hallen selbst (z +17,5 bis +26,5). Je ein Platz vor einem Tor: Wer auf
- * seine Einweisung wartet, steht schon vor der richtigen Halle.
+ * Der LKW faehrt dafuer auf (x | z − PARK_ANFAHRT_M) und setzt von dort nach
+ * NORDEN zurueck; am Ende steht er mit dem Heck zur Wand (`vehicles.ts`).
+ * Zwei der drei Plaetze liegen deshalb wieder an der Nordwand oestlich der
+ * Einfahrt, wo sie bis E-010 schon standen — dort stehen seit dem 15.09.2026
+ * keine Hallen mehr.
+ *
+ * Gesucht, nicht gegriffen. Eine Standflaeche misst 3,10 x 8,60 m:
+ *
+ *   (−18,5 | 24)  x −20,05 … −16,95 — 0,4 m neben der Torspur (x −22 ± 1,55)
+ *   (−14,5 | 24)  x −16,05 … −12,95 — 0,95 m westlich von Janines Kaffeewagen
+ *                 (der belegt x −12,0 … −7,0)
+ *   (−26,0 |  6)  vor dem Tor der dritten Halle, 3,05 m davor; die Waagenspur
+ *                 (x −27,5, z 14 … 26) bleibt frei, der Wagen endet auf z 10,3
+ *
+ * Warum nicht drei an der Nordwand: Oestlich von Janine bleibt zwischen ihr
+ * und der Silo-Gasse (x −1,5, Wagenflanke bis 0,05) kein Streifen von 3,10 m
+ * uebrig — nachgerechnet 3,45 m zwischen Gassenflanke und Silo-Wand, und
+ * darin stuende der Wartende dann wieder im Weg.
  */
 export const PARK_SLOTS: Array<[number, number]> = [
-  [-14, 14],
-  [-5, 14],
-  [4, 14],
+  [-18.5, 24],
+  [-14.5, 24],
+  [-26.0, 6],
 ];
 /**
  * Wie weit suedlich des Platzes der LKW anhaelt, bevor er rueckwaerts an die
@@ -405,18 +483,19 @@ export const WORK_ZONES: Array<[number, number, number]> = [
    * Spieler ihn ausraeumt. Ohne diese Zone haelt der naechste Wagen davor an
    * und hupt, weil sein eigener Vorgaenger etwas hat liegen lassen.
    */
-  [ABLADE_SPUR_X, ABLADE_HALT_Z + 2.5, 9],
+  [ABLADE_SPUR_X, ABLADE_HALT_Z, 9],
   /*
    * Der Verladeplatz vor der Silo-Reihe: Dort steht der Abholer, und dort
    * liegt zwangslaeufig Material, waehrend der Bagger ihn belaedt.
    */
-  [-22, -10, 11],
+  [VERLADE_STAND.x - 3.5, VERLADE_STAND.z, 11],
   /*
    * Die Silo-Reihe samt Gasse. Dorthin kippt der sortenreine Kipper; was dort
    * liegt, ist Ziel und nicht Hindernis. Ein Radius deckt die ganze Reihe ab:
-   * Sie laeuft von z +12,1 bis −28,9 auf x −36.
+   * Sie laeuft seit dem 15.09.2026 von z +0,8 bis +28,6 auf x +6,5, die Gasse
+   * auf x −1,5. Von (2,5 | 14,7) sind es 15,6 m in die entfernteste Ecke.
    */
-  [-33, -8, 24],
+  [2.5, 14.7, 16],
 ];
 /** Nach so langer Blockade fährt der Fahrer vorsichtig weiter (kein Deadlock) */
 export const BLOCK_GIVEUP_S = 35;

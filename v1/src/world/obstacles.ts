@@ -18,7 +18,7 @@ import {
   TRENNSTEIN_L,
   TRENNSTEIN_T,
 } from "./yard";
-import { officeFootprints, hallenFootprints } from "./office";
+import { officeFootprints, hallenWaende } from "./office";
 import { CONFIGS, type ContainerConfig } from "./containers";
 
 /**
@@ -368,17 +368,25 @@ export const STATIC_OBSTACLES: Obstacle[] = [
   })),
 
   /*
-   * Die drei Sortierhallen an der Nordwand (E-010). In dieser Phase sind es
-   * leere Huellen ohne Funktion — als Hindernis zaehlen sie trotzdem von der
-   * ersten Sekunde an, sonst faehrt der erste Haendler hindurch.
+   * Die drei Sortierhallen — nur ihre WAENDE, nicht ihre Grundflaeche.
+   *
+   * Bis zum 15.09.2026 stand hier je ein Vollrechteck von 7,5 x 9,0 m. Damit
+   * war eine Halle nicht anfahrbar: Jeder LKW haelt 1,4 m vor einem Hindernis
+   * an und hupt, und der ganze Weg aus E-011 („Haendler fahren ueber die Waage
+   * in ihre Halle und laden selbst ab") lief ins Leere. Jetzt ist es wie bei
+   * den Sortiermulden: drei Waende, das Tor bleibt frei.
+   *
+   * Die Waende kommen aus `hallenWaende()` — derselben Quelle, aus der auch
+   * der Rapier-Kollider gebaut wird. Vorher waren es zwei Listen, und sie
+   * zeigten in entgegengesetzte Richtungen.
    */
-  ...hallenFootprints().map(([x, z, hw, hd], i) => ({
-    x,
-    z,
-    hw,
-    hd,
+  ...hallenWaende().map((w) => ({
+    x: w.x,
+    z: w.z,
+    hw: w.hw,
+    hd: w.hd,
     top: 6.9,
-    label: `Halle ${i + 1}`,
+    label: `Halle ${w.nr} ${w.teil}`,
   })),
 ];
 
