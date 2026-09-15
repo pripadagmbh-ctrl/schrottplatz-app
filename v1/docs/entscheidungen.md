@@ -4094,3 +4094,181 @@ Bild `docs/f5-zahnknick-2026-09-15.svg`:
    hängt statt lotrecht zu stehen? Das ist der ganze Preis von B.
 3. Zeile 3, geschlossen auf der Betonkante: Der graue Schatten ist die tiefste
    Stellung auf dem Schließweg. **Sie** hält den Arm oben, nicht die Traverse.
+
+---
+
+### E-069 — Was mitfährt, wird gewogen und bezahlt: ein Fenster statt drei (15.09.2026)
+
+**Entscheidung.** Die Frage „liegt dieses Stück auf der Ladefläche?" wird in
+`src/delivery/vehicles.ts` nur noch **einmal** beantwortet
+(`aufDerFlaeche()`). Verriegeln für die Fahrt, Ausfahrtswiegung und Verkauf
+fragen dieselbe Stelle; maßgeblich ist das Fenster des Verriegelns
+(|x| ≤ 1,70 m · z −0,40 … L+0,40 m · y −0,40 … 3,00 m über dem Blech).
+
+**Anlass.** Patrick am Gerät, 15.09.2026: „Also ich habe gerade einen Abholer
+kommen lassen mit Stahlschrott, der ist auch abgefahren, aber es hat sich weder
+am Kontostand noch was geändert, noch sind danach noch Händler gekommen und es
+stand auch 0 Tonnen umgeschlagen."
+
+**Was gemessen wurde, bevor etwas gebaut wurde.** Neu ist
+`v1/tools/abholung-abrechnung.ts`: Es **fährt** eine ganze Abholung kopflos —
+Wagen für Stahlschrott rufen, Stahl über die Physik auf die Fläche fallen
+lassen, mit V losschicken — und schreibt in jedem Schritt mit, was
+`containedItems()`, `ladeflaecheKg()` und `sellContainer()` sagen. Nullprobe
+zuerst: ein Abholer ohne Ladung muss 0 kg, 0 € und „Container war leer"
+bringen; sonst bricht das Werkzeug ab.
+
+**Befund 1 — die gemeldete Kette ist heil.** Vier vollständige Abholungen, auf
+dem nackten Platz und auf dem Platz wie beim Neuen Spiel (Behälter,
+Starthaufen, Altautos, Platzinventar), dazu eine mitten im laufenden
+Anlieferbetrieb:
+
+| Fall | auf der Fläche | verkauft | Konto | Umschlag |
+|---|---|---|---|---|
+| Nullprobe, leer | 0 kg | 0 kg / 0,00 € | 5000,00 → 5000,00 | 0 kg |
+| 3 Teile | 455 kg | 455 kg / 113,75 € | 5000,00 → 5113,75 | 455 kg |
+| 6 Teile | 1500 kg | 1500 kg / 375,00 € | 5000,00 → 5375,00 | 1500 kg |
+| 6 Teile, voller Platz | 1500 kg | 1500 kg / 375,00 € | 5000,00 → 5375,00 | 1500 kg |
+| 6 Teile, im Betrieb | 1500 kg | 1500 kg / 375,00 € | 1050,08 → 1425,08 | 1500 kg |
+
+`containedItems()` und `ladeflaecheKg()` sind in allen Fällen auf das Kilogramm
+gleich — der blinde Fleck aus E-064 ist hier **nicht**.
+
+**Befund 2 — dafür ein anderer, und es ist dieselbe Fehlerklasse.** Drei
+Stellen beantworteten dieselbe Frage, und zwar verschieden:
+
+```
+verriegeleLadeflaeche()  |x| < 1,70   z −0,40 … L+0,40   y −0,40 … 3,00
+ladeflaecheKg()          |x| < 1,85   z −0,50 … L+0,50   y −0,40 … 5,00
+containedItems()         |x| < 1,60   z −0,30 … L+0,30   y −0,40 … 2,60
+```
+
+Punktprobe an neun Stellen der Mulde, gemessen mit dem Werkzeug; **fünf davon
+bekamen zwei verschiedene Antworten**:
+
+| Lage (im System der Fläche) | fährt mit | gewogen | bezahlt |
+|---|---|---|---|
+| mitten drin | ja | ja | ja |
+| auf der Bordwand, x 1,50 | ja | ja | ja |
+| **auf der Bordwand, x 1,65** | **ja** | **ja** | **nein** |
+| auf der Bordwand, x 1,80 | nein | **ja** | nein |
+| **auf der Heckklappe, z −0,35** | **ja** | **ja** | **nein** |
+| **an der Stirnwand, z L+0,35** | **ja** | **ja** | **nein** |
+| **oben auf dem Haufen, y 2,80** | **ja** | **ja** | **nein** |
+| turmhoch, y 4,00 | nein | **ja** | nein |
+
+Ein Blech auf der Bordwandkante wurde also an die Fläche gekoppelt, fuhr mit,
+stand auf dem Lieferschein der Ausfahrtswiegung — **und war beim Verkauf nicht
+dabei**. Es verließ den Hof, ohne bezahlt zu werden. Das ist die Klasse von
+E-044 („`loadCargo` überschrieb statt zu füllen") und E-064 („zwei Rechnungen
+über dieselbe Ladung, nur eine repariert"), zum dritten Mal an einem Tag.
+
+**Die Regel dahinter ist jetzt ein Satz: Was mitfährt, wird gewogen und
+bezahlt.** Maßgeblich ist deshalb das Verriegelungsfenster und nicht das
+weiteste: Ein Stück, das nicht gekoppelt wird, bleibt beim Anfahren liegen — es
+darf folglich weder auf die Waage noch auf die Rechnung. Nach dem Umbau
+antworten alle neun Punkte dreimal dasselbe. Nebenbei wird die Weltmatrix der
+Fläche vor jeder Abfrage frisch gerechnet; im Spiel besorgt das sonst der
+Renderer, beim Messen und im Test niemand.
+
+**Verworfene Alternative.** Nur `containedItems()` auf die Maße von
+`ladeflaecheKg()` bringen. Verworfen: Dann würde verkauft, was gar nicht
+mitfährt (der Fall „turmhoch" — gewogen und bezahlt, liegt danach noch auf dem
+Hof). Drei Zahlenpaare nebeneinander stehen zu lassen und zu pflegen, war die
+Ursache; mehr davon ist keine Lösung.
+
+**Wächter.** `test/abholungAbrechnung.test.ts` (neu, 5 Fälle): die Nullprobe;
+eine **vollständige Abholung mit Geld** (1500 kg → Konto + 375,00 € auf den
+Cent, Umschlag + 1500 kg, `pickups` 1, alle sechs Teile vom Platz verschwunden);
+die Punktprobe an den neun Stellen; und zwei Gegenproben — eine absichtlich
+falsch gezählte Ladefläche (ein Teil unterschlagen) **muss** an den Schranken
+auffallen, und die Punktliste muss beide Antworten treffen, nicht nur eine.
+Nachgewiesen: Setzt man allein `containedItems()` auf sein altes Fenster
+zurück, wird der Wächter rot mit „auf der Bordwand, halb drüber: fährt mit
+true, gewogen true, bezahlt false".
+
+**Zahlen und ihre Herkunft.** Die drei Maße sind die bisherigen des
+Verriegelns (`vehicles.ts`, seit E-034); 0,25 €/kg Stahl aus
+`materials/catalog.ts`; 0,16 €/kg Ankauf und 5.000 € Start aus
+`economy/account.ts` (Briefing Kap. 10). Keine Zahl der Wirtschaft ist
+angefasst.
+
+**Abnahmekriterium.** `npm test` grün (**1073 Tests in 94 Dateien**),
+`npm run build` grün.
+
+**Auf dem Gerät zu prüfen.**
+
+1. Eine Abholung für **Stahlschrott** rufen, die Mulde **bis über die
+   Bordwandkante** vollladen und mit **V** wegschicken: Stimmt der Betrag in
+   der Verkaufsmeldung mit dem überein, was die Waage zwei Meter weiter als
+   „abgeholt" nennt?
+2. Ein Blech **quer auf die Heckklappe** legen und losschicken: Fährt es mit —
+   und steht es im Erlös?
+3. Einen Abholer **leer** wegschicken: Kommt „Container war leer — der LKW
+   fährt umsonst", und bleibt das Konto stehen?
+
+---
+
+### Befund zur Sackgasse — ohne Eingriff, nur Zahlen (15.09.2026)
+
+Kein Entscheid, sondern eine Messung zum zweiten Teil derselben Ansage („noch
+sind danach noch Händler gekommen"). **Am Kreislauf wurde nichts geändert**
+(Ansage Patrick: „Kreislaufsachen noch nicht"); Startkapital, Preise und
+Grenzen stehen unverändert.
+
+**Zwei Tore, und ein drittes, das keines sein will.** Anlieferer kommen nur,
+wenn `shift.acceptsDeliveries` (Platz nicht dicht) **und** `account.canBuy`
+(über −1.500 €) — und wenn gerade **kein Fahrzeug** auf dem Platz steht: Der
+Platz ist einspurig (E-029), `VehicleManager.update` startet niemanden, solange
+`active` gesetzt ist. Gemessen (`tools/hofstille.ts`): Auf freiem Hof mit
+offenem Tor steht der nächste Wagen **34,4 s** nach der Abfahrt des Abholers
+vor der Waage — Stille danach ist also nie normal.
+
+**Wie weit ist es bis zur Sackgasse?** Gemessen im laufenden Betrieb
+(`tools/abholung-abrechnung.ts`, zwei Läufe zu je drei Fuhren): eine
+Anlieferung wiegt im Mittel **8.260 kg** und kostet bei 0,16 €/kg **1.321,60 €**.
+
+| Marke | Rechnung | Fuhren | Spielzeit |
+|---|---|---|---|
+| Konto auf 0 € | 5.000 / 1.321,60 | **3,8** | ~8 min |
+| Konto auf −1.500 € (Tor zu) | 6.500 / 1.321,60 | **4,9** | ~10 min |
+| Platz dicht (16.000 kg lose) | 16.458 kg gemessen | **2** | ~4 min |
+
+**Das erste Tor, das zufällt, ist nicht das Konto, sondern der Platz.** Nach
+zwei Fuhren lagen 16.458 kg lose — über `JAM_KG` (16.000 kg). Wieder auf geht
+es unter `JAM_CLEAR_KG` (11.000 kg), also nach 5.458 kg. In eine Abholmulde
+gehen gemessen **20.000 kg** (80 Stück à 250 kg, alle blieben liegen und alle
+wurden bezahlt) — **eine einzige gut gefüllte Abholung räumt den Stau.** Beim
+Konto war in denselben Läufen nie Schluss: 1.018 € bis 1.425 €, `canBuy` immer
+wahr.
+
+**Kommt der Spieler wieder heraus?** `moneyEur` wächst an genau einer Stelle
+(`Account.sellContainer`, account.ts:158) — es gibt keine zweite Einnahme.
+Solange etwas Verkäufliches herumliegt, ist die Rettung also immer da, und die
+Bestell-Liste zeigt genau das an (`main.ts`, nur Fraktionen mit kg > 0).
+**Endgültig wird es nur auf einem Weg: schlecht verkaufen.** Der Erlös ist
+kg × Preis × Reinheit³, der Ankauf 0,16 €/kg — der Gewinnpunkt für Stahl liegt
+bei ∛(0,16 / 0,25) = **86,2 % Sortenreinheit**. Darunter ist jede Fuhre ein
+Verlust: bei 50 % bringen 8.260 kg nur 258,13 € statt 2.065,00 €, macht
+−1.063,47 € je Fuhre. Nach **6,1 solchen Fuhren** steht das Konto bei −1.500 €
+**und der Platz ist leer** — ab da kommt niemand mehr, und es gibt nichts mehr
+zu verkaufen. Das ist die einzige echte Sackgasse, und sie ist erarbeitet, nicht
+zufällig.
+
+**Erscheint die Warnung zuverlässig?** Ja, die Flanke stimmt:
+`zahlungsUnfaehig` wird vor der Bildschleife auf `false` gesetzt (main.ts:777),
+der Kontostand kommt schon beim Aufbau aus dem Spielstand (main.ts:143) — beim
+**ersten Bild nach dem Laden** feuert die Meldung. Einen Schichtwechsel gibt es
+nicht; `Shift` kennt keinen Tag (siehe `world/platzinventar.ts`). **Die
+Schwäche liegt woanders:** „Konto leer" ist ein **Toast**, also flüchtig,
+während der Zustand dauerhaft ist. Für „Platz dicht" gibt es eine stehende
+Zeile im HUD (`shift.statusText`), für die Zahlungsunfähigkeit nichts;
+`Account.lowOnCash` (< 800 €) ist gebaut und wird nirgends benutzt.
+
+**Was ich NICHT entschieden habe** (Vorlage, kein Eingriff):
+1. Ob die Zahlungsunfähigkeit eine stehende HUD-Zeile bekommt wie der Stau.
+2. Ob `JAM_KG`/`JAM_CLEAR_KG` zu den gemessenen 8,3 t je Fuhre passen — zwei
+   Fuhren bis dicht ist eng.
+3. Ob ein Anlieferer, der nie abgeladen wird, nach einer Standzeit selbst
+   abfährt. `waitUnload` hat keine Frist; im kopflosen Lauf stand eine Pritsche
+   10 Minuten und hielt eine vorgemerkte Abholung auf.
