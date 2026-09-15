@@ -33,7 +33,7 @@ beforeAll(async () => {
   await initPhysics();
 });
 
-const KUPFERBOX = CONFIGS.find((c) => c.id === "r_copper")!;
+const KUPFERBOX = CONFIGS.find((c) => c.id === "r_bunt")!;
 const KUPFERLAGER = CONFIGS.find((c) => c.id === "c_copper_lager")!;
 
 function inZone(p: { x: number; z: number }, c: typeof KUPFERBOX): boolean {

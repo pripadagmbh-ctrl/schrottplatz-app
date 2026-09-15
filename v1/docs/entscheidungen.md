@@ -1312,3 +1312,227 @@ Drittel. Messung unter `docs/messungen/2026-09-15-greifanzeige/`.
    ohne Pedale oder Drehtasten zu berühren?
 4. **iPad quer:** Abholer rufen und gleichzeitig greifen — stehen beide Zeilen
    getrennt übereinander, ohne sich zu überdecken?
+
+---
+
+### E-028 — Silos als L an Westwand und Südwand, eine Mulde „BUNT + VA", Janine ans Tor (15.09.2026)
+
+**Entscheidung.** Drei Umzüge, die zusammengehören, plus zwei Befunde, die beim
+Nachrechnen aufgefallen sind.
+
+1. **Die Silo-Reihe wird ein L.** Drei Silos an der Westwand neben den Hallen
+   (x −36,0; z −3,4 · −8,0 · −12,6, Öffnung nach Osten), drei um die
+   Südwestecke an der Südmauer (z −25,0; x −30,0 · −25,4 · −20,8, Öffnung nach
+   Norden). Die Gasse ist ebenfalls ein L: x −28,0 und z −17,0, Ecke bei
+   (−28,0 | −17,0). Der Verladeplatz zieht mit auf (−25,5 | −8,0), die
+   Abholer-Spur auf x −18,0.
+2. **Aus drei Metallmulden wird eine** auf (−7,6 | −19,2), 4,2 × 6,0 m, mit
+   Alu, Zink, Kupfer, Messing, Kabel **und Edelstahl**. Sie ist ein **Puffer**,
+   kein Abrechnungsort (Ansage: „erstmal alles rausfischen in die Mulde tun und
+   dann später entweder ich oder Lambert das sortieren").
+3. **Janines Kaffeewagen steht wieder an der Nordmauer**, auf (−9,5 | 26,8),
+   östlich der Einfahrt neben den beiden Warteplätzen.
+
+**Begründung.** Ansagen Patricks vom 15.09.2026: „Das mit der Buntmetallmulde
+ist in Ordnung. Das heißt, du kannst da die Mulden alle wegmachen und machst
+nur noch eine Buntmetallmulde. Die Silos, die da links stehen, die sollen neben
+den Hallen stehen und dann ums Eck über die Südseite weitergehen, damit links
+die Seite erstmal frei ist. Janine kommt wieder an die Außengrenze, links neben
+dem Tor, da wo auch die LKWs parkieren."
+
+**Links ist +x.** Der Bagger schaut nach +z. Wer mit +y oben nach +z blickt,
+hat rechts = vorn × oben = z × y = −x, also **+x links**. Die Reihe stand am
+Vormittag auf x +6,5 — das ist die Seite, die Patrick „links" nennt, und die
+wird frei. Der Quelltext sagt dasselbe (`containers.ts`, Kopf von `CONFIGS`:
+„rechts vom Sitz = −x, links vom Sitz = +x"), und die Bezeichner lügen weiter:
+Behälter an der Westwand tragen `facing: "east"`, weil das die Richtung ihrer
+Öffnung ist, nicht ihr Standort. **Gelesen werden Koordinaten, nie Namen.**
+
+**Warum die Mulde „BUNT + VA" heißt.** Edelstahl hatte am Bagger bis heute
+überhaupt kein Ziel: Wer ihn aus einem Wrack fischte, bekam überall „falsche
+Zone" — offener Punkt seit dem 14.09. Patrick hat entschieden, ihn dazuzulegen.
+Fachlich ist VA aber kein Buntmetall, sondern legierter Stahl; eine Mulde
+namens „BUNTMETALL", in der Edelstahl richtig liegt, wäre eine Unwahrheit auf
+einem Schild. „BUNT + VA" sind zwei Abkürzungen, die auf einem Platz wirklich
+gesagt werden, passen in dieselbe Zeile wie „VA-LAGER" daneben und bleiben auch
+im Griff-HUD des iPhone mini lesbar. Verworfen: „NE-METALLE" (VA ist Eisen,
+also gerade kein NE), „BUNTMETALL + VA" (zu lang fürs Schild).
+
+**Was die eine Mulde im Geldkreislauf kostet: null Euro.** Verdient wird nicht
+an der Mulde, sondern beim Verkauf aus dem Container des Abholers
+(`economy/account.ts`, `sellContainer`) — dort zählt **jedes Stück mit seiner
+eigenen Fraktion**, und Lambert trägt jedes Stück einzeln in das Silo seiner
+Fraktion (`people.ts`, `muldeFuer` liest `item.materialId`, nicht die Mulde).
+Gerechnet an einer Fuhre von je 100 kg Alu, Zink, Kupfer, Messing und Kabel
+(`test/buntmetall.test.ts`, auf den Cent):
+
+| Weg | Erlös |
+|---|---|
+| Silos getrennt (gebaut) — drei Fuhren: 37,50 + 180,00 + 220,00 € | **437,50 €** |
+| Silos ebenfalls zusammengelegt — eine Fuhre, Reinheit 0,20³ | **28,80 €** |
+
+Ein gemeinsames **Lager**silo kostete also 408,70 € je 500 kg, **93 %**. Eine
+gemeinsame **Mulde am Bagger** kostet nichts. Deshalb: Mulde zusammen, Silos
+getrennt.
+
+**Was das Zusammenlegen wirklich ändert, ist die Ampel.** Wer Kupfer neben
+Kabel legt, bekommt kein „falsche Zone" mehr — und das ist jetzt richtig so:
+Die Mulde soll nicht tadeln, dass gemischt wird. Fremdstoff drückt weiterhin
+quadratisch: 100 kg Stahl unter 400 kg Nichteisen lassen vom Schildwert 64 %
+übrig. Eine **Sortierprämie** wird nirgends ausgezahlt — `SORTING_BONUS_PER_KG`
+steht in `account.ts`, wird aber von keiner Stelle gelesen; `noteSorted` zählt
+nur Kilogramm fürs Tutorial. Die Mulde tadelt also nichts und belohnt nichts;
+sie ist genau der Puffer, der sie sein soll.
+
+**Das Schild rechnet jetzt je Stoff** (`containerValueGemischt`). Vorher stand
+der ganze Inhalt zum Preis der Leitfraktion da — Messing zum Kupferpreis, Zink
+zum Alupreis; an der Beispielfuhre 1960 statt 1602 €, also **22 % zu viel**.
+Bei sechs Fraktionen in einem Behälter wäre daraus ein Sprung geworden:
+derselbe Inhalt zwischen 410 € (Leitfraktion Zink) und 3600 € (Kupfer). Die
+neue Rechnung ist gegen das Zusammenlegen unempfindlich — dieselben Stücke auf
+eine oder auf sechs Mulden verteilt ergeben dieselbe Summe.
+
+**Warum drei und drei, und nicht vier und zwei.** Auf der Westwand allein
+passten **sechs** (Mitten −2,725 bis −25,725) — die L-Form ist Patricks Bild,
+nicht Platznot. Die Aufteilung hängt an einer einzigen Zahl: Die Gasse des
+Südschenkels muss 5,0 m vor dessen Öffnungen liegen, also auf z −17,0, und ein
+LKW ist dort 3,10 m breit. Mit vier Westsilos reichte das unterste bis z
+−19,575 hinunter — der Wagen führe mitten hindurch. Mit drei endet es auf
+−14,975 und lässt 0,475 m Luft.
+
+**Die Südwestecke bleibt frei, und das ist gerechnet.** Ein Kipper, der in der
+Südgasse nach Westen fährt und hält, steht mit der Kabine 4,90 m vor seinem
+Haltepunkt. Ein Silo auf x −36,0 hätte ihn 1,20 m in die Westmauer geschickt;
+beim Zurückstoßen hätte er 4,90 m nach Norden in die Flanke des untersten
+Westsilos geragt. Die Südreihe beginnt deshalb erst auf x −30,0. In der Ecke
+**wendet die Gasse** — sie ist kein verlorener Platz, sondern die Kurve. Nach
+Osten ist Luft bis zur Presse (Rahmen ab x −10,375, offene Deckelklappe bis
+−11,85): dort passen noch zwei weitere Silos, ohne dass etwas umgebaut wird.
+
+**Zwei Fehler, die erst beim Drehen der halben Reihe sichtbar wurden.**
+
+1. **Die Muldenkörper drehten nicht mit.** Die sichtbaren Steine steckten in
+   einer gedrehten Gruppe, die Rapier-Kollider hingen an einem ungedrehten
+   Körper. Bei `facing: "east"` lag die physische Rückwand damit genau dort, wo
+   die sichtbare Öffnung war: **An der Müllmulde (−3,2 | −14,6) stand seit
+   heute Vormittag eine 2,2 m hohe unsichtbare Wand quer vor dem Einwurf.**
+   Dieselbe Klasse Fehler wie die „unsichtbare Barriere" vom 12.09.2026, nur
+   diesmal zwischen Bau und Physik statt zwischen Bau und Hindernisliste. Die
+   Zählzone (`containsPoint`) und Lamberts Halteplatz hatten denselben Fehler.
+   Behoben, indem Drehung, Umriss, Vorderkante und Rücken ab jetzt aus **einer**
+   Quelle kommen (`bayDrehung`, `bayHalb`, `bayVorderkante`, `bayRuecken`).
+2. **`test/fahrumriss.test.ts` war zwei Stunden lang grün, weil die Silo-Routen
+   `NaN` enthielten.** `bayApproach` bekommt seit dem Umbau einen Datensatz
+   statt einer z-Koordinate; der Test übergab weiter `c.z`, und jeder Vergleich
+   mit NaN ist falsch — die Trennachsenprüfung fand nie eine Überschneidung.
+   Die Tests laufen ohne `tsc` (`tsconfig.json` sammelt nur `src`), deshalb
+   fängt das kein Typ ab. Der Wächter prüft jetzt zuerst, ob jede Strecke aus
+   Zahlen besteht.
+
+**Die Mulde bekommt vorn eine Schwelle von 0,50 m — eine Lage Betonlego.**
+Wunsch Patrick vom 14.09.2026, heute bestätigt: vorn niedrig zumauern, damit
+nichts über die Vorderkante zurückrollt, „aber bei abgesenkter Kabine muss man
+noch hineinsehen können". Das ist eine Sichtlinie, keine Geschmacksfrage, und
+sie ist gerechnet. Augpunkt bei **abgesenkter** Kabine: **3,28 m**
+(`excavator.ts`: `cabGroup.position.y = 1,60` plus Augpunkt lokal 1,68 —
+dieselbe Zahl in `docs/baggerkonzept.md`, Tabelle „Augpunkt Kabine"). Der Blick
+streift die Wandkrone und trifft den Boden erst dahinter:
+
+    blind = h × D / (H − h)
+
+Die Baggerseite der Mulde läuft von (−5,5 | −22,2) bis (−5,5 | −16,2), also
+5,01 bis 8,04 m vom Sitz. Bei 4,20 m Muldentiefe:
+
+| Wandhöhe | toter Streifen | Boden sichtbar |
+|---|---|---|
+| **0,50 m (eine Lage)** | 0,90 … 1,45 m | **65 … 79 %** |
+| 1,00 m (zwei Lagen) | 2,20 … 3,53 m | 16 … 48 % |
+
+Ab **1,13 m** sieht man vom hinteren Ende der Mulde überhaupt keinen Boden
+mehr. Es wird deshalb **eine** Lage gebaut, nicht zwei. Die Schwelle steht an
+derselben Stelle wie die volle Stirnwand, ersetzt sie aber nicht:
+`shareEast` bleibt gesetzt, der Greifer fährt weiter frei darüber hinweg
+(`hitsObstacle` lässt alles über `top` passieren). Gebaut aus derselben
+`reihenstuecke()`-Quelle wie jede andere Reihe seit E-018, damit der letzte
+Stein bündig endet. Kollider und Hindernisliste führen sie mit — was gebaut und
+nicht verzeichnet ist, fällt Lambert und den LKW nicht auf.
+
+**Verworfene Alternativen.**
+
+- **Zwei Lagen (1,00 m) an der Mulde**: nimmt 52 bis 84 % des Bodens aus dem
+  Blick, siehe Tabelle.
+- **Die Lagersilos mitzusammenlegen**: kostet 93 % des Erlöses, siehe Tabelle.
+- **Vier Westsilos und zwei Südsilos**: Die Südgasse führte durch das vierte.
+- **Ein Silo in der Südwestecke** (x −36,0 oder −34,6): Kabine in der Mauer.
+- **Zwei Verladestände** (ein zweiter auf (−30,0 | −14,5) mit LKW-Spur auf
+  z −7,0 ist gerechnet): Der Abholer hält an genau einem Ort; das zu ändern ist
+  ein eigenes Paket.
+- **Die Gasse auf x −27,0** (6,0 statt 5,0 m vor den Öffnungen), um den geraden
+  Weg von der Waage zu bekommen: Sie läge dann 1,5 m neben dem Verladeplatz,
+  und jeder sortenreine Kipper bliebe stehen, solange der Spieler dort lädt.
+  Mit −28,0 sind es 2,5 m — dasselbe Maß wie vorher an der Ostwand.
+
+**Abnahmekriterium.** 548 Prüfungen in 51 Dateien grün, darunter:
+
+- `test/fahrumriss.test.ts`: 27 Strecken × 6 Fahrzeuglagen gegen 51 Bauwerke,
+  **null Durchdringungen** — und jeder Wegpunkt ist eine Zahl.
+- `test/platz.test.ts`: die vier Pflichtziele im Band (Mischschrott 7,91 ·
+  Stahlschrott 6,96 · Presse 8,28 · Müll 8,35), Abladeplatz 6,82, und **93 %
+  der Muldenachse von BUNT + VA** vom Sitz aus erreichbar (Mitte 7,83 m).
+- `test/silos.test.ts`: jede Fraktion findet ihr Lager; beide Schenkel in einer
+  Flucht mit 4,60 m Achsabstand; kein Silo in einer Mauer; die Ecke frei;
+  Lambert hält 2,20 m vor jeder Öffnung.
+- `test/janine.test.ts` (neu): der Kaffeewagen liegt auf keiner Sehne der vier
+  Anfahrten, verdrängt keinen Warteplatz und ist von der Waage aus zu Fuß
+  erreichbar, ohne den Arbeitsbereich zu queren.
+- `test/buntmetall.test.ts` (neu): die Euro-Zahlen oben, auf den Cent — und
+  die Schwelle vorn mit der Sichtrechnung, samt Gegenprobe, dass eine Lage mehr
+  durchfiele.
+
+Grundriss vorher/nachher: `docs/messungen/2026-09-15_silos-l-form.svg`.
+
+**Offen.**
+
+1. **Die Kipper fahren weiter die Silo-Gasse.** Patricks Ansage vom selben Tag
+   („Kipper fahren die falsche Spur. Die sollen auch, wie die anderen LKWs,
+   seitlich von mir abgeladen werden") ist **nicht** Teil dieses Pakets — sie
+   berührt die Zustandsmaschine in `vehicles.ts` und die Kippmechanik mit ihrer
+   eigenen Messgeschichte. Eigenes Paket.
+2. **Batterien haben ein Silo, aber keine Mulde am Bagger.** Dasselbe, was VA
+   bis heute fehlte. Sie gehören nicht in „BUNT + VA" (Gefahrgut, und der
+   Bleiakku im Kupfer drückt die Reinheit) — entweder eine eigene kleine Mulde
+   am Bagger oder ausdrücklich „fährt der Spieler hin".
+3. **Der Spieler kann nicht sortenrein aus der Mulde ins Silo** — dafür müsste
+   er 28 m fahren. Lambert kann es heute schon: Er greift ein Stück aus der
+   Mulde und trägt es in das Silo **seiner** Fraktion, unabhängig davon, in
+   welcher Mulde es lag. Ein Paket „Lambert räumt die Mulde auf Zuruf leer"
+   würde daraus den zweiten Sortierschritt machen, den Patrick beschreibt.
+4. **Drei von sechs Silos sind vom Verladeplatz aus erreichbar** (Kupfer,
+   Kabel, Alu — 8,80 · 7,50 · 8,80 m). Die drei Südsilos sind 15 bis 20 m weg.
+   Unverändert gegenüber der Ostwand, wo es dieselben drei waren.
+5. **Zehn Fuhren in Folge sind nicht simuliert.** Alle Strecken sind
+   geometrisch geprüft, keine in der echten Physik gefahren.
+6. **Bodies, Physik-ms und Haufenruhe sind ungemessen** — dafür braucht es
+   einen Lauf auf dem Gerät. Zählbar ist: 51 feste Bauwerke (vorher 53),
+   8 Mulden statt 10, also **sechs Netze weniger** (je Mulde zwei
+   InstancedMesh und ein Schild).
+
+**Auf dem Gerät zu prüfen.**
+
+1. **Aus dem Sitz nach vorn schauen, Kabine ganz unten:** Steht rechts nur noch
+   **eine** Mulde („BUNT + VA"), ist die Aufschrift lesbar — und siehst du über
+   die neue niedrige Schwelle hinweg auf den Muldenboden, oder verdeckt sie ihn?
+   Gerechnet sind 65 bis 79 % sichtbarer Boden.
+2. **In die Müllmulde greifen** (links vorn, Öffnung nach Osten): Kommt die
+   Spinne jetzt bis auf den Boden, oder stößt sie noch an etwas Unsichtbares?
+   Das war bis heute Vormittag eine unsichtbare Wand.
+3. **Mit V den Abholer rufen** und zum Verladeplatz fahren — er liegt jetzt
+   **rechts hinten** vor den Hallen, nicht mehr links: Erreichst du Silo und
+   Container, ohne umzusetzen, und stimmt der Betrag am Container mit dem
+   Schild am Silo überein?
+4. **Einen sortenreinen Kipper kommen lassen** (z. B. Batterien): Fährt er die
+   Gasse an der Westwand hinunter, um die Ecke und rückwärts in sein Silo —
+   oder bleibt er irgendwo stehen und hupt?
+5. **Zum Tor schauen:** Steht Janines Wagen an der Nordmauer neben den
+   Warteplätzen, und laufen die wartenden Fahrer zu ihr, ohne über den
+   Arbeitsbereich zu müssen?

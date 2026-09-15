@@ -28,7 +28,12 @@ import {
   SCHWENK_AUSSEN,
   abstandVomStand,
 } from "../src/world/baggerstand";
-import { CONFIGS, type ContainerConfig } from "../src/world/containers";
+import {
+  CONFIGS,
+  bayHalb,
+  bayVorderkante,
+  type ContainerConfig,
+} from "../src/world/containers";
 import {
   ABLADE_SPUR_X,
   ABLADE_HALT_Z,
@@ -47,8 +52,14 @@ import {
   YARD_MIN_X,
 } from "../src/world/yard";
 
-/** Die drei Mulden, die der Spieler selbst befüllt. */
-const SORTIERMULDEN = ["r_alu", "r_cable", "r_copper"];
+/**
+ * Die Mulden, die der Spieler selbst befüllt.
+ *
+ * Seit E-028 ist es EINE: die Buntmetall-Mulde. Aus den drei Metallmulden
+ * (Alu+Zink, Kabel, Kupfer+Messing) ist eine geworden — die dritte lag mit
+ * 12,26 m ohnehin ausserhalb des Schwenkbands.
+ */
+const SORTIERMULDEN = ["r_bunt"];
 
 function cfg(id: string): ContainerConfig {
   const c = CONFIGS.find((x) => x.id === id);
@@ -178,23 +189,32 @@ describe("Die vier Pflichtziele liegen im Schwenkband", () => {
     expect(Math.abs(winkel - 90), `${winkel.toFixed(0)}° statt quer`).toBeLessThan(25);
   });
 
-  it("die Metallmulden sind zweitrangig — hier steht, was von ihnen im Band liegt", () => {
+  it("die Buntmetall-Mulde liegt im Band — und zwar ganz (E-028)", () => {
     /*
-     * KEINE Zusicherung, sondern eine Bestandsaufnahme mit Zahl: Patrick
-     * entscheidet, was aus den drei Mulden wird. Faellt eine weitere aus dem
-     * Band, faellt es hier auf.
+     * Seit dem 15.09.2026 gibt es nur noch EINE Sortiermulde, und damit ist
+     * aus der Bestandsaufnahme eine Zusicherung geworden: Faellt sie aus dem
+     * Band, kann der Spieler ueberhaupt nicht mehr sortieren.
+     *
+     * Geprueft wird nicht nur die Mitte, sondern der erreichbare ANTEIL ihrer
+     * Achse. Bei 6,0 m Laenge ist das die Frage, die zaehlt — eine Mulde,
+     * deren Nordende 12 m weg liegt, ist zur Haelfte Deko (genau das war
+     * KUPFER + MESSING bis gestern).
      */
-    const drin = SORTIERMULDEN.map((id) => cfg(id)).filter((c) => {
-      const d = abstandVomStand(c.x, c.z);
-      return d >= SCHWENK_INNEN && d <= SCHWENK_AUSSEN;
-    });
-    expect(
-      drin.length,
-      "keine einzige Sortiermulde mehr in Reichweite — dann kann der Spieler nichts mehr sortieren"
-    ).toBeGreaterThanOrEqual(1);
-    // Stand 14.09.2026 abends: ALU+ZINK 7,28 m und KABEL 9,17 m sind drin,
-    // KUPFER+MESSING mit 12,31 m nicht.
-    expect(drin.map((c) => c.id)).toEqual(["r_alu", "r_cable"]);
+    const c = cfg("r_bunt");
+    const mitte = abstandVomStand(c.x, c.z);
+    expect(mitte, `BUNTMETALL: ${mitte.toFixed(2)} m`).toBeGreaterThanOrEqual(SCHWENK_INNEN);
+    expect(mitte, `BUNTMETALL: ${mitte.toFixed(2)} m`).toBeLessThanOrEqual(SCHWENK_AUSSEN);
+    const laenge = c.size[1];
+    let treffer = 0;
+    const schritte = 100;
+    for (let i = 0; i <= schritte; i++) {
+      const z = c.z - laenge / 2 + (laenge * i) / schritte;
+      const d = abstandVomStand(c.x, z);
+      if (d >= SCHWENK_INNEN && d <= SCHWENK_AUSSEN) treffer++;
+    }
+    const anteil = treffer / (schritte + 1);
+    expect(anteil, `nur ${(anteil * 100).toFixed(0)} % der Muldenachse erreichbar`)
+      .toBeGreaterThan(0.85);
   });
 
   it("der Verladeplatz liegt symmetrisch zwischen Silo und LKW-Spur", () => {
@@ -209,8 +229,8 @@ describe("Die vier Pflichtziele liegen im Schwenkband", () => {
      * westlich des Baggers statt oestlich. Gerechnet wird deshalb mit dem
      * Betrag — die Eigenschaft ist die Symmetrie, nicht das Vorzeichen.
      */
-    const silo = cfg("c_copper_lager");
-    const siloKante = silo.x - silo.size[0] / 2;
+    const silo = cfg("c_cable_lager");
+    const siloKante = bayVorderkante(silo).x;
     const zurSilo = Math.abs(siloKante - VERLADE_STAND.x);
     expect(zurSilo, `${zurSilo.toFixed(2)} m zur Silo-Vorderkante`).toBeGreaterThanOrEqual(
       SCHWENK_INNEN
@@ -344,8 +364,17 @@ describe("Nichts steht im anderen", () => {
       for (let j = i + 1; j < CONFIGS.length; j++) {
         const a = CONFIGS[i]!;
         const b = CONFIGS[j]!;
-        const dx = Math.abs(a.x - b.x) - (a.size[0] + b.size[0]) / 2;
-        const dz = Math.abs(a.z - b.z) - (a.size[1] + b.size[1]) / 2;
+        /*
+         * In WELTachsen gerechnet, nicht in Muldenachsen. Bei einer nach
+         * Norden offenen Mulde sind Tiefe und Laenge vertauscht; wer hier
+         * stur `size[0]` als x liest, prueft ein um 90 Grad verdrehtes
+         * Rechteck — und findet eine Ueberschneidung von 1,40 m nicht, die
+         * daneben steht. `bayHalb` liefert beides aus einer Quelle.
+         */
+        const ha = a.kind === "bay" ? bayHalb(a) : { hw: a.size[0] / 2, hd: a.size[1] / 2 };
+        const hb = b.kind === "bay" ? bayHalb(b) : { hw: b.size[0] / 2, hd: b.size[1] / 2 };
+        const dx = Math.abs(a.x - b.x) - (ha.hw + hb.hw);
+        const dz = Math.abs(a.z - b.z) - (ha.hd + hb.hd);
         expect(
           dx >= 0 || dz >= 0,
           `${a.label} und ${b.label} überschneiden sich um ` +

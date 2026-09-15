@@ -31,19 +31,21 @@ export const BAGGER_STAND: Stand = { x: -0.5, z: -22.5 };
  *
  * Von hier raeumt der Spieler aus den Silos in den Container des Abholers.
  * 7,5 m nach beiden Seiten — die Eigenschaft ist dieselbe wie seit E-010, nur
- * die Seite hat gewechselt: Seit dem 15.09.2026 steht die Silo-Reihe an der
- * Wand bei x +10,5, ihre Vorderkante liegt auf x +3,5. Der Bagger steht 7,5 m
- * davor auf −4,0, die LKW-Spur noch einmal 7,5 m weiter auf −11,5.
+ * die Seite hat wieder gewechselt: Seit E-028 steht der Westschenkel der
+ * Silo-Reihe auf x −36,0, seine Vorderkante liegt auf x −33,0. Der Bagger
+ * steht 7,5 m davor auf −25,5, die LKW-Spur noch einmal 7,5 m weiter auf
+ * −18,0.
  *
- * z +5,4: die Mitte des fuenften Silos von Norden (KUPFER-LAGER) — dorthin
- * geht die meiste Fuhre, und der Halt liegt weit genug suedlich, dass der
- * Abholer Janines Kaffeewagen nicht beruehrt. Gemessen: Seine Standflaeche
- * reicht 4,90 m nach vorn und 3,14 m nach hinten; von Sueden angesetzt endet
- * er auf z +10,3, der Kaffeewagen beginnt auf +14,1 — 3,8 m Luft.
+ * z −8,0: die Mitte des zweiten Silos von Norden (KABEL-LAGER). Der Punkt ist
+ * gerechnet, nicht gewaehlt: Bei 7,5 m Seitenabstand reicht der Arm in z noch
+ * sqrt(9,20² − 7,50²) = 5,33 m weit, also genau ueber einen Achsabstand von
+ * 4,60 m hinweg. Von hier sind drei Silos zu erreichen (8,80 · 7,50 · 8,80 m);
+ * jeder andere Halt auf der Reihe erreicht hoechstens zwei. Vier auf einmal
+ * ginge nicht — dafuer muesste der Arm 13,8 m ueberspannen.
  *
- * Vom Hauptstandplatz sind es hypot(3,5 | 27,9) = 28,1 m (vorher 27,1 m).
+ * Vom Hauptstandplatz sind es hypot(25,0 | 14,5) = 28,9 m (vorher 28,1 m).
  */
-export const VERLADE_STAND: Stand = { x: -4.0, z: 5.4 };
+export const VERLADE_STAND: Stand = { x: -25.5, z: -8.0 };
 
 /**
  * Das Schwenkband: näher als `SCHWENK_INNEN` bekommt der Arm den Ausleger

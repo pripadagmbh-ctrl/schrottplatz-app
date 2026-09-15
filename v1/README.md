@@ -88,33 +88,40 @@ Doppeltipp mit Ablauf nach vier Sekunden und die eigene Fahrfläche unten links.
 Doppeltipp rechts wechselt die Ansicht, rechten Daumen stillhalten öffnet den
 Funktionskranz.
 
-## Der Platz (Stand 14.09.2026, E-010)
+## Der Platz (Stand 15.09.2026, E-028)
 
 Der Bagger steht auf **(−0,5 | −22,5)** und schaut nach Norden, zur Waage und zur
 Einfahrt. Sein Standplatz kommt aus `src/world/baggerstand.ts` — dieselbe Quelle,
 aus der auch die Abnahmemessung rechnet. Wer ihn verschiebt, verschiebt ihn dort
 und nirgendwo sonst.
 
+**Aus dem Sitz gesehen ist +x LINKS und −x RECHTS** (der Bagger schaut nach +z;
+rechts = vorn × oben = z × y = −x). Die Bezeichner im Quelltext meinen etwas
+anderes: `facing: "east"` ist die Richtung, in die eine Mulde OFFEN ist, nicht
+ihr Standort. **Im Zweifel die Koordinaten lesen, nie den Namen.**
+
 ```
                           EINFAHRT (x −22, Nordwand)
-   BÜRO   WAAGE     [P] [P]      JANINE          ABFALL      (z 23,8)
+   BÜRO   WAAGE     [P] [P]   JANINE                       (z 26,8)
  ┌──────────────────────────────────────────────────────┐
- │ HALLE 1  ▶                                 BATTERIEN │
- │ HALLE 2  ▶                                 VA-LAGER  │
- │ HALLE 3  ▶      [P]     [B2]               ALU       │
- │                      Verladen              KUPFER    │
- │                     (−4 | 5,4)             KABEL     │  Silo-Reihe
- │          KUPFER+MSG                                  │  x +6,5
- │          KABEL         MÜLL     ▏Kipper              │
- │          ALU+ZINK   [B]         ▏          ABLADE-   │
- │   PRESSE                                     PLATZ   │
+ │ HALLE 1  ▶                                           │
+ │ HALLE 2  ▶                                           │
+ │ HALLE 3  ▶      [P]                                  │
+ │ KUPFER ▶                                             │
+ │ KABEL  ▶   [B2] Verladen (−25,5 | −8)   ◀ Abholer    │
+ │ ALU    ▶        │                         x −18      │
+ │            ╌╌╌╌╌┘ Gasse x −28                        │
+ │      ╌╌╌╌╌╌╌╌╌╌╌╌╌ Gasse z −17        BUNT+VA        │
+ │  ▲VA  ▲BATT  ▲ABFALL          MÜLL  ▏     [B]        │
+ │      z −25                          ▏Kipper ABLADE-  │
+ │                            PRESSE           PLATZ    │
  └──────────────────────┬──────────────────┬────────────┘
                         │  STAHL │ MISCH   │   Ausbuchtung
                         └────────┴─────────┘   (z −29 … −35,5)
 ```
 
-Stand 15.09.2026. `[B]` = Baggerstand, `[B2]` = Verladeplatz, `[P]` = Warteplatz,
-`▶` = Hallentor.
+`[B]` = Baggerstand, `[B2]` = Verladeplatz, `[P]` = Warteplatz, `▶`/`▲` = offene
+Seite (Hallentor bzw. Muldenöffnung).
 
 **Vier Pflichtziele im Schwenkbereich** plus Abladeplatz, alle gemessen von
 `(−0,5 | −22,5)` — bei Halden zur vorderen Kante, bei Mulden zur Mitte:
@@ -126,26 +133,41 @@ Stand 15.09.2026. `[B]` = Baggerstand, `[B2]` = Verladeplatz, `[P]` = Warteplatz
 | Presse | 8,28 m |
 | Müllmulde | 8,35 m |
 | Abladeplatz (Mitte der Ladefläche) | 6,82 m |
-| Mulde Alu + Zink | 7,28 m |
-| Mulde Kabel | 9,17 m |
-| Mulde Kupfer + Messing | 12,26 m — **nicht erreichbar**, offen seit E-024 |
+| Mulde BUNT + VA (−7,6 \| −19,2) | 7,83 m — 93 % ihrer Achse erreichbar |
 
 **Die Ausbuchtung** hinter dem Bagger wölbt sich nach Süden aus der Platzgrenze
 heraus, rundum mit 4,8 m hoher Wand. Darin die beiden Halden, getrennt durch eine
 Pyramide aus Betonlego — 0,6 bis 2,4 m hoch. Niedrig genug, dass der Zugriff von
 einer Halde zur anderen durchläuft.
 
-**Die Silo-Reihe** steht seit dem 15.09.2026 an der OSTwand (x +6,5), sechs
-Stück von Norden nach Süden: Abfall, Batterien, VA, Alu+Zink, Kupfer+Messing,
-Kabel. Stahl und Mischschrott haben bewusst kein Silo — sie werden direkt an der
-Halde verladen. Holz, Kunststoff und Baumisch sind zu einem ABFALL-Silo
-zusammengelegt: Alle vier Abfallsätze sind negativ (−0,02 bis −0,06 €/kg), sie
-werden entsorgt und nie bestellt. Das E-Motoren-Silo ist entfallen — es war eine
-Hülle ohne Fraktion.
+**Eine Mulde am Bagger statt dreier** (E-028): `BUNT + VA` fasst Alu, Zink,
+Kupfer, Messing, Kabel und Edelstahl. Sie ist ein **Puffer**, kein
+Abrechnungsort — „erstmal alles rausfischen in die Mulde tun und dann später
+entweder ich oder Lambert das sortieren" (Ansage 15.09.2026). Sortiert wird auf
+dem Weg ins Silo; deshalb bleiben die Lagersilos getrennt. Ein gemeinsames
+Lagersilo kostete gemessen 93 % des Erlöses (`test/buntmetall.test.ts`), eine
+gemeinsame Mulde kostet nichts.
 
-**Der Verladeplatz** (−4 | 5,4) liegt zwischen Silo-Reihe und LKW-Spur: 7,5 m zur
-einen, 7,5 m zur anderen Seite. Der Bagger steht dazwischen und greift aus dem
-Silo in den Container, ohne umzusetzen.
+Zum Bagger hin hat sie seit E-028 eine **Schwelle von 0,50 m** (eine Lage
+Betonlego), damit nichts über die Vorderkante zurückrollt. Die Höhe ist
+gerechnet, nicht gegriffen: Der Augpunkt bei abgesenkter Kabine liegt auf
+3,28 m (`excavator.ts`), die Wand ist 5,01 bis 8,04 m entfernt, und aus
+`blind = h × D / (H − h)` bleiben 65 bis 79 % des Muldenbodens im Blick. Zwei
+Lagen wären es nur noch 16 bis 48 %.
+
+**Die Silo-Reihe ist ein L** (E-028): drei an der WESTwand neben den Hallen
+(x −36, z −3,4 · −8,0 · −12,6, Öffnung nach Osten) — Kupfer+Messing, Kabel,
+Alu+Zink — und drei um die Südwestecke an der SÜDmauer (z −25, x −30,0 · −25,4 ·
+−20,8, Öffnung nach Norden) — VA, Batterien, Abfall. Die Gasse folgt dem L:
+x −28 und z −17, jeweils 5,0 m vor den Öffnungen. Stahl und Mischschrott haben
+bewusst kein Silo — sie werden direkt an der Halde verladen. Nach Osten ist an
+der Südmauer Platz für zwei weitere Silos.
+
+**Der Verladeplatz** (−25,5 | −8) liegt zwischen Silo-Reihe und LKW-Spur: 7,5 m
+zur Vorderkante der Westsilos (x −33), 7,5 m zur Spur des Abholers (x −18). Der
+Bagger steht dazwischen und greift aus dem Silo in den Container, ohne
+umzusetzen. Von dort erreicht er die drei Westsilos (8,80 · 7,50 · 8,80 m); zu
+den drei Südsilos muss er fahren.
 
 **Die Hallen** stehen südlich ans Bürogebäude gebaut an derselben Wand, Tor nach
 Osten auf den Platz (`TOR_RICHTUNG` in `src/world/office.ts`). Sie sperren nur
@@ -153,6 +175,12 @@ ihre Wände, nicht ihre Grundfläche — ein LKW fährt hinein. Zufahrt ist der 
 Mittelplatz: von der Waage nach rechts und geradeaus. Was darin passieren soll —
 Händler laden selbst ab, Lambert räumt in die Silos — steht in E-011 und ist noch
 nicht gebaut.
+
+**Janines Kaffeewagen** steht an der Nordmauer (−9,5 | 26,8), östlich der
+Einfahrt neben den beiden Warteplätzen — dort, wo die Fahrer nach dem Abladen
+ohnehin warten. Seine Lage ist ein Wächter wert (`test/janine.test.ts`): An zwei
+früheren Stellen hat er einmal einen Kipper 292 Sekunden lang aufgehalten und
+einmal die Abholer-Spur gedreht.
 
 ### Geldkreislauf
 
