@@ -41,17 +41,61 @@
       }
       #help { top: 12px; left: 12px; }
       #help b { color: #f0b429; }
-      #gripinfo { bottom: 12px; left: 50%; transform: translateX(-50%); font-size: 14px; }
-      /* Die Fahrpedale stehen unten links (Ansage Patrick 14.09.2026: "Pedale
-         links unten anordnen, sonst verdeckt er zu viel Sicht"). Griff-Info und
-         Ladeanzeige bleiben trotzdem angehoben: Beide sind mittig zentrierte
-         Zeilen, die bei langem Text bis in die linke Ecke reichen — auf dem
-         iPhone mini quer (812 px breit) deckt eine volle Ladungszeile den
-         Pedalbereich. Sie ruecken darum weiter darueber: 10 px Rand + 6 px Fassung + 84 px Pedal + 6 px Fassung
-         = 106 px Oberkante, plus 12 px Luft = 118 px. Die Ladeanzeige noch
-         einmal um die Hoehe der Griff-Info (39 px) plus Luft weiter hinauf. */
-      body.touch #gripinfo { bottom: 118px; }
-      body.touch #load { bottom: 163px; }
+      /* --- Unterer HUD-Block: Ladeanzeige und Griff-Info ---
+         Anlass (Patrick, 15.09.2026, iPhone mini): "Bei iPhone Mini wird auch
+         durch die Greifanzeige, also was gegriffen worden ist, die Sicht
+         verdeckt."
+
+         Drei Ursachen steckten darin, alle drei sind hier behoben:
+
+         1. Beide Zeilen waren mittig zentriert (left: 50%, translateX(-50%))
+            und wuchsen nach beiden Seiten. Auf dem iPhone mini hoch (375 px
+            breit) stand die Ladungszeile damit als schmale, hohe Saeule genau
+            dort, wo man beim Greifen hinsieht. Jetzt haengt der Block links am
+            freien Streifen und waechst nur nach rechts und oben.
+         2. Jede Zeile hatte ihren eigenen Abstand zum Bildrand (118 / 163 px).
+            Wurde die untere zweizeilig, schob sie sich unter die obere. Jetzt
+            stapelt ein Halter beide mit festem Zwischenraum — ueberlappen
+            koennen sie nicht mehr.
+         3. Die Anhebung auf 118 px stammte aus der Zeit, als die Fahrpedale
+            unten in der Bildmitte standen. Seit sie unten links sitzen
+            (14.09.2026), war die Anhebung nur noch uebrig — und schob eine
+            Textzeile mitten ins Bild.
+
+         Ohne Touch (Maus/Tastatur) bleibt alles wie gehabt: mittig am unteren
+         Rand, dort steht nichts im Weg. */
+      #hudunten {
+        position: fixed; left: 0; right: 0; bottom: 12px;
+        display: flex; flex-direction: column; align-items: center; gap: 6px;
+        pointer-events: none;
+      }
+      /* Im Stapel positioniert der Halter, nicht das Element selbst.
+         max-width haelt die Zeile im Streifen: Ohne sie waere der Kasten so
+         breit wie sein laengster unumbrechbarer Inhalt (die Liste) und liefe
+         ueber die Drehtasten hinaus.
+         Zeilenabstand 1,35 statt der 1,5 aus `.hud`: Das hier ist kein
+         Fliesstext, sondern ein Datenblock aus zwei Zeilen. Enger gesetzt
+         spart er auf dem iPhone mini hoch bei drei Zeilen 18 px Bildhoehe und
+         liest sich als ein Block statt als drei Meldungen. */
+      #hudunten .hud { position: static; max-width: 100%; line-height: 1.35; }
+      #gripinfo { font-size: 14px; }
+      /* Kopf: Zustand, Gewicht, Preis, Ampel. Darf umbrechen, nie abschneiden. */
+      #grip-kopf { display: block; }
+      /* Liste: was in der Spinne liegt. Genau eine Zeile; passt sie nicht,
+         endet sie mit "…". Verloren geht dabei nur der Schwanz der
+         Aufzaehlung — Gesamtgewicht und Ampel stehen im Kopf. */
+      #grip-liste {
+        display: block; color: #c8ced2;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      #grip-liste:empty { display: none; }
+      /* Nichts zu melden (offen, oder zu und leer): Der Kasten tritt zurueck.
+         Er bleibt lesbar — der Zustand des Greifers muss ablesbar sein —, sieht
+         aber nicht mehr aus wie eine Meldung. */
+      #gripinfo.ruhig {
+        background: rgba(20,22,24,0.45); border-color: rgba(255,255,255,0.06);
+        color: #c2c8cc;
+      }
       #money { top: 12px; right: 12px; font-size: 15px; color: #f0d060; }
       #shift { top: 46px; right: 12px; font-size: 13px; color: #f0d060; }
       /*
@@ -66,7 +110,37 @@
       @media (min-height: 431px) {
         body.touch #money, body.touch #shift { right: 68px; }
       }
-      #load { display: none; bottom: 44px; left: 50%; transform: translateX(-50%); font-size: 14px; white-space: nowrap; }
+      /* Touch: Der untere Block steht im freien Streifen zwischen den
+         Fahrpedalen (unten links) und den Drehtasten (rechts), linksbuendig.
+         Linksbuendig, weil die Zeile staendig ihre Laenge aendert — eine
+         zentrierte Zeile wandert bei jedem Wechsel hin und her.
+
+         Links:  12 px Rand + 6 px Fassung + 72 px + 18 px Luecke + 72 px
+                 + 6 px Fassung = 186 px Pedalkante, plus 12 px Luft = 198 px.
+         Rechts: 12 px Rand + 54 px Taste + 2 x 2 px Rahmen = 70 px, plus
+                 12 px Luft = 82 px. Der Rahmen zaehlt mit: Die Tasten stehen
+                 auf content-box, ohne ihn faehlten genau 4 px (Lehre aus der
+                 Messung 14.09.2026). */
+      body.touch #hudunten {
+        left: 198px; right: 82px; bottom: 10px; align-items: flex-start;
+      }
+      /* Telefon hoch (iPhone mini 375 x 812): Neben den Pedalen bleiben nur
+         189 px — zu wenig fuer eine Textzeile. Der Block geht darum ueber die
+         Pedale: 10 px Rand + 6 px Fassung + 84 px Pedal + 6 px Fassung
+         = 106 px Oberkante, plus 12 px Luft = 118 px. Die Breite endet
+         weiterhin links der Drehtasten, die im Hochformat bei 180 px ueber dem
+         Rand sitzen und sonst vom Block gestreift wuerden.
+
+         Eigene Abfrage, weil "max-height: 430px" nur das Querformat der
+         Telefone fasst: Im Hochformat ist ein iPhone 812 px hoch und laeuft
+         sonst mit den Tablet-Regeln (Befund 15.09.2026). */
+      @media (max-width: 500px) and (min-height: 431px) {
+        body.touch #hudunten { left: 12px; bottom: 118px; }
+      }
+      /* Kein white-space: nowrap mehr — in der Ladeanzeige ist jede Angabe
+         wichtig (Fraktion, Masse, Reinheit). Sie darf umbrechen, aber nichts
+         abschneiden. */
+      #load { display: none; font-size: 14px; }
       #debug { top: 80px; right: 12px; display: none; text-align: right; }
       #loading {
         position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
@@ -247,12 +321,17 @@
            Tastenleiste den Platz, sobald sie zweispaltig umbricht */
         #money { top: 8px; left: 8px; right: auto; font-size: 12px; padding: 4px 8px; }
         #shift { top: 34px; left: 8px; right: auto; font-size: 11px; padding: 4px 8px; }
-        #gripinfo { bottom: 6px; font-size: 12px; padding: 4px 10px; }
-        /* 6 px Rand + 5 px Fassung + 64 px Pedal + 5 px Fassung = 80 px
-           Oberkante, plus 10 px Luft; darueber die Ladeanzeige um die Hoehe der
-           flachen Griff-Info (28 px) plus Luft versetzt. */
-        body.touch #gripinfo { bottom: 90px; }
-        body.touch #load { bottom: 124px; }
+        #gripinfo, #load { font-size: 12px; padding: 4px 10px; }
+        /* Telefon quer: Hier ist das Bild flach, aber breit — neben den Pedalen
+           ist Platz genug, der Block muss nicht darueber.
+           Links:  8 px Rand + 5 px Fassung + 58 px + 14 px Luecke + 58 px
+                   + 5 px Fassung = 148 px Pedalkante, plus 8 px Luft = 156 px.
+           Rechts: 190 px (linke Drehtaste) + 46 px + 2 x 2 px Rahmen = 240 px,
+                   plus 12 px Luft = 252 px.
+           Damit sitzt der Block am unteren Rand statt wie bisher 90 px
+           darueber — er verdeckt genau das Stueck Boden vor der Maschine und
+           nicht mehr die Maschine selbst. */
+        body.touch #hudunten { left: 156px; right: 252px; bottom: 6px; }
         #toast { top: 60px; font-size: 12px; }
       }
       /* --- Pausenmenü --- */
@@ -374,6 +453,13 @@
          Muss hinter der Grundregel stehen: gleiche Spezifitaet, es zaehlt die Reihenfolge. */
       @media (max-height: 430px) {
         body.touch #tutorial { top: 66px; }
+      }
+      /* Telefon hoch: Oben rechts stehen Konto und Tagesablauf — auf 375 px
+         Breite reicht die Kontozeile mit rund 280 px fast ueber das ganze Bild
+         und lag bisher unter der Karte. Die Karte darum darunter
+         (12 px Rand + 41 px Konto + 31 px Tagesablauf = 84 px). */
+      @media (max-width: 500px) and (min-height: 431px) {
+        body.touch #tutorial { top: 84px; }
       }
       /* Die Karte selbst schluckt keine Beruehrung mehr: ein Daumen darauf
          setzt den Stick, nur der Ueberspringen-Knopf faengt seinen Tipp ab. */
@@ -499,10 +585,24 @@
       Z&nbsp;&nbsp;Platz ausbauen (Maschinen kaufen)<br />
       L&nbsp;&nbsp;Stand laden &nbsp;·&nbsp; N&nbsp;&nbsp;Neues Spiel
     </div>
-    <div id="gripinfo" class="hud">Greifer: offen</div>
     <div id="money" class="hud">Konto: 0 €</div>
     <div id="shift" class="hud">Annahme</div>
-    <div id="load" class="hud"></div>
+    <!--
+      Der untere HUD-Block. Ladeanzeige oben, Griff-Info darunter — beide in
+      einem Halter, der sie stapelt. Vorher hing jede einzeln mit eigenem
+      Abstand am Bildrand; wuchs die Griff-Info auf zwei Zeilen, schob sie sich
+      unter die Ladeanzeige (Befund 15.09.2026). Ein Stapel kann das nicht.
+
+      Die Griff-Info hat zwei Zeilen: Der Kopf traegt Zustand, Gewicht, Preis
+      und Ampel und darf umbrechen; die Liste zaehlt auf, was in der Spinne
+      liegt, bleibt auf einer Zeile und wird am Ende abgeschnitten.
+    -->
+    <div id="hudunten">
+      <div id="load" class="hud"></div>
+      <div id="gripinfo" class="hud ruhig">
+        <span id="grip-kopf">Greifer: offen</span><span id="grip-liste"></span>
+      </div>
+    </div>
     <div id="toast" class="hud" style="top: 56px; left: 50%; transform: translateX(-50%); opacity: 0; transition: opacity 0.4s; color: #f0d060;"></div>
     <div id="debug" class="hud"></div>
     <div id="touch">

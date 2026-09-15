@@ -279,32 +279,73 @@ describe("Platz auf dem Glas", () => {
     expect(css(handyHalter, "gap")).toBeGreaterThanOrEqual(12);
   });
 
-  it("schiebt Griff-Info und Ladeanzeige ueber die Pedale", () => {
-    // Beide sind mittig zentrierte Zeilen und reichen bei langem Text bis in
-    // die linke Ecke, in der die Pedale seit dem Geraetetest stehen.
-    // Die Griff-Info muss oberhalb der Pedaloberkante beginnen. Die Fassung um
-    // die Pedale zaehlt doppelt mit (oben und unten); vergisst man sie, fehlen
-    // genau die Pixel, die auf dem iPhone mini die Anzeige aufs Pedal
-    // geschoben haben (Messung 14.09.2026).
-    const oberkanteTablet =
-      css(tabletHalter, "bottom") + 2 * css(tabletHalter, "padding") + css(tabletPedal, "height");
-    const griffTablet = css(bloecke("body.touch #gripinfo")[0] ?? "", "bottom");
-    expect(griffTablet).toBeGreaterThan(oberkanteTablet);
-    // Und die Ladeanzeige wiederum ueber der Griff-Info.
-    expect(css(bloecke("body.touch #load")[0] ?? "", "bottom")).toBeGreaterThan(griffTablet);
-
-    const oberkanteHandy =
-      css(handyHalter, "bottom") + 2 * css(handyHalter, "padding") + css(handyPedal, "height");
-    const griffHandy = css(bloecke("body.touch #gripinfo")[1] ?? "", "bottom");
-    expect(griffHandy).toBeGreaterThan(oberkanteHandy);
-    expect(css(bloecke("body.touch #load")[1] ?? "", "bottom")).toBeGreaterThan(griffHandy);
+  it("laesst den unteren HUD-Zeilen einen Streifen neben oder ueber den Pedalen", () => {
+    /*
+     * GEAENDERT am 15.09.2026. Vorher hiess der Test "schiebt Griff-Info und
+     * Ladeanzeige ueber die Pedale" und verlangte: Die Griff-Info muss
+     * OBERHALB der Pedaloberkante beginnen (118 px auf dem Tablet, 90 px in
+     * der flachen Fassung) — denn beide Zeilen waren mittig zentriert, ohne
+     * Breitengrenze, und reichten bei langem Text bis in die linke Ecke, in
+     * der die Pedale stehen.
+     *
+     * Was davon weiter gilt und was nicht:
+     *  - Weiter gilt: Eine lange Zeile darf die Pedale nicht erreichen. Das
+     *    ist der Kern, und er wird hier weiter geprueft.
+     *  - Nicht mehr gilt: dass "darueber" der einzige Weg dorthin ist. Die
+     *    Zeilen stehen seit heute linksbuendig im freien Streifen und haben
+     *    eine Breitengrenze; sie koennen die Pedale nicht mehr erreichen.
+     *    "Darueber" schob statt dessen eine Textzeile mitten ins Bild — genau
+     *    das hat Patrick am 15.09.2026 am iPhone mini beanstandet.
+     *
+     * Die Fassung um die Pedale zaehlt weiter doppelt mit (oben und unten);
+     * vergisst man sie, fehlen genau die Pixel, die auf dem iPhone mini die
+     * Anzeige aufs Pedal geschoben haben (Messung 14.09.2026).
+     *
+     * Wo der Block wirklich landet, rechnet test/greifanzeige.test.ts aus:
+     * mit dem laengstmoeglichen Text und in allen DREI Fassungen — auch im
+     * Hochformat, das hier nie geprueft wurde.
+     */
+    const zahl = (block: string, feld: string): number | null => {
+      const m = new RegExp(`(?:^|[;{\\s])${feld}:\\s*(\\d+)px`).exec(block);
+      return m ? Number(m[1]) : null;
+    };
+    const frei = (block: string, pHalter: string, pedal: string): boolean => {
+      const links = zahl(block, "left");
+      const unten = zahl(block, "bottom");
+      const pedalRechts =
+        css(pHalter, "left") +
+        2 * css(pHalter, "padding") +
+        2 * css(pedal, "width") +
+        css(pHalter, "gap");
+      const pedalOben = css(pHalter, "bottom") + 2 * css(pHalter, "padding") + css(pedal, "height");
+      return (links !== null && links >= pedalRechts) || (unten !== null && unten >= pedalOben);
+    };
+    // Reihenfolge im Dokument: [0] Grundregel fuer Touch (iPad, Telefon hoch),
+    // [1] Telefon hoch, [2] die flache Fassung.
+    const halter = bloecke("body.touch #hudunten");
+    expect(halter.length, "die drei Fassungen des Halters fehlen").toBe(3);
+    expect(frei(halter[0], tabletHalter, tabletPedal), "Tablet-Streifen liegt auf den Pedalen").toBe(
+      true
+    );
+    expect(frei(halter[1], tabletHalter, tabletPedal), "Hochformat liegt auf den Pedalen").toBe(true);
+    expect(frei(halter[2], handyHalter, handyPedal), "flache Fassung liegt auf den Pedalen").toBe(
+      true
+    );
   });
 
   it("laesst dem flachen Layout noch Bild uebrig", () => {
-    // iPhone mini quer ist 375 px hoch. Pedale, Griff-Info und Ladeanzeige
-    // stapeln sich unten in der Mitte; zusammen duerfen sie nicht das halbe
-    // Bild fuellen, sonst sieht man den Platz nicht mehr.
-    const oben = css(bloecke("body.touch #load")[1] ?? "", "bottom") + 28;
+    /*
+     * iPhone mini quer ist 375 px hoch. Pedale und die beiden HUD-Zeilen
+     * stapeln sich unten; zusammen duerfen sie nicht das halbe Bild fuellen,
+     * sonst sieht man den Platz nicht mehr.
+     *
+     * GEAENDERT am 15.09.2026: Gemessen wird am Halter statt an der einzelnen
+     * Ladeanzeige, weil beide Zeilen jetzt in einem Stapel stehen. Der
+     * Zuschlag ist von 28 px (eine flache Textzeile) auf 100 px gewachsen —
+     * so hoch wird der Stapel im schlimmsten Fall aus BEIDEN Zeilen zusammen.
+     * Die Rechnung dazu steht in test/greifanzeige.test.ts.
+     */
+    const oben = css(bloecke("body.touch #hudunten")[2] ?? "", "bottom") + 100;
     expect(oben).toBeLessThan(375 / 2);
   });
 
