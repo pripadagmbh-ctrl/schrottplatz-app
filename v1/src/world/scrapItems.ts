@@ -668,6 +668,34 @@ export function resteFuerPaket(anteile: Array<{ materialId: string; massKg: numb
 }
 
 /**
+ * Absolute Massen (`ScrapItem.composition`, in kg) in relative Anteile
+ * (`ScrapShape.zusammensetzung`, 0..1) umrechnen — die Form eines Presspakets.
+ *
+ * Warum zwei Schreibweisen fuer dieselbe Sache: Am TEIL stehen Kilogramm, weil
+ * die Wirtschaft in Kilogramm rechnet. An der FORM stehen Anteile, weil eine
+ * Form nicht weiss, wie schwer das Stueck ist, das aus ihr gebaut wird — der
+ * Katalog beschreibt so einen Kuehlschrank, egal ob er 55 oder 62 kg wiegt.
+ * `spawnScrap` rechnet beim Anlegen zurueck (`anteil × massKg`), und weil die
+ * Masse des Pakets genau die Summe seiner Bestandteile ist, kommt dabei wieder
+ * exakt dasselbe heraus.
+ *
+ * Null Kilo bleiben null Kilo: Platzinventar, das in der Presse verschwindet,
+ * bringt auch als Teil eines Pakets kein Geld (E-079).
+ */
+export function zusammensetzungAus(
+  composition: Array<{ materialId: string; massKg: number }> | undefined,
+  vorgabe: string
+): Anteil[] | undefined {
+  if (!composition || composition.length === 0) return undefined;
+  const summe = composition.reduce((a, c) => a + c.massKg, 0);
+  // Ein Paket ganz ohne Masse — nur Platzinventar. Es behaelt seine Null.
+  if (summe <= 0) return [{ materialId: vorgabe, anteil: 0 }];
+  return composition
+    .filter((c) => c.massKg > 0)
+    .map((c) => ({ materialId: c.materialId, anteil: c.massKg / summe }));
+}
+
+/**
  * Ein Rest der Ursprungsform, roh und ungefärbt — der Aufrufer setzt Farbe,
  * Drehung und Sitz.
  *
@@ -2077,7 +2105,34 @@ export class ItemManager {
       massKg,
       mesh,
       body,
-      shape: { kind: "box", dims, color: mat.color, flat: true },
+      shape: {
+        kind: "box",
+        dims,
+        color: mat.color,
+        flat: true,
+        /*
+         * Die Zusammensetzung wandert MIT DER FORM, nicht nur am Teil.
+         *
+         * Sie hing bis zum 16.09.2026 allein an `ScrapItem.composition`, und
+         * das ueberlebt keinen Spielstand: Gesichert wird je Teil nur
+         * `materialId`, `massKg` und `shape` (`core/save.ts`, `SavedItem`),
+         * und wiederhergestellt wird ueber `spawnScrap`, das die
+         * Zusammensetzung ausschliesslich aus `shape.zusammensetzung` liest
+         * (oben in dieser Datei). Ein Presspaket hatte dort nichts stehen —
+         * also war es nach jedem Laden ein Klumpen aus einem einzigen Stoff.
+         *
+         * Was das kostete, ist gemessen (`tools/pressbilanz.ts`): Ein Paket
+         * aus dem KUPFER-LAGER (64 kg Kupfer + 217 kg Messing, zusammen
+         * 281 kg) brachte 556,46 € — nach einem Neuladen 44,96 €, weil die
+         * ganze Masse als Mischschrott zaehlte. Faktor 12,4, und zwar
+         * unsichtbar: Am Paket war nichts zu sehen, was sich geaendert haette.
+         *
+         * Dieselbe Loesung wie bei `massiv` (E-042): Was ein Stueck IST,
+         * gehoert an das Stueck und nicht an seine Entstehungsgeschichte.
+         * Kostet ein Feld im Spielstand und keine Zeile in `save.ts`.
+         */
+        zusammensetzung: zusammensetzungAus(composition, materialId),
+      },
       composition,
     });
   }

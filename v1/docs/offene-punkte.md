@@ -48,8 +48,25 @@ erledigt ist, bekommt den Commit dazu.
       Sechstel der Masse ein Stück von sich: Blech, Rohr, Felge oder
       Kantstück, in derselben verschmolzenen Geometrie, also weiter ein
       Zeichenruf je Ballen.
-- [ ] **Schere trennt nicht sortenrein** — was in die Presse geht, kommt als
-      Mischschrott heraus.
+- [x] **Schere trennt nicht sortenrein** — was in die Presse geht, kommt als
+      Mischschrott heraus. **Nachgemessen und behoben 16.09.2026 (E-091).**
+      Beim Geld war die Presse schon sauber: Fünf Kupferteile ergaben ein
+      Kupferpaket, und der Erlös war vor und nach dem Zuschlagen auf den Cent
+      derselbe. Kaputt waren zwei andere Dinge. **Erstens** galt an der Presse
+      eine strengere Regel als auf dem Platz — sie verlangte 95 % EINES
+      STOFFES, während ein Teil auf dem Platz bis 10 % Fremdstoff Stahlschrott
+      bleibt (E-042). Fünf Stücke, die jedes für sich Stahlschrott sind, kamen
+      als Mischschrott heraus. **Zweitens** verlor das Paket seine
+      Zusammensetzung beim Speichern: Sie stand nur am Teil, gesichert wird
+      aber nur die Form. Ein Ballen aus 64 kg Kupfer und 217 kg Messing war
+      556,46 € wert und nach einem Neuladen 44,96 €; ein Ballen aus vier
+      Abfallsorten kostete 0,60 € Gebühr und brachte nach dem Laden 12,48 €
+      Gutschrift — man konnte Müll pressen, neu laden und wurde dafür bezahlt.
+      Beides zu, `test/presspaket.test.ts` hält es fest.
+      **Offen und bewusst nicht entschieden:** Kupfer und Messing gehören in
+      DIESELBE Mulde (KUPFER-LAGER, E-029), das Schild zeigt „100 %
+      sortenrein" — zusammen gepresst ergeben sie trotzdem einen Mischballen.
+      Dasselbe für ALU-LAGER, BUNT+VA und die Müllmulde.
 - [ ] **Misch- und Stahlschrott unterscheiden** — getrennt verkaufen, Stahl
       erzielt den besseren Preis.
 

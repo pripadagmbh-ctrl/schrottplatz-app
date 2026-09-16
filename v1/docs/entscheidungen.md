@@ -8007,3 +8007,111 @@ Rückgabewerte 0.
    statt 4,20 — die Nachbarwände stehen ineinander. Sieht man das?
 
 ---
+### E-092 — Die Presse rechnet in Fraktionen, und das Paket trägt seine Zusammensetzung in den Spielstand (16.09.2026)
+
+**Befund Patrick** (`docs/offene-punkte.md`, Gerätetest): „Schere trennt nicht
+sortenrein — was in die Presse geht, kommt als Mischschrott heraus."
+
+---
+
+#### Zuerst nachgemessen, bevor etwas geändert wurde
+
+Der Weg eines Stücks durch die Presse ist mit echter Physik durchgespielt
+worden (`tools/pressprobe.ts`) und die Rechnung dahinter kopflos
+(`tools/pressbilanz.ts`). Ergebnis in einem Satz: **Die Presse selbst war beim
+Geld schon sauber** — fünf Kupferteile ergaben ein Kupferpaket, und der Erlös
+war vor und nach dem Zuschlagen auf den Cent derselbe (0,00 € Unterschied in
+allen zwölf gemessenen Fällen). Das hatte E-071 erledigt.
+
+Gefunden wurden dafür **zwei andere Löcher**, beide unsichtbar:
+
+**Loch 1 — an der Presse galt eine strengere Regel als auf dem ganzen Platz.**
+`world/press.ts` legte `SORTENREIN_AB` (95 %) an die **Stoffliste** an: Was zu
+weniger als 95 % aus EINEM Stoff bestand, hieß Mischschrott. Auf dem Platz gilt
+aber `fraktionVonTeil`, und die lässt Stahl bis **10 %** Fremdstoff
+(`VERBUND_BIS`, E-042: „ein Tank mit Dichtungen ist Stahlschrott"). Fünf
+Stücke, die jedes für sich Stahlschrott sind, weil sie 9 % Gummi tragen, kamen
+also als Mischschrott heraus. Pressen machte Sortierarbeit kaputt.
+
+**Loch 2 — das Paket verlor seine Zusammensetzung beim Speichern.** Sie stand
+nur am Teil (`ScrapItem.composition`). Gesichert wird je Teil aber nur
+`materialId`, `massKg` und **`shape`** (`core/save.ts`, `SavedItem`), und
+`spawnScrap` stellt sie ausschließlich aus `shape.zusammensetzung` wieder her.
+Ein Presspaket hatte dort nichts stehen — nach jedem Neuladen war es ein
+Klumpen aus einem einzigen Stoff. Gemessen:
+
+| Paket | vor dem Laden | nach dem Laden (bis 16.09.) |
+|---|---:|---:|
+| KUPFER-LAGER, 64 kg Cu + 217 kg Ms | **556,46 €** | **44,96 €** (Faktor 12,4 weg) |
+| Mischschrott, 267 kg aus fünf Stücken | 9,43 € | 42,72 € (4,5× zu viel) |
+| Abfall, 78 kg aus vier Sorten | **−0,60 € Gebühr** | **+12,48 € Gutschrift** |
+
+Die letzte Zeile ist die schlimmste: Man konnte Abfall pressen, neu laden und
+wurde für seine Entsorgung **bezahlt** — weil Mischschrott einen positiven
+Preis hat und das Paket nach dem Laden als reiner Mischschrott zählte.
+
+---
+
+#### Entscheidung
+
+1. **Das Etikett eines Pakets kommt aus den FRAKTIONEN, nicht aus den
+   Rohstoffen.** Die Regel in einem Satz: *Ein Paket ist so sortenrein wie das,
+   was hineinging.* Gleiche Fraktion hinein, gleiche Fraktion heraus;
+   verschiedene hinein, Mischschrott heraus. Besser wird nichts durchs Pressen
+   — `fraktionAus` verlangt weiterhin 95 % EINER Fraktion. Gewichtet wird mit
+   der **wirtschaftlichen** Masse, damit Platzinventar (der Kehrbesen besteht
+   aus nichts, E-079) keine Stimme über den Namen des Pakets bekommt.
+2. **Die Zusammensetzung wandert an die FORM** (`shape.zusammensetzung`) und
+   damit ohne eine Zeile in `save.ts` in den Spielstand. Dieselbe Lösung wie
+   bei `massiv` (E-042): Was ein Stück IST, gehört an das Stück und nicht an
+   seine Entstehungsgeschichte.
+
+**Begründung.** Der Platz sortiert in Fraktionen — danach entscheidet der
+Spieler, danach rechnet das Muldenschild, danach bestellt der Abholer. Eine
+Maschine mitten auf diesem Platz, die nach einer zweiten, strengeren Regel
+urteilt, ist ein Widerspruch, den niemand sehen kann.
+
+**Verworfene Alternative.** `SORTENREIN_AB` von 95 auf 90 % senken, damit beide
+Regeln zusammenfallen. Das hätte dieselbe Schwelle für JEDES Teil im Spiel
+verschoben (Katalog, Container, Anlieferung) und wäre Balancing gewesen — genau
+das, was hier nicht gefragt war.
+
+**Nicht entschieden** (gehört Patrick, nicht mir):
+
+* Ob ein Paket aus **Kupfer und Messing** Mischschrott sein soll. Beide gehören
+  laut `containers.ts` in dieselbe Mulde („KUPFER-LAGER", E-029), und das
+  Muldenschild zeigt dafür „100 % sortenrein" — die Presse macht daraus ein
+  Mischpaket. Physikalisch ist das richtig (wer Cu und Ms zusammen presst, hat
+  einen Mischballen), wirtschaftlich stehen Schild und Paket auseinander.
+  Dasselbe für ALU-LAGER (Al + Zn), BUNT+VA (sechs Fraktionen) und die
+  Müllmulde (vier Abfallsorten).
+* Der **Abstand zwischen Muldenschild und Kasse** (Befunde W-1 bis W-10 in
+  `docs/fraktionen.md`) bleibt unberührt. Er ist kein Pressefehler.
+* `press.getBaleBonus` (der Faktor 1,6 aus der großen Presse, `main.ts:713`)
+  wird **nirgends benutzt**. Aufgefallen, nicht angefasst — das wäre eine
+  Änderung am Verdienst.
+
+**Abnahmekriterium.** `npm run build` mit Rückgabewert 0 GEPRÜFT. `npm test`
+mit Rückgabewert 0 GEPRÜFT: **111 Dateien, 1.299 Prüfungen** (vorher 110 /
+1.286 — dreizehn neue in `test/presspaket.test.ts`). Der neue Wächter ist
+gegen den ALTEN Presse-Code laufen gelassen worden und ist dabei rot geworden
+(„was jedes für sich Stahlschrott ist, bleibt es auch als Paket") — er bewacht
+also etwas.
+
+**Was sich am Verdienst verschiebt.** Gemessen über **96 Tage à 12 Fuhren,
+3.037 Pakete** (`tools/pressbilanz.ts`): Das neue Etikett ändert **kein
+einziges** Paket und **0,00 €** — es schließt ein Loch, das der heutige Katalog
+noch nicht trifft. Verschoben wird nur, was ein Spielstand kaputtmachte: Wer
+sortenrein presst und neu lädt, bekam bisher **5,0 % zu viel** für seine Ballen
+(321 € je Tag bei 8.810 € Tagesumsatz und 21 t Umschlag); wer über Fraktionen
+hinweg presste, verlor bis zu 92 %. Beides ist weg.
+
+**Auf dem Gerät zu prüfen.**
+
+1. **Fünf Kupferteile in die Presse, zuschlagen.** Heißt das Paket „Kupfer"
+   und ist es kupfern — oder steht da Mischschrott?
+2. **Ein Paket liegen lassen, Seite neu laden, dann verkaufen.** Der Betrag muss
+   derselbe sein wie vor dem Neuladen. Vorher sprang er, je nach Paket, um das
+   Zwölffache nach unten oder das Viereinhalbfache nach oben.
+3. **Vier Abfallsorten pressen, neu laden, abholen lassen.** Es muss **Geld
+   kosten**. Bis heute bekam man dafür welches.
