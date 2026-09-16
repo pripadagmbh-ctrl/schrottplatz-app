@@ -62,8 +62,10 @@ import {
   rollCustomer,
   vehicleForCustomer,
   fahrerfunk,
+  anliefererfunk,
   ABHOLFAHRER,
   type Fahrerlage,
+  type Anliefererlage,
   type CustomerProfile,
 } from "./customers";
 import { buildVehicleModel, wandHoehe, brueckenKeilEcken, type Rad } from "./vehicleModel";
@@ -585,6 +587,51 @@ class DeliveryVehicle {
   private nudgeReturn: Phase = "waitUnload";
   private nudgeTargetS = 0;
 
+  /**
+   * DIE FRIST IST UM: Er faehrt mit dem, was er gebracht hat (E-082).
+   *
+   * Drei Dinge gehoeren zusammen, und alle drei aus demselben Grund — WAS
+   * NICHT ABGELADEN WURDE, WIRD NICHT BEZAHLT:
+   *
+   *  1. Er sagt es. Ein Wagen, der klammheimlich verschwindet, sieht aus wie
+   *     ein Fehler des Spiels.
+   *  2. Die Fuhre wird fuer die Fahrt verriegelt (das erledigt `sendAway`),
+   *     die Karosse eines Wracks dazu — sie liegt nicht in `itemQuelle` und
+   *     wuerde sonst beim Anfahren vom Blech rutschen.
+   *  3. `ladungFaehrtMit` merkt sich, dass sie den Hof verlaesst. Ohne das
+   *     stellt `despawn()` sie an der Ausfahrt ab (dort ist das richtig: Wer
+   *     abgeladen HAT, soll seine Reste nicht mitnehmen) — und der Spieler
+   *     bekaeme eine ganze Fuhre geschenkt, indem er vier Minuten wartet.
+   *
+   * AM KREISLAUF WIRD NICHTS ANGEFASST. Die Ausfahrtswiegung rechnet weiter,
+   * wie sie immer gerechnet hat: brutto minus dem, was noch oben liegt. Steht
+   * alles noch auf der Flaeche, ist das Netto null und es fliesst kein Geld.
+   * Wurde die Haelfte abgeladen, wird die Haelfte bezahlt. Kein neuer Satz
+   * Regeln, nur ein Wagen, der endlich faehrt.
+   */
+  private faehrtUnverrichtet(): void {
+    this.onAnliefererlage?.("faehrtUnverrichtet");
+    /*
+     * WAS DIE WAAGE GEZAEHLT HAT, FAEHRT MIT. Nicht `aufDerFlaeche`, sondern
+     * `wiegtMit`: Das engere Fenster laesst eine hoch aufgetuermte Fuhre
+     * oben offen. Gemessen am 16.09.2026 — eine Pritsche fuhr mit 56 kg
+     * Differenz hinaus, weil ein Stueck ueber 3 m Hoehe nicht gekoppelt
+     * wurde, unterwegs herunterfiel und an der Ausfahrt fehlte. Bezahlt
+     * worden waere es trotzdem.
+     */
+    this.bedGroup.updateWorldMatrix(true, false);
+    const schon = new Set(this.riding.map((r) => r.body.handle));
+    for (const it of this.cargo.items) {
+      if (schon.has(it.body.handle)) continue;
+      if (this.wiegtMit(it.body)) this.lockToBed(it.body);
+    }
+    if (this.cargo.car && this.wiegtMit(this.cargo.car.body, 0.6)) {
+      this.lockToBed(this.cargo.car.body);
+    }
+    this.ladungFaehrtMit = true;
+    this.sendAway();
+  }
+
   sendAway(): boolean {
     if (this.phase === "out") return false;
     // Was noch oben liegt, faehrt mit — sonst verliert der Wagen es unterwegs
@@ -662,6 +709,53 @@ class DeliveryVehicle {
   private static readonly WARTE_FUNK_S = 25;
   /** Schon gesagt? Sonst redet er in jedem Bild. */
   private warteFunkGehabt = false;
+
+  /**
+   * WIE LANGE EIN FAHRZEUG AUF DIESEM HOF STEHT — eine Zahl, nicht zwei.
+   *
+   * Der Abholer hatte sie seit jeher (`phaseT > 240` im `waitLoad`, am Geraet
+   * abgenommen); der Anlieferer hatte gar keine und stand unbegrenzt. Im
+   * kopflosen Lauf zu E-070 blieb eine Pritsche ZEHN MINUTEN am Abladeplatz
+   * und hielt dabei eine vorgemerkte Abholung auf — der Platz ist einspurig
+   * (E-029), solange einer steht, kommt kein naechster.
+   *
+   * 240 s gelten ab jetzt fuer beide. Begruendung fuer genau diese Zahl:
+   *
+   *  - Sie ist NICHT neu. Sie steht seit dem Abholer im Spiel und hat sich am
+   *    Geraet als „lang genug zum Arbeiten" erwiesen. Zwei verschiedene
+   *    Standzeiten auf demselben Hof waeren zwei Regeln, die der Spieler
+   *    nirgends nachlesen kann.
+   *  - Sie liegt weit ueber dem, was Abladen kostet: Eine Pritsche ist mit
+   *    einer Handvoll Griffen leer.
+   *  - Sie liegt weit ueber den 32 s, nach denen die Preisverhandlung
+   *    abbricht — Abladen ist Arbeit, Verhandeln ist ein Klick.
+   *  - Und sie ist kurz genug, dass der Hof nicht steht: Nach der Abfahrt
+   *    steht der naechste Wagen 34,4 s spaeter vor der Waage (E-070).
+   */
+  static readonly STANDZEIT_S = 240;
+
+  /**
+   * Die Mahnung kommt eine Minute vor Schluss. SW: 60 s — genug fuer zwei,
+   * drei Griffe, also lang genug, dass die Ansage noch etwas nuetzt. Sie
+   * haengt an der Standzeit und ist keine zweite Zahl: Wird oben gedreht,
+   * wandert die Mahnung mit.
+   */
+  static readonly MAHNUNG_VOR_S = 60;
+  /** Schon gemahnt? Sonst redet er in jedem Bild (wie `warteFunkGehabt`). */
+  private abladeMahnungGehabt = false;
+  /**
+   * Faehrt er mit seiner Fuhre vom Hof? Dann wird sie beim Abraeumen NICHT
+   * neben dem Wagen abgestellt (`despawn`) — sie war nie abgeladen und ist
+   * folglich auch nie bezahlt worden.
+   */
+  private ladungFaehrtMit = false;
+
+  /**
+   * Der Anlieferer sagt etwas — derselbe Weg wie `onFahrerlage` bei Achim:
+   * Am Fahrzeug steht der ZEITPUNKT, die Worte stehen in `customers.ts`, und
+   * wo sie erscheinen, entscheidet das HUD.
+   */
+  onAnliefererlage: ((lage: Anliefererlage) => void) | null = null;
 
   /**
    * Die beiden Wiegungen des Abholers (E-064) — reine Meldungen.
@@ -1156,7 +1250,15 @@ class DeliveryVehicle {
    */
   ladeFuellung = 0;
 
+  /**
+   * Der Verbund-Verwalter, gemerkt beim Beladen. Gebraucht wird er genau
+   * einmal: Faehrt ein Wrack unverrichtet wieder vom Hof (E-082), muss die
+   * Karosse mit — und sie liegt nicht im `ItemManager`, sondern hier.
+   */
+  private composites: CompositeManager | null = null;
+
   loadCargo(items: ItemManager, composites: CompositeManager): void {
+    this.composites = composites;
     this.group.updateWorldMatrix(true, true);
     if (this.isPickup) return; // Abholer kommt leer — der Spieler belädt ihn
     if (this.kind === "wrack") {
@@ -1423,26 +1525,44 @@ class DeliveryVehicle {
    * Abgekippter Schrott neben dem Fahrzeug darf nicht mitzählen, sonst fiele
    * das Nettogewicht zu niedrig aus.
    */
+  /** Rechenhilfe fuer `wiegtMit` — kein neues Feld je Abfrage. */
+  private waagePos = new THREE.Vector3();
+
+  /**
+   * DAS FENSTER DER BRUECKENWAAGE: Wiegt sie dieses Stueck mit?
+   *
+   * Stand bis E-082 als anonyme Hilfsfunktion IN `cargoMassKg` und war damit
+   * von aussen nicht zu beantworten. Das war genau ein Stueck weit zu eng:
+   * Wenn ein Wagen unverrichtet wieder abfaehrt, muss das, was die Waage beim
+   * Hereinfahren gezaehlt hat, beim Hinausfahren noch oben liegen — sonst
+   * faellt die Differenz an, und der Spieler bekaeme Geld fuer Schrott, der
+   * unterwegs vom Blech gerutscht ist.
+   *
+   * Es ist ABSICHTLICH weiter als `aufDerFlaeche` (bis 5 m hoch statt 3 m):
+   * Eine hoch aufgetuermte Fuhre wiegt vollstaendig, auch wenn nur der untere
+   * Teil an die Mulde gekoppelt wird.
+   */
+  private wiegtMit(b: RAPIER.RigidBody, extra = 0): boolean {
+    if (!b.isValid()) return false;
+    const p = b.translation();
+    this.waagePos.set(p.x, p.y, p.z);
+    this.bedGroup.worldToLocal(this.waagePos);
+    const l = this.waagePos;
+    return (
+      Math.abs(l.x) < BED_HALF_W + 0.5 + extra &&
+      l.z > -0.5 - extra &&
+      l.z < this.bedLen + 0.5 + extra &&
+      l.y > -0.4 &&
+      l.y < 5.0 // hoch aufgetürmte Ladung zählt mit
+    );
+  }
+
   cargoMassKg(): number {
     let sum = 0;
-    const local = new THREE.Vector3();
-    const onBed = (b: RAPIER.RigidBody, extra = 0): boolean => {
-      if (!b.isValid()) return false;
-      const p = b.translation();
-      local.set(p.x, p.y, p.z);
-      this.bedGroup.worldToLocal(local);
-      return (
-        Math.abs(local.x) < BED_HALF_W + 0.5 + extra &&
-        local.z > -0.5 - extra &&
-        local.z < this.bedLen + 0.5 + extra &&
-        local.y > -0.4 &&
-        local.y < 5.0 // hoch aufgetürmte Ladung zählt mit
-      );
-    };
     for (const it of this.cargo.items) {
-      if (onBed(it.body)) sum += it.massKg;
+      if (this.wiegtMit(it.body)) sum += it.massKg;
     }
-    if (this.cargo.car && onBed(this.cargo.car.body, 0.6)) sum += 950;
+    if (this.cargo.car && this.wiegtMit(this.cargo.car.body, 0.6)) sum += 950;
     return sum;
   }
 
@@ -1992,7 +2112,10 @@ class DeliveryVehicle {
         }
         // Abhol-LKW wartet, bis der Spieler den Container beladen hat und
         // die Abfahrt freigibt (Taste V) — oder bis die Standzeit abläuft.
-        if (this.releaseRequested || this.phaseT > 240) {
+        // Die 240 s stehen seit E-082 als `STANDZEIT_S` oben; sie gelten
+        // jetzt auch fuer den Anlieferer, und eine Zahl an zwei Stellen war
+        // schon einmal der Anfang von zwei verschiedenen Zahlen.
+        if (this.releaseRequested || this.phaseT > DeliveryVehicle.STANDZEIT_S) {
           this.justDeparted = true; // Container wird jetzt abgerechnet
           // Zuerst das Platzinventar: Es faehrt nicht mit und wird nie bezahlt
           const vorher = this.letzteRueckgabe;
@@ -2050,7 +2173,25 @@ class DeliveryVehicle {
         if (this.tip <= 0) this.leaveUnloadingBay();
         break;
       case "waitUnload":
-        if (this.phaseT > 1 && this.isUnloaded()) this.leaveUnloadingBay();
+        if (this.phaseT > 1 && this.isUnloaded()) {
+          this.leaveUnloadingBay();
+          break;
+        }
+        /*
+         * DIE FRIST (E-082). Bis heute stand hier nur die Zeile darueber —
+         * wer nicht abgeladen wurde, stand fuer immer.
+         *
+         * Erst die Mahnung, dann die Abfahrt. Beides einmal je Fuhre, beides
+         * ueber denselben Kanal wie Achims Funk.
+         */
+        if (
+          !this.abladeMahnungGehabt &&
+          this.phaseT > DeliveryVehicle.STANDZEIT_S - DeliveryVehicle.MAHNUNG_VOR_S
+        ) {
+          this.abladeMahnungGehabt = true;
+          this.onAnliefererlage?.("wartetLange");
+        }
+        if (this.phaseT > DeliveryVehicle.STANDZEIT_S) this.faehrtUnverrichtet();
         break;
       case "toPark": {
         /*
@@ -2251,6 +2392,32 @@ class DeliveryVehicle {
     // Himmel fallen — ohne Fahrzeug, ohne Zusammenhang. Jetzt wird nur abgesetzt,
     // was wirklich auf der Flaeche liegt, und zwar dicht neben dem Fahrzeug auf
     // dem Boden: Das liest sich als Abladen, nicht als Regen.
+    //
+    // ES SEI DENN, DIE FUHRE FAEHRT MIT (E-082): Wem die Frist am
+    // Abladeplatz abgelaufen ist, der nimmt wieder mit, was er gebracht hat.
+    // Bezahlt wurde davon nichts (Netto null an der Ausfahrtswaage) — bliebe
+    // es liegen, waere es geschenkter Schrott.
+    if (this.ladungFaehrtMit) {
+      /*
+       * MITGENOMMEN WIRD NUR, WAS AUCH AUF DER WAAGE STAND. Waehrend der vier
+       * Minuten Standzeit liegen die Bordwaende offen; es kann von selbst
+       * etwas heruntergerutscht sein. Das liegt dann auf dem Hof, die
+       * Ausfahrtswaage hat es als abgeladen verbucht und es ist bezahlt — es
+       * darf nicht mit verschwinden. Dieselbe Frage, dieselbe Antwort wie an
+       * der Waage: `wiegtMit`.
+       */
+      this.bedGroup.updateWorldMatrix(true, false);
+      const bleibtLiegen: ScrapItem[] = [];
+      for (const it of this.cargo.items) {
+        if (it.body.isValid() && this.wiegtMit(it.body)) this.itemQuelle?.remove(it, true);
+        else bleibtLiegen.push(it);
+      }
+      this.cargo.items = bleibtLiegen;
+      if (this.cargo.car && this.wiegtMit(this.cargo.car.body, 0.6)) {
+        this.composites?.despawnByBody(this.cargo.car.body);
+        this.cargo.car = null;
+      }
+    }
     const gp = this.group.position;
     const quer = { x: Math.cos(this.group.rotation.y), z: -Math.sin(this.group.rotation.y) };
     const local = new THREE.Vector3();
@@ -2317,12 +2484,18 @@ export class VehicleManager {
   /** Abhol-LKW fährt los → Containerinhalt abrechnen */
   onPickupDepart: ((truck: DeliveryVehicle) => void) | null = null;
   /**
-   * Achim funkt durch — wo er steht (E-056) und was sonst gerade ist.
+   * DER FUNKKANAL DES HOFES. Achim funkt durch — wo er steht (E-056) und was
+   * sonst gerade ist; seit E-082 meldet sich hier auch der Anlieferer, dem am
+   * Abladeplatz die Zeit ausgeht.
    *
    * Eine Zeile je Lage, zum Ueberhoeren gedacht. Sie geht denselben Weg wie
    * die Begruessung eines Haendlers (`onCustomerArrived`): Das Fahrzeugmodul
    * sagt, WER was sagt — wo es steht, entscheidet das HUD. Der Name reist
    * mit, damit das HUD keine zweite Liste von Sprechern fuehren muss.
+   *
+   * Der Name blieb `onPickupFunk`, obwohl jetzt mehr als der Abholer darauf
+   * spricht: Ein zweiter Rueckruf mit demselben Zweck waere genau die zweite
+   * Liste, die beim naechsten Umbau zurueckbleibt.
    */
   onPickupFunk: ((wer: string, spruch: string) => void) | null = null;
   /**
@@ -2419,6 +2592,16 @@ export class VehicleManager {
       // Die beiden Wiegungen (E-064) — leer herein, voll hinaus.
       wagen.onTara = (tara) => this.onAbholerTara?.(tara);
       wagen.onAbholungGewogen = (tara, brutto) => this.onAbholerBrutto?.(tara, brutto);
+    } else {
+      /*
+       * Und der Anlieferer spricht ebenfalls (E-082) — derselbe Kanal zum
+       * HUD, aber mit seinem eigenen Namen und seinen eigenen Saetzen. Der
+       * Name kommt aus dem Kundenprofil, das ohnehin schon am Wagen haengt;
+       * eine zweite Liste von Sprechern gibt es nicht.
+       */
+      const wagen = this.active;
+      wagen.onAnliefererlage = (lage) =>
+        this.onPickupFunk?.(wagen.customer?.name ?? "Fahrer", anliefererfunk(lage));
     }
     if (c) this.onCustomerArrived?.(c);
     // Händler bleiben gern noch auf einen Kaffee; Gewerbe hat es eilig.

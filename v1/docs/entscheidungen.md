@@ -6049,3 +6049,173 @@ fälschlich als aufgeladen gelten. Er ist unbegründet: Die Ladefläche sitzt
    ÜBER der Fuhre (29 cm Luft), oder steckt noch etwas darin?
 
 ---
+
+### E-081 — „Konto leer" verschwand, der Zustand blieb: eine stehende Zeile für die Zahlungslage (16.09.2026)
+
+**Der Befund.** Es gibt zwei Tore, die Anlieferer aufhalten (`main.ts`):
+`shift.acceptsDeliveries` (Platz zugestellt) und `account.canBuy` (Kontostand
+über der Kreditgrenze von −1.500 €). Für „Platz dicht" steht seit jeher eine
+Zeile im Bild — sie kommt aus `Shift.statusText` und bleibt stehen, solange es
+dicht ist. Für die Zahlungsunfähigkeit gab es **nur einen Toast**, der nach
+2,6 s verschwindet, während der Zustand bleibt. Der Spieler steht dann auf
+einem Hof, auf dem nichts mehr passiert, und sieht nirgends, warum (Nachstellen
+zu E-070). Die Flanke selbst ist in Ordnung und wurde nicht angefasst.
+
+Dazu: **`Account.lowOnCash` (Schwelle 800 €) war seit dem 02.09.2026 gebaut und
+wurde nirgends benutzt.** Genau die Vorwarnstufe, die fehlte.
+
+**Entscheidung.** Die Zahlungslage steht **in derselben Zeile** wie der
+Tagesablauf (`#shift`), nicht in einem neuen Kasten — ein zweites
+Anzeigesystem für dieselbe Art Nachricht wäre der Anfang von zwei Systemen, die
+auseinanderlaufen. Drei Stufen, als `Zahlungslage` in `ui/hud.ts`:
+
+| Stufe | Bedingung | Zeile |
+|---|---|---|
+| `ok` | — | nichts (der Normalfall braucht kein Wort) |
+| `knapp` | `account.lowOnCash` | `! Kasse wird knapp` (orange) |
+| `leer` | `!account.canBuy` | `✗ Konto leer — niemand liefert` (rot) |
+
+Die Rückkehr ist der Wegfall der Zeile; den Wechsel meldet weiterhin der Toast.
+**Farbe ist nie der einzige Kanal** (Briefing Kap. 20): `!` und `✗` sind
+dieselben Zeichen wie in der Abwurf-Ampel, und der Satz sagt es noch einmal in
+Worten.
+
+**Kein Kreislauf.** Weder `CREDIT_LIMIT_EUR` noch die 800-€-Schwelle noch Preise
+oder Startkapital wurden angefasst. Die Lage wird in `main.ts` aus genau den
+beiden Fragen gebaut, die oben schon die Einfahrt auf- und zumachen; das HUD
+bekommt nur das Wort und importiert nichts aus `economy/`.
+
+**Verworfen.** *Eigener Kasten im oberen Stapel* — hätte im Normalfall nichts
+gekostet, wäre aber ein zweites Anzeigesystem für dieselbe Sache. *Nur den
+Toast länger stehen lassen* — ein Toast ist eine Meldung über ein Ereignis,
+kein Zustand.
+
+**Was das Layout gekostet hat.** Die Zeile kann im schlimmsten Fall beide
+Sperren zugleich tragen: „✗ Konto leer — niemand liefert · 07:14 · Platz dicht ·
+12.3 t umgeschlagen · erst räumen!" — 88 Zeichen, auf dem iPad in einer Zeile
+rund 630 px. Das ist ein Balken über das halbe Bild, der bis in die Spalte der
+Tutorialkarte reicht. Zwei Änderungen, beide mit `test/hudplatz.test.ts`
+nachgerechnet:
+
+1. **`#hudoben` bekommt `max-width: 340px`.** Bei 13 px Schrift sind das rund
+   47 Zeichen; der schlimmste Fall bricht um, und der Stapel wächst nach unten
+   statt zur Seite. Genau dafür ist er ein Stapel.
+2. **Die Tutorialkarte rückt auf den Telefonen nach unten** (flach 76 → 92 px,
+   hoch 105 → 141 px). Sie rechnete mit einem **einzeiligen** Tagesablauf. Das
+   war schon vorher zu knapp: Bereits die alte Zeile „Platz dicht … erst
+   räumen!" bricht auf dem iPhone mini hoch auf zwei Zeilen um — der
+   Überlappungs-Wächter war nur nie gegen die längstmögliche Zeile geprüft
+   worden, sondern gegen ein kurzes Beispiel. Das ist jetzt umgekehrt: In
+   `test/hudplatz.test.ts` steht ab sofort der schlimmste Fall.
+
+**Abnahmekriterium.** Wer unter 800 € rutscht, sieht eine stehende orange
+Zeile; wer unter −1.500 € rutscht, eine rote mit dem Grund; wer verkauft, sieht
+sie verschwinden. Nichts überlappt auf iPad quer, iPhone mini quer und hoch.
+
+**Wächter.** `test/kassenlage.test.ts` — mit zwei Gegenproben: Wird
+`account.lowOnCash` herausgeschnitten oder der dritte Aufrufparameter entfernt,
+MUSS der Wächter rot werden. Geprüft wird außerdem, dass der Block in `main.ts`
+kein Geld anfasst.
+
+**Auf dem Gerät zu prüfen.**
+
+1. **Verkaufe nichts und kaufe zwei, drei Fuhren an, bis das Konto unter 800 €
+   fällt:** Steht „! Kasse wird knapp" wirklich dauerhaft da, oder übersieht
+   man es neben der Kontozeile?
+2. **Weiter, bis niemand mehr liefert:** Sagt „✗ Konto leer — niemand liefert"
+   genug, um zu wissen, was zu tun ist — oder fehlt „erst verkaufen"?
+3. **Auf dem iPhone mini hoch:** Die Tutorialkarte beginnt jetzt 36 px tiefer.
+   Klafft im Normalfall eine sichtbare Lücke zwischen Tagesablauf und Karte?
+
+---
+
+### E-082 — Der Anlieferer bekommt eine Frist: vier Minuten, dann fährt er mit seiner Fuhre (16.09.2026)
+
+**Der Befund.** Ein Anlieferer, den niemand ablädt, stand in `waitUnload`
+**unbegrenzt**. Im kopflosen Lauf zu E-070 stand eine Pritsche **zehn Minuten**
+und hielt dabei eine vorgemerkte Abholung auf — der Platz ist einspurig
+(E-029), solange ein Fahrzeug da ist, kommt kein nächstes. Auf freiem Hof steht
+der nächste Wagen 34,4 s nach der Abfahrt vor der Waage; Stille danach ist nie
+normal.
+
+**Entscheidung: 240 s Standzeit, Mahnung 60 s vorher.** Beides als
+`DeliveryVehicle.STANDZEIT_S` / `MAHNUNG_VOR_S`.
+
+Woran sich die 240 s orientieren — und warum keine neue Zahl erfunden wurde:
+
+- **Sie steht schon im Spiel.** Der Abhol-LKW wartet seit jeher 240 s
+  (`waitLoad`), am Gerät abgenommen. Sie stand dort als nackte `240` mitten in
+  der Zustandsmaschine und ist jetzt der gemeinsame Name. Zwei verschiedene
+  Standzeiten auf demselben Hof wären zwei Regeln, die der Spieler nirgends
+  nachlesen kann.
+- Sie liegt weit über dem, was Abladen kostet (eine Pritsche ist mit einer
+  Handvoll Griffen leer) und weit über den 32 s, nach denen die
+  Preisverhandlung abbricht — Abladen ist Arbeit, Verhandeln ist ein Klick.
+- Sie ist kurz genug, dass der Hof nicht steht: 240 s statt zehn Minuten.
+
+Die Mahnung eine Minute vorher hängt an der Standzeit (`STANDZEIT_S −
+MAHNUNG_VOR_S`) und ist keine zweite Zahl; 60 s reichen für zwei, drei Griffe.
+
+**Er verschwindet nicht klammheimlich.** Zwei kurze Funksprüche, denselben Weg
+wie Achims Funk (`onPickupFunk` → `hud.toast`), aber mit dem **Namen des
+Kunden** aus dem Profil und eigenen Sätzen (`ANLIEFERER_SPRUECHE` in
+`customers.ts`): erst „Wie lange brauchst du noch?", dann „Ich nehm die Fuhre
+wieder mit." Ohne Vorwurf — dass er mitnimmt, was er gebracht hat, ist sein
+Geschäft, nicht das Versagen des Spielers (dieselbe Haltung wie bei Achims
+`abfahrtLeer`).
+
+**Der Kreislauf bleibt unberührt — und genau da lag die Falle.** Bezahlt wird
+weiter an der Ausfahrtswaage: brutto minus dem, was noch oben liegt. Steht
+alles noch auf der Fläche, ist das Netto null. Wurde die Hälfte abgeladen, wird
+die Hälfte bezahlt. Keine neue Regel.
+
+Aber: `despawn()` stellt Reste, die noch auf der Fläche liegen, **absichtlich
+neben dem Wagen ab** — für den Fall „hat abgeladen, ein Blech klemmt noch" ist
+das richtig. Für den Fall „hat gar nicht abgeladen" wäre es **eine ganze Fuhre
+geschenkt**: vier Minuten warten hätte sich mehr gelohnt als jede Arbeit.
+Deshalb merkt sich der Wagen mit `ladungFaehrtMit`, dass die Fuhre den Hof
+verlässt, und nimmt beim Abräumen genau das mit, was auch auf der Waage stand.
+
+**Zwei Messungen, die dabei angefallen sind.**
+
+1. **56 kg Differenz.** Eine Pritsche fuhr mit 56 kg weniger hinaus, als sie
+   hereingebracht hatte: `verriegeleLadeflaeche()` koppelt nur bis 3 m Höhe,
+   die Waage zählt bis 5 m. Ein hoch aufgetürmtes Stück fiel unterwegs
+   herunter und fehlte an der Ausfahrt — bezahlt worden wäre es trotzdem. Das
+   Fenster der Waage steht jetzt als `wiegtMit()` da (vorher eine anonyme
+   Hilfsfunktion **in** `cargoMassKg`) und wird beim Wegfahren benutzt. Das
+   ist dieselbe Fehlerklasse wie E-044 und E-064: zwei Rechnungen über
+   dieselbe Ladung, und nur eine wurde in Ordnung gebracht.
+2. **Was von selbst herunterrutscht, bleibt liegen.** Während der Standzeit
+   hängen die Bordwände offen; in vier Minuten kann ein Stück herunterfallen.
+   Das **ist** abgeladen, es liegt ja da, und die Waage hat es bezahlt — es
+   darf nicht mit verschwinden. Auch hier entscheidet `wiegtMit()`.
+
+**Verworfen.** *Wagen einfach löschen* — er verschwände mitten auf dem Hof.
+*Ihn ohne Ladung wegfahren lassen* — dann bliebe die Fuhre unbezahlt liegen
+(siehe oben). *Eine kürzere Frist (90–120 s)* — die Standzeit des Abholers ist
+die abgenommene Zahl, und Abladen ist nicht schneller als Beladen.
+
+**Abnahmekriterium.** Ein Anlieferer, den man stehen lässt, meldet sich nach
+drei Minuten, fährt nach vier ab, nimmt seine Ladung mit, und der Kontostand
+ändert sich nicht. Danach kommt der nächste Wagen.
+
+**Wächter.** `test/wartefrist.test.ts` (echte Physik, ganzer Hof): Er fährt
+überhaupt (unter 600 s) und nicht zu früh (über 240 s); Mahnung und
+Abfahrtsspruch kommen an, mit dem Namen des Kunden; **was auf dem Hof bleibt,
+ist auf das Kilo genau das, was bezahlt wurde**; und als Gegenprobe: wer
+wirklich ablädt, wird weiter bezahlt.
+
+**Auf dem Gerät zu prüfen.**
+
+1. **Lass einen Anlieferer absichtlich stehen und arbeite woanders weiter:**
+   Kommt die Meldung „Wie lange brauchst du noch?" zur rechten Zeit — oder
+   erschrickt man, weil man den Wagen vergessen hatte?
+2. **Sieh ihm beim Abfahren zu:** Liegt seine Fuhre wirklich noch oben, oder
+   verliert er unterwegs etwas?
+3. **Lade die Hälfte ab und lass ihn dann ablaufen:** Bekommt der Kunde Geld
+   für die Hälfte — und stimmt die Zahl auf der Ausfahrtswaage?
+4. **Vier Minuten sind lang.** Zu lang, wenn man ungeduldig ist, zu kurz, wenn
+   man in Ruhe sortiert — welche Richtung stimmt auf dem iPad?
+
+---

@@ -43,7 +43,18 @@ import {
 
 /** Realistisch lange Zeilen fuer die beiden oberen Kaesten. */
 const KONTO = "Konto: 1250 € · Haufen ≈ 3480 €";
-const SCHICHT = "Sortieren — 12:40 (Abholer wartet)";
+/*
+ * DIE LAENGSTMOEGLICHE ZEILE, nicht irgendeine (E-081).
+ *
+ * Seit die Zahlungslage vor dem Tagesablauf steht, koennen BEIDE Tore
+ * gleichzeitig zu sein: Der Platz ist zugestellt UND das Konto ist leer. Dann
+ * steht alles in einer Zeile, und genau dieser Fall gehoert in die Messung —
+ * ein kurzer Beispieltext haette die Ausweichregeln nie auf die Probe
+ * gestellt. Zusammengesetzt aus `KASSENLAGE.leer` (`ui/hud.ts`) und
+ * `Shift.statusText` im Zustand „dicht".
+ */
+const SCHICHT =
+  "✗ Konto leer — niemand liefert · 07:14 · Platz dicht · 12.3 t umgeschlagen · erst räumen!";
 
 /** Mit Beruehrungseingabe (iPad/iPhone) — dort gilt die Ausweichregel. */
 const HALTER = ["#hudoben", "body.touch #hudoben"];
@@ -67,8 +78,12 @@ function obenStapel(f: Fassung, mitDebug: boolean): Kasten[] {
   const luecke = px(HALTER, "gap", f);
   if (rechts === null && links === null) throw new Error("Halter haengt an keiner Seite");
   /* Nur ein waagerechter Anker: Der fixierte Kasten ist "shrink to fit" —
-     so breit wie noetig, hoechstens bis zur gegenueberliegenden Bildkante. */
-  const verfuegbar = f.w - (links ?? 0) - (rechts ?? 0);
+     so breit wie noetig, hoechstens bis zur gegenueberliegenden Bildkante.
+     Und hoechstens so breit, wie der Halter zulaesst (`max-width`, E-081):
+     Ohne diese Grenze zog die laengste Zeile den Kasten als Balken durchs
+     halbe Bild. */
+  const grenze = pxOderNull(HALTER, "max-width", f);
+  const verfuegbar = Math.min(f.w - (links ?? 0) - (rechts ?? 0), grenze ?? Infinity);
 
   /* Ein Kasten mit einem waagerechten Anker ist so breit wie sein Text —
      Consolas, 0,55 em je Zeichen — plus Fassung und Rahmen. */

@@ -715,6 +715,48 @@ export function fahrerfunk(lage: Fahrerlage, schild: string | null = null): stri
 }
 
 /**
+ * DER ANLIEFERER HAT ES EILIG (E-082).
+ *
+ * Achim ist der Abholfahrer; er faehrt fuer den Hof und hat Standzeit. Der
+ * ANLIEFERER ist ein Kunde: Er steht mit seiner eigenen Fuhre da, will sie
+ * loswerden und hat einen Tag vor sich. Bis heute konnte er unbegrenzt am
+ * Abladeplatz stehen — im kopflosen Lauf zehn Minuten, und weil der Platz
+ * einspurig ist (E-029), kam solange kein zweites Fahrzeug.
+ *
+ * Zwei Lagen, zwei kurze Saetze — gesprochen, nicht angesagt, und ohne
+ * Vorwurf: Dass er wieder mitnimmt, was er gebracht hat, ist sein Geschaeft,
+ * nicht das Versagen des Spielers (dieselbe Haltung wie bei Achims
+ * `abfahrtLeer`).
+ *
+ *   wartetLange        die Mahnung, eine Minute vor Schluss
+ *   faehrtUnverrichtet er faehrt — mit der Fuhre, die noch oben liegt
+ *
+ * WER es sagt, steht im Kundenprofil (`CustomerProfile.name`); es gibt hier
+ * absichtlich keine zweite Namensliste (Lehre aus E-066).
+ */
+export type Anliefererlage = "wartetLange" | "faehrtUnverrichtet";
+
+export const ANLIEFERER_SPRUECHE: Record<Anliefererlage, string[]> = {
+  wartetLange: [
+    "Wie lange brauchst du noch?",
+    "Ich muss gleich weiter.",
+    "Hab noch einen Termin heute.",
+    "Sag an, ich hab's eilig.",
+  ],
+  faehrtUnverrichtet: [
+    "Ich nehm die Fuhre wieder mit.",
+    "Bleibt drauf. Ich fahr.",
+    "Dann eben ein andermal.",
+    "Zu lange gestanden. Bis dann.",
+  ],
+};
+
+/** Was der Anlieferer in dieser Lage sagt. Eine Zeile, zum Ueberhoeren. */
+export function anliefererfunk(lage: Anliefererlage): string {
+  return pick(ANLIEFERER_SPRUECHE[lage]);
+}
+
+/**
  * Die Ankunftsmeldung — der Fall, den es seit E-056 gibt.
  *
  * Bleibt als eigener Name stehen, weil genau an ihm die Kopplung an das

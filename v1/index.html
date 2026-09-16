@@ -164,10 +164,24 @@
          Der Debugblock ist mit im Halter, obwohl er meistens `display: none`
          traegt: Ein ausgeblendetes Flex-Kind nimmt keinen Platz ein. Mit F3
          erscheint es genau unter dem Tagesablauf, ohne eigene Rechnung. */
+      /* Der Stapel bekommt eine Breitengrenze (E-081). Vorher war sie nicht
+         noetig: Konto und Tagesablauf waren kurze Zeilen. Seit die
+         Zahlungslage davorsteht, kann der Tagesablauf im schlimmsten Fall
+         „✗ Konto leer — niemand liefert · 07:14 · Platz dicht · 12.3 t
+         umgeschlagen · erst raeumen!" heissen — auf dem iPad in einer Zeile
+         rund 630 px, ein Balken ueber das halbe Bild, der bis in die Spalte
+         der Tutorialkarte reicht (gemessen mit `test/hudplatz.test.ts`,
+         85 px Ueberschneidung).
+
+         340 px sind bei 13 px Schrift rund 47 Zeichen — der schlimmste Fall
+         bricht damit auf zwei Zeilen um, und der Stapel waechst nach unten
+         statt zur Seite. Genau dafuer ist er ein Stapel. Kurze Zeilen bleiben
+         unberuehrt: Das Konto misst rund 220 px. */
       #hudoben {
         position: fixed;
         top: max(12px, calc(var(--sa-t) + 8px));
         right: max(12px, calc(var(--sa-r) + 8px));
+        max-width: 340px;
         display: flex; flex-direction: column; align-items: flex-end; gap: 6px;
         pointer-events: none;
       }
@@ -615,22 +629,35 @@
       body.touch #tutorial { top: max(12px, calc(var(--sa-t) + 8px)); bottom: auto; }
       /* Im flachen Layout stehen Konto und Tagesablauf oben links — Karte darunter.
          Muss hinter der Grundregel stehen: gleiche Spezifitaet, es zaehlt die Reihenfolge.
-         8 px Rand + 28 px Konto + 4 px Luecke + 27 px Tagesablauf + 8 px Luft
-         = 75; aufgerundet 76. (Konto: 12 px Schrift x 1,5 = 18, dazu 2 x 4 px
-         Innenrand und 2 x 1 px Rahmen.) */
+         8 px Rand + 28 px Konto + 4 px Luecke + 44 px Tagesablauf + 8 px Luft
+         = 92. (Konto: 12 px Schrift x 1,5 = 18, dazu 2 x 4 px Innenrand und
+         2 x 1 px Rahmen.)
+
+         Der Tagesablauf zaehlt seit E-081 mit ZWEI Zeilen (44 statt 27). Er
+         kann jetzt beide Sperren gleichzeitig tragen — „✗ Konto leer …" und
+         „Platz dicht … erst raeumen!" —, und der Halter ist auf 340 px
+         begrenzt, also bricht er um. Gerechnet wird der schlimmste Fall, nicht
+         der uebliche: Eine Karte, die nur meistens passt, ist genau der Fehler
+         vom 15.09.2026. */
       @media (max-height: 430px) {
-        body.touch #tutorial { top: max(76px, calc(var(--sa-t) + 76px)); }
+        body.touch #tutorial { top: max(92px, calc(var(--sa-t) + 92px)); }
       }
       /* Telefon hoch: Oben rechts stehen Konto und Tagesablauf — auf 375 px
          Breite reicht die Kontozeile mit rund 280 px fast ueber das ganze Bild
          und lag bisher unter der Karte. Die Karte darum darunter:
-         12 px Rand + 41 px Konto + 6 px Luecke + 38 px Tagesablauf + 8 px Luft
-         = 105. Die 84 px von gestern waren um 21 px zu klein — sie rechneten
-         mit 41 + 31 statt mit den wirklichen Kastenhoehen und ohne die Luecke.
-         Der sichere Rand kommt oben drauf, weil die Karte unter dem Stapel
-         haengt und der Stapel unter der Notch beginnt. */
+         8 px Rand + 41 px Konto + 6 px Luecke + 78 px Tagesablauf + 8 px Luft
+         = 141. Die 84 px vom 14.09.2026 waren um 21 px zu klein — sie
+         rechneten mit 41 + 31 statt mit den wirklichen Kastenhoehen und ohne
+         die Luecke; die 105 von gestern rechneten weiter mit einem
+         einzeiligen Tagesablauf.
+
+         Auf 307 px nutzbarer Breite traegt der Tagesablauf im schlimmsten
+         Fall DREI Zeilen (E-081): beide Sperren zugleich, „✗ Konto leer —
+         niemand liefert · 07:14 · Platz dicht · … erst raeumen!". Der sichere
+         Rand kommt oben drauf, weil die Karte unter dem Stapel haengt und der
+         Stapel unter der Notch beginnt. */
       @media (max-width: 500px) and (min-height: 431px) {
-        body.touch #tutorial { top: calc(var(--sa-t) + 105px); }
+        body.touch #tutorial { top: calc(var(--sa-t) + 141px); }
       }
       /* Die Karte selbst schluckt keine Beruehrung mehr: ein Daumen darauf
          setzt den Stick, nur der Ueberspringen-Knopf faengt seinen Tipp ab. */

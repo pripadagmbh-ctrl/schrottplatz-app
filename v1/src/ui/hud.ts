@@ -226,6 +226,42 @@ export function griffLadung(
  * nachzuschauen.
  */
 const zuletztGeschrieben = new WeakMap<HTMLElement, { text: string; farbe: string }>();
+/**
+ * DIE ZAHLUNGSLAGE DES HOFES (E-081).
+ *
+ * Es gibt zwei Tore, die Anlieferer aufhalten: der volle Platz
+ * (`Shift.acceptsDeliveries`) und das leere Konto (`Account.canBuy`). Fuer den
+ * vollen Platz stand seit jeher eine Zeile im Bild — „Platz dicht … erst
+ * raeumen!". Fuer das leere Konto blitzte nur ein Toast auf, waehrend der
+ * Zustand blieb: Der Spieler stand auf einem Hof, auf dem nichts mehr
+ * passierte, und sah nirgends, warum (Befund E-070).
+ *
+ * Drei Stufen, eine Zeile:
+ *
+ *   ok      nichts steht da — das ist der Normalfall und braucht kein Wort
+ *   knapp   `Account.lowOnCash` (800 EUR). Vorwarnung; gebaut war sie laengst,
+ *           benutzt hat sie niemand.
+ *   leer    `!Account.canBuy` (unter der Kreditgrenze). Es liefert niemand
+ *           mehr, und das aendert sich erst, wenn der Spieler verkauft.
+ *
+ * ZEICHEN UND WORT, NICHT NUR FARBE (Briefing Kap. 20): „!" und „✗" sind
+ * dieselben Zeichen wie in der Abwurf-Ampel, und der Satz sagt dasselbe noch
+ * einmal in Worten. Auf einem Bildschirm in der Sonne bleibt die Farbe als
+ * Erste weg.
+ *
+ * DIE SCHWELLEN STEHEN NICHT HIER. 800 EUR und −1500 EUR gehoeren dem
+ * Wirtschaftsmodul (`economy/account.ts`); hier wird angezeigt, was ist.
+ */
+export type Zahlungslage = "ok" | "knapp" | "leer";
+
+const KASSENLAGE: Record<Zahlungslage, { text: string; farbe?: string }> = {
+  ok: { text: "" },
+  // Orange wie eine Ladung unter 65 % sortenrein: „noch kein Fehler, aber sieh hin."
+  knapp: { text: "! Kasse wird knapp", farbe: "#e08a5a" },
+  // Der einzige rote Text im HUD — es gibt auch nur diesen einen Stillstand.
+  leer: { text: "✗ Konto leer — niemand liefert", farbe: "#e2705a" },
+};
+
 function schreib(el: HTMLElement, text: string, farbe = ""): void {
   const alt = zuletztGeschrieben.get(el);
   if (alt && alt.text === text && alt.farbe === farbe) return;
@@ -401,11 +437,19 @@ export class Hud {
     );
   }
 
-  /** Phase des Tagesablaufs samt Fortschritt. */
-  updateShift(text: string, sortierphase: boolean): void {
+  /**
+   * Phase des Tagesablaufs samt Fortschritt — und davor die Zahlungslage.
+   *
+   * `lage` steht VORNE, nicht hinten: Wenn niemand mehr liefert, ist das die
+   * Nachricht des Bildschirms, und der Umschlag von heute ist die Fussnote.
+   * Faerbung und Wortlaut kommen aus `KASSENLAGE`; die Lage selbst wird hier
+   * nicht entschieden, sie wird uebergeben (Projektregel 10).
+   */
+  updateShift(text: string, sortierphase: boolean, lage: Zahlungslage = "ok"): void {
     const el = this.shiftEl;
     if (!el) return;
-    schreib(el, text, sortierphase ? "#7ec96a" : "#f0d060");
+    const k = KASSENLAGE[lage];
+    schreib(el, k.text ? `${k.text} · ${text}` : text, k.farbe ?? (sortierphase ? "#7ec96a" : "#f0d060"));
   }
 
   /** Kurze Einblendung (Verkauf, Speichern, Anlieferung). */
