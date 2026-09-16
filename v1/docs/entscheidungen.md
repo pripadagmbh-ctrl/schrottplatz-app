@@ -6049,3 +6049,187 @@ fälschlich als aufgeladen gelten. Er ist unbegründet: Die Ladefläche sitzt
    ÜBER der Fuhre (29 cm Luft), oder steckt noch etwas darin?
 
 ---
+
+### E-081 — „Sieht aus wie die alte Spinne": die Schale ist zweimal nicht angefasst worden — ein Blatt, drei Spalten, und die Stelle, an der der Knick wirklich sitzt (16.09.2026)
+
+**Entscheidung.** Noch keine. Dieses Paket **zeichnet und rechnet, es baut
+nichts**: `v1/src/` ist unangetastet. Auf dem Tisch liegt
+`docs/f5-schalenform-2026-09-16.svg` — HEUTE · NEU · VORBILD, drei Spalten im
+selben Maßstab — und ein Vorschlag aus drei Änderungen, der **29 % der offenen
+Silhouette** bewegt, gegen **1,5 %** beim Paket vom 15.09.
+
+**Anlass, wörtlich.** Patrick, 16.09.2026, vor dem Vorher-Nachher-Blatt von
+E-069:
+
+> „Die Verkleidung — das ist aber an der Stelle wahrscheinlich nicht ganz das
+> Entscheidende. Wenn ich mir die Zeichnung anschaue, sieht alles andere — ich
+> spreche da vor allem von der Form der inneren Spinne — noch gleich aus. …
+> Wie bekommen wir das so hin, dass alles unterhalb der Traverse entsprechend
+> neu gedacht wird? Weil aktuell sieht die neue Spinne aus wie die alte Spinne.
+> … Was aber natürlich auch geschehen muss, ist, dass man den ganzen Knick der
+> Zinken, der Zähne nochmal überarbeitet."
+
+**Er hat recht, und es steht im eigenen Log.** E-069 hat den Zahn um 12,15°
+gedreht (Spitze 41 mm gewandert), E-077 ein Blech über die Säule gelegt. Beides
+liegt im **Seitenriss** — und der Seitenriss ist ausgerechnet die eine Ansicht,
+in der unsere Schale dem Vorbild schon nahekommt. Die Schale selbst — Bogen,
+Querschnitt, Verjüngung, Schulter — ist seit dem 14.09.2026 keine Zeile
+geändert worden.
+
+---
+
+#### Der Befund, der die Richtung umgedreht hat
+
+Am Vorbildfoto nachgemessen (`f5-vorbild-offen-halle-gross-2026-09-15.png`,
+2360 × 1640 px, rechte Schale gegen das Hallenfenster, 16 Punkte am 50-px-Raster,
+Ablesegenauigkeit ±15 px ≈ 2 % der Rückenlänge). Verglichen wird das Stück der
+abgelesenen Linie, das sich um **105°** dreht — genau so viel wie unser
+Schalenkörper, ohne Ferse, ohne Zahn:
+
+| Frage ans Foto | Antwort (SCHÄTZUNG) | Was das für uns heißt |
+|---|---|---|
+| Ist der Rücken ein Kreis? | Krümmung je Drittel **1 : 1,21 : 1,19** | Ein Kreis wäre 1 : 1 : 1. Das obere Drittel ist ein Fünftel flacher — das liegt in der doppelten Ablesegenauigkeit. **Der Knick, den man sieht, steckt NICHT im Rücken.** |
+| Wie lang ist der Zahn? | 87 px von 492 px = **17,7 %** | Heute 250 mm auf 1.385 mm = **18,1 %**. Die Länge stimmt schon. |
+| Steht der Zahn offen senkrecht? | **nein, 17,6° ± 5° nach innen** | Widerspricht der Ansage vom 13.09. und E-069. **Hier nicht geändert** — siehe Rückfrage 1. |
+| Wie breit endet die Schale? | **rund 60 %** der Wurzel (±10 Pp) | Wir laufen auf **30 %** aus. Das ist eine Nadel, das Vorbild endet stumpf. |
+| Hat das Vorbild Wangen? | **ja**, durchgehend | Wir haben **keine** (E-013/E-025 haben sie abgeschafft). Die Ladung des Vorbilds liegt ZWISCHEN den Rändern. |
+| Hat es eine Schulter? | **nein** | Bei uns fällt der Querschnitt im stärksten Zehntel um das 3,8-fache. Bleibt vorerst (E-069). |
+
+Der Knick sitzt also nicht in der Rückenlinie, sondern dort, wo die **breite
+Schulter in das schlanke Bein übergeht** — und das ist eine Sache von **Breite
+und Querschnitt**, nicht von Krümmung. Genau deshalb ist er in den beiden
+letzten Paketen nicht angerührt worden: Beide haben im Seitenriss gearbeitet,
+und im Seitenriss ist er unsichtbar.
+
+---
+
+#### Was vorgeschlagen ist — drei Änderungen, jede einzeln gemessen
+
+| | offen deckungsgleich | geschlossen |
+|---|---|---|
+| **N2** Verjüngung 400 → 248 mm statt 400 → 120 mm, oben gehalten (Exponent 2,2 statt 1,3) | 84,6 % | 87,5 % |
+| **N3** Querschnitt: Trog mit Wangen und Rückenkamm statt Platte mit 220-mm-Kastenrippe | **72,3 %** | 77,1 % |
+| **N4** Zahn auf sichtbarer Aufnahme (25 mm Absatz), Basis 55 % des Schalenendes | 98,0 % | 99,7 % |
+| **Empfehlung N2 + N3 + N4** | **70,7 %** | 76,3 % |
+| N1b Rückenlinie gespreizt (R 1,03 oben / 0,65 unten) | 87,2 % | 90,8 % |
+| *alles inklusive N1b* | *75,7 %* | *80,2 %* |
+| VORBILD-Spalte (abgelesene Rückenlinie) | 75,4 % | 80,0 % |
+
+Gemessen als Schnitt durch Vereinigung der Schattenfläche, 5-mm-Raster,
+Bezugsfläche 1,113 m² (offen). **Zum Einordnen: E-069 kam auf 98,5 %.**
+
+**N1 ist nicht in der Empfehlung**, und das ist der unbequemste Teil dieses
+Blattes: Die Änderung, die Patrick beim Namen nennt („der ganze Knick"), ist die
+einzige, die die Messung **nicht** hergibt — und zusammen mit N2/N3/N4 macht sie
+den Greifer sogar wieder **ähnlicher** (75,7 % statt 70,7 %), weil der flachere
+Rücken oben einen Teil der neuen Breite wieder wegnimmt.
+
+---
+
+#### Was es kostet — die Nadelöhre, jede einzeln
+
+| Randbedingung | Ergebnis |
+|---|---|
+| Drehbolzen und Zylinderauge | **unverändert** |
+| Neigung < 25° | **24,4°**, Zahl unverändert |
+| Hebelarm kleinster > 115 mm | **118 mm**, unverändert |
+| Hebelarm geschlossen > 200 mm | **201 mm**, unverändert |
+| Fünf Schalen im 36°-Halbsektor | **26,3°** statt 16,8° — passt, 10° Luft |
+| 58 zusammengelegte Netze | **58** — kein neues Teil |
+| Dreiecke | 6.840 → **7.560** (+11 % am Schalenkörper) |
+| Maulweite offen | 3,228 → **3,218 m** (−10 mm) |
+| Korbtiefe geschlossen | 0,980 → **0,972 m** (−8 mm) |
+| Korb als Rotationskörper | 1.711 → **1.727 l** (+16 l) |
+| **Überstand unter r 0,30 m** | 16 mm auf 0,03 m → **76 mm auf 0,14 m** |
+
+**Warum die drei Wächter sich gar nicht bewegen können** — das ist keine
+Behauptung, sondern eine Eigenschaft der Rechnung: `kennwerte()` in
+`traverse-rechnen.ts` (wortgleich mit `anbindungspunkt` in `rig.ts`) liest genau
+vier Größen — `STEMPEL_AUGE`, `OBERE_ANBINDUNG`, `ZYLINDER_AUFNAHME` und die
+Anschläge `ZU`/`OFFEN`. **Keine davon liegt in der Schale.** Solange Bolzen und
+Zylinderauge bleiben, wo sie sind, ist die Anlenkung von der Schalenform
+entkoppelt. Keine Schranke ist nachgezogen worden.
+
+**Der einzige echte Preis** steht in der letzten Zeile: In der Zone unter
+r 0,30 m, in der sich die fünf Spitzen ohnehin aneinander vorbeischieben
+(`SEKTOR_AB`, dieselbe Grenze und derselbe Grund wie in `test/greifer.test.ts`),
+überlappen die breiteren Enden auf 14 statt auf 3 cm Länge, und zwar um 76 statt
+16 mm. Das ist der Preis für ein Ende, das kein Nadelstich mehr ist.
+
+**Kein neues Netz**, und das ist nachrechenbar: Die Wangen sind zusätzliche
+Reihen in `06_HAUT`, der Rückenkamm ersetzt die Strebe **innerhalb** von
+`06_ZINKEN`, die Zahnaufnahme ist eine Formänderung des Schalenendes. Es kommt
+kein Teil dazu, nur Dreiecke — und Dreiecke sind erlaubt, Netze nicht (E-077).
+
+---
+
+#### Wie gerechnet wurde, und wogegen es sich prüft
+
+`tools/fuenfschalen/schalenform-modell.ts` (Rechnung) und
+`schalenform-blatt.ts` (Blatt). Beide **lesen** aus `src/fuenfschalen/teile.ts`
+und schreiben nichts.
+
+Drei Fehler sind beim Rechnen gemacht und wieder herausgeholt worden; sie stehen
+im Kopf der Datei, damit sie niemand ein zweites Mal macht:
+
+1. **`ABSCHNITT` ist die Sehne, nicht der Bogen.** 6 × 0,23 m = 1,38 m als
+   Bogenlänge gelesen ergibt R 0,753 statt 0,756 — und trifft `feineStationen()`
+   um 5,4 mm daneben. Richtig sind **1,3854 m**.
+2. **Deckungsgleichheit braucht eine FLÄCHE, keinen Umriss.** Wer nur die
+   Randpunkte rastert, vergleicht zwei Striche: Der erste Lauf meldete 48 % für
+   eine Änderung, die man kaum sieht. Gefüllt wird jetzt zeilenweise wie in
+   `tools/schattenriss.ts` — aus denselben Strecken, aus denen auch das Bild
+   gezeichnet wird. Bild und Zahl können nicht auseinanderlaufen.
+3. **Die Tangente einer abgelesenen Linie ist eine Treppe.** 16 Punkte ergeben
+   15 Richtungen; punktweise abgetastet kamen Viertelradien von 0,97 m heraus,
+   obwohl das Mittel über die ganze Bahn 0,756 m sein MUSS. Geglättet wird über
+   ein Fenster von 5 % der Länge.
+
+**Die Gegenprobe, die das Ganze trägt:** Mit gleichmäßiger Krümmung
+nachgerechnet trifft die Bahn `feineStationen()` aus `teile.ts` auf
+**0,0009 mm**. Die HEUTE-Spalte ist also wirklich das, was gebaut ist, und nicht
+eine zweite Meinung darüber. Zusätzlich hält `pruefeKopie()` die drei
+modulprivaten Funktionen (`verjuengung`, `querRadius`, `woelbungBei`), die hier
+als Kopie stehen, gegen die exportierte `halbbreiteBei` — weicht etwas ab,
+**bricht das Werkzeug ab, statt falsch zu zeichnen**.
+
+**Bewusst kein Vitest-Wächter.** Ein Test, der die Zahlen eines VORSCHLAGS
+festnagelt, würde spätere Arbeit blockieren, ohne etwas zu schützen; und die
+Gegenprobe gegen `teile.ts` gehört dorthin, wo sie wirkt — in den Lauf des
+Werkzeugs. 1.204 bestehende Prüfungen in 103 Dateien bleiben grün,
+`npm run build` sauber.
+
+---
+
+**Verworfene Alternative.** Die Krümmung des Rückens spreizen (N1b) und damit
+den „Knick" nachbauen, den Patrick beschreibt. Verworfen, weil die Messung ihn
+nicht hergibt (1 : 1,21 : 1,19 gegen 1 : 1 : 1) und weil er in Verbindung mit
+den anderen drei Änderungen die Silhouette wieder einebnet. Er bleibt als
+Spalte auf dem Blatt stehen, damit die Entscheidung Patricks ist und nicht meine.
+
+**Abnahmekriterium.** Kein Code, also kein Test — das Kriterium ist das Blatt:
+`docs/f5-schalenform-2026-09-16.svg`, drei Spalten, jede Zeile im selben
+Maßstab, die Deckungsgleichheit als Zahl daneben, auch dort, wo sie hoch ist
+(N4 mit 98,0 % steht genauso drauf wie N3 mit 72,3 %).
+
+**Unangetastet.** `v1/src/` vollständig. Anlenkung, Bodenanschlag, Greiffenster,
+Kollider, Sensorkugel, Pendel, Rotator, Kamera, Sichelkralle — nichts davon ist
+geöffnet worden. Die Schulter am Arm bleibt stehen (sie hält das Zylinderauge
+mit 26 statt 60 mm im Guss, das ist E-013), und der Zahnwinkel bleibt auf 0°
+(E-069).
+
+**Auf dem Gerät zu prüfen.**
+
+1. **Blatt `f5-schalenform-2026-09-16.svg`, Zeile 3 und 4, quer über die drei
+   Spalten:** Sieht die mittlere Spalte auf den ersten Blick anders aus als die
+   linke — oder ist das immer noch dieselbe Spinne?
+2. **Zeile 2, die Querschnitte:** Links liegt der ganze Werkstoff außerhalb der
+   Mittellinie (Platte plus schmale Kastenrippe), rechts steht er zu beiden
+   Seiten. Ist das der Unterschied zwischen „Blatt mit einer Leiste drauf" und
+   „Trog", den du am Vorbild siehst?
+3. **Zeile 1, die Schale allein, gestrichelt die heutige darüber:** Das Ende
+   wird von 120 auf 248 mm breit und der Zahn sitzt auf einem sichtbaren
+   Absatz. Ist das der „Knick der Zinken", den du meinst — oder meinst du etwas
+   weiter oben?
+
+---
