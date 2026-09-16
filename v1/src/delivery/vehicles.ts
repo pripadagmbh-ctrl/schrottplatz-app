@@ -655,8 +655,77 @@ class DeliveryVehicle {
     this.sendAway();
   }
 
+  /**
+   * Schon abgerechnet? Ein Abholer verlaesst den Hof genau einmal.
+   *
+   * `justDeparted` allein genuegt dafuer nicht: Es ist ein Einweg-Merker, der
+   * im selben Takt wieder verbraucht wird (`consumeDeparted`). Wer zweimal
+   * abfahren liesse, setzte ihn ein zweites Mal — und die Fuhre waere zweimal
+   * bezahlt.
+   */
+  private abfahrtGemeldet = false;
+
+  /**
+   * DER ABHOLER VERLAESST DEN HOF (E-086) — und zwar auf JEDEM Weg dasselbe.
+   *
+   * Befund am 16.09.2026. Patrick: „hab eine fuhre abholen lassen, es gab aber
+   * keine einzahlung auf dem konto durch verkauf, umgeschlagen war auch 0" —
+   * und auf die Nachfrage, ob die Leermeldung kam: „Nein, gar keine Meldung."
+   *
+   * Gar keine Meldung heisst: Die Abrechnung ist nie GELAUFEN. Sie meldet in
+   * beiden Faellen etwas (`main.ts`: „Verkauft: …" oder „Container war leer").
+   * Der Grund stand hier: Ein Abholer konnte den Hof auf ZWEI Wegen verlassen,
+   * und nur einer davon rechnete ab.
+   *
+   *   Taste V   `requestPickup()` -> `requestRelease()` -> Fall „waitLoad"
+   *             setzte `justDeparted` und meldete den Funkspruch.
+   *   Taste J   `zurWaage()` -> `sendAway()` setzte nur die Phase auf „out".
+   *
+   * Beim zweiten Weg lief `consumeDeparted()` leer, `onPickupDepart` feuerte
+   * nie, `Account.sellContainer` wurde nie gefragt — und weil die Meldung an
+   * derselben Stelle haengt, blieb auch das HUD stumm. Die Ladung war
+   * unterdessen fuer die Fahrt verriegelt und fuhr bezahlungslos vom Hof.
+   * Gemessen mit `tools/abholung-abrechnung.ts`, Abschnitt „Die Abfahrtswege":
+   * acht von acht Faellen ueber Taste J gingen ohne einen Cent aus.
+   *
+   * DIESELBE FEHLERKLASSE WIE E-070: Dort gab es drei Fenster fuer eine Frage,
+   * hier zwei Ausgaenge fuer ein Ereignis. Deshalb steht das Ereignis jetzt an
+   * genau einer Stelle, und beide Wege gehen hindurch. Wer spaeter einen
+   * dritten Weg baut, muss ihn nicht kennen — er muss nur `sendAway()` oder
+   * den Fall „waitLoad" benutzen, und beide fragen hier nach.
+   *
+   * Ein Anlieferer laeuft hier absichtslos hindurch: Fuer ihn ist nichts zu
+   * tun (`isPickup` ist falsch), er wird an der Ausfahrtswaage abgerechnet.
+   */
+  private abholerFaehrtRaus(): void {
+    if (!this.isPickup || this.abfahrtGemeldet) return;
+    this.abfahrtGemeldet = true;
+    this.justDeparted = true; // Container wird jetzt abgerechnet
+    // Zuerst das Platzinventar: Es faehrt nicht mit und wird nie bezahlt
+    // (E-034). Das MUSS vor dem Verriegeln stehen, sonst wird der
+    // Muellcontainer an die Flaeche gekoppelt und ist vom Hof.
+    const vorher = this.letzteRueckgabe;
+    this.gibPlatzinventarZurueck();
+    if (this.letzteRueckgabe !== vorher) this.onFahrerlage?.("containerZurueck");
+    this.verriegeleLadeflaeche();
+    /*
+     * Und dann sagt er, womit er faehrt. Gefragt wird DIESELBE QUELLE, aus der
+     * die Ausfahrtswiegung ihr Brutto nimmt (`ladeflaecheKg`, E-064) — sonst
+     * verabschiedet er sich mit einer vollen Fuhre, und die Waage meldet zwei
+     * Meter weiter „0 kg abgeholt".
+     *
+     * Die Schranke ist 1 kg und keine Null: Jedes einzelne Teil des Spiels
+     * wiegt mehr, und gegen Null zu vergleichen hiesse, sich auf Fliesskomma
+     * zu verlassen.
+     */
+    const aufDerFlaeche = this.ladeflaecheKg();
+    this.onFahrerlage?.(aufDerFlaeche > 1 ? "abfahrtVoll" : "abfahrtLeer");
+  }
+
   sendAway(): boolean {
     if (this.phase === "out") return false;
+    // Ein Abholer wird abgerechnet, EGAL welcher Befehl ihn losschickt (E-086).
+    this.abholerFaehrtRaus();
     // Was noch oben liegt, faehrt mit — sonst verliert der Wagen es unterwegs
     this.verriegeleLadeflaeche();
     this.phase = "out";
@@ -2238,24 +2307,19 @@ class DeliveryVehicle {
         // jetzt auch fuer den Anlieferer, und eine Zahl an zwei Stellen war
         // schon einmal der Anfang von zwei verschiedenen Zahlen.
         if (this.releaseRequested || this.phaseT > DeliveryVehicle.STANDZEIT_S) {
-          this.justDeparted = true; // Container wird jetzt abgerechnet
-          // Zuerst das Platzinventar: Es faehrt nicht mit und wird nie bezahlt
-          const vorher = this.letzteRueckgabe;
-          this.gibPlatzinventarZurueck();
-          if (this.letzteRueckgabe !== vorher) this.onFahrerlage?.("containerZurueck");
-          this.verriegeleLadeflaeche();
           /*
-           * Und dann sagt er, womit er faehrt. Gefragt wird DIESELBE QUELLE,
-           * aus der die Ausfahrtswiegung ihr Brutto nimmt (`ladeflaecheKg`,
-           * E-064) — sonst verabschiedet er sich mit einer vollen Fuhre, und
-           * die Waage meldet zwei Meter weiter „0 kg abgeholt".
+           * Abrechnen, Platzinventar zurueckgeben, verriegeln, funken — das
+           * steht seit E-086 in `abholerFaehrtRaus()` und NICHT mehr hier.
+           * Vorher stand es nur hier, und der zweite Ausgang (`sendAway`, also
+           * Taste J „zur Waage schicken") ging daran vorbei.
            *
-           * Die Schranke ist 1 kg und keine Null: Jedes einzelne Teil des
-           * Spiels wiegt mehr, und gegen Null zu vergleichen hiesse, sich auf
-           * Fliesskomma zu verlassen.
+           * Die Ausfahrt bleibt, wie sie war: Von seinem Halteplatz aus faehrt
+           * er den Ausfahrtsbogen von vorn (`routeS = 0`), waehrend `sendAway`
+           * dort einfaedelt, wo der Wagen gerade steht. Am Verladeplatz ist
+           * das fast dieselbe Stelle; angefasst wird die Lenkung (E-084) hier
+           * trotzdem nicht.
            */
-          const aufDerFlaeche = this.ladeflaecheKg();
-          this.onFahrerlage?.(aufDerFlaeche > 1 ? "abfahrtVoll" : "abfahrtLeer");
+          this.abholerFaehrtRaus();
           this.phase = "out";
           this.routeS = 0;
         }

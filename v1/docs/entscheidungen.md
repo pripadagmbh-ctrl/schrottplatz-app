@@ -6859,3 +6859,137 @@ Der Wurfschwung aus der Seitenlage.
    gekehrt wird mit dem lotrechten Greifer?
 
 ---
+
+### E-086 — Zwei Ausgänge für ein Ereignis: „zur Waage schicken" fuhr an der Abrechnung vorbei (16.09.2026)
+
+**Der Befund, zum zweiten Mal.** Patrick am Gerät, 16.09.2026: „hab eine fuhre
+abholen lassen, es gab aber keine einzahlung auf dem konto durch verkauf,
+umgeschlagen war auch 0". Denselben Satz hatte er tags zuvor schon gesagt;
+daraufhin war E-070 gebaut worden (drei Fenster für eine Frage). Das war ein
+echter Fehler — **aber nicht seiner.** Der damalige Agent hat es notiert:
+„Patricks Totalausfall ist nicht bewiesen reproduziert."
+
+**Zwei Nachfragen haben ihn gefunden.** Auf „Kam die Meldung `Container war
+leer — der LKW fährt umsonst`?": **„Nein, gar keine Meldung."** Und auf „Wie
+ist der Wagen losgefahren?": **„hab ihn zur Waage geschickt."**
+
+Der erste Satz schließt die halbe Ursachenliste aus. Die Abrechnung meldet in
+**beiden** Fällen etwas (`main.ts`, Zeile 924 ff.: „Verkauft: …" oder „Container
+war leer …"). Blieb es still, hat sie nie **stattgefunden** — es war also nie
+die Frage, ob sie die Ladung findet, sondern ob sie überhaupt gerufen wird.
+
+**Die Ursache.** Ein Abholer konnte den Hof auf zwei Wegen verlassen, und nur
+einer rechnete ab:
+
+| Weg | Kette | Abrechnung |
+|---|---|---|
+| Taste V | `requestPickup()` → `requestRelease()` → Fall `waitLoad` | ja |
+| Standzeit (240 s) | derselbe Fall `waitLoad` | ja |
+| **Taste J „zur Waage schicken"** | `zurWaage()` → `DeliveryVehicle.sendAway()` | **nein** |
+
+`sendAway()` (`vehicles.ts:658`) setzte nur `phase = "out"`. Damit lief
+`consumeDeparted()` (`vehicles.ts:331`) leer, `onPickupDepart` (`vehicles.ts:2988`)
+feuerte nie, `Account.sellContainer` wurde nie gefragt — und weil die Meldung an
+derselben Stelle hängt, blieb auch das HUD stumm. **Alle drei Befunde aus einem
+Satz.** Die Ladung war da längst für die Fahrt verriegelt und verließ den Hof,
+ohne bezahlt zu werden; das Platzinventar (E-034) fuhr gleich mit, denn
+`gibPlatzinventarZurueck()` stand ebenfalls nur im Fall `waitLoad`.
+
+`zurWaage()` prüft — anders als `VehicleManager.sendAway()`, das den Abholer
+ausdrücklich ausschließt — **nicht**, wen es da wegschickt. Das ist richtig so:
+„Zur Waage" heißt beim Abholer „fahr raus, ich bin fertig". Nur abgerechnet
+werden musste er dabei.
+
+**Dieselbe Fehlerklasse wie E-070, eine Ebene höher.** Dort gab es drei Fenster
+für eine Frage, hier zwei Ausgänge für ein Ereignis. Diese Woche ist es die
+fünfte Doppelung derselben Art (E-044, E-064, E-070, E-082, jetzt E-086).
+
+**Entscheidung: ein Ausgang, `abholerFaehrtRaus()`.** Abrechnen, Platzinventar
+zurückgeben, verriegeln, funken — das steht jetzt an genau einer Stelle
+(`vehicles.ts`), und **beide** Wege gehen hindurch. `justDeparted` wird nur noch
+dort gesetzt; ein Riegel `abfahrtGemeldet` verhindert, dass zweimal kassiert
+wird, wenn der Spieler J und V hintereinander drückt.
+
+**Verworfen:** `zurWaage()` für den Abholer auf `requestRelease()` umlenken. Das
+hätte den einen bekannten Weg geflickt und den nächsten offen gelassen — und es
+hätte die Ausfahrtsroute geändert (`sendAway` fädelt dort ein, wo der Wagen
+steht, `waitLoad` fährt den Bogen von vorn). Die Lenkung aus E-084 bleibt
+unberührt.
+
+**Am Kreislauf wurde nichts angefasst.** Preise, Startkapital, `CREDIT_LIMIT_EUR`,
+die Ausfahrtswiegung (E-064) und die Fenster aus E-070 stehen unverändert. Es
+wird nur noch abgerechnet, wo vorher gar nichts passierte.
+
+**Gemessen** mit `tools/abholung-abrechnung.ts`, neuer Abschnitt „Die
+Abfahrtswege" — 20 vollständige Abholungen, jede mit Protokoll je Schritt.
+Nullprobe zuerst, und zwar je Weg einzeln.
+
+| | vorher | nachher |
+|---|---|---|
+| Taste V (10 Fälle) | 10× abgerechnet | 10× abgerechnet |
+| Standzeit (2 Fälle) | 2× abgerechnet | 2× abgerechnet |
+| **Taste J (8 Fälle)** | **0× abgerechnet, 0 €, 0 kg, keine Meldung** | **8× abgerechnet** |
+
+Die Fälle, die es bisher nicht gab: Standzeit statt Taste V; Ladung am Rand
+(Bordwand, Heckklappe, Stirnwand); Ladung spät aufgelegt; Abholung vorgemerkt,
+während ein Anlieferer auf dem Hof steht; sortenrein gegen gemischt bestellt;
+Platzinventar fährt mit; Platz wie im Spiel. **Über Taste J brach jeder
+einzelne.** Über Taste V brach keiner — deshalb war der Fehler fünf Anläufe
+lang unsichtbar.
+
+Die beiden Wege zahlen jetzt auf den Cent dasselbe: 1.500 kg Stahl = 375,00 €
+über V wie über J; gemischt 25,00 € über beide.
+
+**Was der Spieler jetzt merkt.** Ein Abholer, den er mit J zur Waage schickt,
+wird bezahlt — und **jede** Abholung sagt, was sie gebracht hat, auch wenn es
+nichts war. Stille nach einer Abfahrt ist ab jetzt selbst ein Fehler.
+
+**Neue Wächter.**
+
+- `test/abfahrtswege.test.ts` (17 Prüfungen): eine **vollständige Abholung mit
+  Geld über jeden** Weg — Nullprobe je Weg, volle Fuhre je Weg, sortenrein
+  gegen gemischt, Platzinventar an Bord. Gegenproben: ein abgeklemmter Rückruf
+  **muss** auffallen (kein Geld, kein Umschlag, keine Meldung); eine Fuhre darf
+  **nicht zweimal** bezahlt werden (J, J, V hintereinander → genau eine
+  Abrechnung); gemischt **muss** weniger bringen als sortenrein; der Besen wiegt
+  wirklich 680 kg, sonst prüfte „er wird nicht bezahlt" nichts.
+- `test/platzinventar-verdrahtung.test.ts`, drei Prüfungen mehr: `onPickupDepart`
+  ist in `main.ts` verdrahtet und meldet in **beiden** Zweigen; `justDeparted`
+  wird an **genau einer** Stelle gesetzt und **beide** Ausgänge rufen sie;
+  `zurWaage()` schickt weiterhin auch den Abholer. Jede mit Gegenprobe am
+  absichtlich kaputt gemachten Quelltext.
+
+**Gegenprobe am Code selbst:** Nimmt man den einen Aufruf aus `sendAway()`
+heraus, fallen **9 der 17** neuen Prüfungen um — genau die über Taste J. Der
+Wächter bewacht also wirklich etwas.
+
+**Objektzahl unverändert.** Kein neues `THREE.Object3D`, kein neuer Körper —
+die Änderung ist reine Ablaufsteuerung. Die Zufallsfolge aus E-080 bleibt, wie
+sie ist; die 96-Saaten-Messung entfällt damit. Physikbudget unberührt:
+`test/federungAmWagen.test.ts` fährt weiterhin **zehn Fuhren in Folge** ohne
+Steckenbleiben (66,8 s), und der Betriebslauf im Messwerkzeug liefert
+unveränderte Haufenmassen (19.680 kg lose nach sechs Minuten).
+
+**1.260 Prüfungen grün in 108 Dateien.** `npm run build` sauber.
+
+**Offen.** Der Besen wiegt an der Ausfahrtswaage 680 kg mit (`ladeflaecheKg`),
+bringt aber null Euro (`sellContainer`, E-034/E-079). Der Wiegezettel meldet
+also mehr, als bezahlt wird — solange Platzinventar auf der Fläche liegt.
+Falsch ist das nicht (gewogen wird, was auf dem Blech steht), aber es ist eine
+zweite Zahl über dieselbe Fuhre. Vorschlag: Platzinventar aus der
+Ausfahrtswiegung herausnehmen — als eigenes Paket, nicht hier.
+
+**Auf dem Gerät zu prüfen.**
+
+1. **Abholer rufen, Stahl aufladen, mit J zur Waage schicken.** Kommt jetzt
+   „Verkauft: … kg Stahlschrott · … % sortenrein · +… €" — und stimmt der
+   Betrag mit dem überein, der auf dem Konto landet?
+2. **Denselben Wagen leer mit J wegschicken.** Sagt er „Container war leer —
+   der LKW fährt umsonst"? (Vorher kam an dieser Stelle gar nichts. Genau das
+   war der Befund.)
+3. **Zweimal hintereinander J drücken, dann V.** Wird die Fuhre trotzdem nur
+   **einmal** bezahlt — oder springt das Konto zweimal?
+4. **Den Müllcontainer auf den Abholer heben und mit J wegschicken.** Steht er
+   danach beim Bagger, oder fährt er mit vom Hof?
+
+---
