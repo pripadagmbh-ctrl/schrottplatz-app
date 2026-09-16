@@ -36,8 +36,6 @@ import {
   SCHALEN_ABSCHNITTE,
   STEMPEL_AUGE,
   ZU,
-  feineStationen,
-  halbbreiteBei,
   mittellinie,
   schalenHalbbreite,
 } from "../src/fuenfschalen/teile";
@@ -171,7 +169,6 @@ const BESEN_MASS = kleinstesMass(BESEN);
  * dazu die beiden Seitenschlüsse. B braucht quer mehr Felder, weil der Trog
  * einen Boden UND zwei aufgestellte Wangen hat.
  */
-const ENDE = feineStationen(3).length - 1;
 const QUER_HEUTE = 4;
 /** Acht Felder quer statt vier — nötig, um den aufgestellten Rand zu zeigen. */
 const QUER_B = 8;
@@ -303,7 +300,7 @@ const py = (y: number): number => rissY + (STEMPEL_AUGE.y - y) * PX;
 /** Seitenriss: die Mittellinie, beidseits um die halbe Bautiefe aufgedickt. */
 function riss(x0: number, tiefe: (s: Station) => number, farbe: string, wangen: boolean): void {
   const mitte = ST.map((s) => [px(s.r, x0), py(s.y)]);
-  const n = mitte.map((p, k) => {
+  const n = mitte.map((_, k) => {
     const a = mitte[Math.max(0, k - 1)]!;
     const b = mitte[Math.min(mitte.length - 1, k + 1)]!;
     const dx = b[0]! - a[0]!;
@@ -311,7 +308,7 @@ function riss(x0: number, tiefe: (s: Station) => number, farbe: string, wangen: 
     const l = Math.hypot(dx, dy) || 1;
     return [-dy / l, dx / l];
   });
-  const innen = mitte.map((p, k) => [p[0]!, p[1]!]);
+  const innen = mitte.map((p) => [p[0]!, p[1]!]);
   const aussen = mitte.map((p, k) => [
     p[0]! + n[k]![0]! * tiefe(ST[k]!) * PX,
     p[1]! + n[k]![1]! * tiefe(ST[k]!) * PX,
@@ -774,7 +771,7 @@ console.log(
     `\nunterste offene Naht (Station ${UNTEN.k}): heute ${(untenHeute * 100).toFixed(1)} cm, B ${(untenB * 100).toFixed(1)} cm`
 );
 console.log(`Sektor max: heute ${maxSektorHeute.toFixed(1)}, B ${maxSektorB.toFixed(1)} (Grenze ${SEKTOR_HALB_GRAD})`);
-console.log(`Dreiecke Haut je Schale: heute ${TRI_HEUTE}, B ${TRI_B}; alle fuenf +${TRI_MEHR}; Greifer ${DREIECKE_HEUTE} -> ${DREIECKE_HEUTE + TRI_MEHR}`);
+console.log(`Felder quer je Schale: heute ${QUER_HEUTE}, B ${QUER_B}; alle fuenf +${TRI_MEHR} Dreiecke; Greifer ${DREIECKE_HEUTE} -> ${DREIECKE_HEUTE + TRI_MEHR}`);
 console.log(`Teile ${TEILE.length}: faellt heute durch ${faelltHeute.length}, bei B ${faelltB.length}`);
 console.log(`zusaetzlich gehalten: ${gerettet.map((t) => `${t.name} ${(t.mass * 100).toFixed(0)}cm`).join(", ") || "(keines)"}`);
 console.log(`kleinstes Teil ${TEILE[0]!.name} ${(TEILE[0]!.mass * 100).toFixed(0)} cm; Besen ${(BESEN_MASS * 100).toFixed(0)} cm`);
