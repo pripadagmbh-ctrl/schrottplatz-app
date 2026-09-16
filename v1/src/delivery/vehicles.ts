@@ -56,6 +56,16 @@ import {
   tiefsteDurchdringung,
   UMRISS_TOLERANZ,
 } from "./umriss";
+import {
+  lenkeEin,
+  dreheWeiter,
+  drehRichtung,
+  winkelRest,
+  fahrtFaktor,
+  LENK_RATE,
+  PIVOT_AB,
+  VORAUS_M,
+} from "./lenkung";
 import { BAGGER_STAND } from "../world/baggerstand";
 import { lagerMuldeFuer, type ContainerConfig } from "../world/containers";
 import {
@@ -165,6 +175,19 @@ class DeliveryVehicle {
   private bedBody: RAPIER.RigidBody;
   private phase: Phase = "settleCargo";
   private routeS = 0;
+  /**
+   * Wie schnell dieser Wagen lenken darf (rad/s).
+   *
+   * Steht als Feld und nicht als Konstante da, weil jeder Waechter dieser
+   * Reparatur seine GEGENPROBE braucht: `Infinity` ist Zeichen fuer Zeichen
+   * der Sprungzustand von vor dem 16.09.2026. Ein Prueflauf, der den alten
+   * Stand nicht mehr melden kann, prueft nichts (Lehre aus E-073).
+   */
+  lenkrate = LENK_RATE;
+  /** Drehrichtung einer laufenden Kehre; null heisst: keine Kehre. */
+  private kehre: 1 | -1 | null = null;
+  /** Phase des letzten Bildes — nur, um eine Kehre am Etappenwechsel zu loesen. */
+  private letztePhase: Phase | null = null;
   private phaseT = 0;
   private tip = 0;
   cargo: Cargo = { items: [], car: null };
@@ -1722,6 +1745,47 @@ class DeliveryVehicle {
     this.group.rotation.y = p.rot;
   }
 
+  /**
+   * Nur den ORT auf die Strecke setzen — die Gierlage fuehrt `advance` selbst.
+   *
+   * DIESE TRENNUNG IST DIE REPARATUR VON E-081. Bis zum 16.09.2026 gab es nur
+   * `placeAt`, und das setzte `rotation.y` HART auf die Richtung des
+   * Streckenstuecks. An einer Ecke wechselt diese Richtung zwischen zwei
+   * Bildern — gemessen bis 168,7 Grad in EINEM Rechenschritt, die weiteste
+   * Umrissecke sprang dabei 10,23 m. Rapier leitet daraus fuer den
+   * kinematischen Koerper 600 m/s ab und raeumt die Durchdringung des
+   * naechsten Bildes in einem Schlag aus. Das ist derselbe Katapult wie in
+   * E-073, nur an der Lenkung statt an der Mulde.
+   *
+   * `placeAt` bleibt daneben stehen, und zwar fuer die beiden Stellen, an
+   * denen ein Sprung richtig ist: das Setzen an den Streckenanfang beim
+   * Erzeugen (da ist noch nichts, was getroffen werden koennte) und die
+   * Vorausschau `probePoint`, die ihre Pose sofort wieder zuruecknimmt.
+   */
+  private setzeOrt(route: Array<[number, number]>, s: number, reverse: boolean): void {
+    const p = poseAuf(route, s, reverse);
+    this.group.position.set(p.x, 0, p.z);
+  }
+
+  /**
+   * Wie tief der Umriss dieses Wagens bei DIESER Gierlage in einem Bauwerk
+   * steckt (m) — die Frage, aus der `drehRichtung` ihre Antwort zieht.
+   *
+   * Ohne Anhaenger: Er knickt waehrend einer Kehre selbst ein, und seine Lage
+   * haengt vom ganzen Schwenkverlauf ab. Der Umriss des Zugfahrzeugs ist der
+   * groessere Kreis (5,14 m gegen 3,50 m) und damit der massgebliche.
+   */
+  private tiefeBeiGier(gier: number): number {
+    this.umrissCache.length = 0;
+    this.umrissCache.push(
+      fahrzeugUmriss(
+        { x: this.group.position.x, z: this.group.position.z, rot: gier },
+        this.bedLen
+      )
+    );
+    return tiefsteDurchdringung(this.umrissCache, alleHindernisse());
+  }
+
   private routeLength(route: Array<[number, number]>): number {
     let len = 0;
     for (let i = 0; i < route.length - 1; i++) {
@@ -1853,13 +1917,71 @@ class DeliveryVehicle {
       this.blockedT = 0;
       this.honked = false;
     }
-    this.routeS += step;
-    this.placeAt(route, this.routeS, reverse);
+    /*
+     * EINLENKEN STATT SPRINGEN (E-081). Drei Regeln, alle in `lenkung.ts`
+     * hergeleitet und gemessen:
+     *
+     *  1. Der Fahrer schaut `VORAUS_M` Meter voraus und lenkt auf DIESE
+     *     Richtung ein, nicht auf die, in der er gerade steht. Ohne
+     *     Vorausschau bleibt er an jeder Ecke stehen und dreht sich wie ein
+     *     Gabelstapler; mit zuviel schneidet er die Ecke ab.
+     *  2. Er dreht hoechstens `lenkrate` rad je Sekunde.
+     *  3. Er faehrt nur mit dem Anteil seines Tempos, der ueberhaupt in
+     *     Bahnrichtung zeigt (`fahrtFaktor`) — in der Kurve wird ein LKW
+     *     langsam. Bei einer Kehre ist dieser Anteil null: Er dreht auf der
+     *     Stelle ein und faehrt erst dann los.
+     *
+     * Die Drehrichtung einer Kehre wird EINMAL gewaehlt (dorthin, wo Platz
+     * ist) und dann festgehalten — sonst kippte sie mitten im Schwenk hin und
+     * her.
+     */
+    if (!Number.isFinite(this.lenkrate)) {
+      /*
+       * DER ALTE ZUSTAND, ausdruecklich erreichbar und nicht nachgebaut: Ort
+       * UND Gierlage hart auf die Strecke setzen. Nur Gegenproben stellen
+       * `lenkrate` auf `Infinity`; im Spiel kommt dieser Zweig nie vor. Eine
+       * abgeschriebene kaputte Fassung im Waechter waere schlechter — sie
+       * altert getrennt vom Quelltext (Lehre aus E-054).
+       */
+      this.routeS += step;
+      this.placeAt(route, this.routeS, reverse);
+      return true;
+    }
+    const ziel = poseAuf(route, this.routeS + Math.max(step, VORAUS_M), reverse);
+    const rest = Math.abs(winkelRest(this.group.rotation.y, ziel.rot));
+    // Rueckwaerts wird IMMER erst ausgerichtet: 90 Grad im Rueckwaertsfahren
+    // nachzuziehen kostet 5,3 m Weg, und die Silogasse ist 7,4 m tief.
+    const kehreNoetig = rest > PIVOT_AB || (reverse && this.routeS <= 0 && rest > 0.035);
+    if (this.kehre !== null || kehreNoetig) {
+      if (this.kehre === null) {
+        this.kehre = drehRichtung(this.group.rotation.y, ziel.rot, (g) => this.tiefeBeiGier(g));
+      }
+      this.group.rotation.y = dreheWeiter(
+        this.group.rotation.y,
+        ziel.rot,
+        this.lenkrate * dt,
+        this.kehre
+      );
+      if (Math.abs(winkelRest(this.group.rotation.y, ziel.rot)) < 1e-9) this.kehre = null;
+      return false;
+    }
+    this.routeS += step * fahrtFaktor(rest);
+    this.setzeOrt(route, this.routeS, reverse);
+    this.group.rotation.y = lenkeEin(this.group.rotation.y, ziel.rot, this.lenkrate * dt);
     return true;
   }
 
   update(dt: number): void {
     this.phaseT += dt;
+    /*
+     * Eine begonnene Kehre gehoert zu EINER Etappe. Wechselt die Phase, faengt
+     * die Richtungswahl neu an — sonst drehte der Wagen auf der naechsten
+     * Strecke noch in die Richtung, die auf der vorigen frei war.
+     */
+    if (this.phase !== this.letztePhase) {
+      this.kehre = null;
+      this.letztePhase = this.phase;
+    }
     switch (this.phase) {
       case "settleCargo":
         // warten, bis sich der Ladungsberg gesetzt hat (max. 4 s)
@@ -2069,10 +2191,19 @@ class DeliveryVehicle {
           this.phaseT = 0;
           break;
         }
-        const schritt = Math.min(SPEED * dt, d);
+        /*
+         * AUCH HIER WIRD EINGELENKT (E-081). Bis zum 16.09.2026 stand hier
+         * `rotation.y = atan2(dx, dz)` — beim ersten Bild dieser Phase ist
+         * das ein Sprung von der Ausfahrtsrichtung auf die Richtung zum
+         * Warteplatz. Der Wagen ist dann zwar leer, faehrt aber quer ueber
+         * den Hof, auf dem Schrott liegt.
+         */
+        const soll = Math.atan2(dx, dz);
+        const rest = Math.abs(winkelRest(this.group.rotation.y, soll));
+        const schritt = Math.min(SPEED * dt * fahrtFaktor(rest), d);
         this.group.position.x += (dx / d) * schritt;
         this.group.position.z += (dz / d) * schritt;
-        this.group.rotation.y = Math.atan2(dx, dz);
+        this.group.rotation.y = lenkeEin(this.group.rotation.y, soll, this.lenkrate * dt);
         this.snapBodiesToPose();
         break;
       }
