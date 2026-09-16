@@ -7135,3 +7135,129 @@ Ausfahrtswiegung herausnehmen — als eigenes Paket, nicht hier.
    danach beim Bagger, oder fährt er mit vom Hof?
 
 ---
+
+### E-088 — Gebaut, gemessen, bewacht — und für Patrick nicht erreichbar: KIPPEN kommt in den Funktionskranz (16.09.2026)
+
+**Der Befund.** Patrick, 16.09.2026: „ich spiele auf ipad". E-085 hat am selben
+Tag das **Seitwärtskippen des Greifers** gebaut — auf seinen ausdrücklichen
+Wunsch („Greifer muss komplett zur seite kippen können, zum kehren und
+schleudern"), mit Freigangsmessung, Kostenrechnung und eigenem Wächter
+(`test/kippen.test.ts`, 519 Zeilen). Gelegt wurde es auf **Taste K**. Auf dem
+iPad gibt es keine Taste K. Im Funktionskranz gab es keinen Knopf. Die Funktion
+war fertig — und für den einzigen Spieler, der das Spiel spielt, **nicht
+vorhanden**.
+
+Der bauende Agent hatte es sauber vermerkt („Für Touch gebraucht:
+`excavator.toggleKippen()` und `excavator.kippAktiv` — ein Knopf im
+Funktionskranz, wie X und O"). Der Hinweis wurde beim Zusammenführen überlesen.
+
+**Es ist die Fehlerklasse dieser Woche, zum sechsten Mal.** E-044, E-064, E-070,
+E-082, E-087 — jedes Mal: *zwei Wege für dasselbe Ereignis, und nur einer ist
+verdrahtet.* Hier sind die zwei Wege **Tastatur und Touch**. Wer nur den ersten
+baut, sieht am Bildschirm fertige Arbeit.
+
+**Entschieden.**
+
+1. **KIPPEN ist der neunte Eintrag im Funktionskranz**, gebunden auf `KeyK`,
+   abgefragt in `main.ts` über `touch.consumePress("KeyK")` — dieselbe Zeile,
+   die es für X (Kabine) und O (Stützen) längst gab.
+2. **Der Eintrag zeigt, ob er an ist.** `kippAktiv` ist ein Umschalter; ohne
+   Anzeige ist er ein Knopf, den man drückt und hofft. Angezeigt wird es mit
+   einem **ausgefüllten Balken am unteren Rand** des Eintrags — nicht mit
+   Farbe allein (Barrierefreiheit, Briefing Kap. 20) und nicht als Text im
+   Kasten: Ein `KIPPEN ✓` hätte den Kasten um zwei Zeichen verbreitert und
+   damit den ganzen Kranz aufgebläht. Den Zustand reicht `main.ts` durch
+   (`touch.setAktiv`); `touch.ts` kennt den Bagger nicht (Projektregel 10).
+3. **Zwei Wächter**, beide mit Gegenprobe:
+   - `test/tastenerreichbarkeit.test.ts` — **jede** Taste, die der Quelltext
+     abfragt, hat einen Touch-Weg oder steht mit Grund auf der Ausnahmeliste.
+     Dazu: kein Knopf ohne Abfrage in `main.ts` (toter Knopf), kein Eintrag auf
+     der Seite ohne Bindung, keine Taste mit zwei Wirkungen.
+   - `test/funktionskranz.test.ts` — die Einträge überlappen einander in keiner
+     Gerätefassung, und die längste Beschriftung passt in den Kasten.
+
+**Der Nebenbefund: acht Einträge haben sich schon überlappt.** Beim Nachmessen
+fiel auf, dass der Kranz **vorher** nicht stimmte — auf dem iPad um 6,1 px, auf
+dem iPhone mini um 1,7 px. Zwei Ursachen, beide nie mitgerechnet: `width: 76px`
+war die Breite des **Inhalts** (der 2-px-Rahmen kam obendrauf, der negative Rand
+traf die Mitte um 2 px daneben), und der scharfgestellte Eintrag **wächst** um
+15 % (`transform: scale`). Der Kommentar im Quelltext behauptete das Gegenteil
+(„mit acht Einträgen so weit gefächert, dass sich nichts überlappt") — eine
+geschätzte Zahl, und eine geschätzte Zahl ist genau die, die nie stimmt.
+
+| | vorher | nachher | Herkunft |
+|---|---|---|---|
+| `box-sizing` | content-box | **border-box** | damit `margin: -h/2 -w/2` die Mitte trifft |
+| Kasten iPad | 76 x 30 (+ 4 Rahmen) | **62 x 34** | „ZUR WAAGE" = 9 Zeichen Consolas 11 px = 54,5 px + 4 px Rahmen |
+| Kasten mini | 66 x 26 (+ 4 Rahmen) | **58 x 30** | 9 Zeichen Consolas 10 px = 49,5 px + 4 px Rahmen |
+| Halbmesser `RADIAL_R` | 104 px | **112 px** | 2·R·sin20° = 72,0 px Mittenabstand bei neun Einträgen |
+| scharfgestellt | x 1,15 | **x 1,10** | 1,15 kostete 4 px Luft, ohne mehr zu zeigen |
+| Höhe | 30 / 26 | **34 / 30** | + 4 px Zustandsbalken unter der Textzeile |
+
+**Ergebnis, gerechnet und gezeichnet** (`docs/messungen/2026-09-16-funktionskranz/`):
+
+| Fassung | acht Einträge, Stand 15.09. | neun Einträge, neu |
+|---|---|---|
+| iPad quer | **−6,1 px** (Überlappung) | **+6,9 px** Luft |
+| iPhone mini quer | **−1,7 px** (Überlappung) | **+11,1 px** Luft |
+
+Die Mindestluft von **6 px** ist hergeleitet, nicht geraten: Jeder Eintrag hat
+einen 2 px starken Rahmen; bei weniger als 2 + 2 px Abstand berühren sich die
+Rahmen zweier Nachbarn und werden zu **einem** Strich.
+
+**Ein zehnter Eintrag passt nicht mehr.** Mit denselben Maßen bleiben auf dem
+iPad **0,7 px** — die Rahmen stoßen aneinander. Wer einen zehnten will, ändert
+nicht diese Zahl, sondern die **Gliederung**: ein Eintrag wandert ins Menü
+(SCHILDER ist eine Anzeigeeinstellung, keine Maschinenfunktion), oder der Kranz
+bekommt zwei Ringe. **Das entscheidet Patrick.**
+
+**Verworfene Alternativen.**
+
+- *Einen KIPPEN-Knopf fest aufs Glas legen.* Feste Knöpfe liegen dort, wo die
+  Daumen ohnehin sind, und werden versehentlich bedient — der Grund, warum es
+  den Kranz überhaupt gibt.
+- *Den Zustand als Text im Kasten zeigen (`KIPPEN ✓`).* Kostet zwei Zeichen
+  Kastenbreite; über alle neun Einträge gerechnet wäre der Kranz dadurch um
+  14 px im Halbmesser gewachsen — und der ragt auf dem iPhone mini schon jetzt
+  bei tiefer Daumenlage unter den Bildrand.
+- *KIPPEN vorn einreihen (bei KABINE und STÜTZEN).* Sachlich schöner, aber mit
+  dem neunten Eintrag drehen sich ohnehin alle Richtungen von 45° auf 40°; die
+  **Reihenfolge** der acht alten bleibt so wenigstens, wie sie war. KIPPEN
+  hängt hinten an. Umsortieren ist eine Zeile, wenn Patrick es anders will.
+
+**Offen — und ausdrücklich nicht entschieden.**
+
+1. **Taste K löst zwei Dinge aus.** Seit E-085 kippt K den Greifer *und*
+   speichert (README „Steuerung": K/L/N speichern/laden/neu, seit dem
+   Prototyp). Auf der Tastatur passiert bei einem Druck beides. Auf dem Gerät
+   nicht — der Kranzeintrag kippt nur. Welche der beiden Funktionen umzieht,
+   entscheidet Patrick; bis dahin steht der Konflikt begründet in
+   `test/tastenerreichbarkeit.test.ts` (Liste `KONFLIKTE`), damit ihn niemand
+   übersieht. **Frei ist kein einziger Buchstabe mehr** — alle 26 sind belegt.
+2. **KABINE und STÜTZEN zeigen ihren Zustand noch nicht.** Die Anzeige ist
+   gebaut und wartet auf zwei Zeilen; der Bagger gibt `cabLiftTarget` und
+   `outriggerTarget` bisher nicht heraus (beide `private`). Gebraucht werden
+   `excavator.cabAktiv` und `excavator.stuetzenAktiv` als `get`, wie
+   `kippAktiv`.
+3. **Der Kranz wird nicht ins Bild gerückt.** Er klappt dort auf, wo der Daumen
+   liegt. Auf dem iPhone mini quer bleibt nur ein **97 px hohes Band** in der
+   rechten Bildhälfte, in dem er ganz sichtbar ist; tiefer hängt der unterste
+   Eintrag unter dem Rand. Wählen lässt er sich trotzdem (es zählt die
+   Zugrichtung, nicht der Ort), lesen nicht. Gegenmaßnahme wäre, den Kranz beim
+   Aufklappen ins Bild zu schieben — erst nach dem Gerätetest.
+
+**Auf dem Gerät zu prüfen.**
+
+1. **Rechten Daumen stillhalten, bis der Kranz aufklappt, dann nach links oben
+   ziehen und loslassen.** Legt sich der Greifer in zwei Sekunden auf die
+   Seite? (KIPPEN ist der letzte Eintrag, also oben links.)
+2. **Denselben Eintrag noch einmal wählen.** Richtet sich der Greifer wieder
+   auf — und hat der Eintrag beim zweiten Öffnen des Kranzes den **Balken
+   unten**, solange er gekippt ist?
+3. **Kranz einmal ganz durchdrehen.** Berühren sich zwei Beschriftungen, wenn
+   eine davon scharfgestellt (gelb, größer) ist? Gerechnet sind 6,9 px Abstand
+   auf dem iPad — das ist wenig.
+4. **iPhone mini quer: den Daumen einmal weit unten aufsetzen.** Hängt der
+   unterste Eintrag unter dem Bildrand, und stört das beim Auswählen?
+
+---

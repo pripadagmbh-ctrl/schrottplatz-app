@@ -1088,6 +1088,20 @@ async function main(): Promise<void> {
     if (touch.consumePress("KeyC")) orbit.touchViewPress = true;
     if (touch.consumePress("KeyX")) excavator.toggleCabLift();
     if (touch.consumePress("KeyO")) excavator.toggleOutriggers();
+    /*
+     * KIPPEN (E-088). Die Tastatur fragt der Bagger selbst ab
+     * (`handleDiscreteInput`, Taste K) — der Kranzknopf kam hier nie an, und
+     * damit war das Seitwaertskippen auf dem iPad nicht erreichbar. Genau
+     * dieselbe Zeile gab es fuer X und O laengst; nur K fehlte.
+     */
+    if (touch.consumePress("KeyK")) excavator.toggleKippen();
+    /*
+     * Und der Knopf zeigt, ob er an ist. Der Kranz bekommt den Zustand von
+     * hier durchgereicht; `touch.ts` kennt den Bagger nicht (Projektregel 10).
+     * Sobald der Bagger `cabAktiv` und `stuetzenAktiv` herausgibt, gehoeren
+     * KABINE und STUETZEN in dieselben zwei Zeilen.
+     */
+    touch.setAktiv("KeyK", excavator.kippAktiv);
     // I und J: liegen auf deutscher wie englischer Tastatur an derselben Stelle
     if (input.wasPressed("KeyI") || touch.consumePress("KeyI")) {
       hud.toast(excavator.toggleBlade() ? "Schild abgesenkt — schieben." : "Schild angehoben.");
