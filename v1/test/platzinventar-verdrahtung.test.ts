@@ -144,4 +144,102 @@ describe("Platzinventar kommt am naechsten Tag wieder", () => {
     const block = main.slice(main.indexOf("if (daylight.neuerTag)"));
     expect(block.slice(0, block.indexOf("}") + 200)).toContain("hud.toast");
   });
+
+  it("und die Abrechnung der Abholung haengt am HUD — in BEIDEN Zweigen", () => {
+    /*
+     * Dieselbe Klasse zum fuenften Mal, und diesmal an der teuersten Stelle
+     * (E-086). `onPickupDepart` ist der einzige Weg, auf dem eine Abholung zu
+     * Geld wird. Fehlte die Zeile in `main.ts`, faehre jeder Abholer umsonst
+     * und niemand saehe, warum.
+     *
+     * Geprueft werden BEIDE Zweige. Patrick hat am 16.09.2026 genau daran
+     * gemerkt, dass etwas nicht stimmt — nicht am Kontostand, sondern daran,
+     * dass GAR KEINE Meldung kam. Eine Abrechnung, die bei null Kilo still
+     * bleibt, sieht fuer den Spieler aus wie ein kaputtes Spiel.
+     */
+    const stelle = main.search(/vehicles\.onPickupDepart\s*=/);
+    expect(stelle, "onPickupDepart wird in main.ts nie verdrahtet").toBeGreaterThan(0);
+    // Der Block reicht bis zum Ende der Zuweisung — grosszuegig, aber begrenzt.
+    const block = main.slice(stelle, stelle + 900);
+    expect(block, "die Abrechnung fragt nie, was auf der Flaeche liegt").toContain(
+      "containedItems"
+    );
+    expect(block, "es wird nie verkauft").toContain("sellContainer");
+    expect(block, "der Umschlagszaehler waechst nie").toContain("noteTurnover");
+    // Zwei Meldungen, eine je Ausgang: voll und leer.
+    expect(block, "die volle Fuhre wird nicht gemeldet").toContain("Verkauft:");
+    expect(block, "die leere Fuhre wird nicht gemeldet").toContain("Container war leer");
+
+    /*
+     * GEGENPROBE mit dem kaputten Eingang: Wer den Leer-Zweig herausnimmt, muss
+     * auffallen — sonst prueft die Liste oben nur, dass es die Datei gibt.
+     */
+    const ohne = main.replace(/hud\.toast\("Container war leer[^;]*;/, "");
+    expect(ohne, "die Gegenprobe hat gar nichts veraendert").not.toBe(main);
+    const ohneBlock = ohne.slice(ohne.search(/vehicles\.onPickupDepart\s*=/), stelle + 900);
+    expect(ohneBlock.includes("Container war leer"), "die Gegenprobe meldet nichts").toBe(false);
+  });
+
+  it("und jeder Ausgang des Abholers geht durch dieselbe Abrechnung (E-086)", () => {
+    /*
+     * DIE ZWEITE HAELFTE DESSELBEN FEHLERS, und sie liegt in `vehicles.ts`.
+     *
+     * Bis zum 16.09.2026 gab es ZWEI Ausgaenge fuer ein Ereignis: Der Fall
+     * „waitLoad" (Taste V, Standzeit) setzte `justDeparted` und meldete den
+     * Funkspruch — `sendAway()` (Taste J, „zur Waage schicken") setzte nur die
+     * Phase. Ueber den zweiten Weg fuhr die Ladung bezahlungslos vom Hof.
+     *
+     * Geprueft wird der Zusammenhang, nicht die Zahl: Beide Ausgaenge muessen
+     * dieselbe Stelle rufen, und `justDeparted` darf NUR dort gesetzt werden.
+     * Wer spaeter einen dritten Ausgang baut und ihn hier vorbeifuehrt, faellt
+     * auf. Was dabei herauskommt, misst `test/abfahrtswege.test.ts`.
+     */
+    expect(vehicles, "die eine Abrechnungsstelle fehlt").toContain("abholerFaehrtRaus");
+    // Genau eine Stelle setzt den Merker — und das ist die Methode selbst.
+    const setzt = vehicles.match(/this\.justDeparted\s*=\s*true/g) ?? [];
+    expect(setzt.length, "justDeparted wird an mehr als einer Stelle gesetzt").toBe(1);
+    // Und beide Ausgaenge rufen sie.
+    const rufe = vehicles.match(/this\.abholerFaehrtRaus\(\)/g) ?? [];
+    expect(rufe.length, "nicht beide Ausgaenge gehen durch die Abrechnung").toBeGreaterThanOrEqual(
+      2
+    );
+    // `sendAway()` ist einer davon — das war der Weg, der Patrick gekostet hat.
+    const ab = vehicles.indexOf("sendAway(): boolean {");
+    expect(ab, "sendAway gibt es gar nicht mehr").toBeGreaterThan(0);
+    expect(
+      vehicles.slice(ab, ab + 400),
+      "sendAway faehrt wieder an der Abrechnung vorbei"
+    ).toContain("abholerFaehrtRaus()");
+
+    /*
+     * GEGENPROBE: Nimmt man den Aufruf aus `sendAway()` heraus, muss die
+     * Pruefung oben anschlagen. Ohne sie waere sie gruen, solange das Wort
+     * irgendwo in der Datei steht.
+     */
+    const kaputt = vehicles.replace(/this\.abholerFaehrtRaus\(\);\r?\n(\s*)\/\/ Was noch oben/, "$1// Was noch oben");
+    expect(kaputt, "die Gegenprobe hat gar nichts veraendert").not.toBe(vehicles);
+    const abK = kaputt.indexOf("sendAway(): boolean {");
+    expect(
+      kaputt.slice(abK, abK + 400).includes("abholerFaehrtRaus()"),
+      "die Gegenprobe meldet nichts"
+    ).toBe(false);
+  });
+
+  it("und `zurWaage` schickt auch den Abholer — sonst ist der Befund ein anderer", () => {
+    /*
+     * Der Weg, den Patrick genommen hat. `zurWaage()` schliesst den Abholer
+     * ABSICHTLICH nicht aus (anders als `VehicleManager.sendAway()`, das nur
+     * Anlieferer wegschickt): „Zur Waage" heisst beim Abholer „fahr raus, ich
+     * bin fertig". Stuende hier ein Ausschluss, waere der Fehler von E-086
+     * anders behoben — dann duerfte diese Datei das sagen, und der Waechter
+     * darueber muesste angepasst werden.
+     */
+    const stelle = vehicles.indexOf("zurWaage():");
+    expect(stelle, "zurWaage gibt es nicht mehr").toBeGreaterThan(0);
+    const block = vehicles.slice(stelle, stelle + 260);
+    expect(block, "zurWaage schickt niemanden mehr weg").toContain("sendAway()");
+    expect(block, 'zurWaage schliesst den Abholer aus — dann gilt E-086 nicht mehr').not.toContain(
+      '"abholer"'
+    );
+  });
 });
