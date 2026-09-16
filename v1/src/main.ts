@@ -14,7 +14,7 @@ import { ItemManager, type ScrapItem } from "./world/scrapItems";
 import { ContainerManager, type AmpelState } from "./world/containers";
 import { ContainerAbholung } from "./delivery/platzinventarAbholung";
 import { AudioManager } from "./audio/audioManager";
-import { Hud } from "./ui/hud";
+import { Hud, type Zahlungslage } from "./ui/hud";
 import { Particles } from "./world/particles";
 import { CompositeManager } from "./dismantle/composites";
 import { FenceManager } from "./world/fence";
@@ -1356,7 +1356,25 @@ async function main(): Promise<void> {
       }
     }
     vehicles.intervalFactor = shift.intervalFactor(looseKg);
-    hud.updateShift(`${daylight.clock} · ${shift.statusText(looseKg)}`, shift.jammed);
+    /*
+     * Und dieselbe Lage noch einmal als STEHENDE Zeile (E-081).
+     *
+     * Der Toast oben meldet den Wechsel und ist nach 2,6 s weg — der Zustand
+     * bleibt. „Platz dicht" steht seit jeher im Tagesablauf; die Zahlungslage
+     * steht ab hier daneben, in derselben Zeile und mit denselben Mitteln.
+     * Entschieden wird sie hier, aus denselben zwei Fragen, die auch die
+     * Einfahrt oben aufmachen oder zumachen — das HUD bekommt nur das Wort.
+     */
+    const kassenlage: Zahlungslage = !account.canBuy
+      ? "leer"
+      : account.lowOnCash
+        ? "knapp"
+        : "ok";
+    hud.updateShift(
+      `${daylight.clock} · ${shift.statusText(looseKg)}`,
+      shift.jammed,
+      kassenlage
+    );
     excavator.updateInstruments(frameDt);
     containers.updateLabels(orbit.camera.position);
     // Bewegliche Behaelter sind Hindernisse wie jedes Bauwerk — nur wandern
