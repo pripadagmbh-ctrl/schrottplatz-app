@@ -1,0 +1,65 @@
+=== Freigang des gekippten Greifers — auf Dreiecksebene (Nachmessung) ===
+
+  9 x 9 = 81 Armstellungen · 5 Kippwinkel · 24 Rotatorstellungen · 6 Oeffnungen
+  Sichelkralle: 146.946 Punkte, groesster Halbmesser 3.073 m
+  Fünfschalengreifer: 114.570 Punkte, groesster Halbmesser 2.814 m
+
+  Armstellungen werden gebaut …
+  62 Armstellungen erreichbar, 19 verworfen (Stielspitze unter 1.52 m — dort steckt der Greifer im Boden), 9 s
+
+  Vorprobe Sichelkralle: 49 von 62 Armstellungen sind bei 0° frei.
+    HEUTE SCHON BERUEHRUNG bei 0° in: 29.38°/-140°, 37.5°/-140°, 45.63°/-140°, 45.63°/-25°, 53.75°/-140°, 53.75°/-25°, 61.88°/-140°, 61.88°/-39.37°, 61.88°/-25°, 70°/-140°, 70°/-53.75°, 70°/-39.37°, 70°/-25° — dort ist die Kippfrage nicht stellbar.
+  Eichung Sichelkralle: R0 = 0.466 m um das Kardangelenk. 2072 von 146946 Punkten liegen darin (Aufhaengung, steckt bauartbedingt im Stiel), 144874 werden gemessen.
+  Vorprobe Fünfschalengreifer: 54 von 62 Armstellungen sind bei 0° frei.
+    HEUTE SCHON BERUEHRUNG bei 0° in: 29.38°/-140°, 37.5°/-140°, 45.63°/-140°, 53.75°/-140°, 61.88°/-140°, 61.88°/-25°, 70°/-140°, 70°/-25° — dort ist die Kippfrage nicht stellbar.
+  Eichung Fünfschalengreifer: R0 = 0.465 m um das Kardangelenk. 2048 von 114570 Punkten liegen darin (Aufhaengung, steckt bauartbedingt im Stiel), 112522 werden gemessen.
+
+
+################  Sichelkralle  ################
+  851.859.120 Abstandsfragen, davon 19.135.242 genau gerechnet  (135 s)
+
+--- Sichelkralle ---
+  Raster 2.5 cm → Abtastfehler EPS = 14.4 mm  ·  R0 = 0.466 m  ·  144.874 Punkte gemessen
+
+  Kipp  | beste Rotatorstellung          | dort  | schlechteste Rotator- | zum
+  winkel| Freigang mindestens            | Gier  | stellung              | Schlauch
+  ------+--------------------------------+-------+-----------------------+---------
+     0° | 0.009 m (07_STIEL_STAHL)       |  150° | 0.002 m               | 0.136 m
+  -22.5° | 0.010 m (07_STIEL_STAHL)       |   60° | BERUEHRUNG (07_STIEL_KASTEN)| 0.136 m
+   -45° | 0.013 m (07_STIEL_STAHL)       |  345° | BERUEHRUNG (01_RAEUMSCHILD_BLATT)| 0.085 m
+  -67.5° | 0.031 m (07_STIEL_STAHL)       |    0° | BERUEHRUNG (07_STIEL_KASTEN)| 0.023 m
+   -90° | 0.083 m (07_STIEL_STAHL)       |   90° | BERUEHRUNG (07_STIEL_KASTEN)| 0.023 m
+
+  Welche Rotatorstellungen bei welchem Kippwinkel frei bleiben:
+      0° | alle 24
+   -22.5° | 13 von 24: 0°, 15°, 30°, 45°, 60°, 75°, 90°, 270°, 285°, 300°, 315°, 330°, 345°
+    -45° | 11 von 24: 0°, 15°, 30°, 45°, 60°, 75°, 285°, 300°, 315°, 330°, 345°
+   -67.5° | 13 von 24: 0°, 15°, 30°, 45°, 60°, 75°, 90°, 270°, 285°, 300°, 315°, 330°, 345°
+    -90° | 15 von 24: 0°, 15°, 30°, 45°, 60°, 75°, 90°, 105°, 255°, 270°, 285°, 300°, 315°, 330°, 345°
+
+  >>> Sichelkralle: GROESSTER KIPPWINKEL, der in JEDER Armstellung frei laeuft (bei passender Rotatorstellung): -90°
+
+
+################  Fünfschalengreifer  ################
+  729.142.560 Abstandsfragen, davon 21.590.193 genau gerechnet  (129 s)
+
+--- Fünfschalengreifer ---
+  Raster 2.5 cm → Abtastfehler EPS = 14.4 mm  ·  R0 = 0.465 m  ·  112.522 Punkte gemessen
+
+  Kipp  | beste Rotatorstellung          | dort  | schlechteste Rotator- | zum
+  winkel| Freigang mindestens            | Gier  | stellung              | Schlauch
+  ------+--------------------------------+-------+-----------------------+---------
+     0° | 0.031 m (07_STIEL_STAHL)       |  270° | 0.001 m               | 0.136 m
+  -22.5° | 0.004 m (07_STIEL_STAHL)       |  300° | BERUEHRUNG (07_STIEL_KASTEN)| 0.136 m
+   -45° | 0.007 m (07_STIEL_STAHL)       |  345° | BERUEHRUNG (07_STIEL_KASTEN)| 0.136 m
+  -67.5° | 0.040 m (07_STIEL_STAHL)       |   90° | BERUEHRUNG (07_STIEL_KASTEN)| 0.136 m
+   -90° | 0.136 m (nichts in Reichweite) |   90° | BERUEHRUNG (07_STIEL_KASTEN)| 0.136 m
+
+  Welche Rotatorstellungen bei welchem Kippwinkel frei bleiben:
+      0° | alle 24
+   -22.5° | 10 von 24: 0°, 15°, 30°, 45°, 60°, 270°, 285°, 300°, 315°, 330°
+    -45° | 12 von 24: 0°, 15°, 30°, 45°, 60°, 75°, 90°, 270°, 285°, 300°, 330°, 345°
+   -67.5° | 13 von 24: 0°, 15°, 30°, 45°, 60°, 75°, 90°, 270°, 285°, 300°, 315°, 330°, 345°
+    -90° | 15 von 24: 0°, 15°, 30°, 45°, 60°, 75°, 90°, 105°, 255°, 270°, 285°, 300°, 315°, 330°, 345°
+
+  >>> Fünfschalengreifer: GROESSTER KIPPWINKEL, der in JEDER Armstellung frei laeuft (bei passender Rotatorstellung): -90°

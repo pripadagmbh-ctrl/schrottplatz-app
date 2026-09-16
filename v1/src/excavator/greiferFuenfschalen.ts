@@ -16,6 +16,7 @@ import {
   KORB_LUFT_UNTEN,
   type Greiferbau,
   type Greiferform,
+  merkeMaxAusladung,
   schalenlueckeVon,
   sensorRadiusVon,
 } from "./greiferform";
@@ -174,10 +175,28 @@ function tiefstenRand(p: Array<{ y: number; z: number }>): Array<{ y: number; z:
    * Eine Huellenrechnung waere kuerzer und leichter falsch. Das hier ist
    * dieselbe Frage, wie `tiefe()` sie stellt, nur vorher.
    */
+  /*
+   * DER RICHTUNGSFAECHER IST SEIT E-083 BREITER — um 90 Grad nach jeder Seite.
+   *
+   * Solange der Greifer lotrecht hing, kamen nur die Richtungen (−cos s, −sin s)
+   * mit s aus dem Schliessweg vor; das sind 96 Grad Faecher. Kippt der Greifer
+   * um θ zur Seite, kommt je Schale ein Dreh dazu: Die gesuchte Richtung ist
+   * dieselbe, gedreht um atan(tan θ · cos a) — und mit θ bis 90 Grad und
+   * cos a von −1 bis +1 laeuft das ueber die vollen ±90 Grad.
+   *
+   * WARUM DAS `tiefe()` NICHT ANRUEHRT: Der breitere Faecher fuegt Punkte
+   * HINZU, er nimmt keine weg. Ein hinzugekommener Punkt ist fuer die alten
+   * Richtungen kein Sieger — sonst stuende er schon in der Liste. Das Maximum
+   * fuer die alten Richtungen kann also nicht steigen. `tiefe(schwenk)`
+   * liefert danach dieselbe Zahl wie vorher; `test/kippen.test.ts` misst das
+   * gegen die eingefrorenen Werte nach.
+   */
   const gewinner = new Set<number>();
-  const N = 2000;
+  const N = 6000;
+  const VON = ZU - Math.PI / 2;
+  const BIS = OFFEN + Math.PI / 2;
   for (let i = 0; i <= N; i++) {
-    const s = ZU + ((OFFEN - ZU) * i) / N;
+    const s = VON + ((BIS - VON) * i) / N;
     const c = Math.cos(s);
     const sn = Math.sin(s);
     let best = -Infinity;
@@ -228,6 +247,46 @@ function tiefe(schwenk: number): number {
   letzterSchwenk = schwenk;
   letzteTiefe = tief;
   return tief;
+}
+
+/**
+ * Dieselbe Zahl fuer einen SEITLICH GEKIPPTEN Greifer (E-083) — wie weit die
+ * Schalen in Weltrichtung −y unter die Aufhaengung langen.
+ *
+ * Exakt, nicht genaehert: Gerechnet wird ueber DIESELBEN Zahnpunkte, mit
+ * denen `tiefe()` rechnet, nur mit dem Kippwinkel darin. Eine Schale auf
+ * Umfangswinkel `a` liegt bei
+ *     y = Bolzen.y + (p.y·cos s − p.z·sin s),   r = Bolzen.r + (p.y·sin s + p.z·cos s)
+ * mit s = −schwenk, und ihr z ist cos(a)·r. Gefragt ist
+ *     max über (p, a) von ( −y·cos θ + cos(a)·r·sin θ ).
+ *
+ * UEBER ALLE FUENF SCHALEN. Lotrecht sind sie gleich tief, deshalb rechnet
+ * `tiefe()` mit einer; gekippt entscheidet `cos(a)`, und das ist fuer jede
+ * eine andere Zahl.
+ *
+ * Erste Fassung war eine Naeherung: Mittellinie plus den Ueberstand, den die
+ * Form bei 0 Grad ueber die Mittellinie hinaus haengt. Gemessen
+ * (`tools/greifer-ausladung.ts`) lag sie beim Fuenfschalengreifer bis zu
+ * **153 mm** daneben — der Bodenanschlag haette den gekippten Greifer 15 cm
+ * ueber dem Beton gehalten, und damit waere Kehren nicht gegangen. Diese
+ * Fassung liegt unter einem Millimeter.
+ */
+function ausladung(schwenk: number, kipp: number): number {
+  if (kipp === 0) return tiefe(schwenk);
+  const c = Math.cos(-schwenk);
+  const sn = Math.sin(-schwenk);
+  const ck = Math.cos(kipp);
+  const sk = Math.sin(kipp);
+  let weit = -Infinity;
+  for (const p of messeZahn()) {
+    const y = STEMPEL_AUGE.y + (p.y * c - p.z * sn);
+    const r = STEMPEL_AUGE.r + (p.y * sn + p.z * c);
+    for (let i = 0; i < MASS.schalen; i++) {
+      const d = -y * ck + Math.cos((i / MASS.schalen) * Math.PI * 2) * r * sk;
+      if (d > weit) weit = d;
+    }
+  }
+  return weit;
 }
 
 let maxTiefeGemerkt: number | null = null;
@@ -326,6 +385,11 @@ export const FUENFSCHALEN: Greiferform = {
   get maxTiefe(): number {
     return maxTiefe();
   },
+  ausladung,
+  maxAusladung: merkeMaxAusladung(
+    () => FUENFSCHALEN,
+    () => maxTiefe()
+  ),
   /*
    * Die Kugel reicht bis zum Korbboden — und der geht bis an die gezeichneten
    * Zaehne (siehe `imKorb`). Also der tiefere der beiden Werte:

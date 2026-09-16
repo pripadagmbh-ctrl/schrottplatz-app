@@ -95,6 +95,7 @@ Das schreibt `src/greifer/fuenfschalen.glb` neu; Maße und Befunde stehen in
 | MMB ziehen | Kamera drehen |
 | C | Ansicht: Orbit → Draufsicht → Kabine |
 | X | Fahrerkabine hoch/runter (2,6 m Hub) |
+| K | Greifer zur Seite kippen / wieder aufrichten (90°, 2 s) |
 | V | Abholung rufen bzw. beladenen Container abfahren lassen |
 | B | Schere/Paketierpresse |
 | H | Hilfe ein/aus · F3 Debug-Overlay |
@@ -305,6 +306,14 @@ wenn die Beschreibung unten von dem abweicht, was das Spiel tut.
 - Greifspinne: 5 Schalen-Zacken, seit E-007 am schlanken Zapfen statt am breiten Ring,
   je acht Segmente. Die Kollider der Zacken folgen der Zeichnung (`updateClawColliders`) —
   dass beide deckungsgleich sind, hält ein eigener Wächter in `test/greifer.test.ts` fest.
+- **Seitwärtskippen** (E-083): Der Greifer legt sich auf Taste K in 2 s um 90° zur Seite.
+  Gekippt wird um seine *eigene* X-Achse, also **nach** dem Rotator (`qPendel · qGier · qKipp`) —
+  damit wählt der Rotator, wohin er fällt. Drei Stellen rechnen deshalb nicht mehr in der
+  Weltsenkrechten, sondern in der Greiferachse: `resolveGroundClamp` (nimmt
+  `form.maxAusladung(kipp)` statt `form.maxTiefe`), `surfaceUnderClaws` (Strahl geht die
+  gekippte Achse entlang, Fußpunkt `Tiefe · sin θ` seitlich) und `hoechsteKrallenspitze`
+  (bekommt die Ausladung als Vorgabe). **Bei Kippwinkel 0 springt jede dieser Stellen vorab
+  auf den alten Weg** — `test/kippen.test.ts` prüft das auf Gleichheit, nicht auf Nähe.
 - Module kommunizieren über den typisierten **EventBus** (`core/events.ts`) — itemEntered/
   itemLeft/grabbed/released; Audio und HUD hängen nur an Events.
 - Container-Zuordnung per **Zonen-Zählung** alle 10 Steps (gegriffene Items zählen nicht);
