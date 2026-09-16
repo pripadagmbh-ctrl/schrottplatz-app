@@ -71,7 +71,7 @@ const SPALTEN = 8;
 const SP_B = 448;
 const RAND = 32;
 const BREITE = RAND * 2 + SPALTEN * SP_B;
-const HOEHE = 2100;
+const HOEHE = 2644;
 
 /** Pixel je Meter für Seitenriss und Vorderansicht. */
 const PX = 230;
@@ -87,21 +87,27 @@ const PX_D = 500;
 /** Pixel je Meter für den Kranz aus fünf Schalen. */
 const PX_K = 108;
 
-/** Höhenlage der Bänder im Blatt. */
+/** Der Kasten über den Spalten: die Bahn der Schneide (DE 31 31 624 A1). */
+const KASTEN = { y0: 142, h: 430 };
+
+/** Höhenlage der Bänder im Blatt. Alles unterhalb des Kastens. */
 const Y = {
-  kopf: 152,
-  seiteBeschr: 266,
-  seiteNull: 296, // y = 0 der Schale (Drehbolzen)
-  vornBeschr: 624,
-  vornNull: 672,
-  schnittBeschr: 934,
-  schnittNull: 996,
-  augeBeschr: 1114,
-  augeNull: 1252, // Bolzenmitte in der Vergrößerung
-  augeText: 1432, // Legende UNTER der Zeichnung, nicht daneben
-  kranzBeschr: 1592,
-  kranzNull: 1712,
-  text: 1884,
+  kopf: 630,
+  seiteBeschr: 744,
+  seiteNull: 778, // y = 0 der Schale (Drehbolzen)
+  seiteLeiter: 1074, // Maßstabsleiter unter dem Seitenriss
+  seiteKey: 1106, // die Dreiteilung des Zinkens erklärt
+  vornBeschr: 1182,
+  vornNull: 1230,
+  schnittBeschr: 1494,
+  schnittNull: 1556,
+  augeBeschr: 1674,
+  augeNull: 1812, // Bolzenmitte in der Vergrößerung
+  augeText: 1992, // Legende UNTER der Zeichnung, nicht daneben
+  augeSpalt: 2130, // die Zeile über die Lücke am Drehpunkt
+  kranzBeschr: 2166,
+  kranzNull: 2286,
+  text: 2448,
 };
 
 const F = {
@@ -468,6 +474,82 @@ const FORMEN = [
   },
 ];
 
+/**
+ * NACHTRAG 16.09.2026, zweiter Durchgang nach besseren Quellen (Patentrisse).
+ * Drei Dinge, die im ersten Entwurf fehlten oder falsch waren:
+ *
+ *  1. DIE LÜCKE AM SCHALENDREHPUNKT IST ABSICHT. Sennebogen zur MG4.1: Die
+ *     Anbindung der Schalen an den Mittelbalken lässt am Schalendrehpunkt
+ *     genügend Platz, damit Kleinmaterial durchfallen kann. Genau die Stelle,
+ *     auf die Patrick zeigt, hat also einen Zweck — Kleinzeug soll dort
+ *     durchfallen, statt sich festzusetzen. Steht jetzt bei jeder Form in der
+ *     Vergrößerung, mit der Frage, ob dort wirklich etwas durchläuft.
+ *  2. DER ZINKEN IST DREITEILIG. Bateman zur B5T: verstärkter Rücken,
+ *     Verschleißstreifen und auswechselbare, ANGESCHWEISSTE Spitze — drei
+ *     Dinge, die wir als eines gezeichnet hatten. (Geschraubte Spitzen gibt es
+ *     auch; der Handel führt Anschweiß- und Schraubzähne nebeneinander.)
+ *  3. E UND F SIND FÜR SCHROTT NICHT BELEGT. Rippen-, Langloch- und
+ *     Gitterschalen habe ich nur für Leicht- und Schüttgut gefunden, nicht für
+ *     Schrott. Im ersten Entwurf stand das als „die Familie, die wir nie
+ *     betrachtet haben" — das war meine Vermutung, nicht die Quellenlage. Die
+ *     Formen bleiben auf dem Blatt, aber sie sind jetzt so gekennzeichnet.
+ */
+const NACHTRAG = {
+  A: {
+    dreiteilig: true,
+    spitzeWort: "Schneide, angeschweißt",
+    spalt: { art: "seite", weite: 14, bis: -42 },
+    spaltWort: "Spalt eng: die breit auslaufende Ferse verengt ihn — Feines kann sich hier setzen.",
+  },
+  B: {
+    dreiteilig: true,
+    spitzeWort: "stumpfe Spitze, angeschweißt",
+    spalt: { art: "seite", weite: 34, bis: -33 },
+    spaltWort: "Spalt weit: der Rücken läuft schlank aus, Kleinzeug fällt durch. Der Schrott-Normalfall.",
+  },
+  C: {
+    dreiteilig: true,
+    spitzeWort: "Spitze angeschweißt (auch geschraubt üblich)",
+    winkel: "US 2012/0299321: Spitze ≈ 53° zur Senkrechten, Innenwinkel ≈ 110°",
+    spalt: { art: "front", paare: [[-29, -18], [18, 29]] },
+    spaltWort: "Beidseits der Nabennase offen — von allen acht der größte Durchfall.",
+  },
+  D: {
+    dreiteilig: true,
+    spitzeWort: "Spitze angeschweißt",
+    winkel: "US 2012/0299321: flache Zinke ≈ 67° zur Senkrechten, Innenwinkel ≈ 134°",
+    spalt: { art: "front", paare: [[-43, -34], [34, 43]] },
+    spaltWort: "Zwei schmale Spalte statt einem breiten — einschnittig heißt hier: zweimal wenig.",
+  },
+  E: {
+    dreiteilig: false,
+    spitzeWort: "gezackte Wangenkante, kein eigener Zahn",
+    unbelegt: "für Schrott nicht belegt",
+    spalt: { art: "front", paare: [[-64, -50], [50, 64]] },
+    spaltWort: "Das Querrohr schließt die Mitte — Durchfall nur außen. Dafür ist die Schale selbst durchlässig.",
+  },
+  F: {
+    dreiteilig: false,
+    spitzeWort: "Stabende, rund",
+    unbelegt: "für Schrott nicht belegt",
+    spalt: { art: "rund" },
+    spaltWort: "Ringsum offen: hier ist alles Spalt. Die Frage stellt sich bei dieser Bauart gar nicht.",
+  },
+  G: {
+    dreiteilig: false,
+    spitzeWort: "Klinge, aus dem Schmiedestück",
+    spalt: { art: "seite", weite: 10, bis: -46 },
+    spaltWort: "Eng gefasst: Holz muss nirgends durchfallen, also wird der Spalt hier nicht gebraucht.",
+  },
+  H: {
+    dreiteilig: true,
+    spitzeWort: "Zahnreihe, geschraubt oder angeschweißt",
+    spalt: { art: "seite", weite: 26, bis: -52 },
+    spaltWort: "Der Anschlagnocken steht im Weg; frei ist es erst unter ihm.",
+  },
+};
+FORMEN.forEach((f) => Object.assign(f, NACHTRAG[f.b]));
+
 /* ================================================== Blattrahmen und Kopf */
 
 z(`<rect x="0" y="0" width="${BREITE}" height="${HOEHE}" fill="${F.papier}"/>`);
@@ -488,10 +570,184 @@ text(
   F.grau
 );
 
+/* ============================== Der Kasten: die Bahn der Schneide ========= */
+
+/**
+ * DER WICHTIGSTE FUND DES PAKETS. Patent DE 31 31 624 A1 („Greifer mit
+ * steuerbarem Bewegungsmuster der Schalenschneiden") beschreibt genau das
+ * Problem, an dem wir seit E-065 hängen: Die Schneide fährt beim Schließen
+ * einen BOGEN, geht dabei erst tiefer und kommt danach wieder hoch.
+ *
+ * Das Patent nennt drei Punkte: A = Schneide, B = Drehpunkt der Schale im
+ * Greiferkopf, C = Anlenkpunkt an der Schale. Seine Lösung ist NICHT eine
+ * bessere Schalenform, sondern eine überlagerte senkrechte Ausgleichsbewegung
+ * des ganzen Greifers; die Schalengeometrie allein genügt ihm nicht. Und es
+ * gibt die Regel an, wann diese Überlagerung einfach wird: wenn AB und BC
+ * einen RECHTEN WINKEL bilden, ist die senkrechte Verschiebung der Schneide
+ * gleich der Bewegung des Anlenkpunktes C — eins zu eins nachführbar. Wird der
+ * Winkel kleiner oder wandert C entgegen der Schließrichtung, bekommt der
+ * Schneidenweg eine Überhöhung.
+ *
+ * Daraus folgt die eine Aussage, die dieses Blatt angeht — und sie ist eine
+ * Aussage über die FORM, nicht über unsere Anlenkung: Der Scheitel entsteht
+ * durch den Winkel φ zwischen der Strecke Drehbolzen→Spitze und der
+ * Senkrechten in der GESCHLOSSENEN Stellung. Steht die Spitze geschlossen
+ * senkrecht unter ihrem Bolzen (φ = 0), gibt es überhaupt keinen Scheitel: Die
+ * Schneide ist im Geschlossenen am tiefsten und steigt von da nur noch. Je
+ * weiter die Spitze zur Mitte hin versetzt ist, desto höher der Scheitel.
+ *
+ * Hier wird NICHTS gegen unseren Greifer gerechnet. Die 25,2 cm stehen seit
+ * E-065 im Log und werden nur zitiert.
+ */
+function bahnkasten() {
+  const x0 = RAND;
+  const y0 = KASTEN.y0;
+  z(`<rect x="${x0}" y="${y0}" width="${BREITE - 2 * RAND}" height="${KASTEN.h}" fill="${F.feld}" stroke="${F.linie}" stroke-width="2.5" rx="10"/>`);
+
+  text(x0 + 28, y0 + 42, "Der eine Riss, der uns wirklich weiterhilft: die Bahn der Schneide", 30, F.linie, "start", true);
+  text(
+    x0 + 28,
+    y0 + 72,
+    "Patent DE 31 31 624 A1, „Greifer mit steuerbarem Bewegungsmuster der Schalenschneiden“ — es beschreibt genau unser Problem aus E-065.",
+    20,
+    F.grau
+  );
+
+  /* --- Die drei kleinen Risse ------------------------------------------- */
+  const RR = 96; // Schalenradius in Pixeln für die Skizzen
+  const skizze = (sx0, titel, phiGrad, farbe, unten) => {
+    const bx = sx0 + 130;
+    const by = y0 + 148;
+    const phi = (phiGrad * Math.PI) / 180;
+
+    /*
+     * Der Bogen, den die Spitze fährt: Kreis um den Drehbolzen.
+     *
+     * Die Winkel sind im Bildschirmsinn (y nach unten), „senkrecht nach unten"
+     * ist also 90°. Geschlossen steht die Spitze um φ neben der Senkrechten,
+     * offen um 90° − φ auf der anderen Seite. Der Bogen läuft damit ÜBER die
+     * Senkrechte hinweg — und der tiefste Punkt der Bahn ist genau dort, nicht
+     * an einem der beiden Enden. Beim ersten Entwurf lief der Bogen in die
+     * falsche Richtung und der Tiefpunkt kam im Bild gar nicht vor; die
+     * Zeichnung behauptete dann das Gegenteil des Textes.
+     */
+    const a0 = Math.PI / 2 + phi; // geschlossen
+    const a1 = phi; // offen, 90° Schwenk
+    const bahn = [];
+    for (let k = 0; k <= 24; k++) {
+      const a = a0 + ((a1 - a0) * k) / 24;
+      bahn.push([bx + Math.cos(a) * RR, by + Math.sin(a) * RR]);
+    }
+    pfad(glatt(bahn), "none", farbe, 2.6);
+
+    // Bolzen und die Strecke B→A im Geschlossenen.
+    kreis(bx, by, 7, F.feld, F.linie, 2);
+    text(bx - 12, by - 8, "B", 17, F.linie, "end", true);
+    const ax = bx + Math.cos(a0) * RR;
+    const ay = by + Math.sin(a0) * RR;
+    linie(bx, by, ax, ay, F.linie, 1.6, "5 4");
+    text(ax - 9, ay + 22, "A", 17, F.linie, "end", true);
+
+    // Die Senkrechte und der Winkel φ.
+    linie(bx, by, bx, by + RR + 16, F.hilfe, 1.4, "4 5");
+    if (phiGrad > 0) {
+      text(bx + 8, by + 34, `φ = ${phiGrad}°`, 16, farbe, "start", true);
+    } else {
+      text(bx + 8, by + 34, "φ = 0", 16, farbe, "start", true);
+    }
+
+    // Der tiefste Punkt der Bahn und der Scheitel darüber.
+    const tiefY = by + RR; // tiefster Punkt des Kreises
+    linie(sx0 + 14, tiefY, sx0 + 250, tiefY, F.hilfe, 1.4, "3 5");
+    const schliessY = ay;
+    if (tiefY - schliessY > 2) {
+      // Es gibt einen Scheitel: die Schneide taucht unter die Schließstellung.
+      linie(sx0 + 30, schliessY, sx0 + 30, tiefY, F.rot, 3);
+      linie(sx0 + 24, schliessY, sx0 + 36, schliessY, F.rot, 3);
+      linie(sx0 + 24, tiefY, sx0 + 36, tiefY, F.rot, 3);
+      text(sx0 + 24, schliessY - 10, "Scheitel", 16, F.rot, "start", true);
+    } else {
+      text(sx0 + 24, tiefY - 12, "kein Scheitel", 16, F.gruen, "start", true);
+    }
+
+    text(sx0 + 14, y0 + 300, titel, 19, F.linie, "start", true);
+    unten.forEach((zl, k) => text(sx0 + 14, y0 + 326 + k * 22, zl, 16, F.grau));
+  };
+
+  skizze(x0 + 28, "1 · Spitze senkrecht unter dem Bolzen", 0, F.gruen, [
+    "Die Schneide ist geschlossen am tiefsten und",
+    "steigt von da nur noch. Kein Tiefpunkt unterwegs.",
+  ]);
+  skizze(x0 + 400, "2 · Spitze zur Mitte versetzt", 38, F.rot, [
+    "Sie taucht auf dem Weg unter die Schließstellung",
+    "und kommt wieder hoch. Je größer φ, desto höher.",
+  ]);
+
+  /* --- Was das Patent sagt ---------------------------------------------- */
+  const rx = x0 + 800;
+  z(`<line x1="${rx - 28}" y1="${y0 + 96}" x2="${rx - 28}" y2="${y0 + KASTEN.h - 24}" stroke="${F.band}" stroke-width="2"/>`);
+
+  text(rx, y0 + 124, "Was das Patent sagt", 21, F.linie, "start", true);
+  [
+    "· Die Schneiden führen beim Schließen eine bogenförmige Bewegung aus. Das ist keine",
+    "  Fehlkonstruktion, sondern die Folge davon, dass die Schale EIN starrer Körper an EINEM",
+    "  Bolzen ist. Genau das steht seit E-065 auch bei uns im Log.",
+    "· Der Bogen verschleißt den Untergrund — im Patent ausdrücklich Waggonböden.",
+    "· Die Lösung des Patents ist NICHT eine bessere Schalenform, sondern eine überlagerte",
+    "  senkrechte Ausgleichsbewegung des GANZEN Greifers, gesteuert über den Schließwinkel.",
+    "· Seine Regel für den Anlenkpunkt C an der Schale: bilden AB (Bolzen→Schneide) und",
+    "  BC (Bolzen→Anlenkung) einen rechten Winkel, ist die senkrechte Verschiebung der",
+    "  Schneide gleich der Bewegung von C — eins zu eins nachführbar. Kleinerer Winkel",
+    "  oder C entgegen der Schließrichtung: der Schneidenweg bekommt eine Überhöhung.",
+  ].forEach((zl, k) => text(rx, y0 + 154 + k * 24, zl, 17, F.grau));
+
+  /* --- Die 90°-Skizze mit A, B, C --------------------------------------- */
+  const cx0 = x0 + 1900;
+  const cy0 = y0 + 250;
+  z(`<line x1="${cx0 - 130}" y1="${y0 + 96}" x2="${cx0 - 130}" y2="${y0 + KASTEN.h - 24}" stroke="${F.band}" stroke-width="2"/>`);
+  text(cx0 - 100, y0 + 124, "Die Regel für den Anlenkpunkt", 21, F.linie, "start", true);
+  linie(cx0, cy0, cx0 + 96, cy0 + 76, F.linie, 2.8); // B → A
+  linie(cx0, cy0, cx0 + 60, cy0 - 76, F.blau, 2.8); // B → C
+  kreis(cx0, cy0, 8, F.feld, F.linie, 2.2);
+  kreis(cx0 + 60, cy0 - 76, 10, F.feld, F.blau, 2.6);
+  text(cx0 - 14, cy0 + 5, "B", 18, F.linie, "end", true);
+  text(cx0 + 106, cy0 + 86, "A", 18, F.linie, "start", true);
+  text(cx0 + 72, cy0 - 84, "C", 18, F.blau, "start", true);
+  pfad(`M ${cx0 + 30} ${cy0 + 24} L ${cx0 + 46} ${cy0 - 4} L ${cx0 + 19} ${cy0 - 22}`, "none", F.rot, 2.2);
+  text(cx0 + 54, cy0 + 6, "90°", 17, F.rot, "start", true);
+  text(cx0 - 100, y0 + 372, "AB ⊥ BC — dann läuft die Nachführung", 17, F.linie);
+  text(cx0 - 100, y0 + 394, "eins zu eins mit dem Anlenkpunkt.", 17, F.linie);
+
+  /* --- Was das für dieses Blatt heißt ------------------------------------ */
+  const fx = x0 + 2340;
+  z(
+    `<rect x="${fx - 28}" y="${y0 + 100}" width="${BREITE - RAND - (fx - 28) - 28}" height="${KASTEN.h - 128}" ` +
+      `fill="#eef3f6" stroke="${F.blau}" stroke-width="2" rx="8"/>`
+  );
+  text(fx, y0 + 134, "Was das für dieses Blatt heißt", 21, F.blau, "start", true);
+  [
+    "Wo die Spitze im Geschlossenen relativ zu IHREM",
+    "Bolzen sitzt, ist eine Frage der FORM — und sie",
+    "steht bei jeder der acht Spalten im Seitenriss.",
+    "",
+    "Aber: Die Spitze senkrecht unter den Bolzen zu",
+    "legen heißt, den Bolzen fast auf die Mitte zu",
+    "holen. Ob das geht, ist eine Frage der Anlenkung",
+    "und wird hier NICHT beantwortet.",
+    "",
+    "Das Patent selbst löst es gar nicht über die Form,",
+    "sondern über eine zweite Bewegung. Auch das ist",
+    "eine mögliche Antwort — aber keine, die man einer",
+    "Schale ansieht.",
+  ].forEach((zl, k) => text(fx, y0 + 164 + k * 22, zl, 17, F.linie));
+}
+
+bahnkasten();
+
 /* Spaltenfelder und Trennlinien. */
 for (let i = 0; i < SPALTEN; i++) {
   const x0 = RAND + i * SP_B;
-  z(`<rect x="${x0 + 6}" y="${Y.kopf - 42}" width="${SP_B - 12}" height="${HOEHE - Y.kopf - 26}" fill="${F.feld}" stroke="${F.band}" stroke-width="2" rx="8"/>`);
+  z(`<rect x="${x0 + 6}" y="${Y.kopf - 42}" width="${SP_B - 12}" height="${HOEHE - Y.kopf - 60}" fill="${F.feld}" stroke="${F.band}" stroke-width="2" rx="8"/>`);
 }
 
 /* =========================================================== Zeichenteile */
@@ -530,7 +786,7 @@ function seitenriss(i, form) {
   // Grundriss-Hilfslinie: die Korbmitte, damit man sieht, wie weit die Spitze kommt.
   const mitte = sx(i, 0.98);
   linie(mitte, sy(-0.12), mitte, sy(1.3), F.hilfe, 1.4, "5 6");
-  text(mitte - 6, 596, "Korbmitte", 14, F.hilfe, "end");
+  text(mitte - 6, Y.seiteLeiter - 14, "Korbmitte", 14, F.hilfe, "end");
 
   // Der Schalenkörper.
   const d =
@@ -556,9 +812,18 @@ function seitenriss(i, form) {
     const fugeA = [a[0] - (a[0] - a2[0]) * 0.42, a[1] - (a[1] - a2[1]) * 0.42];
     const fugeB = [b[0] - (b[0] - b2[0]) * 0.42, b[1] - (b[1] - b2[1]) * 0.42];
     pfad(eckig([fugeA, a, b, fugeB], true), F.fuellTief, F.linie, 2.2);
+    // Die Fuge ist eine SCHWEISSNAHT, kein Bolzen. Bateman zur B5T:
+    // „replaceable weld-on tine tips". Im ersten Entwurf stand hier eine
+    // Schraube — geschraubte Zähne gibt es auch, angeschweißte sind bei
+    // Schrottgreifern aber das, was die Quellen nennen.
     linie(fugeA[0], fugeA[1], fugeB[0], fugeB[1], F.rot, 2.4);
-    kreis((fugeA[0] + fugeB[0]) / 2, (fugeA[1] + fugeB[1]) / 2, 4, F.feld, F.rot, 1.6);
-    text(a[0] - 4, a[1] + 34, "Spitze geschraubt", 15, F.rot, "end");
+    for (let k = 0; k < 4; k++) {
+      const t = 0.15 + k * 0.24;
+      const mx = fugeA[0] + (fugeB[0] - fugeA[0]) * t;
+      const my = fugeA[1] + (fugeB[1] - fugeA[1]) * t;
+      pfad(eckig([[mx - 4, my - 5], [mx + 4, my], [mx - 4, my + 5]]), "none", F.rot, 1.6);
+    }
+    text(a[0] - 4, a[1] + 30, "Spitze angeschweißt", 15, F.rot, "end");
   }
   if (form.spitze === "klinge") {
     const a = innen[innen.length - 1];
@@ -630,6 +895,24 @@ function seitenriss(i, form) {
     text(sx(i, -0.12), sy(0.5), "Knick", 15, F.rot);
   }
 
+  /**
+   * DIE DREITEILUNG. Bateman zur B5T: „thicker backs, wear strips & heavy-duty
+   * replaceable weld-on tine tips" — verstärkter Rücken, Verschleißstreifen,
+   * auswechselbare Spitze. Wir hatten das als EIN Blech gezeichnet. Wo eine
+   * Bauart die drei Teile hat, sind sie jetzt getrennt angeschrieben; die
+   * Sichel (G, ein Schmiedestück), die Rippenschale (E) und die Gitterschale
+   * (F) haben sie nicht, und das ist genauso ein Unterschied.
+   */
+  if (form.dreiteilig) {
+    const nR = Math.max(3, Math.round(aussen.length * 0.62));
+    pfad(glatt(aussen.slice(0, nR)), "none", F.stahl, 7); // verstärkter Rücken
+    // Verschleißstreifen: zwei Linien AUF der Innenfläche (negative Dicke
+    // versetzt nach innen, zur hohlen Seite).
+    for (const d of [3.5, 9]) {
+      pfad(glatt(versetzen(form.innen, -d / PX, -d / PX).map(P)), "none", F.gruen, 2.6);
+    }
+  }
+
   // Der Drehbolzen.
   const bx = sx(i, 0);
   const by = sy(0);
@@ -639,7 +922,19 @@ function seitenriss(i, form) {
   linie(bx, by - 26, bx, by + 26, F.hilfe, 1.2, "4 4");
   text(bx - 20, by + 6, "Drehbolzen", 15, F.grau, "end");
 
-  meterleiter(x0 + 44, 602, PX, "1 m");
+  // Die Legende zur Dreiteilung — bei den Bauarten, die sie haben.
+  if (form.dreiteilig) {
+    linie(x0 + 24, Y.seiteKey - 5, x0 + 46, Y.seiteKey - 5, F.stahl, 7);
+    text(x0 + 52, Y.seiteKey, "verstärkter Rücken", 15, F.grau);
+    linie(x0 + 212, Y.seiteKey - 5, x0 + 234, Y.seiteKey - 5, F.gruen, 2.6);
+    text(x0 + 240, Y.seiteKey, "Verschleißstreifen", 15, F.grau);
+  } else {
+    text(x0 + 24, Y.seiteKey, "ein Stück — kein verstärkter Rücken, keine Streifen", 15, F.grau);
+  }
+  text(x0 + 24, Y.seiteKey + 21, form.spitzeWort, 15, F.rot);
+  if (form.winkel) text(x0 + 24, Y.seiteKey + 42, form.winkel, 14, F.blau);
+
+  meterleiter(x0 + 44, Y.seiteLeiter, PX, "1 m");
 }
 
 /* ------------------------------------------------------- Ansicht von vorn */
@@ -1152,6 +1447,58 @@ function lagerauge(i, form) {
   linie(cx, cy, zx, zy, F.blau, 1.6, "4 4");
   text(zx + 20, zy + 5, "2. Auge", 14, F.blau);
 
+  /**
+   * DIE LÜCKE AM SCHALENDREHPUNKT. Sennebogen zur MG4.1: Die Anbindung der
+   * Greiferschalen an den Mittelbalken lässt am Schalendrehpunkt genügend
+   * Platz, damit Kleinmaterial durchfallen kann. Das ist genau die Stelle, auf
+   * die Patrick zeigt — und sie ist kein Versehen, sondern Absicht. Die Lücke
+   * ist bei jeder Bauart anders groß und sitzt woanders; deshalb steht sie hier
+   * je Form in der Vergrößerung und nicht einmal allgemein am Blattrand.
+   *
+   * ABSICHTLICH OHNE ZENTIMETERANGABE. Die Quellen nennen den ZWECK der Lücke,
+   * kein Maß. Eine Zahl, die ich aus meiner eigenen Skizze abgreife, wäre genau
+   * die Sorte hergeleitete Zahl, die Patrick auf diesem Blatt nicht sehen will.
+   * Die Zeichnung zeigt die Weite im Verhältnis, das Wort in der Legende sagt,
+   * ob dort etwas durchläuft.
+   */
+  const sp = form.spalt;
+  if (sp.art === "seite") {
+    // Mittelbalken links, Schale rechts, die Lücke dazwischen.
+    const x2 = cx + sp.bis;
+    const x1 = x2 - sp.weite;
+    z(
+      `<rect x="${r(x1 - 86)}" y="${r(cy - 64)}" width="86" height="126" fill="${F.band}" ` +
+        `stroke="${F.blau}" stroke-width="2" stroke-dasharray="7 5" rx="5"/>`
+    );
+    text(x1 - 43, cy - 74, "Mittelbalken", 14, F.blau, "middle");
+    const yy = cy + 22;
+    linie(x1, yy - 42, x1, yy + 48, F.rot, 2, "5 4");
+    linie(x1, yy, x2, yy, F.rot, 2.6);
+    linie(x1, yy - 7, x1, yy + 7, F.rot, 2.6);
+    linie(x2, yy - 7, x2, yy + 7, F.rot, 2.6);
+    // Der Wortzeiger UNTER den Pfeil: über ihm sitzt bei jeder Bauart das
+    // Lagerauge, und dort war der Text beim ersten Entwurf nicht lesbar.
+    text((x1 + x2) / 2, yy + 17, "Spalt", 14, F.rot, "middle", true);
+    // Kleinmaterial, das hier durchfällt.
+    for (let k = 0; k < 3; k++) {
+      kreis(x1 + sp.weite / 2 - 3 + k * 5, yy + 34 + k * 15, 3.2, F.rot, F.rot, 1);
+    }
+    text(x1 + 2, yy + 92, "fällt durch", 14, F.rot);
+  } else if (sp.art === "front") {
+    // Die Lücke liegt entlang der Bolzenachse, zwischen Schale und Nabe.
+    const x1 = cx - 96;
+    for (const [a, b] of sp.paare) {
+      linie(x1, cy + a, x1, cy + b, F.rot, 2.8);
+      linie(x1 - 8, cy + a, x1 + 8, cy + a, F.rot, 2.6);
+      linie(x1 - 8, cy + b, x1 + 8, cy + b, F.rot, 2.6);
+    }
+    text(x1 - 12, cy + 4, "Spalt", 14, F.rot, "end", true);
+    text(cx - 60, cy + 104, "hier fällt Kleinzeug durch", 14, F.rot, "middle");
+  } else if (sp.art === "rund") {
+    z(`<circle cx="${r(cx)}" cy="${r(cy)}" r="88" fill="none" stroke="${F.rot}" stroke-width="2.4" stroke-dasharray="8 7"/>`);
+    text(cx - 96, cy - 84, "ringsum offen", 14, F.rot, "start", true);
+  }
+
   // Legende — UNTER der Zeichnung. Daneben stand sie beim ersten Entwurf mitten
   // im Bauteil; man konnte weder den Text noch das Auge lesen.
   let ty = Y.augeText;
@@ -1160,6 +1507,16 @@ function lagerauge(i, form) {
     ty += 22;
     text(x0 + 22, ty, legenden[k], 16, F.grau);
   }
+
+  // Die Lücke am Drehpunkt, in Worten — je Bauart eine andere Antwort.
+  const sw = form.spaltWort.split(" ");
+  const zeilen2 = [];
+  let cur = "";
+  for (const w of sw) {
+    if ((cur + " " + w).trim().length > 54) { zeilen2.push(cur.trim()); cur = w; } else cur = (cur + " " + w).trim();
+  }
+  if (cur) zeilen2.push(cur);
+  zeilen2.forEach((zl, k) => text(x0 + 22, Y.augeSpalt + k * 20, zl, 15, F.rot));
 }
 
 /* ------------------------------------------- Fünf Schalen im Kreis (Korb) */
@@ -1258,6 +1615,11 @@ FORMEN.forEach((form, i) => {
   text(x0 + 48, Y.kopf, form.b, 36, F.feld, "middle", true);
   text(x0 + 88, Y.kopf - 12, form.name, 24, F.linie, "start", true);
   text(x0 + 88, Y.kopf + 12, form.unter, 19, F.grau);
+  // Was ich an einer Schrottquelle NICHT belegen konnte, steht als Warnung dran.
+  if (form.unbelegt) {
+    z(`<rect x="${r(x0 + 22)}" y="${r(Y.kopf + 24)}" width="${SP_B - 44}" height="30" fill="#f6e7e3" stroke="${F.rot}" stroke-width="2" rx="6"/>`);
+    text(x0 + 32, Y.kopf + 45, `⚠ ${form.unbelegt} — nur für Leicht- und Schüttgut gefunden`, 15, F.rot, "start", true);
+  }
 
   seitenriss(i, form);
   vorderansicht(i, form);
@@ -1278,15 +1640,16 @@ linie(RAND, fussY - 22, BREITE - RAND, fussY - 22, F.band, 2);
 text(
   RAND,
   fussY,
-  "Recherche 16.09.2026, Quellen als Text (keine Fremdbilder, keine Zitate): Kinshofer Polypgreifer P-Reihe, Zinkenprofile F/H/W/T, sowie KM 651/652/653 · Sennebogen MG-Reihe, Schalensätze halboffen bis voll geschlossen, Sonderschalen Futter/Hackschnitzel · " +
-    "Idrobenne, geschlossen/halb/offen, Hardox-Zinken, Buchsen mit Fettspirale · HS Schoch, Abbruch- und Sortiergreifer in Rippen- oder Langlochschalenblech, gezackte Seitenwangen, Zähne oder U-Messer · Genesis, Kastenzinken mit versenkten Nähten und geschraubten Spitzen · Rotobec/Hultdins, Holzgreifer mit bypassenden Sichelbacken.",
+  "Recherche 16.09.2026, zweiter Durchgang nach Patentrissen. Quellen als Text (keine Fremdbilder, keine langen Zitate). PATENTE: DE 31 31 624 A1 (Bewegungsmuster der Schalenschneiden — der Kasten oben) · US 2012/0299321 A1 (Orangenschalengreifer, Zinkenwinkel) · US 7,000,339 (universeller Zinken, U- bzw. Kastenprofil, Rückenblech/Seitenbleche/Verschleißstreifen/Spitze) · DE 197 49 848 A1 (Zweischalengreifer: U-förmige Aufnahmen, Bolzen zweischnittig) · US 1,145,220 (1915: Arm ZWEITEILIG, umgreift die Nasen; Lasche in der Armmitte). " +
+    "HERSTELLER: Kinshofer P-Reihe F/H/W/T und KM 651/652/653 · Sennebogen MG4.1 — Mitteltraverse aus Stahlguss, Schalen in Hardox-Schweißkonstruktion, Spitzen aus Schmiedestahl, und am Schalendrehpunkt bleibt Platz, damit Kleinmaterial durchfällt · Bateman B5T — offen / halb geschlossen (Standard) / voll geschlossen, verstärkte Rücken, Verschleißstreifen, angeschweißte Wechselspitzen · " +
+    "Idrobenne, geschlossen/halb/offen, Hardox-Zinken, Buchsen mit Fettspirale · HS Schoch, Abbruch- und Sortiergreifer in Rippen- oder Langlochschalenblech, gezackte Seitenwangen, Zähne oder U-Messer · Genesis, Kastenzinken mit versenkten Nähten · Rotobec/Hultdins, Holzgreifer mit bypassenden Sichelbacken.",
   16,
   F.grau
 );
 text(
   RAND,
   fussY + 22,
-  "Gezeichnet mit tools/schalen-vorbilder.mjs — frei von jeder Randbedingung unserer Konstruktion. Kein Bolzenkreis, keine Zylinderneigung, kein Hebelarm, keine Maulweite geprüft. Ob eine Form bei uns baubar ist, wird erst gerechnet, wenn eine ausgesucht ist.",
+  "Gezeichnet mit tools/schalen-vorbilder.mjs — frei von jeder Randbedingung unserer Konstruktion. Kein Bolzenkreis, keine Zylinderneigung, kein Hebelarm, keine Maulweite geprüft, keine Empfehlung. Die 25,2 cm im Kasten oben sind aus E-065 zitiert, nicht hier gerechnet. Ob eine Form bei uns baubar ist, wird erst gerechnet, wenn eine ausgesucht ist.",
   16,
   F.grau
 );
