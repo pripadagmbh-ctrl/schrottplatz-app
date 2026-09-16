@@ -84,9 +84,16 @@ describe("Fuenfschalengreifer — die Form am Bagger", () => {
      * 1,2289 aus E-048. Damit gewinnt wieder die Mittellinienrechnung —
      * `sensorRadius` nimmt das Maximum der beiden, und genau das ist der Zweck
      * dieser Formel: Sie folgt der Form, statt eine Zahl festzuhalten.
+     *
+     * 16.09.2026 (E-090): UND JETZT KIPPT ES WIEDER ZURUECK — und das ist der
+     * Beweis, dass die Formel tut, was sie soll. Der breitere Saum (60 % statt
+     * 30 % der Wurzel) woelbt das Schalenende staerker; der tiefste Punkt geht
+     * auf 2,7439 m, also 2,7439 − 1,50 = 1,2439 > 1,2289. Jetzt gewinnt wieder
+     * die Schalenrechnung. Die Zahl aus E-048 steht unveraendert daneben: Sie
+     * ist die UNTERGRENZE, nicht das Ergebnis.
      */
-    expect(FUENFSCHALEN.sensorRadius).toBeCloseTo(1.2289, 4);
-    expect(2.5489 + 0.18 - 1.5, "die Rechnung aus E-048").toBeCloseTo(1.2289, 4);
+    expect(FUENFSCHALEN.sensorRadius).toBeCloseTo(1.2439, 4);
+    expect(2.5489 + 0.18 - 1.5, "die Rechnung aus E-048, jetzt die Untergrenze").toBeCloseTo(1.2289, 4);
     expect(FUENFSCHALEN.schalenluecke).toBeCloseTo(0.5954, 4);
     expect(FUENFSCHALEN.sensorSitz, "Sensorsitz wie bei der Sichelkralle").toBe(1.5);
   });
@@ -177,9 +184,12 @@ describe("Fuenfschalengreifer — die Form am Bagger", () => {
      * hoeher —, und gemessen wird die ganze Schale, die geschlossen 1,4 cm
      * tiefer reicht als der Zahn allein.
      */
-    expect(FUENFSCHALEN.maxTiefe).toBeCloseTo(2.7071, 4);
+    /* 2,7071 → 2,7439 mit E-090: breiterer Saum, staerkere Woelbung am Ende. */
+    expect(FUENFSCHALEN.maxTiefe).toBeCloseTo(2.7439, 4);
     expect(FUENFSCHALEN.tiefe(schwenkFuer(1)), "offen").toBeCloseTo(2.2173, 3);
-    expect(FUENFSCHALEN.tiefe(ZU), "geschlossen").toBeCloseTo(2.5127, 3);
+    /* 2,5127 → 2,5525 m mit E-090: der Trogrand steht nach innen, der Ruecken
+     * bleibt aussen, und der breitere Saum woelbt staerker. */
+    expect(FUENFSCHALEN.tiefe(ZU), "geschlossen").toBeCloseTo(2.5525, 3);
     /*
      * Die SCHWEBEHOEHE geschlossen — Patricks eigentliche Beanstandung vom
      * 15.09.2026. Vorher 25,2 cm gerechnet (23,8 cm wirklich), jetzt 19,4 cm.
@@ -187,7 +197,7 @@ describe("Fuenfschalengreifer — die Form am Bagger", () => {
     expect(
       FUENFSCHALEN.maxTiefe - FUENFSCHALEN.tiefe(ZU),
       "schwebt geschlossen ueber dem Beton"
-    ).toBeCloseTo(0.194, 3);
+    ).toBeCloseTo(0.1914, 3); /* 0,194 → 0,1914 m mit E-090: der Greifer haengt 2,6 mm tiefer. */
 
     // Und die Schale ist wirklich das Tiefste am ganzen Greifer.
     let alles = 0;

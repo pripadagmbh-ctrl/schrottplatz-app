@@ -151,9 +151,23 @@ describe("Bei 0 Grad ist nichts anders — Ziffer fuer Ziffer", () => {
    * Bodenanschlag haben koennte, und weit genug fuer das Rauschen einer
    * Physikschleife.
    */
+  /*
+   * 16.09.2026 (E-090): Der Fuenfschalengreifer setzt 20,44 statt 20,99 cm
+   * ueber dem Beton ab — 5,5 mm tiefer.
+   *
+   * Grund ist der breitere Saum: Die Woelbung der Haut geht mit `halb²/(2r)`,
+   * und `halb` ist am Schalenende von 60 auf 120 mm gewachsen. Das Schalenende
+   * baucht dadurch weiter nach aussen, und der tiefste gezeichnete Punkt liegt
+   * entsprechend tiefer. Eine kleine Senkung ist hier ein Gewinn: Der Greifer
+   * kommt naeher an den Boden, ohne dass eine Kralle ihn beruehrt.
+   *
+   * Die SICHELKRALLE steht unveraendert bei 6,37 cm. Sie benutzt
+   * `src/fuenfschalen/` nicht; waere sie mitgewandert, waere das der Beweis
+   * einer Vermischung.
+   */
   const ANSCHLAG: Array<{ form: Greiferform; soll: number }> = [
     { form: SICHELKRALLE, soll: 0.0637 },
-    { form: FUENFSCHALEN, soll: 0.2099 },
+    { form: FUENFSCHALEN, soll: 0.2044 },
   ];
   for (const { form, soll } of ANSCHLAG) {
     it(`${form.name}: der Bodenanschlag steht bei 0 Grad auf ${(soll * 100).toFixed(2)} cm`, () => {

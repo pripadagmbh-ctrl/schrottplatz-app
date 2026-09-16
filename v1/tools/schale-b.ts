@@ -37,6 +37,7 @@ import {
   STEMPEL_AUGE,
   ZU,
   mittellinie,
+  randhoehe,
   schalenHalbbreite,
 } from "../src/fuenfschalen/teile";
 import { BESEN, SPECS } from "../src/world/scrapItems";
@@ -92,14 +93,22 @@ function spalt(r: number, halb: number): number {
 
 const BAHN = mittellinie(ZU);
 
+/**
+ * Die Breitenkurve, wie sie bis zum 16.09.2026 galt — für die Spalte „heute".
+ * Zeile für Zeile die alte `verjuengung`; die neue steht jetzt im Bau.
+ */
+const verjuengungAlt = (k: number): number =>
+  1 - 0.7 * (Math.max(0, Math.min(SCHALEN_ABSCHNITTE, k)) / SCHALEN_ABSCHNITTE) ** 1.3;
+const HALB_WURZEL = MASS.schale.breite / 2;
+
 function stationen(): Station[] {
   const raus: Station[] = [];
-  const halbWurzel = schalenHalbbreite(0);
-  const halbSaumB = halbWurzel * B_SAUM_ANTEIL;
   for (let k = 0; k <= SCHALEN_ABSCHNITTE; k++) {
     const b = BAHN[k]!;
-    const halbHeute = schalenHalbbreite(k);
-    const halbB = halbWurzel + (halbSaumB - halbWurzel) * (k / SCHALEN_ABSCHNITTE);
+    /* „heute" ist der Stand VOR E-090, aus seinen eigenen Formeln nachgebaut. */
+    const halbHeute = HALB_WURZEL * verjuengungAlt(k);
+    /* „B" ist der GEBAUTE Stand — aus `src/fuenfschalen/teile.ts` gelesen. */
+    const halbB = schalenHalbbreite(k);
     raus.push({
       k,
       r: b.r,
@@ -107,7 +116,7 @@ function stationen(): Station[] {
       halbHeute,
       halbB,
       tiefeHeute: woelbung(halbHeute, b.r),
-      tiefeB: B_WANGE * 2 * halbB,
+      tiefeB: randhoehe(k),
       spaltHeute: spalt(b.r, halbHeute),
       spaltB: spalt(b.r, halbB),
       sektorHeute: (Math.atan(halbHeute / Math.max(b.r, 1e-4)) * 180) / Math.PI,
@@ -182,11 +191,13 @@ const QUER_B = 8;
  * auseinander, weil das Verschmelzen Stirnkappen zusammenzieht. Hier steht die
  * gemessene, nicht die gerechnete.
  *
- * Der Umbau ist danach zurückgenommen worden; warum, steht im Feld 6.
+ * Der Umbau IST gebaut (E-090); zwei Waechter sind dafuer umgeschrieben worden.
  */
 const NETZE_HEUTE = 58;
 const DREIECKE_HEUTE = 15004;
 const DREIECKE_B = 16524;
+/** Deckungsgleichheit zur alten Form, gemessen mit tools/schale-deckung.ts. */
+const DECKUNG = 52.1;
 const TRI_MEHR = DREIECKE_B - DREIECKE_HEUTE;
 
 /* ============================================================ Das Blatt */
@@ -685,40 +696,42 @@ text(
 text(52, Z4.y + 604, "Eine Halbschale SOLL nicht ganz schließen — das ist ihr Zweck, nicht ihr Fehler.", 18, F.rot, "start", true);
 text(52, Z4.y + 630, "Was davon erträglich ist, entscheidet nur das Gerät.", 18, F.rot);
 
-feld(1144, Z4.y, BREITE - 32 - 1144, Z4.h, "6 · Gebaut, gemessen, zurückgenommen — was im Weg steht");
+feld(1144, Z4.y, BREITE - 32 - 1144, Z4.h, "6 · Gebaut — und welche zwei Wächter dafür umgeschrieben wurden");
 
 [
-  "Alle vier Änderungen sind am 16.09.2026 gebaut und gemessen",
-  "worden. Drei davon reißen je einen bestehenden Wächter, und",
-  "zwar nicht knapp:",
+  "Alle vier Änderungen sind gebaut. Zwei Wächter mussten dafür",
+  "weichen; Patrick, gefragt welcher: „Beide.“",
   "",
-  "· TROG MIT AUFGESTELLTEM RAND (Änderung 1 + 2). Die drei",
-  "  Schranken in test/schalenform.test.ts messen den SCHATTEN-",
-  "  RISS und verlangen, dass er vom Bolzen an nur dünner wird.",
-  "  Ein aufgestellter Rand macht ihn im ersten Drittel dicker —",
-  "  das ist ja gerade der Sinn. Gemessen: bei 80 mm Rand reißt",
-  "  die Ferse an drei Stellen, bei 60 mm an einer, bei 48 mm",
-  "  reißt die andere Schranke. Ohne Rand: grün. Es gibt keine",
-  "  Randhöhe, die alle drei hält.",
+  "· „VOM BOLZEN AN NUR DÜNNER“ (test/schalenform.test.ts). Die",
+  "  Regel war für ein flaches Blech geschrieben und hat jeden",
+  "  Anlauf flach gehalten: Ein aufgestellter Rand macht den",
+  "  Schattenriss dort dicker, wo er aufsteht — das ist sein",
+  "  Zweck. Durchgemessen von 120 bis 16 mm Randhöhe: keine hält",
+  "  die alte Regel. STATT DESSEN steht jetzt „zwischen Schulter",
+  "  und Saum nur dünner“ und „hat einen Trog, keinen Teller“ —",
+  "  Randhöhe gegen Breite, Schranke 0,30, gemessen 0,35 bis 0,55.",
+  "  Gegenprobe: das alte flache Profil käme auf höchstens 0,25.",
   "",
-  "· SAUM AUF 60 % (Änderung 3). Der Wächter aus E-069 verlangt,",
-  "  dass die Außenkontur ohne Knick über den Zahnsitz läuft",
-  "  (Grenze 4°) — er steht auf Patricks eigenem Vorbildfoto.",
-  "  Ein breiter Saum mit schmalem Zahn macht dort 9,68°. Das",
-  "  ist genau der Absatz, den wir zeigen wollen.",
+  "· „KEIN KNICK AM ZAHNSITZ“, Grenze 4° (E-069). Der Absatz ist",
+  "  jetzt gewollt — der Zahn ist ein eigenes Verschleißteil auf",
+  "  einem doppelt so breiten Saum. Der Wächter prüft ihn jetzt,",
+  "  statt ihn zu verbieten: 6° < Absatz < 14°, gemessen 9,68°.",
+  "  Und die Kontur muss überall SONST glatt bleiben (Stationen",
+  "  2 bis 4: 0,17°, 0,48°, 0,92°). Gegenproben: ohne eigenen",
+  "  Zahn 3,91° — zu wenig; doppelt schief 17,13° — zu viel.",
   "",
-  "Das ist der Grund, warum jeder Anlauf wieder aussah wie vorher:",
-  "Nicht der Entwurf war zu zaghaft — die Wächter halten die",
-  "Schale flach. Welcher von ihnen weichen darf, ist Patricks",
-  "Entscheidung, nicht meine. Der Spielcode ist unverändert.",
-].forEach((zl, k) => text(1164, Z4.y + 82 + k * 22, zl, 16, k < 3 ? F.linie : F.grau));
+  "In beiden Wächtern steht, warum die alte Regel fiel, mit beiden",
+  "Daten — 15.09. „den Knick gibt es nicht“ und 16.09. „Absatz ist",
+  "richtig, wie auf dem Foto“. Damit zieht sie niemand zurück.",
+].forEach((zl, k) => text(1164, Z4.y + 82 + k * 22, zl, 16, k < 2 ? F.linie : F.grau));
 
-text(1164, Z4.y + 624, "Was es gekostet HÄTTE — am gebauten Stand gemessen", 19, F.linie, "start", true);
+text(1164, Z4.y + 624, "Was es kostet — am gebauten Stand gemessen", 19, F.linie, "start", true);
 const KOST: string[][] = [
   ["", "heute", "B"],
   ["Dreiecke am ganzen Greifer", String(DREIECKE_HEUTE), String(DREIECKE_B)],
   ["Netze am ganzen Greifer", String(NETZE_HEUTE), String(NETZE_HEUTE)],
-  ["Nettokorb (l)", "1.525", "1.510"],
+  ["Nettokorb (l)", "1.525", "1.512"],
+  ["Deckungsgleichheit zur alten Form", "—", `${zahl(DECKUNG)} %`],
   [`Sektor je Schale (Grenze ${SEKTOR_HALB_GRAD}°)`, `${zahl(maxSektorHeute)}°`, `${zahl(maxSektorB)}°`],
 ];
 KOST.forEach((zeile, k) => {

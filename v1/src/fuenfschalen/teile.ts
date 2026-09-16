@@ -59,6 +59,34 @@ function verjuengung(k: number): number {
 }
 
 /**
+ * Die Verjüngung der BREITE — seit 16.09.2026 (E-090) eine eigene Kurve.
+ *
+ * `verjuengung` führt zwei Dinge auf einmal: die Breite der Schale UND die
+ * Höhe der Strebe (`STREBE_H_OBEN · verjuengung`). Solange beide dieselbe Kurve
+ * hatten, machte jede Verbreiterung den Zinken mitdicker: Im ersten Anlauf zu
+ * diesem Umbau wuchs die Strebe am Saum von 39 auf 78 mm, der Zahn wurde
+ * doppelt so hoch, die Grabtiefe sprang um 5,7 cm und sechs festgehaltene
+ * Zahlen rissen ohne Not. Gewünscht ist ein breiter SAUM, kein dickerer Zinken.
+ *
+ * Also zwei Kurven. Die Höhe bleibt bei 0,30 (39 mm am Saum, unverändert), die
+ * Breite endet bei 0,60 — 240 mm statt 120 mm.
+ *
+ * WARUM 0,60. Der alte Endwert war nicht gewählt, er WAR der Zahn: 0,30 · 400
+ * = 120 mm, genau die Zahnbreite der Positionsliste. Die Schale lief damit in
+ * eine Nadel aus. Am Vorbild ist es umgekehrt — der Saum ist breit, und der
+ * Zahn sitzt als schmales Verschleißteil mittig darauf, mit sichtbarem Absatz
+ * links und rechts (Kinshofer Profil H, Bateman „Semi-Closed", Sennebogen
+ * MG4.1). `zahnBasis` hängt deshalb jetzt an `MASS.spitze.breite` statt am
+ * Schalenende; sonst wüchse der Zahn mit und der Absatz wäre wieder weg.
+ *
+ * Der Exponent 1,3 bleibt in beiden: Er bestimmt, WO auf der Länge die Breite
+ * verloren geht, nicht wie viel.
+ */
+function breitenverjuengung(k: number): number {
+  return 1 - 0.4 * (Math.max(0, Math.min(SCHALEN_ABSCHNITTE, k)) / SCHALEN_ABSCHNITTE) ** 1.3;
+}
+
+/**
  * Die Verstaerkung — der Streifen unter dem Zahn.
  *
  * Erklaerung dazu (13.09.2026): „Sie hat zwei Aufgaben. Erstens verteilt sie
@@ -1376,6 +1404,74 @@ function woelbungBei(halb: number, k: number): number {
   return (halb * halb) / (2 * querRadius(k));
 }
 
+/**
+ * Ab welchem Anteil der halben Breite die Haut aufsteht, und wie hoch —
+ * als Anteil der VOLLEN Breite an der jeweiligen Stelle.
+ *
+ * 0,30 heißt: an der Wurzel (400 mm breit) steht der Rand 120 mm auf, am Saum
+ * (240 mm breit) 72 mm. Der Anteil ist über die Länge konstant, damit das
+ * Verhältnis stimmt und der Trog zur Spitze hin flacher wird, ohne dass er
+ * verschwindet. SW 16.09.2026, E-090 — Verschleißschalen aus Hardox liegen in
+ * dieser Gegend; eine Zahl aus einer Quelle gibt es nicht, die Hersteller
+ * nennen Bauformen, keine Maße.
+ */
+const WANGE_AB = 0.5;
+const WANGE_ANTEIL = 0.3;
+/**
+ * Über wie viele Stationen der Rand aus der Ferse heraus aufsteht.
+ *
+ * NICHT kosmetisch — ohne ihn steckt der Rand IM Fersenguss. Gemessen: Steht
+ * er schon an Station 0 voll da, springt der Schattenriss der Ferse zwischen
+ * 33 % und 54 % ihrer Länge von 275 auf 464 mm. Der Rand faltet sich dort
+ * 120 mm nach innen, und dort sitzt der Guss. Das ist keine Schranke, die
+ * zickt, das ist Werkstoff im Werkstoff.
+ *
+ * Am Vorbild beginnt die Kante des Blechs auch nicht am Lagerauge, sondern
+ * dort, wo die Ferse aufhört und die Schale anfängt. Über eine Station
+ * aufzustehen ist genau das. SW 16.09.2026, E-090.
+ */
+const WANGE_RAMPE = 1;
+
+/**
+ * Der Querschnitt der Schalenhaut: Boden plus aufgestellter Rand.
+ *
+ * VORHER war es nur der Bogen `(halb² − x²)/(2r)` — an der Wurzel gemessene
+ * 22 mm Wölbung auf 400 mm Breite. Von vorn war die Schale damit ein Strich,
+ * und deshalb hat jede Änderung im Seitenriss nach nichts ausgesehen (E-083:
+ * zweimal 98,5 % bzw. 70,7 % deckungsgleich). Patrick: „der Kopf ist zu
+ * schlank."
+ *
+ * JETZT steht die Haut zum Rand hin auf. Wichtig, und der Grund für DIESE
+ * Bauweise statt angesetzter Bleche: Es ist DIESELBE Haut, nur geformt — kein
+ * aufgeschweißtes Blech, das nach oben steht. Patrick am 13.09.2026: „ein
+ * Guss, keine nach oben stehenden Bleche … nur Stahlbleche, die das innere
+ * Material zusammenhalten sollen." Ein gekantetes Blech hält das innere
+ * Material und steht trotzdem nicht als eigenes Teil ab; die Schenkel im
+ * Querschnitt SIND das gebogene Blech. Genau so ist auch die MG4.1 gebaut
+ * („Greifer-Schalen in Hardox Schweißkonstruktion").
+ *
+ * Der Rand steht nach INNEN (negatives w, gegen die Außennormale): in den Trog
+ * hinein, zur Ladung hin. Die Außenhülle der Schale wird dadurch nicht größer —
+ * Bodenanschlag, Grabtiefe und Hüllkreis sehen dieselbe Silhouette wie vorher.
+ */
+function trogprofil(x: number, halb: number, k: number): number {
+  const bogen = (halb * halb - x * x) / (2 * querRadius(k));
+  const u = Math.min(1, Math.abs(x) / Math.max(halb, 1e-6));
+  const auf = Math.max(0, (u - WANGE_AB) / (1 - WANGE_AB)) ** 2;
+  const rampe = Math.min(1, Math.max(0, k) / WANGE_RAMPE);
+  return bogen - auf * rampe * WANGE_ANTEIL * 2 * halb;
+}
+
+/**
+ * Höhe des aufgestellten Randes an Station k (m) — Boden bis Randoberkante.
+ * Der Wächter in `test/schalenform.test.ts` misst damit, ob der Trog noch einer
+ * ist; ohne diese Zahl wäre „der Querschnitt ist wieder flach" nicht prüfbar.
+ */
+export function randhoehe(k: number): number {
+  const halb = halbbreiteBei(k);
+  return trogprofil(0, halb, k) - trogprofil(halb, halb, k);
+}
+
 const sektorHalb = Math.PI / MASS.schalen;
 /**
  * Ab welchem Abstand von der Drehachse die Sektorgrenze ueberhaupt gilt (m).
@@ -1449,7 +1545,7 @@ export function schalenHalbbreite(k: number): number {
     }
     halb = Math.min(
       halb,
-      HALB * verjuengung(i),
+      HALB * breitenverjuengung(i),
       Math.max(innen, SEKTOR_AB) * Math.tan(sektorHalb) * SEKTOR_SICHER
     );
   }
@@ -1493,7 +1589,16 @@ export function baueGreiferschale(
   const quad = (a: number, b: number, c: number, d: number): void => {
     idx.push(a, b, c, a, c, d);
   };
-  const QUER = 4;
+  /*
+   * ACHT FELDER QUER STATT VIER (E-090).
+   *
+   * Mit vier Feldern lag zwischen Mitte und Rand genau EIN Punkt — daran kann
+   * man keinen aufgestellten Rand zeigen, er wuerde zur schraegen Ebene
+   * verschliffen. Acht Felder geben drei Punkte je Seite und damit einen
+   * erkennbaren Uebergang von Boden auf Rand. Kostet 1.520 Dreiecke am ganzen
+   * Greifer und KEIN einziges Netz.
+   */
+  const QUER = 8;
 
   /*
    * Gebaut wird auf den FEINEN Stuetzstellen — dieselbe Bahn, nur rund statt
@@ -1511,7 +1616,7 @@ export function baueGreiferschale(
       for (let j = 0; j <= QUER; j++) {
         const t = j / QUER;
         const x = -halb + t * 2 * halb;
-        const w = (halb * halb - x * x) / (2 * querRadius(s0.k)) + seite * HAUT;
+        const w = trogprofil(x, halb, s0.k) + seite * HAUT;
         reihe.push(
           // Aussennormale (-sin th, cos th) — siehe `strang`
           p(x, s0.y - w * Math.sin(s0.th), s0.z + w * Math.cos(s0.th), t, k / ENDE)
@@ -1854,7 +1959,17 @@ const ZAHN_STATIONEN: Array<[number, number, number]> = [
 /** Breite und Höhe des Zahns an seinem Sitz (m) — der Querschnitt des Schalenendes. */
 function zahnBasis(): { b: number; h: number } {
   return {
-    b: 2 * schalenHalbbreite(SCHALEN_ABSCHNITTE),
+    /*
+     * 16.09.2026 (E-090): aus der POSITIONSLISTE, nicht mehr vom Schalenende.
+     *
+     * Solange die Zahnbreite am Schalenende hing, wuchs der Zahn mit jeder
+     * Verbreiterung der Schale mit — und der Absatz an seinem Sitz, den man am
+     * Vorbild sieht, konnte gar nicht entstehen. Jetzt ist der Saum 240 mm
+     * breit und der Zahn 120 mm: 60 mm Schulter je Seite. Patrick am
+     * 16.09.2026, gefragt, ob der Absatz bleiben soll: „Absatz ist richtig,
+     * wie auf dem Foto."
+     */
+    b: MASS.spitze.breite,
     /*
      * Die Basis ist genau die Strebenhöhe am Schalenende — NICHT plus Blech.
      * Die flache Seite des Zahns liegt schon auf der Aussenfläche des Blechs;
