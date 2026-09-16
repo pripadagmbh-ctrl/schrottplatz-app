@@ -6859,3 +6859,148 @@ Der Wurfschwung aus der Seitenlage.
    gekehrt wird mit dem lotrechten Greifer?
 
 ---
+
+### E-086 — Acht Schalenformen, frei recherchiert: ein Blatt zum Aussuchen. **Hier ist nichts entschieden** (16.09.2026)
+
+**Es ist nichts entschieden worden.** Dieser Eintrag hält nur fest, dass ein
+Blatt existiert und woher es kommt. Die Wahl trifft Patrick.
+
+---
+
+#### Warum das Paket anders läuft als die drei davor
+
+Patrick, wörtlich:
+
+> „Ich merke, die Schalenform — der Agent bekommt das nicht so richtig hin. […]
+> Das sieht irgendwie alles so danach aus, dass das immer noch passend versucht
+> wird. Es gibt eigentlich keine Änderung zu den ganzen anderen Tests. Das sieht
+> immer alles gleich aus. Der Fehler wird durch den Ansatz, den wir heute
+> fahren, nicht gelöst."
+
+**Er hat recht, und der Fehler liegt bei mir.** E-083 hat es schon gemessen und
+trotzdem nicht behoben: Jedes Paket nahm den GEBAUTEN Greifer als Ausgangspunkt
+und fragte „was ist die kleinste Änderung, die Bolzenkreis, Zylinderneigung,
+Hebelarm, Maulweite und die drei Wächter alle hält?". Auf diese Frage gibt es
+nur eine Sorte Antwort, und die sieht aus wie vorher — gemessen 98,5 % bzw.
+70,7 % deckungsgleich. Eine Parameterfamilie kann nur Verwandte hervorbringen.
+
+Nachtrag von Patrick, der das Paket noch erweitert hat:
+
+> „Ich sehe auch die, ähm, da wo die Bolzen durchkommen und so — das sieht
+> irgendwie alles so danach aus, dass das immer noch passend versucht wird."
+
+Bei uns ist die Bolzenaufnahme ein Loch in einem Blech. An echten Geräten ist
+sie ein eigenes Bauteil mit eigener Gestalt. Sie ist deshalb je Form als eigene
+Vergrößerung gezeichnet, nicht als Punkt im Seitenriss.
+
+---
+
+#### Was gebaut wurde
+
+`tools/schalen-vorbilder.mjs` → **`docs/schalen-vorbilder-2026-09-16.svg`**
+(3648 × 2100 px, 131 kB). Ein Node-Skript ohne Abhängigkeiten; es liest **kein
+einziges Mal** in `src/`. Acht Spalten A…H, damit Patrick sagen kann: „B, aber
+mit der Ferse von E."
+
+Je Spalte: Seitenriss der einzelnen Schale · Ansicht von vorn (Breite und
+Wangen) · drei Querschnitte (nahe Ferse, Mitte, nahe Spitze) · **die
+Bolzenaufnahme 2,5-fach vergrößert** · fünf Schalen im Kreis geschlossen, damit
+man den Korb sieht · vier Zeilen Text.
+
+Seitenrisse, Vorderansichten und Kränze aller acht im selben Maßstab
+(200 px/m → 230 px/m). Die Querschnitte laufen im **halben** Maßstab und sind so
+angeschrieben — bei vollem Maßstab liefen die drei Schnitte einer Spalte
+ineinander, und ein Schnitt, der den Nachbarn überlappt, zeigt nichts.
+
+**Die acht Kurven sind einzeln von Hand gesetzt, nicht aus einer gemeinsamen
+Familie erzeugt.** Genau das war ja der Fehler.
+
+| | Bauart | In einem Satz |
+|---|---|---|
+| **A** | Vollschale, voll schließend | Tiefer gewalzter Trog, die Ränder treffen den Nachbarn über die ganze Länge — für Späne, Glasbruch, Sand, Kies; schwer, viel Blech, wenig Biss. |
+| **B** | Halbschale, halb schließend | Kürzer und flacher, schließt bewusst NICHT ganz; der Standard für Schrott, Abfall, Papier — leichter, kippt schneller leer. |
+| **C** | Zinken, spitzenschließend | Keine Schale mehr, ein **Kastenträger**: Innenblech, zwei Wangen, Rückenblech; schließt nur auf den Spitzen, greift durch Sperrgut und Autowracks. |
+| **D** | Breite Spitzenschale | Aus der Ebene **gekantetes** Blech statt gewalzter Rundung: zwei Knicke, drei gerade Felder; auffällig breit, wenig Tiefe. |
+| **E** | Rippen-/Langlochschale | Die tragende Ansicht ist die **Wange**, nicht der Bogen: zwei dicke Bleche mit Langlöchern und gezackter Kante, dazwischen Rippen mit Luft. |
+| **F** | Gitter-/Stabschale | Fünf gebogene Stäbe und zwei Querbügel, **gar kein Blech** — im Seitenriss ein Strich, von vorn ein Fächer. Leichtgut. |
+| **G** | Holzgreifer-Sichel | Lange, stark eingerollte Sichel; die Spitze läuft an der Gegenschale **vorbei** statt sie zu treffen, damit Stämme an der Innenfläche hochrollen. |
+| **H** | Zahn-/Kammschale | Flache, lange Pfanne mit einer Reihe einzelner Zähne am Saum; die Zähne der Gegenschale **kämmen** dazwischen durch. |
+
+Und je Form eine andere Bolzenaufnahme, weil es die an echten Geräten auch gibt:
+aufgeschweißte Augscheiben (A) · die Seitenwangen selbst als Auge, mit Kragen
+(B) · Gabel um eine einzelne Nabennase (C) · **einschnittig umgekehrt**, ein
+dickes Blech mit überstehender Nabe zwischen zwei Nabenwangen (D) · Querrohr als
+eine durchgehende lange Buchse (E) · Auge im vollen Guss, in den alle Stäbe
+laufen (F) · geschmiedete Gabel ohne sichtbare Naht (G) · Kastenferse mit
+zweitem Auge oben auf dem Kasten und einem Anschlagnocken (H).
+
+---
+
+#### Was die Recherche über unsere bisherigen Annahmen sagt
+
+Quellen als Text im Fuß des Blattes (Kinshofer, Sennebogen, Idrobenne,
+HS Schoch, Genesis, Rotobec/Hultdins). **Keine Fremdbilder heruntergeladen, keine
+langen Zitate** — alles sind eigene Strichskizzen.
+
+1. **„Schale" und „Zinken" sind nicht dasselbe Bauteil.** Die Hersteller
+   verkaufen auf DEMSELBEN Greiferkörper vier Profile — F voll schließend,
+   H halb, W breit spitz, T spitz. Ein T-Zinken ist ein Kastenträger und
+   überhaupt keine Schale. Wir haben eines gezeichnet und beides dazu gesagt.
+2. **Im Seitenriss ist eine echte Schale ein DÜNNES gekrümmtes Band**, kein
+   fetter Körper. Das Volumen steckt im Querschnitt, nicht in der Silhouette.
+   Dick im Seitenriss sind nur Zinken (Kasten) und geschmiedete Holzsicheln.
+3. **„Schließt nicht ganz" ist kein Mangel, sondern die häufigste
+   Schrottschale.** Voll schließend nimmt man für Feines, halb schließend für
+   Schrott und Abfall, spitz für Sperrgut. Das ist eine Materialentscheidung,
+   keine Qualitätsfrage.
+4. **Viele breite Schalen sind gekantet, nicht gewalzt.** Der sichtbare Knick
+   ist gewollt und billiger. Wir haben Rundungen immer für „richtiger" gehalten.
+5. **Die offenen Bauarten sind eine ganze Familie, die wir nie betrachtet
+   haben** — Rippenschale, Langlochschale, Gitterschale. Für einen Schrottplatz
+   ist das womöglich der charakteristischere Anblick, und es kostet weniger
+   Dreiecke als ein geschlossener Trog.
+6. **Die Bolzenaufnahme bestimmt die Silhouette oben.** Einschnittig oder
+   zweischnittig sieht man von vorn sofort. Dazu gehören Kragen, Anschlagnocken,
+   Schmiernippel, Sicherungsblech — an diesen Kleinigkeiten erkennt man ein
+   Bauteil. (Idrobenne führt sogar die Fettspirale in der Buchse auf.)
+7. **Die Spitze ist ein eigenes Verschleißteil**, geschraubt oder angeschweißt.
+   Sie darf anders aussehen als die Schale und ist zum Wechseln da.
+8. **Volle Seitenwangen sind die Ausnahme**, nicht die Regel — sie gehören zur
+   Vollschale für Feines. Sonst sind sie ausgeschnitten, niedrig oder gezackt.
+
+---
+
+#### Was ausdrücklich NICHT getan wurde
+
+- **Kein Spielcode angefasst.** `v1/src/` ist unverändert; die zwei neuen Dateien
+  sind das Werkzeug und sein Blatt.
+- **Nichts gerechnet.** Kein Bolzenkreis, keine Zylinderneigung, kein Hebelarm,
+  keine Maulweite, kein Sektor, keine Wächter. Diese Randbedingungen galten in
+  diesem Paket nicht.
+- **Keine Empfehlung.** Welche Form gebaut wird, entscheidet Patrick; dafür ist
+  das Blatt da. Ob eine Form bei uns überhaupt baubar ist, wird **danach**
+  gerechnet — und wenn eine es nicht ist, kann sie trotzdem die Richtung zeigen.
+
+**Abnahmekriterium.** `npm run build` sauber, `npm test` grün: **107 Dateien,
+1.240 Prüfungen** — unverändert, weil kein Produktivcode berührt wurde. Das
+Blatt selbst hat kein Abnahmekriterium aus Zahlen; sein einziges ist: **Patrick
+kann darauf zeigen.**
+
+**Auf dem Gerät zu prüfen.**
+
+1. **Das Blatt aufmachen und durchsehen** (nach Freigabe und Merge unter
+   `…/v1/plaene/`, die Planmappe listet es von selbst auf). Sind die acht
+   Spalten auf den ersten Blick verschieden — oder sehen zwei davon immer noch
+   gleich aus? Wenn ja: welche zwei, dann fliegt eine raus und eine ganz andere
+   Bauart kommt hinein.
+2. **Ein Buchstabe oder eine Mischung.** „B, aber mit der Ferse von E" ist eine
+   vollständige Antwort. Genauso: „keine davon, aber F geht in die richtige
+   Richtung".
+3. **Die Bolzenaufnahme getrennt betrachten.** Sie ist je Spalte eine andere;
+   sie darf von einer anderen Form kommen als der Bogen.
+4. **Die Frage, die nur du beantworten kannst:** Soll der Greifer aussehen wie
+   ein Gerät für **Feines** (geschlossen, A/B), für **Sperrgut** (Spitzen, C/D),
+   oder wie ein **Sortiergerät** (offen, E/F/H)? Das ist die Vorentscheidung,
+   aus der die Form folgt — nicht umgekehrt.
+
+---
