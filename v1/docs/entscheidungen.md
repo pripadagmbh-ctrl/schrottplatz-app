@@ -6599,3 +6599,263 @@ fährt zehn Fuhren in Folge ohne Steckenbleiben.
    die Wagen jetzt eher wie LKW?
 
 ---
+
+### E-083 — Der Greifer legt sich zur Seite: 90° sind frei, und der Besen bleibt dabei flach liegen (16.09.2026)
+
+**Entscheidung.** Der Greifer kippt auf Taste **K** in zwei Sekunden um **90°**
+zur Seite und richtet sich auf demselben Weg wieder auf. Gekippt wird um seine
+EIGENE X-Achse, also **nach** dem Rotator (`qPendel · qGier · qKipp`, `qKipp`
+ganz rechts) — damit wählt der Rotator, wohin der Greifer fällt. Drei Stellen
+im Bagger rechnen dafür nicht mehr in der Weltsenkrechten, sondern in der
+Greiferachse.
+
+**Anlass.** Patrick, 15.09.2026, wörtlich: „Greifer muss komplett zur seite
+kippen können, zum kehren und schleudern." Zweimal zurückgestellt (E-065,
+E-072), weil erst die Zahnform und dann die Mittelsäule entschieden werden
+mussten.
+
+---
+
+#### 1. Geht 90° überhaupt? — die Freigangmessung auf Dreiecksebene
+
+E-065 konnte das nicht beantworten, und das war ein Befund über die Messung:
+Sie rechnete mit KÄSTEN um die Netze, und die **Nullgrad-Zeile**, an der der
+Greifer nachweislich frei hängt, meldete **−0,071 m**. Absolute Zahlen waren
+damit unbrauchbar.
+
+`tools/greifer-freigang.ts` rechnet jetzt gegen die **gezeichneten Dreiecke**,
+wie E-050 es beim Auslegerbock getan hat. Der Greifer wird im Raster
+abgetastet, der Arm bleibt exakt; gemessen wird Punkt → nächstes Dreieck.
+**Warum das entscheidbar ist:** Jedes Greiferdreieck wird geteilt, bis alle
+Kanten ≤ h sind; jeder Punkt liegt dann höchstens `h/√3` von einer Ecke
+entfernt. Und durchdringen sich zwei Körper, so schneiden sich ihre
+OBERFLÄCHEN — ein gemessener Abstand über dieser Schranke schließt Berührung
+also aus.
+
+**Zwei Dinge mussten dafür erst geklärt werden, sonst misst man Unsinn:**
+
+- **Der Rotatorstummel steckt bauartbedingt im Stiel.** Der Ursprung der
+  `grappleGroup` IST das Kardangelenk, und das sitzt in der Stielspitze. Statt
+  einen Grenzwert zu raten, sucht die Messung ihn: **R0 = 0,466 m** (Sichel)
+  bzw. **0,465 m** (Fünfschalen) ist der kleinste Halbmesser, ab dem bei 0°
+  alles frei ist. Alles darin ist Aufhängung und bleibt beim Kippen auch darin
+  — eine Drehung um den Ursprung erhält den Halbmesser.
+- **Zwei Drittel der Gelenkstellungen erreicht das Spiel nie.** Wer
+  5°…70° × −140°…−25° stur abrastert, misst zum großen Teil Stellungen, in
+  denen der Greifer im Boden steckt. Aussortiert wird mit der Regel des
+  Bodenanschlags selbst (Stielspitze ≥ Fläche + Greifertiefe + 0,02, plus
+  1,50 m Zugabe für Ladeflächen): **62 von 81 erreichbar.** Die erste Fassung
+  hat das nicht getan und meldete R0 = 3,071 m — „der ganze Greifer steckt
+  irgendwo im Bagger".
+
+**Ergebnis** (Raster 2,5 cm, Abtastfehler 14,4 mm; Stiel, Ausleger, alle vier
+Zylinder, Kabine, Oberwagen, Drehkranz, Unterwagen, Räder, Räumschild,
+Pratzen; 851 Mio. Abstandsfragen je Form):
+
+| Kippwinkel | Sichelkralle, Freigang mindestens | Fünfschalengreifer |
+|---|---|---|
+| 0° | 0,009 m | 0,031 m |
+| 22,5° | 0,010 m | 0,004 m |
+| 45° | 0,013 m | 0,007 m |
+| 67,5° | 0,031 m | 0,040 m |
+| **90°** | **0,083 m** | **0,136 m (nichts in Reichweite)** |
+
+**90° laufen in jeder erreichbaren Armstellung frei — und zwar mit MEHR Luft
+als der lotrechte Greifer heute hat.** Die engste Stelle ist überall der
+Stiel.
+
+**Aber nicht in jeder Rotatorstellung.** Bei 90° bleiben 15 von 24 Stellungen
+frei; über den ganzen Kippweg gerechnet sind es **11 von 24 bei der
+Sichelkralle** (−75°…+75°) und **10 von 24 beim Fünfschalengreifer**
+(−90°…+60°). Wer weiter herumdreht, fährt die Schalen an den Stiel.
+
+**Deshalb kippt der Greifer um −x und nicht um +x.** Das ist dieselbe
+Geometrie, nur anders benannt: Mit +x fällt er nach hinten unter den Stiel,
+und das freie Band liegt bei 105°…255° — der Rotator steht aber auf 0. Mit −x
+fällt er nach vorn, über die Stielspitze hinaus, und das freie Band liegt um
+0 herum. **Gebremst wird nichts:** Der Rotator ist Patricks Werkzeug, um sich
+die Richtung zu suchen („ich kann die Spinne ja drehen damit es passt"), und
+eine Sperre, die ihm dabei ins Handgelenk fällt, wäre schlimmer als eine
+Durchdringung, die man sieht und wegdreht.
+
+**Was die Messung außerdem gefunden hat, ohne danach gefragt worden zu sein:**
+In 13 von 62 erreichbaren Armstellungen berührt der Greifer den Arm **heute
+schon bei 0°** (Stiel ganz angezogen bei −140°, und Stiel ganz gestreckt bei
+hohem Ausleger). Dort ist die Kippfrage nicht stellbar, und sie wird dort auch
+nicht gestellt. Das ist ein eigener Befund für ein eigenes Paket.
+
+---
+
+#### 2. Die drei Stellen — und der Nachweis, dass 0° unverändert ist
+
+`tiefe(winkel)` und `maxTiefe` sind Längen **in der Greiferachse**. Lotrecht
+ist das dasselbe wie „so weit langt er nach unten"; gekippt nicht mehr —
+gemessen fällt die Ausladung der Sichelkralle von 3,00 auf **1,44 m**.
+
+Neu ist **`form.ausladung(winkel, kipp)`** und **`form.maxAusladung(kipp)`**:
+die eine Stelle, die die Greiferachse in die Weltsenkrechte umrechnet.
+`tiefe` und `maxTiefe` bleiben unverändert und behalten ihre Bedeutung —
+`imKorb` braucht sie weiter.
+
+- **`resolveGroundClamp`** nimmt `maxAusladung(kipp)` statt `maxTiefe`.
+- **`surfaceUnderClaws`** schickt seinen Strahl die gekippte Achse entlang:
+  Fußpunkt `Tiefe · sin θ` seitlich, in der Richtung, die der Rotator vorgibt.
+  Bei 90° lag er vorher 3 m neben den Schalen. **Was NICHT geändert wurde:**
+  Er kommt weiter aus der MITTE, nicht von der tiefsten Krallenspitze — die
+  Entscheidung von E-046 bleibt.
+- **`hoechsteKrallenspitze`** hatte die Tiefe immer schon als Parameter; sie
+  sagt jetzt, dass es die Ausladung ist. Ihre Vorgabe bleibt die lotrechte
+  Sichelkralle: Was einmal als erreichbar geplant wurde, soll sich nicht
+  verschieben, weil jemand den Greifer kippt.
+
+**DER NACHWEIS, dass bei 0° nichts anders ist.** Jede dieser Stellen hat einen
+Vorabsprung auf `kipp === 0`; `test/kippen.test.ts` prüft sie mit `toBe`, nicht
+mit `toBeCloseTo`. Dazu zwei Messungen am gebauten Bagger:
+
+- **Abdruckvergleich** (`tools/greifer-abdruck.ts`, neu dazu
+  `greifer-abdruck-f5.ts` für die zweite Form; 300 Schritte Absetzen, Zupacken,
+  Öffnen, dazu jedes Netz, jeder Kollider, 2.000 Korbpunkte):
+  Sichelkralle **10.330 Werte, größter Unterschied 0,000e+0**;
+  Fünfschalengreifer **10.910 Werte, 0,000e+0**.
+- **Bodenanschlag** (`tools/bodenanschlag-hoehe.ts`, am Stand `v1/start` vor
+  dem Umbau und danach, gleiche Folge): Sichelkralle **6,37 cm vorher,
+  6,37 cm nachher**; Fünfschalengreifer **20,99 cm vorher, 20,99 cm nachher**.
+
+*Zu den Zahlen aus dem Auftrag (6,7 und 19,4 cm): Die stammen aus anderen
+Messfolgen und anderen Ständen — dazwischen liegen E-069 und E-075. Gehalten
+wird deshalb gegen die eigene Messung am eigenen Ausgangsstand. Werte aus
+verschiedenen Verfahren gegeneinanderzuhalten ist genau der Fehler, an dem
+E-065 gescheitert ist.*
+
+**Eine Zahl, die nicht aus der Rechnung kommt, sondern aus der Messung:** Die
+Schale ist ein Kasten, kein Draht, und ihre Außenkante liegt neben der
+Mittellinie. Lotrecht steht diese Breite waagerecht, gekippt reicht sie nach
+unten. Am gezeichneten Netz gemessen (`tools/greifer-ausladung.ts`) ragt sie
+bei 90° bis zu **29,4 mm** (Sichel) bzw. **18,5 mm** (Fünfschalen) über die
+Rechnung hinaus — so tief wäre der Greifer in den Beton gesunken. Dagegen
+steht **`KIPP_ZUSCHLAG` = 0,05 m**, mit `|sin kipp|` skaliert, damit bei 0°
+nichts dazukommt. Der Preis: ganz zur Seite gelegt bleibt der Greifer rund
+2 cm höher stehen, als er müsste — die richtige Seite des Irrtums.
+
+---
+
+#### 3. Die Steuerung: ein Knopf, zwei Lagen
+
+**Taste K**, wie Kabinenhub (X) und Pratzen (O). Dazwischen wird gerampt
+(**45°/s**, SW — zwischen Rotator 120°/s und Ausleger 19°/s eingeordnet, weil
+das Kippen die halbe Ladung gegen die Schwerkraft hebt, aber nur den Greifer
+bewegt), und man kann mitten in der Bewegung umschalten.
+
+**Warum diese Variante.** Sie ist die einzige, die auf dem iPhone mini mit
+EINEM Daumen geht: Beide Sticks bleiben frei, während der Greifer sich legt.
+Die Alternativen, je ein Satz:
+
+1. **Stufenlose Achse auf einem Touch-Stick** — feiner dosierbar, kostet aber
+   einen Stick, den Patrick für Arm und Ausleger braucht.
+2. **Rastende Stufen (0 / 30 / 60 / 90) auf denselben Knopf** — erlaubt
+   Zwischenwinkel ohne zweiten Finger, macht aus einem Knopf aber einen, bei
+   dem man mitzählen muss.
+3. **Halten statt Umschalten** (Knopf gedrückt = kippt, losgelassen = richtet
+   auf) — braucht einen Daumen dauerhaft und schließt „gekippt fahren" aus.
+
+**Für Touch fehlt noch der Knopf.** `toggleKippen()` und `kippAktiv` stehen
+bereit; der Funktionskranz und `controlConfig.ts` liegen bei einem anderen
+Agenten.
+
+---
+
+#### 4. Kehren — der Besen bleibt flach, aber er hebt ab
+
+Gemessen am echten Bagger mit echter Physik und echtem Griff
+(`tools/besen-kehren.ts`):
+
+**Flach liegt er, wenn der Rotator stimmt.** Die Rolle sitzt fest im Greifer
+(Fixed Joint); ihre Achse liegt in dessen Rahmen fest. Liegt sie PARALLEL zur
+Kippachse, dreht sie sich um sich selbst und bleibt waagerecht — gemessen
+**2,8° bis 4,1° über den ganzen Kippweg**. Steht sie quer, richtet sie sich
+auf: bei 90° Kippung **88,7°**, also senkrecht auf dem Ende. Genau das meinte
+Patrick mit „ich kann die Spinne ja drehen damit es passt".
+
+**Aber das Kippen HEBT den Besen vom Boden.** Der Bodenanschlag schützt die
+Krallenspitzen, und die stehen bei 90° seitlich; die Rolle sitzt dann in der
+Mitte des liegenden Korbs, auf Höhe des Kardangelenks:
+
+| Kippwinkel | 0° | 15° | 30° | 45° | 60° | 75° | 90° |
+|---|---|---|---|---|---|---|---|
+| Rolle über Beton | −1 cm | 1 cm | 14 cm | 39 cm | 68 cm | 93 cm | 111 cm |
+
+**Zum Kehren taugt also der kleine Winkel, nicht der große** — und bei 0°
+liegt die Rolle ohnehin schon auf dem Beton. Das Seitwärtskippen ist damit
+gebaut und frei, aber es ist **nicht die Antwort auf „kehren"**; es ist die
+Antwort auf „schleudern" und aufs seitliche Anreichen.
+
+**Schleudern geht bereits.** `GripSystem.releaseAll` gibt der Ladung den
+Schwung der Spinne mit (über `spinneSpur` geglättet). Wer aus der Seitenlage
+heraus schwenkt und loslässt, wirft. **Einschränkung, gemessen und
+ausgewiesen:** Der Schwung wird am KARDANGELENK abgegriffen, und die Ladung
+hängt gekippt 1,5 m daneben — sie fliegt also schwächer, als sie aussieht.
+Das anzufassen hieße, den Griff-Kern zu ändern; das ist ein eigenes Paket und
+ein eigener Auftrag.
+
+---
+
+**Was es je Bild kostet: nichts** (`tools/kipp-kosten.ts`, 600 Bilder je Fall).
+Lotrecht springt `maxAusladung(0)` vorab auf `maxTiefe` und rechnet gar nicht
+erst. Gekippt rechnet sie 41 Öffnungsstellungen mal fünf Schalen — gemessen
+**+0,31 ms** (Sichelkralle) bzw. **+0,45 ms** je Bild. Mit einem Platz
+Gedächtnis (der Kippwinkel ändert sich innerhalb eines Bildes nie und nach der
+zwei Sekunden Rampe gar nicht mehr) bleiben davon **−0,01 bzw. −0,03 ms**
+übrig, also nichts Messbares. 0,276 ms lotrecht gegen 0,269 ms gekippt.
+
+**Am Griff-Kern ist nichts geändert.** Sensorkugel beim Schließen, ein Fixed
+Joint je Objekt, `imKorb` im Greiferframe, `getSensorPosition` mit derselben
+Drehung — alles unverändert. Kein „Saugen" in die Korbmitte. Schlupf im
+Greifer über alle Besenläufe: **0,0 mm**.
+
+**Der Zylinderschutz (E-077) hat weiterhin keinen Kollider.** Er ist Teil des
+Greifers und wird von der Freigangmessung mit abgetastet, aber er bekommt
+nichts angebaut; `test/verkleidung.test.ts` steht unverändert.
+
+**Abnahmekriterium.** `test/kippen.test.ts`, **23 Prüfungen, jede
+Zahlenschranke mit Gegenprobe, die meldet:**
+
+- `ausladung(w, 0)` ist `tiefe(w)`, mit `toBe`. Gegenprobe: schon ein Grad
+  Kippen ändert die Zahl um mehr als 2 mm.
+- Bodenanschlag 6,37 / 20,99 cm im Millimeterfenster. Gegenprobe: gekippt
+  weicht er um über 5 cm ab — sonst wäre die Zahl ein Zufall.
+- Die Rechnung liegt nie unter dem gezeichneten Netz und nie mehr als 55 mm
+  darüber, über −90°…+90°. Gegenprobe: ohne `KIPP_ZUSCHLAG` fehlen über
+  15 mm, mit der alten Rechnung (`maxTiefe`) über 0,9 m.
+- Die Kipprichtung dreht mit dem Rotator: 90° Rotator = 90° andere
+  Fallrichtung. Gegenprobe: bei `qKipp` links käme 0 heraus.
+- Die Rampe trifft Null und Anschlag exakt. Gegenprobe: eine weiche Rampe
+  trifft beide nie — dafür steht das Aufschnappen da. (Dass die heutige
+  lineare Rampe die Null auch ohne sie trifft, steht im Quelltext; es ist
+  Sterbenz, kein Verlass.)
+- Der Messstrahl trifft gekippt ein Podest unter den Schalen. Gegenproben:
+  derselbe Greifer mit dem Rotator 180° gedreht trifft es nicht.
+
+**1.211 bestehende Prüfungen bleiben grün (jetzt 1.234 in 106 Dateien).**
+`npm run build` sauber.
+
+**Zurückgestellt.** Ein Touch-Knopf für das Kippen (fremder Bereich). Die
+13 Armstellungen, in denen der Greifer heute schon bei 0° den Arm berührt.
+Der Wurfschwung aus der Seitenlage.
+
+**Auf dem Gerät zu prüfen.**
+
+1. **K drücken, ohne etwas im Greifer.** Legt sich die Spinne in zwei Sekunden
+   sauber zur Seite und wieder auf — und sieht die Bewegung nach Hydraulik aus
+   oder nach Zauberei?
+2. **Den Besen quer packen, dann K.** Bleibt die Rolle waagerecht liegen, oder
+   stellt sie sich auf? (Wenn sie sich aufstellt: Spinne um 90° drehen und
+   noch einmal — dann muss sie flach bleiben.)
+3. **Gekippt einen Träger vom Haufen aufnehmen und wegschleudern.** Sitzt er
+   ruhig in der Spinne, ohne zu zittern oder zu schweben — und fliegt er beim
+   Loslassen weit genug, oder fällt er nur herunter?
+4. **Die Frage, die nur du beantworten kannst:** Zum Kehren müsste der Greifer
+   nur wenig kippen (bei 90° schwebt der Besen 1,11 m). Soll der Knopf
+   Zwischenstufen bekommen — oder bleibt es bei „ganz oder gar nicht", und
+   gekehrt wird mit dem lotrechten Greifer?
+
+---

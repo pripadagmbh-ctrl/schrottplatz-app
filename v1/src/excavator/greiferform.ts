@@ -11,6 +11,7 @@ import {
   NACHDRUECK_RESERVE,
   WEICH_RESERVE,
   clawPoint,
+  clawTipAusladung,
   clawTipDepth,
 } from "./clawGeometry";
 
@@ -46,14 +47,13 @@ import {
  * weiter in `excavator.ts` und `gripSystem.ts`.
  *
  * ──────────────────────────────────────────────────────────────────────────
- * ANNAHME: DIE GREIFERACHSE STEHT SENKRECHT.
+ * DIE GREIFERACHSE STEHT NICHT MEHR ZWANGSLAEUFIG SENKRECHT (E-083).
  *
- * Aufgeschrieben, weil sie demnaechst fallen soll (Wunsch Patrick 15.09.2026:
- * „Greifer muss komplett zur Seite kippen koennen, zum Kehren und
- * Schleudern."). Gebaut ist die Neigung NICHT — hier steht nur, wo sie
- * anschlagen wird und wo nicht.
+ * Bis zum 15.09.2026 stand hier eine ANNAHME; sie ist mit dem Seitwaertskippen
+ * gefallen (Wunsch Patrick 15.09.2026: „Greifer muss komplett zur seite kippen
+ * können, zum kehren und schleudern.").
  *
- * TRAGFAEHIG AUCH GENEIGT, weil es im Frame des Greifers rechnet:
+ * WAS UNVERAENDERT TRAEGT, weil es im Frame des Greifers rechnet:
  *   `punkt`        Mittellinie im Greiferframe — dreht mit.
  *   `imKorb`       bekommt den Punkt bereits im Greiferframe (der Bagger
  *                  rechnet ihn mit `grappleGroup.quaternion` um). Kippt der
@@ -64,17 +64,28 @@ import {
  *   `sensorRadius`, `schalenluecke`, `kolliderRadius`, die vier Zahlen des
  *                  Schliessens: reine Bauteilmasse, richtungslos.
  *
- * HAENGT AN DER SENKRECHTEN — und ist beim Kippen neu zu fassen:
+ * WAS AN DER SENKRECHTEN HING — und jetzt `ausladung` heisst:
  *   `tiefe(winkel)`, `maxTiefe`   Beides ist eine Tiefe UNTER DEM URSPRUNG,
- *                  gemessen laengs der Greiferachse. Solange die Achse lotet,
- *                  ist das dasselbe wie „ueber dem Beton". Geneigt ist es das
- *                  nicht mehr: Gefragt waere dann die Ausladung in
- *                  Weltrichtung −y, also so etwas wie
- *                  `ausladung(winkel, richtung)`. Wer kippt, faengt hier an.
+ *                  gemessen LAENGS DER GREIFERACHSE. Solange die Achse lotet,
+ *                  ist das dasselbe wie „ueber dem Beton"; gekippt ist es das
+ *                  nicht mehr. Wer wissen will, wie weit der Greifer WIRKLICH
+ *                  nach unten langt, fragt `ausladung(winkel, kipp)`.
  *
- * Die drei Stellen im Bagger, die diese Tiefe senkrecht verrechnen, stehen mit
- * derselben Notiz in `excavator.ts`: `resolveGroundClamp`,
- * `surfaceUnderClaws` und `hoechsteKrallenspitze`.
+ *                  `tiefe` und `maxTiefe` BLEIBEN, unveraendert und mit
+ *                  unveraenderter Bedeutung — sie sind die Laenge in der
+ *                  Greiferachse, und die braucht `imKorb` weiterhin.
+ *
+ * DIE EINE HARTE BEDINGUNG: `ausladung(winkel, 0)` liefert Ziffer fuer Ziffer
+ * `tiefe(winkel)`. Nicht „fast" — dieselbe Zahl, garantiert durch einen
+ * Vorabsprung in jeder der beiden Fassungen. Alles, was am Bodenanschlag und am
+ * Greifgefuehl haengt, bleibt damit bei lotrechtem Greifer unberuehrt
+ * (`test/kippen.test.ts`, mit Gegenprobe).
+ *
+ * Die drei Stellen im Bagger, die diese Zahl senkrecht verrechnet haben:
+ * `resolveGroundClamp` und `surfaceUnderClaws` rechnen jetzt mit `ausladung`
+ * bzw. schicken ihren Messstrahl die gekippte Achse entlang;
+ * `hoechsteKrallenspitze` nimmt die Ausladung als Vorgabe entgegen (sie hat
+ * sie immer schon als Parameter gehabt) und sagt es jetzt auch.
  * ──────────────────────────────────────────────────────────────────────────
  */
 
@@ -119,6 +130,18 @@ export interface Greiferform {
   tiefe(winkel: number): number;
   /** Dieselbe Tiefe, ueber den ganzen Schliessweg genommen (m). */
   readonly maxTiefe: number;
+  /**
+   * Wie weit der Greifer WIRKLICH unter seine Aufhaengung langt, wenn er um
+   * `kipp` (rad) zur Seite gekippt haengt — gemessen in Weltrichtung −y.
+   *
+   * Bei `kipp === 0` ist das Ziffer fuer Ziffer `tiefe(winkel)`. Jede Form
+   * rechnet das selbst (`clawTipAusladung` bzw. `ausladung` im
+   * Fuenfschalengreifer); warum, steht beim Abschnitt „DIE RECHNUNG, DIE DIE
+   * GREIFERACHSE IN DIE WELTSENKRECHTE UMRECHNET" weiter unten.
+   */
+  ausladung(winkel: number, kipp: number): number;
+  /** Dieselbe Ausladung, ueber den ganzen Schliessweg genommen (m). */
+  maxAusladung(kipp: number): number;
   /** Liegt dieser Punkt (im Frame des Greifers) im Schalenkorb? */
   imKorb(p: THREE.Vector3, winkel: number): boolean;
   /** Abstand vom Ursprung des Greifers bis zur Sensormitte (m). */
@@ -148,6 +171,136 @@ type Kernform = Pick<
   Greiferform,
   "zu" | "offen" | "stationen" | "schalen" | "punkt" | "korbLuftUnten" | "sensorSitz"
 >;
+
+/**
+ * DIE RECHNUNG, DIE DIE GREIFERACHSE IN DIE WELTSENKRECHTE UMRECHNET.
+ *
+ * Gekippt wird um die LOKALE X-ACHSE des Greifers, danach dreht der Rotator um
+ * die Weltsenkrechte (`integratePendulum`: `qPendel · qGier · qKipp`). Die
+ * Drehung des Rotators aendert an der HOEHE eines Punktes nichts — sie dreht
+ * nur um y. Fuer die Ausladung bleibt also allein das Kippen uebrig:
+ *
+ *     Welt-y eines Punktes p  =  p.y · cos θ − p.z · sin θ
+ *     Ausladung(θ)            =  max über p von ( −p.y · cos θ + p.z · sin θ )
+ *
+ * Gerechnet wird ueber ALLE Schalen, nicht nur ueber die erste. Bei θ = 0
+ * spielt das keine Rolle (alle Schalen sind gleich tief, deshalb reicht
+ * `tiefe` mit einer Schale aus); gekippt schon: Die Schalen sitzen auf
+ * verschiedenen Umfangswinkeln, und `p.z = cos(a)·r` ist fuer jede eine
+ * andere Zahl.
+ *
+ * WARUM JEDE FORM DAS SELBST RECHNET, statt es hier gemeinsam zu tun. Ein
+ * gemeinsamer Weg ueber `punkt` haette nur die MITTELLINIE gehabt; was die
+ * Form darunter noch haengen hat — Zahnkegel bei der Sichelkralle, Ruecken
+ * des Zinken beim Fuenfschalengreifer — steckt in `tiefe(winkel)`, aber nicht
+ * in der Mittellinie. Er als festen Aufschlag mitzuschleppen, WAR die erste
+ * Fassung, und sie lag beim Fuenfschalengreifer bis zu **153 mm** daneben
+ * (`tools/greifer-ausladung.ts`): Der Bodenanschlag haette den gekippten
+ * Greifer 15 cm ueber dem Beton gehalten, und Kehren waere nicht gegangen.
+ * Jede Form kennt ihre Unterkante genau; also rechnet jede sie selbst.
+ * Gemessen liegen beide jetzt unter einem Millimeter.
+ *
+ * DER VORABSPRUNG bei `kipp === 0` steht in beiden Fassungen und ist keine
+ * Abkuerzung, sondern die Zusage: Bei lotrechtem Greifer kommt dieselbe Zahl
+ * wie vor dem Umbau, Bit fuer Bit — keine Summe von Kosinus 0 dazwischen.
+ */
+
+/**
+ * Die groesste Ausladung ueber den ganzen Schliessweg (m) — die Zahl, mit der
+ * `resolveGroundClamp` den Arm anhaelt.
+ *
+ * Bei `kipp === 0` kommt `maxTiefe` zurueck, unveraendert und ungerechnet.
+ * Genau das haelt den Bodenanschlag bei lotrechtem Greifer auf seiner
+ * heutigen Hoehe (Sichelkralle 6,7 cm, Fuenfschalengreifer 19,4 cm).
+ *
+ * 41 STUETZSTELLEN, nicht 201. Der tiefste Punkt liegt weder ganz offen noch
+ * ganz zu, sondern dazwischen (E-046), also muss der Weg abgetastet werden.
+ * Wie fein, ist eine Kostenfrage: Diese Zahl wird JEDES BILD gebraucht, und
+ * 201 Stuetzstellen kosten ueber 9.000 Punktrechnungen je Bild. 41 kosten
+ * 1.845. Was das an Genauigkeit kostet, ist gemessen:
+ * `tools/zahnlage-spinne.ts` hat 21 Stuetzstellen mit 0,05 mm Abweichung
+ * ausgewiesen; 41 sind feiner als das. Bei 0 Grad ist der Unterschied ohnehin
+ * null, weil dort gar nicht abgetastet wird.
+ */
+export function maxAusladungVon(
+  f: Pick<Greiferform, "zu" | "offen" | "ausladung">,
+  kipp: number,
+  maxTiefe: number
+): number {
+  if (kipp === 0) return maxTiefe;
+  let weit = 0;
+  for (let i = 0; i <= 40; i++) {
+    weit = Math.max(weit, f.ausladung(f.zu + ((f.offen - f.zu) * i) / 40, kipp));
+  }
+  return weit + KIPP_ZUSCHLAG * Math.abs(Math.sin(kipp));
+}
+
+/**
+ * `maxAusladung` mit EINEM Platz Gedaechtnis.
+ *
+ * `resolveGroundClamp` fragt die Zahl jedes Bild, und gekippt rechnet sie
+ * 41 Oeffnungsstellungen mal fuenf Schalen durch. Gemessen
+ * (`tools/kipp-kosten.ts`) kostete das im gekippten Zustand **0,31 ms**
+ * (Sichelkralle) bzw. **0,45 ms** (Fuenfschalengreifer) je Bild — auf einem
+ * iPad ist das ein spuerbarer Anteil von 16,7 ms.
+ *
+ * Ein Platz reicht, weil der Kippwinkel sich innerhalb eines Bildes nicht
+ * aendert und ueber lange Strecken gar nicht: Waehrend der zwei Sekunden
+ * Rampe wird gerechnet, danach steht der Wert. Lotrecht wurde ohnehin nie
+ * gerechnet — dort greift der Vorabsprung.
+ *
+ * Die Form kommt als Thunk herein, weil dieser Aufruf im Initialisierer der
+ * Form selbst steht und sie zu diesem Zeitpunkt noch nicht existiert.
+ */
+export function merkeMaxAusladung(
+  form: () => Pick<Greiferform, "zu" | "offen" | "ausladung">,
+  maxTiefe: () => number
+): (kipp: number) => number {
+  let letzterKipp = NaN;
+  let letzterWert = 0;
+  return (kipp: number): number => {
+    if (kipp === letzterKipp) return letzterWert;
+    letzterKipp = kipp;
+    letzterWert = maxAusladungVon(form(), kipp, maxTiefe());
+    return letzterWert;
+  };
+}
+
+/**
+ * Der ZUSCHLAG fuer den gekippten Greifer (m) — und warum er noetig ist.
+ *
+ * `ausladung` rechnet mit der MITTELLINIE der Schalen und dem Ueberstand
+ * darunter. Was sie nicht kennt, ist die BREITE der Schale: Eine Kralle ist
+ * ein Kasten, kein Draht, und ihre Aussenkante liegt neben der Mittellinie.
+ *
+ * Lotrecht faellt das nicht ins Gewicht — die Breite steht dann waagerecht.
+ * Gekippt steht sie schraeg und reicht nach unten. Und es kommt darauf an,
+ * WOHIN gekippt wird: Nach der einen Seite steht eine Schale genau unten und
+ * ihre Mittellinie ist der tiefste Punkt; nach der anderen steht eine LUECKE
+ * unten, und dann gewinnt die Aussenkante der beiden Nachbarschalen. Der
+ * Greifer ist fuenfzaehlig, nicht zweizaehlig.
+ *
+ * GEMESSEN am gezeichneten Netz (`tools/greifer-ausladung.ts`), in der
+ * Richtung, in die der Bagger wirklich kippt:
+ *
+ *            −90°     −85°     −45°     −25°
+ *   Sichel   29,4 mm  13,0 mm  −1,2 mm  −3,3 mm
+ *   Fuenf    18,5 mm  18,7 mm   7,0 mm   1,3 mm
+ *
+ * Positiv heisst: Das Netz reicht weiter nach unten als die Rechnung, der
+ * Greifer wuerde um so viel in den Beton sinken. 50 mm sind die naechste
+ * runde Zahl ueber dem schlimmsten Wert; mit `|sin kipp|` skaliert, damit bei
+ * 0 Grad nichts dazukommt und die Zusage „bei 0 Grad ist nichts anders"
+ * nicht an einer Fallunterscheidung haengt, sondern an der Rechnung selbst.
+ *
+ * DER PREIS: Ganz zur Seite gelegt bleibt der Greifer rund 2 cm hoeher
+ * stehen, als er muesste. Das ist die richtige Seite des Irrtums — E-046 hat
+ * den umgekehrten Fall gemessen, und da pfluegte die Spinne durch den Beton.
+ *
+ * `test/kippen.test.ts` haelt beide Seiten fest: nie darunter, und nie mehr
+ * als 55 mm darueber. Die Gegenprobe rechnet ohne Zuschlag und faellt durch.
+ */
+export const KIPP_ZUSCHLAG = 0.05;
 
 /**
  * Der noetige Sensorradius einer Form — GERECHNET, nicht gewaehlt (E-030).
@@ -242,6 +395,11 @@ export const SICHELKRALLE: Greiferform = {
   ...SICHEL_KERN,
   tiefe: clawTipDepth,
   maxTiefe: CLAW_MAX_DEPTH,
+  ausladung: clawTipAusladung,
+  maxAusladung: merkeMaxAusladung(
+    () => SICHELKRALLE,
+    () => CLAW_MAX_DEPTH
+  ),
   sensorRadius: sensorRadiusVon(SICHEL_KERN),
   schalenluecke: schalenlueckeVon(SICHEL_KERN),
   /**

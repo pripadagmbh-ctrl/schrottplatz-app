@@ -219,6 +219,77 @@ export function clawTipDepth(splay: number): number {
   return Math.max(tief, clawToothDepth(splay));
 }
 
+const ausladungP = new THREE.Vector3();
+
+/**
+ * Dieselbe Zahl fuer einen SEITLICH GEKIPPTEN Greifer (E-083): Wie weit langt
+ * die Sichelkralle in Weltrichtung −y unter ihre Aufhaengung, wenn sie um
+ * `kipp` (rad) um ihre eigene X-Achse gekippt haengt?
+ *
+ * Gekippt wird VOR dem Rotator (`integratePendulum`: `qPendel·qGier·qKipp`).
+ * Der Rotator dreht um die Weltsenkrechte und aendert an der Hoehe eines
+ * Punktes nichts — fuer diese Frage bleibt also allein das Kippen uebrig:
+ *
+ *     Welt-y von p  =  p.y·cos θ − p.z·sin θ
+ *     Ausladung(θ)  =  max über p von ( −p.y·cos θ + p.z·sin θ )
+ *
+ * UEBER ALLE FUENF KRALLEN, nicht nur ueber die erste. Lotrecht sind alle
+ * gleich tief, deshalb reicht `clawTipDepth` eine einzige; gekippt sitzt jede
+ * auf einem anderen Umfangswinkel, und `p.z = cos(a)·r` ist fuer jede eine
+ * andere Zahl.
+ *
+ * DER ZAHNKEGEL wird exakt mitgerechnet, nicht als fester Aufschlag. Seine
+ * Unterkante ist eine Scheibe von `rUnten` um den Punkt
+ *     c = Spitze + (versatz + hoehe/2)·u,
+ * wobei `u` die Richtung des letzten Segments ist. Fuer eine Richtung `n` ist
+ * der weiteste Punkt dieser Scheibe
+ *     c·n + rUnten·sqrt(1 − (u·n)²).
+ * Bei θ = 0 ist n = (0,−1,0), und daraus wird Zeichen fuer Zeichen die Formel
+ * von `clawToothDepth`: −Spitze.y + laengs·cos θ_Segment + rUnten·|sin θ_Segment|.
+ *
+ * Der Vorabsprung bei `kipp === 0` ist die Zusage, nicht die Abkuerzung: Bei
+ * lotrechter Kralle kommt `clawTipDepth` zurueck, Bit fuer Bit.
+ */
+export function clawTipAusladung(splay: number, kipp: number): number {
+  if (kipp === 0) return clawTipDepth(splay);
+  const ck = Math.cos(kipp);
+  const sk = Math.sin(kipp);
+  const th = -splay + (CLAW_SEGMENTS - 1) * CLAW_SEG_BEND;
+  const laengs = CLAW_TIP_CONE.versatz + CLAW_TIP_CONE.hoehe / 2;
+  const cth = Math.cos(th);
+  const sth = Math.sin(th);
+  let weit = -Infinity;
+  for (let i = 0; i < CLAW_COUNT; i++) {
+    const a = (i / CLAW_COUNT) * Math.PI * 2;
+    const ca = Math.cos(a);
+    // Die Segmentkette
+    for (let k = 1; k <= CLAW_SEGMENTS; k++) {
+      clawPoint(a, splay, k, ausladungP);
+      const d = -ausladungP.y * ck + ausladungP.z * sk;
+      if (d > weit) weit = d;
+    }
+    /*
+     * Der Zahnkegel an der Spitze.
+     *
+     *   u = Richtung des letzten Segments. In (y, radial) laeuft es nach
+     *       (−cos θ_Segment, −sin θ_Segment); radial heisst (sin a, 0, cos a).
+     *       |u| = 1, denn sth²·(sa²+ca²) + cth² = 1.
+     *   n = (0, −cos kipp, sin kipp) — die Richtung, deren Skalarprodukt
+     *       „wie weit nach unten" misst. Sie hat keine x-Komponente, deshalb
+     *       geht u.x in `un` nicht ein (in |u| = 1 sehr wohl).
+     */
+    clawPoint(a, splay, CLAW_SEGMENTS, ausladungP);
+    const uy = -cth;
+    const uz = -sth * ca;
+    const cn = -ausladungP.y * ck + ausladungP.z * sk;
+    const un = -uy * ck + uz * sk;
+    const kegel =
+      cn + laengs * un + CLAW_TIP_CONE.rUnten * Math.sqrt(Math.max(0, 1 - un * un));
+    if (kegel > weit) weit = kegel;
+  }
+  return weit;
+}
+
 /**
  * Wieviel Winkel eine Kralle gegen Widerstand noch nachdrücken darf (rad).
  * Ein Greifer bleibt nicht schlagartig stehen, wenn er auf Stahl trifft — die
