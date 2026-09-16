@@ -6600,7 +6600,7 @@ fährt zehn Fuhren in Folge ohne Steckenbleiben.
 
 ---
 
-### E-083 — Der Greifer legt sich zur Seite: 90° sind frei, und der Besen bleibt dabei flach liegen (16.09.2026)
+### E-085 — Der Greifer legt sich zur Seite: 90° sind frei, und der Besen bleibt dabei flach liegen (16.09.2026)
 
 **Entscheidung.** Der Greifer kippt auf Taste **K** in zwei Sekunden um **90°**
 zur Seite und richtet sich auf demselben Weg wieder auf. Gekippt wird um seine
