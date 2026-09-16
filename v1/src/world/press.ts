@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
-import { SORTENREIN_AB } from "../materials/purity";
+import { fraktionAus } from "../materials/purity";
 import type { ItemManager } from "./scrapItems";
 import type { CompositeManager } from "../dismantle/composites";
 
@@ -785,6 +785,11 @@ export class PressManager {
    * Wer ein sortenreines Paket will, muss sortenrein einlegen; das Paket
    * merkt sich seine Zusammensetzung und bringt gemischt entsprechend
    * weniger (Design-Fix 29.08.2026).
+   *
+   * Die Regel in einem Satz (E-091): **Ein Paket ist so sortenrein wie das,
+   * was hineinging.** Nichts wird besser durchs Pressen, aber auch nichts
+   * schlechter — der Erloes ist vor und nach dem Zuschlagen auf den Cent
+   * derselbe (`test/presspaket.test.ts`).
    */
   private stamp(): void {
     const inChamber = this.items.items.filter((it) => this.inChamber(it.body.translation()));
@@ -801,23 +806,61 @@ export class PressManager {
         }
       }
       const composition = [...anteile].map(([materialId, massKg]) => ({ materialId, massKg }));
-      // Die dominante Fraktion gibt dem Paket Farbe und Namen
-      const dominant = composition.reduce((a, b) => (b.massKg > a.massKg ? b : a));
       const kg = composition.reduce((s, c) => s + c.massKg, 0);
+      /*
+       * Das Etikett des Pakets kommt aus den FRAKTIONEN, nicht aus den
+       * Rohstoffen (E-091, 16.09.2026).
+       *
+       * Der Unterschied ist der zwischen „woraus ist das gemacht" und „wohin
+       * gehoert das". Ein Baggerloeffel BESTEHT zu 97 % aus Stahl und zu 3 %
+       * aus Gummi; er IST Stahlschrott, denn genau das sagt `fraktionVonTeil`
+       * (E-042: bis 10 % Fremdstoff bleibt Stahl Stahl), und danach sortiert
+       * der Spieler, danach rechnet das Muldenschild, danach bestellt der
+       * Abholer.
+       *
+       * Bis hierher las die Presse die Rohstoffe und wandte `SORTENREIN_AB`
+       * (95 %) darauf an. Damit galt an der Presse eine STRENGERE Regel als
+       * auf dem ganzen uebrigen Platz: Fuenf Stuecke, die jedes fuer sich
+       * Stahlschrott sind, weil sie 9 % Fremdstoff tragen, kamen als
+       * Mischschrott heraus. Pressen machte Sortierarbeit kaputt — und das ist
+       * genau umgekehrt gedacht.
+       *
+       * Die Regel jetzt in einem Satz: **Ein Paket ist so sortenrein wie das,
+       * was hineinging.** Gleiche Fraktion hinein, gleiche Fraktion heraus;
+       * verschiedene hinein, Mischschrott heraus. Besser wird nichts durchs
+       * Pressen — `fraktionAus` verlangt weiterhin 95 % EINER Fraktion.
+       *
+       * Die Zusammensetzung bleibt unveraendert die Summe der Rohstoffe, also
+       * bleibt auch der Erloes auf den Cent derselbe (gemessen,
+       * `tools/pressbilanz.ts`).
+       *
+       * Gewichtet wird mit der WIRTSCHAFTLICHEN Masse eines Stuecks (der Summe
+       * seiner Zusammensetzung), nicht mit `massKg`. Sonst bekaeme
+       * Platzinventar — der Kehrbesen wiegt 14 kg und besteht aus nichts
+       * (E-079) — eine Stimme darueber, wie das Paket heisst.
+       */
+      const fraktionen = new Map<string, number>();
+      for (const it of inChamber) {
+        const wirtKg = (it.composition ?? [{ massKg: it.massKg }]).reduce(
+          (s, c) => s + c.massKg,
+          0
+        );
+        if (wirtKg <= 0) continue;
+        fraktionen.set(it.materialId, (fraktionen.get(it.materialId) ?? 0) + wirtKg);
+      }
+      const paketMaterial = fraktionAus(
+        [...fraktionen].map(([materialId, m]) => ({ materialId, anteil: m / Math.max(kg, 1e-9) })),
+        // Kein Stueck mit Masse in der Kammer: dann gibt es nichts zu benennen.
+        // „mixed" statt der Vorgabe „steel" von `fraktionAus` — ein Paket aus
+        // Nichts ist kein Stahlpaket.
+        "mixed"
+      );
       for (const it of inChamber) {
         const wasCar = this.composites.despawnByBody(it.body);
         this.items.remove(it, !wasCar);
       }
       // Das fertige Paket wandert ins Ballenlager östlich der Kammer —
       // dort liegt es griffbereit für den Abholer, statt der Presse im Weg
-      /*
-       * Was zusammen in die Presse geht, kommt als Mischschrott heraus — eine
-       * Presse sortiert nicht (Wunsch 11.09.2026). Nur wenn praktisch nichts
-       * Fremdes dabei war, bleibt das Paket sortenrein und bringt den besseren
-       * Preis. Genau darin liegt der Anreiz, vorher zu trennen.
-       */
-      const reinheit = dominant.massKg / Math.max(kg, 1);
-      const paketMaterial = reinheit >= SORTENREIN_AB ? dominant.materialId : "mixed";
       const lager = baleYard();
       this.items.spawnBale(
         paketMaterial,
