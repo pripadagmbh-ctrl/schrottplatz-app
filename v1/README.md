@@ -8,9 +8,19 @@ Stand: **M1 gebaut, Gerätetest offen. M2 Phase A gebaut, Gerätetest offen.** Z
 breiter Ring an der Spinne (E-007), Rückwände raus an den vier Sortiermulden (E-006),
 Kommentar-Regel für Messwerte (E-008), der Fünfschalengreifer als Vorschaumodell (E-009),
 Platzumbau auf die L-Silos und die Mulde „BUNT + VA" (E-026 bis E-028), Bestandsaufnahme
-der Sortierung (E-029), Typprüfung für `test/` und `tools/` (E-038). Prüfkette grün:
-`npm test` **774 Tests in 69 Dateien**, `npm run build` sauber. Abgenommen ist nichts davon vor Patricks Gerätetest — die
+der Sortierung (E-029), Typprüfung für `test/` und `tools/` (E-038). Prüfkette grün
+(16.09.2026, beide Rückgabewerte 0 einzeln geprüft): `npm test` **1.292 Prüfungen in 111
+Dateien**, `npm run build` sauber. Abgenommen ist nichts davon vor Patricks Gerätetest — die
 Handgriffe stehen bei E-006, E-007, E-009 und E-029 im Log.
+
+**Offen und gemessen, nicht entschieden (E-091):** Der offene Greifer ist am gebauten Netz
+breiter als die Formel sagt, mit der zwei Wächter rechnen — Sichelkralle **3,5335 m** statt
+3,3805 m. In jede Mulde, jede Halde und die Presskammer passt er (knappste Stelle: Presse
+am geparkten Stempel, 5,3 cm je Seite). **Nicht** in den Müllcontainer: dort fehlen 5,7 cm
+je Seite, bis 95 % Öffnung geht es. Der Fünfschalengreifer ist mit 3,3064 m der schmalere
+und passt überall. Drei Möglichkeiten stehen im Log, entschieden ist keine — das ist
+Patricks Sache. Gemessen mit `tools/greifer-engstellen.ts`, bewacht von
+`test/engstellen.test.ts`.
 
 **Offen und gemessen, nicht behoben (E-029, `docs/fraktionen.md`):** Das Schild an einer
 Mulde und die Kasse beim Verkauf rechnen verschieden — bei „BUNT + VA" um Faktor 87. Und

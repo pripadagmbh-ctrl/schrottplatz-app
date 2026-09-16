@@ -7673,3 +7673,337 @@ weil die Typprüfung der Tests abbrach und damit KEIN einziger Test lief.
    Startwert (`WANGE_ANTEIL`), nach oben begrenzt durch den Fersenguss.
 
 ---
+
+### E-091 — Der Greifer ist 15 cm breiter, als die Wächter glauben: der Hüllkreis am Netz, gegen jede Engstelle des Platzes (16.09.2026)
+
+**Die eine Zahl vorweg:** Die offene Sichelkralle misst **3,5335 m**, nicht
+3,3805 m. Der Unterschied sind **15,3 cm**, und er ist der Grund, warum der
+Müllcontainer heute nicht ganz offen auszuräumen ist.
+
+**Dieser Eintrag entscheidet nichts am Greifer und nichts am Platz.** Er misst,
+meldet und bewacht. Was mit dem einen Befund geschieht, entscheidet Patrick.
+
+---
+
+#### Der Auftrag: der offene Punkt aus E-090
+
+E-090 hat den Hüllkreis des Fünfschalengreifers von 3,2262 auf 3,3064 m wachsen
+lassen und selbst dazugeschrieben:
+
+> „An denselben 8 cm hängen Presskammer und Muldenbreiten (der Kommentar zu
+> `CLAW_OPEN_SPLAY` nennt sie ausdrücklich). Die sind hier NICHT nachgemessen
+> worden."
+
+Nachgemessen ist jetzt, für **beide** Greiferformen, gegen **vierzehn**
+Engstellen. Neu: `tools/greifer-engstellen.ts` (Messlauf),
+`tools/engstellen-kern.ts` (Rechenkern), `tools/engstellen-platz.ts`
+(Zielliste), `test/engstellen.test.ts` (Wächter). **Kein Produktivcode ist
+angefasst.**
+
+---
+
+#### Wie gemessen wird — und warum nicht, wie bisher
+
+**Am NETZ, nicht an der Mittellinie.** `test/spinnenmass.test.ts` und
+`test/presseKammer.test.ts` rechnen mit `clawSpan(CLAW_OPEN_SPLAY)`. Das ist
+die Bahn der Krallen-MITTELLINIE. Der gezeichnete Körper ist breiter, weil an
+jeder Spitze die Zahnkappe `tineTip` sitzt (Radius 0,075 m) und schräg nach
+außen steht.
+
+Das ist **dieselbe Klasse Fehler wie am 14.09.2026 beim Bodenanschlag**: Der
+Zahnkegel wurde gezeichnet, aber nicht gerechnet, es fehlten 0,1241 m — und
+genau so weit sank die Spinne in den Beton („Spinne sitzt auf, die kleinen
+äußersten Noppen verschwinden im Boden"). Diesmal fehlte es in der Breite,
+0,153 m, und es fehlte an vier Stellen zugleich: in beiden Maßwächtern, im
+Kommentar zu `CLAW_OPEN_SPLAY` („Bei 1,555 misst die Spinne wieder 3,38 m …
+an dieser Zahl hängen Presskammer und Muldenbreiten") und im Kommentar zum
+Absetzcontainer in `containers.ts` („der Greifer misst offen 3,02 m über die
+Spitzen, es bleiben also 40 cm auf jeder Seite").
+
+**EXAKT, nicht abgetastet.** Gesucht ist das Maximum von `hypot(x, z)` über die
+Oberfläche. Diese Funktion ist konvex; ihr Maximum über ein Dreieck liegt immer
+in einer **Ecke**. Die Eckpunkte der Netze reichen deshalb aus — es gibt keinen
+Abtastfehler und keine Fehlerschranke, die man abziehen müsste. Das ist der
+Unterschied zur Freigangmessung aus E-085: Dort wird ein ABSTAND zweier Flächen
+gesucht, und der kann mitten in einem Dreieck liegen.
+
+**Ein KREIS, kein Quadrat.** Der Greifer hängt an einem Rotator; in welcher
+Stellung der steht, weiß niemand. Also zählt das Maß, das in jeder
+Rotatorstellung gilt: der Hüllkreis, und ihm gegenüber der größte freie Kreis
+in der Öffnung. `test/presseKammer.test.ts` misst die größte freie
+QUADRATkante — gültig, aber strenger als nötig (3,62 statt 3,64 m).
+
+**Die Nullprobe steht vorn, nicht hinten.** Sechs Fälle, deren Ergebnis von
+Hand nachzurechnen ist. **Sie hat beim ersten Lauf sofort zugeschlagen:**
+Erwartet waren für einen Stern aus fünf 20-cm-Kästen auf Halbmesser 1,50 m
+genau 3,20 m; gemessen wurden 3,2797 m — und gemessen hatte recht. Die Ecke
+eines achsparallelen Kastens liegt nicht radial, sondern schräg. Der Sollwert
+wird jetzt über die acht Ecken ausgerechnet, mit eigener Arithmetik: zwei Wege,
+ein Ergebnis.
+
+**Ein zweiter Selbstfund im selben Lauf:** Die Presskammer meldete „0,000 m
+frei". Ursache war der Kammerboden — er endet auf 0,30 m, das Höhenband fängt
+auf 0,30 m an, und in Gleitkomma ist die Oberkante 0,30000000000000004. Der
+Boden galt damit als Hindernis und deckte die ganze Mündung ab. `BAND_SPIEL`
+= 2 cm steht jetzt im Kern, dieselbe Zahl wie `TOLERANZ` in
+`test/presseKammer.test.ts`, die dort aus demselben Grund steht. Wer sie
+wegnimmt, bekommt keine Fehlermeldung, sondern lauter Nullen — die
+gefährlichere Sorte Fehler.
+
+---
+
+#### Die beiden Greifer, am gebauten Netz
+
+| | Sichelkralle | Fünfschalengreifer |
+|---|---|---|
+| **Hüllkreis über den ganzen Öffnungsweg** | **3,5335 m** | **3,3064 m** |
+| weitester Punkt | `tineTip` (Zahnkappe), y −2,440 m | `SHELL_04_STAHLGUSS`, y −1,965 m |
+| bei welchem Öffnungsgrad | 100 % | 100 % |
+| Spitzenkreis ganz offen | 3,5335 m | 3,2332 m |
+| zum Vergleich `clawSpan(CLAW_OPEN_SPLAY)` | 3,3805 m | — |
+
+**Die Zahl des Fünfschalengreifers stimmt auf die vierte Stelle mit E-090
+überein** (3,3064 m) — das ist die Nullprobe gegen das Log: zwei Werkzeuge,
+zwei Verfahren, dieselbe Zahl.
+
+**Der Fünfschalengreifer ist der SCHMALERE der beiden**, um 22,7 cm. Die Sorge
+aus E-090 („passt er mit 8 cm mehr noch hinein") trifft also nicht ihn, sondern
+die Sichelkralle — und die ist seit Monaten unverändert.
+
+---
+
+#### Ziel für Ziel: Luft je Seite
+
+Gemessen mit `tools/greifer-engstellen.ts`, Raster 2 cm, Fehlerschranke
+28,3 mm **nach unten sicher** (ein zu klein gemessenes Loch meldet lieber
+einmal zu viel).
+
+| Ziel | frei | Sichelkralle | Fünfschalengreifer |
+|---|---|---|---|
+| **Presskammer, Stempel geparkt** | 3,640 m | **+5,3 cm** | **+16,7 cm** |
+| Presskammer, ohne den Stempel | 4,050 m | +25,8 cm | +37,2 cm |
+| Halde MISCHSCHROTT | 6,000 m | +123,3 cm | +134,7 cm |
+| Halde STAHLSCHROTT | 6,000 m | +123,3 cm | +134,7 cm |
+| Mulde BUNT + VA | 4,200 m | +33,3 cm | +44,7 cm |
+| **Absetzcontainer MÜLL** | 3,420 m | **−5,7 cm** | **+5,7 cm** |
+| Mulde KUPFER-LAGER | 4,050 m | +25,8 cm | +37,2 cm |
+| Mulde KABEL-LAGER | 3,900 m | +18,3 cm | +29,7 cm |
+| Mulde ALU-LAGER | 4,050 m | +25,8 cm | +37,2 cm |
+| Mulde VA-LAGER | 4,050 m | +25,8 cm | +37,2 cm |
+| Mulde BATTERIEN | 3,900 m | +18,3 cm | +29,7 cm |
+| Mulde ABFALL | 4,050 m | +25,8 cm | +37,2 cm |
+
+Dazu zwei Stellen, an denen der Greifer **nicht** hineinpassen soll, weil er
+dort von oben lädt — gemessen, damit die Zahl dasteht, aber kein Befund:
+
+| Ziel | frei | Sichelkralle | Fünfschalengreifer |
+|---|---|---|---|
+| Ladefläche des Abholers (zwischen den Bordwänden, 2,50 m hoch) | 2,700 m | −41,7 cm, bis 63 % offen | −30,3 cm, bis **57 %** offen |
+| Silo-Gasse, Wagen in die Mulde zurückgestoßen | 0,550 m | gar nicht | gar nicht |
+
+---
+
+#### DER EINE BEFUND: der Müllcontainer nimmt die Sichelkralle nicht auf
+
+**Was gemessen ist.** Der Absetzcontainer misst außen 3,60 m, seine vier Wände
+sind 0,09 m stark (`containers.ts`, `waende`), innen bleiben **3,42 m**. Die
+offene Sichelkralle misst 3,5335 m. Sie ist **5,7 cm zu breit je Seite**; ganz
+offen setzen ihre Zahnkappen auf den Bordwänden auf. Bis **95 % Öffnung** geht
+sie hinein.
+
+**Er ist ÄLTER als E-090.** Die Sichelkralle ist beim Schalenumbau Bit für Bit
+unverändert geblieben (E-090, Abdruckvergleich: größter Unterschied 0,000e+0).
+Gefunden wurde er erst jetzt, und zwar aus zwei Gründen, die beide in
+`test/spinnenmass.test.ts` stehen:
+
+1. Dort wird mit `clawSpan` = 3,3805 m gerechnet statt mit dem Netz — 3,3805
+   hätte in 3,42 m noch hineingepasst.
+2. **Absetzcontainer werden dort gar nicht geprüft.** Der Wächter kennt
+   Presskammer, Sortierbox und `kind === "bay"`, aber kein `rolloff`.
+
+**Der Fünfschalengreifer passt** — mit 5,7 cm je Seite.
+
+**DREI MÖGLICHKEITEN, und die kleinste zuerst. Entschieden ist keine.**
+
+| | Eingriff | was es kostet |
+|---|---|---|
+| **1. So lassen** | nichts | Der Spieler fährt die Spinne 5 % zu, bevor er hineingreift — das tut er ohnehin, sobald er etwas fasst. Nur das ganz offene Eintauchen stößt an. **Die kleinste Möglichkeit.** |
+| 2. Container breiter | `CONFIGS` `r_rubble`, `size[0]` von 3,60 auf 3,75 m | Ein Maß in einer Datei. Der Container wird 15 cm breiter und damit sichtbar größer als der 40er daneben; sein Umriss geht in Routen und Blockadeprüfung ein (`test/abholplatz.test.ts`, `test/containerrueckgabe.test.ts`). |
+| 3. Greifer schmaler | `CLAW_OPEN_SPLAY` von 1,555 auf rund 1,50 | Rührt an die Spinne, die Patrick am 13.09.2026 ausdrücklich zurückhaben wollte („kannst du einfach wieder die Spinne von gestern Mittag nehmen?"), und ändert Grabtiefe, Bodenanschlag und Greiffenster mit. **Die teuerste.** |
+
+Zuständig, sobald Patrick entschieden hat: **welt** für 2, **bagger** für 3.
+
+---
+
+#### Was die Messung sonst noch gefunden hat, ohne danach gefragt worden zu sein
+
+**1. Die Nachbarsilos stehen ineinander.** Ein Lagersilo ist innen 4,20 m weit;
+über die Wände misst es 4,20 + 2 × 0,55 = 5,30 m. Die Silos stehen aber nur
+**4,60 m** auseinander — ihre Wände überlappen sich um 0,70 m. Gemessen bleibt
+die lichte Weite dadurch nicht 4,20 m, sondern **4,05 m** bei den Endsilos und
+**3,90 m** bei den mittleren (KABEL, BATTERIEN). Für beide Greifer reicht das;
+gemeldet wird es, weil die Zahl nirgends steht.
+
+**2. `test/spinnenmass.test.ts` prüft die falsche Achse.** Zeile 66:
+`const breite = c.size[0]` — das ist die TIEFE von der Öffnung bis zur
+Rückwand (6,00 m), nicht die lichte Weite zwischen den Flanken (`size[1]`,
+4,20 m). Beide Zahlen bestehen die Prüfung, der Wächter ist also grün und
+misst trotzdem das Falsche. Wer `size[1]` auf 3,00 setzte, käme ungehindert
+durch. **Nicht geändert** — eine Zeile in einem fremden Wächter zu drehen,
+ohne dass jemand die Folge sieht, ist genau das, was dieser Eintrag nicht tun
+soll. `test/engstellen.test.ts` deckt die Eigenschaft ab dieser Lieferung ab.
+
+**3. Die Presskammer ist 1 cm enger als ihre Konstante sagt.**
+`PRESS_KAMMER.hw` = 2,025 m, die Innenflächen der gebauten Wandkollider liegen
+auf ±2,020 m. 5 mm je Seite. Ohne Folge, aber es sind zwei Wahrheiten über
+dieselbe Sache.
+
+**4. `tools/leinwand-attrappe.ts` kann den Platzboden nicht bauen.** Sie liefert
+für jeden unbekannten Zeichenbefehl `undefined`; `yard.ts` legt aber einen
+Farbverlauf an und ruft darauf `addColorStop` — `new Yard(…)` bricht ab.
+`tools/platzlast.ts` trägt deshalb seit dem 15.09.2026 eine eigene Attrappe im
+Dateikopf. Jetzt gibt es eine **dritte** (`leinwandMitVerlauf` in
+`engstellen-kern.ts`). Die Doppelung steht ausdrücklich im Kommentar, damit sie
+sichtbar bleibt statt versteckt; aufgeräumt wird sie nicht nebenbei, weil die
+gemeinsame Attrappe an elf Tests hängt.
+
+---
+
+#### Nachgemessen: die 90°-Zahlen aus E-090 sind nicht vergleichbar
+
+E-090 meldet unter „Der Freigang bei 90° (E-085) — er wird enger":
+
+| | E-085 | E-090 |
+|---|---|---|
+| Freigang bei 90° | 0,136 m | 0,115 m |
+| freie Rotatorstellungen bei 90° | 15 von 24 | 11 von 24 |
+
+und schließt daraus: „90° laufen weiter — aber mit 2,1 cm weniger Luft und vier
+Rotatorstellungen weniger … die erwartete Folge des um 8 cm gewachsenen
+Hüllkreises".
+
+**Das hält der Nachmessung nicht stand.** Voller Lauf von
+`tools/greifer-freigang.ts` am 16.09.2026, Übersicht, Raster 6 cm, beide Formen:
+
+- **Die 0,136 m aus E-085 sind kein Freigang, sondern ein DECKEL.** Das Werkzeug
+  hört bei `DECKEL` = 0,15 m auf zu suchen und meldet `Deckel − EPS`. Bei
+  Raster 2,5 cm ist EPS = 14,4 mm, also 0,1356 → „0,136 m (nichts in
+  Reichweite)". Bei Raster 6 cm ist EPS = 34,6 mm, also 0,1154 → **0,115**.
+  Beide Zahlen sagen dasselbe: *nichts innerhalb von 15 cm*. Sie unterscheiden
+  sich um genau die Differenz der beiden Abtastfehler (20,2 mm gegen gemeldete
+  2,1 cm).
+- **Die Gegenprobe steht im selben Lauf.** Die Sichelkralle ist nachweislich
+  unverändert (E-090: größter Unterschied 0,000e+0) und kommt bei 90° auf
+  **ebenfalls 11 von 24** freien Rotatorstellungen, mit derselben Liste
+  105°…255°. Die „vier Rotatorstellungen weniger" sind also keine Folge der
+  Trogschale, sondern des gröberen Rasters.
+
+**Was stimmt:** 90° laufen in jeder erreichbaren Armstellung frei, für beide
+Formen — das Ergebnis aus E-085 und E-090 bleibt. **Was nicht belegt ist:**
+dass der Umbau dort Luft weggenommen hat. Wer die Zahlen vergleichen will, muss
+beide Läufe mit demselben Raster fahren
+(`npx vite-node tools/greifer-freigang.ts fein`); das ist hier nicht geschehen,
+weil der feine Lauf 851 Mio. Abstandsfragen je Form kostet.
+
+---
+
+#### Der offene Befund aus E-085 bei 0°: aus 13 sind NICHT mehr geworden
+
+E-085: „In 13 von 62 erreichbaren Armstellungen berührt der Greifer den Arm
+heute schon bei 0°." Nachgemessen im selben Lauf:
+
+| | E-085 | 16.09.2026 |
+|---|---|---|
+| **Sichelkralle** | 13 von 62 | **13 von 62** |
+| Fünfschalengreifer | nicht getrennt ausgewiesen | **8 von 62** |
+
+Die 13 sind die der **Sichelkralle** und unverändert — sie müssen es sein, der
+Körper ist derselbe. Die acht Stellungen des Fünfschalengreifers sind eine
+**echte Teilmenge** der dreizehn; alle liegen am Stielanschlag (−140°) oder am
+ganz gestreckten Stiel (−25°) bei hohem Ausleger.
+
+**Nicht gemessen** ist, ob der Fünfschalengreifer vor dem Schalenumbau bei 7
+oder bei 8 stand — dafür müsste die alte Schale gebaut werden, und das hieße,
+`src/` anzufassen. Die gestellte Frage ist trotzdem beantwortet: **mehr als 13
+sind es nicht geworden.**
+
+---
+
+#### Der Wächter
+
+`test/engstellen.test.ts`, **sechs Prüfungen**:
+
+1. **Nullprobe** — der Rechenkern misst vier bekannte Figuren richtig,
+   darunter einen Kasten, dessen Hüllkreis von Hand nachzurechnen ist
+   (`2 · hypot(1; 2)`).
+2. **Der Hüllkreis wird am Netz gemessen** — 3,3064 m (E-090) und 3,5335 m
+   festgehalten, weitester Punkt `tineTip`, und der Abstand zur
+   Mittellinienformel muss über 15 cm bleiben. Wächst der Greifer noch einmal,
+   meldet diese Zeile es als Erstes.
+3. **Jede Engstelle nimmt beide Greifer auf** — zwölf Ziele × zwei Formen.
+4. **GEGENPROBE, 20 cm:** Ein GEBAUTER, waagerecht um 20 cm gestreckter Greifer
+   muss neu gemeldet werden. Geprüft wird zuerst, dass er wirklich 20 cm
+   breiter gemessen wird (sonst prüfte die Gegenprobe nur eine Addition).
+   Ergebnis: Sichelkralle 1 → 2 Anstöße, Fünfschalengreifer 0 → 1.
+5. **GEGENPROBE an der Presskammer:** 20 cm reichen dort nicht — und das ist
+   die eigentliche Auskunft. Die Reserve wird gemessen (Sichelkralle 10,7 cm,
+   Fünfschalengreifer 33,4 cm im Durchmesser) und dann um genau 1 cm
+   überschritten; der so gebaute Greifer MUSS an der Presskammer gemeldet
+   werden. Beide tun es. *(Die erste Fassung dieser Gegenprobe ist genau hier
+   gerissen: 16,7 cm Luft JE SEITE sind 33,4 cm Zugabe im Durchmesser, und
+   20 cm reichen dagegen nicht. Der Irrtum steht im Kommentar.)*
+6. **Die Ziele stehen vollzählig** — sieben Mulden, zwei Halden, zwei
+   Presskammer-Stände, Absetzcontainer, Ladefläche, Silo-Gasse. Ein Wächter,
+   der weniger prüft als der Platz hat, ist grün und wertlos (die Lehre vom
+   15.09.2026, `tsconfig.test.json`).
+
+Der eine gemessene Anstoß steht als `BEKANNTE_ANSTOESSE`. **Das ist keine
+Ausnahme, die etwas durchwinkt:** Verglichen wird auf GLEICHHEIT. Kommt einer
+dazu, meldet der Wächter. Wird dieser behoben, meldet er auch — und sagt damit,
+dass die Zeile zu löschen ist. Eine Ausnahme, die sich selbst abräumt.
+
+**Zielliste und Messlauf lesen dieselbe Datei** (`tools/engstellen-platz.ts`).
+Zwei Listen derselben Engstellen liefen unweigerlich auseinander, und zwar
+stumm — dieselbe Klasse Fehler wie die doppelten Wege in E-044, E-064, E-070,
+E-082 und E-087.
+
+---
+
+#### Was NICHT angefasst ist
+
+- **`src/` in jeder Zeile.** Kein Produktivcode, keine Konstante, kein Maß.
+- **`test/spinnenmass.test.ts` und `test/presseKammer.test.ts`** bleiben, wie
+  sie sind — mit ihrer Mittellinienzahl. Sie auf das Netzmaß umzustellen hieße,
+  über eine Sicherheitsluft zu entscheiden: `spinnenmass` verlangt 0,30 m Luft
+  je Seite an der Presskammer, und mit 3,5335 m statt 3,3805 m wäre diese Regel
+  dort gerissen (4,05 m vorhanden, 4,1335 m nötig). Das ist eine Entscheidung
+  über den Platz, keine Testpflege.
+- **Die Trennsteine zwischen den Halden.** Der offene Greifer reicht mit 1,77 m
+  (Sichelkralle) bzw. 1,65 m (Fünfschalengreifer) Halbmesser in jeder Stellung
+  über die 0,60 m dicke, höchstens 2,40 m hohe Fuge hinweg. **So ist es
+  gewollt** (Ansage 14.09.2026: „sodass der Zugriff von Mischschrott zu
+  Stahlschrott flüssig läuft"). Kein Befund, eine Zahl.
+
+**Abnahmekriterium.** `npm run build` mit Rückgabewert **0** geprüft, nicht
+angenommen. `npm test` mit Rückgabewert **0**: **111 Dateien, 1.292 Prüfungen**
+(vorher 110 / 1.286 — eine Datei und sechs Prüfungen mehr). Der Ausgangsstand
+derselben Kette ist vor der Arbeit einzeln gemessen worden: 110 / 1.286, beide
+Rückgabewerte 0.
+
+**Auf dem Gerät zu prüfen.**
+
+1. **In den Müllcontainer greifen, Spinne ganz offen.** Setzt sie auf den
+   Bordwänden auf? Gemessen fehlen 5,7 cm je Seite. Stört es beim Ausräumen —
+   oder merkst du es gar nicht, weil du ohnehin zufährst?
+2. **Dasselbe mit dem Fünfschalengreifer.** Der passt rechnerisch, mit 5,7 cm
+   je Seite. Fühlt sich der Unterschied so an?
+3. **In die Presse greifen, am geparkten Stempel vorbei.** Dort ist die
+   Sichelkralle mit 5,3 cm je Seite am knappsten von allen Behältern. Streift
+   sie?
+4. **Eine Fuhre auf den Abholer laden.** Der Greifer passt nicht zwischen die
+   Bordwände (2,70 m innen, 2,50 m hoch) — er muss auf 57 bis 63 % zufahren, um
+   hineinzukommen. Reicht das zum Beladen, oder fällt zu viel daneben?
+5. **Zwischen zwei Silos greifen.** Die mittleren sind gemessen 3,90 m weit
+   statt 4,20 — die Nachbarwände stehen ineinander. Sieht man das?
+
+---
