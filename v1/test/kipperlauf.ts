@@ -78,6 +78,16 @@ export interface Stand {
    * Prüfcode, der das nicht meldet, prüft nichts.
    */
   brueckeAbschalten?: boolean;
+  /**
+   * Lenkrate des Wagens (rad/s); `Infinity` ist der Sprungzustand von vor dem
+   * 16.09.2026 (E-081). Ohne Angabe faehrt der gebaute Wert.
+   *
+   * Steht hier, damit die Frage „erklaert der Rangierknick den Durchfall"
+   * MIT DIESEM Apparat beantwortet werden kann und nicht mit einem zweiten.
+   * Das ist die Lehre aus E-062: Zwei Geraete fuer denselben Vorgang liefern
+   * zwei Wahrheiten.
+   */
+  lenkrate?: number;
 }
 
 /** Fester Zufall — die Ladung wird gewürfelt, sonst vergleicht man Rauschen. */
@@ -103,6 +113,16 @@ export interface Lauf {
   restAnteil: number;
   /** Anteil der Fuhre, der beim Kippen UNTER die Brücke gerät. */
   durchAnteil: number;
+  /**
+   * Anteil, der schon VOR dem Kippen unter die Brücke gerät (E-081).
+   *
+   * Das Messfenster von `durchAnteil` beginnt bei `tipping`. Zwischen der
+   * Freigabe der Ladung (`pauseBeforeUnload`, dort wird sie wieder dynamisch)
+   * und dem Kippbeginn liegen aber 1,2 s, in denen niemand hinsah — und
+   * genau dort setzt `releaseCargo` die Kollider der Mulde neu (E-071). Ein
+   * Stück, das in dieser Lücke durchsackt, kam in keiner Zahl vor.
+   */
+  durchVorKippen: number;
   /** Abstand des entferntesten Stücks vom Halteplatz des LKW (m). */
   endAbstand: number;
   /** Anteil der Fuhre, der in der zugehörigen Lagermulde gelandet ist (0–1). */
@@ -160,6 +180,7 @@ export function lauf(s: Stand, saat: number): Lauf {
     const bedBody = (v as unknown as { bedBody: RAPIER.RigidBody }).bedBody;
     const bedGroup = (v as unknown as { bedGroup: THREE.Group }).bedGroup;
     const grp = (v as unknown as { group: THREE.Group }).group;
+    if (s.lenkrate !== undefined) (v as unknown as { lenkrate: number }).lenkrate = s.lenkrate;
     if (s.keil) {
       // Gebauten Kollider abschalten statt entfernen: `removeCollider`
       // verschiebt die Nummern aller folgenden, und `vehicles.ts` greift auf
@@ -174,6 +195,8 @@ export function lauf(s: Stand, saat: number): Lauf {
     let amHalt: THREE.Vector3 | null = null;
     const q = new THREE.Vector3();
     const durch = new Set<number>();
+    const durchFrueh = new Set<number>();
+    let freigegeben = false;
     for (let i = 0; i < 60 * 480; i++) {
       m.update(dt);
       items.clampSpeeds(dt);
@@ -183,6 +206,7 @@ export function lauf(s: Stand, saat: number): Lauf {
         if (p === "tipping") kippt = true;
         phase = p;
       }
+      if (p === "pauseBeforeUnload") freigegeben = true;
       if (p === "pauseBeforeUnload" && !amHalt) {
         amHalt = grp.position.clone();
         for (let k = 0; k < bedBody.numColliders(); k++) {
@@ -199,14 +223,14 @@ export function lauf(s: Stand, saat: number): Lauf {
         const lv = it.body.linvel();
         vmax = Math.max(vmax, Math.hypot(lv.x, lv.y, lv.z));
       }
-      if (kippt) {
+      if (freigegeben) {
         bedGroup.updateWorldMatrix(true, false);
         for (const it of items.items) {
           const pp = it.body.translation();
           q.set(pp.x, pp.y, pp.z);
           bedGroup.worldToLocal(q);
           if (Math.abs(q.x) < 1.4 && q.z > 0 && q.z < 6 && q.y < DURCHFALL_MARKE) {
-            durch.add(it.body.handle);
+            (kippt ? durch : durchFrueh).add(it.body.handle);
           }
         }
       }
@@ -253,6 +277,7 @@ export function lauf(s: Stand, saat: number): Lauf {
       fuellgrad: c.fuellgrad,
       restAnteil: rest / n,
       durchAnteil: durch.size / n,
+      durchVorKippen: durchFrueh.size / n,
       endAbstand,
       inDerMulde: inDerMulde / n,
     };
@@ -274,6 +299,8 @@ export interface Reihe {
   rest: number;
   /** Anteil der Fuhre, der beim Kippen unter die Brücke gerät (0–1). */
   durch: number;
+  /** Anteil, der schon vor dem Kippen unter die Brücke gerät (0–1). */
+  durchFrueh: number;
   /** Größter Endabstand über die Reihe (m) und der Mittelwert davon. */
   abstandMax: number;
   abstandMittel: number;
@@ -302,6 +329,7 @@ export function reihe(s: Stand, saaten: number[] = SAATEN): Reihe {
     fuellgrad: mittelwert(r.map((x) => x.fuellgrad)),
     rest: mittelwert(r.map((x) => x.restAnteil)),
     durch: mittelwert(r.map((x) => x.durchAnteil)),
+    durchFrueh: mittelwert(r.map((x) => x.durchVorKippen)),
     abstandMax: Math.max(...r.map((x) => x.endAbstand)),
     abstandMittel: mittelwert(r.map((x) => x.endAbstand)),
     inDerMulde: mittelwert(r.map((x) => x.inDerMulde)),

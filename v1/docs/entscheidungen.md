@@ -6398,5 +6398,204 @@ mit 26 statt 60 mm im Guss, das ist E-013), und der Zahnwinkel bleibt auf 0°
    wird von 120 auf 248 mm breit und der Zahn sitzt auf einem sichtbaren
    Absatz. Ist das der „Knick der Zinken", den du meinst — oder meinst du etwas
    weiter oben?
+### E-084 — Der Rangierknick: der LKW dreht sich nicht mehr in einem Bild um, er lenkt ein (16.09.2026)
+
+**Entscheidung.** `vehicles.placeAt` setzte `group.rotation.y` HART auf die
+Richtung des aktuellen Streckenstücks. An jeder Ecke der Polylinie lag der
+Wagen damit **in einem einzigen Rechenschritt** in der neuen Richtung. Ab
+sofort folgt die Gierlage der Strecke mit **begrenzter Drehrate**, der Wagen
+schaut **1,5 m voraus**, wird **in der Kurve langsamer** und **dreht vor jeder
+Rückwärtsfahrt erst ein**. Das Lenkgesetz steht als eigene Datei
+(`src/delivery/lenkung.ts`) und wird von Fahrt, Wächter und Messwerkzeug aus
+derselben Quelle benutzt.
+
+**Die Knicktabelle, vorher und nachher** (`tools/rangierknick.ts`, alle 17
+Fahrpläne des Platzes, jeder Rechenschritt vermessen):
+
+| | vorher | nachher |
+|---|---|---|
+| schärfster Knick je Rechenschritt | **168,7 Grad** | **0,8 Grad** |
+| weitester Sprung der äußersten Umrissecke | **10,23 m** | **0,14 m** |
+| daraus abgeleitetes Tempo dieser Ecke | 614 m/s (2.210 km/h) | 8,2 m/s (30 km/h) |
+| Durchdringung eines Bauwerks | 0,00 m | **0,00 m** |
+| Fahrzeit einer ganzen Runde | 35,2 s | **40,2 s** |
+
+Die fünf schärfsten Stellen des alten Standes, mit Ort:
+
+| Sprung | Winkel | wo | Strecke |
+|---|---|---|---|
+| 10,23 m | 168,7 Grad | (6,3 \| −16,6) | Kipper-Rangieren |
+| 9,66 m | 168,7 Grad | (6,3 \| −16,6) | Rangieren, Abholer gemischt/steel/mixed |
+| 9,61 m | 163,6 Grad | (−18,0 \| −3,7) | Abholer ALU Rangieren |
+| 8,40 m | 119,9 Grad | (−13,2 \| −6,2) | Abholer ABFALL **Ausfahrt** (E-080) |
+| 7,27 m | 90,0 Grad | (−28,0 \| −16,1) | neun Silo-Ausfahrten |
+
+**WAS DER KNICK AM LIEGENDEN SCHROTT ANRICHTET** (`tools/rangier-wirkung.ts`;
+Haufen ablegen, zur Ruhe bringen, LKW durchschicken, messen — **Nullprobe
+zuerst**, gepaarte Saaten, gemessen NACH dem Geschwindigkeitsdeckel, also das
+Tempo, das das Spiel wirklich anwendet):
+
+12 Saaten je Zeile, Tabelle in
+`docs/messungen/2026-09-16_rangier-wirkung.txt`:
+
+| Wo liegt der Haufen | Stand | Mittel | Median | Höchst | **weiteste Verschiebung** |
+|---|---|---|---|---|---|
+| alle drei Orte | **Nullprobe** | **0,0** | 0,0 | **0,0 km/h** | **0,00 m** |
+| Abkippzone (6,3 \| −26) | Sprung | 25,7 | 19,5 | 95,0 | **8,20 m** |
+| | Einlenken | 22,2 | 20,8 | **45,6** | **4,65 m** |
+| in der Kehre, 4,0 m seitlich | Sprung | 52,5 | 38,5 | 126,9 | 10,24 m |
+| | Einlenken | 47,0 | 49,2 | 108,3 | 11,92 m |
+| neben der Kehre, 6,5 m seitlich | Sprung | 13,6 | 13,9 | 30,1 | **8,39 m** |
+| | Einlenken | 42,5 | 44,2 | 126,8 | **4,89 m** |
+
+Die Nullprobe ist die wichtigste Zeile: Der Haufen liegt ohne Fahrzeug **völlig
+still**, an jeder der drei Stellen. Alles andere kommt vom LKW.
+
+**Was sich verbessert hat, ist die Spalte ganz rechts.** Das ist die Spalte,
+die Patrick sieht („Teile sind ganz woanders gelandet"): Das weiteste Stück
+wandert **8,20 → 4,65 m** und **8,39 → 4,89 m**, also knapp die Hälfte.
+
+**Und hier steht eine unangenehme Wahrheit dazu.** Die Spalten in der Mitte
+werden **nicht** besser, an einer Stelle sogar schlechter. Der Grund ist
+geometrisch: Der springende Wagen **überstrich seinen Schwenkbereich gar
+nicht** — er war im nächsten Bild einfach drüben. Getroffen wurde nur, was
+zufällig in der Endlage lag, das dann aber sehr hart. Der einlenkende Wagen
+ist die ganze Zeit dort, wo er hingehört; er **schiebt** den Schrott beiseite,
+statt ihn gelegentlich zu **schießen**. In der Kehre selbst (Zeile 4/5) fährt
+er jetzt wirklich hindurch — deshalb schiebt er dort 11,9 statt 10,2 m weit.
+
+Wie gross der Unterschied im Kern ist, sieht man erst VOR dem
+Geschwindigkeitsdeckel: dort steht der alte Stand bei **21.965 km/h**
+Höchstwert und der neue bei **537** (3 Saaten, Zwischenmessung). `clampSpeeds`
+(v2 E-045) hat den alten Katapult also die ganze Zeit halb aufgefangen — das
+ist der Grund, warum er in den Endzahlen so klein aussieht, und zugleich der
+Grund, warum die Stücke trotzdem meterweit wanderten.
+
+**Was es kostet** (`tools/lenkkosten.ts`, Dev-PC): **0,76 Mikrosekunden je
+Bild** für die zusätzliche Vorausschau, **0,136 ms EINMAL je Kehre** für die
+Wahl der Drehrichtung (64 Umrisse gegen 52 Bauwerke). Kein neuer Körper, kein
+neues Netz, kein zusätzlicher Zeichenruf.
+
+**ERKLÄRT DER KNICK PATRICKS DURCHFALL? NEIN.** Das war die eigentliche Frage
+dieses Pakets. Gemessen mit dem Kipper-Laufapparat aus E-071
+(`tools/knick-und-durchfall.ts`, 24 Saaten, gewürfelte Händlerfuhre, nur die
+Lenkrate unterschiedlich):
+
+| | Mittel | Median | Höchst | **durch beim Kippen** | **durch VOR dem Kippen** | Rest |
+|---|---|---|---|---|---|---|
+| Sprung | 21,9 | 19,0 | 46,6 km/h | **0,0 %** | **0,0 %** | 38,6 % |
+| Einlenken | 24,4 | 18,2 | 98,7 km/h | **0,0 %** | **0,0 %** | 37,7 % |
+
+Gepaart −2,5 ± 3,8 km/h, der alte Stand schlechter in 13 von 24 — das ist ein
+Münzwurf. **Der Rangierknick ist nicht die Ursache dessen, was Patrick noch
+sieht.** Dabei ist das Messfenster in diesem Zug ausdrücklich **erweitert**
+worden: `durchAnteil` zählte erst ab `tipping`, zwischen der Freigabe der
+Ladung und dem Kippbeginn liegen aber 1,2 s, in denen niemand hinsah — genau
+die Sekunden, in denen `releaseCargo` die Muldenkollider neu anmeldet (E-071).
+Auch in dieser Lücke fällt **nichts** durch (`durchVorKippen`, neue Zahl in
+`test/kipperlauf.ts`).
+
+**DIE PLATZFRAGE — der schwierige Teil, und er hat drei Runden gebraucht.** Ein
+Fahrzeug, das einlenkt, fährt eine Kurve statt einer Ecke. Jede Fassung wurde
+mit dem echten Umriss gegen alle Bauwerke aus `STATIC_OBSTACLES` gerechnet:
+
+| Fassung | tiefste Durchdringung | wo |
+|---|---|---|
+| nur Drehrate begrenzt | **0,70 m** | Silo-Rangieren, Flanken der Nachbarsilos |
+| + Kehre auf der Stelle vor Rückwärtsfahrt | **0,37 m** | Silo-Ausfahrt, Halle 3 Süd |
+| + Vorausschau 1,5 m und Tempo nach Restwinkel | **0,00 m** | — |
+
+Die drei Regeln sind daher **keine Geschmacksfragen, sondern gemessen**:
+
+1. **Vor jeder Rückwärtsfahrt wird eingedreht.** 90 Grad im Rückwärtsfahren
+   nachzuziehen dauert 1,9 s und kostet 5,3 m Weg — die Silogasse ist 7,4 m
+   tief. Der Umriss stand dabei 0,70 m in den Nachbarflanken.
+2. **Die Drehrichtung einer Kehre wird gewählt, nicht gerechnet.** Am
+   Abladeplatz schwenkt die Kabine rechtsherum nach Osten und 0,60 m in die
+   Ostmauer, linksherum über den offenen Hof. `drehRichtung` tastet beide
+   Hälften mit dem echten Umriss ab und nimmt die freie; bei Gleichstand den
+   kürzeren Weg. Der Preis am Abladeplatz: 191 statt 169 Grad, also 0,3 s.
+3. **In der Kurve wird der Wagen langsam** (`fahrtFaktor` = cos des
+   Restwinkels). Ohne das fährt er mit vollem Tempo geradeaus weiter, während
+   er sich noch dreht.
+
+**KEINE STRECKE MUSSTE VERSCHOBEN WERDEN.** Das war nicht abzusehen — die
+Zwischenstände haben vierzehn Stellen gefunden, an denen es eng wurde (Halle 3
+Süd 0,37 m; Nordwand West 0,16 m an der Toreinfahrt; die Gassenecke 0,08 m).
+Alle sind mit dem Fahrgesetz verschwunden, nicht mit einem verschobenen Punkt.
+Der Platz steht, wie er stand.
+
+**WIE SCHNELL DARF GELENKT WERDEN — beide Zahlen, wie verlangt.**
+
+*Der Startwert ist hergeleitet:* Ein LKW dreht sich nicht um seine Hochachse,
+er fährt einen Kreis, und seine Gierrate ist v/R. Der Dreiachser in
+`vehicleModel.ts` hat 4,70 m Radstand (Vorderachse `bedLen/2 + 1,1`, Mitte der
+Hinterachsen −0,90); bei 40 Grad Lenkeinschlag ist R = 5,60 m, bei SPEED =
+4,8 m/s also **omega = 0,857 rad/s = 49 Grad/s**. Gerundet **0,85**.
+
+*Ab welcher Rate der Schaden verschwindet:* Er verschwindet bei **jeder**
+endlichen Rate — die Tabelle (`tools/lenkrate.ts`) zeigt von 0,4 bis 6,0 rad/s
+denselben Befund, 0,00 m Durchdringung und einen Ecksprung zwischen 0,10 und
+0,55 m je Bild. Die Rate ist damit **reines Spielgefühl**, und die Kosten sind
+Fahrzeit: 46,3 s bei 0,4 rad/s, **40,2 s bei 0,85**, 37,3 s bei 2,0 gegen
+35,2 s beim alten Sprung. Wer die Wagen behäbiger mag, dreht sie herunter;
+unter 0,4 rad/s wird die Runde spürbar zäh.
+
+*Die zweite Zahl hat dagegen ein enges Fenster:* Die **Vorausschau** muss
+zwischen **1,0 und 2,0 m** liegen. Darunter bleibt der Wagen an jeder Ecke
+stehen und dreht sich wie ein Gabelstapler (0,14 m Durchdringung, weil er quer
+nachzieht), darüber schneidet er die Ecke ab (bei 3,0 m 0,56 m, bei 4,0 m
+0,70 m Durchdringung). Gewählt ist die Mitte, **1,5 m**. Der Wächter hält
+dieses Fenster fest.
+
+**Gegenproben, jede einzeln.** `lenkrate = Infinity` **ist** der alte Zustand —
+niemand muss einen Fehler nachbauen. Der Wächter
+(`test/rangierknick.test.ts`) wirft denselben Prüfcode darauf und verlangt,
+dass **alle 17 Fahrpläne** auffallen (gemessen: 168,7 Grad, 9,7 m). Die
+Vorausschau bekommt ihre eigene: auf 4,0 m gestellt muss der Prüfcode über
+0,30 m Durchdringung melden.
+
+**Was NICHT entschieden ist, und zwar mit Absicht.**
+
+1. **Der zweite Sprung ist ein Ortssprung, kein Drehsprung** (gemessen,
+   `tools/einfaedeln.ts`). Wenn ein Wagen vom Warteplatz abfährt, setzt
+   `nearestS` ihn auf den nächstgelegenen Punkt der Ausfahrt — quer über den
+   Abstand dazwischen: **5,30 m / 8,50 m / 6,36 m** für die drei Warteplätze,
+   in einem Bild. Dasselbe passiert bei `nudge()`. Das ist derselbe
+   Bauartfehler an einer anderen Stelle und ein eigenes Paket; der kleinste
+   Eingriff wäre eine Phase „ausfädeln", die wie `toPark` frei zum
+   Anfangspunkt fährt, statt dorthin zu springen.
+2. **Die Kehre am Abladeplatz bleibt eine Kehre.** Die Strecke verlangt, dass
+   der Wagen von Norden kommend nach Süden schaut und dann rückwärts weiter
+   nach Süden setzt — 168,7 Grad auf der Stelle. Das ist jetzt sauber
+   gerechnet und passt, sieht aber nach Gabelstapler aus. Eine echte Lösung
+   wäre eine Rangierstrecke, die am Halteplatz vorbeiführt und von dort
+   zurücksetzt. Das ändert den Platz und gehört Patrick vorgelegt.
+3. **Die Fahrzeit steigt um 14 %** (35,2 → 40,2 s). Ob der Umschlag dadurch zu
+   langsam wird, entscheidet das Gerät, nicht die Rechnung.
+
+**Verworfene Alternative.** Nur die Drehrate zu begrenzen und alles andere so
+zu lassen — das war die naheliegende Lesart des Auftrags und **hätte den Wagen
+0,70 m tief durch die Silowände fahren lassen**. Ebenfalls verworfen: an jeder
+Ecke auf der Stelle zu drehen (`PIVOT_AB` klein). Das hält den Platz frei
+(0,08 m), kostet aber 48,6 s je Runde und sieht aus wie ein Gabelstapler.
+
+**Abnahmekriterium.** `npm test` (1.210 Prüfungen) und `npm run build` grün;
+`test/rangierknick.test.ts` hält 0,8 Grad und 0,14 m je Rechenschritt auf allen
+17 Fahrplänen und meldet den alten Stand auf allen 17;
+`test/fahrumriss.test.ts` unverändert grün; `test/federungAmWagen.test.ts`
+fährt zehn Fuhren in Folge ohne Steckenbleiben.
+
+**Auf dem Gerät zu prüfen.**
+
+1. **Sieh einem LKW beim Rangieren zu:** Dreht er sich am Punkt vor der
+   Abladespur sichtbar ein, bevor er zurücksetzt — oder ruckt er immer noch
+   herum? Und dreht er nach WESTEN, also über den Hof, und nicht in die
+   Ostmauer?
+2. **Leg ein paar Teile genau dorthin, wo der LKW wendet, und warte auf den
+   nächsten:** Werden sie beiseitegeschoben (richtig) oder weggeschossen
+   (falsch)?
+3. **Der Umschlag ist 14 % langsamer geworden.** Merkt man das, oder fahren
+   die Wagen jetzt eher wie LKW?
 
 ---

@@ -26,22 +26,8 @@ import { endlich, mindestens } from "./zahl";
 // Kein Import aus `world/baggerstand` mehr: Seit E-029 rechnet dieser Waechter
 // nicht mehr gegen den Baggerstand. Die drei Namen standen bis 15.09.2026 als
 // tote Einfuhr hier und wurden von der neuen Typpruefung gemeldet (E-038).
-import {
-  routeApproach,
-  routeInRev,
-  routeOut,
-  bayApproach,
-  bayInRev,
-  bayOut,
-  ROUTE_IN_FWD,
-  PICKUP_IN_FWD,
-  PARK_SLOTS,
-  PARK_ANFAHRT_M,
-  neueAbladestelle,
-  neueAbholstelle,
-  alleAbholPlaetze,
-  bedLenFor,
-} from "../src/delivery/routes";
+import { bedLenFor, neueAbholstelle, routeInRev } from "../src/delivery/routes";
+import { alleStrecken } from "./strecken";
 import {
   umrisseEntlang,
   umrissUeberlappung,
@@ -52,70 +38,17 @@ import {
   type Rechteck,
 } from "../src/delivery/umriss";
 
-/**
- * Alle Strecken, die auf dem Platz wirklich gefahren werden.
+/*
+ * DIE STRECKENLISTE STEHT SEIT DEM 16.09.2026 IN `test/strecken.ts` (E-081).
  *
- * Steht als eigene Funktion da, seit ein zweiter Waechter dieselbe Liste
- * braucht (E-041, der Startplatz des Muellcontainers). Zwei Abschriften
- * derselben Liste laufen auseinander, sobald eine Route dazukommt — und der
- * zweite Waechter prueft dann eine Strecke weniger, ohne es zu sagen.
+ * Sie stand hier, und sie war die richtige Stelle, solange nur dieser
+ * Waechter sie brauchte. Seit der Rangierknick gemessen wird, brauchen sie
+ * drei: dieser Waechter, `test/rangierknick.test.ts` und
+ * `tools/rangierknick.ts`. Dort steht sie jetzt — samt der zweiten Sicht auf
+ * dieselben Punkte (`fahrplaene`), die die UEBERGAENGE zwischen zwei
+ * Strecken kennt. Genau dort steht der schaerfste Knick, und eine Liste aus
+ * Einzelstrecken sieht ihn nie.
  */
-function alleStrecken(): Array<[string, Array<[number, number]>, string, boolean]> {
-  neueAbladestelle();
-  neueAbholstelle();
-  const lager = CONFIGS.filter((c) => c.lager === true);
-  const strecken: Array<[string, Array<[number, number]>, string, boolean]> = [
-    ["Einfahrt", ROUTE_IN_FWD, "pritsche", false],
-    ["Anfahrt", routeApproach(), "pritsche", false],
-    ["Rangieren", routeInRev(), "pritsche", true],
-    ["Ausfahrt", routeOut(), "pritsche", false],
-    /*
-     * DIESELBEN DREI STRECKEN NOCH EINMAL MIT DEM KIPPER (E-029).
-     *
-     * Er faehrt seit dem 15.09.2026 den Abladeplatz an wie alle anderen,
-     * ist aber mit 6,00 m Ladeflaeche der LAENGSTE Wagen auf dem Platz —
-     * 0,60 m mehr als die Pritsche, also 0,30 m mehr nach jeder Seite. Wer
-     * nur die Pritsche abfaehrt, prueft die Strecke, auf der nichts
-     * passiert.
-     */
-    ["Kipper-Anfahrt", routeApproach(), "kipper", false],
-    ["Kipper-Rangieren", routeInRev(), "kipper", true],
-    ["Kipper-Ausfahrt", routeOut(), "kipper", false],
-    ["Abholer-Einfahrt", PICKUP_IN_FWD, "abholer", false],
-  ];
-  /*
-   * JEDER HALTEPLATZ DES ABHOLERS, NICHT NUR EINER (E-056).
-   *
-   * Seit heute haengt er an der bestellten Fraktion: Stahlschrott und
-   * Mischschrott an den Abladeplatz beim Bagger, alles mit Lagersilo an den
-   * Verladeplatz vor dem Schenkel dieses Silos. Die Liste kommt aus
-   * `routes.ts` selbst — wer ein Silo dazustellt, bekommt seine drei
-   * Strecken hier automatisch mitgeprueft.
-   */
-  for (const p of alleAbholPlaetze()) {
-    const wie = p.order ?? "gemischt";
-    strecken.push([`Abholer ${wie} Anfahrt`, p.anfahrt, "abholer", false]);
-    strecken.push([`Abholer ${wie} Rangieren`, p.rueckweg, "abholer", true]);
-    strecken.push([`Abholer ${wie} Ausfahrt`, p.ausfahrt, "abholer", false]);
-  }
-  for (const c of lager) {
-    strecken.push([`Silo ${c.label} Anfahrt`, bayApproach(c), "kipper", false]);
-    strecken.push([`Silo ${c.label} Rangieren`, bayInRev(c), "kipper", true]);
-    strecken.push([`Silo ${c.label} Ausfahrt`, bayOut(c), "kipper", false]);
-  }
-  for (const [i, p] of PARK_SLOTS.entries()) {
-    strecken.push([
-      `Parken ${i + 1}`,
-      [
-        [p[0], p[1] - PARK_ANFAHRT_M],
-        [p[0], p[1]],
-      ],
-      "pritsche",
-      true,
-    ]);
-  }
-  return strecken;
-}
 
 /** Alle Fahrzeuglagen einer Streckenliste, mit ihrem Streckennamen. */
 function alleLagen(): Array<[string, ReturnType<typeof fahrzeugUmriss>]> {

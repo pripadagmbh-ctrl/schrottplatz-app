@@ -97,6 +97,48 @@ export function fahrzeugUmriss(p: Pose, bedLen: number): Box {
 }
 
 /**
+ * Die vier Ecken einer Standflaeche in Weltkoordinaten.
+ *
+ * Gebraucht, seit der Knick einer Strecke in METERN gemessen wird und nicht
+ * mehr nur in Grad (E-081): Wie weit ein Fahrzeug bei einer Drehung springt,
+ * haengt nicht am Winkel allein, sondern daran, wie weit seine aeusserste Ecke
+ * von der Drehachse absteht. Bei 1,55 x 4,90 m sind das 5,14 m Hebel — 119,9
+ * Grad werden daraus 10,75 m.
+ *
+ * Dieselbe Drehkonvention wie `fahrzeugUmriss`: lokal +z zeigt in
+ * Fahrtrichtung, also x += dz·sin(rot) und z += dz·cos(rot).
+ */
+export function umrissEcken(b: Box): Array<[number, number]> {
+  const c = Math.cos(b.rot);
+  const s = Math.sin(b.rot);
+  const out: Array<[number, number]> = [];
+  for (const dx of [-b.hw, b.hw]) {
+    for (const dz of [-b.hd, b.hd]) {
+      out.push([b.x + dx * c + dz * s, b.z - dx * s + dz * c]);
+    }
+  }
+  return out;
+}
+
+/**
+ * Wie weit die weiteste Umrissecke zwischen zwei Lagen springt (m).
+ *
+ * Nicht der Abstand der Mittelpunkte: Ein Wagen, der sich auf der Stelle
+ * dreht, versetzt seine Mitte um null und seine Ecke um mehrere Meter — und
+ * die Ecke ist es, die in den liegenden Schrott faehrt.
+ */
+export function eckenSprung(a: Box, b: Box): number {
+  const ea = umrissEcken(a);
+  const eb = umrissEcken(b);
+  let weit = 0;
+  for (let i = 0; i < ea.length; i++) {
+    const d = Math.hypot(ea[i]![0] - eb[i]![0], ea[i]![1] - eb[i]![1]);
+    if (d > weit) weit = d;
+  }
+  return weit;
+}
+
+/**
  * Die Standflaeche eines Anhaengers, gemessen an seiner Kupplungslage.
  *
  * `wx`/`wz` ist der Weltpunkt der Anhaengergruppe, `rot` ihre Weltdrehung —

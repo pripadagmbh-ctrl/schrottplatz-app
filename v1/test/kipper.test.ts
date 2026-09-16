@@ -117,6 +117,7 @@ function erfundeneReihe(x: Partial<Reihe>): Reihe {
     fuellgrad: 0.7,
     rest: 0.31,
     durch: 0,
+    durchFrueh: 0,
     abstandMax: 5.8,
     abstandMittel: 3.1,
     inDerMulde: 0,
