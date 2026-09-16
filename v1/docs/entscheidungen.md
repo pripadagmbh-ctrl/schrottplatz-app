@@ -7135,3 +7135,181 @@ Ausfahrtswiegung herausnehmen — als eigenes Paket, nicht hier.
    danach beim Bagger, oder fährt er mit vom Hof?
 
 ---
+
+### E-088 — Die Halbschale ist gebaut, gemessen und wieder zurückgenommen: drei Wächter halten die Schale flach (16.09.2026)
+
+**Es steht kein Spielcode in dieser Lieferung.** `v1/src/` ist unverändert,
+1.260 Prüfungen grün. Was hier steht, ist der Grund dafür — und es ist die
+Antwort auf Patricks Frage, warum jeder Anlauf wieder aussieht wie vorher.
+
+---
+
+#### Was beauftragt war
+
+Nach dem Blatt der acht Bauarten (E-086) hat Patrick entschieden: **Form B, die
+Halbschale** — der dokumentierte Standard für Schrott (Kinshofer Profil H,
+Bateman „Semi-Closed (Standard)", Sennebogen „halboffen bis vollständig
+geschlossen") und die Bauart auf seinen eigenen Aufnahmen (MG4.1). Dann:
+„kannst jetzt die spinne überarbeiten." Vier Änderungen am
+Fünfschalengreifer, je eine Beschwerde:
+
+| | heute | Ziel | beantwortet |
+|---|---|---|---|
+| Seitenwangen | keine | durchgehend | „sieht aus wie die alte Spinne" |
+| Querschnitt | Blech, 22 mm gewölbt | Trog | „der Kopf ist zu schlank" |
+| Breite am Saum | 30 % der Wurzel | 60 % | die Nadel am Ende |
+| Lücke am Drehbolzen | Loch im Blech | Absicht, mit Zweck | „da wo die Bolzen durchkommen" |
+
+---
+
+#### Was gebaut wurde — und was dabei herauskam
+
+**Alle vier sind gebaut worden, nicht geschätzt.** `trogprofil()` als neuer
+Querschnitt (Boden plus aufgestellter Rand, aus DERSELBEN Haut geformt — kein
+aufgeschweißtes Blech, wegen Patricks Ansage vom 13.09.2026: „ein Guss, keine
+nach oben stehenden Bleche"), acht Felder quer statt vier, eine eigene
+Breitenkurve `breitenverjuengung()` mit Endwert 0,60, und `zahnBasis()` von der
+Schale abgekoppelt auf die Positionsliste (120 mm), damit der Zahn nicht
+mitwächst und der Absatz an seinem Sitz überhaupt entstehen kann.
+
+**Gemessen am gebauten Stand:**
+
+| | heute | mit B |
+|---|---|---|
+| Dreiecke am ganzen Greifer | 15.004 | **16.524** (+1.520, +10,1 %) |
+| Netze | 58 | **58** — unverändert |
+| Nettokorb | 1.525 l | **1.510 l** (der Rand nimmt 15 l) |
+| Bruttokorb | 1.615 l | 1.615 l — von außen gleich groß |
+| Sektor je Schale (Grenze 36°) | 13,0° | 16,2° — hält |
+| Neigung (< 25°), Hebelarm (> 115 mm) | unberührt | unberührt |
+
+**Und dann rissen drei Wächter.** Nicht knapp, und nicht durch einen Fehler im
+Entwurf:
+
+**1. Der Trog mit aufgestelltem Rand (Änderung 1 + 2) gegen
+`test/schalenform.test.ts`.** Drei Schranken dort messen den SCHATTENRISS und
+verlangen, dass er vom Bolzen an nur noch dünner wird. Ein aufgestellter Rand
+macht ihn im ersten Drittel dicker — **das ist genau sein Zweck.** Gemessen,
+Randhöhe als Anteil der vollen Breite:
+
+| Rand | was reißt |
+|---|---|
+| 0,30 (120 mm an der Wurzel) | Ferse an drei Stellen dicker als am Bolzen (46 %, 50 %, 54 %) |
+| 0,20 (80 mm) | Ferse an drei Stellen, ohne Anlauf; mit Anlauf stattdessen „nur dünner" bei k = 0,33 |
+| 0,15 (60 mm) | Ferse an einer Stelle (54 %) |
+| 0,12 (48 mm) | die andere Schranke: Fersenende 234 mm gegen erlaubte 223 mm |
+| **0,00 (kein Rand)** | **grün** |
+
+**Es gibt keine Randhöhe, die alle drei hält.** Der Wächter erlaubt der Schale
+keine Tiefe — er ist am 13.09.2026 gegen ein anderes Problem geschrieben worden
+(„die mitte ist zu dün") und hält seitdem die Schale flach.
+
+**2. Der Saum auf 60 % (Änderung 3) gegen `test/zahnkontur.test.ts` (E-069).**
+Der Wächter verlangt, dass die Außenkontur ohne Knick über den Zahnsitz läuft,
+Grenze 4°. Ein breiter Saum mit schmalem Zahn macht dort **9,68°** — das
+Zweieinhalbfache. Und das ist kein Versehen: Es IST der Absatz, den das Vorbild
+zeigt und den diese Lieferung sichtbar machen sollte. E-069 steht aber auf
+Patricks eigenem Vorbildfoto, auf dem an dieser Stelle ein durchgehender Schwung
+liegt. **Zwei Ansagen von Patrick widersprechen sich hier direkt.**
+
+Nebenwirkungen derselben Änderung, gemessen: Grabtiefe 2,7069 → 2,7439 m,
+Spitzenabstand von der Achse 137,6 → 142,3 mm, Bodenanschlag **20,99 → 20,44 cm**.
+
+**3. Ein erster, gröberer Anlauf riss zusätzlich sechs festgehaltene Zahlen**,
+weil `verjuengung()` die Breite UND die Strebenhöhe führt: Die Strebe wuchs am
+Saum von 39 auf 78 mm, der Zahn wurde doppelt so hoch, die Grabtiefe sprang um
+5,7 cm. Das ist behoben (zwei getrennte Kurven) und hier nur festgehalten,
+damit es niemand zweimal findet.
+
+---
+
+#### Warum nichts davon im Spielcode steht
+
+Der Auftrag war ausdrücklich: „Bau so viel, wie ohne Verletzung geht … **Verbieg
+die Form nicht, damit sie passt.** Genau das ist die Falle, in die wir dreimal
+gelaufen sind — dann sieht am Ende wieder alles aus wie vorher."
+
+Es gibt hier nichts, was ohne Verletzung geht. Jede der drei Formänderungen
+reißt je einen Wächter, und zwar **weil sie wirkt**, nicht weil sie schlecht
+gemacht ist. Ich habe eine Weile Randhöhen durchprobiert, bis eine durchkommt —
+das ist genau das Verbiegen, vor dem der Auftrag warnt, und ich habe es
+abgebrochen und zurückgebaut.
+
+**Der eigentliche Befund ist damit nicht „B geht nicht", sondern:** Die
+Wächter, die die Schale flach halten, sind älter als die Erkenntnis, dass sie
+nicht flach sein soll. Welcher von ihnen weichen darf, ist eine
+Gestaltungsentscheidung — und die trifft Patrick, nicht ich.
+
+---
+
+#### Was geliefert ist
+
+- **`docs/schalen-vorbilder-2026-09-16.svg`** überarbeitet (E-086 fortgeschrieben):
+  ein Kasten zur Bahn der Schneide nach **Patent DE 31 31 624 A1**, die
+  **Lücke am Schalendrehpunkt** bei allen acht Formen als eigene Vergrößerung,
+  der **Zinken in drei Teilen** (Bateman: verstärkter Rücken, Verschleißstreifen,
+  angeschweißte Spitze), und E + F als **„für Schrott nicht belegt"** markiert.
+- **`docs/schale-b-2026-09-16.svg`** (neu, `tools/schale-b.ts`): B ausgearbeitet —
+  Seitenriss neben dem heutigen Stand, Vorderansicht, drei Querschnitte,
+  Bolzenaufnahme mit der gewollten Lücke, fünf im Kreis, die Durchfall-Zahlen
+  und die drei Blockaden. Mittellinie, Stationen und heutige Breiten sind aus
+  `src/fuenfschalen/teile.ts` gerechnet, nicht nachempfunden.
+
+**Was DE 31 31 624 A1 zum Scheitel sagt** (E-065, 25,2 cm): Der Bogen der
+Schneide ist die Folge davon, dass die Schale EIN starrer Körper an EINEM Bolzen
+ist — das Patent bestätigt unseren Befund und löst ihn **nicht über die
+Schalenform**, sondern über eine überlagerte senkrechte Bewegung des ganzen
+Greifers. Seine Regel für den Anlenkpunkt: stehen AB (Bolzen→Schneide) und BC
+(Bolzen→Anlenkung) im rechten Winkel, ist die senkrechte Verschiebung der
+Schneide gleich der Bewegung von C. **B ändert am Scheitel nichts** und sollte
+es auch nicht — die Mittellinie ist unangetastet.
+
+**Die Lücke am Schalendrehpunkt ist Absicht.** Sennebogen zur MG4.1: Die
+Anbindung der Greiferschalen an den Mittelbalken lässt dort genügend Platz,
+damit Kleinmaterial durchfallen kann. Die Stelle, auf die Patrick seit zwei
+Tagen zeigt, hat einen Zweck.
+
+**Die Durchfall-Lücke, gerechnet** (fünf Schalen, 72° Teilung, Sehne auf dem
+jeweiligen Radius):
+
+| | heute | mit 60 % Saum |
+|---|---|---|
+| an der Schulter (Station 1) | 729 mm | 728 mm — **kein Unterschied** |
+| unterste offene Naht (Station 5) | **188 mm** | **114 mm** |
+| Gegenstände des Platzes, die durchfallen | 41 von 199 | 15 von 199 |
+
+Neu gehalten würden 26 Stücke zwischen 114 und 188 mm — Profilstahl, Rohr,
+Stahlknüppel, Spülbecken, Kantholz, Heizkörper, Kabelringe und andere. Der
+Besen (kleinste Kante 800 mm) wird von beiden gehalten; das kleinste Teil des
+Platzes (Alu-Tafel, 40 mm) fällt bei beiden durch. **Oben schließt auch eine
+Halbschale nicht** — wer dort dicht will, braucht eine Vollschale, und die ist
+für Späne und Sand gebaut, nicht für Schrott.
+
+---
+
+#### Was ich NICHT entschieden habe
+
+- **Welcher Wächter weicht.** Das ist die eine offene Frage, und sie ist
+  gestalterisch, nicht technisch.
+- **Ob der Absatz am Zahnsitz sichtbar sein soll.** E-069 sagt nein (Patricks
+  Foto), der Auftrag zu dieser Lieferung sagt ja („er ist jetzt begründet").
+- **Die Randhöhe.** Ich habe Werte gemessen, aber keinen ausgewählt.
+
+**Abnahmekriterium.** `npm run build` sauber, `npm test` grün — **108 Dateien,
+1.260 Prüfungen**, unverändert, weil kein Produktivcode in der Lieferung steht.
+
+**Auf dem Gerät zu prüfen.**
+
+1. **Das B-Blatt ansehen** (nach Freigabe unter `…/v1/plaene/`). Ist der
+   Seitenriss von B neben dem heutigen deutlich genug verschieden — oder sieht
+   auch das wieder gleich aus? Wenn ja, ist die Zielform falsch gewählt und
+   nicht die Umsetzung schuld.
+2. **Die Durchfall-Zahl beurteilen.** 188 mm heute, 114 mm mit breiterem Saum.
+   Stört das beim Sortieren im Spiel, oder merkt man es gar nicht?
+3. **Die Frage, die nur du beantworten kannst:** Soll die Schale einen
+   aufgestellten Rand bekommen, auch wenn dafür der Wächter „von der Aufhängung
+   an nur dünner" (13.09.2026) fallen muss? Und soll der Absatz am Zahnsitz
+   sichtbar werden, auch wenn dafür E-069 („kein Knick am Zahnsitz", nach deinem
+   Foto) fällt? Ohne mindestens eines von beidem bleibt die Schale flach.
+
+---
