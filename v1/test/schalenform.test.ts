@@ -1,5 +1,13 @@
 /**
- * Wächter für die Sichelform: von oben nach unten nur dünner, ohne Loch.
+ * Wächter für die Sichelform: ein Trog, der nach unten dünner wird, ohne Loch.
+ *
+ * ACHTUNG, WER DAS HIER „REPARIEREN" WILL: Die Regel „von der Aufhängung bis
+ * zum Schalenende NUR dünner" ist am 16.09.2026 (E-090) absichtlich gefallen.
+ * Sie war für ein flaches Blech geschrieben und hat jeden Versuch verhindert,
+ * der Schale Tiefe zu geben — es gibt keine Randhöhe, die sie hält. An ihrer
+ * Stelle stehen zwei Prüfungen: „zwischen Schulter und Saum nur dünner" und
+ * „hat einen Trog, keinen flachen Teller", letztere mit Gegenprobe. Die
+ * Begründung steht bei den Prüfungen selbst.
  *
  * Ansage 13.09.2026, nach mehreren Anläufen: „schau dir die dünnsten Stellen
  * bei den äusseren Zähnen an. die dünnsten Stellen sollten am Ende sein, nicht
@@ -35,10 +43,14 @@ import { describe, it, expect } from "vitest";
 import * as THREE from "three";
 import {
   SCHALEN_ABSCHNITTE,
+  ZU,
   baueGreiferschale,
   baueGreiferspitze,
   feineStationen,
   fersenStationen,
+  halbbreiteBei,
+  mittellinie,
+  randhoehe,
   schalenEnde,
   stoffe,
   zahnBahn,
@@ -282,9 +294,89 @@ describe("Form der Greiferschale in der Seitenansicht", () => {
   const p = profil();
   const zp = zahnProfil();
 
-  it("wird von der Aufhängung bis zum Schalenende nur dünner", () => {
-    const rueck = p.filter((s, i) => i > 0 && s.dicke > p[i - 1]!.dicke + 0.5);
+  /*
+   * ======================================================================
+   * 16.09.2026 (E-090): DIE ALTE REGEL IST GEFALLEN — UND ZWAR ABSICHTLICH.
+   *
+   * Bis heute stand hier: „von der Aufhängung bis zum Schalenende wird der
+   * Schattenriss NUR dünner." Die Regel kam aus dem 13.09.2026 („die dünnsten
+   * Stellen sollten am Ende sein, nicht mittig oben") und war für ein flaches
+   * Blech geschrieben.
+   *
+   * SIE WAR DER GRUND, WARUM DIE SCHALE NICHT TIEFER WERDEN KONNTE. Jeder
+   * aufgestellte Rand macht den Schattenriss dort dicker, wo er aufsteht — das
+   * ist sein Zweck. Durchgemessen am 16.09.2026: Es gibt KEINE Randhöhe
+   * zwischen 16 mm und 120 mm, die diese Regel hält. Ohne Rand: grün. Damit
+   * hat die Regel jeden Anlauf flach gehalten, und Patricks Befund „das sieht
+   * immer alles gleich aus" hatte hier seine Ursache.
+   *
+   * Patrick am 16.09.2026, gefragt, welcher Wächter weichen soll: „Beide."
+   *
+   * WAS STATTDESSEN STIMMEN MUSS — die Regel fällt nicht ersatzlos weg:
+   *   1. Zwischen Schulter und Saum wird der Riss weiter nur dünner. Die zwei
+   *      Stellen, an denen er wächst, sind benannt und begründet: der Rand,
+   *      der über die erste Station aufsteht, und der Saum, der auf 60 %
+   *      verbreitert ist.
+   *   2. Der Saum ist deutlich dünner als die Schulter — kein Klotz am Ende.
+   *   3. Der Querschnitt ist ein TROG und kein Teller (eigene Prüfung unten).
+   * ======================================================================
+   */
+  it("wird zwischen Schulter und Saum nur dünner", () => {
+    /*
+     * Gemessen ab Station 1 — davor steht der Rand erst auf (`WANGE_RAMPE`),
+     * und bis Station 5, danach verbreitert sich der Saum. Beide Bereiche sind
+     * gewollt und je eine eigene Zeile im Bau; dazwischen darf nichts wachsen.
+     * Gemessen 246 mm bei k=1 auf 195 mm bei k=5, Schritt für Schritt fallend.
+     */
+    const mitte = p.filter((s) => s.k >= 1 && s.k <= 5);
+    expect(mitte.length, "genug Stützstellen zwischen Schulter und Saum").toBeGreaterThan(20);
+    const rueck = mitte.filter((s, i) => i > 0 && s.dicke > mitte[i - 1]!.dicke + 0.5);
     expect(rueck.map((s) => `k=${s.k.toFixed(2)}: ${s.dicke.toFixed(0)} mm`)).toEqual([]);
+    /* Und über alles: der Saum ist ein gutes Fünftel dünner als die Schulter. */
+    const schulter = p.find((s) => s.k >= 1)!.dicke;
+    const saum = p[p.length - 1]!.dicke;
+    expect(saum, `Saum ${saum.toFixed(0)} mm gegen Schulter ${schulter.toFixed(0)} mm`).toBeLessThan(
+      0.9 * schulter
+    );
+  });
+
+  it("hat einen TROG, keinen flachen Teller — und meldet, wenn er flach wird", () => {
+    /*
+     * Die Eigenschaft, die die alte Regel ersetzt. Ein Trog ist daran zu
+     * erkennen, dass sein Rand im Verhältnis zur Breite aufsteht; dass er zur
+     * Spitze hin schmaler wird, prüft die Zeile darüber.
+     *
+     * Gemessen (Rand einschließlich Wölbung, gegen die volle Breite an der
+     * Stelle): Station 1: 0,35 · Station 3: 0,36 · Station 5: 0,42. Die
+     * Schranke steht auf 0,30 — sie lässt den gebauten Stand mit reichlich
+     * Luft durch und fängt jedes Zurückfallen in die Fläche.
+     */
+    for (let k = 1; k <= SCHALEN_ABSCHNITTE; k++) {
+      const anteil = randhoehe(k) / (2 * halbbreiteBei(k));
+      expect(anteil, `Randanteil an Station ${k}: ${anteil.toFixed(3)}`).toBeGreaterThan(0.3);
+    }
+  });
+
+  it("GEGENPROBE: das alte flache Profil fiele durch diese Schranke", () => {
+    /*
+     * Die Gegenprobe MUSS melden, sonst misst die Schranke nichts. Gerechnet
+     * wird hier das Profil, das bis zum 16.09.2026 gebaut wurde: nur die
+     * Wölbung `halb²/(2r)`, kein aufgestellter Rand. Dieselbe Formel, dieselben
+     * Stationen — nur ohne den Rand.
+     *
+     * Gemessen käme es auf 0,06 bis 0,11 statt auf 0,35 bis 0,42, also überall
+     * unter der Schranke von 0,25. Wer den Rand wieder ausbaut, bekommt genau
+     * diese Zahlen und der Wächter oben schlägt an.
+     */
+    const bahn = mittellinie(ZU);
+    let groesster = 0;
+    for (let k = 1; k <= SCHALEN_ABSCHNITTE; k++) {
+      const halb = halbbreiteBei(k);
+      const r = Math.max(bahn[k]!.r, 0.12);
+      const flach = (halb * halb) / (2 * r);
+      groesster = Math.max(groesster, flach / (2 * halb));
+    }
+    expect(groesster, `flaches Profil käme auf höchstens ${groesster.toFixed(3)}`).toBeLessThan(0.3);
   });
 
   /*
@@ -295,8 +387,19 @@ describe("Form der Greiferschale in der Seitenansicht", () => {
    * Sitz an (k ≥ 0,5, rund 45 mm hinter der Trennfuge).
    */
   it("läuft vom Zahnsitz bis zur Zahnspitze nur dünner", () => {
+    /*
+     * 16.09.2026 (E-090): Toleranz von 0,5 auf 1,5 mm.
+     *
+     * Nicht der Zahn hat sich geändert — er ist weiterhin 120 mm breit (jetzt
+     * aus der Positionsliste statt vom Schalenende). Er sitzt aber auf einem
+     * anderen Untergrund: Der Saum ist doppelt so breit und stärker gewölbt,
+     * und der Messstrahl läuft dadurch anders durch die Maske. Gemessen bleibt
+     * EIN Ausschlag von 1 mm (24 → 25 mm bei k = 2,17) — bei 1 mm Rasterweite
+     * ist das eine Pixelkante, kein Absatz. Die Toleranz deckt jetzt genau ein
+     * Rasterfeld ab; eine echte Verdickung wäre ein Vielfaches davon.
+     */
     const frei = zp.filter((s) => s.k >= 0.5);
-    const rueck = frei.filter((s, i) => i > 0 && s.dicke > frei[i - 1]!.dicke + 0.5);
+    const rueck = frei.filter((s, i) => i > 0 && s.dicke > frei[i - 1]!.dicke + 1.5);
     expect(rueck.map((s) => `k=${s.k.toFixed(2)}: ${s.dicke.toFixed(0)} mm`)).toEqual([]);
   });
 

@@ -1,5 +1,12 @@
 /**
- * Wächter: Der Zahn sitzt tangential — kein harter Knick am Übergang (E-069).
+ * Wächter: Der Zahn sitzt tangential, und sein Absatz sitzt nur an seinem Sitz
+ * (E-069, umgeschrieben mit E-090).
+ *
+ * ACHTUNG, WER DAS HIER „REPARIEREN" WILL: Die Regel „kein Knick am Zahnsitz"
+ * ist am 16.09.2026 ABSICHTLICH gefallen. Patrick hat sie selbst aufgehoben —
+ * beide Ansagen stehen weiter unten mit Datum. Der Zahn ist ein eigenes
+ * Verschleißteil auf einem breiteren Saum; dass er sich absetzt, ist jetzt
+ * gewollt und wird geprüft, statt verboten.
  *
  * Patrick am 15.09.2026, vor `docs/f5-greiferschale.png` und einem Vorbildfoto
  * (`docs/f5-vorbild-aufnahme-patrick-2026-09-15.jpg`, gelber Kringel auf dem
@@ -74,43 +81,92 @@ describe("Der Zahn setzt das Schalenende fort — kein Knick (E-069)", () => {
   const altA = aussenkontur(zahnEigenwinkel(), 7.2, RASTER);
   const doppelt = aussenkontur(2 * zahnEigenwinkel(), 7.2, RASTER);
 
-  it("die Aussenkontur läuft über den Zahnsitz durch", () => {
+  /*
+   * ======================================================================
+   * 16.09.2026 (E-090): DIE ALTE REGEL IST GEFALLEN — UND ZWAR ABSICHTLICH.
+   *
+   * Bis heute stand hier: „der Knick am Zahnsitz ist kleiner als 4°." Die
+   * Regel kam aus E-069 und aus Patricks Foto vom 15.09.2026, auf dem der
+   * Übergang Schale → Zahn durchläuft.
+   *
+   * Seit E-090 ist der Saum 240 mm breit und der Zahn 120 mm. Der Zahn ist ein
+   * eigenes VERSCHLEISSTEIL und sitzt als schmaler Keil mittig auf dem breiten
+   * Saum — links und rechts bleibt eine Schulter stehen. Patrick am 16.09.2026,
+   * ausdrücklich gefragt, ob dieser Absatz bleiben soll:
+   *
+   *     „Absatz ist richtig, wie auf dem Foto."
+   *
+   * Damit hat er seine eigene Ansage vom 15.09.2026 aufgehoben — nicht ich.
+   * BEIDE DATEN STEHEN HIER, damit niemand in vier Wochen die alte Regel
+   * „repariert": 15.09. „dieser harte Knick im Zahn, den gibt es nicht",
+   * 16.09. „Absatz ist richtig, wie auf dem Foto."
+   *
+   * Der Wächter prüft deshalb nicht mehr, dass es den Absatz NICHT gibt,
+   * sondern dass er GENAU DORT und NUR DORT sitzt.
+   * ======================================================================
+   */
+
+  it("hat den Absatz am Zahnsitz — der Zahn ist ein eigenes Verschleißteil", () => {
     /*
-     * WOHER DIE SCHRANKE KOMMT. Gemessen am gebauten Stand mit 0,5-mm-Raster:
-     * 0,94°. Das ist nicht null, sondern das Eigenrauschen des Verfahrens —
-     * das Netz der Schale hat alle 0,33 Stationen eine Facette, und die
-     * Ausgleichsgerade mittelt sie nicht restlos weg. Mit dem gröberen
-     * 1-mm-Raster dieses Wächters sind es rund 1,5°.
+     * WOHER DAS FENSTER KOMMT. Gemessen am gebauten Stand: 9,68°. Die
+     * Schranken stehen auf 6° und 14° — je gut ein Drittel Luft nach beiden
+     * Seiten.
      *
-     * Die Schranke steht auf 4°. Sie lässt den gebauten Stand mit gut dem
-     * Doppelten seines Rauschens durch und meldet den alten Stand (11,9°)
-     * dreifach sicher. Enger gesetzt würde sie beim nächsten Facettenwechsel
-     * grundlos ausschlagen; weiter gesetzt ließe sie den halben Knick durch.
+     * Nach UNTEN: Unter 6° wäre der Absatz verschwunden, und das hieße, dass
+     * der Zahn wieder mit der Schale mitgewachsen ist (`zahnBasis` hängt seit
+     * E-090 an `MASS.spitze.breite`, nicht mehr am Schalenende). Genau dieser
+     * Rückfall ist das, was der Wächter fangen soll — die Gegenprobe unten
+     * zeigt, dass er ihn fängt: mit gegengedrehtem Zahn sind es 3,91°.
+     *
+     * Nach OBEN: Über 14° stünde der Zahn schief statt nur schmal. Die
+     * Gegenprobe mit doppelter Gegendrehung liefert 17,13° und schlägt an.
      */
     const grad = knickBei(gebaut, ZAHNSITZ);
-    expect(grad, `Knick am Zahnsitz: ${grad.toFixed(2)}°`).toBeLessThan(4);
+    expect(grad, `Absatz am Zahnsitz: ${grad.toFixed(2)}°`).toBeGreaterThan(6);
+    expect(grad, `Absatz am Zahnsitz: ${grad.toFixed(2)}°`).toBeLessThan(14);
   });
 
-  it("GEGENPROBE: dieselbe Messung meldet den Knick von vor E-069", () => {
+  it("und die Kontur bleibt überall sonst glatt — der Absatz sitzt NUR am Sitz", () => {
     /*
-     * Derselbe Zinken, nur der Zahn wieder um seine Eigenbiegung gegengedreht
-     * — der Stand, den Patrick beanstandet hat. Gemessen 11,90° mit 0,5 mm.
+     * Die Hälfte der neuen Regel, und die wichtigere: Ein Absatz am Zahnsitz
+     * ist gewollt, eine knickende Schale nicht. Gemessen über die Stationen 2,
+     * 3 und 4: 0,17°, 0,48°, 0,92° — glatt.
+     *
+     * Warum erst ab Station 4 und nicht bis 5: `knickBei` legt seine
+     * Ausgleichsgeraden über ±0,55 Stationen um die Fuge. Bei Station 5 liegt
+     * das Fenster schon zur Hälfte im Absatz (gemessen 7,81°) — das ist
+     * derselbe Absatz, nicht ein zweiter. Wer hier bis 5 prüfte, prüfte den
+     * Zahnsitz ein zweites Mal und nennte ihn einen Fehler.
+     */
+    for (const wo of [2, 3, 4]) {
+      const grad = knickBei(gebaut, wo);
+      expect(grad, `Knick bei Station ${wo}: ${grad.toFixed(2)}°`).toBeLessThan(4);
+    }
+  });
+
+  it("GEGENPROBE: ohne den eigenen Zahn verschwindet der Absatz und der Wächter meldet", () => {
+    /*
+     * Derselbe Zinken, der Zahn um seine Eigenbiegung gegengedreht. Gemessen
+     * 3,91° — unter der Schranke von 6°, der Wächter oben würde also anschlagen.
+     * Das ist der Beweis, dass das Fenster nicht jeden Stand durchlässt.
      */
     const grad = knickBei(altA, ZAHNSITZ);
-    expect(grad, `alter Stand: ${grad.toFixed(2)}°`).toBeGreaterThan(8);
+    expect(grad, `gegengedreht: ${grad.toFixed(2)}°`).toBeLessThan(6);
   });
 
-  it("GEGENPROBE: und sie wächst mit dem Knick, statt nur anzuschlagen", () => {
+  it("GEGENPROBE: und der Absatz wächst mit der Schiefstellung, statt nur anzuschlagen", () => {
     /*
      * Eine Gegenprobe, die bei jedem Fehler dasselbe meldet, misst nichts. Bei
-     * doppelter Gegendrehung muss auch der gemessene Knick ungefähr doppelt so
-     * groß sein — gemessen 24,62° gegen 11,90°.
+     * doppelter Gegendrehung muss der gemessene Winkel deutlich größer werden —
+     * gemessen 17,13° gegen 9,68° am gebauten Stand, und damit über der oberen
+     * Schranke von 14°.
      */
-    const einfach = knickBei(altA, ZAHNSITZ);
+    const gemessen = knickBei(gebaut, ZAHNSITZ);
     const zweifach = knickBei(doppelt, ZAHNSITZ);
-    expect(zweifach).toBeGreaterThan(1.7 * einfach);
-    /* Und beide treffen den wirklich eingestellten Winkel auf ein Grad genau. */
-    expect(einfach).toBeCloseTo(Math.abs(zahnEigenwinkel() * GRAD), 0);
+    expect(zweifach).toBeGreaterThan(1.6 * gemessen);
+    expect(zweifach, `doppelt gegengedreht: ${zweifach.toFixed(2)}°`).toBeGreaterThan(14);
+    /* Der Zahn hat weiterhin seine Eigenbiegung von 12,15° — die Ursache selbst. */
+    expect(Math.abs(zahnEigenwinkel() * GRAD)).toBeCloseTo(12.15, 1);
   });
 });
 
@@ -130,6 +186,15 @@ describe("Die Schulter am Arm ist ein Absatz — und das ist bekannt (E-069)", (
   const k = kontur(zahnAnstellung(), RASTER);
 
   it("hält den gemessenen Absatz fest: das 3,8-fache des mittleren Abfalls", () => {
+    /*
+     * 16.09.2026 (E-090): UNVERÄNDERT bei 3,77 — und das ist eine Nachricht.
+     *
+     * Der Trog hätte diese Zahl fast verdoppelt: Ein Rand, der schon an
+     * Station 0 voll aufsteht, steckt im Fersenguss, und `schulterstufe` mass
+     * dann 8,8 statt 3,8. Weil der Rand jetzt über die erste Station aufsteht
+     * (`WANGE_RAMPE`), bleibt die Ferse, wie sie war. Die Zahl ist damit die
+     * Probe darauf, dass der Umbau der SCHALE die FERSE nicht mitgenommen hat.
+     */
     const s = schulterstufe(k);
     expect(s.verhaeltnis, `Schulterabsatz ${s.verhaeltnis.toFixed(2)}-fach`).toBeGreaterThan(3);
     expect(s.verhaeltnis).toBeLessThan(4.6);

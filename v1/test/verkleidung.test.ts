@@ -164,7 +164,8 @@ describe("Der Zylinderschutz — er trägt nichts", () => {
      * Die Zahlen stehen hier als ABSOLUTE Werte aus E-069 und E-065, nicht als
      * „wie vorher" — ein Wächter, der sich selbst als Maßstab nimmt, misst nichts.
      */
-    expect(FUENFSCHALEN.maxTiefe).toBeCloseTo(2.7071, 3);
+    /* 2,7071 → 2,7439 mit E-090 (Trog + 60 % Saum). Der Zylinderschutz aendert daran weiterhin NICHTS. */
+    expect(FUENFSCHALEN.maxTiefe).toBeCloseTo(2.7439, 3);
     expect(FUENFSCHALEN.schalenluecke).toBeCloseTo(0.5954, 3);
     expect(FUENFSCHALEN.kolliderRadius).toBeCloseTo(SICHELKRALLE.kolliderRadius, 9);
     /* Die Tiefe über den ganzen Schließweg, nicht nur an den Enden. */

@@ -7436,3 +7436,240 @@ für Späne und Sand gebaut, nicht für Schrott.
    Foto) fällt? Ohne mindestens eines von beidem bleibt die Schale flach.
 
 ---
+
+### E-090 — Die Halbschale ist gebaut: Trog mit aufgestelltem Rand, Saum auf 60 %, und zwei Wächter umgeschrieben statt abgeschafft (16.09.2026)
+
+**Deckungsgleichheit zur alten Form: 52,1 %.** Zum Vergleich: E-069 lag bei
+98,5 %, E-083 bei 70,7 % — beide Male sah der Greifer danach aus wie vorher.
+Diesmal nicht.
+
+---
+
+#### Was entschieden war
+
+E-089 hat acht Bauarten echter Greifer nebeneinandergelegt und gemessen, dass
+drei der vier gewünschten Änderungen je einen bestehenden Wächter reißen. Die
+Frage ging an Patrick, und er hat sie beantwortet:
+
+- **Welcher Wächter weicht?** — „Beide."
+- **Der Absatz am Zahnsitz?** — „Absatz ist richtig, wie auf dem Foto."
+
+**Damit hat er seine eigene Ansage vom 15.09.2026 aufgehoben** („dieser harte
+Knick im Zahn, den gibt es nicht. Das ist nicht so."). Beide Daten stehen
+wörtlich in `test/zahnkontur.test.ts`, mit einer Warnung im Dateikopf — damit
+niemand in vier Wochen die alte Regel „repariert".
+
+---
+
+#### Was gebaut ist
+
+Alles in `src/fuenfschalen/teile.ts`; **keine andere Quelldatei ist angefasst**.
+
+| | vorher | jetzt |
+|---|---|---|
+| **Querschnitt** | flache Wölbung, 22 mm auf 400 mm Breite | **Trog mit aufgestelltem Rand**, 143 mm an der Wurzel |
+| **Seitenwangen** | keine | **durchgehend** — dieselbe Haut, gekantet |
+| **Breite am Saum** | 120 mm (30 % der Wurzel) | **240 mm (60 %)** |
+| **Zahnbreite** | folgte dem Schalenende | **120 mm aus der Positionsliste** |
+| **Felder quer** | 4 | **8** |
+
+**Die Wangen sind kein aufgeschweißtes Blech.** `trogprofil()` formt DIESELBE
+Haut: Der Rand steht nach innen, zur Ladung hin. Das ist die Antwort auf
+Patricks Ansage vom 13.09.2026 („ein Guss, keine nach oben stehenden Bleche …
+nur Stahlbleche, die das innere Material zusammenhalten sollen") — ein
+gekantetes Blech hält das Material und steht trotzdem nicht als eigenes Teil
+ab. Die Schenkel im Querschnitt SIND das gebogene Blech. Die MG4.1 ist genauso
+gebaut („Greifer-Schalen in Hardox Schweißkonstruktion").
+
+**Der Absatz am Zahnsitz ist jetzt konstruiert, nicht geduldet.** `zahnBasis()`
+hängt an `MASS.spitze.breite` statt am Schalenende — sonst wäre der Zahn mit
+der Schale mitgewachsen und der Absatz wieder verschwunden. Saum 240 mm, Zahn
+120 mm, **60 mm Schulter je Seite**.
+
+**Zwei Kurven statt einer.** `verjuengung()` führte Breite UND Strebenhöhe. Ein
+erster Anlauf verbreiterte damit auch den Zinken: Strebe am Saum von 39 auf
+78 mm, Zahn doppelt so hoch, Grabtiefe +5,7 cm, sechs festgehaltene Zahlen
+gerissen — ohne Not. Jetzt gibt es `breitenverjuengung()` für die Breite; die
+Höhe bleibt, wo sie war.
+
+**`WANGE_RAMPE` ist kein Schönheitsmittel.** Steht der Rand schon an Station 0
+voll da, steckt er IM Fersenguss — gemessen springt der Schattenriss der Ferse
+zwischen 33 % und 54 % ihrer Länge von 275 auf **464 mm**. Das ist Werkstoff im
+Werkstoff, keine zickende Schranke. Der Rand steht deshalb über die erste
+Station auf, so wie am Vorbild die Blechkante dort anfängt, wo die Ferse
+aufhört. **Nebenwirkung, gemessen:** Die Schulterstufe bleibt dadurch bei 3,77
+statt auf 8,8 zu springen — der Umbau der Schale hat die Ferse nicht
+mitgenommen.
+
+---
+
+#### Die zwei Wächter — umgeschrieben, nicht abgeschafft
+
+**1. `test/schalenform.test.ts`: „vom Bolzen an nur dünner" ist gefallen.**
+
+Die Regel war für ein flaches Blech geschrieben (13.09.2026: „die dünnsten
+Stellen sollten am Ende sein, nicht mittig oben"). **Sie war die Ursache dafür,
+dass die Schale nicht tiefer werden konnte:** Jeder aufgestellte Rand macht den
+Schattenriss dort dicker, wo er aufsteht — das ist sein Zweck. Durchgemessen
+von 120 mm bis 16 mm Randhöhe: **keine hält die alte Regel.** Ohne Rand: grün.
+
+An ihrer Stelle stehen zwei Prüfungen:
+
+- **„wird zwischen Schulter und Saum nur dünner"** — Stationen 1 bis 5, Schritt
+  für Schritt fallend (246 → 195 mm). Die zwei Stellen, an denen der Riss
+  wächst, sind benannt und begründet: der Rand, der über die erste Station
+  aufsteht, und der Saum auf 60 %. Dazu: der Saum ist mindestens ein Zehntel
+  dünner als die Schulter — kein Klotz am Ende.
+- **„hat einen TROG, keinen flachen Teller"** — Randhöhe gegen Breite, an jeder
+  Station ab 1 über **0,30**. Gemessen 0,354 · 0,355 · 0,361 · 0,375 · 0,418 ·
+  0,550.
+- **GEGENPROBE, die melden MUSS:** dasselbe Profil ohne Rand — nur die Wölbung,
+  Zeile für Zeile die alte Formel — käme auf **höchstens 0,25** und fiele damit
+  überall durch. Wer den Rand wieder ausbaut, bekommt genau diese Zahl.
+
+**2. `test/zahnkontur.test.ts`: „kein Knick am Zahnsitz, Grenze 4°" ist
+gefallen.**
+
+Der Absatz ist jetzt gewollt. Der Wächter prüft, dass er **genau dort und nur
+dort** sitzt:
+
+- **Absatz am Zahnsitz: 6° < x < 14°**, gemessen **9,68°**. Nach unten fängt
+  die Schranke den Rückfall (Zahn wächst wieder mit der Schale mit), nach oben
+  einen schief stehenden Zahn.
+- **Überall sonst glatt:** Stationen 2, 3, 4 unter 4° — gemessen 0,17° · 0,48° ·
+  0,92°. (Station 5 zählt nicht mit: `knickBei` legt seine Ausgleichsgeraden
+  über ±0,55 Stationen, dort liegt das Fenster schon zur Hälfte im Absatz. Wer
+  bis 5 prüfte, prüfte den Zahnsitz zweimal und nennte ihn einen Fehler.)
+- **Zwei GEGENPROBEN, beide melden:** Zahn um seine Eigenbiegung gegengedreht →
+  **3,91°**, unter der unteren Schranke. Doppelt gegengedreht → **17,13°**,
+  über der oberen. Die Messung schlägt also nicht nur an, sie wächst mit.
+
+In beiden Dateien steht im Kopf eine Warnung mit beiden Daten, warum die alte
+Regel fiel.
+
+---
+
+#### Die Zahlen
+
+| | vorher | jetzt |
+|---|---|---|
+| **Deckungsgleichheit zur alten Form** | — | **52,1 %** |
+| **Netze am Greifer** | 58 | **58** |
+| Dreiecke am Greifer | 15.004 | **16.524** (+1.520, +10,1 %) |
+| **Bodenanschlag, 0° Kippung** | 20,99 cm | **20,44 cm** |
+| Bodenanschlag Sichelkralle | 6,37 cm | **6,37 cm** |
+| Grabtiefe | 2,7069 m | 2,7439 m |
+| Bauhöhe geschlossen | 2,505 m | 2,5451 m |
+| Hüllkreis | 3,2262 m | **3,3064 m** (+8 cm) |
+| Nettokorb | 1.525 l | 1.512 l |
+| Bruttokorb | 1.615 l | 1.615 l |
+| Spitzenabstand von der Achse | 137,6 mm | 142,3 mm |
+| Sensorradius | 1,2289 m | 1,2439 m |
+| **Sektor je Schale** (Grenze 36°) | 26,34° | **26,52°** |
+| **Neigung** (Grenze 25°) | unberührt | unberührt |
+| **Hebelarm** (Grenze 115 mm) | unberührt | unberührt |
+
+**Die Deckungsgleichheit ist am QUERSCHNITT gemessen** (`tools/schale-deckung.ts`),
+nicht am Schattenriss: Dort sitzt der Umbau. Von der Seite sähe eine Schale,
+die beidseits der Mittellinie aufsteht, einer flachen ähnlich, und die Zahl
+wäre wertlos. Je Station: 100 % · 55 % · 57 % · 59 % · 54 % · 31 % · **0 %**.
+Am Saum haben alte und neue Schale **keinen einzigen Quadratmillimeter**
+gemeinsam.
+
+**Offen wie geschlossen dieselbe Zahl** — der Umbau sitzt im Querschnitt, und
+die Mittellinie ist unangetastet; jede Station dreht starr um ihren Bolzen.
+
+**Der Sensorradius kippt zurück, und das ist der Beweis, dass die Formel tut,
+was sie soll.** Sie nimmt das Maximum aus Mittellinienrechnung (E-048, 1,2289 m)
+und Schalenrechnung. Seit E-069 gewann die erste; mit dem breiteren Saum gewinnt
+wieder die zweite. Die Zahl aus E-048 steht unverändert als Untergrenze daneben.
+
+---
+
+#### Die eine Zahl, die Patrick braucht: was fällt durch?
+
+Fünf Schalen, 72° Teilung, Sehne auf dem jeweiligen Radius:
+
+| | vorher | jetzt |
+|---|---|---|
+| an der Schulter (Station 1) | 729 mm | 719 mm |
+| **unterste offene Naht (Station 5)** | **188 mm** | **108 mm** |
+| Gegenstände des Platzes, die durchfallen | **41 von 199** | **14 von 199** |
+
+**27 Stücke werden neu gehalten** — Profilstahl, Rohr, Stahlknüppel, Spülbecken,
+Kantholz, Heizkörper, LKW-Kühler, Kabelringe, Bremsscheibe, Schienenabschnitt
+und andere zwischen 108 und 188 mm.
+
+Der **Besen** (kleinste Kante 800 mm) wird weiter gehalten. Das **kleinste Teil
+des Platzes** (Alu-Tafel, 40 mm) fällt weiter durch — eine Halbschale schließt
+absichtlich nicht ganz, das ist ihr Zweck (Wasser und Dreck laufen ab, sie
+kippt schneller leer). **Oben an der Schulter schließt auch sie nicht:** Wer
+dort dicht will, braucht eine Vollschale, und die ist für Späne und Sand
+gebaut, nicht für Schrott.
+
+---
+
+#### Der Freigang bei 90° Kippung (E-085) — er wird enger
+
+Voller Lauf mit `tools/greifer-freigang.ts` (81 Armstellungen, 24
+Rotatorstellungen, 19 Kippwinkel, Dreiecksebene) — dasselbe Verfahren wie in
+E-085, damit die Zahlen vergleichbar sind:
+
+| | E-085 | jetzt |
+|---|---|---|
+| Freigang bei 90° | 0,136 m | **0,115 m** |
+| freie Rotatorstellungen bei 90° | 15 von 24 | **11 von 24** |
+| größter Kippwinkel, in JEDER Armstellung frei | 90° | **90°** |
+
+**90° laufen weiter — aber mit 2,1 cm weniger Luft und vier
+Rotatorstellungen weniger.** Die engste Stelle ist unverändert der Stiel
+(`07_STIEL_STAHL`). Das ist die erwartete Folge des um 8 cm gewachsenen
+Hüllkreises und der einzige Posten dieser Lieferung, der etwas WEGNIMMT.
+
+**Was daran noch offen ist:** An denselben 8 cm hängen Presskammer und
+Muldenbreiten (der Kommentar zu `CLAW_OPEN_SPLAY` nennt sie ausdrücklich).
+Die sind hier NICHT nachgemessen worden. Vor dem nächsten Gerätetest gehört
+geprüft, ob der Greifer noch zwischen die Bordwände passt.
+
+---
+
+#### Was NICHT angefasst ist
+
+- **Die Sichelkralle.** Abdruckvergleich `tools/greifer-abdruck-vergleich.ts`
+  gegen den Stand vor dem Umbau: **Bewegung 5.020 Werte, Kollider 110, Korb
+  5.200 — größter Unterschied überall 0,000e+0.** 112 Netze, Reihenfolge und
+  Art gleich.
+- **Der Griff-Kern:** Sensorkugel, Fixed Joint, `imKorb`, kein „Saugen" in die
+  Korbmitte.
+- **Der Zylinderschutz (E-077)** hat weiterhin keinen Kollider;
+  `test/verkleidung.test.ts` steht mit angepasster Formzahl, die Aussage
+  („er trägt nichts") ist unverändert grün.
+- **Die Mittellinie.** Damit bleibt auch der Scheitel aus E-065 (25,2 cm), wie
+  er war. Wer ihn weghaben will, muss an die Anlenkung; das Patent
+  DE 31 31 624 A1 löst ihn über eine zweite Bewegung des ganzen Greifers, nicht
+  über die Schalenform (E-089).
+
+**Abnahmekriterium.** `npm run build` sauber. `npm test` grün: **110 Dateien,
+1.286 Prüfungen** (vorher 1.283 — drei Prüfungen mehr durch die umgeschriebenen
+Wächter). `npx tsc -p tsconfig.test.json` mit Rückgabewert 0 GEPRÜFT, nicht
+angenommen: Am 16.09.2026 ist eine Lieferung an dieser Stelle durchgerutscht,
+weil die Typprüfung der Tests abbrach und damit KEIN einziger Test lief.
+
+**Auf dem Gerät zu prüfen.**
+
+1. **Den Greifer von vorn ansehen, offen und geschlossen.** Er war ein Strich;
+   jetzt hat er einen Trog mit aufgestelltem Rand und einen Saum, der doppelt
+   so breit ist. Sieht er nach Schale aus — oder immer noch nach Kralle?
+2. **Den Absatz am Zahnsitz suchen.** 60 mm je Seite. Ist er da, wo er auf
+   deinem Foto sitzt, und sieht er nach Verschleißteil aus?
+3. **Etwas Kleines greifen und schwenken.** Die unterste Naht ist von 188 auf
+   108 mm zugegangen; 27 Gegenstände mehr bleiben drin. Merkt man das beim
+   Sortieren — oder fällt trotzdem zu viel durch?
+4. **Seitwärts kippen (K) und absetzen.** Der Bodenanschlag steht 5,5 mm
+   tiefer, der Hüllkreis ist 8 cm größer. Stößt der Greifer irgendwo an, wo er
+   vorher frei war — besonders in der Presse und zwischen den Muldenwänden?
+5. **Die Frage, die nur du beantworten kannst:** Der Rand steht 143 mm an der
+   Wurzel auf. Ist das zu viel, zu wenig, oder richtig? Die Zahl ist ein
+   Startwert (`WANGE_ANTEIL`), nach oben begrenzt durch den Fersenguss.
+
+---

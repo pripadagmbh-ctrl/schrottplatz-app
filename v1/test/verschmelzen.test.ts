@@ -198,7 +198,7 @@ describe("Fünfschalen — die Formzahlen nach dem Zusammenlegen (E-039, E-048)"
   const g = baueGreifer(stoffe());
   const SCHRITTE = 40;
 
-  it("gräbt 2,7069 m tief, ist geschlossen 2,505 m hoch und dreht in Ø 3,2262 m", () => {
+  it("gräbt 2,7439 m tief, ist geschlossen 2,5451 m hoch und dreht in Ø 3,3064 m", () => {
     let grabtiefe = 0;
     let huellkreis = 0;
     let hoch = 0;
@@ -237,10 +237,13 @@ describe("Fünfschalen — die Formzahlen nach dem Zusammenlegen (E-039, E-048)"
       }
     }
     /* 2,7511 → 2,7069 mit E-069: Der Zahn sitzt tangential (siehe teile.ts). */
-    expect(grabtiefe, "Grabtiefe").toBeCloseTo(2.7069, 4);
-    expect(hoch - tief, "Bauhöhe geschlossen").toBeCloseTo(2.505, 3);
+    /* 2,7069 → 2,7439 mit E-090 (Trog + 60 % Saum). */
+    expect(grabtiefe, "Grabtiefe").toBeCloseTo(2.7439, 4);
+    /* 2,505 → 2,5451 mit E-090. */
+    expect(hoch - tief, "Bauhöhe geschlossen").toBeCloseTo(2.5451, 3);
     /* 3,232 → 3,2262: die Zahnspitze dreht nicht mehr nach aussen (E-069). */
-    expect(huellkreis, "größter gezeichneter Durchmesser über den Weg").toBeCloseTo(3.2262, 3);
+    /* 3,2262 → 3,3064 mit E-090: der Saum ist doppelt so breit und schwenkt weiter aus. */
+    expect(huellkreis, "größter gezeichneter Durchmesser über den Weg").toBeCloseTo(3.3064, 3);
   });
 
   it("lässt die fünf Spitzen geschlossen 137,6 mm von der Achse zusammenkommen", () => {
@@ -263,7 +266,8 @@ describe("Fünfschalen — die Formzahlen nach dem Zusammenlegen (E-039, E-048)"
       weit = Math.max(weit, Math.hypot(mitte.x / 5, mitte.z / 5));
     }
     /* 142,3 → 137,6 mm mit E-069 — sie treffen sich naeher, nicht weiter. */
-    expect(weit * 1000, "Spitzenabstand von der Achse, geschlossen (mm)").toBeCloseTo(137.6, 1);
+    /* 137,6 → 142,3 mm mit E-090: der breitere Saum schiebt sie wieder auseinander. */
+    expect(weit * 1000, "Spitzenabstand von der Achse, geschlossen (mm)").toBeCloseTo(142.3, 1);
   });
 
   it("nutzt 26,34° seines 36°-Sektors", () => {
@@ -292,7 +296,8 @@ describe("Fünfschalen — die Formzahlen nach dem Zusammenlegen (E-039, E-048)"
       }
     }
     expect(((SEKTOR_HALB - engste) * 180) / Math.PI, "genutzter Sektor (Grad)").toBeCloseTo(
-      26.34,
+      /* 26,34 → 26,52 Grad mit E-090 — weiterhin weit unter der Grenze von 36. */
+      26.52,
       2
     );
   });
@@ -314,7 +319,7 @@ describe("Fünfschalen — die Formzahlen nach dem Zusammenlegen (E-039, E-048)"
     expect(hebelarm(OFFEN), "Hebelarm offen").toBeCloseTo(0.118, 3);
   });
 
-  it("fasst netto 1.525 l", () => {
+  it("fasst netto 1.512 l", () => {
     /*
      * Der Nettokorb kommt aus einem Strahlraster durch den ganzen Körper
      * (`tools/greifer-modelle.miss`, 2-cm-Raster) — die einzige Zahl hier, die
@@ -323,7 +328,14 @@ describe("Fünfschalen — die Formzahlen nach dem Zusammenlegen (E-039, E-048)"
      * dadurch auf. Sie kostet rund 25 s; sie ist es wert.
      */
     const m = miss(fuenfschalen());
-    expect(m.nettokorb * 1000, "Nettokorb (l)").toBeCloseTo(1525, 0);
+    /*
+     * 1.525 → 1.512 l mit E-090: Der aufgestellte Rand nimmt dem Korb 13 l.
+     * Kein Verlust durch Schlamperei, sondern die Rechnung der Halbschale — das
+     * Blech, das jetzt am Saum aufsteht, stand vorher in der Flaeche und zaehlte
+     * als Hohlraum mit. Der BRUTTOkorb bleibt bei 1.615 l: Von aussen ist die
+     * Schale gleich gross, innen sitzt mehr Stahl.
+     */
+    expect(m.nettokorb * 1000, "Nettokorb (l)").toBeCloseTo(1512, 0);
     expect(m.bruttokorb * 1000, "Bruttokorb (l)").toBeCloseTo(1615, 0);
     /*
      * 14.884 + 120 = 15.004 seit E-077: Der Zylinderschutz (`08_VERKLEIDUNG`,
@@ -332,7 +344,13 @@ describe("Fünfschalen — die Formzahlen nach dem Zusammenlegen (E-039, E-048)"
      * des Kopfes, und die Zeile „58 Netze" weiter unten steht unverändert da.
      * Dreiecke sind nicht der Engpass (E-025), Netze sind es.
      */
-    expect(m.dreiecke, "Dreiecke").toBe(15004);
+    /*
+     * 15.004 → 16.524 mit E-090: acht Felder quer statt vier, damit der
+     * aufgestellte Rand des Trogs ueberhaupt darstellbar ist. +1.520 Dreiecke
+     * (+10,1 %) und KEIN einziges Netz — die Zeile "58 Netze" unten steht
+     * unveraendert da. Dreiecke sind nicht der Engpass, Netze sind es (E-025).
+     */
+    expect(m.dreiecke, "Dreiecke").toBe(16524);
   }, 120000);
 });
 

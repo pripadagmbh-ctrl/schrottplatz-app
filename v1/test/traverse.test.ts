@@ -160,7 +160,8 @@ describe("Traversenblatt — die harten Bedingungen", () => {
      * Spitze auf halbem Schliessweg 4,4 cm weniger weit nach unten aus. Die
      * Traverse hat damit nichts zu tun — genau das prueft die Schleife darueber.
      */
-    expect(gemessen[0]!.grabtiefe).toBeCloseTo(2.7069, 4);
+    /* 2,7069 → 2,7439 mit E-090. */
+    expect(gemessen[0]!.grabtiefe).toBeCloseTo(2.7439, 4);
   });
 
   it("lässt die fünf Spitzen weiterhin zusammenlaufen", () => {
@@ -187,7 +188,8 @@ describe("Traversenblatt — die harten Bedingungen", () => {
     /* Der Hüllkreis bleibt unter dem Platzmaß der Sichelkralle (E-009). */
     expect(gemessen[0]!.huellkreis).toBeLessThan(3.3805);
     /* Die fünf Unveränderlichen des Auftrags E-039, als Zahlen. */
-    expect(gemessen[0]!.bauhoehe).toBeCloseTo(2.505, 3);
+    /* 2,505 → 2,5451 mit E-090. */
+    expect(gemessen[0]!.bauhoehe).toBeCloseTo(2.5451, 3);
     /*
      * Huellkreis 3,232 → 3,226 und Spitzenabstand 142,3 → 137,6 mm mit E-069:
      * Der tangential sitzende Zahn dreht seine Spitze nicht mehr nach aussen.
@@ -195,10 +197,14 @@ describe("Traversenblatt — die harten Bedingungen", () => {
      * bleibt unter der Grenze 3,3805, und die fuenf Spitzen treffen sich
      * geschlossen 4,7 mm naeher an der Achse.
      */
-    expect(gemessen[0]!.huellkreis).toBeCloseTo(3.226, 3);
-    expect(gemessen[0]!.breiteZu).toBeCloseTo(2.19, 3);
-    expect(gemessen[0]!.spitzenAufAchse * 1000).toBeCloseTo(137.6, 1);
-    expect(gemessen[0]!.sektor).toBeCloseTo(26.34, 2);
+    /* 3,226 → 3,3064 m mit E-090: der breitere Saum schwenkt weiter aus. */
+    expect(gemessen[0]!.huellkreis).toBeCloseTo(3.3064, 3);
+    /* 2,190 → 2,1906 m mit E-090: 0,6 mm breiter geschlossen — der breitere Saum. */
+    expect(gemessen[0]!.breiteZu).toBeCloseTo(2.1906, 3);
+    /* 137,6 → 142,3 mm mit E-090: der breitere Saum schiebt die Spitzen auseinander. */
+    expect(gemessen[0]!.spitzenAufAchse * 1000).toBeCloseTo(142.3, 1);
+    /* 26,34 → 26,52 Grad mit E-090 — weiterhin weit unter der Grenze von 36. */
+    expect(gemessen[0]!.sektor).toBeCloseTo(26.52, 2);
   });
 
   it("meldet ehrlich, wo das Zylinderauge den Gusskörper verlässt", () => {
