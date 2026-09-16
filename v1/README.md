@@ -95,7 +95,7 @@ Das schreibt `src/greifer/fuenfschalen.glb` neu; Maße und Befunde stehen in
 | MMB ziehen | Kamera drehen |
 | C | Ansicht: Orbit → Draufsicht → Kabine |
 | X | Fahrerkabine hoch/runter (2,6 m Hub) |
-| K | Greifer zur Seite kippen / wieder aufrichten (90°, 2 s) |
+| K | Greifer zur Seite kippen / wieder aufrichten (90°, 2 s) — **und speichern**, siehe unten |
 | V | Abholung rufen bzw. beladenen Container abfahren lassen |
 | B | Schere/Paketierpresse |
 | H | Hilfe ein/aus · F3 Debug-Overlay |
@@ -110,6 +110,16 @@ unten. Von selbst schaltet nichts zurück. Verworfen: der Fahrmodus per
 Doppeltipp mit Ablauf nach vier Sekunden und die eigene Fahrfläche unten links.
 Doppeltipp rechts wechselt die Ansicht, rechten Daumen stillhalten öffnet den
 Funktionskranz.
+
+**Funktionskranz (neun Einträge, E-088):** KABINE · STÜTZEN · SCHILD · SCHERE ·
+ABHOLEN · ZUR WAAGE · LAMBERT · SCHILDER · KIPPEN. Umschalter zeigen mit einem
+Balken am unteren Rand, ob sie an sind (heute nur KIPPEN — KABINE und STÜTZEN,
+sobald der Bagger ihren Zustand herausgibt). Hinter dem Menüknopf oben rechts:
+AUSBAU · MUSIK · PAUSE. Ein **zehnter** Kranzeintrag passt nicht mehr
+(`test/funktionskranz.test.ts`, Messung
+`docs/messungen/2026-09-16-funktionskranz/`); dann muss die Gliederung geändert
+werden. Dass jede Taste entweder einen Knopf hat oder mit Grund auf der
+Ausnahmeliste steht, hält `test/tastenerreichbarkeit.test.ts` fest.
 
 ## Der Platz (Stand 15.09.2026, E-028)
 
@@ -262,7 +272,12 @@ wenn die Beschreibung unten von dem abweicht, was das Spiel tut.
   permanente Schrottberge hinter dem Bagger, Zaunreihe an der Ostseite,
   Maschendraht-Bündel (Drahtknäuel) als Kehr-Werkzeug zum Freischieben.
 - **Save/Load:** K speichert (localStorage, Schema v1 mit Migrationspfad), L lädt,
-  N startet neu. Boot rekonstruiert Items (inkl. plattgedrückt), Karossen
+  N startet neu. Auf dem Gerät liegen alle drei im Pausenmenü.
+  **Offen (E-088):** Seit E-085 liegt auf K *zusätzlich* das Seitwärtskippen des
+  Greifers — ein Druck auf K tut auf der Tastatur beides. Welche der beiden
+  Funktionen umzieht, entscheidet Patrick; `test/tastenerreichbarkeit.test.ts`
+  hält den Konflikt fest, damit er nicht vergessen wird. Auf dem Gerät gibt es
+  ihn nicht: Der Kranzeintrag KIPPEN kippt nur. Boot rekonstruiert Items (inkl. plattgedrückt), Karossen
   (Quetschstufe, gerissene Teile, Scheiben) und Zaunzustand. Vitest-geprüft.
 
 ## M2-Umfang „Wrack-Slice" (verifiziert 2026-08-27)

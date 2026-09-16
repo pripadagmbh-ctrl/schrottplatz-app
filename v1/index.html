@@ -402,17 +402,41 @@
          schon liegt — wie die schwebenden Sticks selbst. */
       #radial { position: absolute; pointer-events: none; z-index: 4; width: 0; height: 0; }
       #radial[hidden] { display: none; }
+      /*
+         Kastenmass des Sektors — nachgerechnet, nicht geschaetzt (E-088).
+         `box-sizing: border-box` ist der Grund, warum die Zahlen sich am
+         16.09.2026 geaendert haben: Vorher lagen 76 x 30 als INHALT da, der
+         2-px-Rahmen kam obendrauf, und der negative Rand traf damit nicht die
+         Mitte. Acht Eintraege ueberlappten sich dadurch schon um 3,5 px an den
+         Ecken (iPad), ohne dass es jemandem auffiel. Border-box heisst: 62 x 34
+         ist das Sichtbare, -17/-31 trifft die Mitte auf das Pixel.
+         62 px Breite: "ZUR WAAGE" = 9 Zeichen Consolas 11 px = 54,5 px, dazu
+         2 x 2 px Rahmen — 3,5 px Luft bleiben. 34 px Hoehe: 26 px Zeile plus
+         4 px Zustandsbalken am unteren Rand. */
       #radial .sektor {
-        position: absolute; left: 0; top: 0;
-        width: 76px; height: 30px; margin: -15px 0 0 -38px;
+        position: absolute; left: 0; top: 0; box-sizing: border-box;
+        width: 62px; height: 34px; margin: -17px 0 0 -31px;
         border-radius: 8px; background: rgba(20,22,24,0.88);
         border: 2px solid rgba(255,255,255,0.28); color: #e8e8e4;
         font: 600 11px/26px "Consolas", monospace; text-align: center;
         transition: transform 0.09s ease-out;
       }
+      /* Scharfgestellt: 1,10 statt 1,15. Der gewachsene Kasten frisst die Luft
+         zum Nachbarn auf — bei neun Eintraegen bleiben so 6,9 px statt 2,8. */
       #radial .sektor.sel {
         background: rgba(240,180,41,0.92); color: #1a1c1e; border-color: #f0d060;
-        transform: scale(1.15);
+        transform: scale(1.10);
+      }
+      /*
+         Eingeschaltet (KIPPEN, spaeter auch KABINE und STUETZEN).
+         ZWEI Kanaele, nicht nur Farbe: ein ausgefuellter Balken am unteren
+         Rand — und er liegt absolut, kostet also keine Textbreite. Ein
+         Zustand, der als Text im Kasten stuende ("KIPPEN ✓"), haette den Kasten
+         um zwei Zeichen verbreitert und damit den ganzen Kranz aufgeblasen. */
+      #radial .sektor.an { border-color: rgba(240,208,96,0.85); }
+      #radial .sektor.an::after {
+        content: ""; position: absolute; left: 7px; right: 7px; bottom: 3px;
+        height: 4px; border-radius: 2px; background: #f0d060;
       }
       #radial .nabe {
         position: absolute; left: 0; top: 0; width: 26px; height: 26px;
@@ -441,7 +465,11 @@
           right: max(8px, calc(var(--sa-r) + 8px));
           width: 40px; height: 40px; line-height: 40px; font-size: 18px;
         }
-        #radial .sektor { width: 66px; height: 26px; margin: -13px 0 0 -33px; font-size: 10px; line-height: 22px; }
+        /* Eine Nummer kleiner, dieselbe Rechnung: 9 Zeichen Consolas 10 px =
+           49,5 px, Rahmen 4 px, 4,5 px Luft. 30 px Hoehe = 22 px Zeile + 4 px
+           Balken. Der Halbmesser bleibt bei beiden Fassungen gleich (112 px,
+           `RADIAL_R` in touch.ts) — der Kranz sitzt am Daumen, nicht am Rand. */
+        #radial .sektor { width: 58px; height: 30px; margin: -15px 0 0 -29px; font-size: 10px; line-height: 22px; }
         /* neben den rechten Stick statt darüber — oben liegt die Tastenleiste */
         #touch #btn-rot-l, #touch #btn-rot-r {
           bottom: max(14px, calc(var(--sa-b) + 8px));
@@ -856,11 +884,23 @@
         <span id="btn-away">ZUR WAAGE</span>
         <span id="btn-lambert">LAMBERT</span>
         <span id="btn-marks">SCHILDER</span>
+        <!--
+          KIPPEN (E-088). Der Greifer legt sich auf Knopfdruck 90 Grad zur
+          Seite (E-085, „zum Kehren und Schleudern"). Gebaut war er nur auf
+          Taste K — auf dem iPad, wo ausschliesslich gespielt wird, war die
+          Funktion damit nicht erreichbar.
+          Angehaengt, nicht eingereiht: Mit dem neunten Eintrag drehen sich die
+          Richtungen ohnehin von 45 auf 40 Grad; die REIHENFOLGE der acht alten
+          bleibt wenigstens, wie sie war.
+        -->
+        <span id="btn-kipp">KIPPEN</span>
       </div>
       <!-- Nicht auf den Joystickkopf: Ausbau, Musik und Pause sind keine
            Maschinenfunktionen. Sie liegen hinter dem Menue oben rechts, wo man
-           sie in Ruhe sucht — und der Kranz bleibt mit acht Eintraegen so weit
-           gefaechert, dass sich nichts ueberlappt. -->
+           sie in Ruhe sucht — und der Kranz bleibt so weit gefaechert, dass
+           sich nichts ueberlappt. Wieviel Luft dabei bleibt, rechnet
+           `test/funktionskranz.test.ts` fuer beide Geraete nach; ein zehnter
+           Eintrag faellt dort durch. -->
       <div class="hidden-actions" id="menu-actions">
         <span id="btn-shop">AUSBAU</span>
         <span id="btn-music">MUSIK</span>

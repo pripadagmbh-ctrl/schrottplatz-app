@@ -73,8 +73,17 @@ const DRIVE_DEADZONE = 0.15;
 /** Bis hierhin gilt eine Berührung des Rädchens als Tipp, darüber als Blättern (px) */
 /** So lange muss der rechte Daumen stillhalten, bis der Kranz aufklappt */
 const RADIAL_HOLD_S = 0.4;
-/** Halbmesser des Kranzes in px */
-const RADIAL_R = 104;
+/**
+ * Halbmesser des Kranzes in px.
+ *
+ * 104 -> 112 am 16.09.2026 (E-088), als der neunte Eintrag dazukam. Gerechnet,
+ * nicht geschaetzt: Zwei Nachbarn stehen bei neun Eintraegen 40 Grad
+ * auseinander, ihre Mitten also 2 * R * sin(20 Grad) = 0,643 * R auseinander.
+ * Bei R = 112 sind das 72,0 px; der scharfgestellte Kasten ist 62 * 1,10 = 68,2
+ * px breit, sein Nachbar 62 — macht 6,9 px Luft. Mit R = 104 waeren es 2,8 px
+ * gewesen. Nachgerechnet wird das in `test/funktionskranz.test.ts`.
+ */
+const RADIAL_R = 112;
 /** Ab diesem Zugweg gilt eine Richtung als gewaehlt */
 const RADIAL_MIN_PX = 34;
 /** Bis hierhin gilt der Daumen als stillgehalten (Anteil des Vollausschlags) */
@@ -164,6 +173,7 @@ export class TouchControls {
     this.bindTap("btn-away", "KeyJ");
     this.bindTap("btn-lambert", "KeyY");
     this.bindTap("btn-blade", "KeyI");
+    this.bindTap("btn-kipp", "KeyK");
     this.bindTap("btn-music", "KeyU");
     this.bindTap("btn-shop", "KeyZ");
     this.bindTap("btn-pause", "Escape");
@@ -612,6 +622,26 @@ export class TouchControls {
     if (!this.pressed.has(code)) return false;
     this.pressed.delete(code);
     return true;
+  }
+
+  /**
+   * Zustand eines Kranzeintrags anzeigen: an oder aus.
+   *
+   * Fuer Funktionen, die UMSCHALTEN statt auszuloesen — KIPPEN heute, KABINE
+   * und STUETZEN, sobald der Bagger ihren Zustand herausgibt. Ohne das ist ein
+   * Umschalter im Kranz eine Taste, die man drueckt und hofft.
+   *
+   * Der Kranz erfaehrt den Zustand von aussen (main.ts reicht ihn durch) und
+   * fragt NIE die Maschine (Projektregel 10). `touch.ts` kennt weder Bagger
+   * noch Greifer, nur Tastencodes.
+   *
+   * Unbekannte Codes sind stillschweigend erlaubt: Ein Eintrag kann im Menue
+   * statt im Kranz liegen, dann gibt es nichts zu zeigen.
+   */
+  setAktiv(code: string, an: boolean): void {
+    for (const it of this.radialItems) {
+      if (it.code === code) it.el.classList.toggle("an", an);
+    }
   }
 
   update(dt = 1 / 60): void {
