@@ -8188,8 +8188,8 @@ deshalb einen eigenen Scrollbereich (50 vh, auf flachen Displays 38 vh) mit
 `touch-action: pan-y` — genau wie der Platzausbau ihn schon hat.
 
 **Abnahmekriterium.** `npm run build` mit Rückgabewert 0 GEPRÜFT, `npm test`
-mit Rückgabewert 0 GEPRÜFT: **116 Dateien, 1.373 Prüfungen** (vorher 112 /
-1.305). Steckbrief-Prüfung grün für alle zehn Senderpaare. Gerechnetes Layout
+mit Rückgabewert 0 GEPRÜFT: **116 Dateien, 1.375 Prüfungen** (vorher 112 /
+1.305; dazu zwei, die erst mit der Verdrahtung in `main.ts` laufen). Steckbrief-Prüfung grün für alle zehn Senderpaare. Gerechnetes Layout
 (`test/radioplatz.test.ts`, gezeichnet von `tools/radiobild.ts` nach
 `docs/messungen/2026-09-17-radio/`): iPad quer 635 von 660 px, iPhone mini quer
 332 von 345 px, iPhone mini hoch 657 von 698 px — überall Luft nach unten, die
@@ -8287,6 +8287,16 @@ alle drei — das ist der Normalfall.
   besteht), und dem Moment, in dem er seine Aufgabe zu Ende gebracht hat
   (`staff.lambertArbeitet` fällt von wahr auf falsch) — dann fragt er nach der
   nächsten. Zwischen zwei Sprüchen von ihm liegen mindestens 45 Sekunden.
+
+**Der Funk wartet 3,5 Sekunden.** Beim Bauen aufgefallen und mitentschieden:
+Fast jeder Anlass erzeugt schon selbst eine Einblendung — die Waage meldet ihr
+Gewicht, der Kunde grüßt, das HUD meldet den Störfall, alles im selben Bild.
+Eine Einblendung ersetzt die vorige (`hud.toast`, 2,6 s); wer sofort funkt,
+überschreibt sie, und der Spieler sieht nur eine von zwei Meldungen. Deshalb
+geht ein Funkspruch auf eine Leitung mit genau einem Platz und wird 3,5 s
+später ausgegeben — zugestellt in `platzlage()`, also in der Bildschleife. Das
+klingt obendrein richtig: Der Waagemeister schaut erst hin und greift dann zum
+Hörer.
 
 **Ton-Leitplanke (Projektregel 7), hier wörtlich genommen.** Mario misstraut
 der **Ladung**, nie dem Menschen, der sie bringt: Kein Satz von ihm sagt etwas

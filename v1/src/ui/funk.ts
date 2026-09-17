@@ -56,6 +56,21 @@ import { getMaterial, istAbfall, normalizeMaterialId } from "../materials/catalo
 const FUNK_SPERRE_S = 8;
 
 /**
+ * So lange wartet ein Funkspruch, bevor er ins Bild geht (s).
+ *
+ * SW: 3,5 s. Der Anlass selbst erzeugt fast immer schon eine Einblendung —
+ * die Waage meldet das Gewicht, der Kunde grüßt, das HUD meldet den Störfall.
+ * Alles im selben Bild. Wer sofort funkt, überschreibt sie: Eine Einblendung
+ * ersetzt die vorige, und der Spieler sieht nur die letzte. Beide Meldungen
+ * wären dann halb verloren.
+ *
+ * Deshalb wartet der Funk, bis die Meldung der Maschine ausgeklungen ist
+ * (2,6 s) und noch eine knappe Sekunde dazu. Das klingt obendrein richtig: Der
+ * Waagemeister schaut erst hin und greift dann zum Hörer.
+ */
+const VORLAUF_S = 3.5;
+
+/**
  * Ab diesem Anteil an der Fuhre faellt Mario der Abfall auf (0..1).
  *
  * SW: 0,06. Ein einzelner Reifen auf einer Tonne Blech sind rund 1 % — das
@@ -296,6 +311,8 @@ export class Funkzentrale {
   constructor(private jetzt: () => number = () => performance.now() / 1000) {}
 
   private letzterSpruch = -Infinity;
+  /** Was gleich gesendet wird. Höchstens einer — der Kanal hat eine Leitung. */
+  private wartend: { spruch: Funkspruch; ab: number } | null = null;
   /** Laufender Zeiger je Anlass: derselbe Satz kommt nie zweimal hintereinander. */
   private zeiger = new Map<Anlass, number>();
 
@@ -433,6 +450,8 @@ export class Funkzentrale {
    */
   platzlage(l: Platzlage): void {
     const t = this.jetzt();
+    // Erst durchgeben, was ansteht — das gilt für alle drei Stimmen.
+    this.zustellen(t);
 
     // Merker pflegen — unabhaengig davon, ob gerade gesendet werden darf.
     if (l.lambertArbeitet) this.lambertWarDran = true;
@@ -483,17 +502,39 @@ export class Funkzentrale {
   // ------------------------------------------------------------- Ausgang
 
   /**
-   * Senden — wenn der Kanal frei ist. Liefert true, wenn es wirklich
-   * hinausgegangen ist.
+   * Auf die Leitung legen — wenn sie frei ist. Liefert true, wenn der Spruch
+   * angenommen wurde; heraus geht er `VORLAUF_S` später über `zustellen()`.
    */
   private melde(anlass: Anlass, angabe: string): boolean {
     const t = this.jetzt();
+    if (this.wartend) return false; // es steht schon einer an
     if (t - this.letzterSpruch < FUNK_SPERRE_S) return false;
     this.letzterSpruch = t;
     const liste = SPRUECHE[anlass];
     const i = this.zeiger.get(anlass) ?? 0;
     this.zeiger.set(anlass, i + 1);
-    this.onSpruch?.({ wer: SPRECHER[anlass], text: liste[i % liste.length]!(angabe), anlass });
+    const spruch: Funkspruch = {
+      wer: SPRECHER[anlass],
+      text: liste[i % liste.length]!(angabe),
+      anlass,
+    };
+    this.wartend = { spruch, ab: t + VORLAUF_S };
     return true;
+  }
+
+  /**
+   * Einen anstehenden Spruch durchgeben, sobald seine Zeit gekommen ist.
+   *
+   * Steht am Anfang von `platzlage()` und wird damit in jedem Bild gerufen.
+   * Ohne diese Verbindung bliebe der Funk stumm — auch der von Mario und
+   * Janine. Genau darum steht `funk.platzlage(…)` in der Liste der Zeilen, die
+   * `main.ts` braucht, und genau darum bewacht `test/funk-verdrahtung.test.ts`
+   * sie.
+   */
+  private zustellen(t: number): void {
+    if (!this.wartend || t < this.wartend.ab) return;
+    const s = this.wartend.spruch;
+    this.wartend = null;
+    this.onSpruch?.(s);
   }
 }

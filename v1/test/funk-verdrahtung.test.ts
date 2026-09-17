@@ -65,7 +65,10 @@ describe("Jeder Anlass ist wirklich erreichbar", () => {
    * Textsuche oben: Ein `melde("…")`, das hinter einer Bedingung liegt, die
    * nie wahr wird, bestuende die erste Pruefung und faellt hier durch.
    */
-  const ablaeufe: Record<Anlass, (f: Funkzentrale, vor: (s: number) => void) => void> = {
+  const ablaeufe: Record<
+    Anlass,
+    (f: Funkzentrale, vor: (s: number) => void, hoere: () => void) => void
+  > = {
     abfallDrin: (f) =>
       f.wiegung({
         kg: 3000,
@@ -95,7 +98,7 @@ describe("Jeder Anlass ist wirklich erreichbar", () => {
           { materialId: "zinc", share: 0.1 },
         ],
       }),
-    sauber: (f, vor) => {
+    sauber: (f, vor, hoere) => {
       f.wiegung({
         kg: 3000,
         sortenrein: null,
@@ -104,6 +107,8 @@ describe("Jeder Anlass ist wirklich erreichbar", () => {
           { materialId: "rubble", share: 0.3 },
         ],
       });
+      // Die Beanstandung erst durchgeben — die Leitung hat nur einen Platz
+      hoere();
       vor(60);
       f.wiegung({ kg: 900, sortenrein: "steel", mix: [{ materialId: "steel", share: 1 }] });
     },
@@ -161,7 +166,20 @@ describe("Jeder Anlass ist wirklich erreichbar", () => {
       const f = new Funkzentrale(() => t);
       const gehoert: Funkspruch[] = [];
       f.onSpruch = (s) => gehoert.push(s);
-      ablaeufe[anlass](f, (s: number) => (t += s));
+      const ruhe = { loseKg: 0, spurBlockiert: false, lambertArbeitet: false };
+      const hoere = (): void => {
+        t += 5;
+        f.platzlage(ruhe);
+      };
+      ablaeufe[anlass](f, (s: number) => (t += s), hoere);
+      /*
+       * Zustellen. Ein Funkspruch wartet 3,5 s, damit er die Meldung nicht
+       * überschreibt, an der er hängt; herausgegeben wird er in
+       * `platzlage()`, also in der Bildschleife. Hier wird sie von Hand
+       * gedreht — und genau dieser Schritt ist der Grund, warum
+       * `funk.platzlage(…)` in `main.ts` stehen MUSS.
+       */
+      hoere();
       expect(
         gehoert.map((s) => s.anlass),
         `der Ablauf loest „${anlass}" nicht aus`

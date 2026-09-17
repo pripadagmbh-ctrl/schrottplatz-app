@@ -22,16 +22,65 @@ import {
   type Funkspruch,
 } from "../src/ui/funk";
 
-/** Eine Zentrale mit gestellter Uhr — sonst entscheidet die Rechenzeit mit. */
-function zentrale(): { f: Funkzentrale; gehoert: Funkspruch[]; vor: (s: number) => void } {
-  let t = 1000;
-  const f = new Funkzentrale(() => t);
-  const gehoert: Funkspruch[] = [];
-  f.onSpruch = (s) => gehoert.push(s);
-  return { f, gehoert, vor: (s: number) => (t += s) };
+const RUHE = { loseKg: 0, spurBlockiert: false, lambertArbeitet: false };
+
+/**
+ * Ein Funkspruch geht nicht sofort ins Bild, sondern erst nach 3,5 s — sonst
+ * überschriebe er die Meldung, an der er hängt (die Waage meldet ihr Gewicht
+ * im selben Bild). Zugestellt wird in `platzlage()`, also in der Bildschleife.
+ *
+ * Im Test wird die Schleife von Hand gedreht. Damit nicht hinter jedem
+ * Handgriff zwei Zeilen Buchhaltung stehen, drehen `wiegung` und `kundeDa`
+ * hier die Uhr selbst weiter und leeren den Kanal. Dass die Wartezeit wirklich
+ * eingehalten wird, prüft weiter unten ein eigener Test gegen die nackte
+ * Zentrale.
+ */
+const ZUSTELLUNG_S = 4;
+
+interface Pruefstand {
+  f: {
+    wiegung: (fu: Parameters<Funkzentrale["wiegung"]>[0]) => void;
+    kundeDa: (k: Parameters<Funkzentrale["kundeDa"]>[0]) => void;
+    platzlage: (l: typeof RUHE) => void;
+  };
+  /** Die Zentrale ohne Bequemlichkeit — für die Prüfung der Wartezeit selbst. */
+  echt: Funkzentrale;
+  gehoert: Funkspruch[];
+  vor: (s: number) => void;
+  /** Wartezeit abwarten und den Kanal leeren, ohne die Lage zu verändern. */
+  hoere: (l?: typeof RUHE) => void;
 }
 
-const RUHE = { loseKg: 0, spurBlockiert: false, lambertArbeitet: false };
+/** Eine Zentrale mit gestellter Uhr — sonst entscheidet die Rechenzeit mit. */
+function zentrale(): Pruefstand {
+  let t = 1000;
+  const z = new Funkzentrale(() => t);
+  const gehoert: Funkspruch[] = [];
+  z.onSpruch = (s) => gehoert.push(s);
+  const hoere = (l: typeof RUHE = RUHE): void => {
+    t += ZUSTELLUNG_S;
+    z.platzlage(l);
+  };
+  return {
+    echt: z,
+    gehoert,
+    vor: (s: number) => {
+      t += s;
+    },
+    hoere,
+    f: {
+      wiegung: (fu) => {
+        z.wiegung(fu);
+        hoere();
+      },
+      kundeDa: (k) => {
+        z.kundeDa(k);
+        hoere();
+      },
+      platzlage: (l) => z.platzlage(l),
+    },
+  };
+}
 
 // ------------------------------------------------------------------ Mario
 
@@ -231,12 +280,13 @@ describe("Lambert redet ueber den Platz", () => {
   });
 
   it("fragt nach Arbeit, wenn er seine Aufgabe zu Ende gebracht hat", () => {
-    const { f, gehoert, vor } = zentrale();
+    const { f, gehoert, vor, hoere } = zentrale();
     f.platzlage({ ...RUHE, lambertArbeitet: true });
     vor(30);
     f.platzlage({ ...RUHE, lambertArbeitet: true });
     vor(30);
     f.platzlage(RUHE); // Flanke: fertig
+    hoere();
     expect(gehoert.length).toBe(1);
     expect(gehoert[0]!.wer).toBe(LAMBERT);
     expect(gehoert[0]!.anlass).toBe("lambertFertig");
@@ -249,40 +299,50 @@ describe("Lambert redet ueber den Platz", () => {
   });
 
   it("meldet erst nach einer Weile, dass immer noch etwas im Weg steht", () => {
-    const { f, gehoert, vor } = zentrale();
-    f.platzlage({ ...RUHE, spurBlockiert: true });
+    const { f, gehoert, vor, hoere } = zentrale();
+    const zu = { ...RUHE, spurBlockiert: true };
+    f.platzlage(zu);
     vor(10);
-    f.platzlage({ ...RUHE, spurBlockiert: true });
+    f.platzlage(zu);
+    hoere(zu);
     expect(gehoert.length, "er plappert dem HUD hinterher").toBe(0);
-    vor(20); // zusammen 30 s — laenger als die Geduld
-    f.platzlage({ ...RUHE, spurBlockiert: true });
+    vor(20); // zusammen mehr als 25 s — laenger als die Geduld
+    f.platzlage(zu);
+    hoere(zu);
     expect(gehoert.length).toBe(1);
     expect(gehoert[0]!.anlass).toBe("spurLange");
     // genau einmal je Stoerfall
     vor(60);
-    f.platzlage({ ...RUHE, spurBlockiert: true });
+    f.platzlage(zu);
+    hoere(zu);
     expect(gehoert.length).toBe(1);
   });
 
   it("meldet losen Schrott erst ab der Schwelle und dann nicht wieder", () => {
-    const { f, gehoert, vor } = zentrale();
-    f.platzlage({ ...RUHE, loseKg: 1400 });
+    const { f, gehoert, vor, hoere } = zentrale();
+    /** Eine Lage melden und die Zustellung abwarten, ohne sie zu verändern. */
+    const lage = (kg: number): void => {
+      const l = { ...RUHE, loseKg: kg };
+      f.platzlage(l);
+      hoere(l);
+    };
+    lage(1400);
     expect(gehoert.length).toBe(0);
     vor(60);
-    f.platzlage({ ...RUHE, loseKg: 1600 });
+    lage(1600);
     expect(gehoert.length).toBe(1);
     expect(gehoert[0]!.anlass).toBe("vielLose");
     // knapp unter die Schwelle und wieder darueber: kein zweiter Spruch
     vor(60);
-    f.platzlage({ ...RUHE, loseKg: 1400 });
+    lage(1400);
     vor(60);
-    f.platzlage({ ...RUHE, loseKg: 1600 });
+    lage(1600);
     expect(gehoert.length).toBe(1);
     // erst wenn wirklich aufgeraeumt wurde, zaehlt es wieder
     vor(60);
-    f.platzlage({ ...RUHE, loseKg: 500 });
+    lage(500);
     vor(60);
-    f.platzlage({ ...RUHE, loseKg: 1600 });
+    lage(1600);
     expect(gehoert.length).toBe(2);
   });
 
@@ -299,6 +359,55 @@ describe("Lambert redet ueber den Platz", () => {
 // ------------------------------------------------------- Kanal und Haltung
 
 describe("Der Kanal", () => {
+  it("wartet, bis die Meldung der Maschine durch ist — sonst ueberschreibt er sie", () => {
+    /*
+     * Der Grund: Die Waage meldet ihr Gewicht IM SELBEN BILD, in dem Mario den
+     * Anlass sieht. Eine Einblendung ersetzt die vorige — funkt er sofort,
+     * sieht der Spieler nur noch Mario und nie das Gewicht. Oder umgekehrt.
+     *
+     * Geprueft wird gegen die nackte Zentrale, ohne die Bequemlichkeit des
+     * Pruefstands oben: Hier soll gerade NICHT automatisch zugestellt werden.
+     */
+    const { echt, gehoert, vor } = zentrale();
+    echt.wiegung({
+      kg: 3000,
+      sortenrein: null,
+      mix: [
+        { materialId: "steel", share: 0.7 },
+        { materialId: "rubble", share: 0.3 },
+      ],
+    });
+    // gleiches Bild: noch nichts zu hoeren
+    echt.platzlage(RUHE);
+    expect(gehoert.length, "er funkt sofort und ueberschreibt die Waage").toBe(0);
+    // nach zwei Sekunden immer noch nicht — die Einblendung steht 2,6 s
+    vor(2);
+    echt.platzlage(RUHE);
+    expect(gehoert.length).toBe(0);
+    // danach schon
+    vor(2);
+    echt.platzlage(RUHE);
+    expect(gehoert.length).toBe(1);
+    expect(gehoert[0]!.wer).toBe(MARIO);
+  });
+
+  it("bleibt stumm, wenn die Bildschleife ihn nie fragt — und das faellt auf", () => {
+    /*
+     * Die Kehrseite der Wartezeit: Ohne `platzlage()` in der Bildschleife wird
+     * nichts zugestellt, auch nicht von Mario und Janine. Genau darum steht
+     * die Zeile in der Liste, die `main.ts` braucht, und genau darum bewacht
+     * sie `test/funk-verdrahtung.test.ts`.
+     */
+    const { echt, gehoert, vor } = zentrale();
+    echt.kundeDa({ name: "A", subtitle: "B", group: "privat" });
+    vor(60);
+    echt.kundeDa({ name: "A", subtitle: "B", group: "privat" });
+    vor(600);
+    expect(gehoert.length).toBe(0);
+    echt.platzlage(RUHE);
+    expect(gehoert.length).toBe(1);
+  });
+
   it("laesst nie zwei Sprueche uebereinander laufen", () => {
     const { f, gehoert } = zentrale();
     // Zwei Anlaesse in derselben Sekunde: nur einer geht raus.
