@@ -88,6 +88,35 @@ export interface Stand {
    * zwei Wahrheiten.
    */
   lenkrate?: number;
+  /**
+   * Faedelt der Wagen in die Ausfahrt ein, oder springt er auf sie?
+   * `false` ist der Zustand von vor dem 17.09.2026 (E-093).
+   */
+  faedeltAus?: boolean;
+  /**
+   * WIE LANGE NACH DEM VERLASSEN DER ABLADESPUR NOCH GEMESSEN WIRD (s).
+   *
+   * Ohne Angabe: gar nicht — dann endet der Lauf wie seit E-044, in dem
+   * Rechenschritt, in dem der Wagen die Spur raeumt.
+   *
+   * GENAU DORT LAG ABER EIN BLINDER FLECK, und er ist der Grund fuer diese
+   * Zahl (E-093): `leaveUnloadingBay` setzte `routeS = 0` und damit den Wagen
+   * an den ANFANG der Ausfahrt zurueck. Der Kipper steht da nicht mehr —
+   * `tipCreep` hat ihn 1,4 m nach vorn gezogen. Er sprang also bei JEDER
+   * Fuhre 1,32 m rueckwaerts in den eben abgekippten Haufen, und zwar EINEN
+   * Rechenschritt NACH dem Abbruch dieser Schleife. Ein Messfenster, das
+   * einen Sprung um ein Bild verpasst, meldet 0,0 % und beweist nichts.
+   */
+  nachlaufS?: number;
+  /**
+   * Keine Kaffeepause — der Wagen faehrt nach dem Kippen gleich vom Hof.
+   *
+   * Der Warteplatz wird gewuerfelt (75 % der Haendler bekommen einen), und wer
+   * einen hat, geht nach dem Kippen in `toPark` und nicht in die Ausfahrt.
+   * Genau dort sitzt aber der Sprung, um den es geht. Ohne diesen Schalter
+   * misst man in drei von vier Laeufen etwas anderes als die Frage.
+   */
+  ohnePause?: boolean;
 }
 
 /** Fester Zufall — die Ladung wird gewürfelt, sonst vergleicht man Rauschen. */
@@ -181,6 +210,11 @@ export function lauf(s: Stand, saat: number): Lauf {
     const bedGroup = (v as unknown as { bedGroup: THREE.Group }).bedGroup;
     const grp = (v as unknown as { group: THREE.Group }).group;
     if (s.lenkrate !== undefined) (v as unknown as { lenkrate: number }).lenkrate = s.lenkrate;
+    if (s.faedeltAus !== undefined) {
+      (v as unknown as { faedeltAus: boolean }).faedeltAus = s.faedeltAus;
+    }
+    if (s.ohnePause) (v as unknown as { parkSpot: [number, number] | null }).parkSpot = null;
+    let nachlauf = s.nachlaufS ?? 0;
     if (s.keil) {
       // Gebauten Kollider abschalten statt entfernen: `removeCollider`
       // verschiebt die Nummern aller folgenden, und `vehicles.ts` greift auf
@@ -234,7 +268,17 @@ export function lauf(s: Stand, saat: number): Lauf {
           }
         }
       }
-      if (p === "out" || p === "toPark") break;
+      /*
+       * DIE SPUR IST GERAEUMT — hier endete der Lauf bis zum 17.09.2026.
+       * `ausfaedeln` gehoert in dieselbe Zeile wie `out` und `toPark`: Es ist
+       * dieselbe Etappe, nur mit einem anderen Namen (E-093). Ohne sie wuerde
+       * der reparierte Stand laenger messen als der alte, und der Vergleich
+       * waere wertlos.
+       */
+      if (p === "out" || p === "toPark" || p === "ausfaedeln") {
+        if (nachlauf <= 0) break;
+        nachlauf -= dt;
+      }
     }
     /*
      * Am Ende im Rahmen der LADEFLÄCHE zählen, nicht in dem des Wagens: Der

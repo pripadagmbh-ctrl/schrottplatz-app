@@ -155,6 +155,7 @@ type Phase =
   | "toPark"
   | "parkRueck"
   | "parked"
+  | "ausfaedeln"
   | "out";
 
 interface Cargo {
@@ -186,6 +187,24 @@ class DeliveryVehicle {
    * Stand nicht mehr melden kann, prueft nichts (Lehre aus E-073).
    */
   lenkrate = LENK_RATE;
+  /**
+   * Faedelt dieser Wagen in eine Strecke EIN — oder springt er auf sie?
+   *
+   * `false` ist Zeichen fuer Zeichen der Zustand von vor dem 16.09.2026:
+   * `nearestS` liefert die Bogenlaenge des naechstgelegenen Routenpunktes,
+   * und der naechste Rechenschritt SETZT den Wagen dorthin — quer ueber den
+   * Abstand, der dazwischen liegt. Gemessen (`tools/ausfaedeln.ts`) sind das
+   * beim Abfahren vom Warteplatz 5,59 / 8,74 / 6,63 m in EINEM Bild, also bis
+   * zu 524 m/s. Das ist dieselbe Bauart wie der Kipper-Katapult (E-073) und
+   * der Rangierknick (E-084): ein Koerper wird VERSETZT statt BEWEGT, Rapier
+   * leitet daraus eine Geschwindigkeit ab und raeumt die Durchdringung des
+   * naechsten Bildes in einem Schlag aus.
+   *
+   * Es steht als Feld und nicht als Konstante da, weil jeder Waechter dieser
+   * Reparatur seine GEGENPROBE braucht (Lehre aus E-062). Im Spiel wird es
+   * nie umgestellt.
+   */
+  faedeltAus = true;
   /** Drehrichtung einer laufenden Kehre; null heisst: keine Kehre. */
   private kehre: 1 | -1 | null = null;
   /** Phase des letzten Bildes — nur, um eine Kehre am Etappenwechsel zu loesen. */
@@ -343,11 +362,18 @@ class DeliveryVehicle {
    * Fahrzeug liegt. Fährt entlang der Ausfahrtsroute und hält wieder an.
    */
   nudgeForward(meters = 3.5): boolean {
-    if (this.phase === "out" || this.phase === "nudging") return false;
+    if (this.phase === "out" || this.phase === "nudging" || this.phase === "ausfaedeln") {
+      return false;
+    }
     this.nudgeReturn = this.phase;
+    /*
+     * Das Ziel bleibt, wo es war. Der Punkt, auf den `nearestS` zeigt, liegt
+     * definitionsgemaess AUF der Strecke — wer dorthin faehrt, bekommt beim
+     * naechsten `nearestS` dieselbe Bogenlaenge zurueck. Das Ausfaedeln
+     * verschiebt die Zielmarke also nicht, es holt nur den Weg dorthin nach.
+     */
     this.nudgeTargetS = this.nearestS(this.routeOut) + meters;
-    this.routeS = this.nearestS(this.routeOut);
-    this.phase = "nudging";
+    this.starteAusfaedeln(this.routeOut, "nudging", this.nearestS(this.routeOut));
     return true;
   }
 
@@ -480,10 +506,22 @@ class DeliveryVehicle {
     this.phaseT = 0;
     if (this.parkSpot) {
       this.phase = "toPark";
-    } else {
-      this.phase = "out";
-      this.routeS = 0;
+      return;
     }
+    /*
+     * HIER SASS DER HAEUFIGSTE SPRUNG DES SPIELS, und er sass genau dort, wo
+     * die frische Fuhre liegt (E-093). `routeS = 0` setzt den Wagen an den
+     * ANFANG der Ausfahrt zurueck — das ist der Halteplatz. Der Kipper steht
+     * da aber nicht mehr: `tipCreep` hat ihn gekippt `TIP_CREEP_M` = 1,4 m
+     * nach vorn gezogen, damit der Rest ueber die Kante nachrutscht. Gemessen
+     * sprang er dadurch bei JEDER Kipperfuhre 1,32 m zurueck, in einem Bild,
+     * mitten in den eben abgekippten Haufen.
+     *
+     * `nearestS` statt Null ist hier nicht nur sprungfrei, sondern auch
+     * richtiger: Der Kriechzug laeuft in Fahrtrichtung, also ENTLANG der
+     * Ausfahrt — der Wagen hat den ersten Meter schon hinter sich.
+     */
+    this.starteAusfaedeln(this.routeOut, "out", 0);
   }
 
   /** true, solange über den Preis verhandelt wird — der Fahrer wartet dann. */
@@ -728,11 +766,10 @@ class DeliveryVehicle {
     this.abholerFaehrtRaus();
     // Was noch oben liegt, faehrt mit — sonst verliert der Wagen es unterwegs
     this.verriegeleLadeflaeche();
-    this.phase = "out";
-    this.phaseT = 0;
     // Dort in die Ausfahrt einfädeln, wo der Wagen gerade steht — sonst
-    // würde er an den Anfang der Ausfahrtsroute springen.
-    this.routeS = this.nearestS(this.routeOut);
+    // würde er an den Anfang der Ausfahrtsroute springen. Seit E-093 faehrt
+    // er den Weg dorthin AB, statt ihn zu ueberspringen.
+    this.starteAusfaedeln(this.routeOut, "out", this.nearestS(this.routeOut));
     this.sideOpenTarget = 0;
     return true;
   }
@@ -761,6 +798,163 @@ class DeliveryVehicle {
       s += len;
     }
     return best;
+  }
+
+  /* --------------------------------------------- AUSFAEDELN STATT SPRINGEN */
+
+  /**
+   * Die Punkte, die noch frei angefahren werden, bevor die Strecke gilt.
+   *
+   * Der LETZTE ist immer der Einfaedelpunkt, und er wird BEIM START gerechnet
+   * und dann festgehalten. Das ist kein Detail: Wer ihn unterwegs neu rechnet,
+   * bekommt beim Verlassen der Parkbucht einen ganz anderen — vom
+   * Buchtausgang aus ist der naechste Punkt der Ausfahrt nicht mehr das Tor,
+   * sondern die Waagenspur zwischen den Hallen, und dort kam der Wagen quer
+   * an (gemessen 0,50 m in Halle 1 Sued, 0,63 m im Betriebsgebaeude).
+   */
+  private ausfaedelWeg: Array<[number, number]> = [];
+  /** Der Punkt, auf den gerade zugefahren wird (Weltkoordinaten). */
+  private ausfaedelPunkt: [number, number] | null = null;
+  /** Welche Phase laeuft, sobald die Strecke aufgenommen ist. */
+  private ausfaedelFolge: Phase = "out";
+  /** Auf welche Strecke eingefaedelt wird. */
+  private ausfaedelRoute: Array<[number, number]> | null = null;
+
+  /**
+   * Wie lange ein Ausfaedeln hoechstens dauern darf (s).
+   *
+   * Gerechnet: Der laengste Weg ist Warteplatz 2 — 8,0 m aus der Bucht und
+   * 8,7 m bis zur Ausfahrt, bei SPEED 4,8 m/s zusammen 3,5 s. Dazu zweimal
+   * eine halbe Wendung, bei LENK_RATE 0,85 rad/s je 3,7 s. Macht 10,9 s;
+   * 20 s sind knapp das Doppelte. Der Deckel ist kein Fahrgesetz, sondern
+   * eine Notbremse: Ein Wagen, der sich hier festfaehrt, haelt den ganzen
+   * Betrieb an — dann faedelt er lieber wie frueher ein.
+   */
+  private static readonly AUSFAEDEL_FRIST_S = 20;
+
+  /**
+   * FREI ZUR STRECKE FAHREN STATT AUF SIE ZU SPRINGEN.
+   *
+   * Der kleinste Eingriff, der den Ortssprung beseitigt — und er kommt ohne
+   * einen einzigen verschobenen Streckenpunkt aus: Der Wagen faehrt die
+   * Strecke zwischen seinem Standort und seinem Einfaedelpunkt AB, statt sie
+   * zu ueberspringen. Das Fahrgesetz ist dasselbe wie in `toPark` (E-084):
+   * begrenzte Drehrate, Tempo nach Restwinkel.
+   *
+   * `altS` ist die Bogenlaenge, die der alte Stand an dieser Stelle gesetzt
+   * hat. Sie steht hier, damit die Gegenprobe (`faedeltAus = false`) Zeichen
+   * fuer Zeichen das alte Verhalten liefert — die vier Aufrufstellen setzten
+   * naemlich NICHT alle dieselbe: drei nahmen `nearestS`, zwei die Null.
+   */
+  private starteAusfaedeln(
+    route: Array<[number, number]>,
+    folge: Phase,
+    altS: number,
+    vorpunkte: Array<[number, number]> = []
+  ): void {
+    this.phaseT = 0;
+    if (!this.faedeltAus) {
+      this.routeS = altS;
+      this.phase = folge;
+      return;
+    }
+    this.ausfaedelRoute = route;
+    this.ausfaedelFolge = folge;
+    this.ausfaedelWeg = [
+      ...vorpunkte.map((p) => [p[0], p[1]] as [number, number]),
+      this.punktAuf(route, this.nearestS(route)),
+    ];
+    this.ausfaedelPunkt = null;
+    this.phase = "ausfaedeln";
+  }
+
+  /**
+   * WIE TIEF DIESER AUSFAEDELWEG IN EIN BAUWERK FUEHRT (m) — vor der Abfahrt.
+   *
+   * Dieselbe Frage, die `drehRichtung` fuer eine Kehre stellt (E-084): nicht
+   * gerechnet, sondern mit dem ECHTEN Umriss abgetastet. Sie muss gestellt
+   * werden, weil die beiden Wege verschieden ausgehen und keiner immer
+   * gewinnt:
+   *
+   *   Warteplatz 1 und 2 liegen am Tor. Direkt loszufahren heisst, quer in
+   *   einer 9,0 m breiten Toroeffnung zu stehen — 0,33 bzw. 0,40 m Nordwand.
+   *   Warteplatz 3 steht vor Halle 3. Erst aus der Bucht zu ziehen heisst,
+   *   vor ihrem Tor zu wenden — 0,50 m Halle 3 Sued.
+   *
+   * Gerechnet wird mit demselben Fahrgesetz wie die Fahrt, nur mit grobem
+   * Schritt (0,1 s statt 1/60 s): Die Probe soll den Weg abtasten, nicht ihn
+   * nachrechnen. 0,1 s sind bei SPEED hoechstens 0,48 m Weg und 0,085 rad.
+   */
+  private ausfaedelTiefe(ziele: Array<[number, number]>): number {
+    const PROBE_DT = 0.1;
+    let x = this.group.position.x;
+    let z = this.group.position.z;
+    let gier = this.group.rotation.y;
+    let tief = 0;
+    for (const ziel of ziele) {
+      // Deckel: 300 Proben sind 30 s Fahrzeit, mehr als jede Ausfaedelstrecke.
+      for (let i = 0; i < 300; i++) {
+        const dx = ziel[0] - x;
+        const dz = ziel[1] - z;
+        const d = Math.hypot(dx, dz);
+        if (d <= 1e-6) break;
+        const soll = Math.atan2(dx, dz);
+        const rest = Math.abs(winkelRest(gier, soll));
+        const schritt = Math.min(SPEED * PROBE_DT * fahrtFaktor(rest), d);
+        x += (dx / d) * schritt;
+        z += (dz / d) * schritt;
+        gier = lenkeEin(gier, soll, this.lenkrate * PROBE_DT);
+        const t = this.tiefeBei(x, z, gier);
+        if (t > tief) tief = t;
+        if (d - schritt <= 1e-6) break;
+      }
+    }
+    return tief;
+  }
+
+  /** Der Punkt der Polylinie bei Bogenlaenge `s` — ohne das Fahrzeug zu setzen. */
+  private punktAuf(route: Array<[number, number]>, s: number): [number, number] {
+    const p = poseAuf(route, s, false);
+    return [p.x, p.z];
+  }
+
+  /** Ein Schritt des Ausfaedelns; true, sobald die Strecke aufgenommen ist. */
+  private ausfaedelSchritt(dt: number): void {
+    const route = this.ausfaedelRoute ?? this.routeOut;
+    if (!this.ausfaedelPunkt) this.ausfaedelPunkt = this.ausfaedelWeg.shift() ?? null;
+    const ziel = this.ausfaedelPunkt;
+    if (!ziel) {
+      this.routeS = this.nearestS(route);
+      this.phase = this.ausfaedelFolge;
+      this.phaseT = 0;
+      this.ausfaedelRoute = null;
+      return;
+    }
+    const dx = ziel[0] - this.group.position.x;
+    const dz = ziel[1] - this.group.position.z;
+    const d = Math.hypot(dx, dz);
+    const soll = d > 1e-6 ? Math.atan2(dx, dz) : this.group.rotation.y;
+    const rest = Math.abs(winkelRest(this.group.rotation.y, soll));
+    const schritt = Math.min(SPEED * dt * fahrtFaktor(rest), d);
+    if (d > 1e-6) {
+      this.group.position.x += (dx / d) * schritt;
+      this.group.position.z += (dz / d) * schritt;
+    }
+    this.group.rotation.y = lenkeEin(this.group.rotation.y, soll, this.lenkrate * dt);
+    this.snapBodiesToPose();
+    /*
+     * ANGEKOMMEN ist, wer den Punkt mit diesem Schritt erreicht hat. Der
+     * Schritt ist auf `d` gedeckelt, der Wagen steht also GENAU auf dem Punkt
+     * — und damit ist der Uebergang auf die Strecke wirklich sprungfrei und
+     * nicht nur fast.
+     */
+    if (d - schritt > 1e-6 && this.phaseT <= DeliveryVehicle.AUSFAEDEL_FRIST_S) return;
+    this.ausfaedelPunkt = null;
+    if (this.ausfaedelWeg.length > 0) return;
+    this.routeS = this.nearestS(route);
+    this.phase = this.ausfaedelFolge;
+    this.phaseT = 0;
+    this.ausfaedelRoute = null;
   }
 
   private get isPickup(): boolean {
@@ -1965,13 +2159,13 @@ class DeliveryVehicle {
    * groessere Kreis (5,14 m gegen 3,50 m) und damit der massgebliche.
    */
   private tiefeBeiGier(gier: number): number {
+    return this.tiefeBei(this.group.position.x, this.group.position.z, gier);
+  }
+
+  /** Dasselbe fuer eine beliebige Pose — der Eingang fuer die Ausfaedel-Probe. */
+  private tiefeBei(x: number, z: number, gier: number): number {
     this.umrissCache.length = 0;
-    this.umrissCache.push(
-      fahrzeugUmriss(
-        { x: this.group.position.x, z: this.group.position.z, rot: gier },
-        this.bedLen
-      )
-    );
+    this.umrissCache.push(fahrzeugUmriss({ x, z, rot: gier }, this.bedLen));
     return tiefsteDurchdringung(this.umrissCache, alleHindernisse());
   }
 
@@ -2320,8 +2514,14 @@ class DeliveryVehicle {
            * trotzdem nicht.
            */
           this.abholerFaehrtRaus();
-          this.phase = "out";
-          this.routeS = 0;
+          /*
+           * Auch hier wird eingefaedelt statt gesetzt (E-093). Am Verladeplatz
+           * faellt das nicht ins Gewicht — der Anfang der Ausfahrt IST sein
+           * Halteplatz, gemessen 0,00 m. Es steht trotzdem hier, weil sonst
+           * eine von fuenf Stellen weiter springen wuerde und niemand wuesste,
+           * welche.
+           */
+          this.starteAusfaedeln(this.routeOut, "out", 0);
         }
         break;
       case "tipping":
@@ -2450,9 +2650,55 @@ class DeliveryVehicle {
           this.fahrerState = "rein";
         }
         if (this.phaseT > this.parkSeconds && this.fahrerState === "drin") {
-          this.phase = "out";
-          this.routeS = this.nearestS(this.routeOut);
+          /*
+           * DER AUSFAEDEL-SPRUNG (E-093). Hier stand `routeS = nearestS(...)`,
+           * und der naechste Rechenschritt setzte den Wagen auf diesen Punkt
+           * — gemessen 5,59 / 8,74 / 6,63 m quer ueber den Hof, in EINEM Bild.
+           *
+           * Jetzt faehrt er den Weg. Und er faehrt ihn so, wie er gekommen
+           * ist. Die ZIELMARKE bleibt dieselbe wie im alten Stand — der
+           * naechste Punkt der Ausfahrt, von HIER aus gesehen.
+           *
+           * OB ER VORHER AUS DER BUCHT ZIEHT, WIRD ABGETASTET UND NICHT
+           * FESTGELEGT — genau wie die Drehrichtung einer Kehre (E-084).
+           * Der Zwischenpunkt ist dabei kein neuer Streckenpunkt, sondern
+           * genau der, an dem `toPark` den Wagen abgestellt hat, bevor er
+           * rueckwaerts an die Wand setzte: das Einparken rueckwaerts gelesen.
+           *
+           * Keiner der beiden Wege gewinnt immer, und darum wird gemessen:
+           *
+           *   Warteplatz 1 und 2 liegen am Tor. Das Tor ist 9,0 m breit, der
+           *   zweite Warteplatz 7,5 m oestlich seiner Mitte, und ein
+           *   Dreiachser braucht bei 5,60 m Wendekreis rund 10,6 m Weg, um
+           *   7,5 m zur Seite zu versetzen — zwischen Warteplatz und Nordwand
+           *   sind es 5 m. Ohne Zwischenpunkt: 0,33 / 0,40 m Nordwand West,
+           *   0,37 m Kaffeewagen. Mit: 0,00 m.
+           *   Warteplatz 3 steht vor dem Tor von Halle 3. MIT Zwischenpunkt
+           *   wendet der Wagen genau davor: 0,50 m Halle 3 Sued. Ohne: 0,00 m.
+           */
+          const p = this.parkSpot!;
+          const bucht: [number, number] = [p[0], p[1] - PARK_ANFAHRT_M];
+          const marke = this.punktAuf(this.routeOut, this.nearestS(this.routeOut));
+          const ohne = this.ausfaedelTiefe([marke]);
+          const mit = this.ausfaedelTiefe([bucht, marke]);
+          // 1 cm Toleranz wie in `drehRichtung`: darunter ist es Rundung.
+          // Bei Gleichstand gewinnt der kuerzere Weg, also der ohne Umweg.
+          this.starteAusfaedeln(
+            this.routeOut,
+            "out",
+            this.nearestS(this.routeOut),
+            ohne <= mit + UMRISS_TOLERANZ ? [] : [bucht]
+          );
         }
+        break;
+      case "ausfaedeln":
+        /*
+         * Frei zur Strecke fahren, dann sie aufnehmen. Kein Streckenpunkt ist
+         * dafuer verschoben worden; der Wagen holt nur den Weg nach, den er
+         * bisher uebersprungen hat.
+         */
+        this.sideOpenTarget = 0;
+        this.ausfaedelSchritt(dt);
         break;
       case "out":
         this.sideOpenTarget = 0; // Bordwände zu, bevor es vom Platz geht

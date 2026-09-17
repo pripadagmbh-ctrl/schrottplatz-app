@@ -1,0 +1,9 @@
+24 Saaten, gewuerfelte Haendlerfuhre (rollCustomer), Nachlauf 6 s
+Stand                           |  Mittel  Median Hoechst km/h | durch % | frueh % | Rest % | Abstand max/mittel m
+MESSFENSTER ALT (bis Spur frei) |    24.4    18.2    98.7     |     0.0 |     0.0 |    37.7 |    5.97    4.95
+SPRUNG (vor 17.09.)             |   162.4   171.8   321.8     |    24.5 |     0.0 |     0.0 |   18.56   12.58
+AUSFAEDELN (gebaut)             |    26.8    22.3    98.7     |     0.0 |     0.0 |     0.0 |    5.97    4.95
+
+Gepaart (Sprung minus Ausfaedeln): 135.6 +/- 18.2 km/h, Sprung schlechter in 23 von 24
+Durchfall beim Kippen: 24.5 % gegen 0.0 %; vor dem Kippen: 0.0 % gegen 0.0 %
+Endabstand des entferntesten Stuecks: 18.56 m gegen 5.97 m (Hoechstwert), 12.58 gegen 4.95 m (Mittel)
