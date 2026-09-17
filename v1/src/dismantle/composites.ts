@@ -3,6 +3,7 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import { CAR_DEF, type CarDef, type PartDef } from "./carDef";
 import type { ItemManager } from "../world/scrapItems";
 import type { EventBus } from "../core/events";
+import { AUTOLACK, lackton, verwittert } from "../world/objektbau";
 
 /**
  * Verbundobjekt-System (Briefing Kap. 8, M2-Umfang):
@@ -29,6 +30,73 @@ interface AttachedPart {
 }
 
 const SETTLE_GRACE_STEPS = 90; // nach Spawn keine Aufprall-Events (Setzen des Wracks)
+
+/**
+ * WELCHEN LACK HAT DIESES WRACK?
+ *
+ * Fest am Standort, nicht gewürfelt — dieselbe Regel wie bei `lackton` für
+ * Bauteile: „Dasselbe Objekt sieht nach dem Laden eines Spielstands wieder
+ * gleich aus, ohne dass die Farbe gespeichert werden müsste." Zwei Wracks, die
+ * nebeneinander auf dem Hof stehen, haben verschiedene Standorte und deshalb
+ * verschiedene Farben; dasselbe Wrack an derselben Stelle hat nach dem Laden
+ * wieder seine.
+ *
+ * Das Alter kommt aus derselben Zahl, damit ein blaues Wrack nicht einmal
+ * frisch und einmal durchgerostet dasteht: 0,25 bis 0,85. Ganz unten wäre ein
+ * Neuwagen, ganz oben wäre nichts mehr von der Farbe zu sehen. // SW
+ */
+function lackSchluessel(x: number, z: number): number {
+  // Zentimeter statt Meter: Zwei Wracks 30 cm auseinander sollen sich
+  // unterscheiden, und `lackton` rechnet mit gerundeten Zahlen.
+  const cx = Math.round(x * 100);
+  const cz = Math.round(z * 100);
+  /*
+   * Erst mischen, dann ziehen — und das ist nicht Zierde.
+   *
+   * Der erste Versuch gab `lackton` die Koordinaten direkt (cx, cz, cx+cz).
+   * `lackton` wichtet sie mit 977, 613 und 419, rechnet also
+   * 1396·cx + 1032·cz; beide Faktoren sind durch 4 teilbar, und von einer
+   * Palette aus 16 Farben blieben davon 4 übrig. Gemessen kamen aus zwanzig
+   * Standorten ZWEI verschiedene Lacke heraus.
+   *
+   * Zwei Stufen dagegen, beide nötig (jede einzeln nachgemessen mit
+   * `tools/wracklack.ts` an zwölf Standorten auf einer Geraden — so stehen
+   * Wracks auf einem Hof nämlich, in einer Reihe):
+   *
+   *   nur Koordinaten                    2 Grundtöne
+   *   + Vormischen (Knuth-Faktoren)      2 Grundtöne — LINEAR bleibt linear
+   *   + Lawine (xxHash-Nachmischen)      9 Grundtöne
+   *
+   * Die mittlere Zeile ist der Grund, warum die Lawine drin ist: Eine lineare
+   * Abbildung, so gut ihre Faktoren auch sind, bildet eine Gerade wieder auf
+   * eine Gerade ab. Erst das Schieben und Verodern bricht das auf.
+   */
+  let misch = (Math.imul(cx, 374761393) + Math.imul(cz, 2654435761)) >>> 0;
+  misch ^= misch >>> 15;
+  misch = Math.imul(misch, 2246822519) >>> 0;
+  misch ^= misch >>> 13;
+  misch = Math.imul(misch, 3266489917) >>> 0;
+  misch ^= misch >>> 16;
+  return misch;
+}
+
+/**
+ * Der LACKTON ohne Verwitterung — ab Werk. Getrennt herausgereicht, weil ein
+ * Wächter sonst die Grundfarbe nicht von der Alterung unterscheiden kann und
+ * „zwölf verschiedene Farben" auch dann meldet, wenn es zwei Grundtöne in
+ * zwölf Alterungsstufen sind. Genau das ist am 17.09. passiert.
+ */
+export function wrackGrundton(x: number, z: number): number {
+  // 100000 ist durch 16 teilbar, die durchgerührten unteren Bits bleiben also
+  // erhalten — und an ihnen hängt die Wahl aus der Palette.
+  const k = lackSchluessel(x, z) % 100000;
+  return lackton(AUTOLACK, k, k, k);
+}
+
+export function wrackLack(x: number, z: number): number {
+  const streu = (lackSchluessel(x, z) >>> 11) % 100;
+  return verwittert(wrackGrundton(x, z), 0.25 + (streu / 100) * 0.6);
+}
 
 /**
  * Aus dem Quader eine Karosserie formen.
@@ -156,7 +224,7 @@ export class CarComposite {
     pos: THREE.Vector3
   ) {
     this.currentMassKg = def.totalMassKg;
-    this.buildMeshes();
+    this.buildMeshes(wrackLack(pos.x, pos.z));
     this.group.position.copy(pos);
     scene.add(this.group);
 
@@ -195,12 +263,22 @@ export class CarComposite {
     );
   }
 
-  private buildMeshes(): void {
-    // flatShading: verbeulte Flächen lesen sich als geknautschtes Blech
+  private buildMeshes(lack: number): void {
+    /*
+     * DER LACK KOMMT VOM STANDORT, NICHT AUS EINER KONSTANTEN (17.09.2026).
+     *
+     * Hier stand 0x8c2f24 — jedes Wrack auf dem Platz war derselbe rote
+     * Kasten. `wrackLack` zieht einen der sechzehn Autolacke aus
+     * `objektbau.AUTOLACK` und lässt ihn verwittern.
+     *
+     * Rauheit 0,74 statt 0,50 und Metallglanz 0,12 statt 0,30: Ein Lack, der
+     * zehn Jahre auf dem Hof steht, glänzt nicht mehr. Der alte Wert war für
+     * einen Neuwagen gewählt und ließ jedes Wrack wie frisch poliert aussehen.
+     */
     const paint = new THREE.MeshStandardMaterial({
-      color: 0x8c2f24,
-      roughness: 0.5,
-      metalness: 0.3,
+      color: lack,
+      roughness: 0.74, // SW, siehe oben
+      metalness: 0.12, // SW, siehe oben
       flatShading: true,
     });
     // Klar durchsichtig: Man soll durch die Scheiben hindurchsehen, nicht

@@ -544,20 +544,58 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
 
 ### Offen
 
-- [ ] **Autos brauchen verschiedene Modelle, Farben und Wrackzustände** —
+- [~] **Autos brauchen verschiedene Modelle, Farben und Wrackzustände** —
       Ansage Patrick, 17.09.2026: „und autos, brauchen wir verschiedene
-      modelle, farben und wrackzustände, bitte notieren". Heute gibt es eine
-      Karosserieform. Wrackzustände waren schon einmal als Notiz vermerkt
-      (14.09., „Drei Notizen zum Schrott: Wrackzustaende, Motorraeder,
-      Velos"). Gehört zusammen: Modell, Lackfarbe, und wie weit das Auto
-      schon ausgeschlachtet ist (Räder ab, Motor raus, Scheiben weg,
-      ausgebrannt).
-- [ ] **Kommen die Großteile beim Spieler überhaupt an?** — seine Frage vom
-      17.09.: „was ist eigentlich mit den grossen objekten passiert?". Im
-      Katalog stehen 40 Schwergewichte bis 2,6 t und 4,8 m; `randomCargo`
-      zieht sie mit 50 % in der ersten Runde, bei schweren Kunden 55 %
-      Schwergewichte. Dazwischen liegt `packeLadung`, die verwirft, was nicht
-      auf die Fläche passt. **Zu messen, nicht zu vermuten.**
+      modelle, farben und wrackzustände, bitte notieren".
+
+      **Farben sind gebaut** (E-105): sechzehn echte Autolacke, nach
+      Häufigkeit gewichtet, ausgeblichen und rostig, fest am Standort
+      (`composites.wrackLack`, `objektbau.AUTOLACK`/`verwittert`).
+      Wächter `test/wracklack.test.ts` mit drei Gegenproben.
+
+      **Modelle und Wrackzustände sind NICHT gebaut**, und zwar aus einem
+      gemessenen Grund. `tools/wrackbild.ts`: Ein Wrack ist heute **25 Netze,
+      1 440 Eckpunkte, 21 Geometrien, 12 Materialien** — mit Schattenwurf
+      50 Zeichenrufe, zwei Wracks 100, das sind 7,6 % der gemessenen 1 322.
+      Es ist also nicht ein verschmolzenes Netz je Material, wie E-025 es für
+      den Bagger durchgesetzt hat. Dazu stecken die Karosseriemaße **im
+      Code** (`composites.buildMeshes`: `BoxGeometry(1.7, 0.55, 4.0)` und
+      `(1.5, 0.55, 2.0)`, dazu zwanzig feste Koordinaten in
+      `baueAnbauteile`) und nicht in `CarDef` — Regel 3 ist nur halb erfüllt.
+
+      **Reihenfolge, die sich daraus ergibt:**
+
+      1. Die 13 Anbauteile (Stoßstangen, Grill, Leuchten, Radläufe, Spiegel)
+         zu EINEM Netz mit Eckpunktfarben verschmelzen. Sie hängen alle im
+         `crushGroup` und werden nie einzeln entfernt. 25 → 13 Netze.
+      2. Die Karosseriemaße nach `CarDef` heben (Chassis, Kabine,
+         Anbauteil-Anker als Anteile der Länge, nicht als feste Meter).
+      3. Erst dann die fünf Modelle als reine Maßvarianten:
+         Kleinwagen 1,60 × 3,60 m, Limousine 1,75 × 4,60 m,
+         Kombi 1,78 × 4,80 m, Geländewagen 1,90 × 4,70 m (höher),
+         Transporter 1,95 × 5,20 m (Kabine vorn statt mittig). // SW,
+         Maße aus `KATALOG_HUGE` (Kleinwagen-, Kombi-, SUV-Karosserie,
+         Transporter-Kastenwagen) — dort stehen sie schon.
+         **Das ändert die Silhouette. Patrick entscheidet am Bild.**
+      4. Wrackzustände als Datenfeld in `CarDef`: `raederAb`, `motorRaus`,
+         `scheibenWeg`, `tuerenFehlen`, `ausgebrannt`. Jeder Zustand nimmt
+         genau die `PartDef`s heraus, die er meint, und zieht deren Masse von
+         `totalMassKg` ab — ein Auto ohne Motor wiegt 150 kg weniger und
+         bringt 150 kg Alu weniger. **Vorher/nachher am Tagesverdienst
+         messen** (`tools/grossteile.ts` kann die Rechnung).
+         Ausgebrannt ist der Sonderfall: Lack weg (Ton aus
+         `metallton("steel")`), Kunststoff- und Polsteranteil aus
+         `hullZusammensetzung` heraus, dafür mehr Stahl.
+- [x] **Kommen die Großteile beim Spieler überhaupt an?** — **gemessen und
+      behoben (E-105, 17.09.2026).** Gefunden: `packeLadung` räumte für jedes
+      Stück ein QUADRAT seiner Grundriss-Diagonale frei, obwohl das Teil
+      achsparallel abgesetzt wird. 60 von 64 Schwergewichten passten damit auf
+      keine einzige Ladefläche des Spiels; von 365 gezogenen kamen 7 an
+      (1,9 %), also eines auf jede 137. Fuhre. Jetzt: wirkliches Rechteck,
+      Vierteldrehung erlaubt, 17,9 % kommen an. **Bleibt offen:** 42
+      Katalogeinträge scheitern weiter an der LADEHÖHE (Bordwand + 0,35 m);
+      ob ein einzelnes Großteil höher liegen darf als Schüttgut, ist eine
+      Gestaltungsfrage — Empfehlung im Log.
 
 
 - [ ] **„LKWS fahren durch Müllcontainer"** (17.09.2026) — **gemessen, nicht
