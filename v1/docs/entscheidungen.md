@@ -8115,3 +8115,151 @@ hinweg presste, verlor bis zu 92 %. Beides ist weg.
    Zwölffache nach unten oder das Viereinhalbfache nach oben.
 3. **Vier Abfallsorten pressen, neu laden, abholen lassen.** Es muss **Geld
    kosten**. Bis heute bekam man dafür welches.
+
+---
+
+### E-093 — Lambert räumt selbständig auf: Abfall in die Mulde, solange Platz ist — und der Rest ist gemessen (17.09.2026)
+
+**Was er vorher tat.** Seit dem 13.09. (Ansage: *„er kommt dann nicht mehr bei
+uns aufräumen"*) stand Lambert auf seinem Ostposten (−15,0 | −18,0) und rührte
+sich nicht, bis man ihn mit **Y** rief. Dann holte er Stücke aus der
+Buntmetall-Sortierbox und fuhr sie in das Silo ihrer Fraktion an der Westwand,
+danach stand er wieder da. Die alte Rangfolge von davor — blockierte
+Fahrspuren, Räder mit Alufelge, Buntmetall aus dem Stahlhaufen, weit abgelegte
+Brocken — war nicht gelöscht, sondern über einen Schalter (`RAEUMT_AUF`)
+abgeschaltet: Sie schickte ihn ständig in den Arbeitsbereich des Baggers.
+
+**Entscheidung.** Er räumt wieder von sich aus auf, aber in einem engen Rahmen
+mit genau **zwei** Aufgaben, in fester Reihenfolge (`SELBST_AUFRAEUMEN`):
+
+1. **Liegt Abfall herum, bringt er ihn in eine Abfallmulde** — solange dort
+   Platz ist.
+2. **Sonst schiebt er Schrott von der Büroseite an den Bagger heran.**
+3. **Sonst wartet er** auf dem Ostposten.
+
+Der **Ruf mit Y hat weiter Vorrang** und ist unverändert; ein laufender
+Aufräumauftrag endet dann still.
+
+**„Platz ist" ist gerechnet, nicht geschätzt** (`world/fuellstand.ts`). Es ist
+dieselbe Regel wie beim Beladen eines LKW (E-033), nur nach dem Füllgrad
+aufgelöst und je Fraktion getrennt, weil in einer Mulde mehrere liegen (E-028):
+
+    Schüttvolumen = Σ Masse(f) / Schüttdichte(f)
+    Füllgrad      = Schüttvolumen / Nutzvolumen          (voll ab 0,90)
+
+Das Nutzvolumen kommt aus der Geometrie, nicht aus einer Zahl im Quelltext:
+
+  - **MUELL-Container** 3,60 × 4,30 × 0,80 m außen, 0,09 m Wand (`ROLLOFF_WAND`,
+    dafür aus dem Bauteil herausgezogen) → lichte 3,42 × 4,12 m → **11,27 m³**
+    → voll ab **2.004 kg** gemischtem Abfall (197,5 kg/m³, `abfallDichte`).
+  - **ABFALL-Silo** 6,00 × 4,20 × 3,00 m, zwei Betonlego-Wände à 0,55 m
+    → lichte 5,45 × 3,65 m → **59,68 m³** → voll ab **10.608 kg**.
+
+Kilogramm allein hätten es nicht getan: 900 kg Kunststoff (90 kg/m³) brauchen
+zehnmal so viel Raum wie 900 kg Bleiakku. **0,90 statt 1,00** (SW), weil loser
+Schrott keine Flüssigkeit ist — die Ecken bleiben frei, das Nächste rollt
+wieder herunter. Dieselbe Größenordnung, bei der ein Anlieferer „randvoll"
+heißt (0,85, `delivery/fuellgrad.ts`).
+
+**Wohin er fährt, entscheidet die Entfernung, nicht der Rang.** Es gibt zwei
+Abfallbehälter: den versetzbaren MUELL-Container (E-034) und das ABFALL-Silo
+an der Südwand (E-028). Genommen wird der nächste, den er **erreicht** und in
+dem noch **Platz** ist. Heute ist das immer das Silo — der MUELL-Container
+steht auf (−3,79 | −14,11) und damit in Lamberts Sperrgebiet (`imBaggerrevier`,
+x > −5,0). Wer ihn aus dem Bereich vor dem Bagger schiebt, bekommt den kurzen
+Weg: Das ist dann sichtbar, ohne dass sich eine Zeile Code ändert.
+
+**Das Schieben hat vorher nie funktioniert — gemessen.** `schiebeZiel` legte
+den Brocken stur auf die Gerade Bagger → Teil, 6,0 m vom Sitz. Von acht
+Brocken auf der Büroseite landete **jeder einzelne** in der Buntmetall-Mulde
+oder im Müllcontainer: **0 von 8 wurden geschoben**. Kein Fehler, sondern der
+Platz — seit E-029/E-041 stehen Mulde und Container genau auf dieser Geraden.
+Jetzt sucht er den nächsten **freien Fleck im Schwenkband** (`ablagePlatz`,
+Peilung in 5°-Schritten) und legt ihn auf **8,20 m** ab. Diese Zahl ist aus
+beiden Bandenden gerechnet:
+
+  - Er hält 0,40 m vor dem Ziel an → das Stück liegt bei 8,60 m, **innerhalb**
+    des Bands (bis 9,20). Mit 8,50 lagen gemessen 3 von 7 Brocken bei 9,3 bis
+    9,7 m — hingeschoben und trotzdem nicht zu greifen.
+  - Er selbst steht `SCHIEB_VORLAUF` = 2,40 m dahinter → 10,60 m und damit
+    **außerhalb** des Bands. Mit den alten 6,0 m wären es 8,80 m gewesen, also
+    mitten im Schwenkbereich.
+
+Dazu drei Schranken für den Fleck: kein Bauwerk, keine Sortierfläche, **keine
+Fahrspur** (`world/fahrspuren.ts`, neu — bis hierher konnte ein geschobener
+Brocken mitten auf der Zufahrt landen und war damit genau der Störfall, den
+`laneWatch` meldet). Und 1,60 m Abstand zum nächsten Brocken, sonst stapelt er
+alles auf denselben Fleck: Vor dem Bagger ist nur **ein** Sektor frei.
+
+**Er funkt über den vorhandenen Kanal.** `world/lambertfunk.ts` ist nach Achims
+Vorbild gebaut (E-066): Lagen als Schlüssel, je Lage drei Sätze. Gemeldet wird
+nur der **Wechsel** — wer zwölf Stücke wegfährt, sagt einmal Bescheid und
+einmal, dass er durch ist. Der Text geht an dieselbe Zeile wie der Abholerfunk
+(`hud.toast`), es gibt keinen zweiten Kanal.
+
+**Vorfahrt für den LKW.** Der Platz ist einspurig (E-029), und die Zufahrt läuft
+diagonal über den Hof — genau dort liegt auch der Abfall. Blockieren kann er
+niemanden: `delivery/vehicles.ts` fragt Lambert **nirgends** ab (kein einziger
+Verweis), er hat keinen Kollider, ein LKW fährt durch ihn hindurch. Genau das
+sieht falsch aus. Deshalb: Sobald ein Fahrzeug rangiert, unterbricht er und
+fährt an den Rand; was er in der Schaufel hat oder vor sich herschiebt, bringt
+er vorher zu Ende.
+
+**Messungen** (`tools/lambert-aufraeumen.ts`, 11 Minuten Spielzeit, zwölf
+Abfallstücke und acht Brocken auf dem Hof):
+
+| Größe | Wert |
+|---|---|
+| Abfall weggeräumt | **11 von 12** (das zwölfte liegt hinter der Presse, kein freier Weg) |
+| Brocken geschoben | 4 von 8 — dann ist der eine freie Sektor voll |
+| Ablage der Brocken | 8,0 · 8,3 · 8,5 m vom Sitz, **alle im Band** 5,80–9,20 |
+| **Im Schwenkbereich des Baggers** | **0,0 %** der Zeit |
+| Im alten Sperrgebiet (`imBaggerrevier`) | 0,9 % — nur beim Übergeben |
+| Innerhalb einer LKW-Breite einer Fahrspur | 6,0 % **fahrend**, im **Stehen** 2 von 18.796 Schritten |
+| Prüfstück in seiner Fahrlinie | **0,000 m verschoben, 0,000 m/s** |
+| Körper | 0 von 22 dynamischen wach, 36 gesamt |
+| Physik je Schritt | **0,38 ms** im Mittel, Platz ruhig ab Schritt 145 (2,4 s) |
+| Von Lambert geweckte Körper | **0,0 je Minute** |
+
+**Er macht nichts kaputt, und das hat einen Grund:** Der Radlader ist reine
+Kulisse ohne Kollider. Er bewegt ausschließlich das Stück, das er gerade trägt
+oder schiebt (`setTranslation`); alles andere fährt er hindurch, ohne es
+anzufassen. Das ist der Gegensatz zum Kipper-Katapult (E-073) und zum
+Rangierknick (E-084) — dort schoben echte kinematische Körper gegen Ladung.
+
+Gegenprobe zum Haufen: Mit einem vollen 85-Teile-Starthaufen kommt der Platz in
+**2 von 4** Läufen nicht zur Ruhe — **auch ohne dass Lambert irgendetwas tut**
+(Nullmessung mit `OHNEABFALL=1`: ebenfalls 2 von 4). Die Unruhe ist eine
+Eigenschaft des Haufens und keine Folge dieses Pakets; die wach gebliebenen
+Körper liegen alle auf (1,5 … 6,4 | −30 … −33), also im Starthaufen, 30 m von
+Lamberts Wegen entfernt. Im ausgelieferten Stand (`LEERER_START`) liegt dort
+ohnehin nichts.
+
+**Verworfene Alternativen.**
+
+1. *Den MUELL-Container aus Lamberts Sperrgebiet nehmen.* Wäre der kurze Weg
+   und ein Platzeingriff — sein Halteplatz läge dann in der Fahrlinie des
+   Baggers. Nicht ohne Patricks Entscheidung.
+2. *Ihn auch bei rangierendem LKW weiterarbeiten lassen.* Er kann niemanden
+   aufhalten, es wäre also folgenlos — sieht aber aus, als führe der Wagen
+   durch ihn hindurch.
+3. *Abfall auch schieben statt tragen.* Bei voller Mulde schob er damit
+   Bauschutt vor den Bagger, wo der Spieler ihn nicht loswird. Abfall ist jetzt
+   ausdrücklich vom Schieben ausgenommen.
+4. *Den Füllstand in Kilogramm messen.* Zwei gleich schwere Mulden wären
+   gleich voll — genau der Fehler, den die Schüttdichten (E-033) behoben haben.
+
+**Abnahmekriterium.** Nach einer Anlieferung mit Abfall liegt binnen weniger
+Minuten nichts Loses mehr auf dem Hof, ohne dass jemand Y gedrückt hat; Lambert
+meldet Anfang und Ende; der Bagger schwenkt ohne ihn im Bild.
+
+**Auf dem Gerät zu prüfen.**
+
+1. **Ein paar Bretter und Reifen aus der Spinne fallen lassen und zusehen.**
+   Kommt Lambert von selbst, meldet er sich („ich sammel das ein"), und liegt
+   der Hof danach sauber da?
+2. **Den MUELL-Container mit dem Bagger nach Westen aus dem Arbeitsbereich
+   schieben** (hinter x −5,0). Fährt Lambert danach dorthin statt 20 m weit
+   ans Silo?
+3. **Während er unterwegs ist, einen LKW anliefern lassen.** Bricht er ab und
+   fährt an den Rand — oder steht er dem Wagen im Bild?
