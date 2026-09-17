@@ -12,6 +12,10 @@ import { EM_BREITE, FASSUNGEN, luft, seite, wert, schriftgroesse, type Fassung, 
  * rueckt alle anderen naeher zusammen: acht stehen 45 Grad auseinander, neun
  * nur noch 40, zehn nur noch 36.
  *
+ * Seit E-093 (16.09.2026, Ansage Patrick) sind es wieder ACHT: SCHILDER ist
+ * ins Pausenmenue umgezogen, weil es eine Anzeigeeinstellung ist. Die
+ * reparierte Geometrie bleibt — sie war der eigentliche Befund.
+ *
  * Nachgemessen am 16.09.2026, als KIPPEN als neunter Eintrag dazukam (E-088),
  * und der Befund war unangenehm: Schon die ACHT Eintraege ueberlappten sich —
  * um 3,5 px an den Ecken, auf dem iPad. Der Grund war kein Rechenfehler,
@@ -118,13 +122,30 @@ export function engste(n: number, r: number, w: number, h: number, s: number): n
   return min;
 }
 
-describe("Funktionskranz: neun Eintraege, und was der zehnte kostet", () => {
+describe("Funktionskranz: acht Eintraege, und was der neunte und zehnte kosten", () => {
   const labels = eintraege();
   const r = radius();
 
   it("KIPPEN ist dabei — sonst ist das Seitwaertskippen auf dem iPad nicht da", () => {
     expect(labels, "kein KIPPEN im Kranz").toContain("KIPPEN");
-    expect(labels.length, "der Kranz hat nicht mehr neun Eintraege").toBe(9);
+    expect(labels.length, "der Kranz hat nicht mehr acht Eintraege").toBe(8);
+  });
+
+  it("SCHILDER ist NICHT mehr dabei — es steht im Pausenmenue (E-093)", () => {
+    /*
+     * Ansage Patrick am Geraet, 16.09.2026: „Nimm Schild (Markierungen) aus
+     * dem Menue raus, das kann ueber Hauptmenue geloest werden." Gemeint sind
+     * die Zonenmarkierungen (`btn-marks`, Taste M) — eine Anzeigeeinstellung.
+     * NICHT gemeint ist SCHILD (`btn-blade`, Taste I), das Raeumschild des
+     * Baggers; das ist eine Maschinenfunktion und bleibt im Kranz. Die zwei
+     * Namen sind einander so aehnlich, dass dieser Test beide nennt.
+     */
+    expect(labels, "SCHILDER steht wieder im Kranz").not.toContain("SCHILDER");
+    expect(labels, "SCHILD — das Raeumschild — ist aus dem Kranz verschwunden").toContain("SCHILD");
+    expect(
+      seite.slice(seite.indexOf('<div class="hidden-actions" id="menu-actions">')),
+      "SCHILDER ist nirgends im Menueblock — dann ist Taste M auf dem iPad unerreichbar"
+    ).toContain('<span id="btn-marks">SCHILDER</span>');
   });
 
   for (const f of FASSUNGEN) {
@@ -153,33 +174,94 @@ describe("Funktionskranz: neun Eintraege, und was der zehnte kostet", () => {
     });
   }
 
-  it("ein ZEHNTER Eintrag passt NICHT mehr — mit Zahlen", () => {
+  it("ein NEUNTER Eintrag passt noch, ein ZEHNTER nicht — mit Zahlen", () => {
     /*
-     * Die Antwort auf die Frage, die zu diesem Waechter gefuehrt hat. Zehn
-     * Eintraege ueberlappen sich zwar nicht (0,7 px bleiben auf dem iPad),
-     * aber die Rahmen zweier Nachbarn stossen aneinander. Wer einen zehnten
-     * will, aendert nicht diese Zahl, sondern die Gliederung: ein Eintrag
-     * wandert ins Menue, oder der Kranz bekommt zwei Ringe. Das entscheidet
-     * Patrick, nicht dieser Test.
+     * Die Antwort auf die Frage, die zu diesem Waechter gefuehrt hat, neu
+     * gemessen am 16.09.2026, nachdem SCHILDER ins Menue umgezogen ist
+     * (E-093). Am iPad, R = 112, Kasten 62 x 34, scharf x1,10:
+     *
+     *    acht   14,1 px Luft   (iPhone mini quer: 18,3)
+     *    neun    6,9 px         (11,1)
+     *    zehn    0,7 px         ( 4,9)  -> unter der Schranke
+     *    elf    -4,5 px         (-0,3)  -> Ueberlappung
+     *
+     * Ein Platz ist also frei: Der Kranz vertruege einen neunten Eintrag, ohne
+     * dass sich etwas beruehrt. Was dort hineinkommt, entscheidet Patrick —
+     * dieser Test fuellt den Platz nicht, er haelt ihn nur offen. Wer einen
+     * ZEHNTEN will, aendert nicht diese Zahl, sondern die Gliederung: ein
+     * Eintrag wandert ins Menue, oder der Kranz bekommt zwei Ringe.
      */
     const ipad = FASSUNGEN[0];
     const { w, h } = sektorMass(ipad);
     const s = skala(ipad);
+    const acht = engste(8, r, w, h, s);
     const neun = engste(9, r, w, h, s);
     const zehn = engste(10, r, w, h, s);
-    expect(neun).toBeGreaterThanOrEqual(MIN_LUFT);
+    expect(acht, `acht Eintraege haben ${acht.toFixed(1)} px Luft`).toBeGreaterThanOrEqual(MIN_LUFT);
+    expect(
+      neun,
+      `der freie neunte Platz haette nur ${neun.toFixed(1)} px — er ist NICHT mehr frei`
+    ).toBeGreaterThanOrEqual(MIN_LUFT);
     expect(zehn, `zehn Eintraege haetten ${zehn.toFixed(1)} px Luft`).toBeLessThan(MIN_LUFT);
+  });
+
+  it("R = 112 waere fuer acht Eintraege nicht noetig — die Zahl, die das belegt", () => {
+    /*
+     * Zur Frage „kann RADIAL_R wieder kleiner werden?" (Auftrag 16.09.2026).
+     * Rechnerisch ja: Mit acht Eintraegen reicht R = 101, um die 6-px-Schranke
+     * in allen drei Fassungen zu halten. Gemacht wird es nicht — der
+     * Halbmesser ist reine Ansicht (gewaehlt wird ueber die RICHTUNG des
+     * Daumenzugs), und 112 haelt den neunten Platz offen. Der Test haelt die
+     * Herleitung fest, damit die Zahl 101 nicht beim naechsten Mal wieder
+     * geschaetzt werden muss.
+     */
+    const ipad = FASSUNGEN[0];
+    const { w, h } = sektorMass(ipad);
+    const s = skala(ipad);
+    let kleinstes = 0;
+    for (let rr = 60; rr <= r; rr++) {
+      const eng = Math.min(
+        ...FASSUNGEN.map((f) => {
+          const m = sektorMass(f);
+          return engste(8, rr, m.w, m.h, skala(f));
+        })
+      );
+      if (eng >= MIN_LUFT) {
+        kleinstes = rr;
+        break;
+      }
+    }
+    expect(kleinstes, "kein Halbmesser unter 112 haelt acht Eintraege auseinander").toBeGreaterThan(0);
+    expect(kleinstes, `rechnerisches Minimum liegt bei R = ${kleinstes}`).toBe(101);
+    expect(r, "RADIAL_R steht nicht mehr auf 112 — dann gehoert E-093 fortgeschrieben").toBe(112);
+    // Und der gewaehlte Halbmesser hat mehr Luft als das Minimum, nicht weniger
+    expect(engste(8, r, w, h, s)).toBeGreaterThan(MIN_LUFT);
   });
 
   it("GEGENPROBE: die Masse von gestern wuerden gemeldet", () => {
     /*
      * R = 104, Kasten 76 x 30 als INHALT (also 80 x 34 sichtbar), scharf
      * x1,15 — der Stand bis zum 16.09.2026. Schon mit ACHT Eintraegen faellt
-     * er durch. Ohne diese Gegenprobe koennte die Rechnung oben stillschweigend
-     * immer gruen sein.
+     * er durch: -6,1 px, die Kaesten ueberlappten sich. Genau darum ist der
+     * Rueckweg auf acht Eintraege KEIN Rueckweg auf die alte Geometrie.
+     * Ohne diese Gegenprobe koennte die Rechnung oben stillschweigend immer
+     * gruen sein.
      */
     expect(engste(8, 104, 80, 34, 1.15), "die alten Masse fallen nicht auf").toBeLessThan(0);
     expect(engste(9, 104, 80, 34, 1.15)).toBeLessThan(0);
+  });
+
+  it("GEGENPROBE: ein zu kleiner Halbmesser wird gemeldet", () => {
+    /*
+     * Zur Zahl 101 oben. Bei R = 100 bleiben acht Eintraegen auf dem iPad nur
+     * 5,6 px — unter der Schranke. Faellt das hier NICHT auf, misst die Suche
+     * nach dem kleinsten Halbmesser nichts.
+     */
+    const ipad = FASSUNGEN[0];
+    const { w, h } = sektorMass(ipad);
+    const s = skala(ipad);
+    expect(engste(8, 100, w, h, s), "R = 100 faellt nicht auf").toBeLessThan(MIN_LUFT);
+    expect(engste(8, 101, w, h, s), "R = 101 sollte gerade reichen").toBeGreaterThanOrEqual(MIN_LUFT);
   });
 
   it("GEGENPROBE: ein groesserer Kasten faellt durch", () => {

@@ -132,7 +132,13 @@ const TASTEN: Record<string, Zeile> = {
   KeyV: { wirkung: "Abholung rufen/abfahren", touch: "Kranz: ABHOLEN" },
   KeyJ: { wirkung: "zur Waage schicken", touch: "Kranz: ZUR WAAGE" },
   KeyY: { wirkung: "Lambert rufen", touch: "Kranz: LAMBERT" },
-  KeyM: { wirkung: "Zonenschilder an/aus", touch: "Kranz: SCHILDER" },
+  /*
+   * E-093: SCHILDER zog aus dem Kranz ins Pausenmenue (`pause-markierungen`).
+   * Der Waechter wurde dafuer NICHT gelockert — er verlangt fuer „Menue: …"
+   * genau dasselbe wie fuer „Kranz: …", naemlich eine Abfrage in main.ts.
+   * Geaendert ist nur die Ortsangabe, damit die Tabelle nicht luegt.
+   */
+  KeyM: { wirkung: "Zonenschilder an/aus", touch: "Menue: SCHILDER" },
   KeyK: { wirkung: "Greifer zur Seite kippen (E-085) / speichern", touch: "Kranz: KIPPEN" },
   KeyZ: { wirkung: "Platz ausbauen", touch: "Menue: AUSBAU" },
   KeyU: { wirkung: "Musik an/aus", touch: "Menue: MUSIK" },
@@ -160,7 +166,7 @@ const TASTEN: Record<string, Zeile> = {
     grund:
       "Fehlersuche, nicht Spiel. Erreichbar bleibt sie trotzdem: fuenf Finger " +
       "gleichzeitig aufs Glas (`bindDebugGeste`). Ein Knopf im Kranz wuerde " +
-      "einen der neun Plaetze fuer etwas belegen, das Patrick nie braucht.",
+      "einen der acht Plaetze fuer etwas belegen, das Patrick nie braucht.",
   },
   KeyL: {
     wirkung: "Stand laden",

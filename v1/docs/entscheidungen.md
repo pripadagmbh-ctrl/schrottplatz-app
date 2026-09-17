@@ -8115,3 +8115,142 @@ hinweg presste, verlor bis zu 92 %. Beides ist weg.
    Zwölffache nach unten oder das Viereinhalbfache nach oben.
 3. **Vier Abfallsorten pressen, neu laden, abholen lassen.** Es muss **Geld
    kosten**. Bis heute bekam man dafür welches.
+
+---
+### E-093 — SCHILDER verlässt den Funktionskranz und wird ein Menüeintrag; der Kranz steht wieder auf acht (17.09.2026)
+
+**Ansage Patrick** (am Gerät, 16.09.2026, nach dem ersten Blick auf den neuen
+Kranz): „Nimm Schild (Markierungen) aus dem Menü raus, das kann über Hauptmenü
+gelöst werden."
+
+Gemeint ist der Kranzeintrag **SCHILDER** (`btn-marks`, Taste M, die
+Zonenmarkierungen auf dem Platz). **Nicht** gemeint ist **SCHILD**
+(`btn-blade`, Taste I, das Räumschild des Baggers) — das ist eine
+Maschinenfunktion und bleibt, wo es ist. Die beiden Namen liegen so nah
+beieinander, dass `test/funktionskranz.test.ts` jetzt beide ausdrücklich nennt:
+SCHILDER darf nicht mehr im Kranz stehen, SCHILD muss.
+
+Das deckt sich mit dem, was E-088 selbst vorgeschlagen hatte: „Kandidat zum
+Auslagern ins Menü: SCHILDER — eine Anzeigeeinstellung, keine
+Maschinenfunktion."
+
+#### Entscheidung
+
+1. **SCHILDER steht im Pausenmenü, an dritter Stelle** — direkt unter
+   „Steuerung", als `pause-markierungen` mit der Beschriftung
+   **„Zonenmarkierungen an/aus"**. Die versteckte Trägermarke `btn-marks`
+   wandert von der Kranzliste in den Block `#menu-actions`, zu AUSBAU und
+   MUSIK. Verdrahtet ist es genau wie diese beiden: Der Span trägt nur den
+   Tastencode, gedrückt wird der echte Knopf im Pausenfeld.
+2. **Taste M bleibt.** Tastatur und Knopf rufen dieselbe Zeile
+   (`schalteMarkierungen` in `main.ts`), damit nichts auseinanderlaufen kann.
+3. **Der Zustand steht am Knopf** — als gelber Balken am unteren Rand, aus
+   **derselben CSS-Regel**, die der Kranz für „eingeschaltet" benutzt
+   (`#radial .sektor.an::after, #pause button.an::after`). Es gibt keine
+   zweite Art, „ist an" zu sagen; `test/menue-markierungen.test.ts` besteht
+   darauf, dass es eine gemeinsame Regel bleibt.
+4. **`RADIAL_R` bleibt 112.**
+
+#### Warum an dritter Stelle und nicht unten bei Musik
+
+Die Zonenmarkierungen sind eine Sichthilfe beim Sortieren. Wer sie sucht, sucht
+sie mitten im Spiel — und das Pausenfeld ist auf dem iPad **schon vorher zu
+hoch fürs Bild gewesen**: 769 px gegen 676 px Grenze (`max-height: 88vh`), es
+scrollt seit längerem, ohne dass es jemandem aufgefallen ist. Ein zehnter Knopf
+ganz unten wäre unsichtbar gewesen. An dritter Stelle steht er ohne Scrollen
+da. (Dass das Feld überhaupt scrollt, ist eine eigene Frage — sie gehört nicht
+in diesen Umzug, siehe „Offen".)
+
+#### Der Kranz, neu vermessen
+
+Mit der in E-088 reparierten Geometrie (`box-sizing: border-box`, Kasten
+62 × 34 bzw. 58 × 30, scharfgestellt × 1,10):
+
+| Einträge | Luft iPad | Luft iPhone mini quer |
+|---|---|---|
+| **acht (heute)** | **14,1 px** | **18,3 px** |
+| neun | 6,9 px | 11,1 px |
+| zehn | 0,7 px | 4,9 px |
+| elf | −4,5 px | −0,3 px |
+
+Schranke ist 6 px (zwei 2-px-Rahmen plus 2 px sichtbarer Spalt).
+
+**Ein Platz ist frei:** Ein neunter Eintrag ginge, ohne dass sich etwas
+berührt. Er wird **nicht gefüllt** — was in den Kranz kommt, entscheidet
+Patrick.
+
+#### Verworfene Alternative: `RADIAL_R` zurück auf 104
+
+Rechnerisch ginge der Halbmesser für acht Einträge bis **101** herunter. Drei
+Gründe dagegen:
+
+- Der Halbmesser ist **reine Ansicht**. Gewählt wird über die *Richtung* des
+  Daumenzugs, nicht über den Weg (`RADIAL_MIN_PX = 34`) — ein kleinerer Ring
+  macht das Ziehen nicht kürzer, nur das Bild enger.
+- Die **104 waren nie ein guter Wert**, sondern der Wert zur kaputten
+  Geometrie vor E-088. Mit den echten Randboxen ergaben sie schon bei acht
+  Einträgen **−6,1 px**, also Überlappung. Zurück auf 104 wäre kein Rückweg,
+  sondern ein neuer Fehler.
+- 112 hält den freien neunten Platz offen, ohne dass später wieder an der Zahl
+  gedreht werden muss.
+
+Der Unterschied im Bild ist klein: Bei R = 104 statt 112 wächst der Streifen,
+in dem der Kranz vollständig sichtbar ist, auf dem iPhone mini quer von 97 auf
+113 px Höhe. Kein Grund, etwas anzufassen, das Patrick nicht beanstandet hat.
+
+#### Was das Pausenfeld kostet
+
+| Fassung | Knöpfe | Feld vorher | Feld nachher | Grenze |
+|---|---|---|---|---|
+| iPad quer | 9 → 10 | 769 px | 833 px | 676 px (scrollte schon vorher) |
+| iPhone mini quer | 9 → 10 | 334 px | **334 px** | 353 px (passt) |
+
+Auf dem iPhone mini kostet der neue Knopf **null Pixel**: Das Feld steht dort
+zweispaltig, neun Knöpfe brauchten fünf Reihen und ließen eine halbe Zelle
+leer — der zehnte füllt genau die.
+
+Gerechnet und gezeichnet in
+`docs/messungen/2026-09-17-schilder-ins-menue/` (vier Bilder, kein Browser).
+
+#### Wächter
+
+- `test/funktionskranz.test.ts`: acht Einträge, SCHILDER raus / SCHILD drin,
+  neue Zahlenreihe acht–neun–zehn, und die Herleitung von R = 101. Vier
+  Gegenproben, darunter neu: „ein zu kleiner Halbmesser wird gemeldet"
+  (R = 100 fällt durch, R = 101 hält gerade).
+- `test/menue-markierungen.test.ts` (neu, 13 Prüfungen): Knopf im Pausenfeld,
+  Klickhandler in `main.ts`, **eine** Stelle, die `setLabelsVisible` ruft,
+  Anfangszustand am Knopf, gemeinsame Balkenregel mit dem Kranz, Träger
+  (`position: relative`), Farbe nicht als einziger Kanal. Vier Gegenproben.
+- `test/tastenerreichbarkeit.test.ts` wurde **nicht gelockert**. Der Wächter
+  verlangt für „Menue: …" genau dasselbe wie für „Kranz: …". Geändert ist nur
+  die Ortsangabe in der Tabelle, damit sie nicht lügt.
+
+**Zur Probe rot gemacht:** SCHILDER testweise in den Kranz zurückgeschoben →
+drei Wächter melden. Den Menüknopf testweise aus `index.html` gelöscht → zwei
+Wächter melden.
+
+**Abnahmekriterium.** `npm run build` mit Rückgabewert 0 GEPRÜFT. `npm test`
+mit Rückgabewert 0 GEPRÜFT.
+
+#### Offen — nicht entschieden
+
+1. **Das Pausenfeld scrollt auf dem iPad** (833 px gegen 676 px). Das ist
+   älter als dieser Umzug. Zweispaltig wie im Querformat, oder kürzere
+   Hinweiszeile, oder so lassen? Gestalterisch, also Patricks Entscheidung.
+2. **„Musik an/aus" hat keinen Zustandsbalken**, obwohl es derselbe Umschalter
+   ist. Jetzt gibt es einen Knopf mit und einen ohne. Nachziehen wäre zwei
+   Zeilen — angefasst wurde es nicht, weil es nicht im Auftrag stand.
+3. **Der freie neunte Platz im Kranz** bleibt leer.
+
+**Auf dem Gerät zu prüfen.**
+
+1. **Rechten Daumen stillhalten.** Stehen acht Einträge im Kranz, und ist
+   SCHILDER weg — während SCHILD (das Räumschild) noch da ist?
+2. **Menü oben rechts öffnen.** Steht „Zonenmarkierungen an/aus" an dritter
+   Stelle, und trägt es den gelben Balken? Antippen: Balken weg, Schilder auf
+   dem Platz weg?
+3. **Auf dem iPhone mini quer das Menü öffnen.** Passt es ohne Wischen aufs
+   Bild — zehn Knöpfe in fünf Reihen?
+4. **Auf dem iPad das Menü öffnen.** Wie weit muss man wischen, bis „Neues
+   Spiel" zu sehen ist? (Das ist die offene Frage 1.)
