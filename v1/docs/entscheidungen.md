@@ -8758,3 +8758,146 @@ Prüfungen mehr). `npx tsc -p tsconfig.test.json` Rückgabewert 0.
    Hubhöhe darf es kosten? Eine Sperre bei 25° nimmt 1,14 m weg (Krallenspitze
    7,67 → 6,53 m); die waagerechte Reichweite und alle Mulden bleiben, wie sie
    sind.
+---
+
+### E-096 — Eine Rechnung statt zwei: die Kasse folgt dem Muldenschild (17.09.2026)
+
+**Der Kreislauf ist auf.** Patrick hat die Wirtschaft am 17.09.2026
+freigegeben ("Kreislauf ganz aufmachen"). Damit ist **E-016 in seinem zweiten
+Teil erfüllt** — die Sperre "Kreislaufsachen noch nicht" vom 14.09. gilt nicht
+mehr.
+
+**Der Befund.** Das Muldenschild rechnete über **Fraktionen**
+(`containerValueGemischt`), die Kasse über **Rohstoffe** (`sellContainer`).
+Zehn Widersprüche standen als W-1 bis W-10 in `docs/fraktionen.md`; alle zehn
+sind am 17.09. gegen den heutigen Stand **nachgemessen** worden
+(`tools/kassensturz.ts`) und galten noch. Der teuerste: Ein Kühlschrank steht
+mit 8,80 € am Schild und brachte 1,93 € an der Kasse — 22 %.
+
+**Entscheidung: Das Schild ist maßgeblich, die Kasse folgt ihm.**
+`Account.sellContainer` rechnet jetzt mit derselben Funktion
+(`containerValueGemischt`) und denselben zwei Zutaten wie das Schild und wie
+die Presse: **Fraktion je Stück, Gewicht aus der Zusammensetzung.**
+
+**Begründung — drei Quellen, kein Geschmack:**
+
+1. `docs/02_Briefing.md` Kap. 9/10 schreibt "Erlös = Inhalt × Verkaufspreis ×
+   **Reinheit²**". Das Schild rechnet so; die Kasse hatte Reinheit hoch drei,
+   begründet nur mit einem Kommentar.
+2. **E-091 hat dieselbe Frage an der Presse schon entschieden** — zugunsten der
+   Fraktionen ("danach sortiert der Spieler, danach rechnet das Muldenschild,
+   danach bestellt der Abholer"). Die Kasse war die letzte Stelle, die noch
+   Rohstoffe las.
+3. **Der Ankaufspreis hängt daran.** 0,16 €/kg Ankauf ist genau der
+   Verkaufspreis von Mischschrott ("wer nur Mischschrott macht, arbeitet für
+   null"). Über Rohstoffe brachte ein Kühlschrank 0,035 €/kg — der Spieler
+   machte bei jedem Verbundteil Verlust, ohne dass das jemand entschieden
+   hätte.
+
+**Verworfene Alternative:** Die Kasse als maßgeblich zu nehmen und das Schild
+auf Rohstoffe umzustellen. Das hätte gegen alle drei Quellen verstoßen — und
+gegen den Spieler: Er sortiert nach Fraktionen, die Mulden sind nach Fraktionen
+beschildert, Lambert sortiert nach Fraktionen, die Presse etikettiert nach
+Fraktionen. Die Kasse war die einzige Abweichlerin.
+
+Die Annahme im Auftrag, die Kasse sei "ehrlicher, weil sie über Rohstoffe
+rechnet", hält dem Code nicht stand: Sie rechnete **nicht** je Stoff zum
+eigenen Preis, sondern nahm die schwerste Fraktion und zahlte alles zu deren
+Preis. Je Stoff zum eigenen Preis rechnet nur das Schild.
+
+**Die Sammelmulden — ohne zweite Liste.** Was zusammen abgerechnet wird, steht
+schon in `containers.ts`: die **Silo-Reihe** (`lager: true`) mit ihrem Feld
+`mitFraktionen`. `economy/fraktionsgruppen.ts` fragt nur nach. Gruppen heute:
+KUPFER-LAGER {Kupfer, Messing}, ALU-LAGER {Alu, Zink}, KABEL, VA, BATTERIEN,
+ABFALL {Baumischabfall, Reifen, Holz, Kunststoff}. Stahl und Mischschrott haben
+kein Silo und stehen für sich.
+
+Nicht die Mulden am Bagger: Die BUNT+VA-Mulde fasst sieben Fraktionen, ist aber
+"Durchgang, nicht Abrechnung" (E-028). Ihr Schild nennt darum den **sortierten**
+Wert — 1742 €, und der ist jetzt über die vier Silos auf den Cent erreichbar.
+In einem Zug abgekippt bringt dieselbe Mulde 127,78 €.
+
+**getBaleBonus: verdrahtet, nicht gelöscht.** `main.ts:713` setzte ihn auf 1,6,
+niemand las ihn — der Ausbau "Größere Presse" (42.000 €) tat nachweislich
+nichts. Löschen ginge nur mit einer Änderung in `main.ts`. Verdrahtet ist er
+als das, was im Kaufmenü steht — **"Schwerere Pakete, mehr Ladung je
+Abholung"**, also auf die **Pressdichte**: 1,6 macht dasselbe Paket 37,5 %
+kleiner (Kante −14,5 %), es passt rund die 1,6-fache Masse auf einen Abholer.
+Ein Geldfaktor wäre eine Preisänderung ohne Quelle gewesen.
+
+**Nebenbefund, mitrepariert.** Die Umstellung hätte E-091 wieder aufgemacht: Ein
+Paket aus 64 kg Kupfer und 217 kg Messing heißt "Mischschrott" (keine Fraktion
+hat 95 %) und wäre von 1393,90 € auf 44,96 € gefallen — Pressen hätte wieder
+Sortierarbeit vernichtet. Ein Paket ist kein Stück, sondern ein **Bündel**. Es
+trägt jetzt zwei Listen: `composition` (woraus es gemacht ist — Farbe,
+Gewicht) und **`fraktionsmix`** (welche Fraktionen hineingingen — das Geld).
+Beide hängen an der FORM und überstehen damit den Spielstand, wie in E-092.
+
+**Gemessen (96 Tage à 12 Fuhren, `tools/kassensturz.ts`, dieselben Ladungen für
+beide Rechnungen, 21,3 t Umschlag je Tag):**
+
+| | alt | neu |
+|---|---:|---:|
+| Erlös, je Mulde sortiert verladen | 8378 €/Tag | 9178 €/Tag |
+| Erlös, je Fraktion einzeln verladen | 8785 €/Tag | 9178 €/Tag |
+| Erlös, gar nicht sortiert | 1333 €/Tag | 1154 €/Tag |
+| **Verdienst nach Ankauf** | **4968 €/Tag** | **5768 €/Tag** |
+
+**Das Spiel wird für den sortierenden Spieler spürbar leichter: +14 bis +16 %** 
+(drei Läufe). Für den, der alles auf einen Wagen kippt, wird es um 11 bis 13 %
+schwerer. Der Abstand zwischen sauber und schlampig wächst von Faktor 6,3 auf
+8,0. **Kein Preis, kein Reinheitsexponent, kein Startkapital wurde angefasst** —
+das ist allein die Folge der richtigen Buchführung. Ob der Sprung bleiben soll,
+ist Balancing und damit Patricks Entscheidung, nicht meine.
+
+Neu ist außerdem eine Eigenschaft, die vorher fehlte: Es ist **gleich, ob je
+Fraktion oder je Mulde verladen wird** (beide 9178 €/Tag). Vorher kostete das
+Zusammenlegen 407 € am Tag.
+
+**Zur Probe rot gemacht (Gegenproben).** Die alte Kasse als Vergleichsrechnung
+in `test/fraktionen.test.ts` stehengelassen: Sie fällt bei drei der sieben
+Prüffuhren durch, mit bis zu 970 € Abweichung. Die vier anderen stimmen auch
+alt — und das ist kein Zufall: Bei einer Mulde mit nur EINER Fraktion sind
+beide Formeln algebraisch dasselbe (`passend × r² = gesamt × r³`). Genau
+deshalb ist der Fehler so lange unbemerkt geblieben; er zeigt sich nur an den
+Sammelmulden. Zusätzlich: `fraktionsmix` beim "Speichern" absichtlich gelöscht
+→ der Ballen fällt von 1393,90 € auf 44,96 €, und der Wächter meldet.
+
+**Abnahmekriterium.** `npm run build` mit Rückgabewert 0 GEPRÜFT (einzeln
+aufgerufen). `npm test` mit Rückgabewert 0 GEPRÜFT (einzeln aufgerufen,
+113 Dateien, 1329 Tests). Beim ersten Versuch gab `npm test` **2** zurück —
+der `pretest`-Typcheck hatte eine ungenutzte Variable gefunden; die letzten
+Zeilen der Ausgabe hätten das nicht verraten.
+
+**Objektzahl:** unverändert (E-080). Kein neues Netz, kein neuer Körper. Die
+Ballengröße ändert sich nur, wenn der Ausbau "Größere Presse" gekauft ist —
+und der wird erst ab 160 t Umschlag angeboten.
+
+#### Offen — nicht entschieden
+
+1. **Bleibt der +16-%-Sprung?** Balancing, also Patricks Entscheidung.
+   Empfehlung: erst auf dem Gerät spielen, dann entscheiden — die Zahl steht,
+   und ein Preis lässt sich später an einer Stelle drehen.
+2. **W-8, die zweite Reinheit.** Die Ladeanzeige des wartenden Abholers
+   (`main.ts:1439-1441`) zählt weiter nur die bestellte Fraktion; für 100 kg
+   Kupfer + 100 kg Messing steht an der Mulde 100 % und am Abholer 50 %. Die
+   Kasse meldet jetzt 100 %. Eine Zeile in `main.ts` — nicht angefasst, weil
+   die Datei einem anderen gehört. Empfehlung: `zaehltZu(bestellt, id)` aus
+   `economy/fraktionsgruppen.ts` statt des Gleichheitsvergleichs.
+3. **W-7, der Kommentar.** `containers.ts:96-99` verspricht "für alles den
+   Kupferpreis". Das war schon vorher falsch und ist es jetzt anders herum:
+   Jede Fraktion bekommt ihren eigenen Preis. Nachziehen — `containers.ts`
+   gehört einem anderen.
+4. **Was das Schild einer Durchgangsmulde zeigen soll.** Heute der sortierte
+   Wert (1742 €). Der Wert beim Abkippen in einem Zug wären 127,78 €. Beides
+   ist vertretbar; ich habe nichts geändert.
+
+**Auf dem Gerät zu prüfen.**
+
+1. **Kupfer und Messing zusammen ins KUPFER-LAGER legen**, dann den Abholer für
+   Kupfer rufen und die Mulde leerladen. Steht am Ende derselbe Betrag im
+   Toast, der vorher am Muldenschild stand?
+2. **Vier Abfallsorten in die Müllmulde**, Abholer rufen. Kostet das jetzt
+   spürbar Geld (rund 17 € je 400 kg) statt fast nichts?
+3. **Fünf Kühlschränke auf den Mischschrottplatz**, abholen lassen. Bringt das
+   rund 44 € statt 10 € — und fühlt sich der Tag dadurch zu leicht an?

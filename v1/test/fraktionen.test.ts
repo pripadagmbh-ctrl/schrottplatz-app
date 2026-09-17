@@ -33,6 +33,7 @@ import { SPECS } from "../src/world/scrapItems";
 import { KATALOG_BIG, KATALOG_HUGE, type PileSpec } from "../src/world/objektkatalog";
 import { baueGeometrie } from "../src/world/objektbau";
 import { CONFIGS, gehoertHierhin } from "../src/world/containers";
+import { abrechnungsgruppe, zaehltZu } from "../src/economy/fraktionsgruppen";
 import { deltaEHex, pruefeDeltaE } from "../tools/farbabstand";
 
 const ALLE: PileSpec[] = [...SPECS, ...KATALOG_BIG, ...KATALOG_HUGE];
@@ -205,68 +206,120 @@ describe("Jede Fraktion hat ein Ziel — und eine hat keins in Reichweite", () =
   });
 });
 
-describe("Schild und Kasse rechnen verschieden (Befund W-1 bis W-10)", () => {
-  it("bei einer einzigen Fraktion stimmen sie überein", () => {
-    // 760 kg Stahl, 240 kg Fremdes: Reinheit 76 %.
-    const inhalt: Array<[string, number]> = [
-      ["steel", 760],
-      ["mixed", 240],
-    ];
-    expect(schild("c_steel", inhalt)).toBeCloseTo(109.744, 3);
-    expect(verkauf(inhalt, "steel")).toBeCloseTo(109.744, 3);
+describe("Schild und Kasse rechnen dieselbe Rechnung (E-094, war W-1 bis W-10)", () => {
+  /**
+   * Die Kasse, wie sie bis zum 16.09.2026 rechnete — nur für die Gegenprobe.
+   *
+   * Eine schwerste Fraktion, ihr Preis für die ganze Ladung, Reinheit hoch
+   * drei, `mitFraktionen` unbekannt. Sie steht hier, damit der Wächter
+   * beweisen kann, dass er Zähne hat: Wer die beiden Rechnungen wieder
+   * auseinanderzieht, muss auffallen.
+   */
+  function alteKasse(inhalt: Array<[string, number]>, order?: string | null): number {
+    let gesamt = 0;
+    let dominant = "";
+    let dominantKg = 0;
+    for (const [, kg] of inhalt) gesamt += kg;
+    if (order && inhalt.some(([id]) => id === order)) {
+      dominant = order;
+      dominantKg = inhalt.filter(([id]) => id === order).reduce((s, [, kg]) => s + kg, 0);
+    } else {
+      for (const [id, kg] of inhalt) {
+        if (kg > dominantKg) {
+          dominantKg = kg;
+          dominant = id;
+        }
+      }
+    }
+    const r = dominantKg / gesamt;
+    return gesamt * preis(dominant) * r * r * r;
+  }
+
+  /** Jede Mulde mit ihrer Fraktion und einer Fuhre, die genau hineingehört. */
+  const faelle: Array<{ container: string; order: string; inhalt: Array<[string, number]> }> = [
+    { container: "c_steel", order: "steel", inhalt: [["steel", 760], ["mixed", 240]] },
+    { container: "c_copper_lager", order: "copper", inhalt: [["copper", 100], ["brass", 100]] },
+    { container: "c_alu_lager", order: "alu", inhalt: [["alu", 100], ["zinc", 100]] },
+    { container: "c_cable_lager", order: "cable", inhalt: [["cable", 250]] },
+    { container: "c_va_lager", order: "va", inhalt: [["va", 180], ["steel", 20]] },
+    { container: "c_battery", order: "battery", inhalt: [["battery", 300]] },
+    {
+      container: "c_rubble",
+      order: "rubble",
+      inhalt: [["rubble", 100], ["tires", 100], ["wood", 100], ["plastic", 100]],
+    },
+  ];
+
+  it("für jede Lagermulde steht auf dem Schild, was die Kasse zahlt", () => {
+    for (const f of faelle) {
+      const a = schild(f.container, f.inhalt);
+      const b = verkauf(f.inhalt, f.order);
+      expect(b, `${f.container}: Schild ${a.toFixed(2)} €, Kasse ${b.toFixed(2)} €`).toBeCloseTo(
+        a,
+        2
+      );
+    }
   });
 
-  it("BEFUND: bei einer Mulde mit mehreren Fraktionen um Faktor 87 auseinander", () => {
-    const inhalt: Array<[string, number]> = [
-      ["copper", 100],
-      ["brass", 100],
-      ["alu", 100],
-      ["zinc", 100],
-      ["cable", 100],
-      ["va", 100],
-    ];
-    // Das Schild zählt alle sechs als „gehört hierhin" — 100 % rein.
-    expect(schild("r_bunt", inhalt)).toBeCloseTo(1742, 2);
-    // Die Kasse kennt `mitFraktionen` nicht: Kupfer dominiert, Reinheit 1/6.
-    expect(verkauf(inhalt)).toBeCloseTo(20, 2);
-  });
-
-  it("BEFUND: auch die zusammengelegten Lagersilos liegen um das Sechsfache daneben", () => {
-    const kupfer: Array<[string, number]> = [
-      ["copper", 100],
-      ["brass", 100],
-    ];
-    expect(schild("c_copper_lager", kupfer)).toBeCloseTo(1150, 2);
-    expect(verkauf(kupfer)).toBeCloseTo(180, 2);
-
-    const alu: Array<[string, number]> = [
-      ["alu", 100],
-      ["zinc", 100],
-    ];
-    expect(schild("c_alu_lager", alu)).toBeCloseTo(232, 2);
-    expect(verkauf(alu)).toBeCloseTo(37.5, 2);
-  });
-
-  it("BEFUND W-9: gemischter Abfall kostet weniger Gebühr als sortenreiner", () => {
+  it("GEGENPROBE: die alte Kasse fällt bei genau diesen Fuhren durch", () => {
     /*
-     * `containerValue` und `containerValueGemischt` fangen negative Preise
-     * ausdrücklich ab; `sellContainer` nicht. Wer sauber trennt, zahlt mehr.
+     * Ohne diesen Test wäre der obige wertlos — er könnte trivial grün sein.
+     * Hier steht, dass er die Abweichung wirklich sieht: Die Rechnung von
+     * gestern weicht bei drei der sieben Fuhren ab, um bis zum 68-fachen.
+     *
+     * Die vier anderen stimmen auch mit der alten Rechnung überein, und das
+     * ist kein Zufall: Fasst eine Mulde nur EINE Fraktion, sind beide Formeln
+     * algebraisch dasselbe (`passend × r² = gesamt × r³`, weil `r =
+     * passend/gesamt`). Genau deshalb ist der Fehler so lange unbemerkt
+     * geblieben — er zeigt sich nur an den Sammelmulden.
      */
-    const rein: Array<[string, number]> = [["rubble", 400]];
-    const gemischt: Array<[string, number]> = [
+    const abweichungen = faelle
+      .map((f) => ({
+        container: f.container,
+        schild: schild(f.container, f.inhalt),
+        alt: alteKasse(f.inhalt, f.order),
+      }))
+      .filter((x) => Math.abs(x.schild - x.alt) > 0.005);
+    expect(
+      abweichungen.map((x) => x.container),
+      "die alte Kasse muss auffallen"
+    ).toEqual(["c_copper_lager", "c_alu_lager", "c_rubble"]);
+    // Und zwar deutlich, nicht auf der letzten Stelle.
+    const groesste = Math.max(...abweichungen.map((x) => Math.abs(x.schild - x.alt)));
+    expect(groesste).toBeGreaterThan(900); // Kupfer+Messing: 1150 statt 180 €
+  });
+
+  it("W-3/W-4: die Sammelmulden sind sortenrein, nicht Mischschrott", () => {
+    // Kupfer und Messing gehören in DIESELBE Mulde (E-010) — jedes zu seinem
+    // eigenen Preis, keines drückt die Reinheit des anderen.
+    expect(verkauf([["copper", 100], ["brass", 100]], "copper")).toBeCloseTo(1150, 2);
+    expect(verkauf([["alu", 100], ["zinc", 100]], "alu")).toBeCloseTo(232, 2);
+    // Und die Reinheit, die der Spieler dazu abliest, ist 100 %.
+    const r = new Account().sellContainer(
+      [
+        { materialId: "copper", massKg: 100, body: null, composition: undefined },
+        { materialId: "brass", massKg: 100, body: null, composition: undefined },
+      ] as never,
+      items,
+      comps,
+      "copper"
+    );
+    expect(r.purity).toBeCloseTo(1, 6);
+  });
+
+  it("W-9 behoben: gemischter Abfall kostet dieselbe Gebühr wie getrennter", () => {
+    const sorten: Array<[string, number]> = [
       ["rubble", 100],
       ["tires", 100],
       ["wood", 100],
       ["plastic", 100],
     ];
-    expect(schild("r_rubble", gemischt)).toBeCloseTo(-17, 2);
-    expect(verkauf(gemischt)).toBeCloseTo(-0.25, 2);
-    // Sortenrein ist die Gebühr voll fällig — und damit 68-mal so hoch.
-    expect(verkauf(rein)).toBeCloseTo(-16, 2);
-    expect(verkauf(gemischt)).toBeGreaterThan(verkauf(rein));
+    const einzeln = sorten.reduce((s, x) => s + verkauf([x]), 0);
+    expect(verkauf(sorten)).toBeCloseTo(-17, 2);
+    expect(verkauf(sorten)).toBeCloseTo(einzeln, 2);
   });
 
-  it("BEFUND W-10: bei Gleichstand entscheidet die Ladereihenfolge", () => {
+  it("W-10 behoben: die Ladereihenfolge ändert nichts mehr", () => {
     const kupferZuerst: Array<[string, number]> = [
       ["copper", 100],
       ["alu", 100],
@@ -281,8 +334,153 @@ describe("Schild und Kasse rechnen verschieden (Befund W-1 bis W-10)", () => {
       ["brass", 100],
       ["cable", 100],
     ];
-    expect(verkauf(kupferZuerst)).toBeCloseTo(28.8, 2);
-    expect(verkauf(aluZuerst)).toBeCloseTo(6, 2);
+    expect(verkauf(kupferZuerst)).toBeCloseTo(verkauf(aluZuerst), 6);
+    expect(verkauf(kupferZuerst)).toBeCloseTo(184, 2);
+    // Gegenprobe: genau hier war die alte Kasse auseinandergelaufen.
+    expect(alteKasse(kupferZuerst)).toBeCloseTo(28.8, 2);
+    expect(alteKasse(aluZuerst)).toBeCloseTo(6, 2);
+  });
+
+  it("W-1/W-2 bleiben — die Buntmulde ist Durchgang, und ihr Schild sagt das Ziel", () => {
+    /*
+     * BUNT + VA nimmt sieben Fraktionen auf, ist aber ausdrücklich „Durchgang,
+     * nicht Abrechnung" (E-028). Ihr Schild zeigt darum nicht, was die Mulde
+     * in einem Zug gekippt bringt, sondern was ihr Inhalt SORTIERT wert ist —
+     * und diese Zahl ist jetzt auf den Cent erreichbar.
+     */
+    const inhalt: Array<[string, number]> = [
+      ["copper", 100],
+      ["brass", 100],
+      ["alu", 100],
+      ["zinc", 100],
+      ["cable", 100],
+      ["va", 100],
+    ];
+    expect(schild("r_bunt", inhalt)).toBeCloseTo(1742, 2);
+    const ueberDieSilos =
+      verkauf([["copper", 100], ["brass", 100]], "copper") +
+      verkauf([["alu", 100], ["zinc", 100]], "alu") +
+      verkauf([["cable", 100]], "cable") +
+      verkauf([["va", 100]], "va");
+    expect(ueberDieSilos).toBeCloseTo(1742, 2);
+    // In einem Zug gekippt ist es eine Mischung und bringt einen Bruchteil.
+    expect(verkauf(inhalt)).toBeCloseTo(127.78, 2);
+  });
+
+  it("W-6 bleibt: ohne Bestellung kauft der Abnehmer, was dominiert", () => {
+    const inhalt: Array<[string, number]> = [
+      ["steel", 400],
+      ["mixed", 600],
+    ];
+    // Als Stahlfuhre bestellt: genau der Schildwert.
+    expect(schild("c_steel", inhalt)).toBeCloseTo(16, 2);
+    expect(verkauf(inhalt, "steel")).toBeCloseTo(16, 2);
+    // Ohne Bestellung ist es eine Mischschrottfuhre — andere Ware, anderer Preis.
+    expect(verkauf(inhalt)).toBeCloseTo(34.56, 2);
+  });
+
+  it("ein Kühlschrank ist Mischschrott, an der Mulde wie an der Kasse", () => {
+    /*
+     * Der teuerste der zehn Befunde: Die Kasse las die ROHSTOFFE eines
+     * Verbundteils (Blech, Alu, Kupfer, Kunststoff) und zahlte 1,93 €, das
+     * Schild las die FRAKTION und versprach 8,80 €. Seit E-094 lesen beide die
+     * Fraktion — das ist dieselbe Regel, nach der schon die Presse etikettiert
+     * (E-091) und nach der Lambert sortiert.
+     */
+    const kuehlschrank = {
+      materialId: "mixed",
+      massKg: 55,
+      body: null,
+      composition: [
+        { materialId: "steel", massKg: 55 * 0.52 },
+        { materialId: "alu", massKg: 55 * 0.1 },
+        { materialId: "copper", massKg: 55 * 0.06 },
+        { materialId: "plastic", massKg: 55 * 0.32 },
+      ],
+    };
+    const sale = new Account().sellContainer([kuehlschrank] as never, items, comps, null);
+    expect(sale.eur).toBeCloseTo(8.8, 2);
+    expect(schild("c_mixed", [["mixed", 55]])).toBeCloseTo(8.8, 2);
+    // Und die Masse bleibt die wirtschaftliche Masse aus der Zusammensetzung.
+    expect(sale.massKg).toBeCloseTo(55, 6);
+  });
+
+  it("Platzinventar wiegt weiter null und bringt weiter null (E-079)", () => {
+    const besen = {
+      materialId: "mixed",
+      massKg: 14,
+      body: null,
+      composition: [{ materialId: "mixed", massKg: 0 }],
+    };
+    const sale = new Account().sellContainer([besen] as never, items, comps, null);
+    expect(sale.eur).toBe(0);
+    expect(sale.massKg).toBe(0);
+  });
+});
+
+describe("Die Abrechnungsgruppe kommt aus der Silo-Reihe, nicht aus einer Liste", () => {
+  /*
+   * Die Regel in einem Satz: Was in DASSELBE Lagersilo darf, wird zusammen
+   * abgerechnet. `containers.ts` weiß das bereits (`lager: true` +
+   * `mitFraktionen`) — `economy/fraktionsgruppen.ts` fragt nur nach.
+   *
+   * Diese Wächter prüfen die Ableitung gegen die Quelle, nicht gegen eine
+   * abgeschriebene Kopie: Wer künftig ein Silo umwidmet, verschiebt damit
+   * automatisch die Abrechnung, und wenn nicht, fällt es hier auf.
+   */
+  const silos = CONFIGS.filter((c) => c.lager);
+
+  it("jedes Silo definiert genau eine Gruppe, und alle seine Fraktionen sind darin", () => {
+    expect(silos.length, "die Silo-Reihe ist leer").toBeGreaterThanOrEqual(6);
+    for (const silo of silos) {
+      const fraktionen = [silo.fractionId, ...(silo.mitFraktionen ?? [])];
+      for (const a of fraktionen) {
+        expect(
+          abrechnungsgruppe(a).slice().sort(),
+          `${silo.label}: ${a} muss dieselbe Gruppe sehen`
+        ).toEqual(fraktionen.slice().sort());
+        for (const b of fraktionen) expect(zaehltZu(a, b), `${a} ↔ ${b}`).toBe(true);
+      }
+    }
+  });
+
+  it("Fraktionen aus verschiedenen Silos gehören NICHT zusammen", () => {
+    // Die Gegenprobe zur Zeile darüber: Alu ins Kupferlager wäre Fremdstoff.
+    expect(zaehltZu("copper", "alu")).toBe(false);
+    expect(zaehltZu("alu", "copper")).toBe(false);
+    expect(zaehltZu("copper", "steel")).toBe(false);
+    expect(zaehltZu("rubble", "steel")).toBe(false);
+    // Und eine Fraktion ohne Silo steht für sich allein.
+    expect(abrechnungsgruppe("steel")).toEqual(["steel"]);
+    expect(abrechnungsgruppe("mixed")).toEqual(["mixed"]);
+  });
+
+  it("die Buntmulde am Bagger stiftet KEINE Gruppe — sie ist Durchgang", () => {
+    /*
+     * Würde die Abrechnung auch die Sortiermulden lesen, hinge alles
+     * Nichteisen in einer einzigen Gruppe, und eine in einem Zug gekippte
+     * BUNT+VA-Mulde brächte 1742 statt 127,78 €. Die Mulde am Bagger ist aber
+     * „Durchgang, nicht Abrechnung" (E-028) — sortiert wird auf dem Weg ins
+     * Silo.
+     */
+    const bunt = CONFIGS.find((c) => c.id === "r_bunt")!;
+    expect(bunt.mitFraktionen, "die Buntmulde fasst mehrere Fraktionen").toContain("alu");
+    expect(bunt.lager, "sie ist kein Lagersilo").not.toBe(true);
+    expect(zaehltZu("copper", "cable"), "Kabel gehört nicht ins Kupferlager").toBe(false);
+    expect(zaehltZu("copper", "va")).toBe(false);
+  });
+
+  it("es ist gleich, ob je Fraktion oder je Mulde verladen wird", () => {
+    /*
+     * Die Eigenschaft, die die ganze Reparatur trägt: Dieselben Stücke bringen
+     * dasselbe Geld, egal auf wie viele Fuhren sie verteilt werden. Genau das
+     * konnte die alte Kasse nicht — dort war es 437,50 € über drei Silos
+     * gegen 28,80 € in einem Zug (W-2).
+     */
+    const zusammen = verkauf([["copper", 120], ["brass", 80]], "copper");
+    const getrennt = verkauf([["copper", 120]], "copper") + verkauf([["brass", 80]], "brass");
+    expect(zusammen).toBeCloseTo(getrennt, 6);
+    expect(zusammen).toBeCloseTo(120 * 7.2 + 80 * 4.3, 2);
   });
 });
 

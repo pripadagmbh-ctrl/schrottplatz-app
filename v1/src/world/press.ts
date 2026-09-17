@@ -312,7 +312,13 @@ const RAM_BACK_TIME = 2.0;
 type Phase = "idle" | "lidsClose" | "ramFwd" | "hold" | "ramBack" | "lidsOpen";
 
 export class PressManager {
-  /** Faktor aus der größeren Presse — von main gesetzt (1 = Grundausbau) */
+  /**
+   * Verdichtung der größeren Presse — von `main.ts` gesetzt (1 = Grundausbau).
+   *
+   * Wirkt auf die Pressdichte, nicht aufs Geld: Dieselbe Masse kommt als
+   * kleinerer Würfel heraus, und davon passt mehr auf einen Abholer. Kein
+   * Preis, keine Reinheit, kein Erlös ändert sich (E-094).
+   */
   getBaleBonus: (() => number) | null = null;
 
   /**
@@ -870,7 +876,31 @@ export class PressManager {
           1.4,
           lager.z + (Math.random() - 0.5) * (lager.d - 1.4)
         ),
-        composition
+        composition,
+        /*
+         * Hier hing der Ausbau bis zum 16.09.2026 in der Luft: `main.ts` setzte
+         * `getBaleBonus` auf 1,6, und niemand hat ihn je gefragt — toter Code,
+         * 42.000 € fuer nichts (`docs/fraktionen.md`, Nachtrag 17.09.).
+         *
+         * Verdrahtet ist er jetzt als das, was im Kaufmenue steht („Schwerere
+         * Pakete, mehr Ladung je Abholung"), NICHT als Geldfaktor: 1,6 auf die
+         * Pressdichte macht dasselbe Paket 37,5 % kleiner (Kante −14,5 %), also
+         * passt rund die 1,6-fache Masse auf denselben Abholer. Ein Geldfaktor
+         * waere eine Preisaenderung ohne Quelle gewesen.
+         */
+        this.getBaleBonus?.() ?? 1,
+        /*
+         * Der Fraktionsmix geht MIT (E-094). Bis hierher trug das Paket nur
+         * seine Rohstoffe, und die Kasse las sie — seit sie in Fraktionen
+         * rechnet, braucht sie die Fraktionen, die hineingegangen sind.
+         *
+         * Sonst waere E-091 wieder aufgemacht: 64 kg Kupfer und 217 kg
+         * Messing aus dem KUPFER-LAGER heissen als Paket „Mischschrott"
+         * (keine Fraktion hat 95 %) und kaemen auf 44,96 € statt 1393,90 €.
+         * Mit dem Mix bleibt der Erloes vor und nach dem Zuschlagen auf den
+         * Cent derselbe — die Zusage aus E-091.
+         */
+        [...fraktionen].map(([materialId, massKg]) => ({ materialId, massKg }))
       );
       count += inChamber.length;
     }
