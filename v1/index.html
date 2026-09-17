@@ -556,44 +556,6 @@
         max-height: 88vh; overflow-y: auto; -webkit-overflow-scrolling: touch;
         touch-action: pan-y; overscroll-behavior: contain;
       }
-      /* Flache Displays (Handy quer, etwa iPhone 13 mini mit 812 x 375):
-         Untereinander gestapelte Knopflisten passen dort nicht mehr aufs Bild.
-         Das Pausenmenue steht deshalb zweispaltig — Ueberschrift und Hinweis
-         laufen ueber beide Spalten. Scrollen in einem Menue ist die schlechtere
-         Loesung: Man sieht nicht, dass es weitergeht. */
-      @media (max-height: 430px) {
-        #pause .panel {
-          padding: 12px 16px; min-width: 300px; max-height: 94vh;
-          display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px;
-          align-content: start;
-        }
-        #pause h1, #pause .hint, #pause .grund { grid-column: 1 / -1; }
-        #pause .grund { margin: 0; font-size: 10px; }
-        #pause h1 { margin: 0 0 4px; font-size: 17px; letter-spacing: 3px; }
-        #pause button { margin: 0; padding: 9px 10px; font-size: 12px; }
-        #pause .hint { margin: 6px 0 0; font-size: 10px; line-height: 1.45; }
-        /* Ankauf, Abholung und Ausbau hatten gar keine Regeln fuer flache
-           Displays — dort standen 22 px Polster und 19-px-Ueberschriften. */
-        #pickup .panel, #haggle .panel, #shop .panel, #radio .panel {
-          padding: 12px 16px; min-width: 260px; max-width: 92vw; max-height: 92vh;
-        }
-        #pickup h2, #haggle h2, #shop h2, #radio h2 { margin: 0 0 4px; font-size: 15px; letter-spacing: 2px; }
-        #pickup .sub, #haggle .sub, #shop .sub, #radio .sub { margin: 0 0 8px; font-size: 11px; line-height: 1.45; }
-        #pickup button, #haggle button, #shop button, #radio button {
-          margin: 5px 0; padding: 9px 12px; font-size: 12px;
-        }
-        /* Der Ausbau ist die laengste Liste — sie bekommt einen eigenen
-           Scrollbereich, damit der Schliessen-Knopf sichtbar bleibt. */
-        #shop-list { max-height: 46vh; overflow-y: auto; }
-        #controls-menu { padding: 12px 16px; min-width: 240px; max-height: 94vh; }
-        #controls-menu h2 { margin: 0 0 8px; font-size: 15px; }
-        #controls-menu button { margin: 5px 0; padding: 9px 12px; font-size: 13px; }
-        #controls-menu .hint { margin: 8px 0 0; font-size: 10px; line-height: 1.5; }
-        #controls-menu .row { margin: 4px 0; gap: 6px; }
-        #controls-menu .row label { flex-basis: 88px; font-size: 11px; }
-        #controls-menu select { padding: 5px 4px; font-size: 11px; }
-        #controls-menu .inv { padding: 5px 8px; font-size: 11px; }
-      }
       #pause h1 { margin: 0 0 18px; font-size: 26px; letter-spacing: 6px; color: #f0b429; }
       /* `position: relative` traegt den Zustandsbalken von `.an` (E-093) —
          ohne Wirkung auf alle anderen Knoepfe. */
@@ -789,10 +751,17 @@
       /* --- Radio: Senderwahl ---
          Gleiches Feld wie der Platzausbau, damit nichts Neues zu lernen ist.
          Die Knoepfe stehen auf mindestens 44 px, auch auf flachen Displays:
-         Sie sind mit dem Daumen zu treffen, und es sind nur drei. */
+         Sie sind mit dem Daumen zu treffen. */
       #radio button {
         text-align: left; min-height: 44px;
       }
+      /* Die Senderliste bekommt einen eigenen Scrollbereich — wie der Ausbau.
+         Seit fuenf Sender darin stehen (E-093) waere sie auf dem iPhone mini
+         quer laenger als das Feld, und der Aus-Schalter rutschte darunter aus
+         dem Bild. `pan-y` ist hier Absicht: Die Seite selbst hat
+         `touch-action: none`, dieser eine Kasten darf mit dem Finger
+         geschoben werden. */
+      #radio-list { max-height: 50vh; overflow-y: auto; touch-action: pan-y; }
       #radio button .stand {
         float: right; color: #9aa2a8; font-weight: 400;
       }
@@ -806,6 +775,62 @@
       #radio button.laeuft { border-color: #f0b429; }
       #radio-power { text-align: center !important; margin-top: 12px !important; }
       #radio-close { text-align: center !important; margin-top: 6px !important; }
+      /* =====================================================================
+         FLACHE DISPLAYS (Handy quer, etwa iPhone 13 mini mit 812 x 375)
+
+         DIESER BLOCK STAND BIS ZUM 17.09.2026 WEITER OBEN — und war dadurch
+         zur Haelfte wirkungslos (E-096). CSS entscheidet bei gleichem Gewicht
+         nach der Reihenfolge: Was spaeter steht, gewinnt. Die Grundregeln fuer
+         Pausenmenue und Dialoge standen HINTER dieser Abfrage, also haben sie
+         sie ueberschrieben. Auf dem iPhone mini quer standen deshalb weiter
+         22 px Polster, 19-px-Ueberschriften und 15-px-Knoepfe — genau das,
+         was hier abgestellt werden sollte.
+
+         Der Block gehoert ans ENDE der Fassung. Wer hier etwas ergaenzt:
+         nichts davor einfuegen, was dieselben Selektoren anfasst.
+
+         Warum ueberhaupt: Untereinander gestapelte Knopflisten passen auf
+         375 px Hoehe nicht mehr aufs Bild. Das Pausenmenue steht deshalb
+         zweispaltig — Ueberschrift und Hinweis laufen ueber beide Spalten.
+         Scrollen in einem Menue ist die schlechtere Loesung: Man sieht nicht,
+         dass es weitergeht.
+         ===================================================================== */
+      @media (max-height: 430px) {
+        #pause .panel {
+          padding: 12px 16px; min-width: 300px; max-height: 94vh;
+          display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px;
+          align-content: start;
+        }
+        #pause h1, #pause .hint, #pause .grund { grid-column: 1 / -1; }
+        #pause .grund { margin: 0; font-size: 10px; }
+        #pause h1 { margin: 0 0 4px; font-size: 17px; letter-spacing: 3px; }
+        #pause button { margin: 0; padding: 9px 10px; font-size: 12px; }
+        #pause .hint { margin: 6px 0 0; font-size: 10px; line-height: 1.45; }
+        /* Ankauf, Abholung und Ausbau hatten gar keine Regeln fuer flache
+           Displays — dort standen 22 px Polster und 19-px-Ueberschriften. */
+        #pickup .panel, #haggle .panel, #shop .panel, #radio .panel {
+          padding: 12px 16px; min-width: 260px; max-width: 92vw; max-height: 92vh;
+        }
+        #pickup h2, #haggle h2, #shop h2, #radio h2 { margin: 0 0 4px; font-size: 15px; letter-spacing: 2px; }
+        #pickup .sub, #haggle .sub, #shop .sub, #radio .sub { margin: 0 0 8px; font-size: 11px; line-height: 1.45; }
+        #pickup button, #haggle button, #shop button, #radio button {
+          margin: 5px 0; padding: 9px 12px; font-size: 12px;
+        }
+        /* Der Ausbau ist die laengste Liste — sie bekommt einen eigenen
+           Scrollbereich, damit der Schliessen-Knopf sichtbar bleibt. */
+        #shop-list { max-height: 46vh; overflow-y: auto; }
+        /* Flaches Display: Die Senderliste muss noch enger werden, sonst
+           deckt sie „Radio ausschalten" und „Zurueck" zu. */
+        #radio-list { max-height: 38vh; }
+        #controls-menu { padding: 12px 16px; min-width: 240px; max-height: 94vh; }
+        #controls-menu h2 { margin: 0 0 8px; font-size: 15px; }
+        #controls-menu button { margin: 5px 0; padding: 9px 12px; font-size: 13px; }
+        #controls-menu .hint { margin: 8px 0 0; font-size: 10px; line-height: 1.5; }
+        #controls-menu .row { margin: 4px 0; gap: 6px; }
+        #controls-menu .row label { flex-basis: 88px; font-size: 11px; }
+        #controls-menu select { padding: 5px 4px; font-size: 11px; }
+        #controls-menu .inv { padding: 5px 8px; font-size: 11px; }
+      }
     </style>
   </head>
   <body>

@@ -340,8 +340,425 @@ export const BLUESROCK: Song = {
   ],
 };
 
-/** Alle Sender, in der Reihenfolge des Menues. Der erste ist der Standard. */
-export const SENDER: Song[] = [SCHLAGER, BLUESROCK];
+// ---------------------------------------------------------------------------
+// Hilfen fuer wiederkehrende Muster
+// ---------------------------------------------------------------------------
+/**
+ * Achtel-Arpeggio ueber die Akkorde der Schleife.
+ *
+ * Gebrochene Akkorde brauchen die EINZELNEN Toene, nicht den Klang als
+ * Ganzes — `akkord: true` wuerde alle drei gleichzeitig anschlagen. Und
+ * `anStufe` hilft hier nicht: Es haengt den Ton an den Grundton des Akkords
+ * und kennt sein Geschlecht nicht; eine feste Terz von +4 waere ueber einem
+ * Mollakkord der falsche Ton. Deshalb werden die Stufen aus dem Akkord selbst
+ * geholt, Takt fuer Takt.
+ *
+ * Die Folge geht hoch und zurueck (Grundton, Terz, Quinte, Terz); die zweite
+ * Takthaelfte liegt eine Oktave hoeher — das ist die Figur, an der man ein
+ * Popstueck in zwei Sekunden erkennt.
+ */
+function arpeggioAchtel(akkorde: number[][], laenge: number): Ton[][] {
+  const folge = [0, 1, 2, 1]; // hoch und zurueck, ueber die Akkordtoene
+  return akkorde.map((a) =>
+    [...folge, ...folge].map((stufe, i) => ({
+      halbton: a[stufe]! + (i >= 4 ? 12 : 0),
+      schlag: i * 0.5,
+      laenge,
+      // SW: leichte Betonung auf den Zaehlzeiten, sonst klappert die Figur
+      kraft: i % 2 === 0 ? 1 : 0.78,
+    }))
+  );
+}
+
+/** Gleichmaessige Unterteilung: `anzahl` Toene je Takt, alle gleich lang. */
+function raster(anzahl: number, schlaegeProTakt: number, laenge: number): Ton[] {
+  const schritt = schlaegeProTakt / anzahl;
+  return Array.from({ length: anzahl }, (_, i) => ({
+    halbton: 0,
+    schlag: i * schritt,
+    laenge,
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// Sender 3 — Nachtschicht (Techno)
+// ---------------------------------------------------------------------------
+/*
+ * WORAN MAN IHN ERKENNT: die Bassdrum auf JEDER Zaehlzeit. Kein anderer
+ * Sender hat das, und es ist das eine Merkmal, das auch aus einem
+ * Kabinenlautsprecher durch den Motorlaerm kommt. Darueber der Bass auf den
+ * Nachschlaegen — Schlag, Bass, Schlag, Bass: der Wechselschritt, der Techno
+ * ausmacht. Dazu eine Sechzehntelfigur, die sich nie aendert, und ein
+ * Akkordstoss hinter dem Schlag.
+ *
+ * Tempo 132 (SW): zwischen den ueblichen 128 und 140 die Mitte. Schneller
+ * waere es im Fuehrerhaus hektisch, langsamer klaenge es nach Rock. Tonart
+ * a-Moll; die Sechzehntelfigur laesst die Terz weg und passt deshalb ueber
+ * jeden Akkord der Schleife.
+ */
+export const TECHNO: Song = {
+  id: "techno",
+  sender: "Nachtschicht",
+  frequenz: "102,3",
+  beschreibung: "Bassdrum auf jedem Schlag, Sechzehntel, kein Gesang.",
+  grundtonHz: 55, // A1 — tief genug fuer den Bass, alles andere sitzt darueber
+  bpm: 132, // SW: Mitte zwischen 128 und 140
+  schlaegeProTakt: 4,
+  // i · i · VI · VII — vier Takte, die sich nie aufloesen
+  akkorde: [
+    [0, 3, 7], // Am
+    [0, 3, 7], // Am
+    [8, 12, 15], // F
+    [10, 14, 17], // G
+  ],
+  shuffle: 0, // eine Maschine schleppt nicht
+  pegel: 0.16,
+  klang: { hochpassHz: 45, tiefpassHz: 7200 },
+  spuren: [
+    // DAS Merkmal: vier auf den Boden
+    {
+      stimme: "kick",
+      pegel: 0.5,
+      muster: [
+        { halbton: 0, schlag: 0, laenge: 0.5 },
+        { halbton: 0, schlag: 1, laenge: 0.5, kraft: 0.88 },
+        { halbton: 0, schlag: 2, laenge: 0.5 },
+        { halbton: 0, schlag: 3, laenge: 0.5, kraft: 0.88 },
+      ],
+    },
+    // Bass auf den Nachschlaegen — er faellt in die Luecke zwischen zwei
+    // Schlaegen, nie auf den Schlag selbst. Daher der Wechselschritt.
+    {
+      stimme: "bass",
+      pegel: 0.3,
+      anStufe: true,
+      muster: [0.5, 1.5, 2.5, 3.5].map((s) => ({ halbton: 0, schlag: s, laenge: 0.42 })),
+    },
+    // Geschlossene Hi-Hat auf allen Achteln, leise und gleichmaessig
+    {
+      stimme: "hihat",
+      pegel: 0.05,
+      cutoff: 8200,
+      abkling: 0.028,
+      muster: raster(8, 4, 0.1).map((t) => ({
+        ...t,
+        kraft: t.schlag % 1 === 0 ? 1 : 0.6,
+      })),
+    },
+    // Offene Hi-Hat auf den Nachschlaegen: der lange Zischer, der das Tempo
+    // traegt. Gleiche Stimme, nur laengere Abklingzeit (SW: 0,19 s).
+    {
+      stimme: "hihat",
+      pegel: 0.04,
+      cutoff: 6800,
+      abkling: 0.19,
+      muster: [0.5, 1.5, 2.5, 3.5].map((s) => ({ halbton: 0, schlag: s, laenge: 0.2 })),
+    },
+    // Sechzehntelfigur: Grundton, Quinte, Oktave, Quinte — sicher ueber Dur
+    // wie ueber Moll, weil die Terz fehlt.
+    {
+      stimme: "zupf",
+      pegel: 0.045,
+      form: "square",
+      cutoff: 3200,
+      oktave: 2,
+      anStufe: true,
+      muster: raster(16, 4, 0.22).map((t, i) => ({
+        ...t,
+        halbton: [0, 7, 12, 7][i % 4]!,
+        kraft: i % 4 === 0 ? 1 : 0.7,
+      })),
+    },
+    // Akkordstoss hinter dem Schlag — kurz, hart, immer an derselben Stelle
+    {
+      stimme: "zupf",
+      pegel: 0.075,
+      form: "sawtooth",
+      cutoff: 2600,
+      oktave: 1,
+      muster: [0.75, 2.75].map((s) => ({
+        halbton: 0,
+        schlag: s,
+        laenge: 0.3,
+        akkord: true,
+      })),
+    },
+    // Klatscher auf zwei und vier, damit der Takt eine Richtung hat
+    {
+      stimme: "snare",
+      pegel: 0.15,
+      muster: [
+        { halbton: 0, schlag: 1, laenge: 0.3 },
+        { halbton: 0, schlag: 3, laenge: 0.3 },
+      ],
+    },
+  ],
+};
+
+// ---------------------------------------------------------------------------
+// Sender 4 — Werkhof (Rap-Beat)
+// ---------------------------------------------------------------------------
+/*
+ * WORAN MAN IHN ERKENNT: am Tempo. 88 Schlaege sind zwei Drittel des
+ * Technotempos und deutlich langsamer als alles andere im Kranz — man hoert
+ * beim ersten Takt, dass hier nichts eilt. Dazu die Snare hart auf zwei und
+ * vier, eine Bassdrum, die dazwischen stolpert, und ein dumpfer Klang, als
+ * kaeme das Stueck von einer alten Platte (Tiefpass 3000 Hz).
+ *
+ * WAS ER NICHT HAT: eine Stimme. Ein Rap ohne Rapper ist ein Beat — das ist
+ * ehrlich so gebaut und nicht vergessen worden. Eine erzeugte Sprechstimme
+ * waere ein eigenes Paket und eine Geschmacksfrage, die Patrick entscheidet.
+ *
+ * Tonart d-Moll. Die Figur darueber laeuft durch einen Tiefpass von 900 Hz —
+ * so klingt ein Ausschnitt, der schon einmal durch ein Band gelaufen ist.
+ */
+export const RAP: Song = {
+  id: "rap",
+  sender: "Werkhof",
+  frequenz: "90,4",
+  beschreibung: "Langsamer Beat, harte Snare, dumpf wie von Platte.",
+  grundtonHz: 73.42, // D2
+  bpm: 88, // SW: Boom-Bap-Mass, langsamster Sender im Kranz
+  schlaegeProTakt: 4,
+  // i · VII · VI · iv
+  akkorde: [
+    [0, 3, 7], // Dm
+    [10, 14, 17], // C
+    [8, 12, 15], // B-Dur
+    [5, 8, 12], // Gm
+  ],
+  shuffle: 0.05, // SW: knapper Nachzug auf den Achteln — das Schleppen
+  pegel: 0.16,
+  klang: { hochpassHz: 60, mitten: { hz: 420, q: 0.8, db: 4 }, tiefpassHz: 3000 },
+  spuren: [
+    /*
+     * Die Bassdrum stolpert: einmal auf die Eins, einmal kurz dahinter, einmal
+     * vor der Vier. Sie steht ausgeschrieben und bekommt deshalb KEINEN
+     * Shuffle — sonst rutschte die Drei-und noch einmal nach hinten.
+     */
+    {
+      stimme: "kick",
+      pegel: 0.55,
+      shuffle: false,
+      muster: [
+        { halbton: 0, schlag: 0, laenge: 0.5 },
+        { halbton: 0, schlag: 0.75, laenge: 0.5, kraft: 0.6 },
+        { halbton: 0, schlag: 2.5, laenge: 0.5, kraft: 0.9 },
+      ],
+    },
+    // Snare hart auf zwei und vier, ohne Shuffle — sie ist das Metronom
+    {
+      stimme: "snare",
+      pegel: 0.24,
+      shuffle: false,
+      muster: [
+        { halbton: 0, schlag: 1, laenge: 0.4 },
+        { halbton: 0, schlag: 3, laenge: 0.4 },
+      ],
+    },
+    // Hi-Hat auf den Achteln; die Nachschlaege bekommen den Shuffle und
+    // erzeugen damit das Schleppen
+    {
+      stimme: "hihat",
+      pegel: 0.045,
+      cutoff: 7000,
+      abkling: 0.032,
+      muster: raster(8, 4, 0.1).map((t) => ({
+        ...t,
+        kraft: t.schlag % 1 === 0 ? 1 : 0.55,
+      })),
+    },
+    // Bass: zwei lange Toene je Takt und ein kurzer Nachschlag eine Oktave
+    // hoeher — mehr braucht ein Beat nicht
+    {
+      stimme: "bass",
+      pegel: 0.32,
+      anStufe: true,
+      laengeFaktor: 1.15,
+      muster: [
+        { halbton: 0, schlag: 0, laenge: 1.4 },
+        { halbton: 0, schlag: 2.5, laenge: 0.9 },
+        { halbton: 12, schlag: 3.5, laenge: 0.4, kraft: 0.5 },
+      ],
+    },
+    // Akkordflaeche, vom Tiefpass des Stuecks stumpf gemacht
+    {
+      stimme: "orgel",
+      pegel: 0.045,
+      muster: [{ halbton: 0, schlag: 0, laenge: 2.2, akkord: true }],
+    },
+    // Die Figur darueber, dumpf (Tiefpass 900 Hz) — vier Takte, immer gleich
+    {
+      stimme: "zupf",
+      pegel: 0.17,
+      form: "triangle",
+      cutoff: 900,
+      oktave: 1,
+      musterProTakt: [
+        [
+          { halbton: 0, schlag: 0, laenge: 1.2 },
+          { halbton: 3, schlag: 1.5, laenge: 0.5 },
+          { halbton: 5, schlag: 2, laenge: 1.0 },
+        ],
+        [
+          { halbton: 3, schlag: 0, laenge: 1.0 },
+          { halbton: 0, schlag: 1.5, laenge: 0.5 },
+          { halbton: -2, schlag: 2.5, laenge: 1.2 },
+        ],
+        [
+          { halbton: 8, schlag: 0, laenge: 1.2 },
+          { halbton: 7, schlag: 1.5, laenge: 0.5 },
+          { halbton: 5, schlag: 2.5, laenge: 1.0 },
+        ],
+        [
+          { halbton: 3, schlag: 0, laenge: 1.0 },
+          { halbton: 5, schlag: 1.5, laenge: 0.5 },
+          { halbton: 7, schlag: 2.5, laenge: 1.2 },
+        ],
+      ],
+    },
+  ],
+};
+
+// ---------------------------------------------------------------------------
+// Sender 5 — Niederrhein Eins (Pop)
+// ---------------------------------------------------------------------------
+/*
+ * WORAN MAN IHN ERKENNT: an der gebrochenen Akkordfigur in Achteln, die
+ * durchlaeuft, und daran, dass er BREIT klingt. Der Schlager laeuft durch ein
+ * Nadeloehr bei 1100 Hz und klingt deshalb nach Kofferradio; dieser Sender
+ * hat oben 9000 Hz und eine Anhebung bei 2600 — er klingt nach Autoradio von
+ * heute. Das ist der Unterschied, den man auch ohne Musikgehoer hoert.
+ *
+ * Dazu die vier Akkorde, die in der Popmusik seit vierzig Jahren dieselben
+ * sind (I–V–vi–IV), ein Backbeat auf zwei und vier und eine Melodie, die man
+ * mitsummen kann. Tempo 116 (SW): Gehtempo, kein Tanztempo.
+ */
+export const POP: Song = {
+  id: "pop",
+  sender: "Niederrhein Eins",
+  frequenz: "106,9",
+  beschreibung: "Vier Akkorde, gebrochene Figur, helle Aufnahme.",
+  grundtonHz: 98, // G2 — der Bass hat darunter noch Luft
+  bpm: 116, // SW: Gehtempo, zwischen Rap (88) und Schlager (130)
+  schlaegeProTakt: 4,
+  // I · V · vi · IV in G-Dur
+  akkorde: [
+    [0, 4, 7], // G
+    [7, 11, 14], // D
+    [9, 12, 16], // Em
+    [5, 9, 12], // C
+  ],
+  shuffle: 0,
+  pegel: 0.16,
+  klang: { hochpassHz: 80, mitten: { hz: 2600, q: 0.7, db: 3 }, tiefpassHz: 9000 },
+  spuren: [
+    {
+      stimme: "kick",
+      pegel: 0.42,
+      muster: [
+        { halbton: 0, schlag: 0, laenge: 0.5 },
+        { halbton: 0, schlag: 2, laenge: 0.5 },
+        { halbton: 0, schlag: 3.5, laenge: 0.5, kraft: 0.7 },
+      ],
+    },
+    {
+      stimme: "snare",
+      pegel: 0.2,
+      muster: [
+        { halbton: 0, schlag: 1, laenge: 0.4 },
+        { halbton: 0, schlag: 3, laenge: 0.4 },
+      ],
+    },
+    {
+      stimme: "hihat",
+      pegel: 0.05,
+      cutoff: 7800,
+      abkling: 0.03,
+      muster: raster(8, 4, 0.1).map((t) => ({
+        ...t,
+        kraft: t.schlag % 1 === 0 ? 1 : 0.6,
+      })),
+    },
+    // DIE Figur: gebrochener Akkord in Achteln, zweite Takthaelfte eine
+    // Oktave hoeher. Die Stufen kommen aus derselben Akkordreihe wie oben —
+    // eine zweite Liste waere die Stelle, an der spaeter etwas auseinanderlaeuft.
+    {
+      stimme: "zupf",
+      pegel: 0.085,
+      form: "triangle",
+      cutoff: 3400,
+      oktave: 1,
+      musterProTakt: arpeggioAchtel(
+        [
+          [0, 4, 7],
+          [7, 11, 14],
+          [9, 12, 16],
+          [5, 9, 12],
+        ],
+        0.45
+      ),
+    },
+    // Teppich darunter
+    {
+      stimme: "flaeche",
+      pegel: 0.07,
+      muster: [{ halbton: 0, schlag: 0, laenge: 3.7, akkord: true }],
+    },
+    // Bass: Grundton auf eins und drei, lang gehalten
+    {
+      stimme: "bass",
+      pegel: 0.26,
+      oktave: -1,
+      anStufe: true,
+      muster: [
+        { halbton: 0, schlag: 0, laenge: 1.8 },
+        { halbton: 0, schlag: 2, laenge: 1.8 },
+      ],
+    },
+    // Melodie zum Mitsummen, minimal hinter dem Schlag (SW: 0,04 Schlaege)
+    {
+      stimme: "zupf",
+      pegel: 0.13,
+      form: "sawtooth",
+      cutoff: 3000,
+      oktave: 1,
+      versatz: 0.04,
+      musterProTakt: [
+        [
+          { halbton: 7, schlag: 0, laenge: 1.0 },
+          { halbton: 11, schlag: 1, laenge: 1.0 },
+          { halbton: 12, schlag: 2, laenge: 1.6 },
+        ],
+        [
+          { halbton: 14, schlag: 0, laenge: 1.0 },
+          { halbton: 11, schlag: 1.5, laenge: 1.0 },
+          { halbton: 7, schlag: 2.5, laenge: 1.4 },
+        ],
+        [
+          { halbton: 9, schlag: 0, laenge: 1.0 },
+          { halbton: 12, schlag: 1, laenge: 1.0 },
+          { halbton: 16, schlag: 2, laenge: 1.6 },
+        ],
+        [
+          { halbton: 14, schlag: 0, laenge: 1.4 },
+          { halbton: 12, schlag: 1.5, laenge: 0.8 },
+          { halbton: 7, schlag: 2.5, laenge: 1.4 },
+        ],
+      ],
+    },
+  ],
+};
+
+/**
+ * Alle Sender, in der Reihenfolge des Menues — und damit auch in der
+ * Reihenfolge, in der die Taste MUSIK weiterschaltet (E-094).
+ *
+ * Der erste ist der Standard und bleibt es: Von der Schlagerwelle geht es
+ * ueber Pop und Bluesrock ins Schnelle und am Ende ins Langsame. Wer einmal
+ * zu weit tippt, ist nicht am anderen Ende der Welt.
+ */
+export const SENDER: Song[] = [SCHLAGER, POP, BLUESROCK, TECHNO, RAP];
 
 /** Standardsender — die alte Schlagermelodie (Ansage Patrick, 14.09.2026). */
 export const STANDARD_SENDER = SCHLAGER.id;
