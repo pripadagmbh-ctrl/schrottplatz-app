@@ -254,6 +254,16 @@ const zuletztGeschrieben = new WeakMap<HTMLElement, { text: string; farbe: strin
  */
 export type Zahlungslage = "ok" | "knapp" | "leer";
 
+/**
+ * Die Tagesablaufzeile in ihren zwei Grundfarben.
+ *
+ * `PLATZ_DICHT` ist dasselbe Orange wie die Warnstufe in `KASSENLAGE` — zwei
+ * Aufforderungen, eine Farbe. `NORMAL` ist das Gelb, in dem die Zeile den
+ * ganzen Tag ueber steht.
+ */
+const PLATZ_DICHT = "#e08a5a";
+const NORMAL = "#f0d060";
+
 const KASSENLAGE: Record<Zahlungslage, { text: string; farbe?: string }> = {
   ok: { text: "" },
   // Orange wie eine Ladung unter 65 % sortenrein: „noch kein Fehler, aber sieh hin."
@@ -444,12 +454,23 @@ export class Hud {
    * Nachricht des Bildschirms, und der Umschlag von heute ist die Fussnote.
    * Faerbung und Wortlaut kommen aus `KASSENLAGE`; die Lage selbst wird hier
    * nicht entschieden, sie wird uebergeben (Projektregel 10).
+   *
+   * ZUGESTELLT HEISST NICHT IN ORDNUNG (Patrick, 17.09.2026).
+   *
+   * Der zweite Wert hiess `sortierphase` und faerbte GRUEN — ein Rest der
+   * abgeschafften Sortierphase. Uebergeben wird dort seit langem
+   * `shift.jammed`, also „Platz dicht, erst raeumen!". Gruen fuer eine
+   * Aufforderung ist das falsche Signal; der Spieler liest Gruen als „laeuft".
+   *
+   * Jetzt heisst der Wert, was er ist, und faerbt ORANGE: dieselbe Warnstufe
+   * wie „Kasse wird knapp", eine Stufe unter dem Rot des leeren Kontos. Rot
+   * ist dem vorbehalten, was den Betrieb anhaelt.
    */
-  updateShift(text: string, sortierphase: boolean, lage: Zahlungslage = "ok"): void {
+  updateShift(text: string, platzDicht: boolean, lage: Zahlungslage = "ok"): void {
     const el = this.shiftEl;
     if (!el) return;
     const k = KASSENLAGE[lage];
-    schreib(el, k.text ? `${k.text} · ${text}` : text, k.farbe ?? (sortierphase ? "#7ec96a" : "#f0d060"));
+    schreib(el, k.text ? `${k.text} · ${text}` : text, k.farbe ?? (platzDicht ? PLATZ_DICHT : NORMAL));
   }
 
   /** Kurze Einblendung (Verkauf, Speichern, Anlieferung). */
