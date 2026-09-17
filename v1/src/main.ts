@@ -23,7 +23,8 @@ import { PressManager } from "./world/press";
 import { randomCargo } from "./world/scrapItems";
 import { Shift } from "./economy/shift";
 import { Tutorial } from "./ui/tutorial";
-import { installRadio } from "./ui/radio";
+import { installRadio, radioWeiter } from "./ui/radio";
+import { Funkzentrale } from "./ui/funk";
 import { Reputation } from "./economy/reputation";
 import { UPGRADES, UpgradeState, type UpgradeId } from "./economy/upgrades";
 import { haggle, leavesOnRefusal, hint, OFFER_FACTOR, OFFER_LABEL, type Offer } from "./economy/haggle";
@@ -770,6 +771,15 @@ async function main(): Promise<void> {
     gewaehlt: save?.radio?.songId,
   });
 
+  /*
+   * Das Funkgeraet (E-100). Mario, Janine und Lambert melden sich ueber
+   * denselben Kanal wie Achim und die Anlieferer — eine Meldezeile, nicht
+   * zwei. Ohne diese Verdrahtung ist der Funk stumm, und genau das haelt
+   * `test/funk-verdrahtung.test.ts` fest.
+   */
+  const funk = new Funkzentrale();
+  funk.onSpruch = (spruch) => hud.toast(`${spruch.wer}: „${spruch.text}"`);
+
   // --- Verhandeln an der Waage ---
   const ruf = new Reputation();
   ruf.load(save?.reputation);
@@ -882,6 +892,7 @@ async function main(): Promise<void> {
           ? c.name
           : `${c.name} ${c.subtitle}`;
     hud.toast(`${wer}: „${c.greeting}"`);
+    funk.kundeDa({ name: c.name, subtitle: c.subtitle, group: c.group });
   };
   vehicles.onWeighIn = (kg) => {
     const rein = vehicles.activeSortedMaterial;
@@ -890,6 +901,12 @@ async function main(): Promise<void> {
         ? `Waage: ${kg.toFixed(0)} kg brutto — sortenrein ${getMaterial(rein).name}.`
         : `Waage: ${kg.toFixed(0)} kg brutto — bitte abladen.`
     );
+    funk.wiegung({
+      kg,
+      sortenrein: rein,
+      mix: vehicles.activeCargoMix,
+      kunde: vehicles.activeCustomer?.name,
+    });
     const kunde = vehicles.activeCustomer;
     if (!kunde) return;
     if (kunde.group === "gewerbe") {
@@ -1176,7 +1193,7 @@ async function main(): Promise<void> {
     }
     if (input.wasPressed("KeyZ") || touch.consumePress("KeyZ")) zeigeAusbau();
     if (input.wasPressed("KeyU") || touch.consumePress("KeyU")) {
-      hud.toast(audio.toggleMusic() ? "Musik an." : "Musik aus.");
+      hud.toast(radioWeiter(audio));
     }
     if (input.wasPressed("KeyK")) {
       hud.toast(storeSave(buildSaveData()) ? "Gespeichert." : "Speichern fehlgeschlagen!");
@@ -1367,6 +1384,16 @@ async function main(): Promise<void> {
       stoerfallGemeldet = lanes.blocked;
       hud.toast(lanes.blocked ? lanes.message + " — freiräumen!" : "Fahrspur wieder frei.");
     }
+    /*
+     * Hier wird zugestellt — auch fuer Mario und Janine. Ihre Sprueche warten
+     * 3,5 s auf ihren Anlass, damit sie die Maschinenmeldung nicht
+     * ueberschreiben; ohne diesen Aufruf kaeme keiner davon je an.
+     */
+    funk.platzlage({
+      loseKg: looseKg,
+      spurBlockiert: lanes.blocked,
+      lambertArbeitet: staff.lambertArbeitet,
+    });
     if (
       tutorial.update(frameDt, {
         verhandeltGerade: haggleEl.classList.contains("open"),

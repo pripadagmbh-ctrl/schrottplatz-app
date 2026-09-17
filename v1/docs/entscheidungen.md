@@ -9145,14 +9145,14 @@ ausdrücklich: Sein Verhalten liegt in `world/people.ts` und wird gerade
 umgebaut; ein Befehlskanal wäre eine zweite Stelle, an der sein Kopf sitzt. Er
 fragt nach Arbeit und verweist auf den Ruf, den es schon gibt (Taste Y).
 
-**FUNK-VERDRAHTUNG OFFEN.** Die Funkzentrale ist gebaut und geprüft, aber sie
-hängt noch an keiner Leitung: `main.ts` gehört diesem Paket nicht (dort
-arbeitet gleichzeitig der SCHILDER-Agent). Es fehlen fünf Zeilen — eine
-Konstruktion, eine Verbindung ans HUD und drei Einhängepunkte. Sie stehen im
-Übergabebericht. `test/funk-verdrahtung.test.ts` bewacht genau das: Entweder
-`main.ts` ist vollständig verdrahtet, **oder** dieser Vermerk steht hier —
-nie beides und nie keines. Wer die Zeilen einbaut, muss diesen Absatz
-entfernen; wer den Absatz entfernt, muss die Zeilen einbauen.
+**Verdrahtet am 17.09.2026.** Die Funkzentrale hing nach ihrer Lieferung an
+keiner Leitung: `main.ts` gehörte dem Paket nicht, dort arbeitete gleichzeitig
+der SCHILDER-Agent. Sechs Stellen sind nachgetragen, sobald die Datei frei war
+— Einfuhr, Konstruktion samt Verbindung ans HUD, und die drei Einhängepunkte
+`kundeDa`, `wiegung` und `platzlage`; dazu schaltet MUSIK jetzt weiter statt
+an und aus. `test/funk-verdrahtung.test.ts` bewacht genau diese Lücke:
+Entweder `main.ts` ist vollständig verdrahtet, **oder** hier steht der Vermerk
+`FUNK-VERDRAHTUNG OFFEN` — nie beides und nie keines.
 
 **Abnahmekriterium.** `npm run build` Rückgabewert 0, `npm test` Rückgabewert
 0. Jeder der elf Anlässe wird in `test/funk-verdrahtung.test.ts` einzeln
