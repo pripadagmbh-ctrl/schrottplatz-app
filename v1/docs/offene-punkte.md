@@ -544,6 +544,22 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
 
 ### Offen
 
+- [ ] **Autos brauchen verschiedene Modelle, Farben und Wrackzustände** —
+      Ansage Patrick, 17.09.2026: „und autos, brauchen wir verschiedene
+      modelle, farben und wrackzustände, bitte notieren". Heute gibt es eine
+      Karosserieform. Wrackzustände waren schon einmal als Notiz vermerkt
+      (14.09., „Drei Notizen zum Schrott: Wrackzustaende, Motorraeder,
+      Velos"). Gehört zusammen: Modell, Lackfarbe, und wie weit das Auto
+      schon ausgeschlachtet ist (Räder ab, Motor raus, Scheiben weg,
+      ausgebrannt).
+- [ ] **Kommen die Großteile beim Spieler überhaupt an?** — seine Frage vom
+      17.09.: „was ist eigentlich mit den grossen objekten passiert?". Im
+      Katalog stehen 40 Schwergewichte bis 2,6 t und 4,8 m; `randomCargo`
+      zieht sie mit 50 % in der ersten Runde, bei schweren Kunden 55 %
+      Schwergewichte. Dazwischen liegt `packeLadung`, die verwirft, was nicht
+      auf die Fläche passt. **Zu messen, nicht zu vermuten.**
+
+
 - [ ] **„LKWS fahren durch Müllcontainer"** (17.09.2026) — **gemessen, nicht
       repariert** (E-093). Gefunden: `toPark` und `parkRueck` in
       `src/delivery/vehicles.ts:2382`/`:2415` fahren eine **Luftlinie** vom
