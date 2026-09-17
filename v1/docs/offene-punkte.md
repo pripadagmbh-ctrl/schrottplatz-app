@@ -544,6 +544,16 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
 
 ### Offen
 
+- [ ] **`test/lambertAufraeumen.test.ts` ist unzuverlässig** (beobachtet
+      17.09.2026, beim Arbeiten an E-105). „bringt herumliegenden Abfall in
+      die Abfallmulde und meldet sich an und ab" schlug in **einem von fünf**
+      vollen `npm test`-Läufen fehl (`expected 1 to be 2`, Zeile 200);
+      allein aufgerufen lief er dreimal hintereinander grün. Es hängt also am
+      parallelen Lauf, nicht am Inhalt — vermutlich eine Zeitschranke, die
+      unter Last reißt. **Nicht angefasst**, weil E-105 an Lamberts Weg nichts
+      ändert; aber ein Wächter, der zufällig rot wird, kostet beim nächsten
+      Mal eine halbe Stunde Suche am falschen Ort.
+
 - [~] **Autos brauchen verschiedene Modelle, Farben und Wrackzustände** —
       Ansage Patrick, 17.09.2026: „und autos, brauchen wir verschiedene
       modelle, farben und wrackzustände, bitte notieren".
