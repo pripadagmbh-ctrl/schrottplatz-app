@@ -8115,3 +8115,286 @@ hinweg presste, verlor bis zu 92 %. Beides ist weg.
    Zwölffache nach unten oder das Viereinhalbfache nach oben.
 3. **Vier Abfallsorten pressen, neu laden, abholen lassen.** Es muss **Geld
    kosten**. Bis heute bekam man dafür welches.
+
+---
+
+### E-093 — Fünf Sender statt zwei: Techno, Rap und Pop kommen dazu, im selben Verfahren (17.09.2026)
+
+**Was vorher da war.** Das Kabinenradio ist seit dem 14.09.2026 fertig gebaut und
+in zwei Hälften geteilt: `audio/music.ts` ist der Klangapparat (neun Stimmen —
+Zupf, Fläche, Fuzz, Bass, Orgel, Bassdrum, Snare, Hi-Hat, Tamburin — plus
+Taktgeber, Überblendung, Klangfarbe), `audio/songs.ts` sind die Stücke als
+reine Daten. Der Apparat kennt kein einziges Stück. Ein weiterer Sender war
+damit von Anfang an als Datensatz vorgesehen, nicht als Programmcode.
+
+**Entscheidung.** Drei neue Datensätze in `songs.ts`, keine Zeile im
+Klangapparat:
+
+| Sender | Fasson | Tempo | Woran man ihn erkennt |
+|---|---|---|---|
+| Schlagerwelle 104,1 | Schlager (Standard) | 130 | Umtata-Bass, Bandpass 1100 Hz — Kofferradio |
+| Niederrhein Eins 106,9 | **Pop** | 116 | gebrochene Achtelfigur, breit bis 9000 Hz |
+| Hallenfunk 98,7 | Bluesrock | 128 | Fuzz-Riff, Tamburin |
+| Nachtschicht 102,3 | **Techno** | 132 | Bassdrum auf **jedem** Schlag, Bass in den Lücken |
+| Werkhof 90,4 | **Rap** | 88 | langsamster Beat, Snare auf 2 und 4, dumpf bis 3000 Hz |
+
+Zwei Hilfen sind dazugekommen, beide in `songs.ts` und beide reine
+Datenerzeugung: `arpeggioAchtel()` (gebrochener Akkord über die Akkordtöne des
+jeweiligen Takts — `anStufe` hätte über einem Mollakkord die falsche Terz
+gesetzt) und `raster()` (gleichmäßige Achtel/Sechzehntel).
+
+**Begründung.** Der Auftrag nennt die Gefahr selbst: „Vier Sender, die alle
+gleich klingen, sind schlimmer als zwei, die sich unterscheiden." Deshalb hat
+jeder Sender **ein** Merkmal, das kein anderer hat, und zwar eins, das auch
+durch einen Kabinenlautsprecher und über Motorlärm noch durchkommt:
+
+* **Techno** — die Bassdrum auf jeder Zählzeit. Kein anderer Sender hat das.
+* **Rap** — das Tempo. 88 Schläge, der nächste liegt bei 116.
+* **Pop** — die durchlaufende gebrochene Figur, und die Breite: 80–9000 Hz
+  gegen das Nadelöhr des Schlagers bei 1100 Hz.
+* **Schlager** — genau dieses Nadelöhr, unverändert seit der alten Fassung.
+
+Nachgerechnet wird das maschinell: `test/sender.test.ts` zieht aus jedem
+Sender einen Steckbrief aus sechs Merkmalen (Bassdrum-Muster, Tempo auf 10
+gerundet, Tongeschlecht, Besetzung, Klangfarbe, Shuffle) und verlangt, dass
+sich **je zwei Sender in mindestens drei davon unterscheiden**. Das ersetzt
+kein Ohr, aber es fängt den Fall ab, dass jemand einen Sender kopiert und nur
+die Melodie tauscht.
+
+**Verworfene Alternativen.** *Ein zweites Tonsystem* für die neuen Fassons
+(z. B. ein Sampler für den Beat) — ausdrücklich nicht, der Auftrag schließt es
+aus und der vorhandene Apparat trägt alle vier. *Den Bluesrock streichen*,
+damit es genau vier sind — das entscheidet Patrick, nicht dieses Paket; der
+Sender ist abgenommen und bleibt. *Fremde Aufnahmen oder Streams* — bleibt
+ausgeschlossen (GEMA, Beschluss 12.09.2026).
+
+**Ehrlich gesagt: der Rap hat keine Stimme.** Ein Rap ohne Rapper ist ein
+Beat. Er ist als Hip-Hop-Instrumental gebaut und als solches erkennbar
+(Tempo, Snare, dumpfer Klang) — aber wer „Rap" sagt, meint vielleicht jemanden,
+der spricht. Eine erzeugte Sprechstimme (zwei bis drei Formantfilter über einem
+Sägezahn, Silbenhüllkurve) wäre technisch im selben Apparat machbar und ein
+eigenes Paket. Das steht als Rückfrage im Übergabebericht, nicht als halbe
+Lieferung im Quelltext.
+
+**Spielstand.** Kein Schemawechsel. Der Sender steht seit Schema 2 als
+`radio.songId` im Stand; neue Kennungen (`pop`, `techno`, `rap`) fallen unter
+die vorhandene Rückfalllogik in `migrate()` — ein unbekannter Sender wird zum
+Standard, kein Schwarzbild.
+
+**Layout.** Die Senderliste im Menü hat jetzt fünf Einträge. Auf dem iPhone
+mini quer (375 px hoch) wären das mehr als die Tafel hoch ist; der Aus-Schalter
+und „Zurück" wären darunter aus dem Bild gerutscht. `#radio-list` bekommt
+deshalb einen eigenen Scrollbereich (50 vh, auf flachen Displays 38 vh) mit
+`touch-action: pan-y` — genau wie der Platzausbau ihn schon hat.
+
+**Abnahmekriterium.** `npm run build` mit Rückgabewert 0 GEPRÜFT, `npm test`
+mit Rückgabewert 0 GEPRÜFT: **116 Dateien, 1.373 Prüfungen** (vorher 112 /
+1.305). Steckbrief-Prüfung grün für alle zehn Senderpaare. Gerechnetes Layout
+(`test/radioplatz.test.ts`, gezeichnet von `tools/radiobild.ts` nach
+`docs/messungen/2026-09-17-radio/`): iPad quer 635 von 660 px, iPhone mini quer
+332 von 345 px, iPhone mini hoch 657 von 698 px — überall Luft nach unten, die
+beiden Knöpfe unter der Liste bleiben im Bild.
+
+**Auf dem Gerät zu prüfen.**
+
+1. **Alle fünf durchhören, je zehn Sekunden.** Hört man, dass es fünf
+   verschiedene Stücke sind — oder klingen zwei davon gleich?
+2. **Nachtschicht bei laufendem Motor.** Kommt die Bassdrum durch, oder
+   versinkt sie?
+3. **Werkhof:** Ist das ein Beat, mit dem man arbeiten kann, oder fehlt die
+   Stimme so sehr, dass er nicht als Rap durchgeht?
+4. **Menü auf dem iPhone mini quer öffnen.** Sind „Radio ausschalten" und
+   „Zurück" sichtbar, ohne dass man die Liste erst wegschieben muss?
+
+---
+
+### E-094 — MUSIK schaltet weiter, statt nur an und aus (17.09.2026)
+
+**Entscheidung.** Die vorhandene Taste/der vorhandene Kranzknopf **MUSIK**
+(`KeyU`, `btn-music`) wird zum Knebelschalter mit sechs Stellungen: die fünf
+Sender der Reihe nach, dann aus, dann wieder von vorn. Aus dem Stillstand
+heraus macht der erste Tipp Musik — mit dem Sender, der gewählt ist. Beim
+Ausschalten springt die Wahl auf den Standardsender zurück.
+
+**Begründung.** Der Auftrag verlangt Umschalten **im Führerhaus**, nicht nur im
+Pausenmenü. Ein reiner Ein/Aus-Schalter ist mit fünf Sendern der falsche
+Knopf: Wer am Hebel sitzt, will umschalten, nicht abschalten. Und ein zweiter
+Kranzplatz nur für die Senderwahl wäre eine Entscheidung über den Kranz — die
+gehört Patrick, nicht diesem Paket. Der Knebelschalter braucht keinen neuen
+Platz und kein neues Zeichen; das Wort MUSIK stimmt weiter.
+
+Der Rücksprung auf den Standard beim Ausschalten ist kein Schönheitsfehler,
+sondern der Grund, dass der Schalter überhaupt ein Kreis ist: Bliebe der letzte
+Sender stehen, pendelte zweimaliges Tippen zwischen „aus" und dem **letzten**
+Sender hin und her, und man käme nie wieder an den Anfang der Reihe.
+
+**Verworfene Alternativen.** *Langer Druck = aus, kurzer = weiter* — eine
+zweite Geste für eine Sache, die eine Stellung sein kann, und auf dem Touch
+schwer zu treffen. *Eigener Kranzplatz SENDER* — der Kranz gehört Patrick.
+*Nur im Pausenmenü umschalten* — steht so im Auftrag ausdrücklich nicht.
+
+**Der Ein/Aus-Schalter bleibt**, wo er ist: im Radiofeld des Pausenmenüs
+(`#radio-power`). Wer das Radio gezielt abstellen will, muss nicht fünfmal
+tippen.
+
+**Auf dem Gerät zu prüfen.**
+
+1. **Fünfmal MUSIK antippen.** Kommt man einmal durch alle Sender und landet
+   danach bei „Radio aus"?
+2. **Nach dem Ausschalten noch einmal tippen.** Läuft wieder die
+   Schlagerwelle — also der Anfang der Reihe?
+3. **Sender wählen, Seite neu laden.** Läuft derselbe Sender wieder?
+4. Ist das Weiterschalten im Fahrbetrieb **zu leicht aus Versehen** zu
+   treffen? (Der Knopf sitzt im Kranz, nicht am Joystickkopf.)
+
+---
+
+### E-095 — Das Funkgerät: Mario, Janine und Lambert melden sich, und zwar nur, wenn etwas ist (17.09.2026)
+
+**Was vorher da war.** Ein Funkkanal existiert seit E-056/E-066:
+`vehicles.onPickupFunk(wer, spruch)` → `hud.toast`. Darüber sprechen Achim,
+der Abholfahrer (`delivery/customers.ts`, `ABHOLFAHRER`, `fahrerfunk`), und
+seit E-082 der wartende Anlieferer. Die drei Platzleute — Mario Bär an der
+Waage, Janine Prison am Kaffeewagen, Lambert Prison im Radlader — sind in
+`world/people.ts` als Figuren gebaut, hatten aber keine Stimme.
+
+**Entscheidung.** Eine `Funkzentrale` in `src/ui/funk.ts`, mit **einer** Regel:
+**kein Spruch ohne Anlass.** Es gibt in dieser Datei keinen Zähler, der von
+selbst hochläuft, und keinen Zufallsauslöser. Wenn nichts anliegt, schweigen
+alle drei — das ist der Normalfall.
+
+**Woran die Sätze hängen**, je Stimme:
+
+* **Mario (Waage)** hängt an der Fuhre, die gerade gewogen wurde
+  (`vehicles.onWeighIn`, dazu `activeCargoMix` und `activeSortedMaterial`). Er
+  sagt nur dann etwas, wenn an der **Ladung** etwas ist: Abfall zwischen dem
+  Schrott ab 6 % Massenanteil, Buntmetall, das mit unter 30 % Anteil in einem
+  gemischten Haufen untergeht, oder vier und mehr Fraktionen auf einer Fuhre.
+  Eine saubere Fuhre lobt er nur, wenn die davor eine Beanstandung war. Wer
+  Holz **anliefert**, bekommt dazu nichts zu hören — dann ist es die Fuhre und
+  keine Beimischung.
+* **Janine (Kaffeewagen)** hängt an einem Kunden, der da ist
+  (`vehicles.onCustomerArrived`) — und daran, dass sie etwas zu **verbinden**
+  hat: derselbe Wagen wie vorhin, derselbe Betrieb, der dritte Händler an einem
+  Tag, oder was dieser Kunde beim letzten Mal gebracht hat (das merkt sie sich
+  aus Marios Wiegungen). Einen Kunden, den sie heute zum ersten Mal sieht,
+  kommentiert sie nicht. Genau das trennt Klatsch von Geplapper. Sie spricht
+  außerdem nie bei zwei Ankünften hintereinander.
+* **Lambert (Radlader)** hängt am Platz: losem Schrott ab 1500 kg
+  (`measureLoose()` in `main.ts` — dieselbe Zahl, die schon im Schichtbalken
+  steht), etwas, das **seit 25 Sekunden** in der Fahrspur steht (`lanes.blocked`
+  — der Störfall selbst meldet das HUD sofort, Lambert meldet, dass er noch
+  besteht), und dem Moment, in dem er seine Aufgabe zu Ende gebracht hat
+  (`staff.lambertArbeitet` fällt von wahr auf falsch) — dann fragt er nach der
+  nächsten. Zwischen zwei Sprüchen von ihm liegen mindestens 45 Sekunden.
+
+**Ton-Leitplanke (Projektregel 7), hier wörtlich genommen.** Mario misstraut
+der **Ladung**, nie dem Menschen, der sie bringt: Kein Satz von ihm sagt etwas
+über den Fahrer. Janine redet über **Geschäft und Tag** — wer wie oft kommt,
+wer was bringt, wie viele Händler heute da waren —, nie über Leute. Eine
+Prüfung in `test/funk.test.ts` fährt jeden Satz gegen eine Sperrliste
+(„klau", „dieb", „hehler", „kriminell", Herkunftswörter …) und gegen die
+Längengrenze von zwei bis acht Wörtern.
+
+**Verworfene Alternativen.** *Sprüche auf einen Zufallszähler* — genau das,
+was der Auftrag ausschließt; es fällt nach zehn Minuten auf und ist danach
+Lärm. *Ein zweiter Funkkanal neben `onPickupFunk`* — derselbe Kanal, dieselbe
+Einblendung, zum Überhören. *Lambert nimmt Anweisungen an* — **nicht gebaut**,
+ausdrücklich: Sein Verhalten liegt in `world/people.ts` und wird gerade
+umgebaut; ein Befehlskanal wäre eine zweite Stelle, an der sein Kopf sitzt. Er
+fragt nach Arbeit und verweist auf den Ruf, den es schon gibt (Taste Y).
+
+**FUNK-VERDRAHTUNG OFFEN.** Die Funkzentrale ist gebaut und geprüft, aber sie
+hängt noch an keiner Leitung: `main.ts` gehört diesem Paket nicht (dort
+arbeitet gleichzeitig der SCHILDER-Agent). Es fehlen fünf Zeilen — eine
+Konstruktion, eine Verbindung ans HUD und drei Einhängepunkte. Sie stehen im
+Übergabebericht. `test/funk-verdrahtung.test.ts` bewacht genau das: Entweder
+`main.ts` ist vollständig verdrahtet, **oder** dieser Vermerk steht hier —
+nie beides und nie keines. Wer die Zeilen einbaut, muss diesen Absatz
+entfernen; wer den Absatz entfernt, muss die Zeilen einbauen.
+
+**Abnahmekriterium.** `npm run build` Rückgabewert 0, `npm test` Rückgabewert
+0. Jeder der elf Anlässe wird in `test/funk-verdrahtung.test.ts` einzeln
+ausgelöst; die Gegenprobe am kaputt gemachten Quelltext („Regel für ‚viel
+Loses' entfernt") wird rot.
+
+**Auf dem Gerät zu prüfen** (erst nach der Verdrahtung).
+
+1. **Eine gemischte Fuhre mit Bauschutt wiegen lassen.** Meldet Mario sich —
+   und redet er über die Ladung, nicht über den Fahrer?
+2. **Denselben Kunden zweimal an einem Tag kommen lassen.** Erkennt Janine
+   ihn wieder?
+3. **Zwanzig Teile liegen lassen und nicht aufräumen.** Meldet Lambert sich
+   genau einmal — oder nervt er?
+4. **Zehn Minuten normal spielen.** Wie oft hat überhaupt jemand gefunkt? Zu
+   viel, zu wenig, gerade richtig?
+
+---
+
+### E-096 — Die Regeln für flache Displays standen zu früh in der Datei und waren zur Hälfte wirkungslos (17.09.2026)
+
+**Befund, beim Nachrechnen des Radiofeldes gefunden.** `index.html` hat einen
+Block `@media (max-height: 430px)` mit den Anpassungen fürs Handy quer:
+kleineres Polster, kleinere Überschriften, engere Knöpfe für das Pausenmenü und
+für die vier Dialoge (Ankauf, Verhandeln, Ausbau, Radio). Dieser Block stand
+**vor** den Grundregeln derselben Elemente.
+
+CSS entscheidet bei gleichem Gewicht nach der Reihenfolge: **Was später steht,
+gewinnt.** Beide Regelsätze haben dasselbe Gewicht (eine Kennung plus eine
+Klasse, z. B. `#radio .panel`). Die Grundregeln standen 190 Zeilen weiter
+unten — also haben sie die Anpassung überschrieben.
+
+**Was dadurch auf dem iPhone mini quer wirklich galt** (nicht, was dastand):
+
+| Element | gedacht | tatsächlich |
+|---|---|---|
+| Tafelpolster der Dialoge | 12/16 px | 22/26 px |
+| Tafelhöhe der Dialoge | 92 vh | 86 vh |
+| Überschrift der Dialoge | 15 px | 19 px |
+| Knöpfe der Dialoge | 9/12 px, 12 px Schrift | 12/16 px, 14 px Schrift |
+| `#shop-list` Scrollbereich | 46 vh | **keiner** |
+| `#pause h1` | 17 px | 26 px |
+| `#pause button` | 9/10 px, 12 px Schrift | 13/18 px, 15 px Schrift |
+| `#pause .hint` | 10 px | 11 px |
+
+Wirksam blieb nur, was **keine** spätere Grundregel hatte: das Raster des
+Pausenfeldes (`#pause .panel`, dessen Grundregel davorsteht) und
+`#controls-menu`.
+
+**Entscheidung.** Der Block wandert unverändert ans **Ende** der Fassung, mit
+einem Kasten darüber, der den Grund festhält. Kein Wert wurde dabei geändert —
+sie gelten ab jetzt einfach, wie sie gemeint waren.
+
+**Begründung.** Das ist keine Geschmacksfrage: Ohne den Scrollbereich für die
+Ausbauliste ist der Schließen-Knopf auf dem Handy quer nicht erreichbar, und
+das Radiofeld mit fünf Sendern bräuchte 444 px auf 322 px Platz. Die Werte im
+Block sind am 15./16.09.2026 für genau dieses Gerät gewählt worden; sie nicht
+gelten zu lassen wäre die schlechtere von zwei Möglichkeiten.
+
+**Verworfene Alternativen.** *Die Anpassungen mit `!important` durchsetzen* —
+das verschiebt das Problem und macht die nächste Regel noch schwerer zu
+verstehen. *Die Selektoren schwerer machen* (`body #radio .panel`) — dasselbe
+in Grün. *Nur die Radioregeln herausziehen und den Rest liegen lassen* — dann
+bliebe derselbe Fehler für Pausenmenü, Ankauf, Verhandeln und Ausbau stehen,
+und der nächste stolpert wieder darüber.
+
+**Das ist eine sichtbare Änderung an mehr als dem Radio.** Pausenmenü, Ankauf,
+Verhandeln und Ausbau werden auf dem iPhone mini quer **enger und kleiner** —
+so, wie es am 15./16.09. gedacht war, aber anders als das, was Patrick bisher
+auf dem Gerät gesehen hat. Auf dem iPad ändert sich **nichts** (768 px Höhe,
+die Abfrage greift dort nicht).
+
+**Abnahmekriterium.** `npm run build` Rückgabewert 0, `npm test` Rückgabewert
+0, alle vorhandenen Layout-Wächter (`hudplatz`, `tastenerreichbarkeit`,
+`sichererand`, `kassenlage`, `greifanzeige`) unverändert grün — sie rechnen die
+Kaskade mit derselben Reihenfolgeregel und hätten eine Verschlechterung
+gemeldet.
+
+**Auf dem Gerät zu prüfen.**
+
+1. **iPhone mini quer, Pausenmenü öffnen.** Passen jetzt alle Knöpfe aufs Bild,
+   ohne zu schieben — und ist die Schrift noch groß genug?
+2. **Platzausbau öffnen.** Ist „Schließen" sichtbar, ohne die Liste erst
+   hochzuschieben?
+3. **Ankauf und Verhandeln öffnen.** Nichts abgeschnitten, nichts zu klein?
+4. **iPad quer gegenprüfen:** Dort muss alles aussehen wie vorher.
