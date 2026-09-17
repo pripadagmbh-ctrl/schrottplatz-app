@@ -1,0 +1,36 @@
+ZEHN FUHREN AUF DEN WARTEPLATZ
+  Nr  Platz  Bilder  angekommen  tiefste Durchdringung  Restabstand  Gierlage
+   1      1    3339       ja                     0.00 m       0.00 m   180.0 Grad  parked
+   2      2    3438       ja                     0.00 m       0.00 m   180.0 Grad  parked
+   3      3    3370       ja                     0.00 m       0.00 m   180.0 Grad  parked
+   4      1    3339       ja                     0.00 m       0.00 m   180.0 Grad  parked
+   5      2    3438       ja                     0.00 m       0.00 m   180.0 Grad  parked
+   6      3    3351       ja                     0.00 m       0.00 m   180.0 Grad  parked
+   7      1    3339       ja                     0.00 m       0.00 m   180.0 Grad  parked
+   8      2    5539       ja                     0.00 m       0.00 m   180.0 Grad  parked
+   9      3    5452       ja                     0.00 m       0.00 m   180.0 Grad  parked
+  10      1    5440       ja                     0.00 m       0.00 m   180.0 Grad  parked
+  angekommen: 10 von 10   tiefste Durchdringung ueberhaupt: 0.00 m 
+
+ABGELEITETES TEMPO DES LKW-RAHMENS JE PHASE (Spitze, m/s)
+Null heisst: versetzt statt bewegt — der Loeser sieht keinen Stoss.
+  approach           4.891
+  toPark             4.890
+  in                 4.889
+  weighIn            4.325
+  shiftPause         3.616
+  reverseIn          2.885
+  parkRueck          2.043
+  pauseBeforeUnload  1.682
+  settleCargo        0.171
+  parked             0.005
+  tipping            0.001
+  tipCreep           0.000
+  ausfaedeln         0.000
+  tipHold            0.000
+
+WAS ES KOSTET
+  Bilder gerechnet:      40345
+  Koerper gesamt:        119
+  wache dynamische max:  93
+  Physik je Bild:        1.497 ms (Mittel)

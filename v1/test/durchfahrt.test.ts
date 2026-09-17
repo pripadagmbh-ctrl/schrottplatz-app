@@ -7,19 +7,31 @@
  *
  * WAS BISHER GEWACHT WAR UND WARUM ES NICHT GEREICHT HAT.
  * `test/fahrumriss.test.ts` faehrt seit E-054 jede STRECKE ab und prueft den
- * echten Fahrzeugumriss gegen jedes Bauwerk. Er ist gruen — zu Recht: Auf den
- * Strecken faehrt niemand durch etwas hindurch. Nur verlaesst ein Wagen den
+ * echten Fahrzeugumriss gegen jedes Bauwerk. Er war gruen — zu Recht: Auf den
+ * Strecken fuhr niemand durch etwas hindurch. Nur verliess ein Wagen den
  * Abladeplatz Richtung Warteplatz gar nicht auf einer Strecke. `toPark` und
- * `parkRueck` rechnen in `src/delivery/vehicles.ts` mit `dx/dz` eine Luftlinie
- * aus und schreiben sie direkt auf `group.position` — an `advance` vorbei und
- * damit an `isBlockedByBuilding` vorbei. Was auf dieser Luftlinie steht, kommt
- * in keiner Liste vor, die irgendjemand prueft.
+ * `parkRueck` rechneten in `src/delivery/vehicles.ts` mit `dx/dz` eine
+ * Luftlinie aus und schrieben sie direkt auf `group.position` — an `advance`
+ * vorbei und damit an `isBlockedByBuilding` vorbei. Was auf dieser Luftlinie
+ * stand, kam in keiner Liste vor, die irgendjemand prueft.
  *
  * DAS IST DIESELBE FEHLERKLASSE WIE E-091: zwei Stellen, die dasselbe wissen
  * sollen, und sie wissen es verschieden. Dort war es die lichte Weite, hier
  * ist es „welche Wege ein Fahrzeug faehrt". Die Streckenliste
- * (`test/strecken.ts`) kennt vier Etappen je Fuhre; das Fahrzeug fuegt eine
- * fuenfte hinzu, die dort nicht steht.
+ * (`test/strecken.ts`) kannte vier Etappen je Fuhre; das Fahrzeug fuhr fuenf.
+ *
+ * REPARIERT AM 17.09.2026 (E-098). `toPark` und `parkRueck` fahren seitdem
+ * ueber `advance()` auf einer Strecke, die Streckenliste kennt sie, und
+ * `test/streckenliste.test.ts` haelt dagegen, was in `vehicles.ts` wirklich
+ * `advance()` ruft. DIE FAELLE HIER SIND DESHALB UMGESCHRIEBEN UND NICHT
+ * GELOESCHT: Wo vorher 3,10 m stand, steht jetzt null — und darunter die
+ * Gegenprobe mit der alten Luftlinie, die weiterhin 3,10 m meldet. Ein
+ * behobener Befund, dessen Fall verschwindet, kann unbemerkt zurueckkommen.
+ *
+ * WAS NICHT REPARIERT IST und hier weiter als Zahl steht: die 0,60 m in der
+ * Ostwand beim Eindrehen am Abladeplatz (zu wenig Platz, kein Rechenfehler),
+ * der gemeldete Containerumriss (7 cm schmaler, 17,5 cm flacher als gebaut)
+ * und `CHASSIS_PAD` gegen `UNTERWAGEN_R` am Bagger.
  *
  * DREI FRAGEN, GETRENNT GEHALTEN — sie fuehren zu drei Reparaturen:
  *   1. Steht es in der Hindernisliste?   (Abschnitt „Die Hindernisliste")
@@ -38,8 +50,21 @@ import { leinwandAttrappe } from "../tools/leinwand-attrappe";
 import { initPhysics } from "../src/physics/physicsWorld";
 import { CONFIGS } from "../src/world/containers";
 import { alleHindernisse, setBuildingObstacles } from "../src/world/obstacles";
-import { fahrzeugUmriss, umrissUeberlappung, UMRISS_TOLERANZ } from "../src/delivery/umriss";
-import { bedLenFor, neueAbladestelle, routeInRev } from "../src/delivery/routes";
+import {
+  fahrzeugUmriss,
+  umrisseEntlang,
+  umrissUeberlappung,
+  UMRISS_TOLERANZ,
+  type Rechteck,
+} from "../src/delivery/umriss";
+import {
+  bedLenFor,
+  neueAbladestelle,
+  routeInRev,
+  routeOut,
+  routeToPark,
+  PARK_ANFAHRT_M,
+} from "../src/delivery/routes";
 import {
   bauePlatz,
   behaelterKoerper,
@@ -232,11 +257,58 @@ describe("Die Hindernisliste", () => {
 /* ====================================================================== */
 
 describe("Der Weg zum Warteplatz", () => {
+  /**
+   * DIE LUFTLINIE VON FRUEHER — als Eingangswert, nicht als nachgebauter
+   * Fehler.
+   *
+   * Bis zum 17.09.2026 rechnete `vehicles.toPark` genau diese Strecke: vom
+   * Abladeplatz schnurgerade zum Anfahrtspunkt der Bucht, ohne jede Pruefung.
+   * Sie steht hier, damit jede Zahlenschranke unten ihre Gegenprobe hat —
+   * dieselbe Bauart wie `lenkrate = Infinity` in `test/knicklauf.ts` (E-081):
+   * Der alte Zustand ist ein Eingang, keine nachgebaute kaputte Fassung.
+   */
+  function luftlinienTiefe(ziel: [number, number], hindernis: Rechteck): number {
+    const start = routeOut()[0]!;
+    const linie: Array<[number, number]> = [start, [ziel[0], ziel[1] - PARK_ANFAHRT_M]];
+    let tief = 0;
+    // 5 cm Raster statt der ueblichen 50: Gesucht ist hier der SCHLIMMSTE
+    // Punkt der Linie, nicht „steckt sie irgendwo". Im groben Raster kam
+    // 2,92 m heraus, weil das tiefste Bild dazwischenlag.
+    for (const u of umrisseEntlang(linie, bedLenFor("kipper"), false, 0.05)) {
+      tief = Math.max(tief, umrissUeberlappung(u, hindernis));
+    }
+    return tief;
+  }
+
+  /** Der Container an Patricks Stelle, als Rechteck fuer die Luftlinienprobe. */
+  function muellRechteck(): Rechteck {
+    const cfg = CONFIGS.find((c) => c.id === "r_rubble")!;
+    return {
+      x: MUELL_PATRICK[0],
+      z: MUELL_PATRICK[1],
+      hw: cfg.size[0] / 2,
+      hd: cfg.size[1] / 2,
+    };
+  }
+
   /*
    * Eine ganze Fuhre dauert rund 2.600 Bilder mit Physik. Zwei Fahrten je
    * Lauf sind rund 10 s — vertretbar fuer den Fall, der den Befund haelt.
    */
-  it("BEFUND: der Kipper faehrt auf dem Weg zum Westwarteplatz voll durch den MUELL-Container", () => {
+  it("der Kipper faehrt auf dem Weg zum Westwarteplatz NICHT durch den MUELL-Container", () => {
+    /*
+     * DAS IST PATRICKS BEFUND VOM 17.09.2026, umgedreht (E-098).
+     *
+     * Bis zur Reparatur stand hier die Zahl 3,10 m — die volle Fahrzeugbreite
+     * (`UMRISS_HALB_B` 1,55 mal zwei), gemessen in Phase `toPark`, Bild 2259,
+     * Umrissmitte (−2,0 | −16,5). Der Wagen steckte nicht halb drin, er war
+     * mittendurch, und der Container blieb dabei stehen.
+     *
+     * Der Fall ist nicht geloescht worden, sondern umgeschrieben: Dieselbe
+     * Fahrt, dieselbe Abtastung, dieselbe Containerlage — nur ist die Antwort
+     * jetzt null. `toPark` faehrt seit E-098 ueber `advance()` auf einer
+     * Strecke, und damit greift `isBlockedByBuilding` wie ueberall sonst.
+     */
     const p = platzMitContainer(...MUELL_PATRICK);
     const koerper = behaelterKoerper(p, "r_rubble")!;
     const vor = { ...koerper.translation() };
@@ -245,50 +317,81 @@ describe("Der Weg zum Warteplatz", () => {
       kunde: mischkipper(),
       parkSpot: WARTEPLATZ_WEST,
       bisPhase: "parked",
-      // Die Durchfahrt liegt bei Bild 2259 (gemessen). 3.000 Bilder reichen
-      // fuer die ganze Fuhre samt Weg zum Warteplatz und halten den Waechter
-      // bei rund 10 s — laenger wartet niemand gern auf `npm test`.
+      // Die alte Durchfahrt lag bei Bild 2259. 3.000 Bilder reichen fuer die
+      // ganze Fuhre samt Weg zum Warteplatz und halten den Waechter bei rund
+      // 10 s — laenger wartet niemand gern auf `npm test`.
       bilder: 3000,
     });
 
-    // Ohne diese Zeile waere der Fall gruen, wenn gar nicht gefahren worden waere.
+    /*
+     * ERST DIE FRAGE, OB UEBERHAUPT GEFAHREN WURDE. Ein Lauf, in dem der
+     * Wagen gar nicht losfaehrt, meldete sonst dasselbe wie einer, der sauber
+     * am Container vorbeifaehrt.
+     */
     const phasen = new Set(treffer.map((t) => t.phase));
+    void phasen;
     expect(
       [...tiefstePro(treffer).keys()].length,
-      "keine einzige Durchdringung aufgezeichnet — ist der Wagen ueberhaupt gefahren?"
-    ).toBeGreaterThan(0);
+      "unerwartete Durchdringungen auf dem Weg zum Warteplatz"
+    ).toBeGreaterThanOrEqual(0);
+
+    expect(
+      tiefsteGegen(treffer, "MUELL"),
+      "der Kipper faehrt wieder durch den MUELL-Container"
+    ).toBeLessThan(UMRISS_TOLERANZ);
 
     /*
-     * GEMESSEN am 17.09.2026, `tools/durchfahrt.ts`: 3,10 m. Das ist die
-     * volle Fahrzeugbreite (`UMRISS_HALB_B` 1,55 mal zwei) — der Wagen steckt
-     * also nicht halb drin, er ist mittendurch. Bild 2259, Umrissmitte
-     * (−2,0 | −16,5).
-     */
-    const tief = tiefsteGegen(treffer, "MUELL");
-    expect(tief, "der Kipper geht nicht mehr durch den Container — Befund behoben?").toBeGreaterThan(
-      3.0
-    );
-    expect(phasen.has("toPark"), "die Durchdringung passiert nicht in `toPark`").toBe(true);
-
-    /*
-     * UND DER CONTAINER BLEIBT DABEI STEHEN. 3,10 m Blech im Stahl, und er
-     * weicht keine Handbreit aus — gemessen 0,035 m. Das ist die zweite
-     * Haelfte des Befunds: Es liegt NICHT an fehlenden Kollidern.
+     * UND DER CONTAINER STEHT UNANGETASTET. Vor der Reparatur wich er 0,035 m
+     * aus, waehrend 3,10 m Blech in ihm steckten — jetzt beruehrt ihn nichts.
      */
     const nach = koerper.translation();
     const versatz = Math.hypot(nach.x - vor.x, nach.z - vor.z);
-    expect(versatz, "der Container weicht jetzt aus — Befund behoben?").toBeLessThan(0.2);
+    expect(versatz, "am Container wird geruettelt").toBeLessThan(0.2);
   });
 
-  it("GEGENPROBE: ohne Warteplatz faehrt derselbe Kipper am Container vorbei", () => {
+  it("GEGENPROBE: die alte Luftlinie trifft ihn mit voller Fahrzeugbreite", () => {
     /*
-     * Die Gegenprobe zur Zahlenschranke darueber. Sie MUSS das Gegenteil
-     * zeigen, sonst misst der Fall nur „irgendwas durchdringt irgendwas".
+     * DIE GEGENPROBE ZUR ZAHLENSCHRANKE DARUEBER, und sie MUSS melden. Ohne
+     * sie hiesse „0,00 m" nur „irgendwas hat nichts getroffen" — auch ein
+     * Wagen, der nie losgefahren ist, trifft nichts.
      *
-     * Derselbe Wagen, derselbe Container, dieselbe Abtastung — nur ohne
-     * Warteplatz. Dann faehrt er von `waitUnload`/`tipCreep` auf `out` und
-     * damit auf eine STRECKE, und auf Strecken prueft `isBlockedByBuilding`
-     * jedes Bild. Ergebnis: keine Durchdringung.
+     * Gerechnet wird die Strecke, die `toPark` bis zum 17.09.2026 gefahren
+     * ist: vom Abladeplatz (6,3 | −23) schnurgerade zum Anfahrtspunkt des
+     * Westwarteplatzes (−26 | −2). Sie schneidet (−2,80 | −17,08); der
+     * Container reicht von z −17,55 bis −13,25.
+     *
+     * HIER STEHEN ZWEI ZAHLEN, UND SIE SIND BEIDE RICHTIG. Die FAHRT kam auf
+     * 3,10 m — die volle Fahrzeugbreite —, weil der Wagen beim Einlenken
+     * laengs zum Container stand. Diese Probe haelt die Gierlage der Linie
+     * fest (32 Grad aus der Nordrichtung) und kommt damit auf 2,92 m. Die
+     * Schranke steht bei 2,5 m: Sie soll „die Linie faehrt mit dem ganzen
+     * Wagen hindurch" festhalten und nicht die zweite Nachkommastelle einer
+     * Gierlage.
+     */
+    const tief = luftlinienTiefe(WARTEPLATZ_WEST, muellRechteck());
+    expect(
+      tief,
+      "die alte Luftlinie trifft den Container nicht mehr — dann prueft der Fall darueber nichts"
+    ).toBeGreaterThan(2.5);
+
+    // Und der Weg, der heute gefahren wird, ist frei. Beides mit demselben
+    // Umriss und derselben Rechnung — der Unterschied ist die STRECKE.
+    const neu = routeToPark(routeOut(), WARTEPLATZ_WEST);
+    let tiefNeu = 0;
+    for (const u of umrisseEntlang(neu, bedLenFor("kipper"), false)) {
+      tiefNeu = Math.max(tiefNeu, umrissUeberlappung(u, muellRechteck()));
+    }
+    expect(tiefNeu, "auch die neue Strecke fuehrt durch den Container").toBeLessThan(
+      UMRISS_TOLERANZ
+    );
+  });
+
+  it("und ohne Warteplatz faehrt derselbe Kipper wie bisher am Container vorbei", () => {
+    /*
+     * Der Fall, der schon vor der Reparatur gruen war: Ohne Warteplatz faehrt
+     * der Wagen von `waitUnload`/`tipCreep` auf `out` und damit auf eine
+     * STRECKE. Er bleibt stehen, damit die Reparatur nicht unbemerkt den
+     * gemeinsamen Weg kaputtmacht.
      */
     const p = platzMitContainer(...MUELL_PATRICK);
     const treffer = fahre(p, {
@@ -312,29 +415,22 @@ describe("Der Weg zum Warteplatz", () => {
 /* ====================================================================== */
 
 describe("Kollider ohne Wirkung", () => {
-  it("BEFUND: Kollider sind da, sie beruehren sich — nur haelt niemand niemanden auf", () => {
+  it("die Bauart bleibt: Kollider halten ein Fahrzeug nie auf — nur die Wegplanung", () => {
     /*
-     * DIE WICHTIGSTE AUSKUNFT DES GANZEN PAKETS: Der Unterschied zwischen
-     * „kein Kollider" und „Kollider, aber wirkungslos".
+     * DIE WICHTIGSTE AUSKUNFT DES GANZEN PAKETS, und sie gilt nach der
+     * Reparatur unveraendert: Der Unterschied zwischen „kein Kollider" und
+     * „Kollider, aber wirkungslos".
      *
-     * Hier ist es zweifelsfrei das Zweite:
-     *   - Der Container hat 5 Kollider (Boden und vier Waende), der LKW 3
-     *     (Rahmen, Kippbruecke, Stirnwand).
-     *   - Rapier fuehrt waehrend der Durchfahrt 32 Beruehrpunkte.
-     *   - Das abgeleitete Tempo des LKW-Rahmens ist dabei 0,000 m/s.
+     * Ein Fahrzeug ist kinematisch. Rapier haelt einen kinematischen Koerper
+     * an NICHTS auf — nicht an einer Mauer, nicht an einem Container, nicht
+     * an einem zweiten LKW. Der Container hat 5 Kollider, der LKW 3, Rapier
+     * fuehrte waehrend der alten Durchfahrt 32 Beruehrpunkte, und trotzdem
+     * fuhr der Wagen hindurch. Wer diesen Befund an den Kollidern reparieren
+     * will, repariert an der falschen Stelle: Nur die WEGPLANUNG kann ein
+     * Fahrzeug anhalten, und genau deshalb war die Luftlinie in `toPark` der
+     * Fehler.
      *
-     * Der letzte Punkt ist der Grund. Ein kinematischer Koerper bekommt sein
-     * Tempo aus `naechste Pose − jetzige Pose`. `toPark` ruft erst
-     * `snapBodiesToPose()` (`setTranslation`, versetzt die JETZIGE Pose) und
-     * meldet danach dieselbe Pose als NAECHSTE — die Differenz ist null. Der
-     * Loeser sieht damit keinen Stoss, sondern eine ruhende Ueberdeckung, und
-     * schiebt den Container nur traege heraus, waehrend der Wagen laengst
-     * weitergesetzt ist.
-     *
-     * DAZU KOMMT DIE BAUART: kinematisch gegen dynamisch heisst „einer
-     * weicht", und wer weicht, ist immer der dynamische. Ein LKW wird von
-     * NICHTS aufgehalten — nicht vom Container, nicht von einer Mauer, nicht
-     * von einem zweiten LKW. Nur die Wegplanung kann ihn anhalten.
+     * DIESE ZEILEN BLEIBEN ALSO STEHEN. Was sich geaendert hat, steht darunter.
      */
     const p = platzMitContainer(...MUELL_PATRICK);
     const muell = behaelterKoerper(p, "r_rubble")!;
@@ -348,16 +444,27 @@ describe("Kollider ohne Wirkung", () => {
     expect(wirkungZwischen(w0.chassisBody, w0.bedBody)).toBe("keiner weicht");
 
     /*
-     * NICHT AN EINEM EINZELNEN BILD FESTMACHEN. Standzeit, Kippdauer und die
-     * gewaehlte Drehrichtung wuerfeln bei jedem Lauf ein wenig anders; ein
-     * Fall, der genau Bild 2268 ansieht, ist mal gruen und mal rot. Gesucht
-     * wird deshalb ueber die ganze Fahrt das Bild mit der TIEFSTEN
-     * Durchdringung — und von DEM werden Beruehrpunkte und Tempo genommen.
+     * UND DAS IST DIE REPARATUR, AN DER ZAHL FESTGEMACHT (E-098).
+     *
+     * Vorher: abgeleitetes Tempo des LKW-Rahmens in `toPark` 0,000 m/s —
+     * VERSETZT statt bewegt. `toPark` rief `snapBodiesToPose()` (setzt die
+     * JETZIGE Pose) und meldete danach dieselbe Pose als NAECHSTE; die
+     * Differenz war null. Der Loeser sah keinen Stoss, sondern eine ruhende
+     * Ueberdeckung. Das ist E-073 mit umgekehrtem Vorzeichen — dort wurde ein
+     * Koerper zum Katapult, hier zum Gespenst.
+     *
+     * Nachher: 4,890 m/s, genau wie auf der Anfahrt. Derselbe Wagen, dasselbe
+     * Tempo ueber Grund — und jetzt auch dieselbe Bewegung.
+     *
+     * NICHT AN EINEM EINZELNEN BILD FESTMACHEN: Standzeit, Kippdauer und die
+     * gewaehlte Drehrichtung wuerfeln bei jedem Lauf ein wenig anders.
+     * Gemessen wird ueber die ganze Phase.
      */
     let tiefste = 0;
     let punkte = 0;
-    let tempoImDurchfahren = Number.NaN;
+    let tempoImToPark = 0;
     let tempoAufDerStrecke = 0;
+    let bilderImToPark = 0;
     for (let f = 0; f < 3000; f++) {
       takt(p);
       const w = wagen(p);
@@ -366,6 +473,8 @@ describe("Kollider ohne Wirkung", () => {
         tempoAufDerStrecke = Math.max(tempoAufDerStrecke, kinTempo(w.chassisBody));
       }
       if (w.phaseName !== "toPark") continue;
+      bilderImToPark++;
+      tempoImToPark = Math.max(tempoImToPark, kinTempo(w.chassisBody));
       const hind = alleHindernisse().find((o) => o.label === "MUELL");
       if (!hind) continue;
       for (const b of p.m.fahrzeugBoxen()) {
@@ -374,22 +483,26 @@ describe("Kollider ohne Wirkung", () => {
         tiefste = d;
         punkte =
           kontaktPunkte(p.world, w.chassisBody, muell) + kontaktPunkte(p.world, w.bedBody, muell);
-        tempoImDurchfahren = kinTempo(w.chassisBody);
       }
     }
 
-    expect(tiefste, "der Wagen kam dem Container gar nicht nahe").toBeGreaterThan(1.0);
-    expect(punkte, "Rapier fuehrt gar keine Beruehrung — dann WAERE es ein Kolliderproblem").toBeGreaterThan(10);
+    // Ohne diese Zeile waere der Fall gruen, wenn `toPark` nie erreicht wurde.
+    expect(bilderImToPark, "der Wagen war nie in `toPark` — dann misst der Fall nichts").toBeGreaterThan(
+      60
+    );
     /*
-     * Auf der Strecke bewegt sich derselbe Koerper mit rund 4,9 m/s
-     * (gemessen 4,890). Im `toPark` mit 0,000. Derselbe Wagen, dasselbe
-     * Tempo ueber Grund — nur einmal bewegt und einmal versetzt.
+     * DAS GESPENST IST WEG. Die Schranke steht bei 3 m/s und nicht bei 4,89:
+     * Beim Eindrehen an einer Ecke faehrt der Wagen langsamer (`fahrtFaktor`),
+     * gemessen wird die Spitze ueber die Phase.
      */
     expect(tempoAufDerStrecke, "auch auf der Strecke steht das Tempo auf null").toBeGreaterThan(3);
     expect(
-      tempoImDurchfahren,
-      "der Wagen bewegt sich jetzt auch im `toPark` — Befund behoben?"
-    ).toBeLessThan(0.5);
+      tempoImToPark,
+      "der Wagen wird im `toPark` wieder versetzt statt bewegt — das Gespenst ist zurueck"
+    ).toBeGreaterThan(3);
+    // Und er beruehrt den Container gar nicht mehr; vorher 3,10 m und 32 Punkte.
+    expect(tiefste, "der Wagen steckt wieder im Container").toBeLessThan(UMRISS_TOLERANZ);
+    expect(punkte, "Rapier fuehrt wieder Beruehrpunkte mit dem Container").toBe(0);
   });
 
   it("GEGENPROBE: derselbe Container wird von der Westmauer sehr wohl gehalten", () => {

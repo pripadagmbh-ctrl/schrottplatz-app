@@ -1313,6 +1313,7 @@ export class ItemManager {
     let still = 0;
     for (const item of this.items) {
       const b = item.body;
+      if (!b.isValid()) continue; // entfernter Koerper: `isDynamic` wuerde abstuerzen
       if (!b.isDynamic()) continue; // auf der Mulde mitgefuehrte Teile sind kinematisch
       if (spinnePos) {
         const t = b.translation();
@@ -1382,6 +1383,9 @@ export class ItemManager {
    * Bildzeit.
    */
   settle(world: RAPIER.World, schritte = 240): void {
+    // Vor dem Beruhigen einmal aufraeumen: Was hier faellt, wird gleich
+    // dutzendfach gefragt (siehe `raeumeVerwaiste`).
+    this.raeumeVerwaiste();
     const runde = (n: number) => {
       for (let i = 0; i < n; i++) {
         world.step();
@@ -2298,6 +2302,7 @@ export class ItemManager {
     let best: ScrapItem | null = null;
     let bestD = maxDist;
     for (const item of this.items) {
+      if (!item.body.isValid()) continue; // siehe `raeumeVerwaiste`
       const p = item.body.translation();
       const d = Math.hypot(p.x - pos.x, p.y - pos.y, p.z - pos.z);
       if (d < bestD) {
@@ -2413,8 +2418,64 @@ export class ItemManager {
    */
   zuwachsGrenzeAus = false;
 
+  /**
+   * EINTRAEGE WEGRAEUMEN, DEREN KOERPER ES NICHT MEHR GIBT.
+   *
+   * DER HAERTESTE EINZELFEHLER AUS E-097, und er ist kein Grenzfall: Rapier
+   * beantwortet `isDynamic()` auf einem entfernten Koerper nicht mit `false`,
+   * sondern mit `RuntimeError: unreachable`. Gemessen am 17.09.2026
+   * (`tools/absturz-probe.ts`): Danach ist die ganze Welt hin — der naechste
+   * `world.step()` meldet „recursive use of an object detected which would
+   * lead to unsafe aliasing in rust". Das Spiel steht, nicht nur das Teil.
+   * Aufgetreten ist es bei Bild 19.766 eines kopflosen Dauerlaufs, also nach
+   * rund 5,5 Minuten.
+   *
+   * WARUM DAS UEBERHAUPT VORKOMMEN KANN: `remove(item, false)` nimmt den
+   * Eintrag aus der Liste und LAESST den Koerper stehen — das ist richtig so,
+   * bei Wracks gehoert er dem Verbundteil, das ihn selbst abraeumt
+   * (`composites.ts`). Der umgekehrte Fall darf es nicht geben, und trotzdem
+   * gibt es ihn: Ein Koerper, der anderswo entfernt wurde, waehrend sein
+   * Eintrag noch in `items` steht. Solange das so ist, fragt hier NIEMAND
+   * mehr einen Koerper, ohne vorher `isValid()` gefragt zu haben.
+   *
+   * Die Frage kostet einen Aufruf je Teil und Bild. Gemessen ist sie nicht
+   * spuerbar: `translation()` und `rotation()` laufen in `syncMeshes` ohnehin
+   * zweimal je Teil.
+   *
+   * @returns wieviele Eintraege weggeraeumt wurden (0 ist der Normalfall)
+   */
+  raeumeVerwaiste(): number {
+    let weg = 0;
+    for (let i = this.items.length - 1; i >= 0; i--) {
+      const item = this.items[i]!;
+      if (item.body.isValid()) continue;
+      this.items.splice(i, 1);
+      /*
+       * DIE NUMMER KOMMT AUS DER KARTE, NICHT AUS DEM KOERPER. `body.handle`
+       * eines entfernten Koerpers liest Speicher, der nicht mehr ihm gehoert
+       * — gemessen kam 2,1e−314 heraus, wo 0 stehen sollte. Wer damit
+       * loeschte, traefe nichts oder das Falsche. Ueber die Karte ist es die
+       * Nummer, unter der dieses Teil wirklich eingetragen war.
+       */
+      for (const [h, it] of this.byHandle) {
+        if (it !== item) continue;
+        this.byHandle.delete(h);
+        this.tempoVorher.delete(h);
+        this.gesamtVorher.delete(h);
+        this.letzterAufprall.delete(h);
+      }
+      if (this.highlighted === item) this.highlighted = null;
+      item.mesh.removeFromParent();
+      weg++;
+    }
+    return weg;
+  }
+
   clampSpeeds(dt = 1 / 60): void {
     this.aufprallUhr += dt;
+    // Erst die Leichen aus der Liste, dann rechnen — sonst stuerzt die
+    // Physik in der naechsten Zeile ab (siehe `raeumeVerwaiste`).
+    this.raeumeVerwaiste();
     for (const item of this.items) {
       if (!item.body.isDynamic()) {
         // Getragene Teile sind kinematisch. Beim Loslassen sollen sie ihren
@@ -2525,6 +2586,7 @@ export class ItemManager {
 
   syncMeshes(): void {
     for (const item of this.items) {
+      if (!item.body.isValid()) continue; // siehe `raeumeVerwaiste`
       const p = item.body.translation();
       const r = item.body.rotation();
       item.mesh.position.set(p.x, p.y, p.z);

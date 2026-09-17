@@ -1,0 +1,118 @@
+NULLPROBE — ein Fall, dessen Ergebnis feststeht
+  Umriss 90 m noerdlich des Hofes:        0.00 m  (soll 0)
+  derselbe Umriss auf dem Kaffeewagen:    2.80 m  (soll 2.80)
+
+KOLLIDERBILD — gibt es einen Kollider, und haelt er jemanden auf?
+  MUELL-Container        dynamisch             5 Kollider
+  LKW Rahmen             kinematisch (Pose)    1 Kollider
+  LKW Ladeflaeche        kinematisch (Pose)    2 Kollider
+
+  LKW gegen MUELL:        einer weicht
+  LKW gegen LKW:          keiner weicht
+  LKW gegen Bauwerk:      keiner weicht (Mauern sind feste Koerper)
+  MUELL gegen Bauwerk:    einer weicht (der Container ist dynamisch)
+
+HINDERNISLISTE — was die Fahrer sehen
+  53 Eintraege, davon 1 beweglich
+  beweglich: MUELL auf (-3.79 | -14.11) halb 1.80 x 2.15, Oberkante 1.00 m  [cfg.size 3.6 x 4.3 x 0.8]
+  kein beweglicher Behaelter fehlt in der Liste
+
+FAHRPROBEN — eine ganze Fuhre je Lage, jedes Bild abgetastet
+Der MUELL-Container steht dort, wo Patrick ihn am 17.09.2026 stehen hatte.
+
+  kipper, Warteplatz (-18.5 | 24)
+     —  keine Durchdringung
+     erreichte Phasen: settleCargo, in, weighIn, approach, shiftPause, reverseIn, pauseBeforeUnload, tipping, tipHold, tipCreep, ausfaedeln, toPark, waitUnload
+     Container hat sich um 0.000 m bewegt
+
+  kipper, Warteplatz (-14.5 | 24)
+     —  keine Durchdringung
+     erreichte Phasen: settleCargo, in, weighIn, approach, shiftPause, reverseIn, pauseBeforeUnload, tipping, tipHold, tipCreep, ausfaedeln, toPark, out, parked
+     Container hat sich um 0.000 m bewegt
+
+  kipper, Warteplatz (-26 | 6)
+     —  keine Durchdringung
+     erreichte Phasen: settleCargo, in, weighIn, approach, shiftPause, reverseIn, pauseBeforeUnload, tipping, tipHold, tipCreep, ausfaedeln, toPark, parked
+     Container hat sich um 0.000 m bewegt
+
+  kipper, Warteplatz keiner
+     —  keine Durchdringung
+     erreichte Phasen: settleCargo, in, weighIn, approach, shiftPause, reverseIn, pauseBeforeUnload, tipping, tipHold, tipCreep, ausfaedeln, out
+     Container hat sich um 0.000 m bewegt
+
+  pritsche, Warteplatz (-18.5 | 24)
+     —  keine Durchdringung
+     erreichte Phasen: settleCargo, in, weighIn, approach, shiftPause, reverseIn, pauseBeforeUnload, waitUnload
+     Container hat sich um 0.000 m bewegt
+
+  pritsche, Warteplatz (-14.5 | 24)
+     —  keine Durchdringung
+     erreichte Phasen: settleCargo, in, weighIn, approach, shiftPause, reverseIn, pauseBeforeUnload, waitUnload
+     Container hat sich um 0.000 m bewegt
+
+  pritsche, Warteplatz (-26 | 6)
+     —  keine Durchdringung
+     erreichte Phasen: settleCargo, in, weighIn, approach, shiftPause, reverseIn, pauseBeforeUnload, waitUnload
+     Container hat sich um 0.000 m bewegt
+
+  pritsche, Warteplatz keiner
+     —  keine Durchdringung
+     erreichte Phasen: settleCargo, in, weighIn, approach, shiftPause, reverseIn, pauseBeforeUnload, waitUnload
+     Container hat sich um 0.000 m bewegt
+
+  abholer, Warteplatz (-18.5 | 24)
+     —  keine Durchdringung
+     erreichte Phasen: in, weighIn, approach, shiftPause, reverseIn, pauseBeforeUnload, waitLoad
+     Container hat sich um 0.000 m bewegt
+
+  abholer, Warteplatz (-14.5 | 24)
+     —  keine Durchdringung
+     erreichte Phasen: in, weighIn, approach, shiftPause, reverseIn, pauseBeforeUnload, waitLoad
+     Container hat sich um 0.000 m bewegt
+
+  abholer, Warteplatz (-26 | 6)
+     —  keine Durchdringung
+     erreichte Phasen: in, weighIn, approach, shiftPause, reverseIn, pauseBeforeUnload, waitLoad
+     Container hat sich um 0.000 m bewegt
+
+  abholer, Warteplatz keiner
+     —  keine Durchdringung
+     erreichte Phasen: in, weighIn, approach, shiftPause, reverseIn, pauseBeforeUnload, waitLoad
+     Container hat sich um 0.000 m bewegt
+
+  kipper, Warteplatz (-26 | 6), Container auf seinem STARTPLATZ
+     —  keine Durchdringung
+     erreichte Phasen: settleCargo, in, weighIn, approach, shiftPause, reverseIn, pauseBeforeUnload, tipping, tipHold, tipCreep, ausfaedeln, toPark, waitUnload
+     Container hat sich um 0.000 m bewegt
+
+DIE KEHRE — was der Umriss beim Eindrehen auf der Stelle ueberstreicht
+Kein Wegpunkt, keine Strecke: `test/fahrumriss.test.ts` sieht diese Lagen nie.
+  Abladeplatz, Wechsel Anfahrt/Rangieren (6.3 | -17.5): tiefstens   0.60 m in Ostwand bei 44 Grad
+  Abladeplatz, Halt (6.3 | -23): tiefstens   0.60 m in Ostwand bei 44 Grad
+
+BEWEIS — beruehren sich die Kollider waehrend der Durchfahrt?
+  der Wagen kam dem Container nie naeher als 1,6 m
+
+VERGLEICH — abgeleitetes Tempo des LKW-Rahmens je Phase
+Null heisst: versetzt statt bewegt. Der Loeser sieht dann keinen Stoss.
+  settleCargo        0.279 m/s
+  in                 4.889 m/s
+  weighIn            4.325 m/s
+  approach           4.890 m/s
+  shiftPause         3.616 m/s
+  reverseIn          2.886 m/s
+  pauseBeforeUnload  1.681 m/s
+  tipping            0.001 m/s
+  tipHold            0.000 m/s
+  tipCreep           0.000 m/s
+  ausfaedeln         0.000 m/s
+  toPark             4.890 m/s
+  parked             0.000 m/s
+
+FAHRZEUG GEGEN LIEGENDEN SCHROTT auf dem Weg zum Warteplatz
+  400-kg-Brocken auf (1,0 | −18,4): verschoben um 0.00 m auf (1.00 | -18.40)
+
+BEHAELTER GEGEN BAUWERK — die Gegenprobe: hier haelt die Physik
+  Container mit 6 m/s gegen die Westmauer: von x -34.05 auf x -34.06 — von der Mauer gehalten
+
+Nullprobe bestanden.
