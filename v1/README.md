@@ -9,9 +9,24 @@ breiter Ring an der Spinne (E-007), Rückwände raus an den vier Sortiermulden (
 Kommentar-Regel für Messwerte (E-008), der Fünfschalengreifer als Vorschaumodell (E-009),
 Platzumbau auf die L-Silos und die Mulde „BUNT + VA" (E-026 bis E-028), Bestandsaufnahme
 der Sortierung (E-029), Typprüfung für `test/` und `tools/` (E-038). Prüfkette grün
-(16.09.2026, beide Rückgabewerte 0 einzeln geprüft): `npm test` **1.292 Prüfungen in 111
-Dateien**, `npm run build` sauber. Abgenommen ist nichts davon vor Patricks Gerätetest — die
-Handgriffe stehen bei E-006, E-007, E-009 und E-029 im Log.
+(17.09.2026, beide Rückgabewerte 0 einzeln geprüft): `npm test` **1.314 Prüfungen in 113
+Dateien** in 293 s, `npm run build` sauber. Abgenommen ist nichts davon vor Patricks
+Gerätetest — die Handgriffe stehen bei E-006, E-007, E-009 und E-029 im Log.
+
+**Offen und gemessen, nicht repariert (E-093):** Patricks Befund vom 17.09.2026 — „LKWS
+fahren durch Müllcontainer. Objekte fahren durch einander hindurch" — ist nachgemessen.
+Es liegt **weder an der Hindernismeldung noch an fehlenden Kollidern**: Der Container
+steht in der Liste, er hat fünf Kollider, der LKW drei, und Rapier führt während der
+Durchfahrt 32 Berührpunkte. Die beiden Phasen `toPark` und `parkRueck`
+(`src/delivery/vehicles.ts:2382`/`:2415`) fahren eine **Luftlinie** vom Abladeplatz zum
+Warteplatz und gehen dabei an jeder Hindernisprüfung vorbei; die Linie zum Westwarteplatz
+trifft den Container auch an seinem **Startplatz**. Tiefe **3,10 m** — die volle
+Fahrzeugbreite. Dazu ist das abgeleitete Tempo des Wagens in diesen Phasen 0,000 m/s statt
+4,89: Er wird versetzt statt bewegt, also sieht der Löser keinen Stoß. Drei mögliche
+Reparaturen stehen im Log, entschieden ist keine — ob ein LKW davor stehenbleibt und hupt
+oder den Container beiseiteschiebt, ist eine Spielgefühlsfrage. Gemessen mit
+`tools/durchfahrt.ts`, bewacht von `test/durchfahrt.test.ts`, Protokoll in
+`docs/messungen/2026-09-17_durchfahrt.md`.
 
 **Offen und gemessen, nicht entschieden (E-091):** Der offene Greifer ist am gebauten Netz
 breiter als die Formel sagt, mit der zwei Wächter rechnen — Sichelkralle **3,5335 m** statt
