@@ -355,3 +355,119 @@ export function schiebeZiel(
   const ziel = SCHIEB_ZIEL_M + ANSTELL_ABSTAND;
   return [ex + (dx / d) * ziel, ez + (dz / d) * ziel];
 }
+
+/*
+ * --- Wohin der Brocken wirklich darf (17.09.2026, E-093) ---
+ *
+ * `schiebeZiel` legt das Stueck stur auf die Gerade Bagger -> Teil, 6,0 m vom
+ * Sitz. Gemessen ist das fuer die Bueroseite unbrauchbar: Von acht Brocken
+ * zwischen (-30 | 2) und (-8 | 14) landete JEDER entweder in der
+ * Buntmetall-Mulde oder im Muellcontainer - 0 von 8 wurden geschoben. Der
+ * Grund ist kein Fehler, sondern der Platz: Vor dem Bagger stehen seit E-029
+ * und E-041 die Sortiermulde und der Muellcontainer, und die Gerade von der
+ * Bueroseite laeuft genau dort hindurch.
+ *
+ * Deshalb sucht er sich jetzt einen freien Fleck: dieselbe Entfernung vom
+ * Sitz, aber auf der naechstgelegenen PEILUNG, die frei ist. Zwei Schranken
+ * dabei:
+ *
+ *  - Der Fleck liegt im Schwenkband (5,80 ... 9,20 m, `baggerstand.ts`) -
+ *    sonst haette das Schieben keinen Zweck.
+ *  - LAMBERT SELBST bleibt DRAUSSEN. Er steht beim Uebergeben 2,80 m hinter
+ *    dem Stueck (`ANSTELL_ABSTAND`); bei 6,0 m Ablage waeren das 8,80 m und
+ *    damit mitten im Band. Bei 8,50 m sind es 11,30 m - ausserhalb. Das ist
+ *    die Zahl, an der `SCHIEB_ABLAGE_M` haengt, und sie wird gerechnet, nicht
+ *    geglaubt: `test/lambertAufraeumen.test.ts` rechnet sie nach.
+ */
+
+/**
+ * Wie weit vom Sitz der Brocken abgelegt wird (m).
+ *
+ * Gerechnet aus beiden Enden des Schwenkbands (5,80 ... 9,20 m):
+ *
+ *   NACH AUSSEN  Der Lader haelt an, sobald er 0,40 m vor seinem Ziel ist
+ *                (`walking`-Schwelle in `people.ts`). Dazu kommt, dass die
+ *                Schneide nie exakt radial steht. 8,20 + 0,40 = 8,60 m — das
+ *                Stueck liegt sicher INNERHALB des Bands. Mit 8,50 lagen
+ *                gemessen 3 von 7 Brocken bei 9,3 bis 9,7 m, also ausserhalb:
+ *                hingeschoben und trotzdem nicht zu greifen.
+ *   NACH INNEN   Der Lader steht `SCHIEB_VORLAUF` dahinter: 8,20 + 2,40 =
+ *                10,60 m, und damit ausserhalb des Bands. Genau das ist die
+ *                Bedingung („nicht in den Schwenkbereich fahren").
+ */
+export const SCHIEB_ABLAGE_M = 8.2;
+/**
+ * Wie weit vor dem Lader das geschobene Stueck liegt (m).
+ *
+ * Steht hier und wird von `people.ts` beim Mitfuehren gelesen — vorher stand
+ * die 2,4 dort als Zahl im Quelltext und die 2,8 (`ANSTELL_ABSTAND`) in der
+ * Zielrechnung. Zwei Zahlen fuer dieselbe Strecke, und das Stueck lag
+ * systematisch 0,40 m zu weit draussen.
+ */
+export const SCHIEB_VORLAUF = 2.4;
+/** In diesen Schritten wird die Peilung aufgefaechert (rad) - 5 Grad. */
+export const PEIL_SCHRITT = (5 * Math.PI) / 180;
+/** So weit faechert er auf: eine halbe Umdrehung nach jeder Seite. */
+export const PEIL_MAX = Math.PI;
+
+/**
+ * Der Fleck, auf den der Brocken soll: im Schwenkband, auf der freien Peilung,
+ * die seiner jetzigen am naechsten liegt.
+ *
+ * @param frei Was der Platz erlaubt - kennt Hindernisse, Mulden und
+ *             Fahrspuren. Steht bewusst draussen: Der Radlader soll nicht
+ *             wissen, was eine Sortiermulde ist.
+ * @returns [x, z] oder null, wenn ringsum nichts frei ist
+ */
+export function ablagePlatz(
+  ix: number,
+  iz: number,
+  ex: number,
+  ez: number,
+  frei: (x: number, z: number) => boolean,
+  radius = SCHIEB_ABLAGE_M
+): [number, number] | null {
+  const peil0 = Math.atan2(ix - ex, iz - ez);
+  for (let d = 0; d <= PEIL_MAX + 1e-6; d += PEIL_SCHRITT) {
+    for (const vz of d === 0 ? [1] : [1, -1]) {
+      const a = peil0 + vz * d;
+      const x = ex + Math.sin(a) * radius;
+      const z = ez + Math.cos(a) * radius;
+      if (frei(x, z)) return [x, z];
+    }
+  }
+  return null;
+}
+
+/**
+ * Wo der Lader sich anstellt, wenn das Ziel NICHT auf der Geraden zum Bagger
+ * liegt: hinter dem Teil, auf der Verlaengerung Ziel -> Teil. Von dort schiebt
+ * er in die richtige Richtung.
+ */
+export function anstellFuerZiel(
+  ix: number,
+  iz: number,
+  zx: number,
+  zz: number
+): [number, number] {
+  const dx = ix - zx;
+  const dz = iz - zz;
+  const d = Math.hypot(dx, dz) || 1;
+  return [ix + (dx / d) * ANSTELL_ABSTAND, iz + (dz / d) * ANSTELL_ABSTAND];
+}
+
+/**
+ * Wo der Lader stehen bleibt, damit das Stueck auf dem Fleck liegt: eine
+ * Anstelllaenge dahinter.
+ */
+export function haltFuerZiel(
+  ix: number,
+  iz: number,
+  zx: number,
+  zz: number
+): [number, number] {
+  const dx = ix - zx;
+  const dz = iz - zz;
+  const d = Math.hypot(dx, dz) || 1;
+  return [zx + (dx / d) * SCHIEB_VORLAUF, zz + (dz / d) * SCHIEB_VORLAUF];
+}

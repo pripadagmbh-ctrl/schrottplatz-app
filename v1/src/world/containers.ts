@@ -710,6 +710,17 @@ export function muldenWandSpannen(
   };
 }
 
+/**
+ * Wandstaerke eines Absetzcontainers (Bestand seit 13.09.2026, „Container
+ * sollen massiver werden").
+ *
+ * Stand bis zum 17.09.2026 nur als lokales `T` im Bauteil. Seit der
+ * Fuellstand gerechnet wird (`world/fuellstand.ts`), braucht die lichte Weite
+ * eine Adresse: Wer die Wand dicker macht, soll nicht an zwei Stellen
+ * nachziehen muessen.
+ */
+export const ROLLOFF_WAND = 0.09;
+
 /** Fangbereich über einer Haufen-Zone (Zonen-Zählung + Ampel) */
 const PILE_CATCH_HEIGHT = 2.4;
 
@@ -1265,7 +1276,7 @@ class GameContainer {
        * offen 3,02 m ueber die Spitzen, es bleiben also 40 cm auf jeder Seite.
        * `test/spinnenmass.test.ts` rechnet das mit.
        */
-      const T = 0.09;
+      const T = ROLLOFF_WAND;
       const KUFE = 0.22;
       const stahl = new THREE.MeshStandardMaterial({
         color: fraction.color,

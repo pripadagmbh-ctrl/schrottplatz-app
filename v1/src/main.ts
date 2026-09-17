@@ -863,6 +863,13 @@ async function main(): Promise<void> {
    * richtig.
    */
   vehicles.onPickupFunk = (wer, spruch) => hud.toast(`${wer}: „${spruch}"`);
+  /*
+   * Lambert haengt an DEMSELBEN Kanal (Auftrag 17.09.2026: „Kein zweiter
+   * Kanal"). Er meldet sich, wenn er von sich aus anfaengt aufzuraeumen, wenn
+   * er durch ist und wenn die Abfallmulde nichts mehr nimmt — gleiche Zeile,
+   * gleiche Form wie beim Abholer.
+   */
+  staff.onFunk = (wer, spruch) => hud.toast(`${wer}: „${spruch}"`);
 
   /*
    * DER LIEFERSCHEIN DES ABHOLERS (E-064).

@@ -28,11 +28,18 @@ import {
   WheelLoader,
   LOADER_SPEED,
   brauchtSchieben,
-  anstellPunkt,
   schiebeZiel,
   SCHIEB_MIN_M,
   SCHIEB_MIN_KG,
+  ablagePlatz,
+  anstellFuerZiel,
+  haltFuerZiel,
+  SCHIEB_VORLAUF,
 } from "./loader";
+import { aufFahrspur } from "./fahrspuren";
+import { istVoll, fuellgrad } from "./fuellstand";
+import { ABFALL } from "../materials/catalog";
+import { lambertfunk, LAMBERT_FUNKNAME, type Lambertlage } from "./lambertfunk";
 
 /**
  * Platzpersonal (Design 2026-08-29):
@@ -279,6 +286,61 @@ const RADLADER_IN_BETRIEB = true;
  */
 const RAEUMT_AUF = false;
 /**
+ * Raeumt er von SICH AUS auf — ohne Ruf, aber in einem engen Rahmen?
+ *
+ * Patricks Gerätetest 16.09.2026, zwei Punkte, die zusammengehoeren:
+ * „Lambert sortiert den Abfall mit dem Radlader in die Mulden" und „Mulden
+ * befuellen, solange Platz ist; sonst andere Arbeit aufnehmen — z. B. Schrott
+ * von der Bueroseite an den Bagger heranschieben."
+ *
+ * Das ist NICHT die alte Rangfolge von vor dem 13.09. (`RAEUMT_AUF`). Die
+ * suchte Arbeit auf dem ganzen Platz — blockierte Fahrspuren, Raeder mit
+ * Alufelge, Buntmetall im Stahlhaufen — und schickte ihn dabei staendig in den
+ * Arbeitsbereich des Baggers. Diese hier kennt genau ZWEI Aufgaben, in fester
+ * Reihenfolge:
+ *
+ *   1. Abfall, der herumliegt, in eine Abfallmulde — solange dort Platz ist
+ *      (`world/fuellstand.ts`).
+ *   2. sonst: Schrott von der Bueroseite an den Bagger heranschieben.
+ *
+ * Beide beruehren den Arbeitsbereich des Baggers nicht: Das Sperrgebiet
+ * (`imBaggerrevier`) gilt unveraendert weiter, und die Bueroseite liegt
+ * ohnehin auf der anderen Haelfte des Platzes. Gerufen wird er weiterhin mit
+ * Y; der Ruf hat Vorrang vor beidem.
+ */
+const SELBST_AUFRAEUMEN = true;
+/**
+ * Bis wohin er Abfall aufsammelt (m, Weltkoordinaten).
+ *
+ * Derselbe Arbeitsteil des Platzes wie in `findStray` — der Kasten steht dort
+ * schon so. Weiter draussen liegt nichts, was er einsammeln soll: im Norden
+ * die Waage, im Sueden hinter z −20 die Muldenzeile.
+ */
+const ABFALL_FELD = { xMax: 22, zMin: -20, zMax: 22 };
+/**
+ * Die BUEROSEITE — der Streifen, aus dem er Schrott zum Bagger schiebt.
+ *
+ * Gerechnet, nicht gegriffen. Das Buero steht an der Westwand
+ * (`OFFICE_X` = −35,1, Tiefe 9,0 m), seine Front liegt damit auf x −30,6;
+ * davor liegt der grosse freie Mittelplatz. Nach Westen ist bei x −30,6
+ * Schluss — dahinter ist Gebaeude. Nach Osten reicht der Streifen bis an die
+ * alte Grenze von `findSchiebegut` (x +4), damit sich an dem, was er bisher
+ * schon schob, nichts aendert; neu ist nur der Teil zwischen −30,6 und −24.
+ *
+ * In z bleibt es bei der alten Schranke: noerdlich von z −12 endet das
+ * Sperrgebiet des Baggers (`REVIER_Z` = −11,9), suedlich davon hat er nichts
+ * zu suchen.
+ */
+const BUEROSEITE = { xMin: OFFICE_X + 4.5, xMax: 4, zMin: -12, zMax: 22 };
+/**
+ * Wie viel Luft ein geschobener Brocken zum naechsten braucht (m).
+ *
+ * Die Schaufel ist 2,20 m breit (`SCHAUFEL_BREITE`); die Haelfte davon plus
+ * ein halber Meter Rand sind 1,60 m. Weniger, und er schiebt den naechsten
+ * Brocken in den vorigen hinein.
+ */
+const ABLAGE_LUECKE = 1.6;
+/**
  * Wo er wartet: auf der Ostseite, zwischen Muldenreihe und Sortierboxen.
  *
  * Ansage: „Lambert faehrt von der Ostseite ran auf Befehl." Der Platz ist
@@ -383,6 +445,55 @@ export class StaffManager {
   private lambertState: LambertState = "patrol";
   /** Ist er gerufen? Ohne Ruf bleibt er auf dem Ostposten stehen. */
   private gerufen = false;
+  /**
+   * Wohin das aufgenommene Stueck soll, wenn es NICHT die Standardmulde seiner
+   * Fraktion ist.
+   *
+   * Beim Abfall gibt es zwei Ziele — den versetzbaren Muellcontainer auf dem
+   * Hof und das Abfall-Silo an der Suedwand. Welches genommen wird, entscheidet
+   * sich beim Annehmen der Arbeit (naechstes erreichbares mit Platz); ohne
+   * dieses Feld wuerde `onArrived` es ein zweites Mal entscheiden und koennte
+   * auf das andere kommen.
+   */
+  private zielMulde: ContainerConfig | null = null;
+  /**
+   * Was er gerade von sich aus tut — fuer die Funkmeldungen.
+   *
+   * `null` heisst: kein laufender Auftrag. Beim Wechsel von `null` auf eine
+   * Arbeit meldet er sich an, beim Wechsel zurueck ab. So kommt je Lauf EINE
+   * Meldung und nicht je Stueck.
+   */
+  private aufraeumLauf: "abfall" | "schieben" | null = null;
+  /**
+   * Hat er schon gemeldet, dass die Mulde voll ist? Sonst funkt er es bei
+   * jeder Arbeitssuche neu — alle drei bis fuenf Sekunden.
+   */
+  private vollGemeldet = false;
+  /**
+   * Der Funkkanal. Denselben, den auch der Abholer und die Anlieferer
+   * benutzen (`VehicleManager.onPickupFunk` → `hud.toast`); `main.ts` haengt
+   * beide an dieselbe Zeile.
+   */
+  onFunk: ((wer: string, spruch: string) => void) | null = null;
+
+  /** Eine Lage durchgeben. */
+  private funk(lage: Lambertlage): void {
+    this.onFunk?.(LAMBERT_FUNKNAME, lambertfunk(lage));
+  }
+
+  /**
+   * Einen Lauf anmelden oder abmelden. Gemeldet wird nur der WECHSEL — wer
+   * zwanzig Bretter in die Mulde faehrt, sagt einmal Bescheid und einmal, dass
+   * er durch ist.
+   */
+  private setzeLauf(lauf: "abfall" | "schieben" | null): void {
+    if (this.aufraeumLauf === lauf) return;
+    if (this.aufraeumLauf === "abfall") this.funk("abfallFertig");
+    else if (this.aufraeumLauf === "schieben") this.funk("schiebenFertig");
+    this.aufraeumLauf = lauf;
+    if (lauf === "abfall") this.funk("abfallAn");
+    else if (lauf === "schieben") this.funk("schiebenAn");
+  }
   /** Faehrt er gerade nur bis vor die offene Seite einer Mulde? */
   private zwischenhalt = false;
 
@@ -796,6 +907,46 @@ export class StaffManager {
       this.lambertTarget.copy(this.patrol[this.patrolIdx]);
     }
 
+    /*
+     * VORFAHRT FUER DEN LKW (Auftrag 17.09.2026: „Er darf nicht im Weg
+     * stehen").
+     *
+     * Der Platz ist einspurig (E-029), und die Zufahrt laeuft quer ueber den
+     * Hof: von (−27,5 | 22,5) diagonal bis (6,3 | −17,5). Genau dort liegt
+     * auch der Abfall, den er einsammeln soll — gemessen verbringt er beim
+     * Aufraeumen 13,2 % der Zeit innerhalb einer LKW-Breite davon, im Tiefsten
+     * mit 0,00 m Abstand mitten drauf.
+     *
+     * Blockieren kann er niemanden: Lambert hat keinen Kollider, die
+     * Fahrzeugverwaltung fragt ihn nirgends ab (gemessen: kein einziger Verweis
+     * auf ihn in `delivery/vehicles.ts`). Ein LKW faehrt also durch ihn
+     * HINDURCH — und genau das sieht falsch aus.
+     *
+     * Deshalb die einfachste Regel, die ein Platzwart auch haette: Sobald ein
+     * Fahrzeug rangiert, unterbricht er das Aufraeumen und faehrt an den Rand.
+     * Was er schon in der Schaufel hat oder vor sich herschiebt, bringt er
+     * vorher zu Ende — es mitten auf dem Hof fallen zu lassen waere schlimmer.
+     * Der RUF (Taste Y) ist davon unberuehrt: Wer ruft, will ihn jetzt.
+     */
+    this.rangiert = truck !== null;
+    if (
+      SELBST_AUFRAEUMEN &&
+      !RAEUMT_AUF &&
+      !this.gerufen &&
+      this.rangiert &&
+      this.aufraeumLauf !== null &&
+      this.lambertState !== "carry" &&
+      this.lambertState !== "shoving"
+    ) {
+      // Still abbrechen: Er ist nicht fertig, er macht Platz.
+      this.aufraeumLauf = null;
+      this.carriedItemId = null;
+      this.lastAufgenommen = false;
+      this.zielMulde = null;
+      this.lambertState = "patrol";
+      this.lambertTarget.copy(OSTPOSTEN);
+    }
+
     // Ziel erreicht?
     const toTarget = this.lambertTarget.clone().sub(g.position);
     toTarget.y = 0;
@@ -1011,9 +1162,9 @@ export class StaffManager {
       if (this.lambertState === "shoving") {
         // vor der Schneide, am Boden — nicht in der Schaufel
         ziel.set(
-          g.position.x + Math.sin(g.rotation.y) * 2.4,
+          g.position.x + Math.sin(g.rotation.y) * SCHIEB_VORLAUF,
           0.35,
-          g.position.z + Math.cos(g.rotation.y) * 2.4
+          g.position.z + Math.cos(g.rotation.y) * SCHIEB_VORLAUF
         );
       }
     } else {
@@ -1063,7 +1214,13 @@ export class StaffManager {
       const ex = this.getExcavatorPos?.();
       if (it && it.body.isValid() && ex) {
         const p = it.body.translation();
-        const [zx, zz] = schiebeZiel(p.x, p.z, ex.x, ex.z);
+        /*
+         * Zum Fleck, der beim Annehmen der Arbeit gefunden wurde. Ohne ihn
+         * (alte Rangfolge, kein Fleck gemerkt) wie bisher auf die Gerade.
+         */
+        const [zx, zz] = this.schiebeFleck
+          ? haltFuerZiel(p.x, p.z, this.schiebeFleck[0], this.schiebeFleck[1])
+          : schiebeZiel(p.x, p.z, ex.x, ex.z);
         this.lambertState = "shoving";
         this.lastAufgenommen = true;
         this.lambertTarget.set(zx, 0, zz);
@@ -1123,7 +1280,9 @@ export class StaffManager {
       // Aufgenommen — jetzt zur Box, in die das Material gehört
       const it = this.items.items.find((i) => i.id === this.carriedItemId);
       if (it) {
-        const mulde = StaffManager.muldeFuer(it.materialId);
+        // Beim Abfall steht das Ziel schon fest (`zielMulde`) — es gibt zwei,
+        // und die Wahl ist beim Annehmen der Arbeit gefallen.
+        const mulde = this.zielMulde ?? StaffManager.muldeFuer(it.materialId);
         if (mulde) {
           this.lambertState = "carry";
           this.lastAufgenommen = true;
@@ -1146,7 +1305,7 @@ export class StaffManager {
       // In die Box legen: Lambert wirft es über die Wand hinein
       const it = this.items.items.find((i) => i.id === this.carriedItemId);
       if (it && it.body.isValid()) {
-        const mulde = StaffManager.muldeFuer(it.materialId);
+        const mulde = this.zielMulde ?? StaffManager.muldeFuer(it.materialId);
         if (mulde) {
           /*
            * ÜBER die Kante fallen lassen, nicht hinein.
@@ -1177,8 +1336,28 @@ export class StaffManager {
       }
       this.carriedItemId = null;
       this.lastAufgenommen = false;
+      const warAbfall = this.aufraeumLauf === "abfall";
+      this.zielMulde = null;
       this.lambertState = "patrol";
-      this.lambertTarget.copy(this.ruhepunkt);
+      /*
+       * Beim Aufraeumen NICHT erst zum Ostposten zurueck.
+       *
+       * Der Posten ist der Warteplatz fuer den Ruf; auf dem Weg dorthin steht
+       * er gemessen 9,0 m Umweg je Stueck (Silo −20,8 | −25,0 → Posten
+       * −15,0 | −18,0). Wer eine Fuhre abgeladen hat, dreht sich um und holt
+       * die naechste. Er bleibt deshalb stehen, wo er ist, und sucht im
+       * naechsten Bild weiter; ist nichts mehr da, faehrt er von dort aus auf
+       * den Posten.
+       *
+       * Fuer die gerufene Boxarbeit bleibt es beim Alten — daran haengen die
+       * Waechter aus `test/lambert.test.ts`.
+       */
+      if (warAbfall) {
+        this.lambertTarget.copy(this.lambert.group.position);
+        this.pruefUhr = this.naechstePruefung;
+      } else {
+        this.lambertTarget.copy(this.ruhepunkt);
+      }
       return;
     }
 
@@ -1238,10 +1417,61 @@ export class StaffManager {
      */
     if (!RAEUMT_AUF) {
       if (!this.gerufen) {
-        // Warten. Nicht patrouillieren, nicht Kaffee holen — bereitstehen.
+        /*
+         * OHNE RUF: die zwei Aufgaben aus Patricks Geraetetest, in dieser
+         * Reihenfolge (siehe `SELBST_AUFRAEUMEN`).
+         *
+         *   1. Abfall wegraeumen, solange in der Mulde Platz ist
+         *   2. sonst Schrott von der Bueroseite an den Bagger schieben
+         *   3. sonst warten — nicht patrouillieren, nicht Kaffee holen
+         */
+        if (SELBST_AUFRAEUMEN && this.faehrt && !this.rangiert) {
+          const abfall = this.findAbfall();
+          if (abfall) {
+            this.vollGemeldet = false;
+            this.setzeLauf("abfall");
+            this.zielMulde = abfall.mulde;
+            hol(abfall.it);
+            return;
+          }
+          /*
+           * Kein Ziel — lag es am Fuellstand? Dann einmal durchgeben und
+           * danach schweigen, bis wieder Platz ist. Sonst funkt er es bei
+           * jeder Arbeitssuche neu, also alle drei bis fuenf Sekunden.
+           */
+          if (this.abfallOhnePlatz && !this.vollGemeldet) {
+            this.vollGemeldet = true;
+            this.funk("muldeVoll");
+          }
+          const weit = this.findSchiebegut();
+          if (weit && this.schiebeFleck) {
+            const p = weit.body.translation();
+            const [ax, az] = anstellFuerZiel(
+              p.x,
+              p.z,
+              this.schiebeFleck[0],
+              this.schiebeFleck[1]
+            );
+            this.setzeLauf("schieben");
+            this.zielMulde = null;
+            this.carriedItemId = weit.id;
+            this.lambertTarget.set(ax, 0, az);
+            this.lambertState = "shove";
+            return;
+          }
+        }
+        this.setzeLauf(null);
+        this.zielMulde = null;
         this.lambertTarget.copy(OSTPOSTEN);
         return;
       }
+      /*
+       * Der Ruf hat Vorrang. Der laufende Aufraeumauftrag endet damit still —
+       * „Abfall ist weg" waere an dieser Stelle schlicht falsch: Er hoert auf,
+       * weil er gerufen ist, nicht weil er fertig ist.
+       */
+      this.aufraeumLauf = null;
+      this.zielMulde = null;
       const ausDerBox = this.findBoxTeil();
       if (ausDerBox) {
         hol(ausDerBox);
@@ -1294,10 +1524,9 @@ export class StaffManager {
       return;
     }
     const weit = this.findSchiebegut();
-    if (weit) {
+    if (weit && this.schiebeFleck) {
       const p = weit.body.translation();
-      const ex = this.getExcavatorPos!();
-      const [ax, az] = anstellPunkt(p.x, p.z, ex.x, ex.z);
+      const [ax, az] = anstellFuerZiel(p.x, p.z, this.schiebeFleck[0], this.schiebeFleck[1]);
       this.carriedItemId = weit.id;
       this.lambertTarget.set(ax, 0, az);
       this.lambertState = "shove";
@@ -1515,6 +1744,16 @@ export class StaffManager {
       if (!it.body.isValid() || !it.body.isDynamic()) continue;
       // Fuer eine Schraube faehrt niemand den Lader an
       if (it.massKg < SCHIEB_MIN_KG) continue;
+      /*
+       * Abfall wird NICHT geschoben.
+       *
+       * Er hat seinen eigenen Weg (in die Mulde), und wenn die voll ist,
+       * gehoert er erst recht nicht vor den Bagger: Der Spieler kann ihn dann
+       * nirgends hinlegen und haette den Muell mitten im Arbeitsbereich. Ohne
+       * diese Zeile schob Lambert bei voller Mulde genau das dorthin
+       * (gemessen im Waechter „laesst den Abfall liegen").
+       */
+      if (ABFALL.has(it.materialId)) continue;
       const p = it.body.translation();
       if (p.y > 1.4) continue;
       if (!brauchtSchieben(p.x, p.z, ex.x, ex.z)) continue;
@@ -1525,18 +1764,38 @@ export class StaffManager {
       // ohne diese Regel schob Lambert den Haufen endlos in sich zusammen
       // (gemessen 10.09.2026).
       if (StaffManager.inZone(p.x, p.z)) continue;
-      // Nur auf dem Arbeitsteil des Platzes, nicht hinten bei den Gebaeuden
-      if (p.z < -12 || p.z > 22 || p.x < -24 || p.x > 4) continue;
+      /*
+       * Nur auf dem Arbeitsteil des Platzes, nicht hinten bei den Gebaeuden.
+       *
+       * Der Streifen reicht seit dem 17.09.2026 bis an die Buerofront
+       * (x −30,6) statt bis x −24 — genau der Bereich, den Patrick meint
+       * („Schrott von der Bueroseite an den Bagger heranschieben"). Alles
+       * andere ist unveraendert; die Silo-Reihe faellt weiter durch
+       * `inZone` heraus, ihre Aussenkante liegt auf x −33,0.
+       */
+      if (p.z < BUEROSEITE.zMin || p.z > BUEROSEITE.zMax) continue;
+      if (p.x < BUEROSEITE.xMin || p.x > BUEROSEITE.xMax) continue;
       if (gr && Math.hypot(p.x - gr.x, p.z - gr.z) < StaffManager.GRAPPLE_KEEPOUT) continue;
-      // Das Ziel muss frei sein, sonst schiebt er es gegen den naechsten Haufen
-      const [zx, zz] = schiebeZiel(p.x, p.z, ex.x, ex.z);
+      /*
+       * Wohin damit? Nicht stur auf die Gerade zum Bagger — dort stehen die
+       * Sortiermulde und der Muellcontainer, und genau daran scheiterte das
+       * Schieben von der Bueroseite (0 von 8, gemessen 17.09.2026). Gesucht
+       * wird der naechste FREIE Fleck im Schwenkband (`ablagePlatz`).
+       */
+      const fleck = ablagePlatz(p.x, p.z, ex.x, ex.z, (fx, fz) =>
+        this.ablageFrei(fx, fz)
+      );
+      if (!fleck) continue;
+      const [zx, zz] = fleck;
       if (Math.hypot(zx - ex.x, zz - ex.z) < SCHIEB_MIN_M) continue;
-      if (hitsObstacle(zx, zz, 0.8)) continue;
-      // Und es darf nicht in einem Behaelter enden: Absetzcontainer stehen in
-      // keiner Hindernisliste, weil sie sich bewegen — ohne diese Pruefung
-      // schoebe er das Stueck mitsamt Container vor sich her.
-      if (StaffManager.inZone(zx, zz)) continue;
-      const [ax, az] = anstellPunkt(p.x, p.z, ex.x, ex.z);
+      /*
+       * Und er selbst bleibt DRAUSSEN: Sein Halteplatz liegt 2,80 m hinter
+       * dem Stueck; der muss ausserhalb des Schwenkbands liegen, sonst steht
+       * er dem Arm im Weg (Auftrag 17.09.2026).
+       */
+      const [hx, hz] = haltFuerZiel(p.x, p.z, zx, zz);
+      if (Math.hypot(hx - ex.x, hz - ex.z) <= SCHWENK_AUSSEN) continue;
+      const [ax, az] = anstellFuerZiel(p.x, p.z, zx, zz);
       if (!this.reachable(ax, az)) continue;
       // Nicht durch den Haufen pfluegen: Der Anstellpunkt muss anfahrbar sein
       if (this.faehrt && inZonen(ax, az, this.sperrZonen, ZONE_RAND)) continue;
@@ -1545,10 +1804,44 @@ export class StaffManager {
       if (d < bestD) {
         bestD = d;
         best = it;
+        this.schiebeFleck = [zx, zz];
       }
     }
     return best;
   }
+
+  /**
+   * Darf dort ein geschobener Brocken liegen bleiben?
+   *
+   * Drei Dinge zugleich: kein Bauwerk, keine Sortierflaeche und keine
+   * Fahrspur. Das Letzte ist neu (17.09.2026) — vorher konnte ein Brocken
+   * mitten auf der Zufahrt landen und war damit genau der Stoerfall, den
+   * `delivery/laneWatch.ts` meldet. Der Rand ist die halbe Kantenlaenge eines
+   * grossen Teils (0,8 m), damit auch das Stueck selbst neben der Spur liegt.
+   */
+  private ablageFrei(x: number, z: number): boolean {
+    if (hitsObstacle(x, z, 0.8)) return false;
+    if (StaffManager.inZone(x, z)) return false;
+    if (aufFahrspur(x, z, 0.8)) return false;
+    /*
+     * Und nicht auf einen Brocken, der schon dort liegt.
+     *
+     * Ohne diese Zeile landet ALLES auf demselben Fleck: Gemessen ist vor dem
+     * Bagger nur ein einziger Sektor frei (Peilung 0 Grad, rund (−0,4 |
+     * −14,3)) — die uebrigen Peilungen sind Mulde, Muellcontainer oder
+     * Fahrspur. Sieben geschobene Brocken lagen damit uebereinander.
+     */
+    for (const it of this.items.items) {
+      if (!it.body.isValid() || !it.body.isDynamic()) continue;
+      const q = it.body.translation();
+      if (q.y > 1.4) continue;
+      if (Math.hypot(q.x - x, q.z - z) < ABLAGE_LUECKE) return false;
+    }
+    return true;
+  }
+
+  /** Der Fleck, auf den der naechste Brocken geschoben wird. */
+  private schiebeFleck: [number, number] | null = null;
 
   /**
    * Wohin gehört welche Fraktion? Direkt aus containers.ts gelesen.
@@ -1855,6 +2148,129 @@ export class StaffManager {
       return [box.x + Math.sign(dx || 1) * (hw + 1.0), box.z + dz];
     }
     return [box.x + dx, box.z + Math.sign(dz || 1) * (hd + 1.0)];
+  }
+
+  /**
+   * Alle Behaelter, in die Abfall gehoert.
+   *
+   * Zwei Stueck, und sie sind sehr verschieden: der versetzbare
+   * MUELL-Container mitten auf dem Hof (`platzinventar`, E-034) und das
+   * ABFALL-Silo an der Suedwand (`lager`, E-028). Welches genommen wird,
+   * entscheidet nicht der Rang, sondern die Entfernung — und ob Lambert
+   * ueberhaupt hinkommt.
+   */
+  private static abfallBehaelter(): ContainerConfig[] {
+    return CONFIGS.filter(
+      (c) =>
+        (c.lager === true || c.platzinventar === true) &&
+        (c.kind === "bay" || c.kind === "rolloff" || c.kind === "grosscontainer")
+    );
+  }
+
+  /** Was in einem Behaelter liegt, je Fraktion — aus der Zonenzaehlung. */
+  private muldenMassen(id: string): Map<string, number> {
+    const m = new Map<string, number>();
+    for (const it of this.items.items) {
+      if (it.containerId !== id) continue;
+      m.set(it.materialId, (m.get(it.materialId) ?? 0) + it.massKg);
+    }
+    return m;
+  }
+
+  /** Wie voll ein Behaelter ist (0 = leer, 1 = bis Oberkante) — fuer Tests und Overlay. */
+  muldenFuellgrad(cfg: ContainerConfig): number {
+    return fuellgrad(cfg, this.muldenMassen(cfg.id));
+  }
+
+  /** Halteplatz vor einem Behaelter — bei der Mulde die offene Seite, sonst die naechste Kante. */
+  private anfahrtFuer(cfg: ContainerConfig): [number, number] {
+    if (cfg.kind === "bay") return StaffManager.anlieferPunkt(cfg);
+    const ort = this.getMuldenOrt?.(cfg.id) ?? { x: cfg.x, z: cfg.z };
+    return StaffManager.boxAnfahrt(
+      { ...cfg, x: ort.x, z: ort.z },
+      this.lambert.group.position
+    );
+  }
+
+  /**
+   * Wohin dieses Abfallstueck soll: der naechste Behaelter, den er erreicht
+   * UND in dem noch Platz ist.
+   *
+   * `null` heisst nicht „gibt es nicht", sondern „gerade nicht" — deshalb
+   * setzt die Suche `abfallOhnePlatz`, wenn ein Behaelter nur am Fuellstand
+   * gescheitert ist. Daran haengt die Funkmeldung „die Mulde ist voll": Ohne
+   * die Unterscheidung klaenge ein unerreichbarer Container wie ein voller.
+   */
+  private abfallZiel(materialId: string): ContainerConfig | null {
+    const von = this.lambert.group.position;
+    let best: ContainerConfig | null = null;
+    let bestD = Infinity;
+    for (const c of StaffManager.abfallBehaelter()) {
+      if (!gehoertHierhin(c, materialId)) continue;
+      const [ax, az] = this.anfahrtFuer(c);
+      if (!this.reachable(ax, az)) continue;
+      if (istVoll(c, this.muldenMassen(c.id))) {
+        this.abfallOhnePlatz = true;
+        continue;
+      }
+      const d = Math.hypot(ax - von.x, az - von.z);
+      if (d < bestD) {
+        bestD = d;
+        best = c;
+      }
+    }
+    return best;
+  }
+
+  /** Letzte Abfallsuche scheiterte nur am Fuellstand, nicht am Weg. */
+  private abfallOhnePlatz = false;
+  /** Rangiert gerade ein Fahrzeug auf dem Platz? Dann hat es Vorfahrt. */
+  private rangiert = false;
+
+  /**
+   * Abfall, der frei auf dem Hof liegt — mit der Mulde, in die er gehoert.
+   *
+   * Patricks Punkt: „Lambert sortiert den Abfall mit dem Radlader in die
+   * Mulden." Gesucht wird nur nach der FRAKTION (Holz, Baumischabfall,
+   * Reifen, Kunststoff — `ABFALLFRAKTIONEN`), nicht nach Gewicht oder
+   * Entfernung: Abfall ist das Einzige, was er von sich aus anfasst.
+   *
+   * Was schon in einem Abfallbehaelter liegt, bleibt liegen — sonst traegt er
+   * aus der Mulde in die Mulde (dieselbe Falle wie 13.09.2026 bei den
+   * Sortierboxen).
+   */
+  private findAbfall(): { it: ScrapItem; mulde: ContainerConfig } | null {
+    this.abfallOhnePlatz = false;
+    const gr = this.getGrapplePos?.();
+    const ex = this.getExcavatorPos?.();
+    const von = this.lambert.group.position;
+    let best: { it: ScrapItem; mulde: ContainerConfig } | null = null;
+    let bestD = Infinity;
+    for (const it of this.items.items) {
+      if (!ABFALL.has(it.materialId)) continue;
+      if (it.massKg > this.tragkraft) continue;
+      if (!it.body.isValid() || !it.body.isDynamic()) continue;
+      // Was in einem Abfallbehaelter liegt, liegt richtig
+      if (it.containerId && StaffManager.abfallBehaelter().some((c) => c.id === it.containerId)) {
+        continue;
+      }
+      const p = it.body.translation();
+      if (p.y > 1.4) continue; // auf einer Ladeflaeche, nicht auf dem Hof
+      if (Math.abs(p.x) > ABFALL_FELD.xMax) continue;
+      if (p.z < ABFALL_FELD.zMin || p.z > ABFALL_FELD.zMax) continue;
+      // Nicht dort zugreifen, wo die Spinne gerade arbeitet
+      if (gr && Math.hypot(p.x - gr.x, p.z - gr.z) < StaffManager.GRAPPLE_KEEPOUT) continue;
+      if (ex && Math.hypot(p.x - ex.x, p.z - ex.z) < StaffManager.EXCAVATOR_KEEPOUT) continue;
+      const d = Math.hypot(p.x - von.x, p.z - von.z);
+      if (d >= bestD) continue;
+      if (!this.reachable(p.x, p.z)) continue;
+      if (!this.wegIstFrei(p.x, p.z, it)) continue;
+      const mulde = this.abfallZiel(it.materialId);
+      if (!mulde) continue;
+      bestD = d;
+      best = { it, mulde };
+    }
+    return best;
   }
 
   private findStray(): (typeof this.items.items)[number] | null {
