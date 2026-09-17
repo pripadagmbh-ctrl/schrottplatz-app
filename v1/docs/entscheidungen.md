@@ -9151,8 +9151,14 @@ der SCHILDER-Agent. Sechs Stellen sind nachgetragen, sobald die Datei frei war
 — Einfuhr, Konstruktion samt Verbindung ans HUD, und die drei Einhängepunkte
 `kundeDa`, `wiegung` und `platzlage`; dazu schaltet MUSIK jetzt weiter statt
 an und aus. `test/funk-verdrahtung.test.ts` bewacht genau diese Lücke:
-Entweder `main.ts` ist vollständig verdrahtet, **oder** hier steht der Vermerk
-`FUNK-VERDRAHTUNG OFFEN` — nie beides und nie keines.
+Entweder `main.ts` ist vollständig verdrahtet, **oder** hier steht der
+Offen-Vermerk — nie beides und nie keines.
+
+Beim Ablösen ist der Wächter zu Recht rot geworden: Der erste Entwurf dieses
+Absatzes nannte die Signalworte des Vermerks im Fließtext, und ein Text, der
+ein Signalwort *erwähnt*, sieht für eine Textsuche aus, als *sende* er es.
+Dieselbe Falle wie beim Konfliktmarker-Wächter am 15.09. Wer hier schreibt,
+schreibt die Kennung also nicht aus.
 
 **Abnahmekriterium.** `npm run build` Rückgabewert 0, `npm test` Rückgabewert
 0. Jeder der elf Anlässe wird in `test/funk-verdrahtung.test.ts` einzeln
