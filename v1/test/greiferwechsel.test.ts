@@ -16,6 +16,8 @@
  * ueber den ganzen Schliessweg).
  */
 import { describe, it, expect, beforeAll } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { leinwandAttrappe } from "../tools/leinwand-attrappe";
@@ -29,6 +31,7 @@ import {
   formZu,
   knopfstand,
   naechsteForm,
+  STANDARD_GREIFER,
   setzeGreifer,
   wechsleGreifer,
 } from "../src/excavator/greiferwahl";
@@ -179,17 +182,54 @@ function greifversuch(
 }
 
 describe("Der Schalter", () => {
-  it("es gibt genau zwei Greifer, die Sichelkralle ist der Vorgabewert", () => {
+  it("es gibt genau zwei Greifer, und der Fuenfschalengreifer ist die Vorgabe (E-105)", () => {
+    /*
+     * Ansage Patrick, 17.09.2026: „ansonsten fuenfschalengreifer als default".
+     * Bis dahin war es die Sichelkralle (E-059).
+     *
+     * ZWEI VERSCHIEDENE DINGE, und sie stehen absichtlich nebeneinander:
+     *
+     *   - `STANDARD_GREIFER` ist die Vorgabe DES SPIELS. Damit faengt eine
+     *     neue Runde an, und darauf faellt eine unbekannte Kennung zurueck.
+     *   - `new Excavator(...)` haengt sich weiter die SICHELKRALLE an. Das ist
+     *     der Grundzustand der Maschine, und an ihm haengen die Planungszahlen
+     *     des Platzes (`hoechsteKrallenspitze`) und rund hundert Waechter, die
+     *     einen Bagger bauen und sofort messen. Wer das verschiebt, verschiebt
+     *     den Platz.
+     *
+     * `main.ts` setzt die Vorgabe beim Start; welcher Greifer beim Laden eines
+     * alten Standes haengt, steht dort.
+     */
     expect(GREIFERFORMEN.map((f) => f.id)).toEqual(["sichel", "fuenfschalen"]);
     expect(naechsteForm("sichel")).toBe(FUENFSCHALEN);
     expect(naechsteForm("fuenfschalen")).toBe(SICHELKRALLE);
     // Was im Spielstand steht und was nicht
     expect(formZu("fuenfschalen")).toBe(FUENFSCHALEN);
     expect(formZu("sichel")).toBe(SICHELKRALLE);
-    expect(formZu("gibtsnicht"), "unbekannt → Sichelkralle").toBe(SICHELKRALLE);
+    expect(STANDARD_GREIFER, "die Vorgabe ist nicht der Fuenfschalengreifer").toBe(FUENFSCHALEN);
+    expect(formZu("gibtsnicht"), "unbekannt → Vorgabe").toBe(STANDARD_GREIFER);
     const s = aufbau();
-    expect(s.bagger.greiferform).toBe(SICHELKRALLE);
+    expect(s.bagger.greiferform, "der Grundzustand der Maschine ist verrutscht").toBe(SICHELKRALLE);
     s.world.free();
+  });
+
+  it("main.ts setzt die Vorgabe beim Start und laesst alte Staende in Ruhe", () => {
+    /*
+     * Die Zeile, an der es sonst haengenbliebe. `STANDARD_GREIFER` allein tut
+     * gar nichts \u2014 er muss beim Start auch gesetzt werden, sonst faengt jede
+     * Runde weiter mit dem Grundzustand der Maschine an und die Ansage waere
+     * gebaut, aber unwirksam. Dieselbe Fehlerklasse wie beim Kranzknopf
+     * (E-088): fertig gebaut, nirgends verdrahtet.
+     *
+     * Geprueft wird am Quelltext, weil `main.ts` ein Browserstart ist und sich
+     * kopflos nicht aufrufen laesst.
+     */
+    const mainTs = readFileSync(resolve(__dirname, "../src/main.ts"), "utf8");
+    expect(mainTs, "main.ts setzt STANDARD_GREIFER nie").toContain("STANDARD_GREIFER");
+    expect(
+      /save \? formZu\(save\.greifer \?\? SICHELKRALLE\.id\) : STANDARD_GREIFER/.test(mainTs),
+      "main.ts entscheidet nicht mehr zwischen neuer Runde und altem Stand"
+    ).toBe(true);
   });
 
   it("wechselt Modell, Kollider und Sensorkugel in einem Zug", () => {

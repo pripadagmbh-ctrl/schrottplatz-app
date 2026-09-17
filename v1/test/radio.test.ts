@@ -15,6 +15,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   BLUESROCK,
+  RAP,
   SCHLAGER,
   SENDER,
   STANDARD_SENDER,
@@ -151,11 +152,23 @@ function starte(sender?: string): { m: Music; ctx: FakeCtx } {
 // -------------------------------------------------------- Die alte Melodie
 
 describe("Schlagerwelle — die Melodie von frueher", () => {
-  it("ist der Standardsender", () => {
-    expect(STANDARD_SENDER).toBe(SCHLAGER.id);
-    expect(SENDER[0]).toBe(SCHLAGER);
-    expect(findeSender(undefined)).toBe(SCHLAGER);
-    expect(findeSender("gibtsnicht")).toBe(SCHLAGER);
+  it("ist NICHT mehr der Standardsender — Werkhof 90,4 ist es (E-105)", () => {
+    /*
+     * Ansage Patrick, 17.09.2026: „werkshof radio". Bis dahin war die
+     * Schlagerwelle die Vorgabe (E-094). Die Melodie selbst bleibt Ton fuer
+     * Ton dieselbe — das prueft der naechste Abschnitt; hier geht es nur
+     * darum, was beim Anschalten laeuft.
+     *
+     * Werkhof steht dabei auch VORN in der Reihe, nicht nur im Standard: Beim
+     * Ausschalten springt die Wahl auf `SENDER[0]` zurueck, und waeren das
+     * zwei verschiedene Sender, waere die Stellung „aus" eine Sackgasse.
+     */
+    expect(STANDARD_SENDER).toBe(RAP.id);
+    expect(SENDER[0]).toBe(RAP);
+    expect(findeSender(undefined)).toBe(RAP);
+    expect(findeSender("gibtsnicht")).toBe(RAP);
+    // Und die Schlagerwelle ist weiter dabei, nur eben als zweite.
+    expect(SENDER).toContain(SCHLAGER);
   });
 
   it("haelt Grundton, Tempo und Klangfarbe der alten Fassung", () => {
@@ -265,7 +278,8 @@ describe("Ein Stueck ist nur ein Datensatz", () => {
 describe("Senderwechsel", () => {
   it("wechselt das Stueck und meldet es", () => {
     const { m } = starte();
-    expect(m.songId).toBe(SCHLAGER.id);
+    // Ohne Angabe laeuft der Standardsender — seit E-105 Werkhof 90,4.
+    expect(m.songId).toBe(STANDARD_SENDER);
     expect(m.setSong(BLUESROCK.id)).toBe(true);
     expect(m.songId).toBe(BLUESROCK.id);
     // derselbe Sender noch einmal: nichts zu tun, kein Aussetzer
@@ -275,7 +289,7 @@ describe("Senderwechsel", () => {
   it("faellt bei unbekanntem Sender auf den Standard zurueck", () => {
     const { m } = starte(BLUESROCK.id);
     m.setSong("radio-eriwan");
-    expect(m.songId).toBe(SCHLAGER.id);
+    expect(m.songId).toBe(STANDARD_SENDER);
   });
 
   it("blendet ueber, statt zu knacken", () => {

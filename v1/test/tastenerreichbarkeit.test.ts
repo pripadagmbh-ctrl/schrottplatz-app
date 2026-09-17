@@ -6,11 +6,14 @@ import { resolve, join, relative } from "node:path";
  * JEDE Taste, die im Spiel etwas ausloest, ist auf dem Geraet erreichbar —
  * oder sie steht mit Begruendung auf der Ausnahmeliste.
  *
- * Der Anlass (E-088). E-085 hat das Seitwaertskippen des Greifers gebaut, auf
- * Patricks ausdruecklichen Wunsch ("zum Kehren und Schleudern"), und auf Taste
- * K gelegt. Patrick spielt auf dem iPad. Dort gibt es keine Taste K. Im
- * Funktionskranz gab es keinen Knopf. Die Funktion war fertig gebaut,
+ * Der Anlass (E-088). E-085 hat das Seitwaertskippen des Greifers gebaut und
+ * auf Taste K gelegt. Patrick spielt auf dem iPad. Dort gibt es keine Taste K.
+ * Im Funktionskranz gab es keinen Knopf. Die Funktion war fertig gebaut,
  * gemessen, bewacht — und fuer den einzigen Spieler unerreichbar.
+ *
+ * Nachtrag 17.09.2026 (E-105): Die Funktion selbst ist wieder weg, samt Taste
+ * und Kranzknopf — sie beruhte auf einem Missverstaendnis. Der WAECHTER
+ * bleibt; er hat seine Arbeit getan und die naechste Taste wartet schon.
  *
  * Es ist dieselbe Fehlerklasse wie in `platzinventar-verdrahtung.test.ts`:
  * zwei Wege fuer dasselbe Ereignis, und nur einer ist verdrahtet. Tastatur und
@@ -23,8 +26,12 @@ import { resolve, join, relative } from "node:path";
  *      keinen gibt.
  *   3. Jeder Kranz- und Menueknopf wird in `main.ts` auch abgefragt
  *      (ein Knopf, den niemand abfragt, ist ein toter Knopf).
- *   4. Keine Taste loest zwei verschiedene Dinge aus.
- * Dazu vier Gegenproben, die melden MUESSEN.
+ *   4. Jeder DIREKT verdrahtete Knopf ("Knopf: id") steht auf der Seite und
+ *      haengt in `main.ts` an einem Klick. Das ist der zweite Weg, wie eine
+ *      Taste auf dem Geraet erreichbar sein kann: nicht ueber den Kranz,
+ *      sondern ueber einen echten Knopf im Pausenfeld.
+ *   5. Keine Taste loest zwei verschiedene Dinge aus.
+ * Dazu fuenf Gegenproben, die melden MUESSEN.
  */
 
 const wurzel = resolve(__dirname, "..");
@@ -139,7 +146,18 @@ const TASTEN: Record<string, Zeile> = {
    * Geaendert ist nur die Ortsangabe, damit die Tabelle nicht luegt.
    */
   KeyM: { wirkung: "Zonenschilder an/aus", touch: "Menue: SCHILDER" },
-  KeyK: { wirkung: "Greifer zur Seite kippen (E-085) / speichern", touch: "Kranz: KIPPEN" },
+  /*
+   * E-105 (17.09.2026): Der Doppelgriff auf K ist weg. E-085 hatte das
+   * Seitwaertskippen auf die Speichern-Taste gelegt; die Funktion selbst ist
+   * auf Patricks Wort hinausgeflogen („kippen soll als funktion raus, das war
+   * ein missverstaendnis"), und damit tut K wieder genau eine Sache.
+   *
+   * Der Touch-Weg ist KEIN Kranzeintrag, sondern der Knopf „Speichern" im
+   * Pausenfeld — er haengt an einem eigenen Klick, nicht an einem Tastencode.
+   * Dafuer gibt es die Schreibweise „Knopf: id", und die Pruefung unten
+   * verlangt fuer sie genauso einen Nachweis wie fuer „Kranz: …".
+   */
+  KeyK: { wirkung: "Stand speichern", touch: "Knopf: pause-save" },
   KeyZ: { wirkung: "Platz ausbauen", touch: "Menue: AUSBAU" },
   KeyU: { wirkung: "Musik an/aus", touch: "Menue: MUSIK" },
   Escape: { wirkung: "Pause", touch: "Menueknopf oben rechts + Menue: PAUSE" },
@@ -187,19 +205,17 @@ const TASTEN: Record<string, Zeile> = {
 /**
  * Tasten, die MEHR ALS EINE Sache ausloesen — mit Grund.
  *
- * Offen und gemeldet (16.09.2026): `KeyK` steht hier NICHT als gute Loesung,
- * sondern als bekannter Konflikt. E-085 hat das Seitwaertskippen auf K gelegt,
- * wo seit dem Prototyp das Speichern liegt (README "Steuerung", Zeile
- * "K/L/N speichern/laden/neu"). Ein Druck auf K tut auf der Tastatur seither
- * BEIDES. Welche der beiden Funktionen umzieht, entscheidet Patrick — bis
- * dahin steht der Konflikt hier, damit ihn niemand uebersieht.
+ * LEER, und das ist der Stand seit dem 17.09.2026 (E-105). Bis dahin stand
+ * hier `KeyK`: E-085 hatte das Seitwaertskippen auf die Taste gelegt, auf der
+ * seit dem Prototyp das Speichern liegt (README "Steuerung", Zeile
+ * "K/L/N speichern/laden/neu"). Ein Druck tat auf der Tastatur beides. Mit dem
+ * Kippen ist auch der Konflikt weg.
  *
- * Auf dem Geraet gibt es den Konflikt nicht: Der Kranzeintrag KIPPEN geht
- * ueber `touch.consumePress("KeyK")` und kippt nur.
+ * Die Liste bleibt stehen, samt der Pruefung darunter, die verlangt, dass
+ * jeder Eintrag noch doppelt belegt IST. Eine leere Liste ist kein toter Code,
+ * sondern die Aussage: Es gibt gerade keinen.
  */
-const KONFLIKTE: Record<string, string> = {
-  KeyK: "E-085 legte Kippen auf die Speichern-Taste — offene Frage an Patrick",
-};
+const KONFLIKTE: Record<string, string> = {};
 
 describe("Jede Taste ist auf dem Geraet erreichbar", () => {
   const funde = sammle(quellen());
@@ -248,6 +264,31 @@ describe("Jede Taste ist auf dem Geraet erreichbar", () => {
         `${z.touch} ist ein toter Knopf: main.ts fragt "${code}" nie ueber touch ab`
       ).toBe(true);
     }
+  });
+
+  it("jeder direkt verdrahtete Knopf steht auf der Seite und haengt an einem Klick", () => {
+    /*
+     * Die zweite Art, wie eine Taste auf dem Geraet erreichbar sein kann.
+     * `pause-save` traegt keinen Tastencode und taucht in `touch.ts` nicht
+     * auf — er ist ein gewoehnlicher Knopf im Pausenfeld mit eigenem
+     * Klick-Horcher. Dass er da ist UND gehoert wird, ist genauso pruefbar wie
+     * beim Kranz; ohne diese Zeile waere "Knopf: …" eine Behauptung, die
+     * niemand nachhaelt.
+     */
+    let geprueft = 0;
+    for (const [code, z] of Object.entries(TASTEN)) {
+      const m = /^Knopf: ([\w-]+)/.exec(z.touch ?? "");
+      if (!m) continue;
+      geprueft++;
+      const id = m[1];
+      expect(seite.includes(`id="${id}"`), `${code}: den Knopf ${id} gibt es auf der Seite nicht`)
+        .toBe(true);
+      expect(
+        main.includes(`getElementById("${id}")`),
+        `${code}: main.ts holt sich ${id} nie — der Knopf tut nichts`
+      ).toBe(true);
+    }
+    expect(geprueft, "kein einziger direkt verdrahteter Knopf in der Tabelle").toBeGreaterThan(0);
   });
 
   it("und jeder gebundene Knopf gehoert zu einem Eintrag auf der Seite", () => {
@@ -313,19 +354,29 @@ describe("Jede Taste ist auf dem Geraet erreichbar", () => {
   });
 
   it("GEGENPROBE: ein Knopf ohne Abfrage in main.ts wird gemeldet", () => {
-    const kaputt = main.replace('touch.consumePress("KeyK")', 'false /* weg */');
+    // KeyX (Kranz: KABINE) statt KeyK — K ist seit E-105 kein Kranzeintrag mehr.
+    const kaputt = main.replace('touch.consumePress("KeyX")', 'false /* weg */');
     expect(kaputt, "die Gegenprobe hat gar nichts veraendert").not.toBe(main);
     expect(
-      kaputt.includes('touch.consumePress("KeyK")'),
+      kaputt.includes('touch.consumePress("KeyX")'),
       "die Pruefung wuerde den toten Knopf nicht bemerken"
     ).toBe(false);
   });
 
   it("GEGENPROBE: ein Knopf ohne Eintrag auf der Seite wird gemeldet", () => {
-    const kaputt = seite.replace('<span id="btn-kipp">KIPPEN</span>', "");
+    const kaputt = seite.replace('<span id="btn-cab">KABINE</span>', "");
     expect(kaputt, "die Gegenprobe hat gar nichts veraendert").not.toBe(seite);
-    expect(kaputt.includes('id="btn-kipp"'), "die Pruefung findet den fehlenden Eintrag nicht")
+    expect(kaputt.includes('id="btn-cab"'), "die Pruefung findet den fehlenden Eintrag nicht")
       .toBe(false);
+  });
+
+  it("GEGENPROBE: ein direkt verdrahteter Knopf ohne Klick-Horcher wird gemeldet", () => {
+    const kaputt = main.replace('getElementById("pause-save")', 'getElementById("gibtsnicht")');
+    expect(kaputt, "die Gegenprobe hat gar nichts veraendert").not.toBe(main);
+    expect(
+      kaputt.includes('getElementById("pause-save")'),
+      "die Pruefung wuerde den stummen Knopf nicht bemerken"
+    ).toBe(false);
   });
 
   it("GEGENPROBE: eine zweite Abfrage derselben Taste wird gemeldet", () => {

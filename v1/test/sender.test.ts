@@ -72,9 +72,14 @@ describe("Fuenf Sender, und man haelt sie auseinander", () => {
     }
     // Der Bluesrock von frueher bleibt: ihn wegzunehmen entscheidet Patrick.
     expect(SENDER).toContain(BLUESROCK);
-    // Und der Schlager bleibt der Standard (Ansage Patrick, 14.09.2026).
-    expect(SENDER[0]).toBe(SCHLAGER);
-    expect(STANDARD_SENDER).toBe(SCHLAGER.id);
+    /*
+     * Standard ist Werkhof 90,4 (Ansage Patrick, 17.09.2026: „werkshof
+     * radio"); bis dahin war es die Schlagerwelle (E-094). Standard und
+     * erster Platz in der Reihe MUESSEN derselbe Sender sein — sonst ist die
+     * Stellung „aus" eine Sackgasse, siehe `naechsterSender`.
+     */
+    expect(SENDER[0]).toBe(RAP);
+    expect(STANDARD_SENDER).toBe(RAP.id);
   });
 
   it("je zwei Sender unterscheiden sich in mindestens drei Merkmalen", () => {
