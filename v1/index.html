@@ -433,11 +433,20 @@
          Rand — und er liegt absolut, kostet also keine Textbreite. Ein
          Zustand, der als Text im Kasten stuende ("KIPPEN ✓"), haette den Kasten
          um zwei Zeichen verbreitert und damit den ganzen Kranz aufgeblasen. */
-      #radial .sektor.an { border-color: rgba(240,208,96,0.85); }
-      #radial .sektor.an::after {
+      /*
+         EINE Darstellung fuer „ist an", im Kranz wie im Pausenmenue (E-093).
+         Als SCHILDER aus dem Kranz ins Menue zog, brauchte der Menueknopf
+         dieselbe Auskunft. Zwei Regeln haetten zwei Bildsprachen ergeben —
+         darum steht der Balken hier einmal und gilt fuer beide Orte. */
+      #radial .sektor.an, #pause button.an { border-color: rgba(240,208,96,0.85); }
+      #radial .sektor.an::after, #pause button.an::after {
         content: ""; position: absolute; left: 7px; right: 7px; bottom: 3px;
         height: 4px; border-radius: 2px; background: #f0d060;
       }
+      /* Beim Ueberfahren/Antippen wird der Knopf selbst gelb — dann verschwaende
+         ein gelber Balken darauf. Dunkel gehalten, damit der Zustand ablesbar
+         bleibt, solange der Finger liegt. */
+      #pause button.an:hover::after, #pause button.an:active::after { background: #6b5410; }
       #radial .nabe {
         position: absolute; left: 0; top: 0; width: 26px; height: 26px;
         margin: -13px 0 0 -13px; border-radius: 50%;
@@ -586,8 +595,11 @@
         #controls-menu .inv { padding: 5px 8px; font-size: 11px; }
       }
       #pause h1 { margin: 0 0 18px; font-size: 26px; letter-spacing: 6px; color: #f0b429; }
+      /* `position: relative` traegt den Zustandsbalken von `.an` (E-093) —
+         ohne Wirkung auf alle anderen Knoepfe. */
       #pause button {
-        display: block; width: 100%; margin: 8px 0; padding: 13px 18px; cursor: pointer;
+        display: block; position: relative; width: 100%; margin: 8px 0;
+        padding: 13px 18px; cursor: pointer;
         background: rgba(46,52,57,0.95); color: #e8e8e4; font: 600 15px "Consolas", monospace;
         border: 2px solid rgba(255,255,255,0.22); border-radius: 9px; touch-action: manipulation;
       }
@@ -883,27 +895,33 @@
         <span id="btn-pickup">ABHOLEN</span>
         <span id="btn-away">ZUR WAAGE</span>
         <span id="btn-lambert">LAMBERT</span>
-        <span id="btn-marks">SCHILDER</span>
         <!--
           KIPPEN (E-088). Der Greifer legt sich auf Knopfdruck 90 Grad zur
           Seite (E-085, „zum Kehren und Schleudern"). Gebaut war er nur auf
           Taste K — auf dem iPad, wo ausschliesslich gespielt wird, war die
           Funktion damit nicht erreichbar.
-          Angehaengt, nicht eingereiht: Mit dem neunten Eintrag drehen sich die
-          Richtungen ohnehin von 45 auf 40 Grad; die REIHENFOLGE der acht alten
-          bleibt wenigstens, wie sie war.
+          Angehaengt, nicht eingereiht: Die REIHENFOLGE der alten Eintraege
+          bleibt, wie sie war.
         -->
         <span id="btn-kipp">KIPPEN</span>
       </div>
-      <!-- Nicht auf den Joystickkopf: Ausbau, Musik und Pause sind keine
-           Maschinenfunktionen. Sie liegen hinter dem Menue oben rechts, wo man
-           sie in Ruhe sucht — und der Kranz bleibt so weit gefaechert, dass
-           sich nichts ueberlappt. Wieviel Luft dabei bleibt, rechnet
-           `test/funktionskranz.test.ts` fuer beide Geraete nach; ein zehnter
-           Eintrag faellt dort durch. -->
+      <!-- Nicht auf den Joystickkopf: Ausbau, Musik, Pause und die
+           Zonenmarkierungen sind keine Maschinenfunktionen. Sie liegen hinter
+           dem Menue oben rechts, wo man sie in Ruhe sucht — und der Kranz
+           bleibt so weit gefaechert, dass sich nichts ueberlappt. Wieviel Luft
+           bleibt, rechnet `test/funktionskranz.test.ts` fuer beide Geraete
+           nach; ein zehnter Eintrag faellt dort durch.
+
+           Diese Spans tragen nur die Tastencodes (`bindTap` haengt
+           `data-action` daran). Gedrueckt wird nicht hier, sondern an den
+           echten Knoepfen im Pausenfeld — `pause-shop`, `pause-music`,
+           `pause-markierungen`. -->
       <div class="hidden-actions" id="menu-actions">
         <span id="btn-shop">AUSBAU</span>
         <span id="btn-music">MUSIK</span>
+        <!-- SCHILDER lag bis zum 16.09.2026 im Kranz (E-093). Es ist eine
+             Anzeigeeinstellung, keine Maschinenfunktion — Ansage Patrick. -->
+        <span id="btn-marks">SCHILDER</span>
         <span id="btn-pause">PAUSE</span>
       </div>
     </div>
@@ -912,6 +930,16 @@
         <h1>PAUSE</h1>
         <button id="pause-resume">Weiterspielen</button>
         <button id="pause-controls">Steuerung</button>
+        <!--
+          Zonenmarkierungen (E-093). Kam aus dem Funktionskranz hierher: eine
+          Anzeigeeinstellung, keine Maschinenfunktion. Steht weit oben, direkt
+          bei „Steuerung" — beides ist eine Einstellung, und wer die Schilder
+          sucht, sucht sie nicht zwischen Speichern und Neues Spiel.
+          Der gelbe Balken unten zeigt, dass sie an sind: dieselbe Darstellung
+          wie im Kranz, eine gemeinsame CSS-Regel, damit es nicht zwei Arten
+          gibt, dasselbe zu sagen.
+        -->
+        <button id="pause-markierungen">Zonenmarkierungen an/aus</button>
         <!--
           Greiferwahl (E-059): ausgegraut, solange etwas in der Spinne haengt
           oder sie nicht offen ist. Der Grund steht dann in `.grund` darunter.

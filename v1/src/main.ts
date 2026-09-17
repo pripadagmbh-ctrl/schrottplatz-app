@@ -1066,7 +1066,31 @@ async function main(): Promise<void> {
   let frameCount = 0;
   /* Restzeit bis zur naechsten Ladungs-Durchrechnung, siehe LADUNG_TAKT_S. */
   let ladungTakt = 0;
+  /* --- Zonenmarkierungen: Taste M und Menueknopf, ein Weg (E-093) ---------
+   * Lag bis zum 16.09.2026 im Funktionskranz. Patrick am Geraet: „Nimm Schild
+   * (Markierungen) aus dem Menue raus, das kann ueber Hauptmenue geloest
+   * werden." Es ist eine Anzeigeeinstellung, keine Maschinenfunktion.
+   * Verdrahtet wie `pause-shop` und `pause-music`: versteckter Span in
+   * `#menu-actions` traegt den Tastencode, der echte Knopf steht im
+   * Pausenfeld. Die Taste bleibt, `touch.consumePress("KeyM")` auch — so
+   * bleibt es EIN Schalter, egal woher der Druck kommt.
+   */
   let labelsOn = true; // Zonen-Schilder sichtbar
+  const markKnopf = document.getElementById("pause-markierungen")!;
+  /** Zustand setzen — und ihn am Menueknopf stehen lassen (gelber Balken). */
+  const zeigeMarkierungen = (an: boolean): void => {
+    labelsOn = an;
+    containers.setLabelsVisible(an);
+    markKnopf.classList.toggle("an", an);
+  };
+  /** Umschalten samt Meldung. Beide Bedienwege rufen genau diese Zeile. */
+  const schalteMarkierungen = (): void => {
+    zeigeMarkierungen(!labelsOn);
+    hud.toast(labelsOn ? "Markierungen an" : "Markierungen aus");
+  };
+  // Anfangszustand steht am Knopf, bevor jemand ihn zum ersten Mal sieht
+  zeigeMarkierungen(labelsOn);
+  markKnopf.addEventListener("click", schalteMarkierungen);
 
   function frame(): void {
     const now = performance.now();
@@ -1106,11 +1130,10 @@ async function main(): Promise<void> {
     if (input.wasPressed("KeyI") || touch.consumePress("KeyI")) {
       hud.toast(excavator.toggleBlade() ? "Schild abgesenkt — schieben." : "Schild angehoben.");
     }
-    if (input.wasPressed("KeyM") || touch.consumePress("KeyM")) {
-      labelsOn = !labelsOn;
-      containers.setLabelsVisible(labelsOn);
-      hud.toast(labelsOn ? "Markierungen an" : "Markierungen aus");
-    }
+    // `touch.consumePress("KeyM")` bleibt stehen wie bei KeyZ und KeyU: Der
+    // Span in `#menu-actions` traegt den Code, falls der Eintrag je wieder
+    // gedrueckt wird. Der Menueknopf geht ueber seinen eigenen Klick.
+    if (input.wasPressed("KeyM") || touch.consumePress("KeyM")) schalteMarkierungen();
     if (input.wasPressed("F3") || touch.consumePress("F3")) debug.toggle();
     if (input.wasPressed("KeyH")) {
       helpEl.style.display = helpEl.style.display === "none" ? "block" : "none";

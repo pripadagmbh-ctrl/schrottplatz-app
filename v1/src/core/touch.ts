@@ -82,6 +82,15 @@ const RADIAL_HOLD_S = 0.4;
  * Bei R = 112 sind das 72,0 px; der scharfgestellte Kasten ist 62 * 1,10 = 68,2
  * px breit, sein Nachbar 62 — macht 6,9 px Luft. Mit R = 104 waeren es 2,8 px
  * gewesen. Nachgerechnet wird das in `test/funktionskranz.test.ts`.
+ *
+ * Bleibt 112, obwohl SCHILDER einen Tag spaeter ins Menue umgezogen ist (E-093)
+ * und nur noch ACHT Eintraege auf dem Ring stehen. Nachgemessen: Acht haben
+ * bei R = 112 satte 14,1 px Luft (iPad) bzw. 18,3 px (iPhone mini quer); die
+ * 6-px-Schranke liesse R bis 101 herunter. Kleiner gemacht wird trotzdem
+ * nichts — der Halbmesser ist reine Ansicht (gewaehlt wird ueber die
+ * RICHTUNG des Daumenzugs, nicht ueber den Weg, siehe RADIAL_MIN_PX), und
+ * die 112 halten den Platz fuer den neunten Eintrag frei, den Patrick
+ * vergeben kann. Was in den Kranz kommt, entscheidet er.
  */
 const RADIAL_R = 112;
 /** Ab diesem Zugweg gilt eine Richtung als gewaehlt */
@@ -169,13 +178,15 @@ export class TouchControls {
     this.bindTap("btn-outrig", "KeyO");
     this.bindTap("btn-press", "KeyB");
     this.bindTap("btn-pickup", "KeyV");
-    this.bindTap("btn-marks", "KeyM");
     this.bindTap("btn-away", "KeyJ");
     this.bindTap("btn-lambert", "KeyY");
     this.bindTap("btn-blade", "KeyI");
     this.bindTap("btn-kipp", "KeyK");
+    // Menue statt Kranz: Diese Spans tragen nur den Tastencode. Gedrueckt
+    // werden sie nie — die echten Knoepfe stehen im Pausenfeld.
     this.bindTap("btn-music", "KeyU");
     this.bindTap("btn-shop", "KeyZ");
+    this.bindTap("btn-marks", "KeyM"); // E-093: aus dem Kranz ins Menue
     this.bindTap("btn-pause", "Escape");
     this.bindMenu();
     this.buildRadial();
