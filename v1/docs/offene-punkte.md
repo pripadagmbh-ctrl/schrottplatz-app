@@ -544,6 +544,38 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
 
 ### Offen
 
+- [ ] **„LKWS fahren durch Müllcontainer"** (17.09.2026) — **gemessen, nicht
+      repariert** (E-093). Gefunden: `toPark` und `parkRueck` in
+      `src/delivery/vehicles.ts:2382`/`:2415` fahren eine **Luftlinie** vom
+      Abladeplatz zum Warteplatz und gehen dabei an `advance()` und damit an
+      jeder Hindernisprüfung vorbei. Die Linie zum Westwarteplatz (−26 | 6)
+      schneidet den Container — **auch an seinem Startplatz**, ohne dass
+      Patrick etwas versetzt. Tiefe **3,10 m**, das ist die ganze
+      Fahrzeugbreite. Werkzeug: `npx vite-node tools/durchfahrt.ts`, Wächter:
+      `test/durchfahrt.test.ts`. *Wartet auf die Entscheidung, welche
+      Reparatur — stehenbleiben und hupen, oder beiseiteschieben.*
+- [ ] **„Objekte fahren durch einander hindurch"** (17.09.2026) — **gemessen,
+      nicht repariert** (E-093). Es ist **kein fehlender Kollider**: Container
+      und LKW haben welche, Rapier führt 32 Berührpunkte. Ein Fahrzeug ist
+      kinematisch und wird von Rapier an **nichts** aufgehalten; dazu ist sein
+      abgeleitetes Tempo in `toPark` 0,000 m/s statt 4,89 — es wird versetzt
+      statt bewegt. Gleiches Paar betroffen: Fahrzeug gegen liegenden Schrott
+      (400-kg-Brocken 1,22 m verschoben) und Fahrzeug gegen Fahrzeug (steht in
+      keiner der beiden Abfragen der Fahrt). *Wartet auf sein Urteil am Gerät,
+      ob es dieselbe Beobachtung ist oder noch eine zweite.*
+- [ ] **LKW schleift beim Eindrehen durch die Ostwand** — 0,27 m gefahren,
+      0,60 m über alle Gierlagen, am Abladeplatz. Nicht von ihm gemeldet, beim
+      Nachmessen zu E-093 gefunden. Die Kehre auf der Stelle (E-081) ist weder
+      Strecke noch Wegpunkt, `test/fahrumriss.test.ts` sieht diese Lagen nie.
+      *Wartet auf sein Urteil: sichtbar oder nicht?*
+- [ ] **Bagger-Unterwagen darf 1,30 m in den Müllcontainer** — `CHASSIS_PAD`
+      1,30 m (`excavator/collision.ts:43`) gegen `UNTERWAGEN_R` 2,60 m
+      (`excavator/excavator.ts:540`): zwei Zahlen für dieselbe Maschine. Nicht
+      von ihm gemeldet, bei E-093 mitgefunden.
+- [ ] **Der gemeldete Container-Umriss ist flacher als der gebaute** — 1,00 m
+      statt 1,175 m Oberkante (`world/containers.ts:1484`). Der Baggerarm
+      schwenkt in den 17,5 cm dazwischen durch den Oberriegel hindurch. Bei
+      E-093 mitgefunden.
 - [ ] **Mittelsäule raus, Zacken direkt an die Traverse** — gemessen sitzen
       zwischen `TRAVERSE_Y` (−0,865) und `STEMPEL_AUGE.y` (−1,5335) **66,9 cm
       Säule**. In seiner Skizze durchgekreuzt, von mir übersehen.

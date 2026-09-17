@@ -8115,3 +8115,51 @@ hinweg presste, verlor bis zu 92 %. Beides ist weg.
    Zwölffache nach unten oder das Viereinhalbfache nach oben.
 3. **Vier Abfallsorten pressen, neu laden, abholen lassen.** Es muss **Geld
    kosten**. Bis heute bekam man dafür welches.
+
+## 2026-09-17 — Wer fährt durch wen: gemessen statt erschlossen
+
+| # | Entscheidung | Begründung | Alternative (verworfen) |
+|---|---|---|---|
+| E-093 | **Der Befund „LKWs fahren durch Müllcontainer" wird als Messung festgehalten, nicht als Vermutung** — mit `tools/durchfahrt-kern.ts` (Rechnung), `tools/durchfahrt.ts` (Bericht) und `test/durchfahrt.test.ts` (neun Wächter, jeder mit Gegenprobe). **Repariert wird in diesem Paket nichts**; `v1/src/` ist unangetastet | Zwei Erklärungen waren im Umlauf, und sie führen zu verschiedenen Reparaturen: „die Hindernismeldung greift nicht" gegen „es gibt keinen Kollider". **Beide sind falsch.** Gemessen am 17.09.2026: Der Container steht lückenlos in der Liste (53 Hindernisse, davon 1 beweglich, keiner fehlt), er hat **5 Kollider**, der LKW hat **3**, und Rapier führt während der Durchfahrt **32 Berührpunkte** | Aus dem Quelltext schließen und gleich reparieren — genau so wäre an `hindernisse()` geschraubt worden, und dort ist nichts kaputt |
+
+**Was wirklich gemessen wurde** (`npx vite-node tools/durchfahrt.ts`, Nullprobe bestanden):
+
+| Paar | durchdringt? | Tiefe | Lage | Kollider? | Warum wirkungslos |
+|---|---|---|---|---|---|
+| LKW × MÜLL-Container | **ja** | **3,10 m** = volle Fahrzeugbreite | Phase `toPark`, Warteplatz (−26 \| 6), Umrissmitte (−2,0 \| −16,5), Bild 2259 | ja, 5 + 3, 32 Berührpunkte | Fahrzeuge sind kinematisch: Rapier hält sie an **nichts** auf. Dazu ist das abgeleitete Tempo des Rahmens in `toPark` **0,000 m/s** statt 4,89 wie auf der Strecke — der Wagen wird **versetzt statt bewegt**, der Löser sieht keinen Stoß. Der Container weicht 0,035 m aus |
+| LKW × liegender Schrott | ja | 400-kg-Brocken **1,22 m** verschoben | dieselbe Phase | ja | dynamisch weicht — aber der LKW hält nicht an |
+| LKW × Bauwerk (Ostwand) | **ja** | **0,27 m** gefahren, **0,60 m** über alle Gierlagen | Kehre auf der Stelle am Abladeplatz, Umrissmitte (8,4 \| −16,8) | ja (feste Kollider) | „keiner weicht": kinematisch gegen fest hält Rapier nicht auf. `lenkung.drehRichtung` wählt bereits die flachere Seite; das ist der Rest |
+| LKW × LKW | in den Proben 0 | — | — | ja | „keiner weicht" — und das Paar steht in **keiner** der beiden Abfragen der Fahrt |
+| Behälter × Bauwerk | **nein** | 0,01 m | mit 6 m/s gegen die Westmauer | ja | **Gegenprobe: hier hält die Physik.** Dynamisch gegen fest wird gelöst |
+| Bagger × MÜLL-Container | **ja** | **1,30 m** | überall | Punktabfrage mit Puffer | `CHASSIS_PAD` = 1,30 m (`excavator/collision.ts:43`) gegen `UNTERWAGEN_R` = 2,60 m (`excavator/excavator.ts:540`) — zwei Zahlen für dieselbe Maschine |
+| Hindernisliste × gebauter Container | **ja** | **0,175 m** zu flach, 0,07 m zu schmal, 0,105 m zu kurz | immer | — | `hindernisse()` meldet `top = size[2] + 0,2` = 1,00 m; der Oberriegel sitzt auf 1,175 m. Der Baggerarm schwenkt dazwischen hindurch |
+
+**Ursache je Fall, mit Datei und Zeile.**
+
+1. **`src/delivery/vehicles.ts:2382` (`case "toPark"`) und `:2415` (`case "parkRueck"`)** rechnen mit `dx/dz` eine **Luftlinie** aus und schreiben sie direkt auf `group.position` — an `advance()` (`:2085`) vorbei und damit an `isBlockedByBuilding()` (`:2021`) und `isBlocked()` (`:2040`) vorbei. Die Luftlinie vom Abladeplatz (6,3 \| −23) zum Anfahrtspunkt des Westwarteplatzes (−26 \| −2) schneidet die Stelle (−2,80 \| −17,08); der Container reicht von z −17,55 bis −13,25. **Das trifft ihn auch an seinem Startplatz (−3,79 \| −14,11)** — es braucht kein Versetzen durch den Spieler.
+2. **Dieselben Zeilen** rufen `snapBodiesToPose()` (`:1310`), das mit `setTranslation(…, false)` die JETZIGE Pose versetzt; am Ende von `update()` (`:2546`) wird dieselbe Pose als NÄCHSTE gemeldet. Die Differenz ist null, also auch das abgeleitete Tempo. Das ist die Bauart von E-073 mit umgekehrtem Vorzeichen: dort wurde ein Körper zum Katapult, hier zum Gespenst.
+3. **Die Kehre auf der Stelle** (`src/delivery/lenkung.ts`, `PIVOT_AB`, seit E-081) erzeugt Gierlagen, die auf **keiner** Strecke vorkommen. `test/fahrumriss.test.ts` tastet Strecken ab und sieht sie deshalb nie.
+4. **`src/excavator/collision.ts:43`** gegen **`src/excavator/excavator.ts:540`** — 1,30 gegen 2,60 m Sicherheitsabstand für denselben Unterwagen.
+5. **`src/world/containers.ts:1484`** (`get hindernis`) meldet `top: h + 0.2`; gebaut wird bis `KUFE + T + h + 0,065`.
+
+**Zwei Nebenbefunde, gemessen, nicht angefasst.**
+
+* **Sprung an der Ausfahrt:** `tools/durchfahrt.ts` meldet in Phase `out` ein abgeleitetes Tempo von **79,2 m/s** — 1,32 m in einem Bild, gemessen beim Übergang `tipCreep → out` am VA-Lager, Bild 2446, von (−34,00 \| −12,60) auf (−35,32 \| −12,60). `leaveUnloadingBay()` setzt `routeS = 0`, und der Wagen steht nicht am Streckenanfang. Das ist der Ausfädel-Sprung, an dem gerade gearbeitet wird — hier nur als Zahl.
+* **Harter Absturz nach rund 5,5 Minuten kopflosem Dauerlauf:** `ItemManager.clampSpeeds` (`src/world/scrapItems.ts:2350`) ruft `item.body.isDynamic()` ohne vorheriges `isValid()`; ein Eintrag mit entferntem Körper lässt Rapier mit `RuntimeError: unreachable` abstürzen. Aufgetreten bei Bild 19.766 im Übergang `waitUnload → out`. **Nicht weiterverfolgt** — gehört zum Fuhrpark, nicht zu diesem Paket.
+
+**Verworfene Alternative.** Einen zweiten Umrissrechner im Wächter aufschreiben. Genau das war der Fehler, den E-054 behoben hat: Der Wächter prüfte ein Rechteck, die Fahrt prüfte einen Punkt. `test/durchfahrt.test.ts` rechnet deshalb nichts selbst, sondern ruft `tools/durchfahrt-kern.ts`, und das ruft `src/delivery/umriss.ts` — dieselbe Funktion, mit der `isBlockedByBuilding` nach vorn schaut.
+
+**Was hier NICHT entschieden ist** (gehört dem Orchestrator und Patrick):
+
+* **Welche der drei möglichen Reparaturen** genommen wird. Die kleinste je Fall wäre: (a) `toPark`/`parkRueck` über `advance()` auf eine echte Strecke legen, so wie jede andere Etappe — dann greift die bestehende Prüfung ohne eine Zeile neuer Logik; (b) nur `snapBodiesToPose()` aus den beiden Phasen entfernen — dann schiebt der LKW den Container wenigstens beiseite, fährt aber weiter hindurch; (c) `CHASSIS_PAD` auf `UNTERWAGEN_R` ziehen. **(a) und (c) sind Einzeiler, (b) ist eine halbe Zeile — welche davon richtig ist, ist eine Spielgefühlsfrage:** Ein LKW, der vor dem Container stehenbleibt und hupt, ist etwas anderes als einer, der ihn beiseiteschiebt.
+* Ob der Warteplatz (−26 \| 6) überhaupt bleiben soll. Er ist der einzige der drei, dessen Luftlinie über die Arbeitsfläche führt.
+* Ob die 0,60 m in der Ostwand beim Eindrehen hingenommen werden. Der Abladeplatz liegt 2,15 m vor der Wand, der Umriss überstreicht beim Drehen 4,0 m Halbmesser — das ist kein Rechenfehler, sondern zu wenig Platz.
+
+**Abnahmekriterium.** `npm run build` mit Rückgabewert **0 GEPRÜFT**. `npm test` mit Rückgabewert **0 GEPRÜFT: 113 Dateien, 1.314 Prüfungen** (vorher 112 / 1.305 — neun neue in `test/durchfahrt.test.ts`), Laufzeit 293 s. Die Fahrproben sind vier Läufe hintereinander grün geblieben: Die Fuhre wird über `pruefKunde` vorgegeben, weil ein sortenreiner Kipper ins Lagersilo fährt statt an den Abladeplatz und der Wächter sonst mal das eine und mal das andere misst. Jeder Wächter mit Zahlenschranke hat seine Gegenprobe im selben Fall — der Umriss neben dem Hof gegen den auf dem Kaffeewagen, die Fahrt mit Warteplatz gegen die ohne, der Container gegen die Westmauer, die Kehrlage gegen die Streckenlage.
+
+**Auf dem Gerät zu prüfen.**
+
+1. **Einen Kipper abladen lassen und ihm zusehen, wenn er zum Warteplatz an der Westseite rollt** — fährt er durch den Müllcontainer? (Der Container darf dafür an seinem Startplatz stehenbleiben, es muss nichts versetzt werden.)
+2. **Den Müllcontainer mitten auf den Hof stellen und dasselbe noch einmal.** Hält irgendein Wagen davor an und hupt?
+3. **Beim Zurückstoßen an den Abladeplatz auf die Ostwand sehen.** Schleift die Ecke des Wagens sichtbar durch die Betonlego, während er sich eindreht?
+4. **Mit dem Bagger dicht an den Müllcontainer heranfahren.** Wie weit steckt der Unterwagen darin, bevor es klemmt?
