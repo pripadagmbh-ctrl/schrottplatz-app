@@ -1,0 +1,66 @@
+=== Berührt der Greifer den Arm im BETRIEB? — im laufenden Spiel gemessen ===
+
+  Raster 5 cm → Abtastfehler EPS = 28.9 mm  ·  Vorhalt 0.8 m um das Kardangelenk  ·  Deckel 0.15 m
+  Gemessen wird jedes 10. Bild, gegen den ganzen gezeichneten Arm (Stiel,
+  Ausleger, Zylinder, Kabine, Oberwagen, Unterwagen, Räder, Räumschild, Pratzen).
+
+
+################  Sichelkralle  ################
+  Tastenprobe: KeyR bewegt den Ausleger um 6.8° (HEBEN), KeyG den Stiel um -8.6° (ANZIEHEN).
+
+--- Stiel gestreckt, dann Ausleger ganz heben ---
+  Abgefahren: Ausleger 11.3…70.0°, Stiel -25.0…-25.0°.
+  42 Bilder gemessen, davon 28 mit Berührung (67 % der Bewegung).
+  Engste Stelle: BERUEHRUNG an 07_STIEL_KASTEN, bei Ausleger 70.0° / Stiel -25.0° (Ausleger heben).
+  Berührung ab Ausleger 53.2° / Stiel -25.0° bis Ausleger 70.0° / Stiel -25.0°, Netze: 07_STIEL_KASTEN.
+
+--- Stiel ganz anziehen (Fahrstellung) ---
+  Abgefahren: Ausleger 70.0…70.0°, Stiel -140.0…-70.0°.
+  42 Bilder gemessen, davon 0 mit Berührung (0 % der Bewegung).
+  Engste Stelle: 0.085 m an 01_UNTERWAGEN_LACK, bei Ausleger 70.0° / Stiel -140.0° (Stiel anziehen).
+
+--- Stiel ganz anziehen MIT FUHRE (Greifer zu) ---
+  Abgefahren: Ausleger 51.4…70.0°, Stiel -140.0…-70.0°.
+  81 Bilder gemessen, davon 0 mit Berührung (0 % der Bewegung).
+  Engste Stelle: 0.121 m an —, bei Ausleger 70.0° / Stiel -70.0° (zupacken).
+
+--- Eingeklappt absetzen: Stiel angezogen, Greifer auf und wieder zu ---
+  Abgefahren: Ausleger 70.0…70.0°, Stiel -140.0…-140.0°.
+  40 Bilder gemessen, davon 2 mit Berührung (5 % der Bewegung).
+  Engste Stelle: BERUEHRUNG an 01_RAEUMSCHILD_BLATT, bei Ausleger 70.0° / Stiel -140.0° (öffnen).
+  Berührung ab Ausleger 70.0° / Stiel -140.0° bis Ausleger 70.0° / Stiel -140.0°, Netze: 01_RAEUMSCHILD_BLATT.
+
+--- Greifzyklus: fassen, heben, schwenken, absetzen ---
+  Abgefahren: Ausleger 11.3…70.0°, Stiel -85.3…-25.0°.
+  68 Bilder gemessen, davon 28 mit Berührung (41 % der Bewegung).
+  Engste Stelle: BERUEHRUNG an 07_STIEL_KASTEN, bei Ausleger 70.0° / Stiel -25.0° (schwenken, Greifer zu).
+  Berührung ab Ausleger 53.3° / Stiel -25.0° bis Ausleger 70.0° / Stiel -46.0°, Netze: 07_STIEL_KASTEN.
+
+################  Fünfschalengreifer  ################
+
+--- Stiel gestreckt, dann Ausleger ganz heben ---
+  Abgefahren: Ausleger 9.7…70.0°, Stiel -25.0…-25.0°.
+  42 Bilder gemessen, davon 21 mit Berührung (50 % der Bewegung).
+  Engste Stelle: BERUEHRUNG an 07_STIEL_KASTEN, bei Ausleger 70.0° / Stiel -25.0° (Ausleger heben).
+  Berührung ab Ausleger 70.0° / Stiel -25.0° bis Ausleger 70.0° / Stiel -25.0°, Netze: 07_STIEL_KASTEN.
+
+--- Stiel ganz anziehen (Fahrstellung) ---
+  Abgefahren: Ausleger 70.0…70.0°, Stiel -140.0…-70.0°.
+  42 Bilder gemessen, davon 0 mit Berührung (0 % der Bewegung).
+  Engste Stelle: 0.121 m an —, bei Ausleger 70.0° / Stiel -70.0° (Stiel anziehen).
+
+--- Stiel ganz anziehen MIT FUHRE (Greifer zu) ---
+  Abgefahren: Ausleger 47.0…70.0°, Stiel -140.0…-70.0°.
+  81 Bilder gemessen, davon 0 mit Berührung (0 % der Bewegung).
+  Engste Stelle: 0.121 m an —, bei Ausleger 70.0° / Stiel -70.0° (zupacken).
+
+--- Eingeklappt absetzen: Stiel angezogen, Greifer auf und wieder zu ---
+  Abgefahren: Ausleger 70.0…70.0°, Stiel -140.0…-140.0°.
+  40 Bilder gemessen, davon 0 mit Berührung (0 % der Bewegung).
+  Engste Stelle: 0.040 m an 01_RAEUMSCHILD_BLATT, bei Ausleger 70.0° / Stiel -140.0° (wieder schließen).
+
+--- Greifzyklus: fassen, heben, schwenken, absetzen ---
+  Abgefahren: Ausleger 9.7…70.0°, Stiel -85.3…-25.0°.
+  68 Bilder gemessen, davon 6 mit Berührung (9 % der Bewegung).
+  Engste Stelle: BERUEHRUNG an 07_STIEL_KASTEN, bei Ausleger 70.0° / Stiel -25.0° (schwenken, Greifer zu).
+  Berührung ab Ausleger 70.0° / Stiel -25.0° bis Ausleger 70.0° / Stiel -25.0°, Netze: 07_STIEL_KASTEN.

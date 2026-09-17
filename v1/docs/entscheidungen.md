@@ -8502,3 +8502,259 @@ Prüfungen mehr). `npx tsc -p tsconfig.test.json` Rückgabewert 0.
 3. **Teile dorthin legen, wo ein abfahrender LKW vorbeikommt.** Werden sie
    beiseitegeschoben (richtig) oder weggeschossen (falsch)?
 4. **Der Umschlag ist noch etwas langsamer geworden.** Merkt man das?
+
+---
+
+### E-095 — Die 13 Armstellungen aus E-085: WO es klemmt, WIE TIEF, und ob man im Betrieb je hinkommt (17.09.2026)
+
+**Entscheidung.** Der Nullgrad-Befund ist aufgeschlüsselt, im laufenden Spiel
+nachgefahren und mit einem Preiszettel versehen — **repariert ist nichts.**
+Jede mögliche Abhilfe nimmt entweder Hubhöhe weg oder greift ins Pendel, und
+beides entscheidet Patrick. Der Stand ist stattdessen mit einem Wächter
+festgenagelt, damit er nicht unbemerkt wächst.
+
+**Anlass.** E-085 hat ungefragt gemeldet: „In 13 von 62 erreichbaren
+Armstellungen berührt der Greifer den Arm **heute schon bei 0°**." E-091 hat
+nachgemessen, dass es nach dem Trogumbau nicht mehr geworden sind
+(Sichelkralle 13, Fünfschalengreifer 8, eine echte Teilmenge). Beide Zeilen
+sagen JA/NEIN. Offen blieb: **wo**, **wie tief**, und **kommt man da im
+Betrieb überhaupt hin**.
+
+---
+
+#### 1. Es sind zwei ganz verschiedene Sachverhalte
+
+`npx vite-node tools/greifer-freigang.ts nullgrad` — neuer Betriebsmodus des
+vorhandenen Werkzeugs, dieselben Punkte, dasselbe Raster (2,5 cm), derselbe
+Vorhalt (0,8 m ums Kardangelenk), zusätzlich Eindringtiefe und Ort.
+Protokoll: `docs/messungen/greifer-nullgrad-2026-09-17.txt`.
+
+| Gruppe | Stellungen | wo | Tiefe | Rotatorstellungen |
+|---|---|---|---|---|
+| **A — Stiel ganz angezogen (−140°)** | 6 (Ausleger 29°…70°) | Räumschild, Unterwagen | 7,0…14,2 cm | 24 von 24 |
+| **B — Stiel gestreckt (−25°/−39°), Ausleger hoch** | 6 (Ausleger 46°…70°) | Stielkasten | 5,5…16,0 cm | 13…24 von 24 |
+| Grenzfall | 1 (70°/−53,75°) | Stielkasten | **0** (9 mm Abstand, unter dem Abtastfehler) | 9 von 24 |
+
+**Die Eindringtiefe ist neu und brauchte ein anderes Messverfahren.** Ein
+Punktabstand wird nie negativ: Ein Punkt einen halben Meter tief im Stiel
+meldet dasselbe wie einer einen halben Meter daneben. Die Tiefe braucht ein
+Vorzeichen, und das Vorzeichen braucht die Frage „liegt der Punkt innen".
+Beantwortet wird sie mit der **Windungszahl** (Summe der Raumwinkel aller
+Dreiecke, Jacobson u. a. 2013), nicht mit einem Strahl: Die Armnetze sind
+VERSCHMOLZEN (E-025), `07_STIEL_STAHL` ist ein Netz aus Gusskopf, Laschen,
+Bolzen und Scheiben — ein Strahl durch zwei ineinandersteckende Teile zählt
+zwei Durchstiche je Seite, also „gerade", also „außen". Die Windungszahl
+zählt die Überdeckung stattdessen hoch (0 außen, 1 in einem Körper, 2 in der
+Überschneidung).
+
+**Gruppe B ist keine Sammlung von Einzelfällen, sondern eine Kante im
+Gelenkfeld.** Sie beginnt, sobald **Ausleger + Stiel** — die Neigung des
+Stiels über der Waagerechten — über rund **20°** steigt: Dann steht die
+Stielspitze höher als der Auslegerkopf, der Stielkasten läuft schräg nach
+hinten-unten davon, und der lotrecht hängende Greifer beschreibt beim Drehen
+einen Kreis, durch den der Kasten hindurchgeht. Gemessen sitzt die tiefste
+Stelle 0,4…2,0 m unter dem Kardangelenk und 0,56…1,69 m von der Achse.
+
+---
+
+#### 2. Drei der dreizehn kommen gar nicht vor — und der Filter der Messung ist schuld
+
+`resolveGroundClamp` hält die Stielspitze auf `Fläche + maxTiefe + 0,02`. Das
+Tiefste, was der Messstrahl treffen kann, ist der Beton auf 0; bei Kippwinkel
+0 ist `maxAusladung(0)` Ziffer für Ziffer `maxTiefe`. Die tiefste Stellung,
+die das Spiel je hält, liegt also bei **3,02 m** (Sichelkralle) bzw.
+**2,76 m** (Fünfschalengreifer). Drei Stellungen der Gruppe A liegen darunter
+(1,76 · 2,21 · 2,68 m) und sind unerreichbar.
+
+**Der Filter der Freigangmessung ist an dieser Stelle zu großzügig.** Sein
+Kommentar begründet die Zugabe `HOCHSTAND = 1,50 m` damit, dass eine
+Ladefläche 1,05 m hoch liegt und „dann die Spitze entsprechend tiefer darf".
+Die Rechnung geht in die andere Richtung: Steht der Greifer auf einer
+Ladefläche, ist `flaeche` GRÖSSER und die Spitze muss HÖHER stehen. **Nicht
+geändert** — an `HOCHSTAND` hängt die Zahl „62 von 81" aus E-085, und die ist
+die Bezugsgröße aller drei Läufe. Stattdessen steht die richtige Regel als
+`amBodenErreichbar()` daneben und als Spalte „im Betrieb" im Protokoll.
+
+---
+
+#### 3. Und jetzt die eigentliche Frage: kommt man im Spiel dorthin?
+
+Nicht gerastert, sondern **gefahren**: `tools/greifer-betrieb.ts` läuft mit dem
+echten `Excavator.update()`, echten Tastendrücken, Rampen, Bodenanschlag und
+Armkollision und misst in jedem zehnten Bild den Abstand zwischen dem
+GEZEICHNETEN Greifer und dem GEZEICHNETEN Arm. Die Tastenrichtungen werden
+vorher nachgemessen, nicht aus den Namen geschlossen. Protokoll:
+`docs/messungen/greifer-betrieb-2026-09-17.txt`.
+
+| Handgriff | Sichelkralle | Fünfschalengreifer |
+|---|---|---|
+| Stiel gestreckt, **Ausleger ganz heben** | **Berührung ab Ausleger 53,2°, 67 % der Bewegung** | Berührung bei 70°, 50 % |
+| Stiel ganz anziehen, Greifer offen | frei, 8,5 cm | frei, >12 cm |
+| Stiel ganz anziehen **mit Fuhre** | frei, >12 cm | frei, >12 cm |
+| Eingeklappt absetzen (Greifer auf und zu) | **Berührung, 5 % der Bewegung**, Räumschild | frei, 4,0 cm |
+| Ganzer Greifzyklus | **Berührung, 41 % der Bewegung**, Stielkasten | Berührung, 9 % |
+
+**Gruppe B kommt vor, und zwar auf einen einzigen Tastendruck.** Wer den Stiel
+gestreckt hat und „Ausleger heben" hält, fährt die Sichelkralle ab 53,2° in
+den Stielkasten und bleibt bis zum Anschlag bei 70° darin. Im vollen
+Greifzyklus sind es 41 % der gemessenen Bilder.
+
+**Gruppe A kommt fast nicht vor.** Eingeklappt ist der Greifer entweder ganz
+offen (breit und flach) oder ganz zu (schmal und tief) — beides geht am
+Räumschild vorbei, mit 8,5 bzw. über 12 cm Luft. Die Berührung sitzt auf
+halbem Schließweg, und den fährt man eingeklappt nur, wenn man eine Fuhre
+direkt über dem eigenen Schild loslässt: 2 von 40 Bildern, nur bei der
+Sichelkralle, nur bei Ausleger 70° / Stiel −140°.
+
+**Was das Schwenkband dazu sagt.** Die Stellungen der Gruppe A liegen bei
+**3,67…3,89 m** Ausladung — weit innerhalb der 5,80 m, mit denen der Platz
+anfängt; dort steht nichts. Gruppe B liegt bei 5,16…7,93 m, also mitten im
+Band, aber mit der Stielspitze 8,1…10,7 m hoch und den Krallenspitzen 5,1…7,7 m
+über Grund. Die höchste Wand, die der Spieler selbst befüllt, ist 5,00 m
+(Mischschrott, Stahlschrott).
+
+---
+
+#### 4. Der Preiszettel: was eine Gelenksperre kostet
+
+`tools/knickgrenze.ts` misst die Maschine in 30.261 Gelenkstellungen aus
+(Auslegerlänge, Stiellänge und Drehpunkt stehen darin nirgends als Zahl — die
+Stielspitze wird ausgelesen) und rechnet die Hubkurve für mehrere Sperren auf
+`Ausleger + Stiel` aus. Protokoll: `docs/messungen/knickgrenze-2026-09-17.txt`.
+
+Sichelkralle, höchste Krallenspitze über Grund:
+
+| Sperre | bei 6,0 m | bei 7,5 m | höchste Spitze | weiteste Reichweite am Boden |
+|---|---|---|---|---|
+| **keine (heute, 45°)** | 7,11 m | 5,69 m | **7,67 m** | 9,54 m |
+| 30° | 6,77 m | 5,69 m | 6,84 m | 9,54 m |
+| **25°** | 6,53 m | 5,65 m | **6,53 m** | **9,54 m** |
+| 20° | **3,34 m** | 5,44 m | 6,20 m | 9,54 m |
+| 15° | 3,34 m | 5,19 m | 5,87 m | 9,54 m |
+
+**Die waagerechte Reichweite ändert sich bei KEINER Sperre** — 9,54 m bleiben
+9,54 m, das Schwenkband 5,80…9,20 m ist unberührt, und alle vier selbst
+befüllten Behälter bleiben bis hinunter zu 15° erreichbar (geprüft gegen ihre
+Wandhöhe + 0,40 m Luft). Was eine Sperre kostet, ist **Hubhöhe**: bei 25°
+1,14 m weniger Krallenhöhe (7,67 → 6,53 m) und 0,58 m weniger direkt über dem
+Nahbereich. Bei 20° bricht die Hubkurve bei 6,0 m ein (7,11 → 3,34 m) — dort
+liegt die Kante der toten Zone, die `test/reach.test.ts` bewacht.
+
+**25° ist die Zahl, an der die Berührung im Betrieb aufhört** (sie beginnt
+gefahren bei 28,2°). Zwei flache Reste blieben: 45,63°/−25° (5,5 cm, 13 von 24
+Rotatorstellungen) und 61,88°/−39,37° (8,2 cm, 13 von 24).
+
+---
+
+#### 5. Warum hier trotzdem nichts geändert wird
+
+Drei Wege stehen offen, und **keiner ist eine Reparatur, die ein Agent allein
+beschließen darf**:
+
+1. **Sperre auf Ausleger + Stiel bei 25°.** Kleinster Eingriff, kostet 1,14 m
+   Hubhöhe. Offen ist auch, WAS an der Sperre passiert: Bleibt der Ausleger
+   stehen (fühlt sich nach kaputter Maschine an) oder zieht der Stiel
+   selbsttätig nach (eine versteckte Kopplung)? Das ist Spielgefühl.
+2. **Der Greifer weicht aus.** Auf einer echten Maschine hängt die Spinne am
+   Kardan und wird vom Stiel zur Seite gedrückt, statt hindurchzugehen. Das
+   wäre die schönste Lösung und kostet keinen Zentimeter Reichweite — greift
+   aber ins **Pendel**, und daran wird nach den Projektregeln nur auf
+   ausdrücklichen Wunsch und in einzeln abgenommenen Schritten gearbeitet.
+3. **Nichts tun.** Die Durchdringung ist rechnerisch da; ob sie beim Spielen
+   auffällt, sieht man erst auf dem Gerät. Der Stielkasten ist an der Stelle
+   0,32 m breit, der Greifer steckt 5,5…16 cm darin — das ist kein
+   Durchrutschen, aber auch kein halber Greifer im Stahl.
+
+**Verworfen:** den Stiel dünner zeichnen. Er verjüngt sich bereits von 0,45 m
+am Fuß auf 0,30 m an der Spitze; 5 cm weniger verschieben die Berührung um
+wenige Zentimeter und beseitigen die 16 cm nicht. **Ebenfalls verworfen:** den
+Bodenanschlag das eigene Räumschild sehen zu lassen. Sein Strahl blendet die
+Maschine bewusst aus (`selfHandles`); wer das ändert, lässt die Spinne auf dem
+eigenen Schild aufsetzen — und Gruppe A kommt im Betrieb ohnehin kaum vor.
+
+---
+
+#### 6. Der Wächter
+
+`test/greiferNullgrad.test.ts`, **sieben Prüfungen**, 37 s.
+
+Er zählt nicht 24 Rotatorstellungen ab, sondern rechnet die Drehung heraus:
+Bei Kippwinkel 0 läuft jeder Greiferpunkt beim Drehen auf einem waagerechten
+Kreis, und der kleinste Abstand über den GANZEN Rotatorweg ist der ebene
+Abstand in der Halbebene (Achsabstand | Höhe) — `Drehprofil` in
+`tools/freigang-kern.ts`. Das ist **strenger** als 24 Stichproben (dazwischen
+rutscht nichts mehr durch) und um Größenordnungen billiger.
+
+1. **62 von 81** Armstellungen erreichbar — dieselbe Auswahl wie das Werkzeug,
+   über dieselbe Funktion `posenBauen`.
+2. **Sichelkralle: Liste gegen Liste**, alle dreizehn Armstellungen namentlich.
+3. **Fünfschalengreifer: Liste gegen Liste**, alle acht.
+4. **Die acht sind eine echte Teilmenge der dreizehn.**
+5. **GEGENPROBE, 25 %:** Ein um ein Viertel größerer Greifer MUSS bei BEIDEN
+   Formen mehr Armstellungen melden. *(Mit 10 % spricht nur die Sichelkralle
+   an — der Fünfschalengreifer berührt in seinen acht Stellungen schon, und
+   die nächste liegt weiter weg als ein Zehntel. Eine Gegenprobe, die nur eine
+   von zwei Formen prüft, prüft die andere nicht.)*
+6. **Drei der dreizehn hält der Bodenanschlag ohnehin nicht** — namentlich,
+   und die Spitzenhöhe wird aus der gebauten Maschine gelesen und gegen die
+   Formel gegengerechnet.
+7. **Die Kante liegt bei der Winkelsumme**, nicht beim Ausleger allein:
+   zwischen 15° und 21°, und keine der über zwanzig Stellungen unter 15° Knick
+   berührt am Stielkasten.
+
+Dass die beiden Verfahren dasselbe messen, steht als Prüfung drin: Bei 3 cm
+Raster (Schranke 34,6 mm) kommen **genau dieselben dreizehn und acht** heraus
+wie beim räumlichen Lauf mit 2,5 cm. Bei 4 cm käme eine vierzehnte dazu
+(53,75°/−39,37°) — deshalb 3 cm.
+
+---
+
+#### 7. Nebenbefund: die Korrektur aus E-091 ist unabhängig bestätigt
+
+Ein voller Übersichtslauf am 17.09.
+(`docs/messungen/greifer-freigang-2026-09-17-uebersicht.txt`) zeigt bei 90°
+Kippung für **beide** Formen **11 von 24** freie Rotatorstellungen, mit
+derselben Liste 105°…255°, und für beide „größter Kippwinkel, der in jeder
+erreichbaren Armstellung frei läuft: 90°". Die unveränderte Sichelkralle kommt
+also auf dieselbe Zahl wie der Trog — die „vier Rotatorstellungen weniger" aus
+E-090 waren ein Rasterartefakt, wie E-091 festgestellt hat. **Das
+Seitwärtskippen ist unverändert.**
+
+---
+
+**Was NICHT angefasst ist.**
+
+- **Kein Produktivcode.** `git diff` gegen `v1/start` zeigt in `v1/src/` keine
+  Zeile. Geändert sind zwei Werkzeuge, dazu zwei neue Werkzeuge, ein Wächter
+  und vier Protokolle.
+- **Die Sichelkralle.** Abdruckvergleich `tools/greifer-abdruck-vergleich.ts`:
+  112 Netze, Reihenfolge und Art gleich, **Bewegung 5.020 Werte, Kollider 110,
+  Korb 5.200 — größter Unterschied überall 0,000e+0.**
+- **Der Bodenanschlag.** Nachgemessen mit `tools/bodenanschlag-hoehe.ts`:
+  Sichelkralle **6,37 cm**, Fünfschalengreifer **20,44 cm** über Beton.
+- **Der Griff-Kern:** Sensorkugel, Fixed Joint, `imKorb`, kein „Saugen" in die
+  Korbmitte.
+- **Der Zylinderschutz (E-077)** hat weiterhin keinen Kollider.
+- **Die Reichweite.** 9,54 m am Boden, Schwenkband 5,80…9,20 m — unberührt,
+  weil nichts gesperrt wurde.
+
+**Abnahmekriterium.** `npm run build` mit Rückgabewert **0** und `npm test` mit
+Rückgabewert **0**, beide einzeln aufgerufen und der Ausgangswert gelesen:
+**115 Dateien, 1.333 Prüfungen** (vorher 114 / 1.326 — eine Datei und sieben
+Prüfungen mehr). `npx tsc -p tsconfig.test.json` Rückgabewert 0.
+
+**Auf dem Gerät zu prüfen.**
+
+1. **Stiel ganz ausstrecken und dann den Ausleger bis zum Anschlag heben.**
+   Ab etwa halber Auslegerhöhe läuft die Spinne rechnerisch durch den
+   Stielkasten. Sieht man das — steckt sichtbar ein Stück Kralle im Stiel, oder
+   fällt es gar nicht auf, weil man in dieser Stellung ohnehin nie steht?
+2. **Dabei die Spinne drehen (Rotator).** Die Berührung ist in 13 bis 24 von
+   24 Drehstellungen da. Gibt es eine Stellung, in der es sauber aussieht?
+3. **Einmal ganz einklappen und über dem eigenen Räumschild loslassen.** Das
+   ist der einzige Handgriff, bei dem die Kralle ins Schild greift — und er
+   sieht künstlich aus. Macht man das je?
+4. **Die Frage, die nur du beantworten kannst:** Wenn es stört — wieviel
+   Hubhöhe darf es kosten? Eine Sperre bei 25° nimmt 1,14 m weg (Krallenspitze
+   7,67 → 6,53 m); die waagerechte Reichweite und alle Mulden bleiben, wie sie
+   sind.

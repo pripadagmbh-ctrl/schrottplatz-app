@@ -416,6 +416,111 @@ export class Naehefeld {
   }
 }
 
+/* --------------------------------------------------------- Das Drehprofil */
+
+/**
+ * DAS DREHPROFIL — die Frage „beruehrt es sich bei IRGENDEINER
+ * Rotatorstellung" in ZWEI Zahlen je Punkt statt 24 Durchgaengen.
+ *
+ * Bei Kippwinkel 0 dreht der Rotator den Greifer um die LOTRECHTE durch das
+ * Kardangelenk. Ein Greiferpunkt laeuft dabei auf einem waagerechten Kreis:
+ * seine Hoehe `y` unter dem Gelenk und sein Achsabstand `r` bleiben, nur der
+ * Winkel wandert. Fuer zwei Punkte A (fest, am Arm) und P (am Greifer) gilt
+ * deshalb
+ *
+ *     min ueber alle Rotatorstellungen von |A − P| = |(r_A, y_A) − (r_P, y_P)|
+ *
+ * — der kleinste raeumliche Abstand ueber den ganzen Rotatorweg ist der
+ * ebene Abstand in der Halbebene (Achsabstand | Hoehe). Das Kleinstmass ueber
+ * einen KONTINUIERLICHEN Rotator kostet damit weniger als ein einziger der
+ * 24 Durchgaenge — und ist strenger als sie, weil zwischen zwei Stichproben
+ * nichts mehr durchrutschen kann.
+ *
+ * WOFUER: `test/greifer-nullgrad.test.ts`. Die Messung selbst
+ * (`tools/greifer-freigang.ts`) rechnet weiter raeumlich, weil sie auch
+ * GEKIPPTE Greifer misst — und sobald der Greifer kippt, laeuft ein Punkt
+ * nicht mehr auf einem waagerechten Kreis und die Abkuerzung gilt nicht.
+ */
+export class Drehprofil {
+  private zelle: number;
+  private r0 = Infinity;
+  private y0 = Infinity;
+  private nr = 0;
+  private ny = 0;
+  private kopf: Int32Array = new Int32Array(0);
+  private naechst: Int32Array = new Int32Array(0);
+  /** (r | y) je Punkt. */
+  readonly rz: Float64Array;
+
+  /**
+   * @param wolke Greiferpunkte im Greiferframe, 3 Zahlen je Punkt
+   * @param ab    erster Punkt, der zaehlt (alles davor ist die Aufhaengung)
+   * @param zelle Rasterweite der Nachbarsuche (m)
+   */
+  constructor(wolke: Float64Array, ab: number, zelle: number) {
+    this.zelle = zelle;
+    const n = wolke.length / 3 - ab;
+    this.rz = new Float64Array(n * 2);
+    let rHi = -Infinity;
+    let yHi = -Infinity;
+    for (let i = 0; i < n; i++) {
+      const o = (ab + i) * 3;
+      const r = Math.hypot(wolke[o], wolke[o + 2]);
+      const y = wolke[o + 1];
+      this.rz[i * 2] = r;
+      this.rz[i * 2 + 1] = y;
+      if (r < this.r0) this.r0 = r;
+      if (y < this.y0) this.y0 = y;
+      if (r > rHi) rHi = r;
+      if (y > yHi) yHi = y;
+    }
+    this.nr = Math.max(1, Math.ceil((rHi - this.r0) / zelle) + 1);
+    this.ny = Math.max(1, Math.ceil((yHi - this.y0) / zelle) + 1);
+    this.kopf = new Int32Array(this.nr * this.ny).fill(-1);
+    this.naechst = new Int32Array(n).fill(-1);
+    for (let i = 0; i < n; i++) {
+      const c = this.zellenNr(this.rz[i * 2], this.rz[i * 2 + 1]);
+      this.naechst[i] = this.kopf[c];
+      this.kopf[c] = i;
+    }
+  }
+
+  private zellenNr(r: number, y: number): number {
+    const ir = Math.max(0, Math.min(this.nr - 1, Math.floor((r - this.r0) / this.zelle)));
+    const iy = Math.max(0, Math.min(this.ny - 1, Math.floor((y - this.y0) / this.zelle)));
+    return ir * this.ny + iy;
+  }
+
+  /**
+   * Kleinster Abstand des Armpunktes (Achsabstand `r`, Hoehe `y` relativ zum
+   * Kardangelenk) zum naechsten Greiferpunkt — ueber ALLE Rotatorstellungen.
+   */
+  abstand(r: number, y: number, deckel: number): number {
+    const ir = Math.floor((r - this.r0) / this.zelle);
+    const iy = Math.floor((y - this.y0) / this.zelle);
+    let best = deckel;
+    const maxRing = Math.ceil(deckel / this.zelle) + 1;
+    for (let ring = 0; ring <= maxRing; ring++) {
+      if (best <= (ring - 1) * this.zelle) break;
+      const a0 = ir - ring, a1 = ir + ring;
+      const b0 = iy - ring, b1 = iy + ring;
+      for (let a = a0; a <= a1; a++) {
+        if (a < 0 || a >= this.nr) continue;
+        const randA = a === a0 || a === a1;
+        for (let b = b0; b <= b1; b++) {
+          if (b < 0 || b >= this.ny) continue;
+          if (!randA && b !== b0 && b !== b1) continue;
+          for (let e = this.kopf[a * this.ny + b]; e !== -1; e = this.naechst[e]) {
+            const d = Math.hypot(this.rz[e * 2] - r, this.rz[e * 2 + 1] - y);
+            if (d < best) best = d;
+          }
+        }
+      }
+    }
+    return best;
+  }
+}
+
 /** Abstand Punkt → Dreieck (Ericson, Real-Time Collision Detection, 5.1.5). */
 export function punktDreieck(px: number, py: number, pz: number, t: Float64Array, o: number): number {
   const ax = t[o], ay = t[o + 1], az = t[o + 2];
