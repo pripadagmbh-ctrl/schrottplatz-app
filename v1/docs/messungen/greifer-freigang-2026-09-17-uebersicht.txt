@@ -1,0 +1,121 @@
+=== Freigang des gekippten Greifers — auf Dreiecksebene (Uebersicht) ===
+
+  9 x 9 = 81 Armstellungen · 19 Kippwinkel · 24 Rotatorstellungen · 4 Oeffnungen
+  Sichelkralle: 13.929 Punkte, groesster Halbmesser 3.071 m
+  Fünfschalengreifer: 13.428 Punkte, groesster Halbmesser 2.846 m
+
+  Armstellungen werden gebaut …
+  62 Armstellungen erreichbar, 19 verworfen (Stielspitze unter 1.52 m — dort steckt der Greifer im Boden), 49 s
+
+  Vorprobe Sichelkralle: 49 von 62 Armstellungen sind bei 0° frei.
+    HEUTE SCHON BERUEHRUNG bei 0° in: 29.38°/-140°, 37.5°/-140°, 45.63°/-140°, 45.63°/-25°, 53.75°/-140°, 53.75°/-25°, 61.88°/-140°, 61.88°/-39.37°, 61.88°/-25°, 70°/-140°, 70°/-53.75°, 70°/-39.37°, 70°/-25° — dort ist die Kippfrage nicht stellbar.
+  Eichung Sichelkralle: R0 = 0.483 m um das Kardangelenk. 294 von 13929 Punkten liegen darin (Aufhaengung, steckt bauartbedingt im Stiel), 13635 werden gemessen.
+  Vorprobe Fünfschalengreifer: 54 von 62 Armstellungen sind bei 0° frei.
+    HEUTE SCHON BERUEHRUNG bei 0° in: 29.38°/-140°, 37.5°/-140°, 45.63°/-140°, 53.75°/-140°, 61.88°/-140°, 61.88°/-25°, 70°/-140°, 70°/-25° — dort ist die Kippfrage nicht stellbar.
+  Eichung Fünfschalengreifer: R0 = 0.481 m um das Kardangelenk. 277 von 13428 Punkten liegen darin (Aufhaengung, steckt bauartbedingt im Stiel), 13151 werden gemessen.
+
+
+################  Sichelkralle  ################
+  304.660.440 Abstandsfragen, davon 8.778.255 genau gerechnet  (343 s)
+
+--- Sichelkralle ---
+  Raster 6.0 cm → Abtastfehler EPS = 34.6 mm  ·  R0 = 0.483 m  ·  13.635 Punkte gemessen
+
+  Kipp  | beste Rotatorstellung          | dort  | schlechteste Rotator- | zum
+  winkel| Freigang mindestens            | Gier  | stellung              | Schlauch
+  ------+--------------------------------+-------+-----------------------+---------
+     0° | 0.019 m (07_STIEL_STAHL)       |  210° | 0.002 m               | 0.115 m
+     5° | 0.018 m (07_STIEL_STAHL)       |  210° | BERUEHRUNG (07_STIEL_KASTEN)| 0.115 m
+    10° | 0.019 m (07_STIEL_STAHL)       |  135° | BERUEHRUNG (01_RAEUMSCHILD_BLATT)| 0.115 m
+    15° | 0.018 m (07_STIEL_STAHL)       |  150° | BERUEHRUNG (07_STIEL_KASTEN)| 0.115 m
+    20° | 0.020 m (07_STIEL_STAHL)       |  150° | BERUEHRUNG (01_RAEUMSCHILD_BLATT)| 0.115 m
+    25° | 0.028 m (07_STIEL_STAHL)       |  150° | BERUEHRUNG (01_RAEUMSCHILD_BLATT)| 0.115 m
+    30° | 0.031 m (07_STIEL_STAHL)       |  135° | BERUEHRUNG (07_STIEL_KASTEN)| 0.115 m
+    35° | 0.030 m (07_STIEL_STAHL)       |  225° | BERUEHRUNG (01_RAEUMSCHILD_SCHNEIDE)| 0.115 m
+    40° | 0.026 m (07_STIEL_STAHL)       |  225° | BERUEHRUNG (01_RAEUMSCHILD_BLATT)| 0.115 m
+    45° | 0.030 m (07_STIEL_STAHL)       |  210° | BERUEHRUNG (07_STIEL_KASTEN)| 0.115 m
+    50° | 0.040 m (07_STIEL_STAHL)       |  210° | BERUEHRUNG (07_STIEL_KASTEN)| 0.115 m
+    55° | 0.033 m (07_STIEL_STAHL)       |  195° | BERUEHRUNG (07_STIEL_KASTEN)| 0.115 m
+    60° | 0.036 m (07_STIEL_STAHL)       |  210° | BERUEHRUNG (07_STIEL_KASTEN)| 0.017 m
+    65° | 0.051 m (07_STIEL_STAHL)       |  195° | BERUEHRUNG (01_RAEUMSCHILD_BLATT)| 0.057 m
+    70° | 0.070 m (07_STIEL_STAHL)       |  195° | BERUEHRUNG (07_STIEL_KASTEN)| 0.023 m
+    75° | 0.091 m (07_STIEL_STAHL)       |  195° | BERUEHRUNG (07_STIEL_KASTEN)| 0.023 m
+    80° | 0.094 m (07_STIEL_STAHL)       |  195° | BERUEHRUNG (07_STIEL_KASTEN)| 0.018 m
+    85° | 0.098 m (07_STIEL_STAHL)       |  255° | BERUEHRUNG (07_STIEL_KASTEN)| 0.011 m
+    90° | 0.082 m (07_STIEL_STAHL)       |  255° | BERUEHRUNG (07_STIEL_KASTEN)| 0.004 m
+
+  Welche Rotatorstellungen bei welchem Kippwinkel frei bleiben:
+      0° | alle 24
+      5° | 18 von 24: 0°, 60°, 75°, 90°, 105°, 120°, 135°, 150°, 165°, 180°, 195°, 210°, 225°, 240°, 255°, 270°, 285°, 300°
+     10° | 17 von 24: 60°, 75°, 90°, 105°, 120°, 135°, 150°, 165°, 180°, 195°, 210°, 225°, 240°, 255°, 270°, 285°, 300°
+     15° | 12 von 24: 60°, 90°, 120°, 135°, 150°, 165°, 180°, 195°, 210°, 225°, 240°, 270°
+     20° | 15 von 24: 75°, 90°, 105°, 120°, 135°, 150°, 165°, 180°, 195°, 210°, 225°, 240°, 255°, 270°, 285°
+     25° | 15 von 24: 75°, 90°, 105°, 120°, 135°, 150°, 165°, 180°, 195°, 210°, 225°, 240°, 255°, 270°, 285°
+     30° | 13 von 24: 90°, 105°, 120°, 135°, 150°, 165°, 180°, 195°, 210°, 225°, 240°, 255°, 270°
+     35° | 13 von 24: 90°, 105°, 120°, 135°, 150°, 165°, 180°, 195°, 210°, 225°, 240°, 255°, 270°
+     40° | 13 von 24: 90°, 105°, 120°, 135°, 150°, 165°, 180°, 195°, 210°, 225°, 240°, 255°, 270°
+     45° | 15 von 24: 75°, 90°, 105°, 120°, 135°, 150°, 165°, 180°, 195°, 210°, 225°, 240°, 255°, 270°, 285°
+     50° | 11 von 24: 90°, 105°, 135°, 150°, 165°, 180°, 195°, 210°, 225°, 255°, 270°
+     55° | 11 von 24: 105°, 120°, 135°, 150°, 165°, 180°, 195°, 210°, 225°, 240°, 255°
+     60° | 13 von 24: 90°, 105°, 120°, 135°, 150°, 165°, 180°, 195°, 210°, 225°, 240°, 255°, 270°
+     65° | 11 von 24: 105°, 120°, 135°, 150°, 165°, 180°, 195°, 210°, 225°, 240°, 255°
+     70° | 11 von 24: 105°, 120°, 135°, 150°, 165°, 180°, 195°, 210°, 225°, 240°, 255°
+     75° | 11 von 24: 105°, 120°, 135°, 150°, 165°, 180°, 195°, 210°, 225°, 240°, 255°
+     80° | 11 von 24: 105°, 120°, 135°, 150°, 165°, 180°, 195°, 210°, 225°, 240°, 255°
+     85° | 11 von 24: 105°, 120°, 135°, 150°, 165°, 180°, 195°, 210°, 225°, 240°, 255°
+     90° | 11 von 24: 105°, 120°, 135°, 150°, 165°, 180°, 195°, 210°, 225°, 240°, 255°
+
+  >>> Sichelkralle: GROESSTER KIPPWINKEL, der in JEDER Armstellung frei laeuft (bei passender Rotatorstellung): 90°
+
+
+################  Fünfschalengreifer  ################
+  323.830.224 Abstandsfragen, davon 9.070.837 genau gerechnet  (246 s)
+
+--- Fünfschalengreifer ---
+  Raster 6.0 cm → Abtastfehler EPS = 34.6 mm  ·  R0 = 0.481 m  ·  13.151 Punkte gemessen
+
+  Kipp  | beste Rotatorstellung          | dort  | schlechteste Rotator- | zum
+  winkel| Freigang mindestens            | Gier  | stellung              | Schlauch
+  ------+--------------------------------+-------+-----------------------+---------
+     0° | 0.034 m (07_STIEL_STAHL)       |  270° | 0.003 m               | 0.115 m
+     5° | 0.018 m (07_STIEL_STAHL)       |  180° | BERUEHRUNG (07_STIEL_KASTEN)| 0.115 m
+    10° | 0.019 m (07_STIEL_STAHL)       |  210° | BERUEHRUNG (07_STIEL_KASTEN)| 0.115 m
+    15° | 0.018 m (07_STIEL_STAHL)       |  180° | BERUEHRUNG (07_STIEL_KASTEN)| 0.115 m
+    20° | 0.018 m (07_STIEL_STAHL)       |  180° | BERUEHRUNG (07_STIEL_KASTEN)| 0.115 m
+    25° | 0.018 m (07_STIEL_STAHL)       |  180° | BERUEHRUNG (07_STIEL_KASTEN)| 0.115 m
+    30° | 0.023 m (07_STIEL_STAHL)       |  150° | BERUEHRUNG (07_STIEL_KASTEN)| 0.115 m
+    35° | 0.019 m (07_STIEL_STAHL)       |  150° | BERUEHRUNG (07_STIEL_KASTEN)| 0.115 m
+    40° | 0.021 m (07_STIEL_STAHL)       |  165° | BERUEHRUNG (01_RAEUMSCHILD_BLATT)| 0.115 m
+    45° | 0.018 m (07_STIEL_STAHL)       |  180° | BERUEHRUNG (07_STIEL_KASTEN)| 0.115 m
+    50° | 0.025 m (07_STIEL_STAHL)       |  210° | BERUEHRUNG (01_RAEUMSCHILD_BLATT)| 0.115 m
+    55° | 0.025 m (07_STIEL_STAHL)       |  180° | BERUEHRUNG (07_STIEL_KASTEN)| 0.115 m
+    60° | 0.034 m (07_STIEL_STAHL)       |  180° | BERUEHRUNG (01_RAEUMSCHILD_BLATT)| 0.115 m
+    65° | 0.043 m (01_RAEUMSCHILD_BLATT) |   90° | BERUEHRUNG (01_RAEUMSCHILD_BLATT)| 0.115 m
+    70° | 0.041 m (07_STIEL_STAHL)       |  180° | BERUEHRUNG (07_STIEL_KASTEN)| 0.115 m
+    75° | 0.063 m (07_STIEL_STAHL)       |  105° | BERUEHRUNG (07_STIEL_KASTEN)| 0.115 m
+    80° | 0.087 m (07_STIEL_STAHL)       |  105° | BERUEHRUNG (07_STIEL_KASTEN)| 0.115 m
+    85° | 0.112 m (07_STIEL_STAHL)       |  105° | BERUEHRUNG (07_STIEL_KASTEN)| 0.115 m
+    90° | 0.115 m (07_STIEL_STAHL)       |  105° | BERUEHRUNG (01_RAEUMSCHILD_BLATT)| 0.115 m
+
+  Welche Rotatorstellungen bei welchem Kippwinkel frei bleiben:
+      0° | alle 24
+      5° | 18 von 24: 0°, 60°, 75°, 90°, 105°, 120°, 135°, 150°, 165°, 180°, 195°, 210°, 225°, 240°, 255°, 270°, 285°, 300°
+     10° | 16 von 24: 0°, 75°, 90°, 105°, 120°, 135°, 150°, 165°, 180°, 195°, 210°, 225°, 240°, 255°, 270°, 285°
+     15° | 10 von 24: 120°, 135°, 150°, 165°, 180°, 195°, 210°, 225°, 240°, 270°
+     20° | 11 von 24: 105°, 120°, 150°, 165°, 180°, 195°, 210°, 240°, 255°, 270°, 285°
+     25° | 13 von 24: 105°, 120°, 135°, 150°, 165°, 180°, 195°, 210°, 225°, 240°, 255°, 270°, 285°
+     30° | 12 von 24: 105°, 120°, 135°, 150°, 165°, 180°, 195°, 210°, 225°, 240°, 255°, 270°
+     35° | 13 von 24: 90°, 105°, 120°, 135°, 150°, 165°, 180°, 195°, 210°, 225°, 240°, 255°, 270°
+     40° | 13 von 24: 90°, 105°, 120°, 135°, 150°, 165°, 180°, 195°, 210°, 225°, 240°, 255°, 270°
+     45° | 14 von 24: 90°, 105°, 120°, 135°, 150°, 165°, 180°, 195°, 210°, 225°, 240°, 255°, 270°, 285°
+     50° | 11 von 24: 90°, 105°, 135°, 150°, 165°, 180°, 195°, 210°, 225°, 255°, 270°
+     55° | 11 von 24: 90°, 105°, 120°, 150°, 165°, 180°, 195°, 210°, 240°, 255°, 270°
+     60° | 13 von 24: 90°, 105°, 120°, 135°, 150°, 165°, 180°, 195°, 210°, 225°, 240°, 255°, 270°
+     65° | 13 von 24: 90°, 105°, 120°, 135°, 150°, 165°, 180°, 195°, 210°, 225°, 240°, 255°, 270°
+     70° | 11 von 24: 105°, 120°, 135°, 150°, 165°, 180°, 195°, 210°, 225°, 240°, 255°
+     75° | 13 von 24: 90°, 105°, 120°, 135°, 150°, 165°, 180°, 195°, 210°, 225°, 240°, 255°, 270°
+     80° | 11 von 24: 105°, 120°, 135°, 150°, 165°, 180°, 195°, 210°, 225°, 240°, 255°
+     85° | 11 von 24: 105°, 120°, 135°, 150°, 165°, 180°, 195°, 210°, 225°, 240°, 255°
+     90° | 11 von 24: 105°, 120°, 135°, 150°, 165°, 180°, 195°, 210°, 225°, 240°, 255°
+
+  >>> Fünfschalengreifer: GROESSTER KIPPWINKEL, der in JEDER Armstellung frei laeuft (bei passender Rotatorstellung): 90°
