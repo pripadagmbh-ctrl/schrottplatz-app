@@ -70,16 +70,15 @@ import {
  * Reine Geometrie, kein Zustand — absichtlich ohne die Klasse benutzbar.
  *
  * `tief` IST DIE AUSLADUNG IN WELTRICHTUNG −y, nicht die Laenge in der
- * Greiferachse (E-083). Bei lotrechtem Greifer sind das dieselbe Zahl, und
- * deshalb steht `SICHELKRALLE.maxTiefe` unveraendert als Vorgabe da. Wer nach
- * der Reichweite eines GEKIPPTEN Greifers fragt, uebergibt
- * `form.maxAusladung(kipp)` — dann stimmt die Antwort auch dann, wenn der
- * Greifer zur Seite liegt und nur noch 1,77 statt 3,00 m nach unten langt.
+ * Greiferachse. Bei lotrechtem Greifer sind das dieselbe Zahl, und deshalb
+ * steht `SICHELKRALLE.maxTiefe` unveraendert als Vorgabe da. Wer nach der
+ * Reichweite eines SCHRAEG haengenden Greifers fragt, uebergibt
+ * `form.maxAusladung(neigung)`.
  *
  * Diese Funktion plant den PLATZ (wo Mulden stehen duerfen, ob die Presse
  * erreichbar ist) und laeuft nicht im Spiel mit. Ihre Vorgabe bleibt deshalb
- * die lotrechte Sichelkralle: Was einmal als erreichbar geplant wurde, soll
- * sich nicht verschieben, weil jemand den Greifer kippt.
+ * die lotrecht haengende Sichelkralle: Was einmal als erreichbar geplant
+ * wurde, soll sich nicht verschieben, weil das Pendel gerade ausschlaegt.
  */
 export function hoechsteKrallenspitze(
   abstandM: number,
@@ -464,77 +463,113 @@ const ACC_GLAETTUNG_S = 0.09;
  * haengenden Pendel.
  */
 const GELENK_STEIFE = 1.0;
+/**
+ * Ab hier gilt der Greifer als schraeg haengend (rad).
+ *
+ * WOFUER ES DA IST: Ein gerechnetes Pendel steht nie exakt auf null. Es bleibt
+ * immer ein Rest von Tausendstelgrad stehen. Ohne Totband waere
+ * `neigung === 0` im laufenden Spiel nie wahr, die drei Vorabspruenge liefen
+ * nie, und die Zusage „bei lotrechtem Greifer Ziffer fuer Ziffer wie vorher"
+ * waere im Betrieb nie eingeloest.
+ *
+ * WARUM 0,5 GRAD. Was das Totband kostet, ist der Versatz, um den der
+ * Messstrahl NICHT wandert: bei 0,5 Grad und 3,00 m Tiefe
+ *     3,00 · sin 0,5° = 2,6 cm.
+ * Der Strahl sucht damit den Boden 2,6 cm neben der wahren Korbmitte. Zum
+ * Vergleich: Der Sensorradius der Sichelkralle ist 1,56 m, ein Muldenrand ist
+ * 20 cm stark, und der Anschlag selbst arbeitet mit 12 mm Totband
+ * (`BODEN_TOLERANZ`). Ein Unterschied, der erst bei einer Kante von unter
+ * 3 cm Breite ueberhaupt messbar waere — und so eine Kante gibt es auf dem
+ * Platz nicht.
+ */
+const NEIGUNG_TOTBAND = THREE.MathUtils.degToRad(0.5);
+
+/**
+ * Rechnet der BODENANSCHLAG mit der Schraeglage des Greifers?
+ *
+ * Nein — und das ist gemessen, nicht vergessen. Die Umstellung von der
+ * Weltsenkrechten auf die Greiferachse (E-085) steckt vollstaendig in
+ * `form.ausladung` / `form.maxAusladung` und ist bewacht; hier steht der
+ * Schalter, der sie im Anschlag scharf stellt.
+ *
+ * WAS PASSIERT, WENN ER AUF `true` STEHT (gemessen am 17.09.2026):
+ *
+ *   - `maxAusladung` waechst mit der Schraeglage, und zwar mit dem HALBMESSER
+ *     der tiefsten Schale, nicht mit dem Kosinus: 0,44 m · sin θ. Schon bei
+ *     0,5 Grad sind das 3,8 mm, beim gewoehnlichen Pendelausschlag eines
+ *     Schwenks (7,8 Grad) 5,1 cm (Sichelkralle) bzw. 7,3 cm
+ *     (Fuenfschalengreifer).
+ *   - Der Anschlag HEBT den Arm aktiv an, wenn die Spitzen zu tief stehen.
+ *     Waehrend des Absenkens pendelt der Greifer immer ein paar Grad — der Arm
+ *     wird also angehoben, waehrend man ihn senkt.
+ *   - Und er bleibt oben: Sobald `bodenSperre` gegriffen hat, ist die
+ *     Abwaertsrichtung gesperrt, solange Kontakt gemeldet wird. Gemessen mit
+ *     `tools/bodenanschlag-hoehe.ts`: Der geschlossene Greifer stand danach
+ *     auf **7,90 cm** statt 6,37 cm (Sichelkralle) und **21,21 cm** statt
+ *     20,44 cm (Fuenfschalengreifer) — auch wenn man den Hebel bis zum Schluss
+ *     unten haelt.
+ *
+ * Das ist eine Aenderung am Absetzen, und Absetzen ist das, was Patrick am
+ * haeufigsten tut. Sie gehoert nicht als Nebenwirkung in ein Paket ueber das
+ * Pendel, sondern in ein eigenes, mit eigener Abnahme — zusammen mit der
+ * Frage, ob `bodenSperre` den Arm oben festhalten darf, nachdem der Grund
+ * fuers Anheben weg ist.
+ *
+ * WAS DAGEGEN SCHON AN DER GREIFERACHSE HAENGT: der Messstrahl
+ * (`surfaceUnderClaws`) und die Krallenlage (`syncMeshes`). Beide beantworten
+ * „wo schaue ich hin", nicht „wie hoch halte ich an" — sie koennen den Arm
+ * nicht anheben, und auf ebenem Beton aendern sie gar nichts.
+ */
+const ANSCHLAG_FOLGT_PENDEL = false;
 /** Dämpfung des Pendels leer und bei Nennlast */
 const PENDEL_DAEMPFUNG_LEER = 5.0;
 const PENDEL_DAEMPFUNG_LAST = 4.0;
-/** Groesster Ausschlag je Achse (rad) — darueber wird es zur Abrissbirne */
-const PENDEL_MAX = THREE.MathUtils.degToRad(17);
-
-/* ------------------------------------------- Seitwaertskippen des Greifers */
-
-/**
- * Um DIESE Achse kippt der Greifer — seine eigene X-Achse, also VOR dem
- * Rotator.
- *
- * Damit dreht die Kipprichtung mit dem Rotator mit: Wer wissen will, wohin
- * der Greifer faellt, dreht die Spinne. Patrick dazu (15.09.2026, zur Breite
- * des Besens): „breite so lassen, ich kann die Spinne ja drehen damit es
- * passt." Die Reihenfolge steht in `integratePendulum`:
- *     q = qPendel · qGier · qKipp        (qKipp ganz rechts)
- */
 /*
- * MINUS x, nicht plus. Die Achse entscheidet, WOHIN der Greifer bei
- * Rotatorstellung 0 faellt, und das ist keine Geschmacksfrage:
+ * KEINE WINKELSPERRE. Hier stand bis zum 17.09.2026 ein Deckel von 17 Grad je
+ * Achse, und genau der ist auf Patricks Wort gefallen:
  *
- *   +x → der Greifer faellt nach HINTEN, unter den Stiel. Dort ist er im Weg;
- *        gemessen (`tools/greifer-freigang.ts`) laeuft das Kippen dann nur in
- *        den Rotatorstellungen 105°…255° frei, und der Rotator steht beim
- *        Anbauen auf 0.
- *   −x → der Greifer faellt nach VORN, ueber die Stielspitze hinaus und vom
- *        Arm weg. Das freie Band liegt dann um 0 herum, also genau dort, wo
- *        der Rotator ohnehin steht.
+ *   „Es ging eher drum, dass ein Greifer keine winkelsperre hat, soll auch
+ *    nicht. Damit ueber das schwenken seitliche kraft erzeugt wird und teile
+ *    geworfen werden koennen." (17.09.2026)
  *
- * Das freie Band ist dasselbe Band, nur anders benannt — die Geometrie
- * aendert sich davon nicht. Was sich aendert, ist, ob Patrick den Rotator
- * erst herumdrehen muss, bevor das Kippen ueberhaupt Sinn hat.
+ * Ein Greifer haengt frei am Kardangelenk. Wer den Oberwagen schwenkt, erzeugt
+ * Fliehkraft, der Greifer schlaegt aus — und daraus wirft man Teile. Ein
+ * Anschlag nimmt genau das weg: Er kappt die Spitze der Bewegung und macht
+ * jeden Schwung ab 17 Grad gleich aussehend.
+ *
+ * WAS DEN AUSSCHLAG JETZT BEGRENZT, und warum das KEIN Anschlag ist:
+ *
+ *   - Die Rueckstellung `−(g/L)·(1+GELENK_STEIFE)·sin(Ausschlag)`. Sie waechst
+ *     mit dem Ausschlag und haelt dem Antrieb irgendwann die Waage; wo das ist,
+ *     haengt davon ab, wie schnell geschwenkt wird. Ein Anschlag stuende immer
+ *     an derselben Stelle.
+ *   - `PENDEL_DAEMPFUNG_*` — Reibung, kein Anschlag. Sie bremst die
+ *     GESCHWINDIGKEIT, nicht den Winkel.
+ *   - `CAP` in `integratePendulum` (15 m/s²) deckelt die ANTRIEBSGROESSE, nicht
+ *     die Lage. Er sitzt dort seit dem 11.09.2026 gegen Zahlenrauschen aus der
+ *     zweifachen Differenzenbildung und gegen Teleports (Tests, Spawns) — mit
+ *     dem Ausschlag hat er nichts zu tun.
+ *
+ * GEMESSEN (`npx vite-node tools/pendelausschlag.ts`, 17.09.2026), voller
+ * Oberwagenschwenk aus dem Stand:
+ *
+ *   |                        | vorher (17°-Deckel) | jetzt  |
+ *   |------------------------|---------------------|--------|
+ *   | hoechster Ausschlag    | 17,3°               | 20,2°  |
+ *   | Beharrung im Schwenk   |  7,8°               |  7,8°  |
+ *   | Ruhe nach dem Stopp    |  1,38 s             |  1,38 s|
+ *
+ * UND DAS IST DER EHRLICHE TEIL: Der Deckel hat nur die Spitze gekappt. Im
+ * gleichmaessigen Schwenk stand der Greifer schon vorher auf 7,8 Grad und hat
+ * den Anschlag nie beruehrt — angefasst hat er nur den Ueberschwinger beim
+ * Anfahren und beim Stoppen.
+ *
+ * Was den Ausschlag wirklich klein haelt, ist `GELENK_STEIFE` (siehe oben):
+ * Sie verdoppelt die Rueckstellung und HALBIERT damit den Ausschlag. Ob der
+ * Greifer weiter hinausschwingen soll, ist eine Gestaltungsfrage und steht als
+ * offener Punkt in E-105 — sie wird dort NICHT mitentschieden, weil eine
+ * Ansage ueber die Winkelsperre keine Ansage ueber die Rueckstellung ist.
  */
-const KIPP_ACHSE = new THREE.Vector3(-1, 0, 0);
-
-/**
- * Wie weit der Greifer zur Seite kippt — 90 Grad, also VOLLSTAENDIG.
- *
- * Das ist keine gewaehlte Zahl, sondern eine gemessene Grenze:
- * `tools/greifer-freigang.ts` hat den Greifer auf DREIECKSEBENE gegen Stiel,
- * Ausleger, alle vier Zylinder, Kabine, Oberwagen, Drehkranz, Unterwagen,
- * Raeder, Raeumschild und Pratzen abgetastet — ueber die erreichbaren
- * Armstellungen, 19 Kippwinkel, 24 Rotatorstellungen und vier
- * Oeffnungsstellungen. Bei 90 Grad bleibt in jeder erreichbaren Armstellung
- * noch Freigang, wenn der Rotator passend steht; die Zahlen und ihre
- * Fehlerschranke stehen im Kopf des Werkzeugs und in E-083.
- *
- * DIE WARNUNG DAZU, und sie gehoert hierher: Es geht nicht in JEDER
- * Rotatorstellung. Bei grossen Kippwinkeln faellt ein Teil der
- * Rotatorstellungen aus — dort laufen die Schalen an den Stiel. Der Greifer
- * wird trotzdem nicht gebremst: Der Rotator ist Patricks Werkzeug, um sich die
- * Richtung zu suchen („ich kann die Spinne ja drehen damit es passt"), und
- * eine Sperre, die ihm dabei ins Handgelenk faellt, waere schlimmer als eine
- * Durchdringung, die man sieht und wegdreht.
- */
-const KIPP_MAX = THREE.MathUtils.degToRad(90);
-
-/**
- * Wie schnell der Greifer kippt (rad/s).
- *
- * SW: 45 Grad je Sekunde, also zwei Sekunden fuer den ganzen Weg. Eingeordnet
- * zwischen Patricks bestaetigten Werten: Der Rotator dreht mit 120 Grad je
- * Sekunde, weil er die Last nur um die eigene Achse dreht und dabei nichts
- * hebt; Ausleger und Stiel laufen mit 19 bzw. 24 Grad, weil sie den ganzen Arm
- * bewegen. Das Kippen hebt die halbe Ladung gegen die Schwerkraft an und
- * gehoert damit naeher an den Arm als an den Rotator — aber es bewegt nur den
- * Greifer, nicht den Arm. 45 ist die Mitte dieser beiden Argumente und
- * ausdruecklich ein Startwert.
- */
-const KIPP_RATE = THREE.MathUtils.degToRad(45);
 
 /** Halbe Breite des Unterwagens — damit rechnet die Fahrzeugsperre. */
 const UNTERWAGEN_R = 2.6;
@@ -594,29 +629,36 @@ export class Excavator {
   stickAngle = THREE.MathUtils.degToRad(-70);
   rotatorYaw = 0;
   /**
-   * Seitwaertskippen des Greifers (rad, 0 = lotrecht) — Ist und Soll.
+   * Wie schraeg der Greifer haengt (rad, 0 = lotrecht) — der Winkel zwischen
+   * seiner Achse und der Weltsenkrechten.
    *
-   * `kippIst` faehrt mit `KIPP_RATE` auf `kippSoll` zu und trifft die Null
-   * EXAKT (siehe die Rampe in `update`). Das ist kein Schoenheitsfehler,
-   * sondern die Bedingung: An `kippIst === 0` haengen drei Vorabspruenge, die
-   * garantieren, dass Bodenanschlag, Messstrahl und Greiferdrehung bei
-   * lotrechtem Greifer Ziffer fuer Ziffer dasselbe tun wie vor E-083.
+   * ER KOMMT AUS DEM PENDEL, nicht aus einem Bedienelement. `integratePendulum`
+   * schreibt ihn zusammen mit `pendelAchse` fort; `resolveGroundClamp`,
+   * `surfaceUnderClaws` und `syncMeshes` lesen ihn.
+   *
+   * Warum das ueberhaupt jemanden angeht: `form.maxTiefe` ist eine Laenge
+   * LAENGS DER GREIFERACHSE. Haengt der Greifer lotrecht, ist sie dasselbe wie
+   * „so weit langt er nach unten"; haengt er schraeg, ist sie es nicht mehr.
+   * Seit dem Pendel ohne Anschlag ist „schraeg" der Normalfall.
+   *
+   * An `neigung === 0` haengen drei Vorabspruenge. Sie sind die Zusage, dass
+   * der lotrechte Greifer Ziffer fuer Ziffer dasselbe tut wie vor dem Umbau —
+   * `test/greiferachse.test.ts` weist es nach.
    */
-  kippIst = 0;
-  private kippSoll = 0;
+  neigung = 0;
   /**
-   * Derselbe Winkel ALS DREHUNG UM DIE LOKALE +X-ACHSE (rad) — also mit
-   * Vorzeichen.
+   * Die Greiferachse als Einheitsvektor in Weltkoordinaten, nach UNTEN
+   * zeigend.
    *
-   * `kippIst` ist der Betrag, weil man so darueber spricht („der Greifer
-   * liegt auf 90 Grad"). Gedreht wird aber um −x (siehe `KIPP_ACHSE`), und
-   * jede Rechnung, die den Winkel in die Weltsenkrechte umsetzt, braucht ihn
-   * mit Vorzeichen: `Welt-y = p.y·cos θ − p.z·sin θ`. Damit dieses Vorzeichen
-   * an EINER Stelle steht und nicht an dreien, gibt es diesen Zugriff.
+   * Lotrecht ist das (0, −1, 0). Der Fusspunkt der Achse in der Tiefe `t`
+   * liegt bei `Gelenk + t · pendelAchse` — daraus holt sich `surfaceUnderClaws`
+   * seinen Strahlansatz, ohne irgendwo einen Winkel und eine Himmelsrichtung
+   * von Hand zusammenzurechnen.
+   *
+   * Es gilt `hypot(x, z) = sin(neigung)` und `−y = cos(neigung)`; beide
+   * Groessen stammen aus derselben Drehung und koennen nicht auseinanderlaufen.
    */
-  private get kippUmX(): number {
-    return KIPP_ACHSE.x * this.kippIst;
-  }
+  readonly pendelAchse = new THREE.Vector3(0, -1, 0);
   /** Drehgeschwindigkeit der Spinne (rad/s) — treibt das Herausreißen */
   private rotatorVel = 0;
   private lastRotatorYaw = 0;
@@ -1696,31 +1738,6 @@ export class Excavator {
     
     if (input.wasPressed("KeyX")) this.toggleCabLift();
     if (input.wasPressed("KeyO")) this.toggleOutriggers();
-    if (input.wasPressed("KeyK")) this.toggleKippen();
-  }
-
-  /**
-   * Greifer zur Seite kippen und wieder aufrichten (Taste K oder Touch-Knopf).
-   *
-   * EIN KNOPF, ZWEI LAGEN — wie Kabinenhub (X) und Pratzen (O). Das ist die
-   * einfachste Form, die die Aufgabe erfuellt, und die einzige, die auf dem
-   * iPhone mini mit EINEM Daumen zu bedienen ist: Beide Sticks bleiben frei,
-   * waehrend der Greifer sich legt. Eine stufenlose Achse haette entweder
-   * einen Stick gekostet, den Patrick fuer Arm und Ausleger braucht, oder
-   * einen zweiten Finger — und „was zwei Finger gleichzeitig braucht, ist
-   * keine Loesung".
-   *
-   * Dazwischen wird gerampt (`KIPP_RATE`), nicht gesprungen: Der Greifer legt
-   * sich in zwei Sekunden, und man kann den Knopf mitten in der Bewegung
-   * wieder druecken — dann faehrt er von dort zurueck.
-   */
-  toggleKippen(): void {
-    this.kippSoll = this.kippSoll > 0 ? 0 : KIPP_MAX;
-  }
-
-  /** Steht der Greifer auf „zur Seite"? Fuers HUD und die Touch-Anzeige. */
-  get kippAktiv(): boolean {
-    return this.kippSoll > 0;
   }
 
   /** Kabine hoch-/runterfahren (Taste X oder Touch-Knopf). */
@@ -1927,26 +1944,6 @@ export class Excavator {
     // wandern Arm, Greifer und Physikkörper mit — nur die Optik anzuheben
     // würde den Greifer von seinem Kollider trennen.
     this.position.y = this.outriggerDown * Excavator.JACK_UP_M;
-
-    /*
-     * Der Greifer legt sich zur Seite (E-083).
-     *
-     * ZUR LETZTEN ZEILE, und zwar ehrlich: Bei DIESER Rampe ist sie
-     * ueberfluessig. Kurz vor dem Ziel liegen `ist` und `soll` so nah
-     * beieinander, dass `soll − ist` exakt darstellbar ist (Sterbenz), und
-     * dann ist `ist + (soll − ist)` exakt `soll`. `test/kippen.test.ts` weist
-     * beide Richtungen nach.
-     *
-     * Sie steht trotzdem da, und zwar gegen die naechste Aenderung: Kaum
-     * jemand laesst eine Rampe auf Dauer linear, und ein weiches Auslaufen
-     * (`ist += (soll − ist) · k`) erreicht seinen Anschlag NIE exakt. Dann
-     * waeren die drei Vorabspruenge auf `kippIst === 0` fuer immer aus, der
-     * lotrechte Greifer liefe dauerhaft durch den gekippten Rechenweg — und
-     * niemand saehe es. Die Gegenprobe im Waechter stellt genau das nach.
-     */
-    const kippStep = KIPP_RATE * dt;
-    this.kippIst += THREE.MathUtils.clamp(this.kippSoll - this.kippIst, -kippStep, kippStep);
-    if (Math.abs(this.kippSoll - this.kippIst) < 1e-9) this.kippIst = this.kippSoll;
 
     // Räumschild heben und senken
     const bladeStep = dt / BLADE_TIME;
@@ -2304,26 +2301,26 @@ export class Excavator {
    * auf ihrer eigenen Kralle oder auf dem Teil auf, das sie gerade trägt.
    */
   /*
-   * DER STRAHL LAEUFT DIE GREIFERACHSE ENTLANG, NICHT DIE WELTSENKRECHTE
-   * (E-083).
+   * DER STRAHL LAEUFT DIE GREIFERACHSE ENTLANG, NICHT DIE WELTSENKRECHTE.
    *
    * Bis zum 16.09.2026 ging er senkrecht aus dem Kardangelenk nach unten. Das
-   * war dasselbe, solange der Greifer lotrecht hing. Gekippt ist es das nicht
-   * mehr: Bei 90 Grad haette der Strahl den Boden 3 m neben den Schalen
-   * gemessen (E-065 hatte 2,44 m fuer die damalige Form ausgerechnet) — der
-   * Greifer waere ueber der Ladeflaeche stehen geblieben, weil daneben der
-   * Beton liegt, oder umgekehrt in die Bordwand gefahren.
+   * ist dasselbe, solange der Greifer lotrecht haengt — und das tut ein frei
+   * pendelnder Greifer selten. Bei 17 Grad Schraeglage und 2,75 m Tiefe liegt
+   * die Korbmitte 80 cm neben dem Gelenk; der Bagger mass dort den Beton
+   * neben der Mulde statt den Muldenboden und blieb ueber der Ladeflaeche
+   * stehen — oder umgekehrt, er fuhr in die Bordwand.
    *
    * WAS SICH NICHT AENDERT: Der Strahl kommt weiter aus der MITTE, nicht von
    * der tiefsten Krallenspitze. Das ist eine Entscheidung von E-046 und sie
    * bleibt: „Eine Spitze, die ueber den Muldenrand hinausragt, ist eine Frage
-   * der Darstellung, nicht des Anschlags." Gekippt ist die Mitte nur nicht
-   * mehr senkrecht unter dem Gelenk, sondern seitlich versetzt — genau um
-   *     Tiefe · sin(Kippwinkel),
-   * in der Richtung, in die der Rotator den Greifer gedreht hat.
+   * der Darstellung, nicht des Anschlags." Schraeg haengend ist die Mitte nur
+   * nicht mehr senkrecht unter dem Gelenk, sondern um
+   *     Tiefe · sin(Neigung)
+   * versetzt, in der Richtung, in die das Pendel ausschlaegt.
    *
-   * Bei Kippwinkel 0 ist der Versatz null und dieser Zweig wird nicht einmal
-   * betreten: Der Strahl steht Ziffer fuer Ziffer dort, wo er immer stand.
+   * Steht der Greifer lotrecht, ist der Versatz null und dieser Zweig wird
+   * nicht einmal betreten: Der Strahl steht Ziffer fuer Ziffer dort, wo er
+   * immer stand.
    */
   private surfaceUnderClaws(splay: number): number {
     this.grappleGroup.updateWorldMatrix(true, false);
@@ -2342,21 +2339,25 @@ export class Excavator {
     this.aufsetzRay.origin.x = this.grappleGroup.position.x;
     this.aufsetzRay.origin.y = this.grappleGroup.position.y;
     this.aufsetzRay.origin.z = this.grappleGroup.position.z;
-    if (this.kippIst !== 0) {
+    if (this.neigung !== 0) {
       /*
-       * Die Greiferachse zeigt bei Kippwinkel θ nicht mehr nach unten, sondern
-       * um θ zur Seite. Ihr Fusspunkt — die Korbmitte in der Tiefe `tief` —
-       * liegt damit `tief·sin θ` neben dem Gelenk, und zwar in der Richtung,
-       * die der Rotator vorgibt (`qGier · qKipp`: erst kippen, dann drehen).
+       * Haengt der Greifer schraeg, zeigt seine Achse nicht mehr nach unten.
+       * Ihr Fusspunkt — die Korbmitte in der Tiefe `tief` — liegt dann bei
+       *     Gelenk + tief · pendelAchse,
+       * und der Strahl soll von dort nach unten gehen, nicht vom Gelenk.
        *
-       *   R_x(θ)·(0,−tief,0) = (0, −tief·cos θ, −tief·sin θ)
-       *   R_y(ψ) darauf      → x = −tief·sin θ·sin ψ,  z = −tief·sin θ·cos ψ
+       * Genommen werden nur x und z: Die HOEHE des Ansatzes bleibt die des
+       * Gelenks, weil der Strahl ohnehin von oben kommt und der erste Treffer
+       * derselbe ist. Eine hoehere oder tiefere Quelle waere ein zweiter
+       * Eingriff in denselben Wert.
+       *
+       * Waagerecht versetzt ist das `tief · sin(neigung)` — bei 17 Grad und
+       * 2,75 m Tiefe also 80 cm. Ohne diese Zeile fragte der Bodenanschlag im
+       * Schwenk nach dem Beton, ueber dem der Greifer gar nicht mehr haengt.
        */
       const tief = BODEN_UEBER_SCHLIESSWEG ? this.form.maxTiefe : this.form.tiefe(splay);
-      const seit = tief * Math.sin(this.kippUmX);
-      const gier = this.heading + this.cabYaw + this.rotatorYaw;
-      this.aufsetzRay.origin.x -= seit * Math.sin(gier);
-      this.aufsetzRay.origin.z -= seit * Math.cos(gier);
+      this.aufsetzRay.origin.x += tief * this.pendelAchse.x;
+      this.aufsetzRay.origin.z += tief * this.pendelAchse.z;
     }
     const treffer = this.world.castRay(
       this.aufsetzRay,
@@ -2457,22 +2458,38 @@ export class Excavator {
     // Spitzentiefe direkt aus der Krallengeometrie — so bleibt der Bodenanschlag
     // richtig, auch wenn sich Form oder Öffnungswinkel ändern.
     /*
-     * DIE AUSLADUNG, NICHT DIE TIEFE (E-083).
+     * DIE AUSLADUNG, NICHT DIE TIEFE.
      *
      * `form.maxTiefe` ist eine Laenge LAENGS DER GREIFERACHSE. Solange der
      * Greifer lotrecht haengt, ist sie dasselbe wie „so weit langt er nach
-     * unten"; gekippt ist sie es nicht. Gemessen (E-065): Bei 90 Grad faellt
-     * die wirkliche Ausladung von 3,00 auf 1,77 m — mit der alten Zeile bliebe
-     * der Arm 1,23 m zu hoch stehen, und Kehren waere unmoeglich.
+     * unten"; haengt er schraeg, ist sie es nicht. Gemessen: Bei 90 Grad
+     * Schraeglage faellt die wirkliche Ausladung der Sichelkralle von 3,00 auf
+     * 1,77 m — mit `maxTiefe` bliebe der Arm 1,23 m zu hoch stehen.
+     *
+     * OB der Winkel aus dem Pendel kommt, entscheidet
+     * `ANSCHLAG_FOLGT_PENDEL` — dort steht auch, was es kostet, und warum es
+     * heute auf `false` steht.
      *
      * `maxAusladung(0)` gibt `maxTiefe` zurueck, ungerechnet. Der
-     * Bodenanschlag bei lotrechtem Greifer bleibt damit auf seiner heutigen
-     * Hoehe — Sichelkralle 6,7 cm, Fuenfschalengreifer 19,4 cm (E-065).
+     * Bodenanschlag bei lotrechtem Greifer bleibt damit auf seiner Hoehe —
+     * Sichelkralle 6,37 cm, Fuenfschalengreifer 20,44 cm.
+     *
+     * DIE NAEHERUNG, die dabei steckt, und warum sie nach der sicheren Seite
+     * faellt: `ausladung(winkel, θ)` legt die Schraeglage in die LOKALE
+     * x-Achse des Greifers, das Pendel kann aber in jede Himmelsrichtung
+     * ausschlagen. Der Unterschied ist, welche Schale dabei unten liegt.
+     * Gerechnet wird ueber alle Schalen mit `cos(Umfangswinkel)`, und der
+     * groesste Beitrag faellt auf die Schale bei 0° — das ist der GROESSTE
+     * Wert ueber alle Himmelsrichtungen. Der Arm haelt damit hoechstens zu
+     * frueh an, nie zu spaet. Die Spanne ist der Umfangsabstand der Schalen:
+     * zwischen `cos 0° = 1` und `cos 36° = 0,809`, also hoechstens ein
+     * Fuenftel des Schraeglagenanteils.
      */
     const splay = this.currentSplay();
+    const achswinkel = ANSCHLAG_FOLGT_PENDEL ? this.neigung : 0;
     const tipDepth = BODEN_UEBER_SCHLIESSWEG
-      ? this.form.maxAusladung(this.kippUmX)
-      : this.form.ausladung(splay, this.kippUmX);
+      ? this.form.maxAusladung(achswinkel)
+      : this.form.ausladung(splay, achswinkel);
     // Gemessene Fläche statt angenommener Ebene: darauf setzt die Spinne auf.
     const flaeche = this.surfaceUnderClaws(splay);
     // tipY() rechnet ab der Maschinenbasis; steht die Maschine aufgebockt,
@@ -2602,21 +2619,22 @@ export class Excavator {
     this.grappleGroup.position.copy(tip);
     this.grappleGroup.rotation.set(0, this.heading + this.cabYaw + this.rotatorYaw, 0);
     /*
-     * Das Seitwaertskippen muss AUCH HIER stehen, nicht nur in
-     * `integratePendulum` (E-083). Zwischen `syncMeshes` und dem Pendel laeuft
+     * Die Schraeglage des Pendels muss AUCH HIER stehen, nicht nur in
+     * `integratePendulum`. Zwischen `syncMeshes` und dem Pendel laeuft
      * `resolveGroundClamp`, und darin fragt `eindringtiefe` die Weltmatrix des
      * Greifers ab, um die Krallenspitzen in Brocken zu suchen. Ohne diese
-     * Zeile suchte sie dort, wo die Spitzen bei lotrechtem Greifer waeren —
-     * bei 90 Grad waeren das drei Meter daneben.
+     * Zeile suchte sie dort, wo die Spitzen bei lotrechtem Greifer waeren.
      *
-     * Bei `kippIst === 0` bleibt die Zeile aus, und `syncMeshes` tut Ziffer
-     * fuer Ziffer dasselbe wie vorher.
+     * Genommen wird die Drehung des LETZTEN Bildes (`qPendel`) — das Pendel
+     * rechnet erst am Ende von `update`. Ein Bild Verzug sind 17 ms; die
+     * Alternative waere, das Pendel vorzuziehen und damit die Reihenfolge
+     * „erst Pose, dann Aufsetzen" umzudrehen, die den Bodenanschlag ueberhaupt
+     * erst ruhig gemacht hat.
+     *
+     * Bei `neigung === 0` bleibt die Zeile aus, und `syncMeshes` tut Ziffer
+     * fuer Ziffer dasselbe wie vor dem Umbau.
      */
-    if (this.kippIst !== 0) {
-      this.grappleGroup.quaternion.multiply(
-        this.kippQuat.setFromAxisAngle(KIPP_ACHSE, this.kippIst)
-      );
-    }
+    if (this.neigung !== 0) this.grappleGroup.quaternion.premultiply(this.qPendel);
 
     // Zacken: offen weit gespreizt. Geschlossen fügen sich die Schalen zur
     // dichten Kalotte — es sei denn, es liegt Material darin: dann bleibt die
@@ -2714,8 +2732,19 @@ export class Excavator {
       (-rueck * Math.sin(this.swing.x) - damping * this.swingVel.x + this.tipAcc.y / L) * dt;
     this.swingVel.y +=
       (-rueck * Math.sin(this.swing.y) - damping * this.swingVel.y - this.tipAcc.x / L) * dt;
-    this.swing.x = THREE.MathUtils.clamp(this.swing.x + this.swingVel.x * dt, -PENDEL_MAX, PENDEL_MAX);
-    this.swing.y = THREE.MathUtils.clamp(this.swing.y + this.swingVel.y * dt, -PENDEL_MAX, PENDEL_MAX);
+    /*
+     * OHNE DECKEL (17.09.2026, Ansage Patrick). Hier stand ein `clamp` auf
+     * ±17 Grad je Achse; der Begruendungstext steht oben bei den Konstanten.
+     *
+     * Dass die Zahl trotzdem nicht davonlaeuft, steckt in der Zeile darueber:
+     * Die Rueckstellung geht mit `sin(Ausschlag)` und ist damit periodisch —
+     * es gibt keinen Term, der mit dem Winkel waechst und ihn aufschaukeln
+     * koennte. Gemessen (`tools/pendelausschlag.ts`) bleibt der groesste
+     * Ausschlag im vollen Schwenk bei 20,2 Grad, und 30 s Dauerschwenk bleiben
+     * unter 60.
+     */
+    this.swing.x += this.swingVel.x * dt;
+    this.swing.y += this.swingVel.y * dt;
     if (this.groundContact.active) {
       this.swing.multiplyScalar(0.75);
       this.swingVel.multiplyScalar(0.5);
@@ -2723,30 +2752,36 @@ export class Excavator {
 
     const yaw = this.heading + this.cabYaw + this.rotatorYaw;
     const qYaw = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yaw, 0));
-    const qTilt = new THREE.Quaternion().setFromEuler(new THREE.Euler(this.swing.x, 0, this.swing.y));
-    this.grappleGroup.quaternion.copy(qTilt).multiply(qYaw);
+    this.qPendel.setFromEuler(this.pendelEuler.set(this.swing.x, 0, this.swing.y));
+    this.grappleGroup.quaternion.copy(this.qPendel).multiply(qYaw);
     /*
-     * Das Seitwaertskippen kommt GANZ RECHTS dazu (E-083) — also als letzte
-     * Drehung vor dem Punkt, im EIGENEN Frame des Greifers. Damit dreht die
-     * Kipprichtung mit dem Rotator mit, statt in einer festen Weltrichtung zu
-     * stehen: Der Rotator waehlt, wohin der Greifer faellt.
+     * Und die Greiferachse fortschreiben — EINMAL, aus derselben Drehung, die
+     * gerade den Greifer gedreht hat.
      *
-     * Stuende `qKipp` links, wuerde der Greifer immer nach derselben
-     * Himmelsrichtung kippen, und der Rotator koennte nur noch drehen, WAS
-     * dabei unten liegt — nicht WOHIN.
+     * Der Rotator (`qYaw`) steht rechts und dreht nur um die Hochachse; auf
+     * die Richtung der Greiferachse hat er keinen Einfluss. Deshalb reicht
+     * `qPendel`.
      *
-     * Bei `kippIst === 0` wird gar nicht multipliziert. Eine Multiplikation
-     * mit der Einheitsdrehung waere zwar exakt, aber der Sprung sagt es
-     * deutlicher: Ohne Kippen ist diese Zeile nicht da.
+     * DAS TOTBAND ist die Stelle, an der der lotrechte Greifer entsteht.
+     * Ein gerechnetes Pendel trifft die Null nie exakt: Es bleibt immer ein
+     * Rest von Tausendstelgrad stehen, und ohne Totband liefe der Bagger
+     * dauerhaft durch den schraegen Rechenweg — teurer, und die Zusage „bei
+     * lotrechtem Greifer Ziffer fuer Ziffer wie vorher" waere im laufenden
+     * Spiel nie eingeloest. Was das Totband kostet, steht bei
+     * `NEIGUNG_TOTBAND`.
      */
-    if (this.kippIst !== 0) {
-      this.grappleGroup.quaternion.multiply(
-        this.kippQuat.setFromAxisAngle(KIPP_ACHSE, this.kippIst)
-      );
+    this.pendelAchse.set(0, -1, 0).applyQuaternion(this.qPendel);
+    const roh = Math.acos(THREE.MathUtils.clamp(-this.pendelAchse.y, -1, 1));
+    if (roh < NEIGUNG_TOTBAND) {
+      this.pendelAchse.set(0, -1, 0);
+      this.neigung = 0;
+    } else {
+      this.neigung = roh;
     }
   }
 
-  private kippQuat = new THREE.Quaternion();
+  private qPendel = new THREE.Quaternion();
+  private pendelEuler = new THREE.Euler();
 
   private syncBodies(): void {
     const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, this.heading, 0));

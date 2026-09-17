@@ -12,11 +12,13 @@ import { EM_BREITE, FASSUNGEN, luft, seite, wert, schriftgroesse, type Fassung, 
  * rueckt alle anderen naeher zusammen: acht stehen 45 Grad auseinander, neun
  * nur noch 40, zehn nur noch 36.
  *
- * Seit E-093 (16.09.2026, Ansage Patrick) sind es wieder ACHT: SCHILDER ist
- * ins Pausenmenue umgezogen, weil es eine Anzeigeeinstellung ist. Die
- * reparierte Geometrie bleibt — sie war der eigentliche Befund.
+ * Seit E-105 (17.09.2026, Ansage Patrick) sind es SIEBEN: Der Eintrag fuer das
+ * Seitwaertskippen ist mit der Funktion selbst hinausgeflogen — sie war ein
+ * Missverstaendnis. Davor waren es acht (E-093: die Zonenmarkierungen zogen
+ * ins Pausenmenue, weil sie eine Anzeigeeinstellung sind). Die reparierte
+ * Geometrie bleibt — sie war der eigentliche Befund.
  *
- * Nachgemessen am 16.09.2026, als KIPPEN als neunter Eintrag dazukam (E-088),
+ * Nachgemessen am 16.09.2026, als ein neunter Eintrag dazukam (E-088),
  * und der Befund war unangenehm: Schon die ACHT Eintraege ueberlappten sich —
  * um 3,5 px an den Ecken, auf dem iPad. Der Grund war kein Rechenfehler,
  * sondern `box-sizing`: `width: 76px` war die Breite des INHALTS, der
@@ -122,13 +124,19 @@ export function engste(n: number, r: number, w: number, h: number, s: number): n
   return min;
 }
 
-describe("Funktionskranz: acht Eintraege, und was der neunte und zehnte kosten", () => {
+describe("Funktionskranz: sieben Eintraege, und was der achte bis zehnte kosten", () => {
   const labels = eintraege();
   const r = radius();
 
-  it("KIPPEN ist dabei — sonst ist das Seitwaertskippen auf dem iPad nicht da", () => {
-    expect(labels, "kein KIPPEN im Kranz").toContain("KIPPEN");
-    expect(labels.length, "der Kranz hat nicht mehr acht Eintraege").toBe(8);
+  it("sieben Eintraege — und der Kippknopf ist keiner davon (E-105)", () => {
+    /*
+     * Patrick, 17.09.2026: kippen soll als Funktion raus, das war ein
+     * Missverstaendnis. Ein Knopf fuer eine Funktion, die es nicht mehr gibt,
+     * waere ein toter Knopf; `test/tastenerreichbarkeit.test.ts` haette ihn
+     * gemeldet, aber erst nachdem jemand darauf getippt haette.
+     */
+    expect(labels, "der Kippknopf steht wieder im Kranz").not.toContain("KIPPEN");
+    expect(labels.length, `der Kranz hat ${labels.length} statt sieben Eintraege`).toBe(7);
   });
 
   it("SCHILDER ist NICHT mehr dabei — es steht im Pausenmenue (E-093)", () => {
@@ -174,68 +182,82 @@ describe("Funktionskranz: acht Eintraege, und was der neunte und zehnte kosten",
     });
   }
 
-  it("ein NEUNTER Eintrag passt noch, ein ZEHNTER nicht — mit Zahlen", () => {
+  it("ZWEI Plaetze sind frei, ein zehnter Eintrag nicht — mit Zahlen", () => {
     /*
-     * Die Antwort auf die Frage, die zu diesem Waechter gefuehrt hat, neu
-     * gemessen am 16.09.2026, nachdem SCHILDER ins Menue umgezogen ist
-     * (E-093). Am iPad, R = 112, Kasten 62 x 34, scharf x1,10:
+     * Die Zahlenreihe, neu gemessen am 17.09.2026, nachdem der Kippknopf
+     * hinausgeflogen ist (E-105). Am iPad, R = 112, Kasten 62 x 34,
+     * scharf x1,10:
      *
-     *    acht   14,1 px Luft   (iPhone mini quer: 18,3)
+     *    sieben 22,5 px Luft   (iPhone mini quer: 26,7)
+     *    acht   14,1 px         (18,3)
      *    neun    6,9 px         (11,1)
      *    zehn    0,7 px         ( 4,9)  -> unter der Schranke
      *    elf    -4,5 px         (-0,3)  -> Ueberlappung
      *
-     * Ein Platz ist also frei: Der Kranz vertruege einen neunten Eintrag, ohne
-     * dass sich etwas beruehrt. Was dort hineinkommt, entscheidet Patrick —
-     * dieser Test fuellt den Platz nicht, er haelt ihn nur offen. Wer einen
-     * ZEHNTEN will, aendert nicht diese Zahl, sondern die Gliederung: ein
-     * Eintrag wandert ins Menue, oder der Kranz bekommt zwei Ringe.
+     * Zwei Plaetze sind also frei: Der Kranz vertruege einen achten und einen
+     * neunten Eintrag, ohne dass sich etwas beruehrt. Was dort hineinkommt,
+     * entscheidet Patrick — dieser Test fuellt die Plaetze nicht, er haelt sie
+     * nur offen. Wer einen ZEHNTEN will, aendert nicht diese Zahl, sondern die
+     * Gliederung: ein Eintrag wandert ins Menue, oder der Kranz bekommt zwei
+     * Ringe.
      */
     const ipad = FASSUNGEN[0];
     const { w, h } = sektorMass(ipad);
     const s = skala(ipad);
+    const sieben = engste(7, r, w, h, s);
     const acht = engste(8, r, w, h, s);
     const neun = engste(9, r, w, h, s);
     const zehn = engste(10, r, w, h, s);
-    expect(acht, `acht Eintraege haben ${acht.toFixed(1)} px Luft`).toBeGreaterThanOrEqual(MIN_LUFT);
-    expect(
-      neun,
-      `der freie neunte Platz haette nur ${neun.toFixed(1)} px — er ist NICHT mehr frei`
-    ).toBeGreaterThanOrEqual(MIN_LUFT);
+    expect(sieben, `sieben Eintraege haben ${sieben.toFixed(1)} px Luft`).toBeGreaterThanOrEqual(
+      MIN_LUFT
+    );
+    expect(acht, `der freie achte Platz haette nur ${acht.toFixed(1)} px`).toBeGreaterThanOrEqual(
+      MIN_LUFT
+    );
+    expect(neun, `der freie neunte Platz haette nur ${neun.toFixed(1)} px`).toBeGreaterThanOrEqual(
+      MIN_LUFT
+    );
     expect(zehn, `zehn Eintraege haetten ${zehn.toFixed(1)} px Luft`).toBeLessThan(MIN_LUFT);
   });
 
-  it("R = 112 waere fuer acht Eintraege nicht noetig — die Zahl, die das belegt", () => {
+  it("R = 112 waere fuer sieben Eintraege nicht noetig — die Zahl, die das belegt", () => {
     /*
-     * Zur Frage „kann RADIAL_R wieder kleiner werden?" (Auftrag 16.09.2026).
-     * Rechnerisch ja: Mit acht Eintraegen reicht R = 101, um die 6-px-Schranke
-     * in allen drei Fassungen zu halten. Gemacht wird es nicht — der
-     * Halbmesser ist reine Ansicht (gewaehlt wird ueber die RICHTUNG des
-     * Daumenzugs), und 112 haelt den neunten Platz offen. Der Test haelt die
-     * Herleitung fest, damit die Zahl 101 nicht beim naechsten Mal wieder
-     * geschaetzt werden muss.
+     * Zur Frage "kann RADIAL_R jetzt enger ruecken?" (Auftrag 17.09.2026).
+     * Rechnerisch ja: Mit sieben Eintraegen reicht R = 91, um die
+     * 6-px-Schranke in allen drei Fassungen zu halten — mit acht waren es 101.
+     *
+     * GEMACHT WIRD ES NICHT, und das ist keine Bequemlichkeit. Der Halbmesser
+     * ist reine Ansicht: Gewaehlt wird ueber die RICHTUNG des Daumenzugs,
+     * nicht ueber die Entfernung. Wie weit der Kranz den Daumen umgibt, ist
+     * eine Gestaltungsfrage — und die entscheidet Patrick. Dazu haelt 112 zwei
+     * Plaetze offen, und der Kranz hat in zwei Tagen zweimal einen Eintrag
+     * verloren und wiederbekommen.
+     *
+     * Der Test haelt die Herleitung fest, damit die Zahl 91 nicht beim
+     * naechsten Mal wieder geschaetzt werden muss.
      */
     const ipad = FASSUNGEN[0];
     const { w, h } = sektorMass(ipad);
     const s = skala(ipad);
-    let kleinstes = 0;
-    for (let rr = 60; rr <= r; rr++) {
-      const eng = Math.min(
-        ...FASSUNGEN.map((f) => {
-          const m = sektorMass(f);
-          return engste(8, rr, m.w, m.h, skala(f));
-        })
-      );
-      if (eng >= MIN_LUFT) {
-        kleinstes = rr;
-        break;
+    const kleinsterFuer = (n: number): number => {
+      for (let rr = 40; rr <= r; rr++) {
+        const eng = Math.min(
+          ...FASSUNGEN.map((f) => {
+            const m = sektorMass(f);
+            return engste(n, rr, m.w, m.h, skala(f));
+          })
+        );
+        if (eng >= MIN_LUFT) return rr;
       }
-    }
-    expect(kleinstes, "kein Halbmesser unter 112 haelt acht Eintraege auseinander").toBeGreaterThan(0);
-    expect(kleinstes, `rechnerisches Minimum liegt bei R = ${kleinstes}`).toBe(101);
-    expect(r, "RADIAL_R steht nicht mehr auf 112 — dann gehoert E-093 fortgeschrieben").toBe(112);
+      return 0;
+    };
+    const fuerSieben = kleinsterFuer(7);
+    expect(fuerSieben, "kein Halbmesser unter 112 haelt sieben Eintraege auseinander").toBeGreaterThan(0);
+    expect(fuerSieben, `rechnerisches Minimum fuer sieben liegt bei R = ${fuerSieben}`).toBe(91);
+    expect(kleinsterFuer(8), "das Minimum fuer acht Eintraege hat sich verschoben").toBe(101);
+    expect(r, "RADIAL_R steht nicht mehr auf 112 — dann gehoert E-105 fortgeschrieben").toBe(112);
     // Und der gewaehlte Halbmesser hat mehr Luft als das Minimum, nicht weniger
-    expect(engste(8, r, w, h, s)).toBeGreaterThan(MIN_LUFT);
+    expect(engste(7, r, w, h, s)).toBeGreaterThan(MIN_LUFT);
   });
 
   it("GEGENPROBE: die Masse von gestern wuerden gemeldet", () => {
@@ -249,28 +271,51 @@ describe("Funktionskranz: acht Eintraege, und was der neunte und zehnte kosten",
      */
     expect(engste(8, 104, 80, 34, 1.15), "die alten Masse fallen nicht auf").toBeLessThan(0);
     expect(engste(9, 104, 80, 34, 1.15)).toBeLessThan(0);
+    // Auch mit nur sieben Eintraegen: die alte Geometrie war schon damals eng.
+    expect(engste(7, 104, 80, 34, 1.15)).toBeLessThan(MIN_LUFT);
   });
 
   it("GEGENPROBE: ein zu kleiner Halbmesser wird gemeldet", () => {
     /*
-     * Zur Zahl 101 oben. Bei R = 100 bleiben acht Eintraegen auf dem iPad nur
-     * 5,6 px — unter der Schranke. Faellt das hier NICHT auf, misst die Suche
-     * nach dem kleinsten Halbmesser nichts.
+     * Zu den Zahlen 91 und 101 oben. Einen Punkt darunter reicht es NICHT
+     * mehr — faellt das hier nicht auf, misst die Suche nach dem kleinsten
+     * Halbmesser nichts. Geprueft wird ueber alle drei Fassungen, so wie die
+     * Suche selbst.
+     */
+    const engsteAlle = (n: number, rr: number): number =>
+      Math.min(
+        ...FASSUNGEN.map((f) => {
+          const m = sektorMass(f);
+          return engste(n, rr, m.w, m.h, skala(f));
+        })
+      );
+    expect(engsteAlle(7, 90), "R = 90 faellt bei sieben nicht auf").toBeLessThan(MIN_LUFT);
+    expect(engsteAlle(7, 91), "R = 91 sollte bei sieben gerade reichen").toBeGreaterThanOrEqual(
+      MIN_LUFT
+    );
+    expect(engsteAlle(8, 100), "R = 100 faellt bei acht nicht auf").toBeLessThan(MIN_LUFT);
+    expect(engsteAlle(8, 101), "R = 101 sollte bei acht gerade reichen").toBeGreaterThanOrEqual(
+      MIN_LUFT
+    );
+  });
+
+  it("GEGENPROBE: ein groesserer Kasten faellt durch", () => {
+    /*
+     * HOEHER, nicht nur breiter — und das ist der eigentliche Befund dieser
+     * Gegenprobe. Bis zum 16.09.2026 stand hier `w + 12`, und bei ACHT
+     * Eintraegen hat das gereicht. Bei SIEBEN stehen die Kaesten 51,4 Grad
+     * auseinander statt 45; die engste Stelle liegt dann nicht mehr zwischen
+     * zwei seitlichen Nachbarn, sondern zwischen zwei uebereinander. Gemessen:
+     * 12 px breiter laesst 9,9 px Luft, 24 px breiter genau dieselben 6,5 px —
+     * die Breite ist nicht mehr massgeblich, und eine Gegenprobe, die nur an
+     * der Breite dreht, meldete nichts mehr.
      */
     const ipad = FASSUNGEN[0];
     const { w, h } = sektorMass(ipad);
     const s = skala(ipad);
-    expect(engste(8, 100, w, h, s), "R = 100 faellt nicht auf").toBeLessThan(MIN_LUFT);
-    expect(engste(8, 101, w, h, s), "R = 101 sollte gerade reichen").toBeGreaterThanOrEqual(MIN_LUFT);
-  });
-
-  it("GEGENPROBE: ein groesserer Kasten faellt durch", () => {
-    const ipad = FASSUNGEN[0];
-    const { w, h } = sektorMass(ipad);
-    const s = skala(ipad);
     expect(
-      engste(labels.length, r, w + 12, h, s),
-      "12 px breiter faellt nicht auf — dann misst der Test nichts"
+      engste(labels.length, r, w + 24, h + 8, s),
+      "24 px breiter und 8 px hoeher faellt nicht auf — dann misst der Test nichts"
     ).toBeLessThan(MIN_LUFT);
   });
 

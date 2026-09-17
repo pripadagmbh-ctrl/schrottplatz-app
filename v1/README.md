@@ -120,7 +120,7 @@ Das schreibt `src/greifer/fuenfschalen.glb` neu; Maße und Befunde stehen in
 | MMB ziehen | Kamera drehen |
 | C | Ansicht: Orbit → Draufsicht → Kabine |
 | X | Fahrerkabine hoch/runter (2,6 m Hub) |
-| K | Greifer zur Seite kippen / wieder aufrichten (90°, 2 s) — **und speichern**, siehe unten |
+| K | Stand speichern (L lädt, N startet neu) |
 | V | Abholung rufen bzw. beladenen Container abfahren lassen |
 | B | Schere/Paketierpresse |
 | H | Hilfe ein/aus · F3 Debug-Overlay |
@@ -136,10 +136,10 @@ Doppeltipp mit Ablauf nach vier Sekunden und die eigene Fahrfläche unten links.
 Doppeltipp rechts wechselt die Ansicht, rechten Daumen stillhalten öffnet den
 Funktionskranz.
 
-**Funktionskranz (neun Einträge, E-088):** KABINE · STÜTZEN · SCHILD · SCHERE ·
-ABHOLEN · ZUR WAAGE · LAMBERT · SCHILDER · KIPPEN. Umschalter zeigen mit einem
-Balken am unteren Rand, ob sie an sind (heute nur KIPPEN — KABINE und STÜTZEN,
-sobald der Bagger ihren Zustand herausgibt). Hinter dem Menüknopf oben rechts:
+**Funktionskranz (sieben Einträge, E-105):** KABINE · STÜTZEN · SCHILD · SCHERE ·
+ABHOLEN · ZUR WAAGE · LAMBERT. Umschalter zeigen mit einem Balken am unteren
+Rand, ob sie an sind (heute niemand — KABINE und STÜTZEN, sobald der Bagger
+ihren Zustand herausgibt). Hinter dem Menüknopf oben rechts:
 AUSBAU · MUSIK · PAUSE. Ein **zehnter** Kranzeintrag passt nicht mehr
 (`test/funktionskranz.test.ts`, Messung
 `docs/messungen/2026-09-16-funktionskranz/`); dann muss die Gliederung geändert
@@ -296,13 +296,16 @@ wenn die Beschreibung unten von dem abweicht, was das Spiel tut.
 - **Platz-Ausbau:** Betonlego-Boxen (gestapelte Noppensteine) für Guss + Alu,
   permanente Schrottberge hinter dem Bagger, Zaunreihe an der Ostseite,
   Maschendraht-Bündel (Drahtknäuel) als Kehr-Werkzeug zum Freischieben.
+- **Vorgaben einer neuen Runde (E-105):** **Fünfschalengreifer** am Arm (umschaltbar im
+  Pausenmenü, E-059) und **Werkhof 90,4** im Radio (weiterschalten mit U bzw. MUSIK,
+  E-094). Beides sind Ansagen Patricks vom 17.09.2026. Ein vorhandener Spielstand behält,
+  was darin steht; ein Stand ohne Greiferfeld — also einer von vor E-059 — behält die
+  Sichelkralle, mit der er gespielt wurde.
 - **Save/Load:** K speichert (localStorage, Schema v1 mit Migrationspfad), L lädt,
   N startet neu. Auf dem Gerät liegen alle drei im Pausenmenü.
-  **Offen (E-088):** Seit E-085 liegt auf K *zusätzlich* das Seitwärtskippen des
-  Greifers — ein Druck auf K tut auf der Tastatur beides. Welche der beiden
-  Funktionen umzieht, entscheidet Patrick; `test/tastenerreichbarkeit.test.ts`
-  hält den Konflikt fest, damit er nicht vergessen wird. Auf dem Gerät gibt es
-  ihn nicht: Der Kranzeintrag KIPPEN kippt nur. Boot rekonstruiert Items (inkl. plattgedrückt), Karossen
+  Der Doppelgriff auf K aus E-088 ist erledigt: Das Seitwärtskippen ist mit
+  E-105 wieder ausgebaut, K tut nur noch eine Sache.
+  Boot rekonstruiert Items (inkl. plattgedrückt), Karossen
   (Quetschstufe, gerissene Teile, Scheiben) und Zaunzustand. Vitest-geprüft.
 
 ## M2-Umfang „Wrack-Slice" (verifiziert 2026-08-27)
@@ -346,14 +349,24 @@ wenn die Beschreibung unten von dem abweicht, was das Spiel tut.
 - Greifspinne: 5 Schalen-Zacken, seit E-007 am schlanken Zapfen statt am breiten Ring,
   je acht Segmente. Die Kollider der Zacken folgen der Zeichnung (`updateClawColliders`) —
   dass beide deckungsgleich sind, hält ein eigener Wächter in `test/greifer.test.ts` fest.
-- **Seitwärtskippen** (E-083): Der Greifer legt sich auf Taste K in 2 s um 90° zur Seite.
-  Gekippt wird um seine *eigene* X-Achse, also **nach** dem Rotator (`qPendel · qGier · qKipp`) —
-  damit wählt der Rotator, wohin er fällt. Drei Stellen rechnen deshalb nicht mehr in der
-  Weltsenkrechten, sondern in der Greiferachse: `resolveGroundClamp` (nimmt
-  `form.maxAusladung(kipp)` statt `form.maxTiefe`), `surfaceUnderClaws` (Strahl geht die
-  gekippte Achse entlang, Fußpunkt `Tiefe · sin θ` seitlich) und `hoechsteKrallenspitze`
-  (bekommt die Ausladung als Vorgabe). **Bei Kippwinkel 0 springt jede dieser Stellen vorab
-  auf den alten Weg** — `test/kippen.test.ts` prüft das auf Gleichheit, nicht auf Nähe.
+- **Pendel ohne Winkelsperre** (E-105): Der Greifer hängt frei am Kardangelenk; wer den
+  Oberwagen schwenkt, erzeugt Fliehkraft und schlägt ihn aus. Bis zum 17.09.2026 deckelte
+  `PENDEL_MAX` bei 17° je Achse — gemessen kam der Greifer auf 17,3° und stand am Anschlag,
+  ohne Deckel sind es **20,2°** (`tools/pendelausschlag.ts`). Was den Ausschlag jetzt
+  begrenzt, ist Rückstellung und Dämpfung, kein Anschlag.
+  Das *gesteuerte* Seitwärtskippen auf Taste K (E-085/E-088) ist **zurückgenommen** —
+  es war ein Missverständnis; gemeint war die Bauart, nicht ein Bedienelement.
+- **Greiferachse statt Weltsenkrechte** (aus E-085, bleibt): `form.maxTiefe` ist eine Länge
+  *längs der Greiferachse*; schräg hängend ist das nicht mehr „so weit langt er nach unten".
+  `surfaceUnderClaws` schickt seinen Strahl deshalb aus dem **Fußpunkt der Achse**
+  (`Gelenk + Tiefe · pendelAchse`), `syncMeshes` setzt die Krallen in die Schräglage, und
+  `form.ausladung/maxAusladung` rechnen die Achse in die Weltsenkrechte um. **Bei
+  lotrechtem Greifer springt jede Stelle vorab auf den alten Weg** —
+  `test/greiferachse.test.ts` prüft das auf Gleichheit, nicht auf Nähe.
+  Der **Bodenanschlag** folgt der Schräglage bewusst NOCH NICHT
+  (`ANSCHLAG_FOLGT_PENDEL = false`): Mit `true` setzt der geschlossene Greifer auf 7,90
+  statt 6,37 cm ab, weil der Anschlag den Arm während des Absenkens anhebt und
+  `bodenSperre` ihn oben festhält. Das ist ein eigenes Paket.
 - Module kommunizieren über den typisierten **EventBus** (`core/events.ts`) — itemEntered/
   itemLeft/grabbed/released; Audio und HUD hängen nur an Events.
 - Container-Zuordnung per **Zonen-Zählung** alle 10 Steps (gegriffene Items zählen nicht);

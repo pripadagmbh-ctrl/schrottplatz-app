@@ -179,13 +179,12 @@ function frage1(bagger: Excavator, world: RAPIER.World): void {
     }
   }
   console.log(`  erreicht, hart geschwenkt        : ${(groesst * GRAD).toFixed(2)}°`);
-  console.log(`  Deckel im Quelltext (PENDEL_MAX) : 17,00° je Achse`);
-  console.log(
-    `  beide Achsen am Anschlag         : ${(Math.acos(Math.cos(17 / GRAD) ** 2) * GRAD).toFixed(2)}°`
-  );
+  console.log(`  Deckel im Quelltext              : KEINER MEHR (E-105, 17.09.2026).`);
+  console.log(`                                     Bis dahin 17,00° je Achse (PENDEL_MAX).`);
   console.log(`  vom Spieler steuerbar            : gar nicht, es gibt keine Eingabe dafuer`);
-  console.log(`  Begrenzt durch                   : PENDEL_MAX in excavator.ts (Zeile 462),`);
-  console.log(`                                     nicht durch Gelenk oder Kollision`);
+  console.log(`  Begrenzt durch                   : Rueckstellung und Daempfung,`);
+  console.log(`                                     nicht durch Anschlag, Gelenk oder Kollision`);
+  console.log(`  Nachgemessen wird das in         : tools/pendelausschlag.ts`);
 }
 
 /* ------------------------------------ Frage 2: was die drei Stellen sagen */

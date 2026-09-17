@@ -18,13 +18,29 @@ import { FUENFSCHALEN } from "./greiferFuenfschalen";
 export const GREIFERFORMEN: Greiferform[] = [SICHELKRALLE, FUENFSCHALEN];
 
 /**
+ * Womit eine NEUE Runde anfaengt (Ansage Patrick, 17.09.2026: „ansonsten
+ * fünfschalengreifer als default").
+ *
+ * Bis dahin war es die Sichelkralle, und der Fuenfschalengreifer musste im
+ * Pausenmenue gewaehlt werden (E-059). Jetzt andersherum.
+ *
+ * DAS IST DIE VORGABE DES SPIELS, nicht der Grundzustand der Maschine.
+ * `Excavator` selbst haengt sich weiterhin die Sichelkralle an — an ihr
+ * haengen die Planungszahlen des Platzes (`hoechsteKrallenspitze`) und rund
+ * hundert Waechter, die eine Maschine bauen und sofort messen. Wer die
+ * Vorgabe aendern will, aendert diese eine Zeile; wer den Grundzustand
+ * aendert, verschiebt den Platz.
+ */
+export const STANDARD_GREIFER: Greiferform = FUENFSCHALEN;
+
+/**
  * Form zu einer Kennung. Nimmt absichtlich einen beliebigen Text: Die Kennung
  * kommt aus dem Spielstand und kann aus einer neueren Fassung stammen oder von
- * Hand verdreht sein. Was unbekannt ist, wird zur Sichelkralle — dieselbe
- * Vorsicht wie beim Radiosender (`save.ts`).
+ * Hand verdreht sein. Was unbekannt ist, wird zur Vorgabe — dieselbe Vorsicht
+ * wie beim Radiosender (`save.ts`).
  */
 export function formZu(id: string): Greiferform {
-  return GREIFERFORMEN.find((f) => f.id === id) ?? SICHELKRALLE;
+  return GREIFERFORMEN.find((f) => f.id === id) ?? STANDARD_GREIFER;
 }
 
 /** Der jeweils andere Greifer — mit zweien ist „durchschalten" ein Umschalten. */

@@ -9437,3 +9437,322 @@ meldet Anfang und Ende; der Bagger schwenkt ohne ihn im Bild.
 1. **Einen Kipper abladen lassen und ihm zum Warteplatz an der Westseite folgen.** Er fährt jetzt nicht mehr quer über den Hof, sondern die Ausfahrt entlang bis kurz vor die Waage und biegt dann nach Süden ab. Fährt er noch durch den Müllcontainer — und sieht der Umweg richtig aus oder umständlich?
 2. **Den Müllcontainer mitten auf diesen Weg stellen** (etwa auf −21 | 10) und dasselbe noch einmal. Hält der Wagen davor an und hupt?
 3. **Beim Rückwärtssetzen in die Parkbucht zusehen.** Der Wagen dreht sich jetzt erst auf der Stelle ein und stößt dann zurück, statt sich während der Fahrt hineinzudrehen. Wirkt das wie ein Fahrer, der einparkt?
+
+---
+
+### E-105 — Ein Greifer hat keine Winkelsperre: die Kippfunktion fliegt raus, das Pendel wird frei, Fünfschalengreifer und Werkhof werden Vorgabe (17.09.2026)
+
+**Anlass.** Patrick, 17.09.2026, wörtlich:
+
+> „kippen soll als funktion raus, das war ein missverständnis. Es ging eher
+> drum, dass ein Greifer keine winkelsperre hat, soll auch nicht. Damit über
+> das schwenken seitliche kraft erzeugt wird und teile geworfen werden können.
+> Ansonsten fünfschalengreifer als default, und werkshof radio"
+
+Sein Satz vom 15.09.2026 („Greifer muss komplett zur seite kippen können, zum
+kehren und schleudern") war als **Bedienelement** gelesen und als solches
+gebaut worden: E-085 (Taste K, 90° in zwei Sekunden), E-088 (Kranzeintrag
+KIPPEN, damit es auf dem iPad überhaupt erreichbar ist). Gemeint war die
+**Bauart**. Ein Greifer hängt frei am Kardangelenk; wer den Oberwagen
+schwenkt, erzeugt Fliehkraft, der Greifer schlägt aus — und daraus wirft man.
+
+---
+
+## 1. Was zurückgenommen wird — und was ausdrücklich nicht
+
+**E-085 und der Kranzeintrag aus E-088 sind zurückgenommen.** Das steht hier so
+deutlich, damit es in vier Wochen niemand wieder einbaut: Die Funktion war
+nicht kaputt, sie war nicht gewollt.
+
+Hinausgeflogen sind `kippIst`, `kippSoll`, `kippUmX`, `toggleKippen()`,
+`kippAktiv`, `KIPP_ACHSE`, `KIPP_MAX`, `KIPP_RATE`, die Rampe in `update()`,
+die Taste K im Bagger, die zwei Zeilen in `main.ts`, der Span `btn-kipp` und
+seine Bindung in `touch.ts`, `test/kippen.test.ts` sowie die zwei Werkzeuge,
+die nur diese Funktion gemessen haben (`tools/kipp-kosten.ts`,
+`tools/besen-kehren.ts`).
+
+**Nicht** hinausgeflogen ist die Umstellung von der Weltsenkrechten auf die
+**Greiferachse**. Sie stammt aus E-085, war aber nie an das Kippen gebunden,
+sondern an die Schräglage — und die gibt es seit jeher, sobald das Pendel
+ausschlägt. `form.ausladung(winkel, θ)` und `form.maxAusladung(θ)` bleiben
+vollständig erhalten, samt Wächtern; gespeist werden sie jetzt vom Pendel
+statt von einem Knopf.
+
+**Nebenbefund, weil er die eigentliche Rechtfertigung von E-088 einlöst:**
+Die Taste K trug seit E-085 zwei Funktionen (Kippen *und* Speichern). Der
+Konflikt stand als offener Punkt in `test/tastenerreichbarkeit.test.ts`. Er ist
+mit dem Kippen weg; die Liste `KONFLIKTE` ist wieder leer.
+
+---
+
+## 2. Das Pendel ohne Anschlag — mit Zahlen
+
+`PENDEL_MAX` deckelte bei **17° je Achse**. Der Deckel ist weg. Gemessen mit
+dem neuen `tools/pendelausschlag.ts` (voller Oberwagenschwenk aus dem Stand,
+5 s, danach loslassen):
+
+| | vorher (17°-Deckel) | jetzt | |
+|---|---|---|---|
+| größter Ausschlag, leer | 17,3° | **20,2°** | +2,9° |
+| größter Ausschlag, 900 kg | 17,3° | **20,4°** | +3,1° |
+| Beharrung im Schwenk | 7,8° | 7,8° | unverändert |
+| Ruhe nach dem Stopp | 1,38 s | 1,38 s | unverändert |
+| Richtungswechsel danach | 18 | 20 | +2 |
+
+**Und das ist der ehrliche Teil dieses Abschnitts: Der Deckel hat nur die
+Spitze gekappt.** Im gleichmäßigen Schwenk stand der Greifer schon vorher auf
+7,8° und hat den Anschlag nie berührt; angefasst hat er nur den Überschwinger
+beim Anfahren und beim Stoppen. Wer also ein Pendel erwartet, das sich beim
+Aufdrehen weit hinauswirft, bekommt es mit dieser Änderung **noch nicht**.
+
+Was den Ausschlag jetzt wirklich klein hält, ist nicht mehr ein Anschlag,
+sondern die **Rückstellung**: `GELENK_STEIFE = 1.0` verdoppelt die
+Schwerkraftrückstellung am Kardangelenk und **halbiert damit den Ausschlag**.
+Sie steht seit dem 27.08.2026 im Prototyp und bildet Reibung im Gelenk und den
+ziehenden Schlauchbaum ab — ohne sie stellte sich der Greifer bei 45° Schwenk
+auf gut 27° schräg, „wie eine Abrissbirne". Ob Patrick genau das will, ist eine
+**Gestaltungsfrage und steht offen** (siehe unten). Sie wird hier nicht
+mitentschieden: Das Pendel gehört zum Spielgefühl des Prototyps
+(Projektregel 2), und eine Ansage über die Winkelsperre ist keine Ansage über
+die Rückstellung.
+
+**Kein Anschlag heißt nicht: kein Grenzwert.** Drei Dinge begrenzen den
+Ausschlag weiter, und keines davon ist eine Sperre:
+
+- die Rückstellung `−(g/L)·(1+GELENK_STEIFE)·sin(Ausschlag)` — sie wächst mit
+  dem Ausschlag und hält dem Antrieb irgendwann die Waage. Wo das ist, hängt
+  davon ab, wie schnell geschwenkt wird; ein Anschlag stünde immer an
+  derselben Stelle;
+- `PENDEL_DAEMPFUNG_LEER/LAST` (5,0 / 4,0) — Reibung. Sie bremst die
+  Geschwindigkeit, nicht den Winkel;
+- `CAP = 15 m/s²` in `integratePendulum` — ein Deckel auf die **Antriebsgröße**,
+  seit dem 11.09.2026 gegen Zahlenrauschen aus der zweifachen
+  Differenzenbildung und gegen Teleports. Mit der Lage hat er nichts zu tun.
+
+**Läuft es davon?** Nein, und das ist gemessen, nicht behauptet: 30 s
+Dauerschwenk bleiben unter 60°, keine NaN. Der Grund steht in der Gleichung —
+die Rückstellung geht mit `sin`, es gibt keinen Term, der mit dem Winkel
+wächst.
+
+**Eine Dämpfung war nicht nötig.** 20° sind bedienbar; der Greifer kommt in
+1,38 s zur Ruhe. Hätte es eine gebraucht, wäre sie eine Dämpfung geworden und
+kein Anschlag — der Unterschied: Eine Dämpfung nimmt Energie aus der Bewegung
+und wirkt umso mehr, je schneller es geht; ein Anschlag setzt eine Wand an
+einen festen Winkel und macht jeden Schwung ab dort gleich aussehend.
+
+---
+
+## 3. Schlägt er an den Stiel? — 24 von 62 werden 26 von 62
+
+Neues Werkzeug `tools/pendelfreigang.ts`. Es beantwortet die Frage **billig**,
+und warum es das kann, ist der interessante Teil:
+
+> Das Pendel dreht den Greifer in der WELT, der Rotator dreht ihn um seine
+> EIGENE Achse, und der Rotator steht ganz rechts in der Drehkette
+> (`qPendel · qGier`). Lässt man den Rotator einmal ganz herumlaufen,
+> überstreicht der Greifer also einen **Drehkörper** um seine eigene Achse, und
+> die Schräglage dreht diesen Drehkörper als Ganzes. Damit genügt ein
+> Drehprofil (Achsabstand | Höhe) und eine Rückdrehung je Armpunkt — statt 24
+> Rotatorstellungen einzeln abzutasten. Bei E-085 ging das nicht: Dort stand
+> der Kippwinkel *rechts* vom Rotator, und der überstrichene Körper war kein
+> Drehkörper mehr.
+
+Gemessen über dieselben **62 erreichbaren Armstellungen** wie E-085/E-095,
+4.353.601 Armpunkte, 24 Himmelsrichtungen der Schräglage, Raster 3 cm,
+Fehlerschranke 34,6 mm:
+
+| Schräglage | Sichelkralle | Fünfschalengreifer |
+|---|---|---|
+| 0° | 13 von 62 | 8 von 62 |
+| 5° | 15 | 9 |
+| 10° | 19 | 10 |
+| 15° | 23 | 14 |
+| **17°** (alter Deckel) | **24** | **14** |
+| **20°** (jetzt) | **26** | **18** |
+| 25° | 29 | 19 |
+| 30° | 32 | 22 |
+
+**Antwort: Ja, er schlägt an — aber er tat es vorher schon fast genauso oft.**
+Die Zeile 0° reproduziert exakt den Befund von E-095 (13 bzw. 8 Armstellungen
+berühren den Arm **schon bei lotrechtem Greifer**, unrepariert). Der Deckel hat
+das nie verhindert; er hat es um **zwei** (Sichelkralle) bzw. **vier**
+(Fünfschalengreifer) Armstellungen gemildert. Die Ursache ist dieselbe wie in
+E-095: Stiel ganz angezogen über dem gehobenen Räumschild, und Stiel gestreckt
+bei hohem Ausleger. **Das bleibt offen und ist ein eigenes Paket** — jede
+Abhilfe kostet entweder Hubhöhe oder greift ins Pendel, und beides entscheidet
+Patrick.
+
+---
+
+## 4. Werfen: der freie Ausschlag behebt es NICHT, und der Grund ist eine Zeile
+
+E-085 hatte als Befund notiert, die gekippte Ladung hänge 1,5 m daneben und
+fliege schwächer, als sie aussieht. Gemessen (300-kg-Träger, aus dem Schwung
+losgelassen):
+
+| | v des Korbes | v beim Abwurf | Weite |
+|---|---|---|---|
+| aus gleichmäßigem Schwenk | 4,73 m/s | 4,62 m/s | **3,12 m** |
+| aus dem Rückschwung | 3,85 m/s | 3,14 m/s | **1,98 m** |
+
+**Vorher und nachher identisch** — Ziffer für Ziffer. Der Grund ist strukturell:
+`GripSystem.releaseAll()` gibt dem Teil die Geschwindigkeit des
+**Kardangelenks** mit (`grappleVelocity`, gemittelt über drei Schritte). Das
+Gelenk bewegt sich beim Pendeln aber gar nicht — es pendelt der Korb darunter.
+Solange der Ausschlag konstant ist, macht das nur 2 % aus; im Rückschwung,
+also genau dort, wo man wirft, sind es **18 %**.
+
+**Das ist NICHT in diesem Paket geändert.** Es wäre ein Eingriff in den
+Loslass-Weg des Greifsystems, und der bekommt seine eigene Abnahme (siehe
+offene Punkte).
+
+---
+
+## 5. Die Greiferachse bleibt — und was sie NOCH NICHT antreibt
+
+Drei Stellen rechneten seit E-085 in der Greiferachse. Zwei davon hängen jetzt
+am Pendel, eine ausdrücklich noch nicht:
+
+- **`surfaceUnderClaws`** (der Messstrahl für den Boden) startet im **Fußpunkt
+  der Greiferachse**: `Gelenk + Tiefe · pendelAchse`, waagerecht. Bei 17°
+  Schräglage und 2,75 m Tiefe sind das 80 cm seitlich. Vorher suchte der Bagger
+  im Schwenk den Boden dort, wo der Greifer gar nicht mehr hängt.
+- **`syncMeshes`** setzt die gezeichneten Krallen in die Schräglage des letzten
+  Bildes, damit `eindringtiefe` und `updateClawBlocking` die Spitzen dort
+  suchen, wo sie sind.
+- **`resolveGroundClamp`** — **noch nicht**, und das ist eine Entscheidung mit
+  Preisschild, keine Vergesslichkeit. Sie steht als benannter Schalter im
+  Quelltext: `ANSCHLAG_FOLGT_PENDEL = false`.
+
+**Warum der Schalter auf `false` steht.** `maxAusladung` wächst mit der
+Schräglage nicht mit dem Kosinus, sondern mit dem **Halbmesser der tiefsten
+Schale** (0,44 m · sin θ): schon bei 0,5° sind das 3,8 mm, beim gewöhnlichen
+Pendelausschlag eines Schwenks (7,8°) sind es 5,1 cm (Sichelkralle) bzw. 7,3 cm
+(Fünfschalengreifer). Der Bodenanschlag **hebt** den Arm aktiv an, wenn die
+Spitzen zu tief stehen — er würde ihn also anheben, während man ihn senkt, denn
+beim Absenken pendelt der Greifer immer ein paar Grad. Und er bleibt oben:
+Sobald `bodenSperre` gegriffen hat, ist die Abwärtsrichtung gesperrt, solange
+Kontakt gemeldet wird. Gemessen mit `tools/bodenanschlag-hoehe.ts`: Der
+geschlossene Greifer setzt dann auf **7,90 statt 6,37 cm** ab (Sichelkralle) und
+auf **21,21 statt 20,44 cm** (Fünfschalengreifer) — auch wenn man den Hebel bis
+zum Schluss unten hält. Das ist eine Änderung am Absetzen, und Absetzen ist
+das, was Patrick am häufigsten tut. Sie gehört in ein eigenes Paket, zusammen
+mit der Frage, ob `bodenSperre` den Arm oben festhalten darf, nachdem der Grund
+fürs Anheben weg ist.
+
+**Das Totband.** Ein gerechnetes Pendel steht nie exakt auf null; ohne Totband
+wäre `neigung === 0` im laufenden Spiel nie wahr, und die Zusage „bei
+lotrechtem Greifer Ziffer für Ziffer wie vorher" nie eingelöst.
+`NEIGUNG_TOTBAND` = **0,5°**. Was es kostet, ist der Versatz, um den der
+Messstrahl nicht wandert: 3,00 m · sin 0,5° = **2,6 cm**. Zum Vergleich: Der
+Sensorradius der Sichelkralle ist 1,56 m, ein Muldenrand 20 cm stark, und der
+Anschlag arbeitet ohnehin mit 12 mm Totband.
+
+---
+
+## 6. Fünfschalengreifer und Werkhof als Vorgabe
+
+**Greifer.** Neu ist `STANDARD_GREIFER = FUENFSCHALEN` in `greiferwahl.ts`.
+`main.ts` setzt ihn beim Start einer neuen Runde; ein vorhandener Stand behält,
+was darin steht. **Ein Stand ohne das Feld — also einer von vor E-059 — behält
+die Sichelkralle**: Damit wurde er gespielt, und ihm beim Laden einen anderen
+Greifer in die Hand zu drücken wäre keine Vorgabe, sondern eine Überraschung.
+
+Ausdrücklich **nicht** geändert: `new Excavator(...)` hängt sich weiter die
+Sichelkralle an. Das ist der Grundzustand der Maschine, und an ihm hängen die
+Planungszahlen des Platzes (`hoechsteKrallenspitze`) und rund hundert Wächter,
+die einen Bagger bauen und sofort messen. Die Vorgabe des **Spiels** und der
+Grundzustand der **Maschine** sind zwei Dinge; sie stehen jetzt getrennt und
+beide mit Namen da.
+
+**Radio.** `STANDARD_SENDER = RAP.id` (Werkhof 90,4). Werkhof rückt dabei auch
+**an die erste Stelle** von `SENDER` — das ist keine Kosmetik: Beim Ausschalten
+springt die Wahl auf `SENDER[0]` zurück (`naechsterSender`). Stünde der Standard
+am Ende der Reihe, wäre die Stellung „aus" eine Sackgasse — ein Tipp schaltete
+Werkhof ein, der nächste sofort wieder aus. Die Reihe lautet jetzt Werkhof →
+Schlager → Pop → Bluesrock → Techno → aus, also vom langsamsten zum schnellsten
+Sender. Ein Spielstand mit gespeichertem Sender behält ihn; ein Stand nach
+Schema 1 (ohne Senderfeld) bekommt wie seit E-094 den jeweils aktuellen
+Standard.
+
+---
+
+## 7. Was gemessen wurde, damit sich nichts anderes bewegt hat
+
+- **Abdruckvergleich** (`tools/greifer-abdruck.ts` / `-f5.ts` gegen
+  `greifer-abdruck-vergleich.ts`, Stand `v1/start` gegen jetzt; 300 Schritte
+  Absetzen/Zupacken/Öffnen, jedes Netz, jeder Kollider, 2.000 Korbpunkte):
+  Sichelkralle **Bewegung 5.020 Werte, Kollider 110, Korb 5.200 — größter
+  Unterschied überall 0,000e+0**; Fünfschalengreifer **5.600 / 110 / 5.200 —
+  0,000e+0**. Netzlisten gleich lang, gleiche Reihenfolge, gleiche Art.
+- **Bodenanschlag** (`tools/bodenanschlag-hoehe.ts`): Sichelkralle **6,37 cm**,
+  Fünfschalengreifer **20,44 cm** — vorher wie nachher, auf die zweite
+  Nachkommastelle.
+- **Kosten je Bild** (Bagger + Physikschritt, im Schwenk mit Ladung):
+  vorher 0,488 / 0,447 ms, nachher 0,27…0,41 ms je Bild. Im Rauschen gleich
+  oder leicht darunter; 7 Körper in beiden Fällen.
+- **Wurfweite und Abwurfgeschwindigkeit**: unverändert (siehe 4).
+- **Prüfkette**: `npm run build` Rückgabewert **0**, `npm test` Rückgabewert
+  **0** — 124 Dateien, **1453** Tests (vorher 1450).
+
+---
+
+## 8. Wächter
+
+- **`test/greiferachse.test.ts`** (aus `kippen.test.ts` hervorgegangen, 22
+  Prüfungen): Lotrecht ist Ziffer für Ziffer nichts anders (`toBe`, nicht
+  `toBeCloseTo`); Bodenanschlag 6,37 / 20,44 cm im Millimeterfenster;
+  `maxAusladung` liegt nie unter dem gezeichneten Netz; der Ausschlag
+  überschreitet den alten Deckel; 30 s Dauerschwenk laufen nicht davon; nach dem
+  Ausschwingen steht `neigung` wieder exakt auf 0; der Messstrahl folgt der
+  Achse (Podest auf der einen Seite zählt, auf der anderen nicht); die
+  Kippfunktion ist im Quelltext nicht wieder da; `ANSCHLAG_FOLGT_PENDEL` steht
+  auf `false`. **Sieben Gegenproben**, darunter: mit dem alten Deckel wäre
+  derselbe Schwenk gekappt worden (eine Achse geht über 17°), und ohne Totband
+  bliebe ein Rest stehen (er ist größer als null und kleiner als 0,5°).
+- **`test/tastenerreichbarkeit.test.ts`** ist **nachgezogen, nicht gelockert**:
+  K trägt jetzt den Touch-Weg „Knopf: pause-save". Dafür gibt es eine **neue
+  Prüfung** — jeder so eingetragene Knopf muss auf der Seite stehen *und* in
+  `main.ts` an einem Klick hängen — samt eigener Gegenprobe. Die zwei
+  Gegenproben, die auf dem Kippknopf standen, hängen jetzt an KABINE.
+- **`test/funktionskranz.test.ts`**: sieben Einträge, Zahlenreihe neu gemessen
+  (iPad, R = 112: sieben 22,5 px · acht 14,1 · neun 6,9 · zehn 0,7 · elf −4,5).
+  Die Gegenprobe „ein größerer Kasten fällt durch" musste **verschärft** werden:
+  Bei sieben Einträgen stehen die Kästen 51,4° auseinander, die engste Stelle
+  liegt dann zwischen zwei *übereinander* statt zwei nebeneinander — 12 px und
+  24 px mehr Breite liefern beide dieselben 6,5 px, die Breite ist nicht mehr
+  maßgeblich. Sie dreht jetzt an Breite **und** Höhe.
+
+---
+
+## 9. Was NICHT entschieden wurde
+
+| Nr. | Offene Frage | Empfehlung |
+|---|---|---|
+| 1 | **`GELENK_STEIFE = 1.0` halbiert den Ausschlag.** Ohne Winkelsperre kommt der Greifer auf 20°; ohne die zusätzliche Rückstellung wären es rund 40°, also das, was man umgangssprachlich „frei hängend" nennt. Das ist eine Gestaltungsfrage. | Ein eigenes Paket, ein Schritt: `GELENK_STEIFE` auf 0,5 und auf 0, je einzeln auf dem iPad angesehen. |
+| 2 | **`releaseAll` gibt den Schwung des Gelenks mit, nicht den des Korbes** — im Rückschwung 18 % zu wenig. | Ein eigenes Paket: die Bahn des Korbes mitschreiben statt die des Gelenks. Klein, aber es liegt im Griff-Kern und gehört einzeln abgenommen. |
+| 3 | **`ANSCHLAG_FOLGT_PENDEL`** — soll der Bodenanschlag der Schräglage folgen? Preis gemessen: Absetzhöhe 6,37 → 7,90 cm. | Zusammen mit `bodenSperre` angehen, nicht einzeln. |
+| 4 | **13 bzw. 8 Armstellungen berühren den Arm schon bei 0°** (E-095, unrepariert); mit Schräglage werden 26 bzw. 18 daraus. | Bleibt E-095s Paket. Die neue Messung liefert die Zahlen dazu. |
+| 5 | **`RADIAL_R` bleibt auf 112.** Rechnerisch reichten für sieben Einträge **91** (für acht waren es 101). Gemacht wurde es nicht: Der Halbmesser ist reine Ansicht — gewählt wird über die *Richtung* des Daumenzugs —, und wie weit der Kranz den Daumen umgibt, entscheidet Patrick. | Auf dem Gerät ansehen und sagen, ob der Kranz enger soll. Die Zahl 91 steht im Wächter. |
+| 6 | **Zwei Kranzplätze sind jetzt frei** (acht und neun passen, zehn nicht). | Nicht füllen, bis Patrick sagt, was hineingehört. |
+
+---
+
+**Abnahmekriterium.** `npm run build` und `npm test` je mit Rückgabewert 0;
+Abdruckvergleich beider Formen auf 0,000e+0; Bodenanschlag 6,37 / 20,44 cm.
+Alles erfüllt.
+
+**Auf dem Gerät zu prüfen.**
+
+1. **Den Oberwagen voll aufdrehen und wieder anhalten.** Der Greifer schlägt
+   jetzt bis gut 20° aus statt bis 17 — beim Anfahren und beim Stoppen, nicht
+   im gleichmäßigen Schwenk. Ist das die Richtung, die du meinst, oder soll er
+   deutlich weiter hinausschwingen? (Dann ist Punkt 1 der offenen Liste dran,
+   nicht noch einmal die Sperre.)
+2. **Einen Träger greifen, aufdrehen, mitten im Schwung aufmachen.** Wie weit
+   fliegt er, und sieht der Wurf so stark aus, wie er sich anfühlt? Gemessen
+   sind 3,12 m aus dem gleichmäßigen Schwenk und 1,98 m aus dem Rückschwung —
+   die Zahl hat sich durch dieses Paket *nicht* geändert.
+3. **Ein neues Spiel anfangen.** Hängt der Fünfschalengreifer dran, und läuft
+   Werkhof 90,4? Danach deinen alten Spielstand laden: Hängt dort noch der
+   Greifer, mit dem du gespielt hast?

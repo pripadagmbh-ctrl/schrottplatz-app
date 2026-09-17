@@ -752,18 +752,26 @@ export const POP: Song = {
 
 /**
  * Alle Sender, in der Reihenfolge des Menues — und damit auch in der
- * Reihenfolge, in der die Taste MUSIK weiterschaltet (E-094).
+ * Reihenfolge, in der die Taste MUSIK weiterschaltet (E-094, umgestellt in
+ * E-105).
  *
- * Der erste ist der Standard und bleibt es: Von der Schlagerwelle geht es
- * ueber Pop und Bluesrock ins Schnelle und am Ende ins Langsame. Wer einmal
- * zu weit tippt, ist nicht am anderen Ende der Welt.
+ * DER ERSTE IST DER STANDARD, und daran haengt mehr als die Optik: Beim
+ * Ausschalten springt die Wahl auf `SENDER[0]` zurueck (`naechsterSender`),
+ * und der Knebelschalter laeuft von dort wieder los. Stuende der Standard
+ * mitten in der Reihe oder am Ende, waere die Stellung „aus" eine Sackgasse —
+ * ein Tipp schaltete den Standard ein, der naechste sofort wieder aus.
+ *
+ * Deshalb ist Werkhof am 17.09.2026 nach VORN gerueckt und nicht nur zum
+ * Standard erklaert worden (Ansage Patrick: „werkshof radio"). Von dort geht
+ * es ueber Schlager, Pop und Bluesrock ins Schnelle — vom langsamsten zum
+ * schnellsten Sender, und dann aus.
  */
-export const SENDER: Song[] = [SCHLAGER, POP, BLUESROCK, TECHNO, RAP];
+export const SENDER: Song[] = [RAP, SCHLAGER, POP, BLUESROCK, TECHNO];
 
-/** Standardsender — die alte Schlagermelodie (Ansage Patrick, 14.09.2026). */
-export const STANDARD_SENDER = SCHLAGER.id;
+/** Standardsender — Werkhof 90,4 (Ansage Patrick, 17.09.2026). */
+export const STANDARD_SENDER = RAP.id;
 
 /** Sender zu einer Kennung; unbekannte Kennung faellt auf den Standard zurueck. */
 export function findeSender(id: string | undefined | null): Song {
-  return SENDER.find((s) => s.id === id) ?? SCHLAGER;
+  return SENDER.find((s) => s.id === id) ?? RAP;
 }

@@ -238,16 +238,16 @@ export function maxAusladungVon(
 /**
  * `maxAusladung` mit EINEM Platz Gedaechtnis.
  *
- * `resolveGroundClamp` fragt die Zahl jedes Bild, und gekippt rechnet sie
- * 41 Oeffnungsstellungen mal fuenf Schalen durch. Gemessen
- * (`tools/kipp-kosten.ts`) kostete das im gekippten Zustand **0,31 ms**
- * (Sichelkralle) bzw. **0,45 ms** (Fuenfschalengreifer) je Bild — auf einem
- * iPad ist das ein spuerbarer Anteil von 16,7 ms.
+ * `resolveGroundClamp` fragt die Zahl jedes Bild, und schraeg haengend rechnet
+ * sie 41 Oeffnungsstellungen mal fuenf Schalen durch. Gemessen am 16.09.2026
+ * kostete das **0,31 ms** (Sichelkralle) bzw. **0,45 ms**
+ * (Fuenfschalengreifer) je Bild — auf einem iPad ist das ein spuerbarer
+ * Anteil von 16,7 ms.
  *
- * Ein Platz reicht, weil der Kippwinkel sich innerhalb eines Bildes nicht
- * aendert und ueber lange Strecken gar nicht: Waehrend der zwei Sekunden
- * Rampe wird gerechnet, danach steht der Wert. Lotrecht wurde ohnehin nie
- * gerechnet — dort greift der Vorabsprung.
+ * Ein Platz reicht, obwohl der Winkel jetzt aus dem Pendel kommt und sich
+ * damit je Bild aendert: Der Bagger fragt innerhalb eines Bildes mehrfach,
+ * und zwischen den Bildern steht der Greifer die meiste Zeit lotrecht — dort
+ * greift der Vorabsprung und es wird gar nicht gerechnet.
  *
  * Die Form kommt als Thunk herein, weil dieser Aufruf im Initialisierer der
  * Form selbst steht und sie zu diesem Zeitpunkt noch nicht existiert.

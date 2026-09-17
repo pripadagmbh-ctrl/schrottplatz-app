@@ -181,7 +181,6 @@ export class TouchControls {
     this.bindTap("btn-away", "KeyJ");
     this.bindTap("btn-lambert", "KeyY");
     this.bindTap("btn-blade", "KeyI");
-    this.bindTap("btn-kipp", "KeyK");
     // Menue statt Kranz: Diese Spans tragen nur den Tastencode. Gedrueckt
     // werden sie nie — die echten Knoepfe stehen im Pausenfeld.
     this.bindTap("btn-music", "KeyU");
@@ -638,9 +637,15 @@ export class TouchControls {
   /**
    * Zustand eines Kranzeintrags anzeigen: an oder aus.
    *
-   * Fuer Funktionen, die UMSCHALTEN statt auszuloesen — KIPPEN heute, KABINE
-   * und STUETZEN, sobald der Bagger ihren Zustand herausgibt. Ohne das ist ein
-   * Umschalter im Kranz eine Taste, die man drueckt und hofft.
+   * Fuer Funktionen, die UMSCHALTEN statt auszuloesen — KABINE und STUETZEN,
+   * sobald der Bagger ihren Zustand herausgibt. Ohne das ist ein Umschalter im
+   * Kranz eine Taste, die man drueckt und hofft.
+   *
+   * Im Kranz nutzt das gerade niemand: Der bisher einzige Nutzer war der
+   * Eintrag KIPPEN, und der ist am 17.09.2026 mit dem Seitwaertskippen
+   * hinausgeflogen (E-105). Die Anzeige bleibt trotzdem stehen — sie kostet
+   * nichts, und das Pausenmenue zeigt seine Zustaende ueber dieselbe
+   * Bildsprache.
    *
    * Der Kranz erfaehrt den Zustand von aussen (main.ts reicht ihn durch) und
    * fragt NIE die Maschine (Projektregel 10). `touch.ts` kennt weder Bagger

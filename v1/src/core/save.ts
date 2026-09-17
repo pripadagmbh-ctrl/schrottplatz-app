@@ -50,9 +50,10 @@ export interface SaveData {
    * Welcher Greifer haengt — „sichel" oder „fuenfschalen" (E-059).
    *
    * Optional und ohne Schemawechsel: Ein Stand ohne dieses Feld ist ein Stand
-   * mit der Sichelkralle, so wie bisher jeder Stand. Das ist dieselbe
-   * Behandlung wie bei `upgrades` und spart einen Migrationspfad fuer eine
-   * Wahl, die sich in zwei Sekunden im Menue wiederholen laesst.
+   * mit der Sichelkralle, so wie jeder Stand vor E-059. Das gilt weiter, auch
+   * seit der Fuenfschalengreifer die Vorgabe fuer NEUE Runden ist (E-105) —
+   * wer mit der Sichelkralle gespielt hat, laedt mit der Sichelkralle.
+   * `main.ts` traegt diese Unterscheidung, nicht `formZu`.
    */
   greifer?: string;
   items: SavedItem[];
@@ -88,9 +89,10 @@ export function migrate(raw: unknown): SaveData | null {
   /*
    * v1 → v2 (14.09.2026): Das Kabinenradio hat mehrere Sender bekommen und
    * merkt sich, welcher läuft. Alte Stände kannten nur ein Stück — sie
-   * bekommen den Standardsender, also die Schlagermelodie. Bewusst nicht der
-   * Bluesrock, der zuletzt lief: Standard ist ab jetzt der Schlager (Ansage
-   * Patrick, 14.09.2026), und ein alter Stand soll sich anhören wie ein neuer.
+   * bekommen den Standardsender. Bewusst nicht den, der zuletzt lief: Ein
+   * Stand ohne gespeicherte Wahl hat nie eine getroffen, und er soll sich
+   * anhören wie ein neuer. Welcher das ist, steht an genau einer Stelle
+   * (`STANDARD_SENDER`) und ist seit dem 17.09.2026 Werkhof 90,4.
    */
   if (d.schemaVersion === 1) {
     d.schemaVersion = 2;

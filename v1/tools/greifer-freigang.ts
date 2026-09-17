@@ -164,7 +164,9 @@ const FEIN: Lauf = {
   stick: reihe(STICK_MIN, STICK_MAX, 14.375), // 9
   gier: reihe(0, 345, 15), // 24
   /*
-   * NEGATIVE Winkel, weil der Bagger um −x kippt (`KIPP_ACHSE`). Der
+   * NEGATIVE Winkel, weil der Bagger bis E-105 um −x kippte (`KIPP_ACHSE`;
+   * die Konstante gibt es seit dem 17.09.2026 nicht mehr — das gesteuerte
+   * Seitwaertskippen ist zurueckgenommen). Der
    * Unterschied ist nicht nur ein Vorzeichen: Der Greifer ist um seine Achse
    * fuenfzaehlig, nicht zweizaehlig — nach der einen Seite gekippt steht eine
    * Schale unten, nach der anderen eine Luecke. Wer das Vorzeichen falsch
