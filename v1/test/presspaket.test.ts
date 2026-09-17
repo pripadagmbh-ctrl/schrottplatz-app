@@ -48,6 +48,7 @@ interface Ware {
   materialId: string;
   massKg: number;
   composition?: Array<{ materialId: string; massKg: number }>;
+  fraktionsmix?: Array<{ materialId: string; massKg: number }>;
 }
 
 function erloes(ware: Ware[], order: string | null = null): number {
@@ -60,7 +61,15 @@ function erloes(ware: Ware[], order: string | null = null): number {
 }
 
 function alsWare(it: ScrapItem): Ware {
-  return { materialId: it.materialId, massKg: it.massKg, composition: it.composition };
+  return {
+    materialId: it.materialId,
+    massKg: it.massKg,
+    composition: it.composition,
+    // Seit E-094 traegt ein Paket zwei Listen: woraus es gemacht ist
+    // (`composition`, Farbe und Gewicht) und welche Fraktionen hineingingen
+    // (`fraktionsmix`, das Geld). Wer hier eine davon vergisst, misst falsch.
+    fraktionsmix: it.fraktionsmix,
+  };
 }
 
 /** Massen je Stoff ueber eine ganze Fuhre — das, was die Kasse liest. */
@@ -277,9 +286,17 @@ describe("Das Paket führt seine Zusammensetzung, nicht nur seine Farbe", () => 
   it("nach Speichern und Laden ist der Ballen auf den Cent so viel wert wie vorher", () => {
     const { nachher, items } = pressen(kupferLager);
     const geladen = speichernUndLaden(items);
-    // 64 kg Kupfer + 217 kg Messing: Messing führt (4,30 €/kg), Reinheit
-    // 217/281 = 77,2 %, hoch drei = 46,0 % → 281 × 4,30 × 0,460 = 556,46 €.
-    expect(erloes(nachher)).toBeCloseTo(556.46, 2);
+    /*
+     * 64 kg Kupfer + 217 kg Messing gehören beide ins KUPFER-LAGER (E-010).
+     * Seit E-094 zahlt die Kasse dieselbe Rechnung wie das Muldenschild: jede
+     * Fraktion zu ihrem eigenen Preis, Reinheit 100 % →
+     * 64 × 7,20 + 217 × 4,30 = 460,80 + 933,10 = 1393,90 €.
+     *
+     * Bis zum 16.09.2026 stand hier 556,46 € — die Kasse nahm damals die
+     * schwerste Fraktion (Messing), zahlte das Kupfer zum Messingpreis und
+     * bestrafte es zusätzlich mit Reinheit hoch drei. Das war Befund W-3.
+     */
+    expect(erloes(nachher)).toBeCloseTo(1393.9, 2);
     expect(erloes(geladen), "der Spielstand darf den Wert nicht verändern").toBeCloseTo(
       erloes(nachher),
       2
@@ -295,10 +312,12 @@ describe("Das Paket führt seine Zusammensetzung, nicht nur seine Farbe", () => 
     const { nachher, items } = pressen(kupferLager);
     const verstuemmelt = speichernUndLaden(items, (s) => {
       delete s.zusammensetzung;
+      delete s.fraktionsmix;
       return s;
     });
     expect(verstuemmelt[0]!.composition, "die Verstümmelung hat nicht gewirkt").toBeUndefined();
-    // 281 kg als reiner Mischschrott zu 0,16 €/kg statt 556,46 € — Faktor 12,4.
+    expect(verstuemmelt[0]!.fraktionsmix, "die Verstümmelung hat nicht gewirkt").toBeUndefined();
+    // 281 kg als reiner Mischschrott zu 0,16 €/kg statt 1393,90 € — Faktor 31.
     expect(erloes(verstuemmelt)).toBeCloseTo(44.96, 2);
     expect(
       Math.abs(erloes(verstuemmelt) - erloes(nachher)),
@@ -323,6 +342,7 @@ describe("Das Paket führt seine Zusammensetzung, nicht nur seine Farbe", () => 
     expect(erloes(speichernUndLaden(items)), "und kostet auch nach dem Laden").toBeLessThan(0);
     const alterStand = speichernUndLaden(items, (s) => {
       delete s.zusammensetzung;
+      delete s.fraktionsmix;
       return s;
     });
     expect(erloes(alterStand), "so sah die Geldquelle aus, die zugemacht wurde").toBeGreaterThan(0);

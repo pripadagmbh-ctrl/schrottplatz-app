@@ -77,6 +77,21 @@ export interface ScrapShape {
    */
   zusammensetzung?: Anteil[];
   /**
+   * Nur Presspakete: aus welchen FRAKTIONEN das Paket gebuendelt ist (0..1).
+   *
+   * Dieselbe Begruendung wie bei `zusammensetzung` (E-092): Was ein Stueck
+   * IST, gehoert an die Form und nicht an seine Entstehungsgeschichte — nur
+   * so uebersteht es den Spielstand, denn `core/save.ts` sichert je Teil bloss
+   * `materialId`, `massKg` und `shape`.
+   *
+   * `zusammensetzung` sagt, woraus das Paket gemacht ist (Farbe, Gewicht),
+   * `fraktionsmix` sagt, welche Sortierarbeit darin steckt (Geld). Bei einem
+   * Paket aus lauter Kuehlschraenken ist das erste vierteilig und das zweite
+   * einteilig; bei einem Paket aus Kupfer und Messing ist es umgekehrt
+   * dasselbe. Siehe `ScrapItem.fraktionsmix`.
+   */
+  fraktionsmix?: Anteil[];
+  /**
    * Massiv trotz duennem Huellmass — die Uebersteuerung aus E-042.
    *
    * Sie stand bis zum 15.09.2026 nur im Katalog (`PileSpec`) und ging beim
@@ -1177,6 +1192,24 @@ export interface ScrapItem {
    * Verkauf weniger als ein sortenrein gepresstes.
    */
   composition?: Array<{ materialId: string; massKg: number }>;
+  /**
+   * Nur bei Presspaketen: welche FRAKTIONEN hineingegangen sind, in Kilogramm.
+   *
+   * Der Unterschied zu `composition` ist derselbe, den E-091 an der Presse
+   * schon benannt hat: „woraus ist das gemacht" gegen „wohin gehoert das".
+   * Ein Paket aus fuenf Kuehlschraenken BESTEHT aus Blech, Alu, Kupfer und
+   * Kunststoff (`composition` — daraus kommen die Farbflecken); es ist aber
+   * 275 kg MISCHSCHROTT (`fraktionsmix` — danach zahlt die Kasse).
+   *
+   * Warum das Paket beides braucht: Seit E-094 rechnet die Kasse in
+   * Fraktionen. Ein Paket ist aber kein Stueck mit einer Fraktion, sondern
+   * ein Buendel — 64 kg Kupfer und 217 kg Messing gehoeren in dieselbe Mulde
+   * und sind zusammen 1393,90 € wert, waehrend das Paket als Ganzes
+   * „Mischschrott" heisst (keine Fraktion hat 95 %). Ohne dieses Feld kaeme es
+   * auf 44,96 € — Pressen wuerde Sortierarbeit vernichten, genau das, was
+   * E-091 abgestellt hat.
+   */
+  fraktionsmix?: Array<{ materialId: string; massKg: number }>;
 }
 
 /**
@@ -1241,6 +1274,7 @@ export class ItemManager {
     body: RAPIER.RigidBody;
     shape?: ScrapShape;
     composition?: Array<{ materialId: string; massKg: number }>;
+    fraktionsmix?: Array<{ materialId: string; massKg: number }>;
   }): ScrapItem {
     const item: ScrapItem = {
       id: `item_${this.nextId++}`,
@@ -1251,6 +1285,7 @@ export class ItemManager {
       containerId: null,
       shape: params.shape,
       composition: params.composition,
+      fraktionsmix: params.fraktionsmix,
     };
     this.items.push(item);
     this.byHandle.set(params.body.handle, item);
@@ -1675,7 +1710,12 @@ export class ItemManager {
       : shape.zusammensetzung
         ? shape.zusammensetzung.map((a) => ({ materialId: a.materialId, massKg: a.anteil * massKg }))
         : undefined;
-    return this.register({ materialId, massKg, mesh, body, shape, composition });
+    // Presspakete bringen zusaetzlich ihren Fraktionsmix mit (E-094) — ohne
+    // ihn waere ein geladenes Paket aus Kupfer und Messing Mischschrott.
+    const fraktionsmix = shape.inventar
+      ? undefined
+      : shape.fraktionsmix?.map((a) => ({ materialId: a.materialId, massKg: a.anteil * massKg }));
+    return this.register({ materialId, massKg, mesh, body, shape, composition, fraktionsmix });
   }
 
   /**
@@ -1907,7 +1947,24 @@ export class ItemManager {
     materialId: string,
     massKg: number,
     pos: THREE.Vector3,
-    composition?: Array<{ materialId: string; massKg: number }>
+    composition?: Array<{ materialId: string; massKg: number }>,
+    /**
+     * Wie stark diese Presse verdichtet. 1 = Grundausbau.
+     *
+     * Der Ausbau „Groessere Presse" verspricht im Kaufmenue (`upgrades.ts`)
+     * „Schwerere Pakete, mehr Ladung je Abholung" — und genau das ist es:
+     * dieselbe Masse in einem kleineren Wuerfel. Kein Euro aendert sich, nur
+     * das Volumen (E-094).
+     */
+    dichteFaktor = 1,
+    /**
+     * Welche FRAKTIONEN in dieses Paket gegangen sind, in Kilogramm.
+     *
+     * Ohne Angabe gilt das Paket als ein Klumpen seiner eigenen Fraktion —
+     * das ist richtig fuer `consolidate()` (Lambert fasst Gleiches zusammen)
+     * und falsch fuer die Presse, die Verschiedenes buendelt.
+     */
+    fraktionsmix?: Array<{ materialId: string; massKg: number }>
   ): ScrapItem {
     const profil = PRESSPROFIL[materialId] ?? PRESSPROFIL.steel;
     const streu = (a: number): number => (Math.random() - 0.5) * 2 * a;
@@ -1940,7 +1997,11 @@ export class ItemManager {
      * Was das in Kilogramm heisst: Erst ab 5625 kg Stahl bzw. 1935 kg Alu
      * greift er ueberhaupt noch. Darunter folgt die Groesse jetzt der Masse.
      */
-    const vol = THREE.MathUtils.clamp(massKg / (profil.dichte * (1 + streu(0.05))), 0.1, 4.5);
+    const vol = THREE.MathUtils.clamp(
+      massKg / (profil.dichte * Math.max(dichteFaktor, 0.1) * (1 + streu(0.05))),
+      0.1,
+      4.5
+    );
     const w = Math.cbrt(vol);
     const dims: [number, number, number] = [
       w * (1.25 + streu(0.06)),
@@ -2132,8 +2193,16 @@ export class ItemManager {
          * Kostet ein Feld im Spielstand und keine Zeile in `save.ts`.
          */
         zusammensetzung: zusammensetzungAus(composition, materialId),
+        /*
+         * Und derselbe Weg fuer den Fraktionsmix (E-094): an die FORM, damit
+         * er den Spielstand ueberlebt. Ein Paket aus 64 kg Kupfer und 217 kg
+         * Messing heisst „Mischschrott" (keine Fraktion hat 95 %), ist aber
+         * 1393,90 € wert — ohne dieses Feld waeren es nach dem Laden 44,96 €.
+         */
+        fraktionsmix: zusammensetzungAus(fraktionsmix, materialId),
       },
       composition,
+      fraktionsmix,
     });
   }
 

@@ -860,3 +860,136 @@ Tabelle oben einen falschen Schluss zieht.
 verschieden), insbesondere **W-9** — gemischter Abfall kostet weiter weniger
 Gebühr als sortenreiner. Das ist Geldrechnung, und die steht in
 `docs/offene-punkte.md` als eigener, noch nicht freigegebener Punkt.
+
+---
+
+## Nachtrag 17.09.2026 — der Kreislauf ist aufgemacht, W-1 bis W-10 nachgemessen (E-094)
+
+Patrick hat am 17.09.2026 die Wirtschaft freigegeben ("Kreislauf ganz aufmachen").
+Damit ist E-016 in seinem zweiten Teil erfuellt. Zuerst wurden alle zehn
+Befunde gegen den heutigen Stand nachgemessen (`tools/kassensturz.ts`), erst
+danach geaendert.
+
+### Was von den zehn Befunden noch stimmte
+
+| Nr. | Stand 17.09. vor der Reparatur | nach E-094 |
+|---|---|---|
+| W-1 | **bestaetigt** — BUNT+VA in einem Zug: Schild 1742,00 EUR, Kasse 20,00 EUR (Faktor 87) | Kasse 127,78 EUR; die Mulde ist Durchgang, ihr Schild nennt den SORTIERTEN Wert, und der ist ueber die vier Silos auf den Cent erreichbar (1742,00 EUR) |
+| W-2 | **bestaetigt** — dieselbe Fuhre ohne VA: Schild 1602,00 EUR, ueber drei Silos 437,50 EUR, in einem Zug 28,80 EUR | ueber die Silos 1602,00 EUR = Schild; in einem Zug 184,00 EUR |
+| W-3 | **bestaetigt** — KUPFER-LAGER: Schild 1150,00 EUR, Kasse 180,00 EUR | beide 1150,00 EUR |
+| W-4 | **bestaetigt** — ALU-LAGER: Schild 232,00 EUR, Kasse 37,50 EUR | beide 232,00 EUR |
+| W-5 | **bestaetigt** — MUELL: Schild -17,00 EUR, Kasse -0,25 EUR | beide -17,00 EUR |
+| W-6 | **bestaetigt** — Stahlhalde: Schild 16,00 EUR, Kasse 34,56 EUR | mit Bestellung "Stahl" beide 16,00 EUR; ohne Bestellung kauft der Abnehmer Mischschrott, und 34,56 EUR sind dafuer der richtige Preis. Bleibt als Unterschied stehen, absichtlich |
+| W-7 | **bestaetigt, und der Kommentar ist weiter falsch** — er verspricht den Kupferpreis fuer alles; die Kasse nahm die schwerste Fraktion | Jede Fraktion zu ihrem eigenen Preis. Der Kommentar in `containers.ts:96-99` beschreibt jetzt die Sache von der anderen Seite falsch und gehoert nachgezogen (offener Punkt) |
+| W-8 | **bestaetigt** — Muldenschild 100 %, Ladeanzeige 50 % fuer dieselben 200 kg | Die Kasse meldet jetzt 100 %. Die Ladeanzeige in `main.ts:1439-1441` zaehlt weiter nur die bestellte Fraktion — offener Punkt, eine Zeile |
+| W-9 | **bestaetigt** — vier Abfallsorten gemischt: -0,25 EUR statt -17,00 EUR | behoben, gemischt kostet dasselbe wie getrennt |
+| W-10 | **bestaetigt** — dieselbe Fuhre 28,80 EUR oder 6,00 EUR, je nach Greifreihenfolge | behoben, in beiden Faellen 184,00 EUR |
+
+Alle zehn galten also noch. Sechs sind zu, zwei bleiben absichtlich stehen
+(W-1/W-2 und W-6), zwei sind Anzeige- und Kommentararbeit ausserhalb dieses
+Pakets (W-7, W-8).
+
+### Welche Rechnung die massgebliche wurde — und warum
+
+**Das Schild.** Nicht, weil es freundlicher ist, sondern weil drei Quellen es
+sagen:
+
+1. `docs/02_Briefing.md` Kap. 9/10: "Erloes = Inhalt x Verkaufspreis x
+   **Reinheit²**". Das rechnet das Schild. Die Kasse rechnete Reinheit hoch
+   drei — ein Kommentar ohne Quelle ("Hoch drei spreizt das deutlicher").
+2. **E-091 hat dieselbe Frage an der Presse schon entschieden**, und zwar
+   zugunsten der Fraktionen: "Der Unterschied ist der zwischen 'woraus ist das
+   gemacht' und 'wohin gehoert das'. ... danach sortiert der Spieler, danach
+   rechnet das Muldenschild, danach bestellt der Abholer." Die Kasse war die
+   letzte Stelle, die noch die Rohstoffe las.
+3. **Der Ankaufspreis haengt daran.** 0,16 EUR/kg Ankauf ist genau der
+   Verkaufspreis von Mischschrott — "wer nur Mischschrott macht, arbeitet fuer
+   null" (Abschnitt 1.4). Das geht nur auf, wenn ein Kuehlschrank als 55 kg
+   Mischschrott abgerechnet wird (8,80 EUR). Ueber die Rohstoffe brachte er
+   1,93 EUR, also 0,035 EUR/kg: Der Spieler machte bei jedem Verbundteil
+   Verlust, ohne dass das je jemand entschieden haette.
+
+Die Behauptung "die Kasse ist ehrlicher, weil ein Kuehlschrank wirklich aus
+Blech, Kupfer und Kunststoff besteht" haelt dem Code nicht stand: Die Kasse
+rechnete **nicht** je Stoff zum eigenen Preis. Sie nahm die schwerste Fraktion
+und zahlte alles zu DEREN Preis — Kupfer zum Messingpreis, wenn mehr Messing
+dabei war. Ehrlich je Stoff rechnet nur das Schild
+(`containerValueGemischt`).
+
+### Die Sammelmulden
+
+Was zusammen abgerechnet wird, steht in **der Silo-Reihe** (`lager: true` +
+`mitFraktionen` in `containers.ts`) — keine zweite Liste,
+`economy/fraktionsgruppen.ts` fragt nur nach. Gruppen heute: KUPFER-LAGER
+{Kupfer, Messing}, ALU-LAGER {Alu, Zink}, KABEL {Kabel}, VA {VA}, BATTERIEN
+{Batterien}, ABFALL {Baumischabfall, Reifen, Holz, Kunststoff}. Stahl und
+Mischschrott haben kein Silo und stehen fuer sich.
+
+**Warum die Silos und nicht die Mulden am Bagger:** Die BUNT+VA-Mulde fasst
+sieben Fraktionen, ist aber ausdruecklich "Durchgang, nicht Abrechnung"
+(E-028) — Lambert traegt jedes Stueck in das Silo seiner Fraktion. Wuerde die
+Abrechnung auch sie lesen, haenge alles Nichteisen in einer Gruppe, und eine in
+einem Zug gekippte Buntmulde braechte 1742 statt 127,78 EUR.
+
+### Was das am Verdienst verschiebt
+
+Gemessen ueber **96 Tage a 12 Fuhren** (`tools/kassensturz.ts`), dieselben
+Ladungen fuer beide Rechnungen, 21,3 t Umschlag je Tag:
+
+| | alt | neu |
+|---|---:|---:|
+| Erloes, je Mulde sortiert verladen | 8378 EUR/Tag | 9178 EUR/Tag |
+| Erloes, je Fraktion einzeln verladen | 8785 EUR/Tag | 9178 EUR/Tag |
+| Erloes, gar nicht sortiert | 1333 EUR/Tag | 1154 EUR/Tag |
+| Ankauf | -3410 EUR/Tag | -3410 EUR/Tag |
+| **Verdienst (sortiert)** | **4968 EUR/Tag** | **5768 EUR/Tag** |
+
+Drei Wiederholungen: +14 % bis +16 % beim sortierenden Spieler, -11 % bis
+-13 % beim unsortierten. Der Abstand zwischen sauber und schlampig waechst von
+Faktor 6,3 auf 8,0. **Kein Preis, kein Reinheitsexponent und kein Startkapital
+wurde geaendert** — das ist allein die Folge der richtigen Buchfuehrung.
+
+Neu ist ausserdem eine Eigenschaft, die vorher fehlte: Es ist jetzt **gleich,
+ob man je Fraktion oder je Mulde verlaedt** (beide 9178 EUR/Tag). Vorher
+kostete das Zusammenlegen 407 EUR am Tag.
+
+### getBaleBonus: verdrahtet, nicht geloescht
+
+`press.getBaleBonus` wurde in `main.ts:713` auf 1,6 gesetzt und **nirgends
+gelesen** — der Ausbau "Groessere Presse" (42.000 EUR) tat nachweislich
+nichts. Loeschen ging nicht ohne eine Aenderung in `main.ts`; verdrahtet ist er
+deshalb als das, was im Kaufmenue steht: **"Schwerere Pakete, mehr Ladung je
+Abholung"**, also auf die **Pressdichte** und nicht aufs Geld.
+
+1,6 auf die Dichte macht dasselbe Paket 37,5 % kleiner (jede Kante -14,5 %),
+also passt rund die 1,6-fache Masse auf denselben Abholer. Ein Geldfaktor waere
+eine Preisaenderung ohne Quelle gewesen und haette ausserdem dem Kaufmenue
+widersprochen. **Am Erloes je Kilogramm aendert sich nichts**, und weil der
+Ausbau erst ab 160 t Umschlag angeboten wird, aendert sich an einem fruehen Tag
+gar nichts.
+
+### Ein Nebenbefund, der dabei herauskam
+
+Die Umstellung haette **E-091 wieder aufgemacht**, wenn sie fuer sich geblieben
+waere: Ein Presspaket aus 64 kg Kupfer und 217 kg Messing heisst "Mischschrott"
+(keine Fraktion hat 95 %) und waere auf 44,96 EUR statt 1393,90 EUR gefallen —
+Pressen haette wieder Sortierarbeit vernichtet. Ein Paket ist eben kein Stueck,
+sondern ein **Buendel**. Es traegt darum seit E-094 zwei Listen:
+
+* `composition` — woraus es gemacht ist (Farbflecken, wirtschaftliche Masse),
+* `fraktionsmix` — welche Fraktionen hineingingen (das Geld).
+
+Beide haengen an der FORM und ueberstehen damit den Spielstand (dieselbe
+Loesung wie E-092). Der Erloes ist vor und nach dem Zuschlagen wieder auf den
+Cent derselbe (`test/presspaket.test.ts`).
+
+### Was NICHT entschieden wurde
+
+* **Ob der +16-%-Sprung bleiben soll.** Das ist Balancing und damit Patricks
+  Entscheidung. Hier ist nur die Buchfuehrung repariert; kein Preis wurde
+  angefasst.
+* **Was das Schild einer Durchgangsmulde zeigen soll** — den sortierten Wert
+  (heute 1742 EUR) oder den, den ein Abkippen in einem Zug braechte
+  (127,78 EUR). Beides ist vertretbar; heute steht der sortierte Wert da.
+* **W-7 und W-8**: der Kommentar in `containers.ts:96-99` und die Ladeanzeige
+  in `main.ts:1439-1441`. Beide Dateien gehoeren anderen.
