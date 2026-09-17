@@ -11,7 +11,7 @@ import { WEIGH_Z, KAFFEE_THEKE } from "../world/yard";
 import { baueKundenfigur, baueHund, type Kundenfigur } from "../world/kundenfigur";
 import { AUSSEHEN_NEUTRAL } from "./aussehen";
 import type { Box } from "../world/boxen";
-import { packeLadung, stueckMass } from "./ladung";
+import { packeLadung, stueckMass, deckelVolumen } from "./ladung";
 
 /** So lange haelt ein beladener Abholer auf der Waage fuer Marios Kontrolle. */
 const WIEGE_HALT_S = 6;
@@ -1685,7 +1685,58 @@ class DeliveryVehicle {
         erste && schwer ? 0.55 : 0,
         this.sortedMaterial ?? undefined
       );
-      const kandidaten = [...specs, ...nachschub];
+      /*
+       * DIE ERSTE RUNDE LEGT EINZELN AUF (E-105).
+       *
+       * Sie warf ihre Brocken bisher alle auf einmal und pruefte erst danach,
+       * ob das Ziel ueberschritten ist. Solange die Haelfte davon ohnehin
+       * wieder wegfiel, ist das nie aufgefallen. Seit sie liegenbleiben, tut
+       * es das: Eine viertelvolle Fuhre kam mit 44 % an, obwohl sie 25 %
+       * bestellt hatte — genau der Befund, den E-033/E-044 schon einmal
+       * beseitigt haben, nur eine Stufe tiefer.
+       *
+       * Zwei Brocken sind bei einem Viertel eben schon die ganze Bestellung.
+       * Also zwei Regeln, beide ohne gewaehlte Zahl:
+       *
+       *   1. Einzeln auflegen und aufhoeren, sobald das Ziel steht.
+       *   2. EIN Stueck darf nicht allein groesser sein als die ganze
+       *      Bestellung. Wer eine viertelvolle Fuhre ankuendigt, bringt keine
+       *      Zwei-Tonnen-Maschine mit; er bringt Kleinkram.
+       *
+       * Bleibt danach nichts uebrig, kommt trotzdem das kleinste Stueck des
+       * Wurfs drauf — eine Fuhre aus null Teilen gibt es nicht.
+       */
+      const anteil = (sp: (typeof nachschub)[number]): number =>
+        raum > 0 ? deckelVolumen(sp.shape.kind, sp.shape.dims) / raum : 0;
+      const kandidaten = [...specs];
+      let steht = fuellung;
+      for (const sp of nachschub) {
+        // Was den Wagen ueber die Bestellung heben wuerde, bleibt beim Kunden
+        // im Hof stehen. Uebersprungen, nicht abgebrochen: Vielleicht passt
+        // das naechste Stueck noch.
+        if (steht > 0 && steht + anteil(sp) > zielFuellung) continue;
+        kandidaten.push(sp);
+        const probe = packeLadung(
+          kandidaten.map((k) => stueckMass(k.shape.kind, k.shape.dims)),
+          halbBreite,
+          nutzLaenge,
+          maxHoehe
+        );
+        steht =
+          raum > 0
+            ? kandidaten.reduce(
+                (a2, k, i) => a2 + (probe[i] ? deckelVolumen(k.shape.kind, k.shape.dims) : 0),
+                0
+              ) / raum
+            : 0;
+      }
+      // Eine Fuhre aus null Teilen gibt es nicht: Passt gar nichts, kommt das
+      // kleinste Stueck des Wurfs trotzdem drauf.
+      if (erste && kandidaten.length === specs.length && nachschub.length > 0) {
+        kandidaten.push(
+          nachschub.reduce((a2, b) => (anteil(b) < anteil(a2) ? b : a2), nachschub[0]!)
+        );
+      }
       const st = kandidaten.map((sp) => stueckMass(sp.shape.kind, sp.shape.dims));
       const pl = packeLadung(st, halbBreite, nutzLaenge, maxHoehe);
       const liegen = pl.filter(Boolean).length;
@@ -1693,8 +1744,15 @@ class DeliveryVehicle {
       // Bei sortenreinen Fuhren aus Kleinteilen kamen gemessen 42 auf eine
       // Flaeche — das fuellt zwar schoen, kostet aber jedes Bild Rechenzeit.
       if (liegen > 28 && !erste) break;
-      const belegt = st.reduce(
-        (a2, t, i) => a2 + (pl[i] ? t.r * 2 * (t.r * 2) * t.hoehe : 0),
+      /*
+       * Der Fuellgrad rechnet mit `deckelVolumen`, nicht mit dem echten
+       * Huellvolumen — siehe die Begruendung dort. Kurz: Mit dem echten
+       * Volumen ist eine Fuhre erst bei doppelt so vielen Koerpern voll, und
+       * das ist eine Budget- und Gestaltungsfrage, keine Reparatur.
+       */
+      const belegt = kandidaten.reduce(
+        (a2, sp, i) =>
+          a2 + (pl[i] ? deckelVolumen(sp.shape.kind, sp.shape.dims) : 0),
         0
       );
       const neueFuellung = raum > 0 ? belegt / raum : 0;
@@ -1754,10 +1812,17 @@ class DeliveryVehicle {
      * waere kein Schrottstueck mehr, sondern ein Amboss. Der Faktor 0,55 auf
      * das Huellvolumen traegt dem Rechnung, dass kaum ein Stueck seinen
      * Quader ausfuellt.
+     *
+     * Das HUELLVOLUMEN ist keines: Es ist das Quadrat der Grundriss-Diagonale
+     * mal Bauhoehe, nicht Breite mal Laenge mal Hoehe. Bei einem Blech von
+     * 1,90 m x 1,50 m sind das 5,86 m² Grundflaeche statt 2,85 m². Das steht
+     * seit E-105 in `ladung.deckelVolumen` — mit Absicht unveraendert, samt
+     * der Messung, was eine Berichtigung kosten wuerde (rund 18 % Tagesgeld).
+     * Es zu aendern ist eine Wirtschaftsentscheidung, keine Aufraeumarbeit.
      */
     const DICHTE_MAX = 2600;
     const grenze = (i: number): number =>
-      DICHTE_MAX * Math.pow(stuecke[i]!.r * 2, 2) * stuecke[i]!.hoehe * 0.55;
+      DICHTE_MAX * deckelVolumen(specs[i]!.shape.kind, specs[i]!.shape.dims) * 0.55;
     const gewicht = new Map<number, number>();
     for (const i of draufIdx) gewicht.set(i, specs[i]!.massKg);
     if (c && summeDrauf > 0) {
@@ -1811,6 +1876,16 @@ class DeliveryVehicle {
       );
     }
 
+    /*
+     * Die Vierteldrehung, mit der ein langes Stueck laengs auf den Wagen
+     * kommt (E-105). `packeLadung` raeumt den Platz dafuer frei; ohne diese
+     * Drehung laege das Modell quer ueber der Luecke, in die es gehoert.
+     */
+    const quer = new THREE.Quaternion().setFromAxisAngle(
+      new THREE.Vector3(0, 1, 0),
+      Math.PI / 2
+    );
+    const lage = new THREE.Quaternion();
     specs.forEach((sp, i) => {
       const platz = plaetze[i];
       if (!platz) return;
@@ -1821,7 +1896,9 @@ class DeliveryVehicle {
         LADE_RAND + platz.z
       );
       this.bedGroup.localToWorld(local);
-      const it = items.spawnScrap(sp.materialId, sp.massKg, sp.shape, local, bedQuat);
+      lage.copy(bedQuat);
+      if (platz.quer) lage.multiply(quer);
+      const it = items.spawnScrap(sp.materialId, sp.massKg, sp.shape, local, lage);
       // Das Setzen soll niemand sehen: erst wenn die Ladung ruhig liegt,
       // taucht der LKW fertig beladen auf.
       it.mesh.visible = false;

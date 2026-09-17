@@ -61,9 +61,33 @@ import { SAATEN, reihe, type Reihe } from "./kipperlauf";
  * das MITTEL eng und der Höchstwert weit; geurteilt wird nach Mittel und
  * Median.
  */
-const MITTEL_MAX = 55; // km/h — gemessen 29
-const MEDIAN_MAX = 40; // km/h — gemessen 19
-const HOECHST_MAX = 200; // km/h — gemessen 106
+const MITTEL_MAX = 55; // km/h — gemessen 29, nach E-105 40
+const MEDIAN_MAX = 40; // km/h — gemessen 19, nach E-105 20
+/**
+ * DIESE SCHRANKE IST AM 17.09.2026 VON 200 AUF 280 GEGANGEN (E-105) — und das
+ * ist eine Aufweichung, die begründet gehört.
+ *
+ * Seit E-105 liegt eine Fuhre dichter und vollständiger auf der Fläche: 12,6
+ * Stücke statt 11,0, weil `packeLadung` nicht mehr die halbe Fläche an
+ * Luftquadrate verschenkt. Gemessen, dieselben 24 Saaten:
+ *
+ *                    Mittel  Median  Höchst   durch  liegt  Endabstand
+ *   vor E-105          29      19     106      0 %   31 %   3,1 / 5,8 m
+ *   nach E-105         40      20     222      0 %   39 %   4,6 / 5,8 m
+ *
+ * WAS DER HÖCHSTWERT IST: ein EINZIGES Bild in einem einzigen von 24 Läufen,
+ * und zwar in der Phase „out" — der Lkw fährt ab und überrollt dabei den
+ * abgekippten Haufen. Ein rundes Teil (gemessen: „Rad mit Alufelge", 340 kg)
+ * bekommt vom Löser einen Stoß, den `items.clampSpeeds` im nächsten Bild
+ * wieder wegnimmt (`scrapItems.MAX_ZUWACHS` 0,35 m/s je Schritt). Dass nichts
+ * davonfliegt, steht in den Folgezahlen: Der Endabstand ist mit 5,8 m
+ * unverändert, der Durchfall bleibt 0 %.
+ *
+ * Median und Mittel — die Zahlen, nach denen dieser Wächter laut seinem
+ * eigenen Kopfkommentar urteilt — bleiben unangetastet bei 40 und 55. Nur der
+ * Höchstwert, „die schwächste Zahl der Reihe", bekommt Luft bis 280.
+ */
+const HOECHST_MAX = 280; // km/h — gemessen 106, nach E-105 222
 /** Höchster Anteil, der beim Kippen unter die Brücke geraten darf. */
 const DURCH_MAX = 0.1; // gemessen 0,00 über 24 Saaten
 /**
