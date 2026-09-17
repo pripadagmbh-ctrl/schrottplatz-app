@@ -8115,3 +8115,253 @@ hinweg presste, verlor bis zu 92 %. Beides ist weg.
    Zwölffache nach unten oder das Viereinhalbfache nach oben.
 3. **Vier Abfallsorten pressen, neu laden, abholen lassen.** Es muss **Geld
    kosten**. Bis heute bekam man dafür welches.
+
+---
+
+### E-093 — Der Ausfädel-Sprung: er erklärt Patricks Durchfall, und zwar ganz — 24,5 % gegen 0,0 % (17.09.2026)
+
+**Die Frage dieses Pakets war nicht, ob der Sprung wegkommt, sondern ob er
+Patricks letzten offenen Gerätebefund erklärt.** Er tut es.
+
+> „Es ist auf jeden Fall besser, nicht alles fällt durch, aber immer noch ein
+> paar Teile." (Patrick, 15.09.2026, nach der Reparatur des Kipper-Katapults)
+
+| 24 Saaten, gewürfelte Händlerfuhre | Mittel | Median | Höchst | **durch %** | weitestes Stück | Mittel |
+|---|---|---|---|---|---|---|
+| **Messfenster ALT** (endet, wenn die Spur frei ist) | 24,4 | 18,2 | 98,7 km/h | **0,0 %** | 5,97 m | 4,95 m |
+| **SPRUNG** (vor dem 17.09.) | 162,4 | 171,8 | **321,8** | **24,5 %** | **18,56 m** | 12,58 m |
+| **AUSFÄDELN** (gebaut) | 26,8 | 22,3 | 98,7 | **0,0 %** | 5,97 m | 4,95 m |
+
+Gepaart: **135,6 ± 18,2 km/h**, der Sprung schlechter in **23 von 24** Saaten.
+Tabelle in `docs/messungen/2026-09-17_ausfaedel-sprung.txt`,
+Werkzeug `tools/sprung-und-durchfall.ts`.
+
+---
+
+#### Warum das bis heute niemand gesehen hat
+
+**Das Messfenster endete einen Rechenschritt zu früh.** `test/kipperlauf.ts`
+bricht ab, sobald der Wagen die Abladespur räumt:
+
+```
+if (p === "out" || p === "toPark") break;
+```
+
+Der Sprung fällt im Bild **danach**. Deshalb stand in E-073, E-081 und E-084
+jedes Mal „Durchfall 0,0 %" — gemessen wurde bis genau eine Sechzigstelsekunde
+vor der Stelle, an der ein Viertel der Fuhre unter die Brücke gerät. Die erste
+Zeile der Tabelle ist der Beweis: **derselbe Lauf, dasselbe alte Fenster,
+0,0 %.** Erst mit sechs Sekunden Nachlauf (`nachlaufS`) wird der Befund
+sichtbar.
+
+Das ist die eigentliche Lehre dieses Eintrags, und sie ist unangenehm: **Drei
+Pakete haben eine Zahl als Entlastung gelesen, die gar nicht hinsah.**
+
+---
+
+#### Was der Sprung ist
+
+`vehicles.nearestS` liefert die Bogenlänge des Routenpunktes, der der
+aktuellen Position am nächsten liegt. An **fünf** Stellen wurde diese Zahl in
+`routeS` geschrieben, und der nächste Rechenschritt **setzte** den Wagen
+dorthin — quer über den Abstand, der dazwischen liegt. Dieselbe Bauart wie der
+Kipper-Katapult (E-073) und der Rangierknick (E-084): ein Körper wird
+**versetzt statt bewegt**, Rapier leitet daraus für den kinematischen Körper
+eine Geschwindigkeit ab und räumt die Durchdringung des nächsten Bildes in
+einem Schlag aus.
+
+**Die Sprungtabelle, mit dem echten Fahrzeug gemessen** (`tools/ausfaedeln.ts`,
+ganzer Zyklus, jeder Rechenschritt; ein regulärer Fahrschritt ist
+SPEED/60 = **0,080 m**):
+
+| Weg | Warteplatz | vorher | nachher |
+|---|---|---|---|
+| Abladeplatz | 1 | **5,59 m** | 0,08 m |
+| Abladeplatz | 2 | **8,74 m** | 0,08 m |
+| Abladeplatz | 3 | **6,63 m** | 0,08 m |
+| Abladeplatz | keiner | **1,32 m** | 0,08 m |
+| Silo | 1 | **5,56 m** | 0,08 m |
+| Silo | 2 | **8,71 m** | 0,08 m |
+| Silo | 3 | **1,02 m** | 0,08 m |
+| Silo | keiner | **1,32 m** | 0,08 m |
+
+`tools/einfaedeln.ts` hatte 5,30 / 8,50 / 6,36 m gerechnet — reine Geometrie
+vom Warteplatz aus. Der Wagen steht beim Abfahren nicht exakt auf seiner Marke
+(`parkRueck` hält bei 0,4 m), deshalb sind es in der Fahrt ein paar Zentimeter
+mehr. Der dritte Warteplatz springt auf dem Siloweg nur 1,02 m, weil dessen
+Ausfahrt über (−27 | 6) läuft und damit dicht an ihm vorbei.
+
+**Die vierte Zeile ist die wichtigste, und sie stand in keinem Auftrag.**
+`leaveUnloadingBay` setzte `routeS = 0`, also an den **Anfang** der Ausfahrt.
+Der Kipper steht da aber nicht mehr: `tipCreep` hat ihn gekippt
+`TIP_CREEP_M` = 1,4 m nach vorn gezogen, damit der Rest über die Kante
+nachrutscht (E-029). Er sprang deshalb bei **jeder** Fuhre **1,32 m
+rückwärts** — 79 m/s, 285 km/h — **mitten in den eben abgekippten Haufen**.
+Die Warteplätze springen weiter, aber sie treffen einen leeren Hof; diese
+Stelle trifft jedes Mal die frische Fuhre. Sie ist die Ursache der 24,5 %.
+
+Und sie erklärt auch den zweiten Teil des Befundes („Teile sind ganz woanders
+auf dem Platz gelandet", 15.09.2026): Das entfernteste Stück lag **18,56 m**
+vom Halteplatz statt 5,97 m.
+
+---
+
+#### Was gebaut ist
+
+Eine neue Phase **`ausfaedeln`** in `vehicles.ts`. Sie fährt frei zu dem
+Punkt, auf den der alte Stand gesprungen ist, und nimmt dort die Strecke auf —
+mit demselben Fahrgesetz wie `toPark` und E-084: begrenzte Drehrate, Tempo
+nach Restwinkel (`fahrtFaktor`). Der Schritt ist auf den Restabstand
+gedeckelt, der Wagen steht am Ende also **genau** auf dem Punkt; der Übergang
+ist wirklich sprungfrei und nicht nur fast.
+
+**Alle fünf Stellen gehen jetzt durch dieselbe Tür** (`starteAusfaedeln`):
+
+| Stelle | alter Wert von `routeS` | gemessener Sprung |
+|---|---|---|
+| `parked` → `out` | `nearestS` | 1,02 – 8,74 m |
+| `leaveUnloadingBay` | `0` | 1,32 m |
+| `sendAway` (Taste J) | `nearestS` | 0,00 m am Halteplatz |
+| `nudgeForward` | `nearestS` | **0,000 m** (nachgemessen) |
+| `waitLoad` → `out` (Abholer) | `0` | 0,00 m |
+
+Die letzten drei springen am Halteplatz nicht, weil dort der Anfang der
+Ausfahrt liegt. Sie gehen trotzdem durch dieselbe Tür — sonst bliebe eine von
+fünf Stellen springend, und in vier Wochen wüsste niemand mehr, welche.
+
+**`altS` steht als Parameter da**, weil die fünf Stellen nicht dieselbe Zahl
+setzten: drei nahmen `nearestS`, zwei die Null. Nur so liefert die Gegenprobe
+Zeichen für Zeichen das alte Verhalten.
+
+---
+
+#### Die Platzfrage — und warum sie nicht mit einer Regel zu beantworten war
+
+Ein Wagen, der **fährt** statt zu springen, überstreicht Fläche, die der
+Sprung übersprungen hat. Jede Fassung mit dem echten Umriss gegen alle
+Bauwerke gerechnet:
+
+| Fassung | tiefste NEUE Durchdringung | wo |
+|---|---|---|
+| direkt auf die Marke zufahren | **0,40 m** | Nordwand West, Warteplatz 2 (dazu 0,37 m Kaffeewagen) |
+| 6 m Anlauf auf der Strecke | **1,43 m** | Betriebsgebäude — die Waagenspur ist zu eng zum Einbiegen |
+| erst aus der Bucht, dann einfädeln | **0,50 m** | Halle 3 Süd, Warteplatz 3 — er wendet vor deren Tor |
+| **abgetastet, je Warteplatz einzeln** | **0,00 m** | — |
+
+**Keine der drei Regeln gewinnt überall**, und das ist Geometrie, keine
+Geschmacksfrage:
+
+- **Warteplatz 1 und 2 liegen am Tor.** Die Toröffnung ist 9,0 m breit
+  (`GATE_HALF` 4,5), der Umriss eines quer stehenden Dreiachsers misst 8,04 m
+  in der Länge — er passt nicht hindurch, solange er nicht steht wie das Tor.
+  Warteplatz 2 liegt 7,5 m östlich der Tormitte; ein Dreiachser braucht bei
+  5,60 m Wendekreis rund **10,6 m Weg**, um 7,5 m zur Seite zu versetzen, und
+  zwischen Warteplatz und Nordwand sind es **5 m**. Er MUSS erst aus der Bucht.
+- **Warteplatz 3 steht vor dem Tor von Halle 3.** Wer dort erst aus der Bucht
+  zieht, wendet genau davor. Er DARF nicht aus der Bucht.
+
+Deshalb wird **abgetastet, nicht festgelegt** — genau wie die Drehrichtung
+einer Kehre (`drehRichtung`, E-084). `ausfaedelTiefe` fährt beide Wege mit dem
+echten Umriss vor und nimmt den freien; bei Gleichstand (1 cm Toleranz, wie
+`UMRISS_TOLERANZ`) gewinnt der kürzere, also der ohne Umweg. Gerechnet wird
+mit grobem Schritt (0,1 s statt 1/60 s, höchstens 0,48 m und 0,085 rad je
+Probe) — die Probe soll den Weg abtasten, nicht ihn nachrechnen. Sie läuft
+**einmal je Abfahrt**, nicht je Bild.
+
+**Der Zwischenpunkt ist kein neuer Streckenpunkt.** Er ist genau der, an dem
+`toPark` den Wagen abgestellt hat, bevor er rückwärts an die Wand setzte
+(`PARK_ANFAHRT_M` südlich) — das Einparken rückwärts gelesen. **Kein
+Streckenpunkt des Platzes ist verschoben worden.**
+
+Nebenbei ist dabei ein Altbestand verschwunden: Der Wagen auf Warteplatz 2
+drehte sich bisher auf der Stelle um und schwenkte dabei **0,37 m durch
+Janines Kaffeewagen**. Jetzt zieht er erst heraus; die Zahl steht auf 0,00 m.
+
+---
+
+#### Die Wächter, jeder mit Gegenprobe
+
+`test/ausfaedeln.test.ts` (5 Prüfungen) fährt über `test/abfahrtslauf.ts` den
+**echten** `VehicleManager` durch **16 Stände** — drei Warteplätze und „ohne
+Pause", je auf dem Abladeplatz- und dem Siloweg, je alt und neu. Ein
+nachgebauter Fahrplan wie in `test/knicklauf.ts` sähe die Stelle gar nicht:
+Der Sprung entsteht nicht **auf** einer Strecke, sondern beim **Wechsel** auf
+eine. Jeder Stand wird genau einmal gefahren und gemerkt (mit fester Saat sind
+die Läufe bitgleich); die Datei braucht 42 s.
+
+1. **Höchstens ein Fahrschritt je Bild** — Schranke 0,080 m × 1,25.
+2. **GEGENPROBE, die melden MUSS:** `faedeltAus = false` **ist** der alte
+   Zustand (kein nachgebauter Fehler, Lehre aus E-054). Alle **sechs** Stände
+   mit Warteplatz müssen auffallen, der größte über 5 m.
+3. **ZWEITE GEGENPROBE:** auch ohne Warteplatz muss der Rückversatz nach dem
+   Kippkriechen gemeldet werden (> 1,0 m, Phase `out`).
+4. **Die Platzfrage, gepaart gemessen:** Das Ausfädeln darf in **kein**
+   Bauwerk führen, in dem der Sprung nicht auch war. Gepaart und nicht
+   absolut, weil `toPark` seit jeher 0,70 m durch das KUPFER-LAGER Nord fährt
+   (siehe „Was offen bleibt") — wer absolut prüft, prüft diesen Altbestand mit
+   und erfährt nichts über das Ausfädeln.
+5. **Er kommt an:** Die Phase `ausfaedeln` kommt vor, die letzte Phase ist
+   `out`, und der Zyklus bleibt unter 300 s. Ein Wagen, der sich beim
+   Ausfädeln festfährt, hielte den ganzen Betrieb an — das wäre schlimmer als
+   der Sprung. Dazu eine Notbremse im Quelltext: `AUSFAEDEL_FRIST_S` = 20 s
+   (gerechnet: längster Weg 3,5 s Fahrt plus zweimal eine halbe Wendung zu je
+   3,7 s = 10,9 s, knapp das Doppelte).
+
+Dazu ist `test/kipperlauf.ts` an einer Stelle erweitert: `ausfaedeln` zählt in
+derselben Zeile wie `out` und `toPark` (sonst misst der reparierte Stand
+länger als der alte), und `nachlaufS` öffnet das Fenster über die Abfahrt
+hinaus. **Ohne Angabe ändert sich nichts** — alle bestehenden Kipper-Zahlen
+sind unberührt.
+
+---
+
+#### Was NICHT entschieden ist
+
+1. **`toPark` fährt 0,70 m durch das KUPFER-LAGER Nord und 0,50 m durch
+   Halle 3 Süd** (Warteplatz 1 und 2, vom Siloweg kommend). Das ist ein
+   **Altbestand**, gemessen im alten wie im neuen Stand, und es ist derselbe
+   Fehler in Grün: eine freie Fahrt quer über den Hof ohne Blick auf die
+   Bauwerke. Es gehört nicht in dieses Paket — ich hätte dafür entweder die
+   Abtastung auch auf `toPark` legen oder einen Streckenpunkt setzen müssen,
+   und beides ändert, wie Fahrzeuge zum Kaffee fahren. *Empfehlung: eigenes
+   Paket, dieselbe Abtastung.*
+2. **`parkRueck` dreht schneller, als die Lenkrate erlaubt.** Dort steht
+   `diff × min(dt × 1,6; 1)` statt `lenkeEin`; gemessen springt die
+   Umrissecke dabei 0,36 m je Bild (E-084 hält sonst 0,14 m). Der Wächter
+   deckelt es bei 0,50 m, damit es nicht wächst. *Empfehlung: mit Punkt 1
+   zusammen.*
+3. **Ob der Umschlag jetzt zu langsam ist.** Das Ausfädeln kostet Fahrzeit;
+   gemessen bleibt der Zyklus unter 300 s, aber wie es sich anfühlt,
+   entscheidet das Gerät.
+4. **Teil B des Auftrags — „der Kunde steigt beim Verhandeln aus" — ist NICHT
+   gebaut.** Die Messreihen und die drei Fassungen der Platzfrage haben das
+   Paket gefüllt; ein angefangener zweiter Teil wäre schlechter als ein
+   fertiger erster. Vorbereitet ist er trotzdem: Die Figur (`baueKundenfigur`,
+   2 Netze, 3 Zeichenrufe) wird in `vehicles.ts` schon gebaut und bewegt,
+   `steigeAus`/`updateFahrer` sind die Stellen, und die Frage „wo steht er?"
+   ist gegen die Spuren zu rechnen, nicht zu wählen.
+
+**Verworfene Alternative.** Den Einfädelpunkt weiter vorn auf der Strecke zu
+wählen, damit der Wagen Anlauf hat (die naheliegende Lesart von „er soll nicht
+quer ankommen"). Gemessen **schlechter als der Sprung**: 1,43 m im
+Betriebsgebäude. Die Waagenspur zwischen den Hallen ist kein Ort, an dem man
+einbiegt.
+
+**Abnahmekriterium.** `npm run build` mit Rückgabewert **0** und `npm test`
+mit Rückgabewert **0**, beide einzeln aufgerufen und der Ausgangswert gelesen:
+**113 Dateien, 1.310 Prüfungen** (vorher 112 / 1.305 — eine Datei und fünf
+Prüfungen mehr). `npx tsc -p tsconfig.test.json` Rückgabewert 0.
+
+**Auf dem Gerät zu prüfen.**
+
+1. **Eine Kipperfuhre abkippen und den Haufen ansehen, bis der LKW weg ist.**
+   Das ist die Zahl: 24,5 % der Fuhre fielen bisher unter die Brücke, und zwar
+   erst, nachdem der Wagen anfuhr. Bleibt der Haufen jetzt liegen, wo er
+   hingekippt wurde?
+2. **Warten, bis ein Händler auf einem Warteplatz Pause macht, und ihn
+   abfahren lassen.** Er sprang bisher 5 bis 9 m quer über den Hof. Zieht er
+   jetzt sichtbar aus der Bucht (Plätze 1 und 2 an der Nordwand) bzw. fährt er
+   direkt los (Platz 3 vor Halle 3)? Und stößt er dabei irgendwo an?
+3. **Teile dorthin legen, wo ein abfahrender LKW vorbeikommt.** Werden sie
+   beiseitegeschoben (richtig) oder weggeschossen (falsch)?
+4. **Der Umschlag ist noch etwas langsamer geworden.** Merkt man das?
