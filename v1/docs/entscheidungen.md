@@ -9391,3 +9391,49 @@ meldet Anfang und Ende; der Bagger schwenkt ohne ihn im Bild.
    ans Silo?
 3. **Während er unterwegs ist, einen LKW anliefern lassen.** Bricht er ab und
    fährt an den Rand — oder steht er dem Wagen im Bild?
+## 2026-09-17 — Der Weg zum Warteplatz wird eine Strecke
+
+| # | Entscheidung | Begründung | Alternative (verworfen) |
+|---|---|---|---|
+| E-103 | **`toPark` und `parkRueck` fahren über `advance()` auf einer echten Strecke** — `routes.routeToPark()` hängt den Weg zur Bucht an die Ausfahrt, die der Wagen ohnehin fährt, und biegt am nächstgelegenen Streckenpunkt ab; `routes.routeParkRueck()` sind die letzten acht Meter rückwärts. Damit greift die bestehende Prüfung, ohne eine Zeile neuer Logik | Patricks Befund vom 17.09.2026 („LKWS fahren durch Müllcontainer") hatte genau eine Ursache: Beide Phasen rechneten mit `dx/dz` eine Luftlinie und schrieben sie direkt auf `group.position` — an `advance()` vorbei und damit an `isBlockedByBuilding()` vorbei (E-097). Gemessen **3,10 m** Blech im Container, jetzt **0,00 m** in allen dreizehn Fahrproben | **Stehenbleiben und hupen ODER beiseiteschieben** als Sonderregel für diesen einen Weg. Über `advance()` verhält sich der Wagen wie überall sonst auf dem Hof; eine eigene Regel nur für den Weg zum Warteplatz wäre eine zweite Wahrheit gewesen |
+| E-103 | **Der Abzweigpunkt ist der Streckenpunkt, der der Bucht am nächsten liegt** | Abgetastet mit dem echten Umriss (`tools/parkweg-probe.ts`) über alle fünf Ausfahrten mal drei Buchten: In **allen 15 Fällen** ist die Abzweigung am nächsten Punkt frei (0,00 m). Der letzte Punkt wäre es nicht — vom Tor (−22 \| 40) aus 0,60 m Nordwand Ost, von der Waage (−27,5 \| 22,5) aus 0,55 bis 0,60 m Betriebsgebäude | Einen eigenen Wegpunkt je Warteplatz von Hand setzen. Dann hinge er an der Platzgeometrie und niemand zöge ihn nach, wenn eine Halle umzieht |
+| E-103 | **`ItemManager.raeumeVerwaiste()`: kein Körper wird mehr gefragt, ohne vorher `isValid()` zu fragen** — Aufruf am Anfang von `clampSpeeds` (jedes Bild) und vor `settle`; dazu Wächterzeilen in `settleSleep`, `syncMeshes` und `findNearest` | Das war der **härteste Einzelfehler** des ganzen Berichts, und er ist kein Grenzfall. Gemessen (`tools/absturz-probe.ts`): `isDynamic()` auf einem entfernten Körper wirft `RuntimeError: unreachable`, und **danach ist die ganze Rapier-Welt hin** — der nächste `world.step()` meldet „recursive use of an object detected which would lead to unsafe aliasing in rust". Nicht ein Teil steht still, sondern das Spiel | Nur die eine Zeile in `clampSpeeds` absichern. `syncMeshes` und `findNearest` fragen denselben Körper im selben Bild — der Absturz wäre eine Zeile weiter wiedergekommen |
+| E-103 | **Die Streckenliste trägt ihre Phasen, und `test/streckenliste.test.ts` liest `vehicles.ts` gegen** | **Der blinde Fleck saß nicht in der Hindernisliste, sondern in der Streckenliste.** `test/strecken.ts` kannte vier Etappen je Fuhre; das Fahrzeug fuhr fünf. Was in keiner Liste steht, tastet kein Wächter ab — und `test/fahrumriss.test.ts` blieb grün, während der Kipper mittendurch fuhr. Der neue Wächter sucht in `src/delivery/vehicles.ts` jede Phase, in deren `case`-Zweig `advance()` steht, und verlangt sie in der Liste | Die zwei fehlenden Etappen von Hand nachtragen und es dabei belassen. Dann fehlte die sechste genauso wie vorher die fünfte |
+
+**Was gebaut wurde, Datei für Datei.**
+
+* **`src/delivery/routes.ts`** — `parkAnfahrt()`, `routeToPark()`, `routeParkRueck()`. Reine Geometrie, kopflos prüfbar.
+* **`src/delivery/vehicles.ts`** — `case "toPark"` und `case "parkRueck"` rufen `advance()`; `leaveUnloadingBay()` fädelt auf den Parkweg ein wie auf jede andere Strecke (E-094, unverändert übernommen). Die beiden `snapBodiesToPose()`-Aufrufe sind damit weg. `meinParkweg` wird beim Verlassen des Abladeplatzes **einmal** gerechnet und nicht mehr angefasst — aus demselben Grund wie `meineAnfahrt`.
+* **`src/world/scrapItems.ts`** — `raeumeVerwaiste()` und vier Wächterzeilen.
+* **`test/strecken.ts`** — `Etappe.phasen`; je Ausfahrt und Bucht eine Kette `Rangieren → zum Warteplatz → Parken`; `alleStrecken()` leitet alles daraus ab (vorher waren die drei Buchten von Hand angehängt und der Weg dorthin fehlte ganz).
+* **`test/streckenliste.test.ts`** (neu, 3 Fälle) — der Wächter gegen den blinden Fleck, mit **zwei** Gegenproben: Der Abtaster muss eine erfundene Phase finden, und die auf den Stand vom 16.09. verkürzte Liste muss `toPark` und `parkRueck` melden.
+* **`test/verwaisteKoerper.test.ts`** (neu, 3 Fälle) — der Absturz, mit Gegenprobe: `isDynamic()` auf einem entfernten Körper **muss** werfen, sonst wäre die Reparatur überflüssig. Der Fall steht absichtlich zuletzt in der Datei, weil sein Fehlschlag die Rapier-Welt zerstört, in der er passiert.
+* **`test/durchfahrt.test.ts`** — zwei der neun Wächter umgeschrieben, keiner gelöscht (siehe unten).
+* **`tools/parkfahrten.ts`, `tools/parkweg-probe.ts`, `tools/absturz-probe.ts`** (neu) — die drei Messungen, auf die sich die Zahlen oben berufen. Rohausgaben in `docs/messungen/2026-09-17_parkweg.md`.
+
+**Welche der neun Wächter aus E-097 umgeschrieben wurden — und warum nicht gelöscht.** Ein behobener Befund, dessen Fall verschwindet, kann unbemerkt zurückkommen.
+
+| Wächter | vorher | jetzt |
+|---|---|---|
+| „der Kipper fährt **voll durch** den MUELL-Container" | hielt 3,10 m fest | **„fährt NICHT durch"** — dieselbe Fahrt, dieselbe Abtastung, Antwort null |
+| „GEGENPROBE: ohne Warteplatz fährt er vorbei" | war die Gegenprobe zu obigem | steht unverändert, ist aber keine Gegenprobe mehr (beide null). **Neu dazu:** „die alte Luftlinie trifft ihn mit voller Fahrzeugbreite" — der alte Weg als **Eingangswert**, gemessen 2,92 m mit der starren Gierlage der Linie (die Fahrt selbst kam auf 3,10 m, weil der Wagen beim Einlenken längs stand) |
+| „Kollider sind da, nur hält niemand niemanden auf" | 3,10 m, 32 Berührpunkte, 0,000 m/s | **Die Bauart-Aussage bleibt Wort für Wort** (kinematisch wird von nichts aufgehalten, nur die Wegplanung hält an). Die Zahlen sind umgedreht: 0,00 m, 0 Berührpunkte, **4,890 m/s statt 0,000** |
+| die übrigen sechs | — | unverändert grün: Nullprobe, Hindernisliste vollständig, gemeldeter Containerumriss (7 cm / 17,5 cm), Westmauer-Gegenprobe, 0,60 m Ostwand, `CHASSIS_PAD` gegen `UNTERWAGEN_R` |
+
+**Was ausdrücklich unberührt blieb, nachgemessen.** Lenkrate `LENK_RATE` 0,85 rad/s, Vorausschau `VORAUS_M` 1,5 m, `PIVOT_AB` und die Phase `ausfaedeln` samt `AUSFAEDEL_FRIST_S` — `test/rangierknick.test.ts` und seine beiden Gegenproben sind grün, mit **68 statt 17 Fahrplänen**. Die Objektzahl ist nicht angefasst (E-080). `src/excavator/`, `src/fuenfschalen/`, `src/ui/`, `src/audio/` und `src/economy/` sind nicht angefasst.
+
+**Was hier NICHT entschieden ist.**
+
+1. **Die 0,60 m in der Ostwand beim Eindrehen am Abladeplatz.** Nachgemessen: **unverändert 0,60 m** über alle 360 Gierlagen, tiefstens bei 44 Grad. Kein Rechenfehler — der Abladeplatz liegt 2,15 m vor der Wand, der Umriss überstreicht beim Drehen 4,0 m Halbmesser. Im gefahrenen Bogen sind es je nach Lauf 0,00 bis 0,27 m. Den Platz umzubauen ist Patricks Sache.
+2. **Ob der Warteplatz (−26 \| 6) bleibt.** Die Frage hat sich erledigt: Er ist über eine echte Strecke erreichbar, die Abzweigung liegt bei (−21 \| 10) und ist frei, und zehn Fuhren in Folge sind dort angekommen. Er kann bleiben.
+3. **`CHASSIS_PAD` (1,30 m, `src/excavator/collision.ts:43`) gegen `UNTERWAGEN_R` (2,60 m, `src/excavator/excavator.ts:540`).** Nicht angefasst — im Baggerordner arbeitet womöglich noch jemand. Der Unterschied ist genau die Tiefe, um die der Unterwagen in den Container hineinragt.
+4. **Der gemeldete Containerumriss** (`containers.ts`, `get hindernis`: Oberkante 1,00 m gemeldet, 1,175 m gebaut). Nicht angefasst; der Wächter hält die Zahl fest.
+5. **`ausfaedeln` hat weiter 0,000 m/s abgeleitetes Tempo** — es ruft `snapBodiesToPose()`, genau wie `toPark` es tat. Es dauert beim Weg zum Warteplatz **ein einziges Bild**, weil der Wagen schon am Streckenanfang steht. E-094 ist gerade erst gelandet und sollte unberührt bleiben; hier steht die Zahl.
+
+**Abnahmekriterium.** `npm run build` mit Rückgabewert **0 GEPRÜFT**. `npm test` mit Rückgabewert **0 GEPRÜFT: 118 Dateien, 1.357 Prüfungen** (vorher 116 / 1.350 — sieben neue), Laufzeit 144 s. Fahrprobe: **10 von 10 Fuhren** erreichen den Warteplatz, tiefste Durchdringung über 40.345 Bilder **0,00 m**. Messwerte kopflos: 119 Körper, Spitze 93 wache dynamische, 1,497 ms Physik je Bild — das ist der Lauf mit zehn abgekippten Fuhren auf dem Hof und ohne Bagger, der sie wegräumt, also die obere Grenze.
+
+**Auf dem Gerät zu prüfen.**
+
+1. **Einen Kipper abladen lassen und ihm zum Warteplatz an der Westseite folgen.** Er fährt jetzt nicht mehr quer über den Hof, sondern die Ausfahrt entlang bis kurz vor die Waage und biegt dann nach Süden ab. Fährt er noch durch den Müllcontainer — und sieht der Umweg richtig aus oder umständlich?
+2. **Den Müllcontainer mitten auf diesen Weg stellen** (etwa auf −21 | 10) und dasselbe noch einmal. Hält der Wagen davor an und hupt?
+3. **Beim Rückwärtssetzen in die Parkbucht zusehen.** Der Wagen dreht sich jetzt erst auf der Stelle ein und stößt dann zurück, statt sich während der Fahrt hineinzudrehen. Wirkt das wie ein Fahrer, der einparkt?

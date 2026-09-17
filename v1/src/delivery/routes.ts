@@ -729,6 +729,71 @@ export const PARK_ANFAHRT_M = 8;
 /** So lange bleibt ein Fahrzeug stehen (s) */
 export const PARK_TIME_S: [number, number] = [45, 120];
 
+/** Der Punkt, an dem der Fahrer anhaelt, bevor er rueckwaerts in die Bucht setzt. */
+export function parkAnfahrt(slot: [number, number]): [number, number] {
+  return [slot[0], slot[1] - PARK_ANFAHRT_M];
+}
+
+/**
+ * DER WEG ZUM WARTEPLATZ — seit E-098 eine STRECKE wie jede andere.
+ *
+ * Bis zum 17.09.2026 rechnete `vehicles.toPark` mit `dx/dz` eine LUFTLINIE
+ * vom Abladeplatz zur Bucht und schrieb sie direkt auf `group.position`. Das
+ * ging an `advance()` vorbei und damit an `isBlockedByBuilding()` — was auf
+ * dieser Linie stand, kam in keiner Liste vor, die irgendjemand prueft.
+ * Gemessen (E-097): 3,10 m Blech im MUELL-Container, die volle Fahrzeugbreite,
+ * und zwar schon an seinem STARTPLATZ. Die Linie vom Abladeplatz (6,3 | −23)
+ * zum Anfahrtspunkt des Westwarteplatzes (−26 | −2) schneidet (−2,80 | −17,08).
+ *
+ * DIE REPARATUR IST KEIN NEUER WEG, SONDERN DER BEKANNTE. Der Wagen faehrt
+ * die AUSFAHRT ab, die er ohnehin faehrt, und biegt an dem Punkt zur Bucht
+ * ab, der ihr am naechsten liegt. So macht es ein Fahrer auf dem Hof auch: Er
+ * faehrt die Spur und biegt ab, er schneidet nicht quer ueber die Flaeche.
+ *
+ * WARUM DER NAECHSTE PUNKT UND NICHT DER LETZTE. Abgetastet mit dem echten
+ * Umriss (`tools/parkweg-probe.ts`, 17.09.2026) ueber alle fuenf Ausfahrten
+ * und alle drei Buchten: Die Abzweigung am naechstgelegenen Streckenpunkt ist
+ * in JEDEM der 15 Faelle frei (0,00 m). Der letzte Punkt waere es nicht — vom
+ * Tor (−22 | 40) aus steckt die Ecke 0,60 m in der Nordwand Ost, von der
+ * Waage (−27,5 | 22,5) aus 0,55 bis 0,60 m im Betriebsgebaeude. Geprueft
+ * bleibt es trotzdem: Die Strecke steht seit E-098 in `test/strecken.ts` und
+ * wird von `test/fahrumriss.test.ts` und `test/rangierknick.test.ts`
+ * abgefahren.
+ */
+export function routeToPark(
+  ausfahrt: Array<[number, number]>,
+  slot: [number, number]
+): Array<[number, number]> {
+  const bucht = parkAnfahrt(slot);
+  let abzweig = 0;
+  let naechster = Infinity;
+  for (let i = 0; i < ausfahrt.length; i++) {
+    const d = Math.hypot(ausfahrt[i]![0] - bucht[0], ausfahrt[i]![1] - bucht[1]);
+    if (d < naechster) {
+      naechster = d;
+      abzweig = i;
+    }
+  }
+  const bis: Array<[number, number]> = ausfahrt
+    .slice(0, abzweig + 1)
+    .map((p) => [p[0], p[1]] as [number, number]);
+  return [...bis, bucht];
+}
+
+/**
+ * Die letzten acht Meter: rueckwaerts aus der Anfahrt in die Bucht.
+ *
+ * Dieselben zwei Punkte, die `test/strecken.ts` seit E-081 als „Parken n"
+ * fuehrt — jetzt faehrt das Fahrzeug sie auch wirklich ab, statt sie mit
+ * `dx/dz` nachzubilden. Rueckwaerts heisst `poseAuf(..., true)`: Die Bahn
+ * zeigt nach Norden, die Kabine steht um 180 Grad gedreht, der Wagen endet
+ * also mit dem Heck an der Wand — genau die Lage, die `parkRueck` bis heute
+ * mit `rotation.y = Math.PI` hart gesetzt hat.
+ */
+export function routeParkRueck(slot: [number, number]): Array<[number, number]> {
+  return [parkAnfahrt(slot), [slot[0], slot[1]]];
+}
+
 export const SPEED = 4.8; // m/s (SW) — zuegiger Umschlag
 export const FIRST_DELAY_S = 12; // (SW)
 export const NEXT_DELAY_S: [number, number] = [7, 15]; // (SW) — dichter Umschlag

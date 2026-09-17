@@ -116,7 +116,9 @@ import {
   bayInRev,
   bayOut,
   PARK_SLOTS,
-  PARK_ANFAHRT_M,
+  parkAnfahrt,
+  routeToPark,
+  routeParkRueck,
   PARK_TIME_S,
   SPEED,
   FIRST_DELAY_S,
@@ -505,7 +507,17 @@ class DeliveryVehicle {
   private leaveUnloadingBay(): void {
     this.phaseT = 0;
     if (this.parkSpot) {
-      this.phase = "toPark";
+      /*
+       * ZUM WARTEPLATZ AUF EINER STRECKE (E-098).
+       *
+       * Hier stand `this.phase = "toPark"`, und `toPark` rechnete sich von da
+       * an seine eigene Luftlinie — an `advance()` und damit an der
+       * Bauwerkspruefung vorbei. Jetzt bekommt der Wagen eine Strecke wie fuer
+       * jede andere Etappe, und er faedelt darauf ein wie ueberall sonst
+       * (E-094): Er faehrt den Weg zum Streckenanfang AB, statt zu springen.
+       */
+      this.meinParkweg = routeToPark(this.routeOut, this.parkSpot);
+      this.starteAusfaedeln(this.meinParkweg, "toPark", this.nearestS(this.meinParkweg));
       return;
     }
     /*
@@ -1098,6 +1110,13 @@ class DeliveryVehicle {
   private meineAnfahrt: Array<[number, number]> | null = null;
   private meinRueckweg: Array<[number, number]> | null = null;
   private meineAusfahrt: Array<[number, number]> | null = null;
+  /**
+   * Der Weg zum Warteplatz. Wird beim Verlassen des Abladeplatzes EINMAL
+   * gerechnet und danach nicht mehr angefasst — aus demselben Grund wie die
+   * Anfahrt darueber: Sonst rutschte dem fahrenden Wagen die Strecke unter den
+   * Raedern weg, sobald der Bagger den Abladeplatz versetzt.
+   */
+  private meinParkweg: Array<[number, number]> | null = null;
 
   /**
    * Halteposition nach der aktuellen Baggerstellung festlegen.
@@ -1154,6 +1173,10 @@ class DeliveryVehicle {
     const mulde = this.zielMulde;
     if (mulde) return bayOut(mulde);
     return this.meineAusfahrt ?? routeOut();
+  }
+  /** Die Strecke zum Warteplatz — Ausfahrt bis zum Abzweig, dann in die Bucht. */
+  private get routeParken(): Array<[number, number]> {
+    return this.meinParkweg ?? routeToPark(this.routeOut, this.parkSpot ?? PARK_SLOTS[0]!);
   }
 
   constructor(
@@ -2581,61 +2604,56 @@ class DeliveryVehicle {
         break;
       case "toPark": {
         /*
-         * Zum Warteplatz rollen — aber nicht bis an die Wand: Der Fahrer
-         * haelt davor, dreht sich und setzt dann rueckwaerts an die
-         * Graffitiwand neben den Kaffeewagen (Wunsch 11.09.2026). Niemand
-         * stellt sich mit der Schnauze an die Mauer.
+         * ZUM WARTEPLATZ — UEBER `advance`, WIE JEDE ANDERE ETAPPE (E-098).
+         *
+         * HIER SASS PATRICKS BEFUND vom 17.09.2026: „LKWS fahren durch
+         * Muellcontainer." Bis heute stand an dieser Stelle eine Luftlinie aus
+         * `dx/dz`, direkt auf `group.position` geschrieben — an `advance()`
+         * vorbei und damit an `isBlockedByBuilding()` vorbei. Gemessen
+         * (E-097): 3,10 m Blech im Container, die volle Fahrzeugbreite, in
+         * Phase `toPark`, Bild 2259. Der Container stand dabei still: Es lag
+         * nie an fehlenden Kollidern, sondern daran, dass NIEMAND auf dem Weg
+         * nachgesehen hat.
+         *
+         * Ueber `advance()` verhaelt sich der Wagen jetzt wie ueberall sonst
+         * auf dem Hof: Er schaut 4 m voraus, haelt vor einem Bauwerk an und
+         * hupt. Eine Sonderregel nur fuer den Weg zum Warteplatz waere eine
+         * zweite Wahrheit gewesen.
+         *
+         * Und der zweite Fehler faellt damit mit weg: Die Luftlinie rief
+         * `snapBodiesToPose()`, setzte also die JETZIGE Pose, waehrend das
+         * Ende von `update()` dieselbe Pose als NAECHSTE meldet. Die Differenz
+         * war null und damit auch das abgeleitete Tempo des kinematischen
+         * Rahmens — 0,000 m/s statt 4,89 auf der Strecke. Rapier sah keinen
+         * Stoss, sondern eine ruhende Ueberdeckung (E-073 mit umgekehrtem
+         * Vorzeichen: dort Katapult, hier Gespenst).
          */
         this.sideOpenTarget = 0;
-        const ziel = this.parkSpot!;
-        const dx = ziel[0] - this.group.position.x;
-        const dz = ziel[1] - PARK_ANFAHRT_M - this.group.position.z;
-        const d = Math.hypot(dx, dz);
-        if (d < 0.6) {
+        const r = this.routeParken;
+        this.advance(r, SPEED * dt, false, dt);
+        if (this.routeS >= this.routeLength(r)) {
           this.phase = "parkRueck";
           this.phaseT = 0;
-          break;
+          this.routeS = 0;
         }
-        /*
-         * AUCH HIER WIRD EINGELENKT (E-081). Bis zum 16.09.2026 stand hier
-         * `rotation.y = atan2(dx, dz)` — beim ersten Bild dieser Phase ist
-         * das ein Sprung von der Ausfahrtsrichtung auf die Richtung zum
-         * Warteplatz. Der Wagen ist dann zwar leer, faehrt aber quer ueber
-         * den Hof, auf dem Schrott liegt.
-         */
-        const soll = Math.atan2(dx, dz);
-        const rest = Math.abs(winkelRest(this.group.rotation.y, soll));
-        const schritt = Math.min(SPEED * dt * fahrtFaktor(rest), d);
-        this.group.position.x += (dx / d) * schritt;
-        this.group.position.z += (dz / d) * schritt;
-        this.group.rotation.y = lenkeEin(this.group.rotation.y, soll, this.lenkrate * dt);
-        this.snapBodiesToPose();
         break;
       }
       case "parkRueck": {
-        // Rueckwaerts an die Wand, dabei in die Laengsrichtung eindrehen.
-        const ziel = this.parkSpot!;
-        const dx = ziel[0] - this.group.position.x;
-        const dz = ziel[1] - this.group.position.z;
-        const d = Math.hypot(dx, dz);
-        if (d < 0.4) {
-          this.group.rotation.y = Math.PI; // Front zum Platz, Heck zur Wand
+        /*
+         * Rueckwaerts in die Bucht — auf den zwei Punkten, die
+         * `test/strecken.ts` seit E-081 als „Parken n" fuehrt. Das Eindrehen
+         * vor der Rueckwaertsfahrt macht `advance` selbst (E-081: „Rueckwaerts
+         * wird IMMER erst ausgerichtet"), und `drehRichtung` waehlt dabei die
+         * Seite mit der geringeren Durchdringung (E-084). Die Endlage ist
+         * dieselbe wie vorher: `poseAuf(..., true)` auf einer Bahn nach Norden
+         * ist genau `rotation.y = Math.PI` — Front zum Platz, Heck zur Wand.
+         */
+        const r = routeParkRueck(this.parkSpot!);
+        this.advance(r, PARK_RUECK_SPEED * dt, true, dt);
+        if (this.routeS >= this.routeLength(r)) {
           this.phase = "parked";
           this.phaseT = 0;
-          this.snapBodiesToPose();
-          break;
         }
-        const schritt = Math.min(PARK_RUECK_SPEED * dt, d);
-        this.group.position.x += (dx / d) * schritt;
-        this.group.position.z += (dz / d) * schritt;
-        // Die Front zeigt beim Zurueckstossen nach Sueden; sie dreht sich
-        // waehrend der Fahrt dorthin ein, statt zu springen.
-        const soll = Math.PI;
-        let diff = soll - this.group.rotation.y;
-        while (diff > Math.PI) diff -= Math.PI * 2;
-        while (diff < -Math.PI) diff += Math.PI * 2;
-        this.group.rotation.y += diff * Math.min(dt * 1.6, 1);
-        this.snapBodiesToPose();
         break;
       }
       case "parked":
@@ -2677,7 +2695,7 @@ class DeliveryVehicle {
            *   wendet der Wagen genau davor: 0,50 m Halle 3 Sued. Ohne: 0,00 m.
            */
           const p = this.parkSpot!;
-          const bucht: [number, number] = [p[0], p[1] - PARK_ANFAHRT_M];
+          const bucht = parkAnfahrt(p);
           const marke = this.punktAuf(this.routeOut, this.nearestS(this.routeOut));
           const ohne = this.ausfaedelTiefe([marke]);
           const mit = this.ausfaedelTiefe([bucht, marke]);
