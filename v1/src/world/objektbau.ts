@@ -403,9 +403,71 @@ function dunkler(hex: number, f: number): number {
  * Objekt sieht nach dem Laden eines Spielstands wieder gleich aus, ohne dass
  * die Farbe gespeichert werden müsste.
  */
-function lackton(palette: number[], w: number, h: number, d: number): number {
+export function lackton(palette: number[], w: number, h: number, d: number): number {
   const k = Math.abs(Math.round(w * 977 + h * 613 + d * 419));
   return palette[k % palette.length];
+}
+
+/**
+ * AUTOLACKE — die Farben, in denen Autos wirklich gebaut werden.
+ *
+ * Anlass (Patrick, 17.09.2026): „und autos, brauchen wir verschiedene modelle,
+ * farben und wrackzustände". Bis dahin war JEDES Wrack derselbe rote Kasten
+ * (`composites.buildMeshes`, Lack 0x8c2f24).
+ *
+ * Die Reihenfolge ist keine Laune: Sie folgt der Häufigkeit auf europäischen
+ * Straßen — Weiß, Schwarz, Grau und Silber machen zusammen rund drei Viertel
+ * aus, danach kommen Blau und Rot, und erst dahinter Grün, Beige und Bordeaux.
+ * Deshalb stehen die vier unbunten Töne mehrfach im Topf: `lackton` zieht
+ * gleichverteilt, die Häufigkeit muss also in der Liste stehen. // SW
+ *
+ * Sie sind ALLE schon ab Werk etwas gedämpft: Ein Wrack auf dem Schrottplatz
+ * hat zehn Jahre Sonne hinter sich, und `verwittert()` nimmt danach noch
+ * einmal Sättigung heraus.
+ */
+export const AUTOLACK: number[] = [
+  0xd8d6d0, 0xd8d6d0, 0xd8d6d0, // Weiß, der häufigste Autolack
+  0x24262a, 0x24262a, // Schwarz
+  0x6f7276, 0x6f7276, // Grau
+  0xa8adb2, 0xa8adb2, // Silber
+  0x2f4f7a, // Blau
+  0x8d3128, // Rot
+  0x1f3a2c, // Dunkelgrün
+  0xb9ad93, // Beige
+  0x5a2530, // Bordeaux
+  0x2f6b74, // Petrol
+  0xb07a22, // Ocker
+];
+
+/** Rostbraun, in das jeder Lack auf einem Schrottplatz hineinläuft. */
+const LACKROST = 0x6b4326;
+
+/**
+ * Ein Lack, der Jahre hinter sich hat.
+ *
+ * Zwei Dinge auf einmal, weil beide dasselbe tun: Die Farbe verliert
+ * Sättigung (die Sonne bleicht das Pigment) und läuft in Richtung Rostbraun
+ * (der Lack platzt ab, darunter kommt Blech). Gerechnet je Kanal, wie
+ * `dunkler()` daneben — eine Farbrechnung im Haus reicht.
+ *
+ * @param alter 0 = frisch lackiert, 1 = durchgerostet
+ */
+export function verwittert(hex: number, alter: number): number {
+  const a = Math.min(1, Math.max(0, alter));
+  const r = (hex >> 16) & 255;
+  const g = (hex >> 8) & 255;
+  const b = hex & 255;
+  // Grauwert nach der üblichen Helligkeitsgewichtung
+  const grau = 0.299 * r + 0.587 * g + 0.114 * b;
+  const misch = (kanal: number, rost: number): number => {
+    // erst ausbleichen (Richtung Grauwert), dann Rost daruntermischen
+    const blass = kanal + (grau - kanal) * (a * 0.55);
+    return Math.round(blass + (rost - blass) * (a * 0.45));
+  };
+  const rr = misch(r, (LACKROST >> 16) & 255);
+  const gg = misch(g, (LACKROST >> 8) & 255);
+  const bb = misch(b, LACKROST & 255);
+  return (rr << 16) | (gg << 8) | bb;
 }
 
 /* ------------------------------------------------------------------------ */

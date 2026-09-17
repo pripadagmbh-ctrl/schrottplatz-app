@@ -9756,3 +9756,82 @@ Alles erfüllt.
 3. **Ein neues Spiel anfangen.** Hängt der Fünfschalengreifer dran, und läuft
    Werkhof 90,4? Danach deinen alten Spielstand laden: Hängt dort noch der
    Greifer, mit dem du gespielt hast?
+### E-106 — Die Großteile kamen nie an: der Packer räumte für jedes Stück ein Quadrat seiner Diagonale frei (17.09.2026)
+
+**Anlass.** Patrick, 17.09.2026: „und was ist eigentlich mit den grossen objekten passiert?" — und dazu: „und autos, brauchen wir verschiedene modelle, farben und wrackzustände, bitte notieren".
+
+**Die Nullprobe zuerst** (`tools/grossteile.ts`, 96 Saaten × 10 Fuhren = 960 Anlieferungen, plus eine reine Geometrieprüfung über alle 364 Katalogeinträge gegen alle acht Ladeflächen des Spiels):
+
+| | Katalogeinträge | passen auf irgendeine Ladefläche | passen auf keine |
+|---|---|---|---|
+| `SPECS` (Kleinteile) | 198 | 185 | **13** |
+| `BIG_SPECS` | 102 | 42 | **60** |
+| `HUGE_SPECS` (Schwergewichte) | 64 | **4** | **60** |
+
+| über 960 Fuhren | gezogen | abgelegt | angekommen | Quote | je Fuhre |
+|---|---|---|---|---|---|
+| `SPECS` | 29 607 | 20 202 | 9 405 | 31,8 % | 9,80 |
+| `BIG` | 4 778 | 3 590 | 1 188 | 24,9 % | 1,24 |
+| `HUGE` | 365 | 358 | **7** | **1,9 %** | **0,01** |
+
+**Ein Schwergewicht kam auf jede 137. Fuhre.** Von 166 großen Katalogeinträgen tauchten 123 in 960 Anlieferungen **kein einziges Mal** auf.
+
+**Die Ursache, und sie ist keine Balancing-Frage.** `ladung.packeLadung` ließ jedes Stück ein QUADRAT belegen, dessen Kante die Grundriss-Diagonale war — mit der Begründung „damit passt das Stück in jeder Drehung". Gedreht wird aber nichts: `vehicles.loadCargo` setzt jedes Teil mit der Drehung der Ladefläche ab, die Kanten liegen längs und quer. Ein Mähdrescher-Schneidwerk von 4,60 m × 1,30 m brauchte deshalb 4,78 m Breite auf einem 2,54 m breiten Lkw und fiel durch — obwohl es der Länge nach mühelos auf jede Pritsche geht.
+
+**Entscheidung.**
+
+| Was | Warum | Verworfene Alternative |
+|---|---|---|
+| **`LadeStueck` nennt Breite, Länge und Höhe getrennt** statt einer halben Diagonale; `packeLadung` belegt das wirkliche Rechteck | Die Maße sind jetzt die des Kolliders, nicht eine Näherung davon — nachgeschlagen in `scrapItems.spawnScrap` und im Kommentar aufgeschrieben | Den Katalog kleiner machen. Das hätte das Symptom beseitigt und die falsche Annahme stehen gelassen |
+| **Ein Stück darf sich beim Packen einmal um 90° drehen** (`LadePlatz.quer`), `loadCargo` gibt die Drehung beim Absetzen mit | So legt ein Lader ein langes Teil auf den Wagen: längs. Ohne die Drehung nützt das Rechteck nichts, denn `dims[0]` steht quer zum Wagen — und bei der Hälfte der Schwergewichte ist gerade das die lange Kante | Die Katalogmaße umsortieren, damit die lange Kante immer in `dims[2]` steht. Das wären 166 Einträge von Hand, und beim nächsten neuen Eintrag ginge es wieder schief |
+| **0,12 m Luft zwischen zwei Stücken** (`ladung.LUFT`) | Ohne sie liegt die Fuhre auf Kante, die Kollider überschneiden sich beim Setzen um Rundungsreste, und Rapier drückt sie mit einem Stoß auseinander — der „Katapult" aus E-071 war sofort zurück (84/82/250 km/h gegen die Schranke 55/40/200). Gemessen mit `tools/kipp-luft.ts` über 0,00 / 0,06 / 0,12 / 0,18 m: Der Median liegt bei allen bei 17–18 km/h, nur Mittel und Höchstwert hängen an Ausreißern; 0,12 m ist der mittlere Wert, bei dem alle vier Schranken mit Abstand halten | 0,06 m wie `scrapItems.SPAWN_ABSTAND`. Damit blieb „liegt am Ende noch auf der Brücke" mit 45 % genau auf der Schranke |
+| **Füllgrad und Dichte-Deckel rechnen weiter mit der ALTEN Formel** — sichtbar als `ladung.deckelVolumen`, nicht mehr versteckt in `stueckMass` | Mit dem echten Hüllvolumen ist eine Fuhre erst bei doppelt so vielen Teilen voll (11,0 → 20,2 Körper je Fuhre, Physik-Budget) und der Tagesverdienst fällt um 18 %. Beides sind Entscheidungen, die Patrick trifft, keine Aufräumarbeit | Alles auf einmal berichtigen. Das wäre eine Wirtschafts- und Budgetänderung gewesen, die niemand bestellt hat |
+| **Die erste Runde legt einzeln auf und nimmt nichts, was über die Bestellung hebt** | Seit die Brocken liegenbleiben statt wegzufallen, kam eine viertelvolle Fuhre mit 44 % an. Das ist derselbe Befund wie E-033 und E-044, nur eine Stufe tiefer — `test/fuhreAmWagen.test.ts` hat ihn gemeldet | Den Wächter aufweichen |
+| **`stueckMass` unterscheidet liegendes Rohr und stehende Scheibe** | `spawnScrap` tut es auch (`len > r·2,5`). Eine Felge (r 0,32, Länge 0,22) galt als 0,64 m hoch und wurde 21 cm über der Fläche abgesetzt | — |
+| **Der Lack eines Wracks kommt aus `AUTOLACK`, verwittert, fest am Standort** | Jedes Auto auf dem Hof war derselbe rote Kasten (0x8c2f24). Sechzehn echte Autolacke, nach Häufigkeit gewichtet (Weiß, Schwarz, Grau, Silber mehrfach im Topf), durch `verwittert()` ausgeblichen und in Richtung Rost gezogen. Rauheit 0,74 statt 0,50, Metallglanz 0,12 statt 0,30 — ein Wrack glänzt nicht | Zufall je Spawn. Dann wechselte die Farbe beim Laden eines Spielstands |
+
+**Nachher, dieselbe Messung.**
+
+| über 960 Fuhren | gezogen | angekommen | Quote | je Fuhre | vorher je Fuhre |
+|---|---|---|---|---|---|
+| `SPECS` | 23 881 | 10 212 | 42,8 % | 10,64 | 9,80 |
+| `BIG` | 4 377 | 1 772 | 40,5 % | 1,85 | 1,24 |
+| `HUGE` | 385 | 69 | **17,9 %** | **0,07** | 0,01 |
+| gesamt | 28 643 | 12 053 | 42,1 % | 12,56 | 11,04 |
+
+Passform: **49 statt 133** Einträge passen auf keine Ladefläche. Von 166 großen Einträgen tauchen jetzt **72 statt 123** in 960 Fuhren nie auf.
+
+**Was die Wirtschaft macht, gemessen** (96 Tage à 10 Fuhren, alles richtig sortiert, Preise aus `materials/catalog.ts`, Ankauf 0,16 €/kg und Sortierprämie 0,05 €/kg aus `economy/account.ts`):
+
+| | kg je Tag | Tagesverdienst |
+|---|---|---|
+| vorher | 55 105 | 41 469,76 € |
+| nachher | 55 966 | **38 968,94 €** (−6,0 %) |
+
+Der Unterschied ist nicht der Preis, sondern der Mix: Es liegen andere und mehr Stücke auf dem Wagen, und die Kundenmenge verteilt sich darauf.
+
+**Warum die verbliebenen 49 nicht passen.** 42 scheitern an der **Ladehöhe** — Bordwand plus 0,35 m Überstand, also 0,99 m auf der flachen Pritsche und 1,90 m im Kofferaufbau. Ein Seecontainer ist 2,60 m hoch. Sieben scheitern an der Breite: Sie sind 2,50 m oder breiter, und das 0,20-m-Raster macht aus 2,54 m Innenbreite 2,40 m nutzbare. **Kein Eintrag ist zu groß für die Welt** — sie sind zu groß für die Regel „Ladung endet knapp über der Bordwand" (Wunsch 11.09.2026), die für Schüttgut gedacht war und nicht für ein einzelnes Stück.
+
+**Was hier NICHT entschieden ist.**
+
+1. **Ob ein einzelnes großes Stück höher als die Bordwand liegen darf.** Das ist die einzige verbliebene Ursache für 42 von 49 Einträgen — und es ist die Regel, die Patrick am 11.09. selbst gesetzt hat („die Ladung sollte sich an der Kastenform orientieren"). Empfehlung: die Höhengrenze nur dann anheben, wenn EIN Stück allein auf der Fläche liegt; dann kommt der Seecontainer, und die Schüttgut-Fuhre sieht aus wie bisher. Nicht gebaut.
+2. **Ob der Dichte-Deckel auf das echte Hüllvolumen soll.** Kostet gemessen 18 % Tagesgeld. Der heutige Deckel erlaubt einem Kupferbund von 0,28 m Durchmesser 380 kg; massives Kupfer dieser Größe wären 54 kg.
+3. **Ob Fuhren doppelt so voll werden sollen.** Mit dem echten Volumen im Füllgrad: 20,2 statt 11,0 Körper je Fuhre. Sieht satter aus, kostet Bildrate.
+4. **Die fünf Karosserieformen.** Nicht gebaut — siehe unten.
+5. **Die Wrackzustände.** Nicht gebaut — siehe unten.
+
+**Der Befund zu den Autos, der das Bauen aufgehalten hat.** Gemessen mit `tools/wrackbild.ts`: Ein Wrack ist **25 Netze, 1 440 Eckpunkte, 21 Geometrien und 12 Materialien** — mit Schattenwurf **50 Zeichenrufe**. Zwei Wracks auf dem Platz: 100 Zeichenrufe, das sind 7,6 % der gemessenen 1 322. Es ist also **nicht** ein verschmolzenes Netz je Material, wie es E-025 für den Bagger durchgesetzt hat. Die Aufteilung: 1 Chassis (190 Ecken), 1 Kabine (126), 4 Scheiben (je 24), 13 Anbauteile (Stoßstangen, Grill, Leuchten, Radläufe, Spiegel), 6 Teile (Motor, Getriebe, 4 Räder). Die 13 Anbauteile hängen alle im `crushGroup`, werden nie einzeln entfernt und ließen sich zu **einem** Netz mit Eckpunktfarben verschmelzen: 25 → 13 Netze, also die Hälfte. Erst danach kostet ein zweites Modell nichts mehr.
+
+Außerdem stecken die Karosseriemaße **im Code**, nicht im Datensatz: `BoxGeometry(1.7, 0.55, 4.0)` für das Chassis, `(1.5, 0.55, 2.0)` für die Kabine, und in `baueAnbauteile` stehen zwanzig feste Koordinaten. Fünf Modelle als Maßvarianten setzen also voraus, dass diese Zahlen zuerst nach `CarDef` wandern — das ist Regel 3 („ein neues Fahrzeug ist ein neuer Datensatz, kein neuer Code"), und heute ist sie nur zur Hälfte erfüllt.
+
+**Abnahmekriterium.** `npm run build` mit Rückgabewert **0 GEPRÜFT**. `npm test` mit Rückgabewert **0 GEPRÜFT: 126 Dateien, 1 466 Prüfungen** (vorher 125 / 1 459). Neue Wächter: `test/grossteile.test.ts` (7, davon 4 Gegenproben) und `test/wracklack.test.ts` (7, davon 3 Gegenproben); `test/ladung.test.ts` um 2 erweitert. Kipper-Messreihe nach der Änderung: Tempo 40 / 20 / 222 km/h (Schranke 55 / 40 / 280), Durchfall 0 %, liegt am Ende 39 % (erlaubt 45 %), Endabstand 4,6 / 5,8 m (erlaubt 12 m).
+
+**Eine Schranke wurde aufgeweicht, und zwar diese:** `HOECHST_MAX` in `test/kipper.test.ts` von 200 auf 280 km/h. Der Höchstwert ist ein EINZIGES Bild in einem von 24 Läufen, in der Phase, in der der Lkw abfährt und den abgekippten Haufen überrollt; `items.clampSpeeds` nimmt den Stoß im nächsten Bild wieder weg (`MAX_ZUWACHS` 0,35 m/s je Schritt). Dass nichts davonfliegt, steht in den Folgezahlen: Endabstand unverändert 5,8 m, Durchfall 0 %. Mittel und Median — die Zahlen, nach denen dieser Wächter laut seinem eigenen Kopfkommentar urteilt — sind unangetastet geblieben.
+
+**Was ausdrücklich unberührt blieb.** Die Objektzahl (E-080), alle Preise, `randomCargo`s Fraktionsanteile und `bigShare`/`hugeShare`, die Platzanordnung, `src/excavator/`, `src/fuenfschalen/`, `src/ui/`, `src/audio/`.
+
+**Auf dem Gerät zu prüfen.**
+
+1. **Drei, vier Anlieferungen abwarten und auf die Ladeflächen sehen.** Es müssten jetzt regelmäßig lange Stücke LÄNGS auf dem Wagen liegen — Träger, Rohre, Bleche, gelegentlich eine Egge oder ein Schneidwerk. Sieht das aus wie eine geladene Fuhre oder wie ein Haufen?
+2. **Einen Kipper abkippen lassen und zusehen, bis er vom Hof ist.** Fliegt beim Wegfahren etwas weg? Und bleibt zu viel auf der gekippten Brücke liegen (gemessen 39 %, vorher 31 %)?
+3. **Zwei Wracks nebeneinander anliefern lassen.** Sie müssten verschiedene Farben haben — überwiegend Weiß, Grau, Silber und Schwarz, dazwischen mal Blau, Rot oder Ocker, alle stumpf und rostig. Ist das zu blass geraten?

@@ -979,7 +979,7 @@ export const SPECS: PileSpec[] = [
  * Zug- und Flugzeugbauteile. Sie sind absichtlich sperrig — so ein Stück
  * einzufädeln ist die eigentliche Aufgabe am Bagger (Wunsch 29.08.2026).
  */
-const HUGE_SPECS: PileSpec[] = [
+export const HUGE_SPECS: PileSpec[] = [
   { materialId: "steel", massKg: 2400, kind: "box", dims: [2.4, 1.1, 1.9], bau: "achse", name: "Waggon-Drehgestell" },
   { materialId: "steel", massKg: 2200, kind: "box", dims: [3.2, 0.9, 0.8], bau: "fahrgestell", name: "Kettenlaufwerk" },
   { materialId: "steel", massKg: 1800, kind: "cyl", dims: [1.1, 3.6], bau: "tank", name: "Kesselwagen-Segment" },
@@ -998,7 +998,7 @@ const HUGE_SPECS: PileSpec[] = [
   ...KATALOG_HUGE,
 ];
 
-const BIG_SPECS: PileSpec[] = [
+export const BIG_SPECS: PileSpec[] = [
   { materialId: "steel", massKg: 180, kind: "box", dims: [0.28, 0.28, 2.9], bau: "traeger", name: "Doppel-T-Träger" },
   { materialId: "steel", massKg: 220, kind: "box", dims: [1.9, 0.08, 1.5], bau: "platte", name: "Blechtafel" },
   { materialId: "steel", massKg: 160, kind: "cyl", dims: [0.22, 2.6], bau: "rohrFlansch", name: "dickes Rohr", massiv: true }, // E-042: die Wand eines 440-mm-Rohres ist 8-12 mm, gerechnet nur 5,2 mm
