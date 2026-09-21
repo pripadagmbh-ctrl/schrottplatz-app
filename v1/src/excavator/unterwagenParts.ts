@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { verschmelze } from "./bauteile";
 import { drehkranzRing, DREHKRANZ_Y_UNTEN } from "./drehkranzParts";
+import { RAD_B, RAD_R } from "./wheelParts";
 
 /**
  * Der Unterwagen des Baggers, Bauteil für Bauteil.
@@ -70,8 +71,53 @@ const WANGE_DICKE = 0.06;
 export const RAD_X = 1.25;
 /** Radmitte in z (m) — Radstand 3,00 m. */
 export const RAD_Z = 1.5;
-/** Radhalbmesser (m) — aus `wheelParts.ts`. */
-const RAD_R = 0.62;
+
+/**
+ * DER GRUNDRISS DES FAHRENDEN UNTERWAGENS (m) — die EINE Quelle fuer alles,
+ * was der Unterwagen nicht durchfahren darf. Halbe Breite, halbe Laenge, und
+ * der Huellkreis daraus gerechnet.
+ *
+ * WARUM SIE HIER STEHT UND NICHT ZWEIMAL WOANDERS. Bis zum 21.09.2026 gab es
+ * zwei Zahlen fuer dieselbe Maschine:
+ *
+ *   `excavator.ts`   UNTERWAGEN_R = 2,60 m  — Sperre gegen stehende Fahrzeuge
+ *   `collision.ts`   CHASSIS_PAD  = 1,30 m  — Tastrand gegen feste Bauten
+ *
+ * Gegen einen LKW hielt die Mitte des Unterwagens 2,60 m Abstand, gegen den
+ * MUELL-Container 1,30 m. Gemessen (`tools/unterwagen-rand.ts`, Abschnitt
+ * EINDRINGTIEFE) fuhr die Maschine damit **1,35 m** tief in den Container
+ * hinein, 1,35 m in Janines Kaffeewagen, 0,70 m in eine Muldenstirnwand und
+ * 0,60 m in die Westmauer.
+ *
+ * Beide Pruefungen rechnen jetzt gegen die Zahlen von hier: die Fahrzeugsperre
+ * (`findeBox` in `excavator.ts`) mit dem Huellkreis, weil ein LKW schraeg
+ * steht und die Maschine sich auf der Stelle dreht; die Bauwerkspruefung
+ * (`chassisHits` in `collision.ts`) mit dem gedrehten Rechteck, weil ein
+ * Huellkreis dort bis zu 0,76 m zu frueh gebremst und dem MUELL-Container
+ * seinen letzten Startplatz genommen haette (dort begruendet und gemessen).
+ *
+ * GERECHNET, NICHT GEGRIFFEN: Das weiteste Stueck des fahrenden Unterwagens
+ * ist die Radaussenkante an der Rahmenecke, also `hypot(RAD_X + RAD_B/2,
+ * RAHMEN_HALB)` = hypot(1,50 | 2,20) = **2,663 m**. Am gebauten Netz
+ * nachgemessen sind es 2,65 m (Lack-Netz mit Kotfluegel und Aufstieg), an den
+ * Raedern 2,56 m — die Rechnung liegt also 1,3 cm auf der sicheren Seite. Die
+ * alten 2,60 m waren 6 cm zu klein: Um diesen Betrag schnitt die Maschine in
+ * jeden LKW.
+ *
+ * NICHT MITGERECHNET, mit Absicht:
+ *  - das RAEUMSCHILD (`BLADE_Z` 2,55 + 0,16, Huellkreis 3,07 m). Es SOLL
+ *    schieben — es hat einen eigenen Koerper und ist dafuer gebaut. Ein
+ *    Tastrand von 3,07 m haette die Maschine einen halben Meter vor allem
+ *    anhalten lassen, was sie beiseiteraeumen soll.
+ *  - die PRATZEN (`PRATZE_X` 1,9, `PRATZE_Z` 2,45, Huellkreis 3,10 m). Sind
+ *    sie ausgefahren, ist das Fahrwerk gesperrt (`blockedByOutriggers`) — sie
+ *    stehen nie im Weg einer Fahrt.
+ */
+export const UNTERWAGEN_HALB_B = RAD_X + RAD_B / 2;
+/** Halbe Laenge des Unterwagens (m) — die Rahmenlaenge, siehe `RAHMEN_HALB`. */
+export const UNTERWAGEN_HALB_L = RAHMEN_HALB;
+/** Huellkreis daraus — was `findeBox` gegen stehende Fahrzeuge braucht. */
+export const UNTERWAGEN_R = Math.hypot(UNTERWAGEN_HALB_B, UNTERWAGEN_HALB_L);
 
 /**
  * Innenradius des Kotflügels (m). SW nach Augenmaß am gezeichneten Riss

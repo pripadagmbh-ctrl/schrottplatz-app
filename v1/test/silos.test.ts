@@ -10,6 +10,7 @@
  * hier fest.
  */
 import { describe, it, expect } from "vitest";
+import { UNTERWAGEN_HALB_B } from "../src/excavator/unterwagenParts";
 import {
   CONFIGS,
   gehoertHierhin,
@@ -392,18 +393,21 @@ describe("Der Müllcontainer steht morgens richtig", () => {
   it("und er steht nicht in der Fahrlinie des Baggers nach vorn", () => {
     /*
      * DER ANLASS VON E-041. Der Bagger schaut nach +z; fährt er geradeaus los,
-     * prüft `ExcavatorCollision.chassisHits()` seinen Standpunkt mit
-     * `CHASSIS_PAD` = 1,30 m Rand gegen die Hindernisliste — und die trägt zur
-     * Laufzeit auch die beweglichen Behälter (`setBuildingObstacles` in
-     * `main.ts`). Am alten Startplatz (−2,8 | −15,4) lagen zwischen Mitte und
-     * Fahrlinie 2,30 m, nötig sind 1,80 + 1,30 = 3,10 — die Maschine stand
-     * nach 4,95 m.
+     * prüft `ExcavatorCollision.chassisHits()` seinen Standpunkt gegen die
+     * Hindernisliste — und die trägt zur Laufzeit auch die beweglichen
+     * Behälter (`setBuildingObstacles` in `main.ts`). Am alten Startplatz
+     * (−2,8 | −15,4) lagen zwischen Mitte und Fahrlinie 2,30 m, nötig sind
+     * 1,80 + 1,50 = 3,30 — die Maschine stand nach 4,95 m.
+     *
+     * DIE 1,50 KOMMT SEIT E-107 AUS DER QUELLE und ist nicht mehr
+     * abgeschrieben: Es ist die halbe Breite des GEBAUTEN Unterwagens
+     * (`UNTERWAGEN_HALB_B`). Hier stand `CHASSIS_PAD` = 1,30 m — zwanzig
+     * Zentimeter weniger, als die Maschine breit ist.
      *
      * Geprüft wird nur die Linie GERADEAUS. Wohin der Spieler den Container
      * danach schiebt, ist seine Sache; am Morgen soll der Weg frei sein.
      */
-    const CHASSIS_PAD = 1.3; // excavator/collision.ts
-    const noetig = muell.size[0] / 2 + CHASSIS_PAD;
+    const noetig = muell.size[0] / 2 + UNTERWAGEN_HALB_B;
     const seitlich = Math.abs(muell.x - BAGGER_STAND.x);
     expect(Number.isFinite(seitlich), "Seitenabstand ist keine Zahl").toBe(true);
     expect(

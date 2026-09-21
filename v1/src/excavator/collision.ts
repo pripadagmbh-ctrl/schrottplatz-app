@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
-import { hitsObstacle } from "../world/obstacles";
+import { alleHindernisse, hitsObstacle } from "../world/obstacles";
+import { umrissUeberlappung } from "../delivery/umriss";
+import { UNTERWAGEN_HALB_B, UNTERWAGEN_HALB_L } from "./unterwagenParts";
 
 /**
  * Kollisionsprüfung des Baggers.
@@ -29,6 +31,14 @@ export interface CollisionContext {
   world: RAPIER.World;
   /** Standort des Unterwagens */
   position: THREE.Vector3;
+  /**
+   * Blickrichtung des Unterwagens (rad, `Excavator.heading`).
+   *
+   * Nicht die des Oberwagens: Der schwenkt, das Fahrwerk nicht. Gebraucht
+   * wird sie, seit `chassisHits()` den wirklichen Grundriss prueft statt eines
+   * Punktes mit Rand.
+   */
+  getHeading: () => number;
   grappleGroup: THREE.Object3D;
   armShapes: ArmShape[];
   /** Körper des Fahrzeugs auf dem Platz */
@@ -39,8 +49,52 @@ export interface CollisionContext {
   getStaffPos: () => THREE.Vector3 | null;
 }
 
-/** Sicherheitsabstand des Unterwagens zu festen Bauten */
-const CHASSIS_PAD = 1.3;
+/*
+ * DER UNTERWAGEN HAT KEINEN EIGENEN TASTRAND MEHR (21.09.2026).
+ *
+ * Hier stand `CHASSIS_PAD = 1.3`, waehrend die Sperre gegen stehende
+ * Fahrzeuge in `excavator.ts` mit `UNTERWAGEN_R = 2.6` rechnete — zwei Zahlen
+ * fuer dieselbe Maschine, und gegen alles Gemauerte gewann die kleinere.
+ * Gemessen (`tools/unterwagen-rand.ts`) fuhr der Unterwagen damit **1,35 m**
+ * in den MUELL-Container, 1,35 m in den Kaffeewagen, 0,70 m in eine
+ * Muldenstirnwand und 0,60 m in die Westmauer.
+ *
+ * WARUM NICHT EINFACH `CHASSIS_PAD = UNTERWAGEN_R`. Das war der erste
+ * Versuch, und er ist gemessen gescheitert. `hitsObstacle` erweitert das
+ * Bauwerk auf BEIDEN Achsen um `pad` — ein Rand von 2,663 m behandelt die
+ * Maschine also als 5,33 x 5,33 m grosses Quadrat statt als 3,00 x 4,40 m
+ * grosses Rechteck, das sich dreht. Die Folgen, beide gemessen:
+ *
+ *   - Sie haelt bis zu 0,76 m VOR dem Hindernis an (gemessene untere Schranke
+ *     an der Westmauer; am MUELL-Container 0,49 m). Das ist derselbe Fehler
+ *     nochmal, nur mit dem Vorzeichen andersherum — und ein Bagger, der einen
+ *     Dreiviertelmeter vor der Wand steht, sieht aus, als haenge die Steuerung.
+ *   - Fuer den MUELL-Container gibt es dann ueberhaupt keinen Startplatz mehr:
+ *     Die vier Schranken aus E-041 haben zusammen KEINE Loesung
+ *     (`tools/unterwagen-rand.ts`, Abschnitt TASCHE).
+ *
+ * JETZT: der wirkliche Grundriss, mitgedreht. Die beiden Halbmasse kommen aus
+ * `unterwagenParts.ts` — derselben Quelle, aus der auch `UNTERWAGEN_R` fuer
+ * die Fahrzeugsperre gerechnet wird (`UNTERWAGEN_R = hypot(HALB_B, HALB_L)`).
+ * Eine Quelle, zwei Ableitungen, keine gepflegte Zweitzahl.
+ *
+ * Gerechnet mit `umrissUeberlappung` aus `delivery/umriss.ts`: gedrehtes
+ * Rechteck gegen achsparalleles Bauwerk, Trennachsensatz — dieselbe Funktion,
+ * mit der auch die LKW nach vorn schauen. Eine zweite Rechnung waere eine
+ * zweite Wahrheit.
+ *
+ * WAS ES KOSTET, gemessen (`tools/unterwagen-rand.ts`, Abschnitt KOSTEN, 52
+ * Bauwerke): 4,09 statt 0,90 µs je Aufruf. `chassisHits()` laeuft hoechstens
+ * dreimal je Bild, also **0,0123 statt 0,0027 ms** — ein Hundertstel
+ * Millisekunde bei einem Bildbudget von 21 ms auf Patricks Geraet.
+ */
+const UNTERWAGEN_UMRISS = {
+  x: 0,
+  z: 0,
+  hw: UNTERWAGEN_HALB_B,
+  hd: UNTERWAGEN_HALB_L,
+  rot: 0,
+};
 /** Sicherheitsabstand von Ausleger und Stiel */
 const ARM_PAD = 0.2;
 /**
@@ -154,10 +208,23 @@ export class ExcavatorCollision {
     return Math.max(PLOW_MIN, 1 / (1 + m / PLOW_HALF_KG));
   }
 
-  /** Steht der Unterwagen in einem festen Bauwerk? Rein zweidimensional. */
+  /**
+   * Steht der Unterwagen in einem festen Bauwerk? Rein zweidimensional.
+   *
+   * Der Grundriss dreht mit der Maschine mit: Laengs an einer Mauer entlang
+   * darf sie naeher heran als quer davor. `alleHindernisse()` enthaelt die
+   * beweglichen Behaelter zuerst — dieselbe Liste in derselben Reihenfolge,
+   * die auch `hitsObstacle` durchgeht.
+   */
   chassisHits(): boolean {
     const p = this.ctx.position;
-    return hitsObstacle(p.x, p.z, CHASSIS_PAD) !== null;
+    UNTERWAGEN_UMRISS.x = p.x;
+    UNTERWAGEN_UMRISS.z = p.z;
+    UNTERWAGEN_UMRISS.rot = this.ctx.getHeading();
+    for (const o of alleHindernisse()) {
+      if (umrissUeberlappung(UNTERWAGEN_UMRISS, o) > 0) return true;
+    }
+    return false;
   }
 
   /** Ragt irgendein Teil des Arms in etwas hinein, wo es nicht hingehört? */

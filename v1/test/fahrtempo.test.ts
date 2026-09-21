@@ -14,6 +14,7 @@
  *      die Rampenzeit stehen lässt, verdreifacht die Beschleunigung mit.
  */
 import { describe, it, expect } from "vitest";
+import { UNTERWAGEN_HALB_B } from "../src/excavator/unterwagenParts";
 import { FAHRWERK, fahrzeit, wenderadius, bremsweg } from "../src/excavator/excavator";
 
 describe("Fahrwerk des Baggers", () => {
@@ -69,10 +70,11 @@ describe("Fahrwerk des Baggers", () => {
 
   it("setzt keinen Schritt, der größer ist als die Kollisionsschürze", () => {
     /*
-     * CHASSIS_PAD in collision.ts ist 1,3 m. Ein Fahrschritt von 3,2 m/s bei
-     * 30 Bildern je Sekunde sind 10,7 cm — weit darunter, es kann nichts
-     * durch eine Wand tunneln.
+     * Die Kollisionspruefung des Unterwagens rechnet mit seinem wirklichen
+     * Grundriss (`UNTERWAGEN_HALB_B` = 1,50 m quer, E-107; vorher ein fester
+     * Rand von 1,30 m). Ein Fahrschritt von 3,2 m/s bei 30 Bildern je Sekunde
+     * sind 10,7 cm — weit darunter, es kann nichts durch eine Wand tunneln.
      */
-    expect(FAHRWERK.maxMS / 30).toBeLessThan(1.3 / 2);
+    expect(FAHRWERK.maxMS / 30).toBeLessThan(UNTERWAGEN_HALB_B / 2);
   });
 });

@@ -28,7 +28,13 @@ import {
   kabineSitz,
   kabineStahl,
 } from "./kabinenParts";
-import { unterwagenLack, unterwagenStahl, PRATZE_X, PRATZE_Z } from "./unterwagenParts";
+import {
+  unterwagenLack,
+  unterwagenStahl,
+  PRATZE_X,
+  PRATZE_Z,
+  UNTERWAGEN_R,
+} from "./unterwagenParts";
 import {
   DREHPUNKT as HUB_DREHPUNKT,
   HUB_MAX as CAB_LIFT_MAX,
@@ -571,8 +577,6 @@ const PENDEL_DAEMPFUNG_LAST = 4.0;
  * Ansage ueber die Winkelsperre keine Ansage ueber die Rueckstellung ist.
  */
 
-/** Halbe Breite des Unterwagens — damit rechnet die Fahrzeugsperre. */
-const UNTERWAGEN_R = 2.6;
 
 const CLOSE_TIME = 0.4; // s (SW)
 const OPEN_TIME = 0.3; // s (SW)
@@ -1638,6 +1642,7 @@ export class Excavator {
     this.collision = new ExcavatorCollision({
       world,
       position: this.position,
+      getHeading: () => this.heading,
       grappleGroup: this.grappleGroup,
       armShapes: this.armShapes,
       obstacleBodies: this.obstacleBodies,
@@ -1827,10 +1832,16 @@ export class Excavator {
     const naechstesX = this.position.x + Math.sin(this.heading) * this.driveVel * dt;
     const naechstesZ = this.position.z + Math.cos(this.heading) * this.driveVel * dt;
     /*
-     * Nicht durch stehende LKW fahren (Befund 11.09.2026). Der Unterwagen ist
-     * gut 2,6 m breit; genau darum wird die Standflaeche des Fahrzeugs
-     * erweitert. Ist der Schritt belegt, bleibt die Maschine stehen und das
-     * Tempo faellt auf null — sie schiebt keinen LKW vor sich her.
+     * Nicht durch stehende LKW fahren (Befund 11.09.2026). Der Unterwagen
+     * ueberstreicht beim Rangieren einen Kreis von `UNTERWAGEN_R` = 2,66 m
+     * (3,00 m breit, 4,40 m lang); genau darum wird die Standflaeche des
+     * Fahrzeugs erweitert. Ist der Schritt belegt, bleibt die Maschine stehen
+     * und das Tempo faellt auf null — sie schiebt keinen LKW vor sich her.
+     *
+     * DIESELBE QUELLE gilt seit dem 21.09.2026 auch gegen Bauwerke: `chassisHits`
+     * in `collision.ts` prueft dort das gedrehte Rechteck aus denselben zwei
+     * Halbmassen. Vorher stand da ein eigener Rand von 1,30 m, und die
+     * Maschine fuhr 1,35 m in den MUELL-Container hinein.
      */
     const boxen = this.getVehicleBoxes?.();
     if (boxen && findeBox(naechstesX, naechstesZ, boxen, UNTERWAGEN_R)) {
