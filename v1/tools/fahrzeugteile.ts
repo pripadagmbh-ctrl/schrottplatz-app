@@ -67,17 +67,17 @@ export const ERLAUBTE_PAARE: ReadonlyArray<{
   bis: number;
   grund: string;
 }> = [
-  {
-    a: BAUGRUPPE.rad,
-    b: BAUGRUPPE.rahmen,
-    bis: 0.35,
-    grund:
-      "Gemessen 30,0 cm am inneren Zwillingsreifen der Hinterachse: Er liegt " +
-      "bei x 0,52 … 0,82 und damit ganz im Rahmenquader (±1,10 m). Der Rahmen " +
-      "ist hier eine durchgehende Platte, kein Leiterrahmen — ein echter hat " +
-      "zwei Längsträger auf ±0,43 m, und dazwischen läuft das Rad frei durch. " +
-      "Bekannt und offen (siehe `docs/offene-punkte.md`), aber kein Kranbefund.",
-  },
+  /*
+   * KEIN PAAR `rad × rahmen` MEHR — und das ist die Änderung, nicht das
+   * Vergessen (E-108, 21.09.2026).
+   *
+   * Hier stand `bis: 0,35` mit dem Grund „gemessen 30,0 cm am inneren
+   * Zwillingsreifen der Hinterachse, der Rahmen ist eine durchgehende Platte
+   * von ±1,10 m". Seit der Rahmen eine Leiter aus zwei Längsträgern auf
+   * ±0,43 m ist, läuft das Rad daran vorbei: gemessen 0,0 cm über alle 18
+   * Bauarten und alle Stellungen. Die Ausnahme ist damit hinfällig — und wer
+   * die Träger je wieder verbreitert, bekommt es sofort gemeldet.
+   */
   {
     a: BAUGRUPPE.rad,
     b: BAUGRUPPE.kotfluegel,
@@ -87,8 +87,13 @@ export const ERLAUBTE_PAARE: ReadonlyArray<{
   {
     a: BAUGRUPPE.kranbock,
     b: BAUGRUPPE.rahmen,
-    bis: 0.3,
-    grund: "Der Kranbock ist auf den Rahmen geschraubt — er MUSS ihn berühren.",
+    bis: 0.05,
+    grund:
+      "Der Kranbock ist auf den Rahmen geschraubt — er MUSS ihn berühren. " +
+      "Gemessen 2,0 cm: Die Bockplatte reicht bis y 0,88, der Rahmen bis 0,90. " +
+      "Bis zum Leiterrahmen (E-108) waren es 13,0 cm, weil die Stützen auf " +
+      "x ±1,05 in der 2,20 m breiten Platte standen; jetzt stehen sie frei " +
+      "daneben.",
   },
   {
     a: BAUGRUPPE.kranbock,

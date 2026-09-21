@@ -30,8 +30,10 @@
  *
  * WAS NICHT REPARIERT IST und hier weiter als Zahl steht: die 0,60 m in der
  * Ostwand beim Eindrehen am Abladeplatz (zu wenig Platz, kein Rechenfehler),
- * der gemeldete Containerumriss (7 cm schmaler, 17,5 cm flacher als gebaut)
- * und `CHASSIS_PAD` gegen `UNTERWAGEN_R` am Bagger.
+ * der gemeldete Containerumriss in der FLAECHE (7 cm schmaler, 36,5 cm kuerzer
+ * als gebaut; die Hoehe ist seit E-108 aus einer Quelle). `CHASSIS_PAD` gegen
+ * `UNTERWAGEN_R` ist seit E-107 BEHOBEN — der Fall steht als Waechter da,
+ * nicht mehr als Befund.
  *
  * DREI FRAGEN, GETRENNT GEHALTEN — sie fuehren zu drei Reparaturen:
  *   1. Steht es in der Hindernisliste?   (Abschnitt „Die Hindernisliste")
@@ -46,9 +48,15 @@
  * prueft am Ende die Messung und nicht die Maschine (Lehre aus E-054).
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import * as THREE from "three";
 import { leinwandAttrappe } from "../tools/leinwand-attrappe";
 import { initPhysics } from "../src/physics/physicsWorld";
-import { CONFIGS } from "../src/world/containers";
+import { CONFIGS, rolloffOberkante } from "../src/world/containers";
+import {
+  UNTERWAGEN_HALB_B,
+  UNTERWAGEN_HALB_L,
+  UNTERWAGEN_R,
+} from "../src/excavator/unterwagenParts";
 import { alleHindernisse, setBuildingObstacles } from "../src/world/obstacles";
 import {
   fahrzeugUmriss,
@@ -210,23 +218,73 @@ describe("Die Hindernisliste", () => {
     );
   });
 
-  it("BEFUND: der gemeldete Umriss ist 7 cm schmaler und 17,5 cm flacher als der gebaute Container", () => {
+  /**
+   * Die HUELLE der gebauten Netze eines Behaelters, in Weltmassen.
+   *
+   * Gemessen wird am Netz und nicht an einer nachgerechneten Formel — sonst
+   * prueft der Waechter am Ende seine eigene Rechnung und nicht das, was
+   * dasteht (dieselbe Lehre wie in `tools/durchdringung.ts`).
+   */
+  function huelleDesBehaelters(p: Platz, x: number, z: number): THREE.Box3 {
+    // `x`/`z` kommen aus der Meldung selbst: Die Netzgruppe folgt dem Koerper
+    // erst in `recount()`, und das laeuft im Messtakt nicht mit. Beide stehen
+    // damit an derselben Stelle, und genau darauf kommt es beim Vergleich an.
+    const nah = p.scene.children.filter(
+      (o): o is THREE.Group =>
+        (o as THREE.Group).isGroup === true &&
+        Math.hypot(o.position.x - x, o.position.z - z) < 0.5
+    );
+    expect(nah.length, "genau eine Behaeltergruppe an dieser Stelle").toBe(1);
+    return new THREE.Box3().setFromObject(nah[0]!);
+  }
+
+  it("die gemeldete Oberkante ist die gebaute — Riegel und Hindernisliste aus einer Quelle", () => {
     /*
-     * ZWEI STELLEN, DIE DASSELBE WISSEN SOLLEN.
+     * ZWEI STELLEN, DIE DASSELBE WISSEN SOLLEN — REPARIERT AM 21.09.2026
+     * (E-108).
      *
-     * `ContainerManager.hindernisse()` meldet `size[0]/2 x size[1]/2` und
-     * `top = size[2] + 0,2`. Gebaut wird in `containers.ts` aber mehr:
+     * Bis dahin meldete `ContainerManager.hindernisse()` `top = size[2] + 0,2`,
+     * gebaut lag die Oberkante des Riegels aber auf
+     * `KUFE + T + h + halber Riegel` = 0,22 + 0,09 + 0,80 + 0,065 = 1,175 m.
+     * Der Baggerarm darf ueber `top` hinwegschwenken (`hitsObstacle` mit `y`,
+     * `excavator/collision.ts`) — zwischen 1,00 und 1,175 m schwenkte er durch
+     * den Oberriegel, den man sieht.
      *
-     *   Rungen   sitzen auf `d/2 + 0,05` und sind 0,11 m tief  → 0,105 m ueber
-     *   Riegel   ist `w + 0,14` breit                          → 0,07 m ueber
-     *   Oberkante des Riegels liegt auf KUFE + T + h + 0,065
-     *            = 0,22 + 0,09 + 0,80 + 0,065 = 1,175 m
-     *   gemeldete Oberkante                                    = 1,00 m
+     * Jetzt kommen Bau und Meldung aus `rolloffOberkante()`. Der Fall misst
+     * die HUELLE der gebauten Netze; waere der Riegel anders gesetzt, faellt
+     * es hier auf und nicht erst am Geraet.
+     */
+    const p = platzMitContainer(...MUELL_PATRICK);
+    const h = p.containers.hindernisse().find((x) => x.label === "MUELL")!;
+    const cfg = CONFIGS.find((c) => c.id === "r_rubble")!;
+    const huelle = huelleDesBehaelters(p, h.x, h.z);
+
+    expect(huelle.max.y, "gebaute Oberkante").toBeCloseTo(1.175, 3);
+    expect(h.top, "gemeldete Oberkante").toBeCloseTo(huelle.max.y, 3);
+    expect(rolloffOberkante(cfg.size[2]), "die gemeinsame Quelle").toBeCloseTo(1.175, 3);
+
+    // GEGENPROBE: die alte Rechnung meldet weiter 1,00 m und liegt 17,5 cm
+    // unter dem Riegel. Ohne sie pruefte der Fall eine Zahl gegen sich selbst.
+    expect(cfg.size[2] + 0.2, "die Rechnung von vorher").toBeCloseTo(1.0, 3);
+    expect(huelle.max.y - (cfg.size[2] + 0.2), "was die alte Rechnung verschenkte").toBeCloseTo(
+      0.175,
+      3
+    );
+  });
+
+  it("BEFUND, offen: der gemeldete Umriss ist in der FLAECHE weiter zu klein", () => {
+    /*
+     * Die Hoehe ist seit E-108 aus einer Quelle, der Grundriss noch nicht.
+     * `hindernisse()` meldet `size[0]/2 x size[1]/2`; angebaut ist mehr:
      *
-     * FOLGE: Der Baggerarm darf ueber `top` hinwegschwenken (`hitsObstacle`
-     * mit `y`). Zwischen 1,00 und 1,175 m schwenkt er durch den Oberriegel,
-     * den man sieht. Das ist klein, aber es ist genau die Bauart Fehler, die
-     * Patrick am Geraet findet und kein Test.
+     *   Riegel  ist `w + 0,14` breit                        →  7,0 cm ueber
+     *   Rungen  sitzen auf `d/2 + 0,05`, 0,11 m tief        → 10,5 cm ueber
+     *   Haken-OEse sitzt auf `-(d/2 + 0,16)`, Radius 0,205  → 36,5 cm ueber
+     *
+     * Bewusst NICHT mitgeaendert: Der Umriss geht in die Fahrwege der LKW ein
+     * (`umriss.ts`, `test/fahrumriss.test.ts`), und ein um 36,5 cm laengeres
+     * Rechteck an der Stirnseite verschiebt jede dort gemessene Zahl. Das ist
+     * eine eigene Messung und keine Nebenwirkung dieser hier.
      *
      * Dieser Fall haelt den IST-Stand fest. Wird er repariert, wird er ROT —
      * dann gehoert er umgeschrieben, nicht geloescht.
@@ -234,23 +292,13 @@ describe("Die Hindernisliste", () => {
     const p = platzMitContainer(...MUELL_PATRICK);
     const h = p.containers.hindernisse().find((x) => x.label === "MUELL")!;
     const cfg = CONFIGS.find((c) => c.id === "r_rubble")!;
-    const KUFE = 0.22; // containers.ts, rolloff-Zweig
-    const WAND = 0.09; // ebenda, `const T`
-    const RIEGEL = 0.13 / 2; // halbe Riegelhoehe, ebenda
+    const huelle = huelleDesBehaelters(p, h.x, h.z);
 
-    const gebauteOberkante = KUFE + WAND + cfg.size[2] + RIEGEL;
-    expect(gebauteOberkante).toBeCloseTo(1.175, 3);
-    expect(h.top, "die gemeldete Oberkante").toBeCloseTo(1.0, 3);
-    expect(gebauteOberkante - h.top, "Luecke zwischen gebauter und gemeldeter Oberkante").toBeCloseTo(
-      0.175,
-      3
-    );
-
-    // In der Breite: der Riegel ragt 7 cm ueber den gemeldeten Umriss hinaus.
     expect(h.hw).toBeCloseTo(cfg.size[0] / 2, 3);
-    expect((cfg.size[0] + 0.14) / 2 - h.hw, "Riegelueberstand in x").toBeCloseTo(0.07, 3);
-    // In der Tiefe: die Rungen ragen 10,5 cm hinaus.
-    expect(cfg.size[1] / 2 + 0.05 + 0.11 / 2 - h.hd, "Rungenueberstand in z").toBeCloseTo(0.105, 3);
+    expect(h.hd).toBeCloseTo(cfg.size[1] / 2, 3);
+    expect(huelle.max.x - h.x - h.hw, "Riegelueberstand in x").toBeCloseTo(0.07, 3);
+    expect(h.z - huelle.min.z - h.hd, "OEsenueberstand in z").toBeCloseTo(0.365, 3);
+    expect(huelle.max.z - h.z - h.hd, "Rungenueberstand in z").toBeCloseTo(0.105, 3);
   });
 });
 
@@ -592,32 +640,35 @@ describe("Die Kehre auf der Stelle", () => {
 /* ====================================================================== */
 
 describe("Der Bagger gegen bewegliche Behaelter", () => {
-  it("BEFUND: der Unterwagen darf 1,30 m in den Container hineinfahren", () => {
+  it("BEHOBEN (E-107): Bauwerkspruefung und Fahrzeugsperre kommen aus einer Quelle", () => {
     /*
-     * ZWEI ZAHLEN FUER DIESELBE MASCHINE, und sie widersprechen einander:
+     * HIER STAND DER BEFUND, und er lautete: zwei Zahlen fuer dieselbe
+     * Maschine, die einander widersprechen.
      *
      *   `src/excavator/collision.ts`  CHASSIS_PAD  = 1,30 m  (gegen Bauwerke)
      *   `src/excavator/excavator.ts`  UNTERWAGEN_R = 2,60 m  (gegen Fahrzeuge)
      *
-     * `chassisHits()` fragt `hitsObstacle(p.x, p.z, CHASSIS_PAD)` — die Mitte
-     * des Unterwagens haelt also 1,30 m vor der Aussenkante eines Bauwerks.
-     * Gegen einen LKW haelt dieselbe Mitte 2,60 m Abstand. Der Unterschied,
-     * 1,30 m, ist genau die Tiefe, um die der Unterwagen in den
-     * MUELL-Container hineinragt, bevor irgendetwas anschlaegt.
+     * Der Unterschied war genau die Tiefe, um die der Unterwagen in den
+     * MUELL-Container hineinragte — gemessen 1,35 m
+     * (`tools/unterwagen-rand.ts`).
      *
-     * Das ist nicht gefahren, sondern aus den beiden Konstanten gerechnet.
-     * Einfuehren lassen sie sich nicht: `CHASSIS_PAD` und `UNTERWAGEN_R` sind
-     * beide modulintern. Deshalb stehen sie hier als Zahl MIT Fundstelle —
-     * wer eine davon aendert, muss diesen Fall mitziehen.
+     * SEIT DEM 21.09.2026 kommen beide aus `excavator/unterwagenParts.ts`:
+     * `UNTERWAGEN_R = hypot(UNTERWAGEN_HALB_B, UNTERWAGEN_HALB_L)`, und
+     * `chassisHits()` prueft dieselben zwei Halbmasse als gedrehtes Rechteck.
+     * Der Fall bleibt stehen und ist umgeschrieben statt geloescht: Wo vorher
+     * 1,30 m Ueberstand stand, steht jetzt null. Ein behobener Befund, dessen
+     * Fall verschwindet, kann unbemerkt zurueckkommen.
+     *
+     * Die Eindringtiefe selbst wird in `test/unterwagenRand.test.ts` gemessen,
+     * samt Gegenprobe mit der alten Regel.
      */
-    const CHASSIS_PAD = 1.3; // src/excavator/collision.ts, Zeile 43
-    const UNTERWAGEN_R = 2.6; // src/excavator/excavator.ts, Zeile 540
-    expect(UNTERWAGEN_R - CHASSIS_PAD, "Ueberstand des Unterwagens ueber seinen Bauwerkspuffer").toBeCloseTo(
-      1.3,
-      3
-    );
+    expect(UNTERWAGEN_R).toBeCloseTo(Math.hypot(UNTERWAGEN_HALB_B, UNTERWAGEN_HALB_L), 9);
+    expect(
+      UNTERWAGEN_R - Math.hypot(UNTERWAGEN_HALB_B, UNTERWAGEN_HALB_L),
+      "Ueberstand des Unterwagens ueber seinen Bauwerkspuffer"
+    ).toBeCloseTo(0, 6);
 
-    // Gegenprobe: Waere der Puffer so gross wie der Unterwagen, waere es null.
-    expect(UNTERWAGEN_R - UNTERWAGEN_R).toBe(0);
+    // Gegenprobe: die alten 2,60 m waren NICHT der gebaute Huellkreis.
+    expect(Math.abs(UNTERWAGEN_R - 2.6), "2,60 ist wieder da").toBeGreaterThan(0.05);
   });
 });

@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { BED_HALF_W } from "./routes";
 
@@ -909,6 +910,66 @@ function buildCarAndTrailer(
   return anhaenger;
 }
 
+/* --------------------------------------------------------------------- */
+/* Leiterrahmen (E-108)                                                    */
+
+/** Höhe der Rahmenmitte über Grund (m) — Bestand, war die Lage der Platte. */
+const RAHMEN_Y = 0.65;
+
+/** Bauhöhe eines Längsträgers (m) — Bestand, war die Dicke der Platte. */
+const RAHMEN_H = 0.5;
+
+/**
+ * Mitte je Längsträger in x (m).
+ *
+ * Aus dem Rad gerechnet, nicht gegriffen: Der innere Zwillingsreifen der
+ * Hinterachse steht auf x 0,67 und ist 0,30 m breit, liegt also zwischen 0,52
+ * und 0,82. Ein Träger von 0,14 m Breite auf 0,43 reicht bis 0,50 — 2 cm Luft
+ * zum Reifen. Das Verhältnis stimmt auch am echten Wagen: 0,86 m Spurweite
+ * der Träger bei 2,50 m Fahrzeugbreite.
+ */
+const RAHMEN_TRAEGER_X = 0.43;
+
+/** Breite eines Längsträgers (m) — so breit, dass 2 cm zum Reifen bleiben. */
+const RAHMEN_TRAEGER_B = 0.14;
+
+/**
+ * Der Rahmen als Leiter statt als Platte — EIN Netz, wie vorher.
+ *
+ * Befund E-076: Der innere Zwillingsreifen steckte 30 cm im Rahmen, weil der
+ * ein durchgehender Quader von 2,20 m Breite (x ±1,10) war und der Reifen bei
+ * x 0,52 … 0,82 steht. Ein Fahrgestell ist aber ein Leiterrahmen: zwei
+ * Längsträger, dazwischen Querträger, und die Räder laufen AUSSEN daran
+ * vorbei. Von der Seite sieht man den Reifen jetzt über und unter dem
+ * Rahmenblech stehen, statt halb darin zu verschwinden.
+ *
+ * Verschmolzen zu einem einzigen Netz, und das ist keine Kür: Zeichenrufe
+ * sind auf dem iPhone mini der Engpass, Dreiecke nicht (E-025). Fünf Quader
+ * einzeln wären vier Zeichenrufe mehr JE FAHRZEUG — die Netzzahl bleibt so
+ * bei 79 bis 102 je Bauart, genau wie vorher.
+ */
+function leiterrahmen(laenge: number): THREE.BufferGeometry {
+  const teile: THREE.BufferGeometry[] = [];
+  for (const sx of [-1, 1]) {
+    const g = new THREE.BoxGeometry(RAHMEN_TRAEGER_B, RAHMEN_H, laenge);
+    g.translate(sx * RAHMEN_TRAEGER_X, 0, 0);
+    teile.push(g);
+  }
+  /*
+   * Drei Querträger — ohne sie ist es keine Leiter, sondern zwei Schienen.
+   * Sie sitzen obenbündig und reichen nur bis zur Außenkante der Träger
+   * (±0,50 m), kommen also keinem Rad nahe.
+   */
+  for (const t of [-0.34, 0, 0.34]) {
+    const g = new THREE.BoxGeometry(2 * RAHMEN_TRAEGER_X + RAHMEN_TRAEGER_B, 0.12, 0.16);
+    g.translate(0, RAHMEN_H / 2 - 0.06, t * laenge);
+    teile.push(g);
+  }
+  const g = mergeGeometries(teile, false);
+  if (!g) throw new Error("Leiterrahmen liess sich nicht verschmelzen");
+  return g;
+}
+
 export function buildVehicleModel(v: VehicleModelContext): VehicleModelParts {
   const paint = new THREE.MeshStandardMaterial({ color: lackFuer(v.halter), roughness: 0.62 });
   const dark = new THREE.MeshStandardMaterial({ color: 0x2b2e31, roughness: 0.8 });
@@ -921,9 +982,9 @@ export function buildVehicleModel(v: VehicleModelContext): VehicleModelParts {
     teile.trailer = buildCarAndTrailer(v, paint, dark, bedMat, teile.raeder);
     return teile;
   }
-  const chassis = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.5, v.bedLen + 1.6), dark);
+  const chassis = new THREE.Mesh(leiterrahmen(v.bedLen + 1.6), dark);
   chassis.name = BAUGRUPPE.rahmen;
-  chassis.position.set(0, 0.65, 0.8);
+  chassis.position.set(0, RAHMEN_Y, 0.8);
   v.group.add(chassis);
   /*
    * Fahrerhaus in zwei Höhen: unten schmaler als oben, so wie ein Fernfahrer-

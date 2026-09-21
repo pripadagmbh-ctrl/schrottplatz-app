@@ -440,29 +440,38 @@ export const CONFIGS: ContainerConfig[] = [
    * vor dem Bagger stoert: „Direkt neben Buntmetall-Mulde."
    *
    * Der erste Platz (−2,8 | −15,4) stand in der Fahrlinie, und zwar messbar:
-   * Der Bagger schaut nach +z und tastet mit 1,30 m Rand (`CHASSIS_PAD` in
-   * `excavator/collision.ts`), der Container ist 1,80 m halbbreit — noetig
-   * waeren 3,10 m Seitenabstand, da waren 2,30 m. Wer geradeaus losfuhr,
+   * Der Bagger schaut nach +z, der Container ist 1,80 m halbbreit — noetig
+   * waeren 3,30 m Seitenabstand, da waren 2,30 m. Wer geradeaus losfuhr,
    * stand nach 4,95 m.
    *
    * VIER SCHRANKEN, alle zugleich:
    *
    *   1  Mitte im Schwenkband 5,80 … 9,20 m vom Sitz (−0,5 | −22,5)
    *   2  kein Kontakt mit der Mulde — Waende, Sockel, Schwellensteine
-   *   3  Fahrlinie nach vorn frei:  |x + 0,5| ≥ 1,80 + 1,30 = 3,10
+   *   3  Fahrlinie nach vorn frei:  |x + 0,5| ≥ 1,80 + 1,50 = 3,30
    *   4  Rueckfahrspur frei:        x + 1,80 ≤ 6,30 − 1,55 − 1,40 = 3,35
    *
-   * Aus 3 und 4 zusammen folgt x ≤ −3,60: Nach Osten auszuweichen verlangte
-   * x ≥ 2,60, und das verbietet 4. Damit liegt die Westkante des Containers
-   * bei x ≤ −5,40 — HINTER der Schwelle der Mulde (Aussenkante −4,95).
+   * DIE 1,50 IN SCHRANKE 3 IST AM 21.09.2026 NACHGEZOGEN WORDEN (E-107), und
+   * das ist der Grund, warum dieser Block ueberhaupt noch einmal gerechnet
+   * wurde. Hier stand 1,30 — abgeschrieben von `CHASSIS_PAD` in
+   * `excavator/collision.ts`. Diese Zahl war um 20 cm kleiner als die halbe
+   * Breite des Unterwagens, weshalb die Maschine 1,35 m in den Container
+   * hineinfuhr. Jetzt prueft `chassisHits()` mit dem wirklichen Grundriss
+   * (`UNTERWAGEN_HALB_B` = 1,50 m, `excavator/unterwagenParts.ts`), und
+   * genau dieselbe Zahl steht hier. **Wer sie dort aendert, muss diesen Block
+   * neu rechnen** — der alte Platz (−3,79 | −14,11) lag danach 1 cm IN der
+   * Fahrlinie.
+   *
+   * Aus 3 und 4 zusammen folgt x ≤ −3,80: Nach Osten auszuweichen verlangte
+   * x ≥ 2,80, und das verbietet 4. Damit liegt die Westkante des Containers
+   * bei x ≤ −5,60 — HINTER der Schwelle der Mulde (Aussenkante −4,95).
    * Oestlich der Mulde, wo er bisher stand, gibt es also ueberhaupt keinen
    * Platz mehr, der nicht in der Fahrlinie liegt. Bleibt der Streifen
    * NOERDLICH von ihr; ihre Nordwand endet auf z −16,45.
    *
-   * Abgesucht im 5-cm-Raster ueber den ganzen Platz (x −14 … 8, z −34 … −6)
-   * bleibt genau EINE freie Tasche uebrig:
-   *
-   *   x −4,67 … −3,60,  z −14,30 … −13,84   (1,07 x 0,46 m, Kontakt erlaubt)
+   * Abgesucht im 5-cm-Raster ueber den ganzen Platz (x −14 … 8, z −34 … −6,
+   * `tools/unterwagen-rand.ts`, Abschnitt TASCHE) bleibt genau EINE freie
+   * Tasche uebrig, noerdlich der Mulde und keine 40 cm dick.
    *
    * „Direkt neben der Mulde" ist damit keine Vorliebe, sondern das Einzige,
    * was die vier Schranken zusammen noch zulassen.
@@ -470,20 +479,22 @@ export const CONFIGS: ContainerConfig[] = [
    * GENOMMEN WIRD DER MITTELPUNKT DIESER TASCHE — der eine Punkt, der von
    * allen drei engen Grenzen gleich weit weg ist. Mit s als diesem Abstand:
    *
-   *   x = −3,60 − s                            (Fahrlinie)
+   *   x = −3,80 − s                            (Fahrlinie)
    *   z = −14,30 + s                           (Nordwand der Mulde)
-   *   hypot(3,10 + s; 8,20 + s) = 9,20 − s     (Schwenkband)
-   *   → s² + 41 s − 7,79 = 0  →  s = 0,189 m
+   *   hypot(3,30 + s; 8,20 + s) = 9,20 − s     (Schwenkband)
+   *   → s² + 41,4 s − 6,51 = 0  →  s = 0,157 m
    *
-   *   Mitte (−3,79 | −14,11)   9,01 m vom Sitz (Band bis 9,20)
-   *   Grundflaeche             x −5,59 … −1,99,  z −16,26 … −11,96
-   *   zur Mulde (Nordwand)     0,19 m     zur Fahrlinie          0,19 m
-   *   zur Rueckfahrspur        5,34 m     zum naechsten Fahrzeug 3,62 m
+   *   Mitte (−3,96 | −14,14)   9,05 m vom Sitz (Band bis 9,20)
+   *   Grundflaeche             x −5,76 … −2,16,  z −16,29 … −11,99
+   *   zur Mulde (Nordwand)     0,16 m     zur Fahrlinie          0,16 m
+   *   zur Rueckfahrspur        5,51 m     zum Rand des Schwenkbands 0,15 m
+   *
+   * Gegen den alten Platz sind das 17 cm nach Westen und 3 cm nach Sueden.
    *
    * WAS ES KOSTET — als Messung, nicht als Einwand: Vom Sitz aus liegen noch
    * 53 % seiner Grundflaeche im Schwenkband (vorher 82 %). Erreichbar ist die
    * SUEDLICHE Haelfte, die zur Mulde hin; die Nordkante ist 11,04 m weg. Mehr
-   * geht an dieser Stelle nicht — die Tasche ist nur 0,19 m „dick": Jeder
+   * geht an dieser Stelle nicht — die Tasche ist nur 0,16 m „dick": Jeder
    * Zentimeter nach Sueden geht in die Mulde, jeder nach Osten in die
    * Fahrlinie, jeder nach Norden aus dem Band. Er bleibt versetzbar; wer ihn
    * lieber voll in Reichweite haben will, schiebt ihn und lebt damit, dass
@@ -528,7 +539,7 @@ export const CONFIGS: ContainerConfig[] = [
    * der Muell zum ersten Mal einen ganzen Weg: Wrack → Container → Silo.
    */
   { id: "r_rubble", fractionId: "rubble", mitFraktionen: ["tires", "wood", "plastic"],
-    label: "MUELL", kind: "rolloff", x: -3.79, z: -14.11, size: [3.6, 4.3, 0.8],
+    label: "MUELL", kind: "rolloff", x: -3.96, z: -14.14, size: [3.6, 4.3, 0.8],
     platzinventar: true },
 
   /*
@@ -720,6 +731,34 @@ export function muldenWandSpannen(
  * nachziehen muessen.
  */
 export const ROLLOFF_WAND = 0.09;
+
+/** Kufenhöhe unter dem Boden (Bestand seit 13.09.2026, siehe rolloff-Zweig). */
+export const ROLLOFF_KUFE = 0.22;
+
+/** Höhe des umlaufenden Oberriegels (Bestand seit 13.09.2026). */
+export const ROLLOFF_RIEGEL = 0.13;
+
+/**
+ * Oberkante eines Absetzcontainers über Grund (m) — EINE Quelle für Bau und
+ * Hindernisliste (E-108).
+ *
+ * Bis zum 21.09.2026 wusste der Bau eine Zahl und die Hindernisliste eine
+ * andere: Gebaut liegt die Oberkante des Riegels auf
+ * `Kufe + Boden + Wandhöhe + halber Riegel`, gemeldet wurde `Wandhöhe + 0,20`.
+ * An der Müllmulde (Wandhöhe 0,80 m) waren das 1,175 gegen 1,000 m — der
+ * Baggerarm schwenkte in diesen 17,5 cm durch den Riegel hindurch, den man
+ * sieht (`hitsObstacle` mit `y`, `excavator/collision.ts`). Dieselbe
+ * Fehlerklasse wie die „unsichtbare Barriere" vom 12.09.2026, nur andersherum:
+ * gebaut und nicht verzeichnet.
+ *
+ * Die anderen Bauarten sind nachgemessen und stimmen auf den Millimeter:
+ * Mulde (`bay`) meldet `h + 1,00` und baut `(round(h/0,5) + 2) · 0,5`, Halde
+ * meldet `h` und baut `round(h/0,5) · 0,5` — bei allen zehn Einträgen in
+ * CONFIGS ist die Differenz 0,000 m.
+ */
+export function rolloffOberkante(wandHoehe: number): number {
+  return ROLLOFF_KUFE + ROLLOFF_WAND + wandHoehe + ROLLOFF_RIEGEL / 2;
+}
 
 /** Fangbereich über einer Haufen-Zone (Zonen-Zählung + Ampel) */
 const PILE_CATCH_HEIGHT = 2.4;
@@ -1277,7 +1316,7 @@ class GameContainer {
        * `test/spinnenmass.test.ts` rechnet das mit.
        */
       const T = ROLLOFF_WAND;
-      const KUFE = 0.22;
+      const KUFE = ROLLOFF_KUFE;
       const stahl = new THREE.MeshStandardMaterial({
         color: fraction.color,
         roughness: 0.62,
@@ -1321,10 +1360,20 @@ class GameContainer {
           group.add(runge);
         }
       }
-      // Obere Kante als durchlaufender Riegel — daran erkennt man die Mulde
+      /*
+       * Obere Kante als durchlaufender Riegel — daran erkennt man die Mulde.
+       *
+       * Seine Lage kommt aus `rolloffOberkante` und nicht mehr aus einer
+       * eigenen Rechnung: Was hier gebaut wird, meldet der Getter `hindernis`
+       * aus derselben Zeile (E-108).
+       */
+      const oberkante = rolloffOberkante(h);
       for (const sz of [-1, 1]) {
-        const kante = new THREE.Mesh(new THREE.BoxGeometry(w + 0.14, 0.13, 0.18), rahmen);
-        kante.position.set(0, KUFE + T + h, sz * (d / 2));
+        const kante = new THREE.Mesh(
+          new THREE.BoxGeometry(w + 0.14, ROLLOFF_RIEGEL, 0.18),
+          rahmen
+        );
+        kante.position.set(0, oberkante - ROLLOFF_RIEGEL / 2, sz * (d / 2));
         group.add(kante);
       }
       // Haken-Öse an der Stirnseite: ohne sie ist es eine Kiste, keine Mulde
@@ -1500,7 +1549,12 @@ class GameContainer {
     const schief = Math.abs(Math.sin(this.pyaw)) > 0.15;
     const hw = schief ? Math.max(w, d) / 2 : w / 2;
     const hd = schief ? Math.max(w, d) / 2 : d / 2;
-    return { x: this.px, z: this.pz, hw, hd, top: h + 0.2 };
+    /*
+     * Die Oberkante kommt aus derselben Quelle wie der gebaute Oberriegel
+     * (E-108). Einen Körper haben nur `rolloff` und `grosscontainer`, und für
+     * beide gilt diese Bauart — ein Behälter ohne Körper kommt hier nie an.
+     */
+    return { x: this.px, z: this.pz, hw, hd, top: rolloffOberkante(h) };
   }
 
   /**
