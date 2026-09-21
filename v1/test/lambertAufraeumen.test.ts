@@ -20,14 +20,9 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import * as THREE from "three";
-import RAPIER from "@dimforge/rapier3d-compat";
 import { initPhysics } from "../src/physics/physicsWorld";
-import { ItemManager, type ScrapItem } from "../src/world/scrapItems";
-import { StaffManager } from "../src/world/people";
-import { CONFIGS, ROLLOFF_WAND, MULDE_STEIN } from "../src/world/containers";
-import { WEIGH_X, WEIGH_Z, KAFFEE_POS } from "../src/world/yard";
+import { CONFIGS, ROLLOFF_WAND, MULDE_STEIN, bayHalb } from "../src/world/containers";
 import { BAGGER_STAND, SCHWENK_INNEN, SCHWENK_AUSSEN } from "../src/world/baggerstand";
-import { OFFICE_X } from "../src/world/office";
 import { schuettdichte, abfallDichte } from "../src/materials/schuettdichte";
 import {
   nutzVolumen,
@@ -37,17 +32,25 @@ import {
   restKg,
   VOLL_AB,
 } from "../src/world/fuellstand";
-import { getMaterial } from "../src/materials/catalog";
 import { LAMBERT_SPRUECHE } from "../src/world/lambertfunk";
 import { SCHIEB_ABLAGE_M, SCHIEB_VORLAUF, SCHIEB_AB_M } from "../src/world/loader";
 import { aufFahrspur } from "../src/world/fahrspuren";
+import {
+  ABFALLSILO,
+  SAATEN,
+  ZWEI_STUECKE,
+  baueAbfall,
+  festerZufall,
+  fuelleSilo,
+  papierStattBrowser,
+} from "./lambertlauf";
 
 beforeAll(async () => {
+  papierStattBrowser();
   await initPhysics();
 });
 
 const MUELL = CONFIGS.find((c) => c.id === "r_rubble")!;
-const ABFALLSILO = CONFIGS.find((c) => c.id === "c_rubble")!;
 
 /* ------------------------------------------------- 1  Wie voll ist voll --- */
 
@@ -116,91 +119,77 @@ describe("Füllstand einer Mulde", () => {
 
 /* ---------------------------------------------------- 2  Lambert selbst --- */
 
-interface Platz {
-  staff: StaffManager;
-  items: ItemManager;
-  funk: string[];
-  schritt: (sekunden: number, lkw?: THREE.Vector3 | null) => void;
-  lege: (materialId: string, kg: number, x: number, z: number) => ScrapItem;
-  imSilo: () => number;
-  minBandAbstand: number;
-  imBand: boolean;
-}
-
-function baueAbfall(): Platz {
-  const scene = new THREE.Scene();
-  const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
-  const boden = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
-  world.createCollider(
-    RAPIER.ColliderDesc.cuboid(400, 0.5, 400).setTranslation(0, -0.5, 0),
-    boden
-  );
-  const items = new ItemManager(scene, world);
-  const staff = new StaffManager(
-    scene,
-    items,
-    new THREE.Vector3(WEIGH_X, 0, WEIGH_Z),
-    KAFFEE_POS,
-    new THREE.Vector3(OFFICE_X + 4.5, 0, 25)
-  );
-  staff.setLoader(true);
-  const bagger = new THREE.Vector3(BAGGER_STAND.x, 0, BAGGER_STAND.z);
-  staff.getExcavatorPos = () => bagger;
-  const funk: string[] = [];
-  staff.onFunk = (_wer, spruch) => funk.push(spruch);
-
-  const p: Platz = {
-    staff,
-    items,
-    funk,
-    minBandAbstand: Infinity,
-    imBand: false,
-    lege: (materialId, kg, x, z) =>
-      items.spawnScrap(
-        materialId,
-        kg,
-        { kind: "box", dims: [0.7, 0.5, 0.7], color: getMaterial(materialId).color },
-        new THREE.Vector3(x, 0.4, z)
-      ),
-    schritt: (sekunden, lkw = null) => {
-      const dt = 1 / 60;
-      for (let i = 0; i < sekunden * 60; i++) {
-        world.step();
-        staff.update(dt, lkw ?? null);
-        const q = staff.lambertOrt;
-        const r = Math.hypot(q.x - BAGGER_STAND.x, q.z - BAGGER_STAND.z);
-        if (r >= SCHWENK_INNEN && r <= SCHWENK_AUSSEN) p.imBand = true;
-      }
-    },
-    imSilo: () =>
-      items.items.filter((it) => {
-        const q = it.body.translation();
-        // Mulde mit Öffnung nach Norden: size[0] ist die Tiefe
-        return (
-          Math.abs(q.x - ABFALLSILO.x) <= ABFALLSILO.size[1] / 2 + 0.5 &&
-          Math.abs(q.z - ABFALLSILO.z) <= ABFALLSILO.size[0] / 2 + 0.5
-        );
-      }).length,
-  };
-  return p;
-}
-
-/** Die Mulde künstlich füllen: Stücke, die schon drinliegen (wie nach `recount`). */
-function fuelleSilo(p: Platz, kg: number): void {
-  const it = p.lege("wood", kg, ABFALLSILO.x, ABFALLSILO.z);
-  it.containerId = ABFALLSILO.id;
-}
-
 describe("Lambert räumt selbständig auf", () => {
+  /*
+   * DIESER FALL WAR DER UNZUVERLÄSSIGE (offener Punkt, behoben in E-109).
+   *
+   * Er stand als ein einziger Lauf da und prüfte `imSilo() === 2`. In 3 von 40
+   * Läufen der Datei kam 1 heraus — und der Verdacht lautete „Zeitschranke
+   * reißt unter Last". Das war er nicht: Der Lauf hängt an gerechneten
+   * Schritten (dt = 1/60), an keiner Wanduhr, und er ist nach 22,1 s fertig,
+   * bei 120 s Budget. Gemessen mit `tools/lambert-streuung.ts` über 60 Saaten:
+   * 22,1 s, jedes Mal, auf die Zehntelsekunde.
+   *
+   * ES WAR DIE FEHLENDE MULDE. Der Aufbau setzte einen Boden und sonst nichts;
+   * die Abfallmulde war ein gedachtes Rechteck, in dem gezählt wurde. Lambert
+   * wirft seine Fuhre aber aus 3,90 m Höhe ab, gestreut um ±0,60 m
+   * (`people.ts:1327`, `Math.random()`), und ohne Betonlego prallte sie auf
+   * den nackten Boden und rutschte weg — gemessen 2,95 m neben der Mitte, also
+   * 0,85 m ausserhalb einer Wand, die es nicht gab. Der Wächter prüfte „bringt
+   * es in die Mulde", ohne dass eine Mulde vorhanden war.
+   *
+   * Jetzt steht der echte `ContainerManager` da, gezählt wird im Grundriss der
+   * Mulde (`bayHalb`) statt in einem Rahmen mit 0,78 m Zuschlag — und gefahren
+   * werden sechs feste Saaten statt eines Wurfs.
+   *
+   * FÜNF VON SECHS, NICHT SECHS VON SECHS, und das ist gemessen, nicht
+   * gefällig gewählt: Mit Mulde springt in 1 von 200 Läufen (`echt`, ohne
+   * Saat) ein Stück über die offene Nordseite wieder heraus und bleibt 0,74 m
+   * davor liegen. Das ist ein Befund am Spiel, kein Testfehler, und er steht
+   * in `docs/offene-punkte.md`. Bei 0,5 % je Lauf reisst „5 von 6" nur in
+   * 0,04 % der Saatensätze — ein Umbau, der den Zufallsstrom verschiebt und
+   * damit sechs andere Würfe würfelt, kippt diesen Wächter also nicht.
+   */
   it("bringt herumliegenden Abfall in die Abfallmulde und meldet sich an und ab", () => {
+    let drin = 0;
+    for (const saat of SAATEN) {
+      const zurueck = festerZufall(saat);
+      try {
+        const p = baueAbfall();
+        for (const [mat, kg, x, z] of ZWEI_STUECKE) p.lege(mat, kg, x, z);
+        p.schritt(120);
+        if (p.imSilo() === 2) drin++;
+        // An- und abmelden muss er in JEDEM Lauf — das hängt an keinem Wurf.
+        expect(p.funk.length, `Saat ${saat}: kein Funk`).toBeGreaterThanOrEqual(2);
+        expect(LAMBERT_SPRUECHE.abfallAn, `Saat ${saat}: meldet sich nicht an`).toContain(p.funk[0]);
+        expect(
+          LAMBERT_SPRUECHE.abfallFertig,
+          `Saat ${saat}: meldet sich nicht ab`
+        ).toContain(p.funk[p.funk.length - 1]);
+      } finally {
+        zurueck();
+      }
+    }
+    expect(drin, `nur ${drin} von ${SAATEN.length} Laeufen haben beide Stuecke in der Mulde`).
+      toBeGreaterThanOrEqual(SAATEN.length - 1);
+  }, 120000);
+
+  it("GEGENPROBE: dieselbe Zaehlung meldet ein Stueck NEBEN der Mulde nicht als drin", () => {
+    /*
+     * Ohne diese Zeile prüft `imSilo()` nichts: Ein Rahmen, der alles zählt,
+     * ist immer bei 2. Genau dieser Zuschlag war der Fehler — die alte
+     * Zählung liess ein Stück 0,78 m ausserhalb der Wand als „in der Mulde"
+     * durchgehen.
+     */
     const p = baueAbfall();
-    p.lege("wood", 80, -14.0, -6.0);
-    p.lege("plastic", 40, -17.0, -3.0);
-    p.schritt(120);
-    expect(p.imSilo()).toBe(2);
-    expect(p.funk.length).toBeGreaterThanOrEqual(2);
-    expect(LAMBERT_SPRUECHE.abfallAn).toContain(p.funk[0]);
-    expect(LAMBERT_SPRUECHE.abfallFertig).toContain(p.funk[p.funk.length - 1]);
+    const { hw, hd } = bayHalb(ABFALLSILO);
+    const drin = p.lege("wood", 40, ABFALLSILO.x, ABFALLSILO.z);
+    expect(p.imSilo()).toBe(1);
+    // Einen halben Meter hinter die Mulde legen: darf nicht mehr zählen.
+    drin.body.setTranslation({ x: ABFALLSILO.x + hw + 0.5, y: 0.4, z: ABFALLSILO.z }, true);
+    expect(p.imSilo()).toBe(0);
+    drin.body.setTranslation({ x: ABFALLSILO.x, y: 0.4, z: ABFALLSILO.z + hd + 0.5 }, true);
+    expect(p.imSilo()).toBe(0);
   });
 
   it("fährt dem Bagger dabei nicht in den Schwenkbereich", () => {

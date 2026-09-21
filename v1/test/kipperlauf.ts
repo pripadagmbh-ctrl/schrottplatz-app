@@ -46,6 +46,25 @@ export const DURCHFALL_MARKE = -0.6;
 export const SAATEN = [20260913, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
   12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23];
 
+/**
+ * 48 SAATEN FÜR DEN WÄCHTER (E-109) — die 24 oben plus 24 weitere.
+ *
+ * WARUM DER WÄCHTER MEHR BRAUCHT ALS DAS WERKZEUG: Eine Stichprobe von 24
+ * Fuhren ist für einen Bericht genug und für ein Urteil zu wenig. Gemessen
+ * (`tools/kipper-streuung.ts`, 144 frische Saaten, 20.000 Ziehungen je
+ * Gruppengrösse) reisst der Median über 24 Saaten die Schranke 40 in 3,5 % der
+ * Fälle, ohne dass sich am Spiel etwas geändert hätte; über 48 sind es 0,36 %,
+ * über 96 gar keine mehr. Der Sprung von 24 auf 48 kostet rund 46 s je
+ * Testlauf und nimmt 90 % der Fehlalarme.
+ *
+ * Für das WERKZEUG bleibt es bei 24 — es berichtet, es urteilt nicht.
+ */
+export const SAATEN_LANG = [
+  ...SAATEN,
+  24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35,
+  36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47,
+];
+
 export interface Stand {
   name: string;
   kunde: () => CustomerProfile;
@@ -359,11 +378,40 @@ export const abweichung = (a: number[]): number => {
 };
 
 export function reihe(s: Stand, saaten: number[] = SAATEN): Reihe {
-  const r = saaten.map((x) => lauf(s, x));
+  return fasseZusammen(s.name, saaten.map((x) => lauf(s, x)));
+}
+
+/**
+ * DIESELBE REIHE, ABER MIT LUFTHOLEN (E-109).
+ *
+ * Ein Vitest-Arbeiter, der 40 s am Stück rechnet, kommt nicht dazu, dem
+ * Berichterstatter zu antworten. Vitest bricht den Lauf dann mit
+ * `[vitest-worker]: Timeout calling "onTaskUpdate"` ab — gemessen am
+ * 21.09.2026 in 1 von 3 vollen `npm test`-Läufen, nachdem der Wächter von 24
+ * auf 48 Saaten gegangen war. Der Test war grün, der Lauf trotzdem rot.
+ *
+ * `setTimeout(0)` alle paar Saaten gibt die Ereignisschleife frei. Es kostet
+ * nichts messbares und macht den Unterschied zwischen „rechnet lange" und
+ * „antwortet nicht mehr".
+ */
+export async function reiheMitLuft(
+  s: Stand,
+  saaten: number[] = SAATEN,
+  atemzugAlle = 4
+): Promise<Reihe> {
+  const r: Lauf[] = [];
+  for (let i = 0; i < saaten.length; i++) {
+    r.push(lauf(s, saaten[i]!));
+    if ((i + 1) % atemzugAlle === 0) await new Promise((fertig) => setTimeout(fertig, 0));
+  }
+  return fasseZusammen(s.name, r);
+}
+
+function fasseZusammen(name: string, r: Lauf[]): Reihe {
   const werte = r.map((x) => x.vmaxKmh);
   const sortiert = [...werte].sort((a, b) => a - b);
   return {
-    name: s.name,
+    name,
     mittel: mittelwert(werte),
     hoechst: Math.max(...werte),
     median: sortiert[Math.floor(sortiert.length / 2)]!,

@@ -115,12 +115,22 @@ erledigt ist, bekommt den Commit dazu.
       *Offen geblieben:* Die Figur ist nur bei der Kaffeepause zu sehen; ein
       Privatmann mit Hund fährt ohne (PKW-Kabine gehört dem Kran-Paket); die
       Glieder schwingen nicht mehr beim Gehen (Netzbudget, siehe E-077).
-- [ ] **Musik nach Fasson** — Techno, Rap, Schlager, Pop; Radio im Führerhaus
-      zum Umschalten.
-- [ ] **Funkgerät im Führerhaus** — Funksprüche von Mario (misstrauisch, was
-      da geladen ist), Janine (Gossip der Händler), Lambert (Unordnung, fragt
-      nach der nächsten Aufgabe). Lambert nimmt Anweisungen an: Alu rauspicken,
-      Kupfer holen, Schrott zusammenschieben, Baumisch abladen.
+- [x] **Musik nach Fasson** — **gebaut 17.09.2026 (E-098).** Fünf Sender, alle
+      selbst gespielt, keine Fremddatei: Schlagerwelle, Hallenfunk,
+      Nachtschicht, Werkhof, Niederrhein Eins (`audio/songs.ts`). Umgeschaltet
+      wird im Führerhaus über SCHILDER → MUSIK; die Taste schaltet **weiter**
+      statt an/aus, weil „aus" sonst eine Sackgasse wäre. Nach dem letzten
+      Sender kommt „Radio aus". Patrick am Gerät: „musik klingt verschieden" —
+      damit ist der Punkt bestätigt.
+- [~] **Funkgerät im Führerhaus** — **die Sprüche sind gebaut**
+      (`ui/funk.ts`): Mario, Janine und Lambert melden sich zu Kundschaft,
+      Wiegung und Platzlage, verdrahtet in `main.ts`.
+
+      **Offen bleibt die Gegenrichtung:** Lambert nimmt **keine** Anweisungen
+      an — Alu rauspicken, Kupfer holen, Schrott zusammenschieben, Baumisch
+      abladen. Heute ist das Funkgerät ein Lautsprecher, kein Gerät zum
+      Sprechen. Sein Verhalten liegt in `world/staff.ts` und hört auf nichts
+      von außen (`ui/funk.ts:39` hält das ausdrücklich fest).
 
 ## Handel
 
@@ -544,15 +554,32 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
 
 ### Offen
 
-- [ ] **`test/lambertAufraeumen.test.ts` ist unzuverlässig** (beobachtet
-      17.09.2026, beim Arbeiten an E-105). „bringt herumliegenden Abfall in
-      die Abfallmulde und meldet sich an und ab" schlug in **einem von fünf**
-      vollen `npm test`-Läufen fehl (`expected 1 to be 2`, Zeile 200);
-      allein aufgerufen lief er dreimal hintereinander grün. Es hängt also am
-      parallelen Lauf, nicht am Inhalt — vermutlich eine Zeitschranke, die
-      unter Last reißt. **Nicht angefasst**, weil E-105 an Lamberts Weg nichts
-      ändert; aber ein Wächter, der zufällig rot wird, kostet beim nächsten
-      Mal eine halbe Stunde Suche am falschen Ort.
+- [x] **`test/lambertAufraeumen.test.ts` ist unzuverlässig** (beobachtet
+      17.09.2026, beim Arbeiten an E-105) — **behoben E-109, 21.09.2026.**
+
+      Nachgestellt: **3 von 40** Läufen der Datei rot (7,5 %), dazu 1 von 100
+      Wiederholungen innerhalb eines Laufs. Es war **keine Zeitschranke**: Der
+      Lauf hängt an gerechneten Schritten (dt = 1/60), an keiner Wanduhr, und
+      er ist nach 22,1 s fertig bei 120 s Budget (`tools/lambert-streuung.ts`,
+      60 Saaten, auf die Zehntelsekunde gleich).
+
+      Es war die **fehlende Mulde**: `baueAbfall()` legte einen Boden an und
+      sonst nichts, gezählt wurde in einem gedachten Rechteck mit 0,78 m
+      Zuschlag. Lambert wirft aus 3,90 m Höhe ab, gestreut um ±0,60 m
+      (`people.ts:1327`) — ohne Wände rutschte das Stück 0,85 m neben die
+      Mulde hinaus. Jetzt steht der echte `ContainerManager` im Aufbau, gezählt
+      wird im Grundriss (`bayHalb`), gefahren werden sechs feste Saaten.
+      Nachher **30 von 30** grün.
+
+- [ ] **Lambert wirft Abfall gelegentlich neben die Mulde** — gefunden in
+      E-109, nicht von Patrick gemeldet, **nicht behoben.** Gemessen über 200
+      Läufe mit echtem Zufall: In **1 von 200** springt ein abgeworfenes Stück
+      über die offene Nordseite der Betonlego-Mulde wieder heraus und bleibt
+      0,74 m davor liegen. Ursache ist die Abwurfhöhe `mulde.size[2] + 0,9` =
+      3,90 m (`src/world/people.ts:1327`) samt ±0,60 m Streuung — das ist ein
+      freier Fall von fast vier Metern auf einen Haufen. Zuständig: `welt`.
+      Frage an Patrick: Stört es, wenn ab und zu ein Brett neben der Mulde
+      liegt, oder gehört das zum Platz?
 
 - [~] **Autos brauchen verschiedene Modelle, Farben und Wrackzustände** —
       Ansage Patrick, 17.09.2026: „und autos, brauchen wir verschiedene
@@ -616,8 +643,14 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
       schneidet den Container — **auch an seinem Startplatz**, ohne dass
       Patrick etwas versetzt. Tiefe **3,10 m**, das ist die ganze
       Fahrzeugbreite. Werkzeug: `npx vite-node tools/durchfahrt.ts`, Wächter:
-      `test/durchfahrt.test.ts`. *Wartet auf die Entscheidung, welche
-      Reparatur — stehenbleiben und hupen, oder beiseiteschieben.*
+      `test/durchfahrt.test.ts`.
+
+      **Repariert 17.09.2026 (E-103), wartet auf sein Urteil am Gerät.** Weder
+      hupen noch beiseiteschieben: Beide Phasen fahren jetzt über `advance()`
+      auf einer echten Strecke (`routes.routeToPark()` / `routeParkRueck()`)
+      und damit durch dieselbe Hindernisprüfung wie jede andere Etappe. Eine
+      Sonderregel nur für den Weg zum Warteplatz wäre eine zweite Wahrheit
+      gewesen. Gemessen **3,10 m → 0,00 m** in allen dreizehn Fahrproben.
 - [ ] **„Objekte fahren durch einander hindurch"** (17.09.2026) — **gemessen,
       nicht repariert** (E-093). Es ist **kein fehlender Kollider**: Container
       und LKW haben welche, Rapier führt 32 Berührpunkte. Ein Fahrzeug ist
@@ -625,8 +658,15 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
       abgeleitetes Tempo in `toPark` 0,000 m/s statt 4,89 — es wird versetzt
       statt bewegt. Gleiches Paar betroffen: Fahrzeug gegen liegenden Schrott
       (400-kg-Brocken 1,22 m verschoben) und Fahrzeug gegen Fahrzeug (steht in
-      keiner der beiden Abfragen der Fahrt). *Wartet auf sein Urteil am Gerät,
-      ob es dieselbe Beobachtung ist oder noch eine zweite.*
+      keiner der beiden Abfragen der Fahrt).
+
+      **Halb erledigt (E-103).** Fahrzeug gegen Container ist weg — nicht weil
+      der Kollider jetzt greift, sondern weil die Fahrt wieder über die
+      Streckenprüfung läuft. **Offen bleiben die anderen beiden Paare:**
+      Fahrzeug gegen liegenden Schrott (400-kg-Brocken 1,22 m verschoben) und
+      Fahrzeug gegen Fahrzeug — beide stehen in keiner der Abfragen, die eine
+      Fahrt heute macht. *Wartet auf sein Urteil am Gerät, welches der drei er
+      gesehen hat.*
 - [ ] **LKW schleift beim Eindrehen durch die Ostwand** — 0,27 m gefahren,
       0,60 m über alle Gierlagen, am Abladeplatz. Nicht von ihm gemeldet, beim
       Nachmessen zu E-093 gefunden. Die Kehre auf der Stelle (E-081) ist weder
@@ -636,10 +676,35 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
       1,30 m (`excavator/collision.ts:43`) gegen `UNTERWAGEN_R` 2,60 m
       (`excavator/excavator.ts:540`): zwei Zahlen für dieselbe Maschine. Nicht
       von ihm gemeldet, bei E-093 mitgefunden.
+
+      **Behoben 21.09.2026 (E-107), wartet auf sein Urteil am Gerät.** Gemessen
+      waren es 1,35 m in den Müllcontainer, 0,70 m in die Muldenstirn, 0,60 m
+      in die Westmauer — und **beide** alten Zahlen waren falsch: Der gebaute
+      Unterwagen misst am Netz 2,65 m Hüllkreis, 1,30 war quer 20 cm zu klein,
+      2,60 war 6 cm zu groß. Der naheliegende Einzeiler
+      (`CHASSIS_PAD = UNTERWAGEN_R`) wurde gebaut, gemessen und **verworfen**:
+      Ein runder Radius um ein rechteckiges Fahrgestell lässt die Maschine bis
+      0,76 m vor Wänden stehen und nimmt dem Müllcontainer jeden erlaubten
+      Startplatz. Geprüft wird jetzt der wirkliche, mitgedrehte Grundriss aus
+      EINER Quelle (`excavator/unterwagenParts.ts`). Eindringung 0 m, zu früh
+      gebremst weiter 0,02 m, anfahrbare Fläche 2 147 → 2 076 m² (−3 %), kein
+      Behälter außer Reichweite, Rechenzeit 0,003 → 0,012 ms je Bild.
+      **Nebenwirkung, bewusst:** Der Müllcontainer steht morgens 17 cm weiter
+      westlich — die Tasche aus den vier Schranken (E-041) war aus der falschen
+      Zahl hergeleitet und musste mit.
 - [ ] **Der gemeldete Container-Umriss ist flacher als der gebaute** — 1,00 m
       statt 1,175 m Oberkante (`world/containers.ts:1484`). Der Baggerarm
       schwenkt in den 17,5 cm dazwischen durch den Oberriegel hindurch. Bei
       E-093 mitgefunden.
+
+      **Behoben 21.09.2026 (E-108), wartet auf sein Urteil am Gerät.** Alle drei
+      Bauarten nachgemessen: Halden (2 Einträge) und Buchten (7) stimmten auf
+      den Millimeter, falsch war allein der Absetzcontainer — und zwar um einen
+      FESTEN Betrag, unabhängig von der Wandhöhe; ein 40er hätte dieselben
+      17,5 cm. Jetzt rechnet `rolloffOberkante()` die Höhe, und der gebaute
+      Riegel wie die Meldung lesen dieselbe Zeile. Nichts wird dadurch
+      zugemacht: Lambert und die Fahrer prüfen im Grundriss, die Spinne wird an
+      `pos.y − 1,20` geprüft und reicht 2,83 m tiefer.
 - [ ] **Mittelsäule raus, Zacken direkt an die Traverse** — gemessen sitzen
       zwischen `TRAVERSE_Y` (−0,865) und `STEMPEL_AUGE.y` (−1,5335) **66,9 cm
       Säule**. In seiner Skizze durchgekreuzt, von mir übersehen.
@@ -666,12 +731,60 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
       und Median urteilen (so steht es schon im Kommentar der Datei, der Code
       urteilt aber auch nach dem Höchstwert) oder mit mehr Saaten messen.
       Gehört zum Kipper-Paket, nicht zum Kran.
+
+      **Erledigt E-109, 21.09.2026 — und die Antwort war „beides".** Gemessen
+      mit `tools/kipper-streuung.ts` (144 frische Saaten, 20.000 Gruppen je
+      Größe), Fehlalarmquote ohne jede Änderung am Spiel:
+
+      | | 24 Saaten | 48 Saaten | 96 Saaten |
+      |---|---|---|---|
+      | Mittel ≥ 55 | 13,99 % | 7,00 % | 2,04 % |
+      | Median ≥ 40 | 3,54 % | **0,36 %** | 0,00 % |
+      | Höchst ≥ 280 | 28,89 % | 48,63 % | **73,91 %** |
+      | Endabstand ≥ 12 m | 0,00 % | 0,00 % | 0,00 % |
+
+      Beim **Höchstwert hilft Messen nicht** — er ist das Maximum einer
+      langschwänzigen Verteilung und wächst mit jeder weiteren Saat. Er fliegt
+      aus dem Urteil und wird nur noch berichtet; das **Mittel** ebenso (14 %
+      Fehlalarm, und genau das war der Rotlauf vom 21.09., ausgelöst von
+      E-108). Geurteilt wird nach dem **Median über 48 Saaten** sowie nach
+      Durchfall, Liegenbleiben und Endabstand. Neue Gegenprobe: eine erfundene
+      Reihe mit einem wegfliegenden Stück (585 km/h **und** 27 m Endabstand)
+      wird weiter rot, ein reiner Tempo-Ausreisser ohne Ortswechsel nicht.
+
+      Nebenbefund, behoben: Mit 48 Saaten rechnete der `beforeAll` 40 s am
+      Stück und konnte dem Vitest-Berichterstatter nicht mehr antworten —
+      `[vitest-worker]: Timeout calling "onTaskUpdate"` in 1 von 3 vollen
+      Läufen, bei grünen Zusicherungen. `reiheMitLuft` holt jetzt alle vier
+      Saaten Luft (`setTimeout(0)`).
+
+- [ ] **`LIEGT_MAX` ist die nächste Zufallsschranke im Kipper-Wächter** —
+      gefunden in E-109, **nicht behoben und absichtlich nicht hochgesetzt.**
+      Über 144 frische Saaten liegt der Anteil der Fuhre, der am Ende noch auf
+      der Brücke liegt, bei einem Median von **45,7 %** (p05 40,8 %, p99
+      52,7 %); die Schranke steht bei 45 %. Über zufällige Sätze von 48 Saaten
+      reisst sie in **59,4 %** der Fälle — der Wächter hält sie heute nur,
+      weil sein Saatensatz mit 42 % günstig liegt.
+
+      Ursache bekannt und unverändert: Reibung 2,2 gegen tan 58° = 1,60, eine
+      ruhende Fuhre rutscht auf dieser Neigung rechnerisch nicht; seit E-106
+      liegt sie mit 14,1 statt 11,0 Stücken dichter und kollert weniger nach.
+      Das ist eine **Gestaltungsfrage für Patrick** — steilerer Kippwinkel,
+      weniger Reibung oder ein Rüttler —, keine QA-Entscheidung. Zuständig:
+      `welt`. *Auf dem Gerät zu prüfen: Bleibt beim Abkippen sichtbar fast die
+      halbe Fuhre auf der Brücke liegen, und stört ihn das?*
 - [ ] **Innerer Zwillingsreifen steckt 30 cm im Rahmen** — gemessen in E-076.
       Der Rahmen ist ein Quader von 2,20 m Breite (x ±1,10), der innere
       Hinterreifen liegt bei x 0,52 … 0,82 und damit ganz darin. Ein echtes
       Fahrgestell ist ein Leiterrahmen mit zwei Trägern auf ±0,43, dazwischen
       läuft das Rad frei. Von aussen sieht man den Reifen über und unter dem
       Rahmenblech herausstehen. Kein Kranbefund, deshalb liegengelassen.
+
+      **Gebaut 21.09.2026 (E-108), wartet auf sein Urteil am Gerät.** Zwei
+      Längsträger auf x ±0,43 (0,14 m breit) plus drei Querträger, mit
+      `mergeGeometries` zu **einem** Netz verschmolzen — 1 596 Netze über alle
+      18 Bauarten, vorher wie nachher, Zeichenrufe unverändert. Der Kranbock
+      saß nebenbei 13 cm im Rahmen, jetzt 2 cm.
 - [ ] **Greifer komplett zur Seite kippen** — zum Kehren und Schleudern.
       Vorgemessen (E-065), zurückgestellt bis die Säulenfrage entschieden ist,
       weil die Kollisionsrechnung sonst zweimal gemacht werden müsste.
@@ -679,13 +792,26 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
       gemessen, keine Durchdringung. *Wartet auf sein Urteil: Rangieren oder
       Unfall?*
 - [ ] **Abholer brachte kein Geld** (15.09.) — die Ursache mit den drei
-      verschiedenen Ladeflächen-Fenstern ist behoben (E-070), sein
-      **Totalausfall aber nicht reproduziert**. Bleibt offen, bis er es
-      wiedersieht oder nicht mehr wiedersieht.
+      verschiedenen Ladeflächen-Fenstern war behoben (E-070), sein
+      **Totalausfall aber nicht reproduziert**.
+
+      **Zweite Ursache gefunden und behoben 16.09.2026 (E-087), wartet auf sein
+      Urteil am Gerät.** „Zur Waage" über die Taste J rief `sendAway()`, und das
+      setzte nur `phase = "out"` — nie `justDeparted`, an dem die Abrechnung
+      hängt. Deshalb ließ es sich vorher fünfmal nicht nachstellen: **8 von 8
+      J-Fällen** brachen, **0 von 20 V-Fällen**. Alle drei Symptome (kein Geld,
+      keine weiteren Händler, 0 t umgeschlagen) kamen aus dieser einen Zeile.
 - [ ] **Anlieferer ohne Frist blockiert den Hof** — wer nie abgeladen wird,
-      steht unbegrenzt; im kopflosen Lauf zehn Minuten, und eine vorgemerkte
+      stand unbegrenzt; im kopflosen Lauf zehn Minuten, und eine vorgemerkte
       Abholung kam nicht durch. Gefunden beim Nachstellen, nicht von ihm
       gemeldet — gehört trotzdem hierher.
+
+      **Gebaut (E-082), wartet auf sein Urteil am Gerät.** `STANDZEIT_S = 240`
+      in `delivery/vehicles.ts`: Nach vier Minuten fährt der Wagen
+      unverrichteter Dinge ab (`faehrtUnverrichtet()`), eine Minute vorher
+      kommt die Mahnung. **Am Gerät zu beurteilen ist der Wert, nicht die
+      Mechanik:** Sind vier Minuten zu knapp, wenn man gerade an der Presse
+      steht, oder zu lang, weil der Hof so lange dicht bleibt?
 - [ ] **Beim Kippen landen Teile quer über den Platz** — „nicht mal in der
       Nähe von dem LKW" (15.09.). Vermutlich der sichtbare Ausgang des
       Katapults: 500 km/h sind 139 m/s, der Platz ist rund 70 m lang. Wird als
@@ -700,6 +826,34 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
       Lenk-Sprung beim Rangieren (168,7° in einem Schritt, 6.596 km/h, E-073,
       nicht behoben). Trennende Beobachtung: **beim Kippen oder beim
       Rangieren?**
-- [ ] **Keine stehende Anzeige für Zahlungsunfähigkeit** — „Konto leer" ist ein
-      Toast und verschwindet, der Zustand bleibt. Für „Platz dicht" gibt es eine
-      Dauerzeile. `Account.lowOnCash` ist gebaut und wird nirgends benutzt.
+
+      **Zweite Ursache gefunden und behoben 17.09.2026 (E-094), wartet auf sein
+      Urteil am Gerät.** Es war keins von beiden ganz: Das Messfenster hörte
+      einen Schritt zu früh auf, die wirkliche Zahl war **24,5 %** Durchfall,
+      weitestes Stück 18,56 m. `leaveUnloadingBay` setzte `routeS = 0` zurück,
+      während `tipCreep` den Kipper schon 1,40 m weitergeschoben hatte — ein
+      Rücksprung von 1,32 m in den frischen Haufen, bei **jeder** Fuhre.
+      Jetzt 0,0 %.
+- [ ] **Der Container-Grundriss wird zu klein gemeldet** — bei E-108
+      mitgefunden, eigene Messung. Über das gemeldete Rechteck hinaus stehen
+      der Riegel 7,0 cm, die Rungen 10,5 cm und die **Haken-Öse 36,5 cm**. Das
+      geht in die Fahrwege der LKW und verschiebt jede Zahl in
+      `test/fahrumriss.test.ts` — deshalb bewusst NICHT als Nebenwirkung
+      mitgemacht. Der Fall steht mit Zahlen in `test/durchfahrt.test.ts`.
+
+- [ ] **Tank und Werkzeugkasten hängen frei in der Luft** — Folge des
+      Leiterrahmens (E-108): Sie saßen 28 cm in der alten Rahmenplatte, jetzt
+      hängen sie 31 cm neben dem Längsträger. Vom äußeren Zwillingsrad
+      verdeckt, deshalb liegengelassen; eine Konsole wäre ein eigener Schritt.
+
+- [ ] **Keine stehende Anzeige für Zahlungsunfähigkeit** — „Konto leer" war ein
+      Toast und verschwand, der Zustand blieb. `Account.lowOnCash` war gebaut
+      und wurde nirgends benutzt.
+
+      **Gebaut 16.09.2026 (E-081), wartet auf sein Urteil am Gerät.** Die
+      Zahlungslage steht jetzt in derselben Dauerzeile wie „Platz dicht", in
+      drei Stufen: `ok` (still), `knapp` ab 800 € Vorwarnung in Orange, `leer`
+      in Rot. Entschieden wird sie an EINER Stelle (`main.ts`, aus
+      `account.canBuy` und `account.lowOnCash`) — dieselben zwei Fragen, die
+      auch die Einfahrt aufmachen oder zumachen; das HUD bekommt nur das Wort.
+      Wächter: `test/kassenlage.test.ts`, `test/tagesablaufzeile.test.ts`.

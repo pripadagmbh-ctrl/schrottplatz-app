@@ -9835,3 +9835,274 @@ Außerdem stecken die Karosseriemaße **im Code**, nicht im Datensatz: `BoxGeome
 1. **Drei, vier Anlieferungen abwarten und auf die Ladeflächen sehen.** Es müssten jetzt regelmäßig lange Stücke LÄNGS auf dem Wagen liegen — Träger, Rohre, Bleche, gelegentlich eine Egge oder ein Schneidwerk. Sieht das aus wie eine geladene Fuhre oder wie ein Haufen?
 2. **Einen Kipper abkippen lassen und zusehen, bis er vom Hof ist.** Fliegt beim Wegfahren etwas weg? Und bleibt zu viel auf der gekippten Brücke liegen (gemessen 39 %, vorher 31 %)?
 3. **Zwei Wracks nebeneinander anliefern lassen.** Sie müssten verschiedene Farben haben — überwiegend Weiß, Grau, Silber und Schwarz, dazwischen mal Blau, Rot oder Ocker, alle stumpf und rostig. Ist das zu blass geraten?
+
+### E-107 — Der Bagger fuhr 1,35 m in den Müllcontainer: zwei Zahlen für eine Maschine, jetzt eine Quelle (21.09.2026)
+
+**Der Befund, gemessen statt gerechnet.** Der Unterwagen wurde gegen Bauwerke mit `CHASSIS_PAD` = 1,30 m geprüft (`excavator/collision.ts`), gegen stehende Fahrzeuge mit `UNTERWAGEN_R` = 2,60 m (`excavator/excavator.ts`). Zwei Zahlen für dieselbe Maschine, und gegen alles Gemauerte gewann die kleinere. Neues Messgerät `tools/unterwagen-rand.ts`, 5-cm-Raster über 24 Gierlagen, gerechnet mit derselben Überlappungsfunktion, mit der auch die LKW geprüft werden:
+
+| Bauwerk | vorher (Rand 1,30) | nachher (Umriss) |
+|---|---|---|
+| MÜLL-Container | **1,35 m** drin | 0,00 m |
+| Janines Kaffeewagen | 1,35 m drin | 0,00 m |
+| Stirnwand KUPFER-LAGER | 0,70 m drin | 0,00 m |
+| Westmauer | 0,60 m drin | 0,00 m |
+| Pressenwand | 0,35 m drin | 0,00 m |
+
+**Und keine der beiden Zahlen war die Maschine.** Am gebauten Netz gemessen (Abschnitt HERKUNFT): Der fahrende Unterwagen ist 3,00 m breit und 4,40 m lang, sein Hüllkreis misst 2,65 m. Die 2,60 waren also auch 6 cm zu klein — um diesen Betrag schnitt die Maschine in jeden LKW.
+
+**Entscheidung.** Es gibt nur noch EINE Quelle, und sie steht dort, wo der Unterwagen gebaut wird (`excavator/unterwagenParts.ts`):
+
+```
+UNTERWAGEN_HALB_B = RAD_X + RAD_B/2 = 1,50 m   (Radaußenkante)
+UNTERWAGEN_HALB_L = RAHMEN_HALB     = 2,20 m   (Rahmenhalblänge)
+UNTERWAGEN_R      = hypot(1,50; 2,20) = 2,663 m
+```
+
+Daraus zwei Ableitungen, keine gepflegte Zweitzahl: Die Fahrzeugsperre (`findeBox`) nimmt den Hüllkreis, weil ein LKW schräg steht und die Maschine sich auf der Stelle dreht. Die Bauwerksprüfung (`chassisHits`) nimmt die beiden Halbmaße als **gedrehtes Rechteck** — der wirkliche Grundriss, der mit der Blickrichtung des Fahrwerks mitdreht. `CHASSIS_PAD` gibt es nicht mehr.
+
+**Verworfene Alternative, und sie ist gemessen verworfen: `CHASSIS_PAD = UNTERWAGEN_R`.** Das war der naheliegende Einzeiler und genau das, was der Auftrag vorschlug. `hitsObstacle` erweitert ein Bauwerk aber auf BEIDEN Achsen um den Rand — ein Rand von 2,663 m behandelt die Maschine als 5,33 × 5,33 m großes Quadrat statt als 3,00 × 4,40 m großes Rechteck. Zwei Folgen, beide gemessen:
+
+1. **Sie bremst zu früh:** bis zu 0,76 m vor der Westmauer, 0,49 m vor dem Container. Das ist derselbe Fehler nochmal, nur andersherum — und es ist die Fehlerklasse, die im Prototyp schon einmal als „bremst 79 cm zu früh" aufgefallen ist.
+2. **Der MÜLL-Container hätte keinen Startplatz mehr.** Die vier Schranken aus E-041 haben mit diesem Rand **keine Lösung** — abgesucht im 5-cm-Raster über den ganzen Platz.
+
+Der gedrehte Umriss kostet nichts davon: 2 076 m² anfahrbar gegen 2 147 m² vorher (mit dem Hüllkreis wären es 1 685 m² gewesen). Der Verladeplatz bleibt erreichbar, und **kein einziger Behälter fällt aus der Reichweite** — geprüft mit einer Flutfüllung ab dem Standplatz, nicht mit einer Flächenzahl.
+
+**Der Müllcontainer musste 17 cm zur Seite, und das ist derselbe Fehler ein drittes Mal.** `world/containers.ts` leitet den Startplatz aus vier Schranken her, und eine davon war die Zahl 1,30 — abgeschrieben aus `collision.ts`. Mit dem wirklichen Maß (1,50) lag der alte Platz (−3,79 | −14,11) **einen Zentimeter IN der Fahrlinie**. Die Tasche ist neu gerechnet, die Herleitung im Kommentarblock mitgewandert:
+
+| | alt | neu |
+|---|---|---|
+| Mitte | −3,79 \| −14,11 | **−3,96 \| −14,14** |
+| zur Fahrlinie | 0,19 m | 0,16 m |
+| zur Nordwand der Mulde | 0,19 m | 0,16 m |
+| zum Rand des Schwenkbands | 0,19 m | 0,15 m |
+
+**Was es kostet, gemessen.** Die Prüfung ist teurer geworden: 4,09 statt 0,90 µs je Aufruf bei 52 Bauwerken, dreimal je Bild also **0,0123 statt 0,0027 ms**. Bei einem Bildbudget von 21 ms auf Patricks Gerät ist das ein Hundertstel einer Millisekunde.
+
+**Was ausdrücklich unberührt blieb.** Der Griff-Kern (Sensorkugel + Fixed Joint), das Pendel, die Spinne, `GRAPPLE_PAD`, `ARM_PAD` und die gesamte Armprüfung, `clampSpeeds`, die Kamera-Modi. Der Arm bleibt kinematisch. Am Fahrtempo, an der Lenkung und an den Rampen wurde nichts geändert.
+
+**Abnahmekriterium.** `npm run build` mit Rückgabewert **0 GEPRÜFT**. `npm test`: alle Dateien außer `test/kipper.test.ts` grün (**127 Dateien, 1 469 Prüfungen**); der Kipper-Fall gehört zur gleichzeitig laufenden Arbeit am Leiterrahmen (E-108, `src/delivery/vehicleModel.ts`) und nicht hierher — `test/kipperlauf.ts` baut weder einen Bagger noch einen Behälter und erreicht keine der hier geänderten Dateien. Neuer Wächter `test/unterwagenRand.test.ts` (7 Fälle, davon 3 Gegenproben): Eindringtiefe null gegen die alte Regel mit 1,28 m, „bremst nicht zu früh" gegen den Hüllkreis mit 0,4 m, und die vier Schranken des Containerstartplatzes gegen dieselbe Quelle. `test/durchfahrt.test.ts` — der Fall „BEFUND: der Unterwagen darf 1,30 m hineinfahren" ist umgeschrieben statt gelöscht: Wo 1,30 m Überstand stand, steht jetzt null. `test/silos.test.ts` und `test/fahrtempo.test.ts` rechnen nicht mehr mit abgeschriebenen 1,30, sondern importieren `UNTERWAGEN_HALB_B`.
+
+**Auf dem Gerät zu prüfen.**
+
+1. **Mit dem Bagger langsam an den Müllcontainer heranfahren, von vorn und dann von der Seite.** Er müsste jetzt stehenbleiben, wenn die Räder den Container berühren — nicht, wenn er halb darin steckt, und auch nicht einen Meter davor. Sieht das aus wie Anstoßen?
+2. **Einmal am Hof entlangfahren: Westmauer, an den Mulden vorbei, zur Presse.** Bleibt irgendwo eine Durchfahrt hängen, die vorher ging? Besonders die Lücke zwischen der Mulde und dem Müllcontainer und der Weg zum Verladeplatz an der Westwand.
+3. **Morgens nachsehen, wo der Müllcontainer steht.** Er müsste 17 cm weiter westlich stehen als bisher, weiter direkt neben der BUNT-Mulde — und die Fahrt geradeaus vom Sitz nach vorn müsste frei sein.
+
+### E-108 — Zweimal dieselbe Fehlerklasse: der Container war flacher gemeldet als gebaut, und der Rahmen war eine Platte statt einer Leiter (21.09.2026)
+
+**Anlass.** Zwei Punkte aus `docs/offene-punkte.md`, beide aus Patricks
+Gerätetests, beide dieselbe Bauart Fehler wie schon acht Mal in diesem Projekt:
+**zwei Stellen, die dasselbe wissen müssten, wissen es verschieden.**
+
+---
+
+#### 1. Der gemeldete Container-Umriss war flacher als der gebaute
+
+**Zuerst nachgemessen, für JEDE Behälterbauart** — gebaute Oberkante gegen
+gemeldete, über alle zehn Einträge in `CONFIGS`:
+
+| Bauart | Einträge | gebaut | gemeldet | Differenz |
+|---|---|---|---|---|
+| `halde` (Misch, Stahl) | 2 | `round(h/0,5) · 0,5` = 5,000 m | `h` = 5,000 m | **0,000 m** |
+| `bay` (Silos, Lager) | 7 | `(round(h/0,5) + 2) · 0,5` = 3,0 … 4,5 m | `h + 1,00` = 3,0 … 4,5 m | **0,000 m** |
+| `rolloff` (MUELL) | 1 | `0,22 + 0,09 + 0,80 + 0,065` = **1,175 m** | `h + 0,20` = **1,000 m** | **0,175 m** |
+
+Die Mulden und die Halden stimmen auf den Millimeter — dort ist die
+Wandhöhe ein Vielfaches der Steinhöhe, und `RUECKWAND_PLUS = 1,00` ist genau
+das, was die zwei zusätzlichen Lagen hoch sind. Falsch war nur der
+Absetzcontainer, und dort um einen festen Betrag: 17,5 cm, unabhängig von der
+Wandhöhe. Ein 40-m³-Container hätte denselben Fehler.
+
+**Wo das wehtut.** `hitsObstacle(x, z, pad, y)` lässt Arm und Spinne über
+`top` hinwegschwenken (`excavator/collision.ts`, Zeilen 175 und 216). Zwischen
+1,000 und 1,175 m schwenkte der Arm durch den Oberriegel, den man sieht.
+Dieselbe Klasse wie die „unsichtbare Barriere" vom 12.09.2026 — nur
+andersherum: gebaut und nicht verzeichnet.
+
+**Entscheidung.**
+
+| Was | Warum | Verworfene Alternative |
+|---|---|---|
+| **`rolloffOberkante(wandHoehe)` in `world/containers.ts`** — Kufe + Boden + Wandhöhe + halber Riegel | Der gebaute Riegel wird aus dieser Zeile gesetzt, und der Getter `hindernis` meldet dieselbe Zeile. Es gibt keine zweite Zahl mehr, die auseinanderlaufen könnte | Eine Konstante `1.175` neben den Getter schreiben. Genau so ist der Fehler entstanden |
+| **`ROLLOFF_KUFE` und `ROLLOFF_RIEGEL` bekommen Namen** (0,22 und 0,13 m, Bestand seit 13.09.2026) | Sie standen als nackte Zahlen im Bauteil, und der Wächter in `test/durchfahrt.test.ts` musste sie abschreiben — eine dritte Stelle, die dasselbe wissen sollte | — |
+| **Der Wächter misst die HÜLLE der gebauten Netze**, nicht eine nachgerechnete Formel | Ein Wächter mit eigener Rechnung prüft am Ende die Rechnung und nicht die Maschine (Lehre aus E-054). Jetzt fällt es hier auf, wenn jemand den Riegel versetzt | Formel gegen Formel vergleichen |
+
+**Macht der größere Umriss etwas zu, das heute geht?** Gemessen: nein.
+
+* **Lambert und die Fahrer** prüfen ohne Höhe (`hitsObstacle(x, z, 0.35)`,
+  `people.ts`) bzw. mit Rechtecken im Grundriss (`umriss.ts`). Der Grundriss
+  ist unverändert — für sie ändert sich **nichts**.
+* **Die Spinne** wird an `pos.y − 1,20` geprüft, das ist die Mitte des
+  Schalenkorbs. Die geschlossenen Schalen reichen **2,8312 m** unter den
+  Spinnenursprung (`grapple/form.ts`). Steht der Prüfpunkt auf 1,175 m, hängen
+  die Zahnspitzen auf **−0,456 m**, also 46 cm unter dem Beton. Der neu
+  gesperrte Streifen von 17,5 cm ist mit geschlossener Spinne gar nicht
+  erreichbar; mit offener liegt er genau **innerhalb des Riegels**, den man
+  sieht.
+* **Über den Rand ablegen** geht weiter: Der Arm muss die Spinne 17,5 cm höher
+  führen als vorher, um über der Mulde zu stehen — und das ist die Höhe, auf
+  der der Riegel wirklich ist.
+
+**Offen und bewusst NICHT entschieden.** Der Grundriss ist weiter zu klein
+gemeldet: Riegel 7,0 cm, Rungen 10,5 cm, **Haken-Öse 36,5 cm** über das
+gemeldete Rechteck hinaus. Das gehört in die Fahrwege der Lkw
+(`test/fahrumriss.test.ts`) und verschiebt dort jede gemessene Zahl — eine
+eigene Messung, keine Nebenwirkung dieser hier. Ebenso offen: Der
+Rapier-Kollider der Wanne endet auf 1,110 m, also 6,5 cm unter dem Riegel.
+Beides steht als Fall in `test/durchfahrt.test.ts` mit seinen Zahlen.
+
+---
+
+#### 2. Der innere Zwillingsreifen steckte 30 cm im Rahmen
+
+**Gemessen (E-076, hier nachgefahren).** Der Rahmen war ein durchgehender
+Quader von 2,20 m Breite (x ±1,10). Der innere Zwillingsreifen der beiden
+Hinterachsen steht auf x 0,67 und ist 0,30 m breit, liegt also zwischen 0,52
+und 0,82 — vollständig darin. Der Trennachsensatz meldete **30,0 cm**
+Durchdringung, und in der Ausnahmeliste `ERLAUBTE_PAARE` stand dafür
+`bis: 0,35` mit dem Vermerk „bekannt und offen".
+
+**Entscheidung.**
+
+| Was | Warum | Verworfene Alternative |
+|---|---|---|
+| **Leiterrahmen statt Platte**: zwei Längsträger auf x ±0,43, je 0,14 m breit, dazu drei Querträger | So ist ein Fahrgestell gebaut. Die Träger reichen bis x 0,50, der Reifen beginnt auf 0,52 — **2 cm Luft**. Von der Seite steht der Reifen jetzt über und unter dem Rahmenblech heraus, statt halb darin zu verschwinden | Die Räder nach außen setzen. Das hätte den Wagen breiter gemacht und jede Fahrspur, jedes Tor und jede Rangiermessung mitgenommen |
+| **Alle fünf Teile zu EINEM Netz verschmolzen** (`mergeGeometries`, wie in `excavator/armParts.ts`) | Zeichenrufe sind der Engpass, Dreiecke nicht (E-025). Netze je Fahrzeug **vorher 79–102, nachher 79–102**, Summe über alle 18 Bauarten **1596 vorher, 1596 nachher**. Dreiecke am Rahmen: 12 → 60 | Fünf einzelne Netze. Das wären vier Zeichenrufe mehr je Fahrzeug, bei vier Wagen auf dem Hof sechzehn |
+| **Die Ausnahme `rad × rahmen` ist gestrichen**, nicht aufgeweicht | Gemessen 0,0 cm über alle 18 Bauarten und alle Stellungen. Eine Ausnahme, die niemand mehr braucht, schaltet nur noch künftige Meldungen ab — wer die Träger je verbreitert, soll es sofort erfahren | `bis` klein setzen. Dann bliebe eine stille Erlaubnis stehen |
+| **`kranbock × rahmen` von 0,30 auf 0,05 m** | Gemessen 13,0 cm vorher (die Stützen auf x ±1,05 standen in der 2,20-m-Platte), **2,0 cm** nachher — die Bockplatte endet auf y 0,88, der Rahmen auf 0,90. Der Bock ist aufgeschraubt, er MUSS berühren | Auf 0,30 stehen lassen |
+
+**Offen und bewusst NICHT entschieden.** Tank (x −1,08) und Werkzeugkasten
+(x +1,08) hingen bisher mit 28 cm in der Rahmenplatte; jetzt stehen sie
+0,31 m neben dem Träger frei. Sichtbar ist davon wenig, weil das äußere
+Zwillingsrad (x −1,15 … −0,85) genau dazwischen steht — beide überschneiden
+sich mit dem Rad übrigens schon seit jeher, sie tragen keinen Baugruppennamen
+und werden deshalb nicht gemessen. Eine Konsole dafür wäre ein eigener Schritt
+und gehört zu „Unterschiedliche Kranfarben und -typen".
+
+---
+
+#### Der Kipper-Wächter ist rot, und das ist gemessen kein Befund
+
+`test/kipper.test.ts > schleudert die Ladung nicht davon` meldet nach dem
+Umbau **Mittel 56 km/h** gegen die Schranke 55. Die Netzzahl je Fahrzeug ist
+unverändert (1596), aber der Leiterrahmen legt fünf Boxgeometrien statt einer
+an, und jede zieht beim Anlegen vier Zufallszahlen
+(`MathUtils.generateUUID`) aus demselben Strom, aus dem die Ladung gewürfelt
+wird. Die 24 festen Saaten würfeln damit 24 ANDERE Fuhren.
+
+Nachgemessen, wie vorgeschrieben, über **96 frische Saaten je Stand**
+(`tools/kipper-streuung.ts`):
+
+| | 24 feste Saaten | 96 frische Saaten: Mittel / Median / Höchst | Anteil zufälliger 24er-Stichproben mit Mittel ≥ 55 |
+|---|---|---|---|
+| Rahmen als Platte (vorher) | 40,4 / 19,6 / 222 → **grün** | 49 / 18 / 381 | **29,5 %** |
+| Leiterrahmen (nachher) | 55,7 / 32,3 / 212 → **rot** | 45 / 20 / 336 | **21,1 %** |
+
+Die Verteilung ist gleich oder eine Spur günstiger geworden; rot geworden ist
+die Stichprobe, nicht das Spiel. Der Wächter reißt bei UNVERÄNDERTEM Quelltext
+in jeder vierten bis fünften Stichprobe — das ist derselbe Befund, der am
+17.09.2026 unter „Ein Wächter, der zufällig rot wird, gehört notiert"
+festgehalten wurde und der zu E-109 gehört. **Hier wurde deshalb keine
+Schranke angefasst.**
+
+**Abnahmekriterium.** `npm run build` grün. `npm test`: 127 von 128 Dateien
+grün; die eine rote ist die oben gemessene Stichprobe des Kipper-Wächters.
+`test/durchfahrt.test.ts` hält fest, dass die gemeldete Oberkante die gebaute
+ist (1,175 m, aus der Hülle der Netze gemessen) und dass die alte Rechnung
+17,5 cm verschenkte. `test/fahrzeugteile.test.ts` meldet für `rad × rahmen`
+nichts mehr, und die Ausnahme dafür ist weg.
+
+**Auf dem Gerät zu prüfen.**
+1. Schwenk mit der Spinne knapp über den Rand des Müllcontainers: Der Arm
+   muss jetzt am oberen Riegel hängenbleiben, statt durch ihn hindurchzugehen
+   — und ein Stück von oben hineinzulegen muss weiter gehen.
+2. Lauf einmal mit der Kamera an einem wartenden Lkw entlang und schau
+   zwischen Rad und Ladefläche hindurch: Der Reifen muss über und unter dem
+   Rahmenblech herausstehen, und man muss zwischen den beiden Trägern
+   hindurchsehen können.
+3. Ruf einen Kranwagen: Der Kranbock steht auf dem Rahmen, seine beiden
+   Stützen hängen daneben — nichts davon darf in der Luft schweben oder im
+   Rad stecken.
+
+### E-109 — Zwei Wächter, die den Zufall maßen: die fehlende Mulde und der Höchstwert aus 24 Würfen (21.09.2026)
+
+**Anlass.** Zwei offene Punkte aus `docs/offene-punkte.md`, Abschnitt „Aus Patricks Gerätetests": `test/lambertAufraeumen.test.ts` schlug in einem von fünf vollen Testläufen fehl, und `test/kipper.test.ts` urteilte nach einer Zahl, die sich bei jedem Umbau neu würfelt. Dazwischen kam der Beleg frei Haus: Am selben Tag machte E-108 (Leiterrahmen statt Rahmenquader) den Kipper-Wächter rot — „Mittel 56 km/h gegen Schranke 55" —, ohne dass am Kippen irgendetwas geändert worden wäre.
+
+Ein Wächter, der zufällig rot wird, kostet beim nächsten echten Fehler eine halbe Stunde Suche am falschen Ort. Beide Punkte sind deshalb Messaufgaben, keine Meinungsfragen.
+
+---
+
+#### 1. Lambert: der Wächter prüfte „bringt es in die Mulde", ohne dass eine Mulde da war
+
+**Erst nachgestellt, dann repariert.** Der Verdacht im offenen Punkt lautete „eine Zeitschranke, die unter Last reißt". Das war er nicht.
+
+| Frage | Messung | Antwort |
+|---|---|---|
+| Hängt der Lauf an einer Wanduhr? | `test/lambertlauf.ts`, `dt = 1/60`, keine `performance.now()` in `people.ts`/`scrapItems.ts` | Nein — gerechnete Schritte |
+| Reicht das Zeitbudget? | `tools/lambert-streuung.ts`, 60 Saaten | Beide Stücke nach **22,1 s** in der Mulde, auf die Zehntelsekunde gleich. Budget: 120 s |
+| Wie oft riss es? | `npx vitest run test/lambertAufraeumen.test.ts`, 40 Läufe | **3 von 40** (7,5 %); dazu 1 von 100 bei Wiederholung innerhalb eines Laufs |
+
+**Die Ursache, Bild für Bild.** Im Fehlerfall lag das zweite Stück bei `dx = −2,95 m` von der Muldenmitte — die Mulde ist 4,20 m breit, ihre Wand endet bei 2,10 m. Das Stück lag also **0,85 m neben einer Wand, die es gar nicht gab**: `baueAbfall()` legte einen Boden an und sonst nichts. Lambert wirft seine Fuhre aus `mulde.size[2] + 0,9` = **3,90 m Höhe** ab und streut die Abwurfstelle um **±0,60 m** (`world/people.ts:1327/1329`, `Math.random()`). Ohne Betonlego prallte sie auf den nackten Boden und rutschte weg. Gezählt wurde in einem handgerechneten Rechteck, das zusätzlich **0,78 m über die Muldenkante hinausragte** (`size[1]/2 + 0,5`).
+
+**Entscheidung.**
+
+| Was | Warum | Verworfene Alternative |
+|---|---|---|
+| Der Aufbau baut den echten `ContainerManager` — die Mulde steht da, mit Wänden | Das ist das fehlende Kettenglied, nicht nur die Fehlerursache: Geprüft wurde „bringt es in die Mulde", während die Mulde fehlte. Der Weg dorthin war bewacht, das Ankommen nicht (v2-Lehre E-047) | Das Zeitbudget von 120 auf 200 s hochsetzen. Hätte nichts geholfen — er ist nach 22,1 s fertig |
+| Gezählt wird im Grundriss der Mulde (`bayHalb`), ohne Zuschlag | `bayHalb` ist dieselbe Rechnung, die `people.ts` benutzt, und sie dreht mit der Öffnungsrichtung mit. Der alte Rahmen ließ ein Stück 0,78 m ausserhalb als „drin" durchgehen | Den Zuschlag lassen. Dann bleibt die Zählung blind für genau den Fall, der Patrick auffiele |
+| Sechs feste Saaten statt eines Wurfs, Urteil „in mindestens 5 von 6 liegen beide drin" | Gemessen über **200 Läufe mit echtem Zufall**: 199 mal liegen beide drin, einmal nicht. Bei 0,5 % je Lauf reisst „5 von 6" in 0,04 % der Saatensätze — ein Umbau, der den Zufallsstrom verschiebt, kippt diesen Wächter nicht | „6 von 6". Das wäre bei 0,5 % je Lauf in 3 % der Fälle rot — wieder eine Lotterie |
+| Der Aufbau zieht nach `test/lambertlauf.ts` um, Wächter und Werkzeug teilen ihn | E-062: Zwei Geräte für denselben Vorgang liefern zwei Wahrheiten. Beim Kipper hat das einen Tag gekostet | Den Aufbau im Wächter lassen und im Werkzeug abschreiben |
+
+**Nachher:** 30 von 30 Läufen grün (vorher 3 von 40 rot).
+
+**Ein Befund am Spiel fällt dabei ab, er ist NICHT behoben:** In 1 von 200 Läufen springt ein abgeworfenes Stück über die offene Nordseite der Mulde wieder heraus und bleibt 0,74 m davor liegen. 3,90 m freier Fall auf einen Haufen sind viel. Steht in `docs/offene-punkte.md`, Zuständig: `welt`.
+
+---
+
+#### 2. Kipper: eine Schranke auf den Höchstwert ist eine Schranke auf „habe ich den Ausreisser diesmal erwischt"
+
+**Woran es liegt.** Jedes `THREE.Object3D` zieht beim Anlegen vier Zufallszahlen (`MathUtils.generateUUID`) aus demselben Strom, aus dem die Ladung gewürfelt wird. Ein Netz mehr am Lkw würfelt 24 andere Fuhren. Der Wächter misst dann eine andere Stichprobe **derselben Sache** und nennt das eine Verschlechterung.
+
+**Die Streuung, gemessen** (`tools/kipper-streuung.ts`, 144 frische Saaten, daraus 20.000 Gruppen je Größe). Einzelläufe: Median 21, Mittel 43, p90 98, p99 322, höchster 336 km/h — eine langschwänzige Verteilung.
+
+Wie oft reisst eine Schranke, **ohne dass sich am Spiel etwas geändert hat**:
+
+| | 24 Saaten | 48 Saaten | 96 Saaten |
+|---|---|---|---|
+| Mittel ≥ 55 | 13,99 % | 7,00 % | 2,04 % |
+| Median ≥ 40 | 3,54 % | **0,36 %** | 0,00 % |
+| **Höchst ≥ 280** | 28,89 % | 48,63 % | **73,91 %** |
+| Endabstand ≥ 12 m | 0,00 % | 0,00 % | 0,00 % |
+| Durchfall ≥ 10 % | 0,00 % | 0,00 % | 0,00 % |
+
+**Die dritte Zeile beantwortet die gestellte Frage.** „Mehr Saaten messen" hilft beim Höchstwert nicht, es macht ihn schlimmer: Er ist das Maximum einer langschwänzigen Verteilung und wächst mit jeder weiteren Ziehung. Genau deshalb ist er am 17.09. von 200 auf 280 gegangen, und genau deshalb hätte er beim nächsten Mal 400 gebraucht. Beim Median dagegen wirkt Messen wie erwartet: 3,5 % → 0,36 % → 0.
+
+**Entscheidung.**
+
+| Was | Warum | Verworfene Alternative |
+|---|---|---|
+| **Der Höchstwert fliegt aus dem Urteil** und wird nur noch berichtet (`HOECHST_BERICHT`) | 28,9 % Fehlalarm bei 24 Saaten, und mehr Messen verschlimmert es auf 73,9 %. Er ist unrettbar als Schranke | `HOECHST_MAX` auf 400 setzen. Dasselbe wie am 17.09., nur eine Stelle weiter |
+| **Das Mittel fliegt ebenfalls aus dem Urteil** (`MITTEL_BERICHT`) | 14 % Fehlalarm bei 24 Saaten — das ist der Rotlauf vom 21.09. („Mittel 56 gegen 55"), ausgelöst von E-108 und nicht vom Kipper. Der Mittelwert wird vom Schwanz gezogen: 43 bei Median 21 | `MITTEL_MAX` von 55 auf 70 setzen. Wieder eine Schranke hochsetzen, damit sie nicht mehr reisst |
+| **Geurteilt wird nach dem Median über 48 Saaten** (`SAATEN_LANG`) | 0,36 % Fehlalarm statt 3,54 %. Der Sprung von 24 auf 48 kostet nichts Messbares: der Wächter läuft mit 48 Saaten in 39 s (vorher 59 s mit 24 — der Leiterrahmen aus E-108 ist schneller geworden) | Bei 24 bleiben. 1 von 29 Umbauten würde weiter zufällig rot |
+| **Geurteilt wird weiter nach Durchfall, Liegenbleiben und Endabstand** | Das sind die drei Zahlen, die Patrick tatsächlich sieht — er sieht keine km/h, er findet einen Kühler im Kabellager. Und sie sind die stabilsten der Reihe (Endabstand p05 5,5 … höchster 6,3 m über alle Gruppen zu 48) | — |
+| **Neue Gegenprobe: ein einzelnes Stück, das wegfliegt** | Die Frage hinter dem Streichen des Höchstwerts. Eine erfundene Reihe mit 585 km/h **und** 27,0 m Endabstand muss rot werden — sie wird es über `bleibtInDerNaehe`. Eine Reihe mit 585 km/h **ohne** Ortswechsel (der gemessene Fall aus E-105: „Rad mit Alufelge", ein Bild lang schnell, im nächsten von `clampSpeeds` eingesammelt) darf NICHT rot werden, sonst ist der Zufallswächter nur umbenannt | Den Höchstwert als reine Warnung ausgeben. Eine Warnung, die nichts rot macht, liest niemand |
+| **Der Wächter druckt seinen Stand bei jedem Lauf**, nicht nur im Fehlerfall | Seit Mittel und Höchstwert nicht mehr urteilen, wären sie sonst unsichtbar. Eine Zahl, die niemand mehr sieht, wandert unbemerkt | — |
+
+**Der Stand am 21.09.2026, 48 Saaten:** Median 21, Mittel 49, Höchst 212 km/h; durch 1 %, liegt 42 %, Endabstand 4,6 / 7,2 m; 14,1 Stück, 8.353 kg. In allen zehn Prüfläufen Zeichen für Zeichen dieselbe Zeile.
+
+**EIN FEHLER, DEN DER SPRUNG AUF 48 SAATEN ERST ERZEUGT HAT — und den ersten Nachweislauf rot machte.** Mit 24 Saaten rechnete der `beforeAll` rund 20 s am Stück, mit 48 rund 40 s. Ein Vitest-Arbeiter, der so lange nicht zur Ereignisschleife zurückkehrt, kann dem Berichterstatter nicht antworten; der Lauf brach mit `[vitest-worker]: Timeout calling "onTaskUpdate"` ab — **1 von 3** vollen Läufen, bei grünen Zusicherungen. Ein neuer Zufallswächter, nur an anderer Stelle. Behoben mit `reiheMitLuft` (`test/kipperlauf.ts`): alle vier Saaten ein `setTimeout(0)`. Kostet nichts Messbares. Verworfen: die Reihe auf 24 zurücknehmen — das hätte den eigentlichen Punkt aufgegeben.
+
+**EIN BLINDGÄNGER BLEIBT LIEGEN, ausdrücklich und unangetastet:** `LIEGT_MAX = 0,45` ist die nächste Schranke, die zufällig reisst. Über 144 frische Saaten liegt der Anteil, der am Ende noch auf der Brücke liegt, bei einem Median von **45,7 %** (p05 40,8 %, p99 52,7 %) — die Schranke steht bei 45 %. Über zufällige Sätze von 48 Saaten reisst sie in **59,4 %** der Fälle; der Wächter hält sie heute nur, weil sein Saatensatz mit 42 % günstig liegt. Sie wird **nicht** hochgesetzt: Die Ursache ist bekannt (Reibung 2,2 gegen tan 58° = 1,60, eine ruhende Fuhre rutscht auf dieser Neigung rechnerisch nicht; seit E-106 liegt die Fuhre mit 14,1 statt 11,0 Stücken dichter und kollert weniger nach) und sie ist eine Gestaltungsfrage — steilerer Kippwinkel, weniger Reibung oder ein Rüttler. Das gehört Patrick vorgelegt, nicht von der QA entschieden.
+
+---
+
+**Abnahmekriterium.**
+
+- `test/lambertAufraeumen.test.ts` › „bringt herumliegenden Abfall in die Abfallmulde und meldet sich an und ab" (6 Saaten, 5 müssen beide Stücke in der Mulde haben)
+- `test/lambertAufraeumen.test.ts` › „GEGENPROBE: dieselbe Zaehlung meldet ein Stueck NEBEN der Mulde nicht als drin"
+- `test/kipper.test.ts` › „schleudert die Ladung nicht davon" (Median über 48 Saaten)
+- `test/kipper.test.ts` › „GEGENPROBE: ein einzelnes Stueck, das wegfliegt, faellt trotzdem auf"
+- Zehn volle `npm test`-Läufe hintereinander grün — **erreicht: 10 von 10**, je 127 Dateien und 1.479 Prüfungen, 187 bis 316 s je Lauf; `npm run build` sauber. Beide Rückgabewerte einzeln gelesen, nichts an eine Pipe gehängt.
+
+**Auf dem Gerät zu prüfen:** Nichts — an `src/` wurde keine Zeile geändert. Was Patrick am Gerät ansehen sollte, sind die beiden Befunde, die dabei sichtbar geworden sind: (1) Bleibt beim Abkippen sichtbar fast die halbe Fuhre auf der Brücke liegen, und stört ihn das? (2) Landet Abfall, den Lambert abwirft, gelegentlich neben der Mulde statt darin?
+

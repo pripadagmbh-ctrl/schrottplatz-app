@@ -44,7 +44,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { initPhysics } from "../src/physics/physicsWorld";
 import { pruefKunde, spielFuhre } from "./pruefkunde";
-import { SAATEN, reihe, type Reihe } from "./kipperlauf";
+import { SAATEN, SAATEN_LANG, reihe, reiheMitLuft, type Reihe } from "./kipperlauf";
 
 /*
  * DER GEMESSENE STAND vom 15.09.2026, gewürfelte Händlerfuhre, 24 Saaten,
@@ -54,42 +54,65 @@ import { SAATEN, reihe, type Reihe } from "./kipperlauf";
  *   vor E-071 (Quader 0,60)     147     123     430     86 %    4 %   2,7 / 27,0 m
  *   gebaut (E-071)               29      19     106      0 %   31 %   3,1 /  5,8 m
  *
- * Die Schranken halten diesen Stand mit Luft nach oben fest. Wieviel Luft: Der
- * Kipper ist eine CHAOTISCHE Größe — bei unverändertem Quelltext streuen
- * dieselben 24 Ladungen weit, und der Höchstwert aus 24 Würfen ist die
- * schwächste Zahl der Reihe (ein einziger Ausreißer kippt ihn). Deshalb steht
- * das MITTEL eng und der Höchstwert weit; geurteilt wird nach Mittel und
- * Median.
+ * ================================================================
+ * WORÜBER DIESER WÄCHTER SEIT E-109 (21.09.2026) NICHT MEHR URTEILT
+ * ================================================================
+ *
+ * Bis dahin urteilte er nach Mittel, Median UND Höchstwert. Das war der Grund,
+ * warum er zufällig rot wurde: Jedes `THREE.Object3D` zieht beim Anlegen vier
+ * Zufallszahlen (`MathUtils.generateUUID`) aus demselben Strom, aus dem die
+ * Ladung gewürfelt wird. Ein Netz mehr am Lkw — ein Leiterrahmen statt eines
+ * Quaders, E-108 — verschiebt den Strom und würfelt 24 ANDERE Fuhren. Der
+ * Wächter misst dann eine andere Stichprobe derselben Sache und nennt das eine
+ * Verschlechterung.
+ *
+ * GEMESSEN (`tools/kipper-streuung.ts`, 144 frische Saaten, daraus 20.000
+ * Gruppen je Grösse; 21.09.2026). Wie oft reisst eine Schranke, OHNE dass sich
+ * am Spiel etwas geändert hat:
+ *
+ *                    24 Saaten   48 Saaten   96 Saaten
+ *   Mittel  >= 55      13,99 %      7,00 %      2,04 %
+ *   Median  >= 40       3,54 %      0,36 %      0,00 %
+ *   Höchst  >= 280     28,89 %     48,63 %     73,91 %   <-- WIRD SCHLIMMER
+ *   Endabstand >= 12    0,00 %      0,00 %      0,00 %
+ *
+ * DIE DRITTE ZEILE IST DIE ANTWORT auf die Frage „mehr Saaten oder raus aus
+ * dem Urteil": Beim Höchstwert hilft Messen nicht. Er ist das Maximum einer
+ * langschwänzigen Verteilung (144 Einzelläufe: Median 21, Mittel 43, p90 98,
+ * p99 322, höchster 336 km/h) und wächst mit jeder weiteren Saat, die man
+ * zieht. Eine Schranke auf das Maximum ist eine Schranke auf „habe ich den
+ * Ausreisser diesmal erwischt". Genau darum ist sie am 17.09. von 200 auf 280
+ * gegangen, und genau darum hätte sie beim nächsten Mal 400 gebraucht.
+ *
+ * Das MITTEL ist dasselbe eine Stufe schwächer: Es wird vom Schwanz gezogen
+ * (Mittel 43 bei Median 21). Bei 24 Saaten reisst es in 14 % der Fälle — das
+ * ist der Fehlalarm vom 21.09.2026, „Mittel 56 gegen Schranke 55", ausgelöst
+ * von E-108 und nicht vom Kipper.
+ *
+ * GEURTEILT WIRD DESHALB NACH:
+ *   - dem MEDIAN des Tempos über 48 Saaten (0,36 % Fehlalarm)
+ *   - dem DURCHFALL, dem LIEGENBLEIBEN und dem ENDABSTAND — den drei Zahlen,
+ *     die Patrick tatsächlich sieht, und den stabilsten der Reihe
+ *     (Endabstand p05 5,3 … höchster 6,3 m über alle Gruppen)
+ *
+ * BERICHTET, ABER NICHT GEURTEILT werden Mittel und Höchstwert. Sie stehen in
+ * jeder Fehlermeldung mit drin; wer sie wandern sieht, hat einen Hinweis, kein
+ * Urteil.
+ *
+ * FLIEGT DANN NOCH ETWAS AUF? Ja — über den Endabstand, und das ist die
+ * ehrlichere Prüfung. Ein Stück mit 585 km/h ist 162 m/s schnell und liegt am
+ * Ende nicht mehr neben dem Lkw; vor E-071 waren es 27,0 m. Ein Tempowert, der
+ * im nächsten Bild von `items.clampSpeeds` wieder eingesammelt wird, bewegt
+ * dagegen kein einziges Stück vom Fleck — den sieht niemand ausser dem
+ * Messgerät. Die Gegenprobe unten fährt genau diesen Fall.
  */
-const MITTEL_MAX = 55; // km/h — gemessen 29, nach E-105 40
 const MEDIAN_MAX = 40; // km/h — gemessen 19, nach E-105 20
-/**
- * DIESE SCHRANKE IST AM 17.09.2026 VON 200 AUF 280 GEGANGEN (E-105) — und das
- * ist eine Aufweichung, die begründet gehört.
- *
- * Seit E-105 liegt eine Fuhre dichter und vollständiger auf der Fläche: 12,6
- * Stücke statt 11,0, weil `packeLadung` nicht mehr die halbe Fläche an
- * Luftquadrate verschenkt. Gemessen, dieselben 24 Saaten:
- *
- *                    Mittel  Median  Höchst   durch  liegt  Endabstand
- *   vor E-105          29      19     106      0 %   31 %   3,1 / 5,8 m
- *   nach E-105         40      20     222      0 %   39 %   4,6 / 5,8 m
- *
- * WAS DER HÖCHSTWERT IST: ein EINZIGES Bild in einem einzigen von 24 Läufen,
- * und zwar in der Phase „out" — der Lkw fährt ab und überrollt dabei den
- * abgekippten Haufen. Ein rundes Teil (gemessen: „Rad mit Alufelge", 340 kg)
- * bekommt vom Löser einen Stoß, den `items.clampSpeeds` im nächsten Bild
- * wieder wegnimmt (`scrapItems.MAX_ZUWACHS` 0,35 m/s je Schritt). Dass nichts
- * davonfliegt, steht in den Folgezahlen: Der Endabstand ist mit 5,8 m
- * unverändert, der Durchfall bleibt 0 %.
- *
- * Median und Mittel — die Zahlen, nach denen dieser Wächter laut seinem
- * eigenen Kopfkommentar urteilt — bleiben unangetastet bei 40 und 55. Nur der
- * Höchstwert, „die schwächste Zahl der Reihe", bekommt Luft bis 280.
- */
-const HOECHST_MAX = 280; // km/h — gemessen 106, nach E-105 222
+/** Nur berichtet, nicht geurteilt (E-109): gemessen 29, nach E-105 40. */
+const MITTEL_BERICHT = 55;
+/** Nur berichtet, nicht geurteilt (E-109): gemessen 106, nach E-105 222. */
+const HOECHST_BERICHT = 280;
 /** Höchster Anteil, der beim Kippen unter die Brücke geraten darf. */
-const DURCH_MAX = 0.1; // gemessen 0,00 über 24 Saaten
+const DURCH_MAX = 0.1; // gemessen 0,00 (E-071), nach E-106 0,01 ueber 48 Saaten; Fehlalarm 0,00 %
 /**
  * Höchster Anteil, der am Ende noch auf der Brücke liegt.
  *
@@ -103,16 +126,49 @@ const DURCH_MAX = 0.1; // gemessen 0,00 über 24 Saaten
  * Rückschritt, sondern der Unterschied zwischen „weg" und „durchgefallen".
  * Steilerer Winkel oder weniger Reibung ist ein eigenes Paket und eine
  * Gestaltungsfrage (`docs/offene-punkte.md`).
+ *
+ * ACHTUNG, DIESE SCHRANKE IST DIE NÄCHSTE, DIE ZUFÄLLIG REISST (E-109).
+ *
+ * Gemessen am 21.09.2026 mit `tools/kipper-streuung.ts` über 144 frische
+ * Saaten: Der Anteil, der am Ende noch auf der Brücke liegt, hat sich seit
+ * E-105/E-106 von 31 % auf einen Median von 45,7 % verschoben (p05 40,8 %,
+ * p99 52,7 %). Die Schranke steht bei 45 %. Über zufällige Sätze von 48 Saaten
+ * reisst sie in **59,4 %** der Fälle; der Wächter hält sie heute nur, weil
+ * SEIN Saatensatz mit 42 % günstig liegt.
+ *
+ * SIE WIRD HIER NICHT HOCHGESETZT. Eine Schranke hochzusetzen, damit sie nicht
+ * mehr reisst, war schon beim Höchstwert die falsche Antwort. Die Ursache
+ * steht unten und ist bekannt: Reibung 2,2 gegen tan 58° = 1,60, eine ruhende
+ * Fuhre rutscht auf dieser Neigung rechnerisch nicht. Seit die Fuhre nach
+ * E-106 dichter liegt (14,1 statt 11,0 Stücke), kollert auch weniger nach.
+ * Das ist eine Gestaltungsfrage — steilerer Winkel, weniger Reibung oder ein
+ * Rüttler —, und sie steht in `docs/offene-punkte.md`. Wer diesen Wächter rot
+ * sieht, hat also wahrscheinlich nicht seinen eigenen Umbau vor sich.
  */
-const LIEGT_MAX = 0.45; // gemessen 0,31
+const LIEGT_MAX = 0.45; // gemessen 0,31 (E-071), nach E-106 0,42 — siehe oben
 /** Wie weit ein Stück am Ende höchstens vom LKW liegen darf (m). */
-const ABSTAND_MAX = 12; // gemessen 5,8; vor E-071 27,0
+const ABSTAND_MAX = 12; // gemessen 5,8 (E-071), nach E-106 7,2; vor E-071 27,0. Fehlalarm 0,00 %
 
 let gemessen: Reihe;
 
 beforeAll(async () => {
   await initPhysics();
-  gemessen = reihe({ name: "gewuerfelte Haendlerfuhre", kunde: spielFuhre }, SAATEN);
+  gemessen = await reiheMitLuft(
+    { name: "gewuerfelte Haendlerfuhre", kunde: spielFuhre },
+    SAATEN_LANG
+  );
+  /*
+   * DER STAND WIRD IMMER GEDRUCKT, nicht nur im Fehlerfall (E-109). Seit
+   * Mittel und Höchstwert nicht mehr urteilen, wären sie sonst unsichtbar —
+   * und eine Zahl, die niemand mehr sieht, wandert unbemerkt.
+   */
+  console.log(
+    `[Kipper ${SAATEN_LANG.length} Saaten] Median ${gemessen.median.toFixed(0)}  ` +
+      `Mittel ${gemessen.mittel.toFixed(0)}  Hoechst ${gemessen.hoechst.toFixed(0)} km/h  |  ` +
+      `durch ${(gemessen.durch * 100).toFixed(0)} %  liegt ${(gemessen.rest * 100).toFixed(0)} %  ` +
+      `Endabstand ${gemessen.abstandMittel.toFixed(1)}/${gemessen.abstandMax.toFixed(1)} m  |  ` +
+      `${gemessen.teile.toFixed(1)} Stk  ${gemessen.masseKg.toFixed(0)} kg`
+  );
 }, 900000);
 
 /* ------------------------------------------------------------------ *
@@ -122,11 +178,21 @@ beforeAll(async () => {
  * ------------------------------------------------------------------ */
 export const urteile = {
   faelltNichtDurch: (r: Reihe): boolean => r.durch <= DURCH_MAX,
-  schleudertNicht: (r: Reihe): boolean =>
-    r.mittel < MITTEL_MAX && r.median < MEDIAN_MAX && r.hoechst < HOECHST_MAX,
+  /*
+   * NUR NOCH DER MEDIAN (E-109). Mittel und Höchstwert sind Ausreisserzahlen;
+   * die Begründung mit den gemessenen Fehlalarmquoten steht im Kopf der Datei.
+   */
+  schleudertNicht: (r: Reihe): boolean => r.median < MEDIAN_MAX,
   bleibtInDerNaehe: (r: Reihe): boolean => r.abstandMax < ABSTAND_MAX,
   brueckeWirdFrei: (r: Reihe): boolean => r.rest <= LIEGT_MAX,
 };
+
+/** Alle vier zusammen — das Gesamturteil über eine Reihe. */
+export const allesInOrdnung = (r: Reihe): boolean =>
+  urteile.faelltNichtDurch(r) &&
+  urteile.schleudertNicht(r) &&
+  urteile.bleibtInDerNaehe(r) &&
+  urteile.brueckeWirdFrei(r);
 
 /** Eine Reihe von Hand, um die Urteile gegen einen kaputten Eingang zu halten. */
 function erfundeneReihe(x: Partial<Reihe>): Reihe {
@@ -178,17 +244,44 @@ describe("Kipper", () => {
     const liste = gemessen.werte.map((w) => w.toFixed(0)).join(" ");
     expect(
       urteile.schleudertNicht(gemessen),
-      `Mittel ${gemessen.mittel.toFixed(0)} / Median ${gemessen.median.toFixed(0)} / ` +
-        `Hoechst ${gemessen.hoechst.toFixed(0)} km/h ueber ${SAATEN.length} Ladungen (${liste})`
+      `Median ${gemessen.median.toFixed(0)} km/h ueber ${SAATEN_LANG.length} Ladungen ` +
+        `(erlaubt ${MEDIAN_MAX}). Nur zur Kenntnis, NICHT geurteilt: Mittel ` +
+        `${gemessen.mittel.toFixed(0)} (Marke ${MITTEL_BERICHT}), Hoechst ` +
+        `${gemessen.hoechst.toFixed(0)} (Marke ${HOECHST_BERICHT}) — beide sind ` +
+        `Ausreisserzahlen, siehe Kopf der Datei. Reihe: ${liste}`
     ).toBe(true);
   });
 
   it("GEGENPROBE: zu schnelle Reihen werden gemeldet", () => {
-    expect(urteile.schleudertNicht(erfundeneReihe({ mittel: MITTEL_MAX + 1 }))).toBe(false);
     expect(urteile.schleudertNicht(erfundeneReihe({ median: MEDIAN_MAX + 1 }))).toBe(false);
-    expect(urteile.schleudertNicht(erfundeneReihe({ hoechst: HOECHST_MAX + 1 }))).toBe(false);
     // und der gemessene Stand darf davon NICHT getroffen werden
     expect(urteile.schleudertNicht(erfundeneReihe({}))).toBe(true);
+  });
+
+  it("GEGENPROBE: ein einzelnes Stueck, das wegfliegt, faellt trotzdem auf", () => {
+    /*
+     * DIE FRAGE ZU E-109: Wenn der Höchstwert aus dem Urteil fliegt — merkt
+     * dann noch jemand, dass ein Kühler im Kabellager liegt?
+     *
+     * Ja, und zwar an der Zahl, die Patrick sieht. Eine Reihe, in der EIN
+     * Stück wegfliegt, sieht so aus wie der Stand vor E-071: Median und Mittel
+     * unauffällig, ein Tempowert von 585 km/h, und das Stück liegt am Ende
+     * 27,0 m vom Lkw. Das Gesamturteil muss rot werden.
+     */
+    const eineFliegt = erfundeneReihe({
+      werte: [19, 18, 21, 585],
+      hoechst: 585,
+      abstandMax: 27.0,
+    });
+    expect(allesInOrdnung(eineFliegt), "wegfliegendes Stueck durchgewinkt").toBe(false);
+    expect(urteile.bleibtInDerNaehe(eineFliegt), "der Endabstand meldet es nicht").toBe(false);
+    /*
+     * GEGENPROBE ZUR GEGENPROBE: Derselbe Tempo-Ausreisser OHNE Ortswechsel —
+     * das ist der gemessene Fall aus E-105 („Rad mit Alufelge", ein Bild lang
+     * schnell, im nächsten von `clampSpeeds` wieder eingesammelt). Der darf
+     * NICHT rot werden, sonst ist der alte Zufallswächter nur umbenannt.
+     */
+    expect(allesInOrdnung(erfundeneReihe({ hoechst: 585 }))).toBe(true);
   });
 
   it("laesst die Fuhre in der Naehe des LKW liegen", () => {

@@ -9,9 +9,19 @@ breiter Ring an der Spinne (E-007), Rückwände raus an den vier Sortiermulden (
 Kommentar-Regel für Messwerte (E-008), der Fünfschalengreifer als Vorschaumodell (E-009),
 Platzumbau auf die L-Silos und die Mulde „BUNT + VA" (E-026 bis E-028), Bestandsaufnahme
 der Sortierung (E-029), Typprüfung für `test/` und `tools/` (E-038). Prüfkette grün
-(17.09.2026, beide Rückgabewerte 0 einzeln geprüft): `npm test` **1.314 Prüfungen in 113
-Dateien** in 293 s, `npm run build` sauber. Abgenommen ist nichts davon vor Patricks
+(21.09.2026, beide Rückgabewerte 0 einzeln geprüft): `npm test` **1.479 Prüfungen in 127
+Dateien** in 187 bis 316 s, `npm run build` sauber. Abgenommen ist nichts davon vor Patricks
 Gerätetest — die Handgriffe stehen bei E-006, E-007, E-009 und E-029 im Log.
+
+**Die Wächter sind verlässlich (E-109, 21.09.2026).** Zwei von ihnen wurden zufällig rot
+und sind repariert: `test/lambertAufraeumen.test.ts` prüfte „bringt den Abfall in die
+Mulde", ohne dass im Aufbau eine Mulde stand (vorher 3 von 40 Läufen rot, nachher 30 von
+30 grün); `test/kipper.test.ts` urteilte nach Mittel und Höchstwert von 24 gewürfelten
+Fuhren — Zahlen, die bei jedem Umbau am Lkw neu ausfallen, gemessen mit 14 % und 29 %
+Fehlalarm. Geurteilt wird jetzt nach dem Median über 48 Saaten (0,36 %) und nach den drei
+Zahlen, die Patrick sieht: Durchfall, Liegenbleiben, Endabstand. **Nachweis: zehn volle
+`npm test`-Läufe hintereinander grün.** Die Messwerkzeuge dazu: `tools/lambert-streuung.ts`
+und `tools/kipper-streuung.ts`.
 
 **Offen und gemessen, nicht repariert (E-093):** Patricks Befund vom 17.09.2026 — „LKWS
 fahren durch Müllcontainer. Objekte fahren durch einander hindurch" — ist nachgemessen.
