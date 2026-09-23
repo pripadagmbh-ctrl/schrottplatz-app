@@ -158,6 +158,10 @@ describe("Jeder Anlass ist wirklich erreichbar", () => {
       f.platzlage({ loseKg: 0, spurBlockiert: true, lambertArbeitet: false });
     },
     vielLose: (f) => f.platzlage({ loseKg: 2500, spurBlockiert: false, lambertArbeitet: false }),
+    // Tagesende und Tagesanfang (E-113): beide haengen an einer Flanke, die
+    // `ui/abrechnung.ts` aus `shift` abholt — hier von Hand ausgeloest.
+    torZu: (f) => f.torschluss(),
+    morgen: (f) => f.neuerTag(),
   };
 
   for (const anlass of ALLE) {

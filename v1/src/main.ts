@@ -29,6 +29,7 @@ import { VehicleManager } from "./delivery/vehicles";
 import { PressManager } from "./world/press";
 import { randomCargo } from "./world/scrapItems";
 import { Shift } from "./economy/shift";
+import { installAbrechnung } from "./ui/abrechnung";
 import { Tutorial } from "./ui/tutorial";
 import { installRadio, radioWeiter } from "./ui/radio";
 import { Funkzentrale } from "./ui/funk";
@@ -363,6 +364,9 @@ async function main(): Promise<void> {
 
   const shift = new Shift();
   shift.load(save?.shift);
+  // Kontostand am Morgen - Bezugspunkt fuer den Tagesgewinn (E-113).
+  // Ueberschreibt nichts: Ein Stand von mittags bringt seinen Morgen mit.
+  shift.starte(account.moneyEur);
   if (typeof save?.timeOfDay === "number") daylight.time = save.timeOfDay;
   let looseKg = 0;
   let looseTimer = 0;
@@ -578,6 +582,12 @@ async function main(): Promise<void> {
   };
   // Zaehne treffen aufeinander — hoerbar, auch wenn nichts drin ist
   excavator.onClawSnap = (haerte) => audio.playClawSnap(haerte);
+  /*
+   * Zudruecken richtet Schaden an (E-112 baut die Kraft, E-114 die Wirkung).
+   * Der Bagger kennt keinen Bus, deshalb ein Haken wie `onClawSnap`; wer
+   * zuhoert, steht in `dismantle/composites.ts` und in `audio`.
+   */
+  excavator.onClawBite = (e) => bus.emit("greifer:zugedrueckt", e);
   grip.partResolver = (pos) => composites.findPartNear(pos);
   // Gewalt beim Herausreißen: Rotator-Drehung zählt am stärksten, dazu die
   // Achsbewegung. Wer die Spinne am Motor verdreht, bekommt ihn schneller los.
@@ -801,6 +811,21 @@ async function main(): Promise<void> {
 
   // --- Verhandeln an der Waage ---
   const ruf = new Reputation();
+  /*
+   * Feierabend und Abrechnung (E-113). Das Feld haengt nur am Bus; die Uhr
+   * kommt aus `daylight`, die Zahlen aus `shift`, der Ruf aus `ruf`.
+   */
+  const abrechnung = installAbrechnung({
+    bus,
+    shift,
+    hud,
+    audio,
+    funk,
+    konto: () => account.moneyEur,
+    ruf,
+    daylight,
+  });
+
   ruf.load(save?.reputation);
   let preisFaktor = 1;
   let zahlungsUnfaehig = false;
@@ -968,7 +993,7 @@ async function main(): Promise<void> {
     const loaded = truck.containedItems(items);
     const sale = account.sellContainer(loaded, items, composites, vehicles.pickupOrder);
     if (sale.massKg > 0) {
-      shift.noteTurnover(sale.massKg);
+      shift.noteTurnover(sale.massKg, sale.purity);
       audio.playSale();
       hud.toast(
         `Verkauft: ${sale.massKg.toFixed(0)} kg ${getMaterial(sale.dominant).name} · ` +
@@ -1144,7 +1169,7 @@ async function main(): Promise<void> {
     if (input.wasPressed("Escape") || input.wasPressed("KeyP") || touch.consumePress("Escape")) {
       setPaused(!paused);
     }
-    if (paused) {
+    if (paused || abrechnung.offen) {
       // In der Pause ruht die Simulation; nur Rendern und Eingaben laufen weiter
       renderer.render(scene, orbit.camera);
       input.endFrame();
@@ -1419,7 +1444,8 @@ async function main(): Promise<void> {
     ) {
       zeigeTutorial();
     }
-    shift.update(frameDt, looseKg);
+    shift.update(frameDt, looseKg, daylight.time);
+    abrechnung.takt();
     // Zahlungsdruck: Wer die Ware nicht bezahlen kann, bekommt keine mehr.
     // Erst wenn wieder Geld hereinkommt, liefern die Händler weiter.
     vehicles.acceptDeliveries = shift.acceptsDeliveries && account.canBuy;

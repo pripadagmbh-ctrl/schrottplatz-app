@@ -34,8 +34,29 @@ export interface SaveData {
   schemaVersion: 2;
   savedAt: string;
   moneyEur: number;
-  /** Betriebszahlen — fehlen in alten Ständen, dann wird bei null begonnen */
-  shift?: { t: number; turnoverKg: number; pickups: number; deliveries: number };
+  /**
+   * Betriebszahlen — fehlen in alten Ständen, dann wird bei null begonnen.
+   *
+   * Seit dem 22.09.2026 (E-113) stehen die TAGESZAHLEN mit drin: `heuteKg`,
+   * `heuteReinKg`, `tag` und der Kontostand vom Morgen. Ohne sie bekäme ein
+   * Stand, der mittags gespeichert wurde, abends eine andere Abrechnung als
+   * derselbe Tag ohne Speichern.
+   *
+   * Ohne Schemawechsel, wie bei `greifer` (E-059): Alle neuen Felder sind
+   * wahlfrei, und was fehlt, ergänzt `Shift.load()` an genau einer Stelle
+   * (dort steht auch, warum `turnoverKg` der Karrierezähler bleibt). Ein Stand
+   * vom 21.09. lädt damit unverändert weiter — geprüft in `test/save.test.ts`.
+   */
+  shift?: {
+    t: number;
+    turnoverKg: number;
+    pickups: number;
+    deliveries: number;
+    heuteKg?: number;
+    heuteReinKg?: number;
+    tag?: number;
+    startKontoEur?: number | null;
+  };
   /** Tageszeit 0..1 (0,25 = Sonnenaufgang) */
   timeOfDay?: number;
   /** Wie weit der geführte Einstieg ist */

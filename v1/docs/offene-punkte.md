@@ -554,6 +554,61 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
 
 ### Offen
 
+- [x] **„Kollisionsprüfung ohne Mauer bei Buntmetallmulde?"** (22.09.2026) —
+      **gemessen und behoben (E-110).** Nachgemessen mit
+      `tools/muldenwand-abgleich.ts`, Abschnitt A: Die Hindernisliste rechnete
+      mit 0,35 m Wanddicke (`BAY_T`) auf der Muldenkante, gebaut sind 0,55 m
+      (`MULDE_STEIN.dicke`) **vor** der Kante. Je Wand ergab das **0,35 m
+      Sperre ohne Stein** nach innen in die Mulde und **0,20 m Stein ohne
+      Sperre** nach außen — an allen sieben Mulden, nicht nur an dieser. An der
+      Schwelle von `BUNT + VA`: gemeldet x −5,85 … −5,15, gebaut −5,50 … −4,95.
+      Patricks Rechnung stimmte auf den Zentimeter. Behoben, indem
+      `bayObstacles` die Wände jetzt aus `muldenWaendeWelt()` liest, also aus
+      derselben Quelle wie Steine und Kollider. Gewinn: die lichte Weite jeder
+      Mulde wächst um 0,70 m (5,30 → 6,00 m bei `BUNT + VA`), die Spinne kommt
+      0,35 m je Flanke weiter hinein. Preis: Der MUELL-Container stand 4 cm in
+      der wirklichen Wand und ist 10 cm nach Norden gerückt (z −14,04);
+      **offen für Patrick:** In der Tasche neben der Mulde sind nur noch 0,12 m
+      Luft zu verteilen, jetzt 0,06 m zu jeder Seite. Wer mehr will, muss den
+      Container aus der Tasche nehmen.
+
+- [x] **„die spinne bleibt über dem abgesenkten muldenwand stehen"**
+      (22.09.2026) — **gemessen und behoben (E-110).** Gemessen wie
+      `surfaceUnderClaws` es tut, mit einem Strahl von oben
+      (`tools/muldenwand-abgleich.ts`, Abschnitt B): Der Kollider stand über
+      der 1,00 m hohen Schwelle auf **3,00 m**. Ursache: Der
+      Rückwand-Kollider entstand in `containers.ts` **ohne Bedingung**, während
+      Steine und Hinderniseintrag unter `if (!cfg.shareEast)` hängen — und
+      `BUNT + VA` ist die einzige Mulde mit `shareEast`. Jetzt entsteht je
+      gebauter Wand genau ein Kollider, nachgemessen 1,00 m. Gegenprobe zur
+      Nebenwirkung: Bei einer bis über die Schwelle gefüllten Mulde (160 Kisten,
+      drei Saaten) gehen jetzt **1 bis 2 Stücke** über die Schwelle nach Osten,
+      vorher 0 — über die offene Westseite gehen in beiden Fällen 17 bis 29.
+      **Offen für Patrick:** Schwelle höher oder diesen Verlust in Kauf nehmen?
+
+- [ ] **Die Öse des MUELL-Containers steckt in der Muldenwand** — gefunden beim
+      Messen zu E-110, nicht von Patrick gemeldet, **nicht behoben.** Der
+      Container ist als Hindernis und als Kollider 3,60 × 4,30 m, gebaut ist
+      seine Hülle 3,74 × 4,77 m: Oberriegel und Rungen stehen 0,07 bis 0,10 m
+      vor, die Haken-Öse an der Stirnseite 0,37 m. An seinem Startplatz ragt sie
+      damit rund 0,30 m in die Nordflanke von `BUNT + VA` — sichtbar nur, wenn
+      man genau hinsieht, und seit E-041 unverändert (die Steine haben sich
+      nicht bewegt, nur die Karte hat dazugelernt). Physisch berührt nichts:
+      Der Kollider ist der Kasten, nicht die Öse. Zuständig: `welt`, zusammen
+      mit der Frage, ob der Container überhaupt in dieser Tasche bleiben soll.
+
+- [ ] **Der Kipper streift beim Eindrehen in das VA-LAGER die Ecke der
+      ALU-LAGER-Flanke** — sichtbar geworden mit E-110, **nicht behoben.**
+      Gemessen 0,02 m Durchdringung an zwei Rechenschritten
+      (`test/rangierknick.test.ts`, dort als benannter Streifer mit Datum
+      eingetragen). Es ist kein neues Verhalten: Die Steine standen immer dort,
+      nur die Hindernisliste führte die Flanke 0,20 m schmaler. Die Ecke ist in
+      **beide** Richtungen dicht — die Gasse 0,30 m nach Süden gerückt macht
+      diesen Streifer null und dafür 0,04 m in `BATTERIEN West`. Ein 8,60 m
+      langer Wagen dreht sich dort in einer 6,75 m breiten Ecke. Zuständig:
+      `welt`; es braucht eine eigene Messung über Gassenlage und Silo-Abstand,
+      und der Abstand der Silos ist Patricks Platzanordnung.
+
 - [x] **`test/lambertAufraeumen.test.ts` ist unzuverlässig** (beobachtet
       17.09.2026, beim Arbeiten an E-105) — **behoben E-109, 21.09.2026.**
 
@@ -845,6 +900,47 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
       Leiterrahmens (E-108): Sie saßen 28 cm in der alten Rahmenplatte, jetzt
       hängen sie 31 cm neben dem Längsträger. Vom äußeren Zwillingsrad
       verdeckt, deshalb liegengelassen; eine Konsole wäre ein eigener Schritt.
+
+- [ ] **Drei Startwerte am Feierabend warten auf einen gespielten Tag** (E-113,
+      22.09.2026). Der Tag endet jetzt: 17:00 Torschluss, 18:00 Glocke und
+      Abrechnung mit ein bis drei Sternen. Drei Zahlen darin sind `// SW` und
+      lassen sich nur am Gerät beurteilen:
+      **Schicht 7 Minuten** (`FEIERABEND_TIME`; auf 0,79 gestellt wären es
+      ≈19:00 und 8,2 min — die Tageslänge selbst NICHT anfassen, sonst wandert
+      der Sonnenstand) · **zwei Sterne ab 300 € und 65 %** · **drei ab 800 € und
+      90 %**. Wenn drei Sterne beim ersten Versuch fallen, ist 800 € zu wenig.
+
+- [ ] **Die Sortierquote misst den Ausgang, nicht den Platz** (E-113). Definiert
+      als Σ Masse × Reinheit ÷ Σ Masse, gemessen an dem, was **abgefahren**
+      wird. Damit wird Umschlag belohnt und Aufräumen nicht. Die Gegenposition
+      wäre, die Reinheit der Behälter zu messen — dann zählt der Zustand des
+      Platzes am Abend. Bewusst so gebaut und bewusst umdrehbar; es ist eine
+      Gestaltungsfrage, keine Rechenfrage.
+
+- [ ] **`ruf.decay(1)` wird weiterhin nirgends aufgerufen** — bei E-113
+      mitgefunden. Der Ruf soll „pro Tag" verblassen, aber es gab keinen Tag.
+      Jetzt gäbe es einen. Nicht eingebaut, weil es Balancing ändert; eine
+      Zeile, sobald du es willst.
+
+- [ ] **Am Feierabend wird nicht selbst gespeichert** (E-113). Bewusst nicht
+      gebaut. Wenn der Tag gesichert enden soll, ist es eine Zeile.
+
+- [ ] **Zwei volle Bisse flachen ein Auto** (E-114, 22.09.2026). Ein Biss auf
+      ein Wrack sind 15,70 kN und damit genau die Quetschschwelle — nach dem
+      zweiten fliegen bis zu zwei Räder aus der Aufhängung. Die Presse macht es
+      sofort, aber zwei ist schnell. *Wartet auf sein Urteil am Gerät.*
+      Ebenfalls offen: Gebissen wird je Zudrücken, nicht im Dauerdruck — zum
+      Weiterquetschen muss man loslassen und erneut drücken.
+
+- [ ] **Ordinärer Schrott beult nicht** (E-114). Verformung gibt es nur an
+      Wracks. Fässer, Kühler, Bleche und Rohre bräuchten eigene formbare Netze,
+      und die kosten Zeichenrufe — deshalb bewusst nicht mitgemacht.
+
+- [ ] **Der Greifer schwingt jetzt 24° aus und braucht 2,5 s bis zur Ruhe**
+      (E-115, 22.09.2026). `GELENK_STEIFE` ist von 1,0 auf 0,0 — die künstliche
+      Rückstellfeder ist weg, das Pendel rechnet nur noch `g/L`. Gemessen über
+      beide Greiferformen, leer und mit 900 kg. *Wartet auf sein Urteil: das
+      richtige Gefühl, oder schwingt es zu lange nach?*
 
 - [ ] **Keine stehende Anzeige für Zahlungsunfähigkeit** — „Konto leer" war ein
       Toast und verschwand, der Zustand blieb. `Account.lowOnCash` war gebaut

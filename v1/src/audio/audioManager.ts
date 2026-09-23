@@ -532,6 +532,47 @@ export class AudioManager {
     this.tone(1568, 0.2, 0.14, 0.18);
   }
 
+  /**
+   * DIE FEIERABENDGLOCKE (E-113).
+   *
+   * Zwei Schläge auf eine Werksglocke, prozedural wie alles hier: ein
+   * Grundton und drei Teiltöne, die NICHT ganzzahlig darüber liegen. Genau das
+   * macht den Unterschied zwischen einer Glocke und einer Orgelpfeife —
+   * 2,00 × (Oktave), 2,76 × und 5,40 × sind die Teiltöne, die eine echte
+   * Glocke in diesem Verhältnis hat. Mit sauberen Oktaven klänge es nach
+   * Kirchenlied, mit einem Ton allein nach Türklingel.
+   *
+   * Lang ausklingend (2,2 s) und leise: Der Tag hört auf, er wird nicht
+   * angepfiffen. Der zweite Schlag kommt nach 0,62 s und etwas schwächer —
+   * niemand schlägt zweimal gleich hart an.
+   */
+  playFeierabend(): void {
+    // SW: Lautstärken wie playSale (0,14) als Obergrenze, Glocke etwas darunter
+    const schlag = (delay: number, gain: number): void => {
+      this.tone(523, 2.2, gain, delay); // Grundton c''
+      this.tone(1046, 1.5, gain * 0.5, delay); // 2,00 ×
+      this.tone(1443, 1.0, gain * 0.26, delay); // 2,76 ×
+      this.tone(2824, 0.45, gain * 0.1, delay); // 5,40 ×
+    };
+    schlag(0, 0.12);
+    schlag(0.62, 0.085);
+  }
+
+  /**
+   * Die Sterne des Tages, hörbar (E-113).
+   *
+   * Ein bis drei kurze Töne, aufsteigend — man hört die Bewertung, ohne
+   * hinzusehen (Blindtest-Regel: Farbe und Zeichen sind nie der einzige
+   * Kanal, und der Ton ist der dritte). Sie setzen nach der Glocke ein, damit
+   * sie nicht im Anschlag untergehen.
+   */
+  playSterne(anzahl: number): void {
+    const stufen = [660, 880, 1320]; // Quinte, Oktave, Duodezime über e''
+    for (let i = 0; i < Math.max(0, Math.min(3, anzahl)); i++) {
+      this.tone(stufen[i]!, 0.3, 0.1, 0.95 + i * 0.26);
+    }
+  }
+
   playCorrect(): void {
     // dezentes „Kaching": zwei weiche Sinustöne (−6 dB unter Weltklang, SW)
     this.tone(660, 0.1, 0.12, 0);

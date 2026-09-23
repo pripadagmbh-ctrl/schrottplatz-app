@@ -704,7 +704,7 @@
          Ein gemeinsamer Stil für alle drei. Sie waren zuvor ohne jede Regel
          im Dokument und wurden dadurch unsichtbar hinter dem Bild gerendert:
          Der Fahrer wartete auf eine Antwort, die niemand geben konnte. */
-      #pickup, #haggle, #shop, #radio {
+      #pickup, #haggle, #shop, #radio, #abrechnung {
         display: none; position: fixed; inset: 0; z-index: 22;
         background: rgba(12, 14, 16, 0.72);
         align-items: center; justify-content: center;
@@ -712,20 +712,20 @@
         padding: var(--sa-t) var(--sa-r) var(--sa-b) var(--sa-l);
         box-sizing: border-box;
       }
-      #pickup.open, #haggle.open, #shop.open, #radio.open { display: flex; }
-      #pickup .panel, #haggle .panel, #shop .panel, #radio .panel {
+      #pickup.open, #haggle.open, #shop.open, #radio.open, #abrechnung.open { display: flex; }
+      #pickup .panel, #haggle .panel, #shop .panel, #radio .panel, #abrechnung .panel {
         background: rgba(24, 27, 30, 0.97); border: 2px solid rgba(255,255,255,0.18);
         border-radius: 14px; padding: 22px 26px; text-align: center;
         min-width: 300px; max-width: 460px; max-height: 86vh; overflow-y: auto;
         color: #e8e8e4; font-family: "Consolas", monospace;
       }
-      #pickup h2, #haggle h2, #shop h2, #radio h2 {
+      #pickup h2, #haggle h2, #shop h2, #radio h2, #abrechnung h2 {
         margin: 0 0 6px; font-size: 19px; letter-spacing: 3px; color: #f0b429;
       }
-      #pickup .sub, #haggle .sub, #shop .sub, #radio .sub {
+      #pickup .sub, #haggle .sub, #shop .sub, #radio .sub, #abrechnung .sub {
         margin: 0 0 14px; font-size: 12px; line-height: 1.6; color: #9aa2a8;
       }
-      #pickup button, #haggle button, #shop button, #radio button {
+      #pickup button, #haggle button, #shop button, #radio button, #abrechnung button {
         display: block; width: 100%; margin: 7px 0; padding: 12px 16px; cursor: pointer;
         background: rgba(46,52,57,0.95); color: #e8e8e4;
         font: 600 14px "Consolas", monospace; border: 2px solid rgba(255,255,255,0.22);
@@ -733,7 +733,8 @@
       }
       #pickup button:hover, #haggle button:hover, #shop button:hover:not(:disabled),
       #radio button:hover, #radio button:active,
-      #pickup button:active, #haggle button:active {
+      #pickup button:active, #haggle button:active,
+      #abrechnung button:hover, #abrechnung button:active {
         background: rgba(240,180,41,0.75); color: #1a1c1e;
       }
       #shop button { text-align: left; }
@@ -749,6 +750,24 @@
       }
       #shop button:hover:not(:disabled) small { color: #3a3020; }
       #shop-close, #pickup-cancel { text-align: center !important; margin-top: 14px !important; }
+      /* --- Feierabend-Abrechnung (E-113) ---
+         Derselbe Stil wie Ankauf, Abholung und Ausbau — darum steht
+         #abrechnung oben in deren Selektorlisten und hat hier nur, was ihr
+         eigen ist: die Zahlentafel. Links das Wort, rechts die Zahl, damit
+         die Zahlenspalte untereinander steht und mit einem Blick zu lesen
+         ist. 14 px ist die Untergrenze aus Briefing Kap. 20; die Zeile wird
+         auch auf dem iPhone mini nicht kleiner gesetzt. */
+      #abr-sterne {
+        font-size: 22px; letter-spacing: 2px; color: #f0b429; margin: 0 0 10px;
+      }
+      #abrechnung .zeile {
+        display: flex; justify-content: space-between; gap: 14px;
+        font-size: 14px; line-height: 1.5; padding: 5px 2px; text-align: left;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      #abrechnung .zeile .wert { font-weight: 700; white-space: nowrap; }
+      /* Der einzige Knopf im Bild — und mit 44 px der Daumenflaeche gewachsen. */
+      #abr-weiter { min-height: 44px; margin-top: 14px !important; }
       /* --- Radio: Senderwahl ---
          Gleiches Feld wie der Platzausbau, damit nichts Neues zu lernen ist.
          Die Knoepfe stehen auf mindestens 44 px, auch auf flachen Displays:
@@ -809,14 +828,21 @@
         #pause .hint { margin: 6px 0 0; font-size: 10px; line-height: 1.45; }
         /* Ankauf, Abholung und Ausbau hatten gar keine Regeln fuer flache
            Displays — dort standen 22 px Polster und 19-px-Ueberschriften. */
-        #pickup .panel, #haggle .panel, #shop .panel, #radio .panel {
+        #pickup .panel, #haggle .panel, #shop .panel, #radio .panel, #abrechnung .panel {
           padding: 12px 16px; min-width: 260px; max-width: 92vw; max-height: 92vh;
         }
-        #pickup h2, #haggle h2, #shop h2, #radio h2 { margin: 0 0 4px; font-size: 15px; letter-spacing: 2px; }
+        #pickup h2, #haggle h2, #shop h2, #radio h2, #abrechnung h2 { margin: 0 0 4px; font-size: 15px; letter-spacing: 2px; }
         #pickup .sub, #haggle .sub, #shop .sub, #radio .sub { margin: 0 0 8px; font-size: 11px; line-height: 1.45; }
         #pickup button, #haggle button, #shop button, #radio button {
           margin: 5px 0; padding: 9px 12px; font-size: 12px;
         }
+        /* Die Abrechnung wird NICHT kleiner gesetzt: Sie ist der einzige
+           Bildschirm, den man liest statt bedient (Text >= 14 px, Kap. 20).
+           Gespart wird am Polster und an den Abstaenden, nicht an der Schrift. */
+        #abrechnung .panel { padding: 10px 16px; min-width: 280px; }
+        #abrechnung .zeile { padding: 3px 0; }
+        #abr-sterne { font-size: 18px; margin: 0 0 6px; }
+        #abr-weiter { margin-top: 8px !important; }
         /* Der Ausbau ist die laengste Liste — sie bekommt einen eigenen
            Scrollbereich, damit der Schliessen-Knopf sichtbar bleibt. */
         #shop-list { max-height: 46vh; overflow-y: auto; }
@@ -1046,6 +1072,14 @@
         <p class="sub">Wofür schickst du den LKW? Sortenrein bringt deutlich mehr.</p>
         <div id="pickup-list"></div>
         <button id="pickup-cancel">Abbrechen</button>
+      </div>
+    </div>
+    <div id="abrechnung">
+      <div class="panel">
+        <h2 id="abr-kopf">FEIERABEND</h2>
+        <p class="sub" id="abr-sterne"></p>
+        <div id="abr-zahlen"></div>
+        <button id="abr-weiter">WEITER</button>
       </div>
     </div>
     <div id="loading">Lade Physik …</div>

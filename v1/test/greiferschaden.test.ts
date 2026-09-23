@@ -1,0 +1,144 @@
+/**
+ * Waechter fuer den Schaden durch Zudruecken (E-114, 22.09.2026).
+ *
+ * ANLASS. Die Spinne hatte keine Kraft: Ein Griff war eine Sensorkugel plus ein
+ * starres Gelenk, also "gefasst" oder "nicht gefasst". Man konnte ein Auto
+ * kaputtWERFEN, aber nicht kaputtDRUECKEN. E-112 hat die Kraft gebaut, hier
+ * haengt die Wirkung daran.
+ *
+ * PATRICKS ENTSCHEIDUNG, 22.09.2026, waehrend der Arbeit: "nein, kaputt machen
+ * verliert keinen wert. warum auch, Motor entfernen durch rohe Gewalt ist eine
+ * art sortierung, auch ein kaputtes auto bringt gleich viel geld." Der dritte
+ * Fall unten ist genau dieser Satz als Zahl — und er ist der wichtigste in
+ * dieser Datei.
+ *
+ * WAS HIER NICHT GEPRUEFT WIRD: wie es sich anfuehlt. Ob ein Biss je Druck
+ * richtig getaktet ist und ob ein Wrack nach zwei Bissen flach sein DARF,
+ * entscheidet Patrick am Geraet.
+ */
+import { describe, it, expect, beforeAll } from "vitest";
+import * as THREE from "three";
+import RAPIER from "@dimforge/rapier3d-compat";
+import { ItemManager } from "../src/world/scrapItems";
+import { CompositeManager } from "../src/dismantle/composites";
+import { CAR_DEF } from "../src/dismantle/carDef";
+import { EventBus } from "../src/core/events";
+
+/*
+ * Die gemessenen Schliesskraefte aus E-112 (`tools/greifkraft.ts`). Sie stehen
+ * hier als Zahlen, damit dieser Waechter rot wird, wenn der
+ * Umrechnungsfaktor in `composites.ts` verschoben wird — und nicht still
+ * mitwandert.
+ */
+const KRAFT_WRACK = 15.7; // kN, voller Biss auf ein Autowrack
+const KRAFT_BLECH = 8.14; // kN, voller Biss auf ein 55-kg-Blech
+
+/** Ein Platz mit Boden, Physik und einem Wrack. Jeder Fall bekommt seinen eigenen. */
+function werkbank(): {
+  composites: CompositeManager;
+  items: ItemManager;
+  bus: EventBus;
+  car: ReturnType<CompositeManager["spawnCar"]>;
+} {
+  const scene = new THREE.Scene();
+  const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
+  const items = new ItemManager(scene, world);
+  const bus = new EventBus();
+  const composites = new CompositeManager(scene, world, items, bus);
+  world.createCollider(
+    RAPIER.ColliderDesc.cuboid(60, 0.5, 60).setTranslation(0, -0.5, 0),
+    world.createRigidBody(RAPIER.RigidBodyDesc.fixed())
+  );
+  const car = composites.spawnCar(new THREE.Vector3(0, 1, 0));
+  return { composites, items, bus, car };
+}
+
+/** Zudruecken, wie der Bagger es meldet — ueber den Bus, nicht als Aufruf. */
+function beissen(
+  bus: EventBus,
+  handle: number,
+  kraftKN: number,
+  at: THREE.Vector3
+): void {
+  bus.emit("greifer:zugedrueckt", { handle, kraftKN, x: at.x, y: at.y, z: at.z });
+}
+
+/** Wo der Motor sitzt — dort setzt die Spinne zum Herausdruecken an. */
+function motorOrt(car: ReturnType<CompositeManager["spawnCar"]>): THREE.Vector3 {
+  const ziel = CAR_DEF.parts.find((p) => p.kind !== "wheel")!;
+  const p = car.body.translation();
+  return new THREE.Vector3(p.x + ziel.anchor[0], p.y + ziel.anchor[1], p.z + ziel.anchor[2]);
+}
+
+beforeAll(async () => {
+  await RAPIER.init();
+});
+
+describe("Schaden durch Zudruecken", () => {
+  it("ein Biss auf Luft richtet nichts an", () => {
+    const { bus, car } = werkbank();
+    const vorher = car.crushStage;
+    // Handle, den es nicht gibt: gebissen wird viel, ein Wrack ist selten dabei
+    beissen(bus, car.body.handle + 9999, KRAFT_WRACK, new THREE.Vector3(0, 1, 0));
+    // Und ein Biss mit null Kraft auf das Wrack selbst
+    beissen(bus, car.body.handle, 0, new THREE.Vector3(0, 1, 0));
+    expect(car.crushStage, "ohne Kraft und ohne Treffer bleibt alles heil").toBe(vorher);
+  });
+
+  it("ein Blech-Biss beult, quetscht aber nicht", () => {
+    const { bus, car } = werkbank();
+    /*
+     * 8,14 kN sind umgerechnet 3,63 m/s: ueber der Beulschwelle (3), unter der
+     * Scheibenschwelle (4,5) und weit unter der Quetschschwelle (7). Gebissen
+     * wird bewusst NICHT am Motor, sonst kommt die Sortierung dazwischen.
+     */
+    const p = car.body.translation();
+    beissen(bus, car.body.handle, KRAFT_BLECH, new THREE.Vector3(p.x, p.y + 0.6, p.z - 1.5));
+    expect(car.crushStage, "ein schwacher Biss quetscht nicht").toBe(0);
+  });
+
+  it("KERN DER ENTSCHEIDUNG: Kaputtdruecken kostet keine Masse", () => {
+    const { bus, items, car } = werkbank();
+    const vorher = car.massKg;
+    const teileVorher = items.items.length;
+
+    // Voller Biss auf den Motor: rohe Gewalt als Sortierung
+    beissen(bus, car.body.handle, KRAFT_WRACK, motorOrt(car));
+
+    const nachher = car.massKg;
+    const teileNachher = items.items.length;
+
+    expect(teileNachher, "das herausgedrueckte Teil lebt als eigenes Stueck weiter")
+      .toBeGreaterThan(teileVorher);
+    /*
+     * Die Karosse wird leichter — aber nur um genau das, was jetzt daneben
+     * liegt. Nichts loest sich in Luft auf. Das ist Patricks Satz als Zahl:
+     * "auch ein kaputtes auto bringt gleich viel geld."
+     */
+    expect(nachher, "die Karosse verliert genau das herausgedrueckte Teil")
+      .toBeLessThan(vorher);
+    const verloren = vorher - nachher;
+    const teilmassen = CAR_DEF.parts.map((p) => p.massKg);
+    expect(
+      teilmassen.some((m) => Math.abs(m - verloren) < 0.01),
+      `verlorene ${verloren.toFixed(1)} kg sind kein Bauteil`
+    ).toBe(true);
+  });
+
+  it("ohne Bauteil unter den Schalen trifft es die Karosse", () => {
+    const { bus, car } = werkbank();
+    /*
+     * Weit weg von jedem Anker: Dann gibt es nichts herauszudruecken, und der
+     * Druck geht ins Blech. Genau ein Biss, genau eine Stufe — damit ein
+     * Dauerdruck nicht in einem Bild durchquetscht.
+     */
+    const p = car.body.translation();
+    const irgendwo = new THREE.Vector3(p.x, p.y + 2.5, p.z);
+    beissen(bus, car.body.handle, KRAFT_WRACK, irgendwo);
+    expect(car.crushStage, "ein voller Biss nimmt eine Quetschstufe").toBe(1);
+    beissen(bus, car.body.handle, KRAFT_WRACK, irgendwo);
+    expect(car.crushStage, "der zweite Biss die naechste").toBe(2);
+    beissen(bus, car.body.handle, KRAFT_WRACK, irgendwo);
+    expect(car.crushStage, "und dann ist Schluss, nicht tiefer").toBe(2);
+  });
+});

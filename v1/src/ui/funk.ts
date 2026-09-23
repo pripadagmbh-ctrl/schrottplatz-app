@@ -161,7 +161,11 @@ export type Anlass =
   /** Lambert: in der Fahrspur steht seit einer Weile etwas */
   | "spurLange"
   /** Lambert: es liegt viel lose herum */
-  | "vielLose";
+  | "vielLose"
+  /** Mario: Torschluss, es kommt keine Fuhre mehr (E-113) */
+  | "torZu"
+  /** Janine: der neue Tag faengt an (E-113) */
+  | "morgen";
 
 /** Ein Funkspruch, fertig zum Anzeigen. */
 export interface Funkspruch {
@@ -244,6 +248,19 @@ export const SPRUECHE: Record<Anlass, Vorlage[]> = {
     () => `Wird voll auf dem Platz. Sag Bescheid.`,
     () => `Da liegt was für mich. Ruf durch.`,
   ],
+  // --- Der Tag geht zu Ende und faengt wieder an (E-113) -------------------
+  // Mario steht am Tor und an der Waage — Torschluss ist seine Nachricht.
+  torZu: [
+    () => `Tor ist zu. Letzte Fuhre.`,
+    () => `Ich mach die Einfahrt zu.`,
+    () => `Keiner kommt mehr rein heute.`,
+  ],
+  // Janine oeffnet den Kaffeewagen, bevor der erste Wagen da ist.
+  morgen: [
+    () => `Kaffee ist durch.`,
+    () => `Guten Morgen. Es geht los.`,
+    () => `Neuer Tag. Die ersten kommen.`,
+  ],
 };
 
 /** Wer welchen Anlass spricht. Eine Stelle, damit Anzeige und Test dasselbe sehen. */
@@ -259,6 +276,8 @@ export const SPRECHER: Record<Anlass, string> = {
   lambertFertig: LAMBERT,
   spurLange: LAMBERT,
   vielLose: LAMBERT,
+  torZu: MARIO,
+  morgen: JANINE,
 };
 
 // ------------------------------------------------------------------ Die Lage
@@ -438,6 +457,38 @@ export class Funkzentrale {
     }
     if (!anlass) return;
     if (this.melde(anlass, angabe)) this.janineZuletzt = this.ankuenfte;
+  }
+
+  // ------------------------------------------------- Der Tag (E-113)
+
+  /**
+   * Torschluss: Es kommt keine Fuhre mehr herein (`shift.torZuFlanke`).
+   *
+   * Eine Flanke, kein Zustand — der Aufrufer meldet sie genau einmal je Tag.
+   */
+  torschluss(): void {
+    this.melde("torZu", "");
+  }
+
+  /**
+   * Ein neuer Tag faengt an.
+   *
+   * Hier stehen die Zaehler, die „heute" im Satz haben. Sie liefen bis zum
+   * 22.09.2026 ueber die ganze Sitzung durch, weil es im Spiel keinen
+   * Tagesanfang gab: Janine meldete irgendwann den „siebten Haendler heute",
+   * und der Wagen von vor zwei Stunden war „heute schon mal da". Jetzt ist
+   * heute wieder heute.
+   *
+   * `gebracht` bleibt stehen: Was ein Kunde beim LETZTEN Mal auf dem Hänger
+   * hatte, ist kein Tagesgeschaeft, sondern Janines Gedaechtnis.
+   */
+  neuerTag(): void {
+    this.besuche.clear();
+    this.betriebe.clear();
+    this.haendlerHeute = 0;
+    this.ankuenfte = 0;
+    this.janineZuletzt = -99;
+    this.melde("morgen", "");
   }
 
   // -------------------------------------------------------------- Lambert

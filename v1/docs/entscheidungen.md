@@ -10106,3 +10106,765 @@ Wie oft reisst eine Schranke, **ohne dass sich am Spiel etwas geändert hat**:
 
 **Auf dem Gerät zu prüfen:** Nichts — an `src/` wurde keine Zeile geändert. Was Patrick am Gerät ansehen sollte, sind die beiden Befunde, die dabei sichtbar geworden sind: (1) Bleibt beim Abkippen sichtbar fast die halbe Fuhre auf der Brücke liegen, und stört ihn das? (2) Landet Abfall, den Lambert abwirft, gelegentlich neben der Mulde statt darin?
 
+
+### E-110 — Eine Muldenwand, dreimal gerechnet: die Sperre ohne Stein und der unsichtbare Drei-Meter-Kollider (22.09.2026)
+
+**Anlass.** Zwei Befunde von Patrick am Gerät, am selben Vormittag, an derselben
+Mulde:
+
+* „Kollisionsprüfung ohne Mauer bei Buntmetallmulde?"
+* „die spinne bleibt über dem abgesenkten muldenwand stehen"
+
+Beide haben eine Ursache, und es ist die Fehlerklasse, die in diesem Projekt
+jetzt zum **zehnten Mal** auftritt: **zwei Stellen, die dasselbe wissen müssten,
+wissen es verschieden.** Eine Muldenwand war im Spiel dreimal beschrieben —
+einmal als Steine, einmal als Rapier-Kollider, einmal als Hinderniseintrag — und
+jede Fassung rechnete selbst.
+
+---
+
+#### 1. Zuerst gemessen: `tools/muldenwand-abgleich.ts`
+
+Vier Abschnitte, aufrufbar mit `npx vite-node tools/muldenwand-abgleich.ts`.
+Der alte Stand ist im Werkzeug nachgebaut (`gemeldetAlt`, `BAY_T_ALT = 0,35`),
+damit die Reparatur eine Zahl hat und nicht nur eine Behauptung.
+
+**A · Grundriss, Stein gegen Hinderniseintrag** — an allen sieben Mulden
+dasselbe Bild, hier `BUNT + VA` (x −7,6 | z −19,8, 4,2 × 6,0 × 2,0 m):
+
+| Wand | gemeldet (alt) | gebaut | Sperre ohne Stein | Stein ohne Sperre |
+|---|---|---|---|---|
+| Nordflanke (z) | −17,15 … −16,45 | −16,80 … −16,25 | **0,35 m** (nach innen) | **0,20 m** (nach außen) |
+| Südflanke (z) | −23,15 … −22,45 | −23,35 … −22,80 | **0,35 m** | **0,20 m** |
+| Schwelle (x) | −5,85 … −5,15 | −5,50 … −4,95 | **0,35 m** | **0,20 m** |
+| Schwelle (z) | −22,80 … −16,80 | −23,35 … −16,25 | 0,00 m | **0,55 m je Ende** |
+
+Patricks Rechnung stimmt auf den Zentimeter. Dazu kam an den drei nach Norden
+offenen Lagersilos ein zweiter Fehler in derselben Liste: ihre Stirnwand war
+**1,00 m zu niedrig** gemeldet (3,00 statt 4,00 m) — der nach Norden gedrehte
+Zweig kannte `RUECKWAND_PLUS` nicht. Die Halden stehen sauber da: Sie tragen
+`haldeWaende: alles false`, bauen keine Wand und melden keine.
+
+**B · Strahl von oben, wie `surfaceUnderClaws` messen würde.** Über der 1,00 m
+hohen Schwelle von `BUNT + VA` traf der Strahl auf **3,00 m**. Die 3,00 m sind
+`(ROWS + 2) · 0,50` bei `h = 2,0` — der Rückwand-Kollider, der ohne jede
+Bedingung angelegt wurde, während seine Steine und sein Hinderniseintrag unter
+`if (!cfg.shareEast)` hängen. `BUNT + VA` ist die einzige Mulde mit `shareEast`
+und die einzige mit `niedrigeStirn`. Der ganze Sinn von E-028 — niedrig zum
+Bagger hin, damit man darüber sieht und darüber hineingreift — war damit
+aufgehoben.
+
+**C · Hält die Schwelle ohne die unsichtbare Wand?** 160 Kisten in die Mulde,
+drei Saaten, 1 200 Schritte. Über die Schwelle nach Osten gehen **1 bis 2
+Stücke**; mit der 3-m-Wand waren es 0. Über die offene Westseite — Lamberts
+Seite — gehen in beiden Fällen **17 bis 29**. Der Verlust, den die Reparatur
+kostet, ist also rund ein Zehntel dessen, was die Mulde vorn ohnehin verliert.
+
+**D · Was die Reparatur bringt.** Die lichte Weite jeder Mulde — der Schlauch,
+in den die Spinne herunterkommt, ohne dass `hitsObstacle` anschlägt — wächst um
+**0,70 m**, also 0,35 m je Flanke:
+
+| Mulde | lichte Weite vorher | nachher |
+|---|---|---|
+| `BUNT + VA` | 5,30 m | **6,00 m** |
+| sechs Lagersilos | 3,50 m | **4,20 m** |
+
+---
+
+#### 2. Entscheidung
+
+| Was | Warum | Verworfene Alternative |
+|---|---|---|
+| **`muldenWaende(cfg)` in `world/containers.ts`** beschreibt jede Wand EINMAL: Lauf (von/bis), Lage, Oberkante in Steinlagen | Steine, Kollider und Hinderniseintrag lesen dieselbe Liste. Wer eine Wand weglässt, lässt sie überall weg — `shareEast` wird nur noch an einer Stelle ausgewertet. Dieselbe Form wie `pressWaende()`, `hallenWaende()`, `rolloffOberkante()` (E-108) | Nur die fehlende Bedingung beim Kollider nachtragen. Das ist die halbe Antwort: Drei Stellen, die dieselbe Wand je für sich entscheiden, laufen wieder auseinander |
+| **`muldenWaendeWelt(cfg)`** dreht dieselbe Liste um `bayDrehung` auf den Platz | `obstacles.ts` braucht Weltkoordinaten, der Kollider hängt am mitgedrehten Körper. Eine Quelle, zwei Blickwinkel | Die Drehung in `obstacles.ts` von Hand — das war genau der Ort, an dem der Nord-Zweig `RUECKWAND_PLUS` vergessen hat |
+| **`BAY_T = 0,35` und `RUECKWAND_PLUS = 1,0` sind gelöscht** | Es waren abgeschriebene Kopien von `MULDE_STEIN.dicke` und „zwei Lagen". Eine gelöschte Zahl kann nicht mehr auseinanderlaufen | Sie auf 0,55 korrigieren und stehen lassen |
+| **MUELL-Container 10 cm nach Norden**, z −14,14 → **−14,04** | Gegen die WIRKLICHE Wand gerechnet stand er 4 cm IN den Steinen — ein dynamischer Körper im Bauwerk, den Rapier im ersten Schritt herausschiebt (v2 E-010). E-041/E-107 verlangen ausdrücklich, diesen Platz neu zu rechnen, wenn eine der Zahlen sich ändert | Ihn stehen lassen und den Wächter aufweichen |
+| **Der bekannte Streifer am VA-LAGER wird benannt, nicht wegdefiniert** (`test/rangierknick.test.ts`) | 0,02 m Durchdringung an zwei Rechenschritten, gemessen mit Datum und Ort. Die Schranke bleibt für alles andere bei 0,01 m | Die Schranke global auf 0,03 m heben — dann fällt der nächste echte Fehler nicht mehr auf |
+
+**Die Tasche neben der Mulde ist eng geworden, und das ist eine Gestaltungsfrage.**
+Der MUELL-Container hängt an vier Schranken (E-041). Zwei davon teilen sich jetzt
+0,12 m:
+
+```
+Südgrenze   Muldenwand z −16,25 + halbe Containertiefe 2,15   →  z −14,10
+Nordgrenze  Schwenkband 9,20 m um den Sitz (−0,5 | −22,5)     →  z −13,98
+```
+
+Die 0,15 m Luft, die E-041 und E-107 an **jeder** Schranke hatten, sind hier
+nicht mehr zu haben: 0,15 m zur Wand verlangt z ≥ −13,95, das Schwenkband
+verlangt z ≤ −13,98. Der Container steht deshalb in der **Mitte** der Tasche,
+mit 0,06 m zu jeder Seite; `test/unterwagenRand.test.ts` führt dafür eine eigene
+Schranke `TASCHENLUFT = 0,05` und prüft zusätzlich, dass die Tasche wirklich so
+knapp ist (wird sie wieder weit, gehört die 0,15 zurück). **Wer mehr Luft will,
+muss den Container aus der Tasche nehmen** — und „direkt neben Buntmetall-Mulde"
+war Patricks Ansage.
+
+**Offen und bewusst NICHT entschieden.**
+
+1. **Schwelle höher oder 1–2 Stücke Verlust in Kauf nehmen?** Gemessen oben,
+   Abschnitt C. Eine dritte Lage (1,50 m) hielte mehr, nähme aber Sicht aus der
+   abgesenkten Kabine: über 1,00 m sind vom Muldenboden 48 bis 21 % sichtbar,
+   über 1,50 m wäre es deutlich weniger (`totenStreifen`).
+2. **Der Kipper streift beim Eindrehen in das VA-LAGER** die Südecke der
+   ALU-LAGER-Flanke, 0,02 m. Kein neues Verhalten — die Steine standen immer
+   dort. Die Ecke ist in beide Richtungen dicht: Die Gasse 0,30 m nach Süden
+   macht diesen Streifer null und dafür 0,04 m in `BATTERIEN West`. Ein 8,60 m
+   langer Wagen dreht dort in einer 6,75 m breiten Ecke; das zu lösen heißt,
+   Gassenlage oder Silo-Abstand zu ändern, und der Abstand der Silos ist
+   Platzanordnung.
+3. **Die Haken-Öse des MUELL-Containers steckt rund 0,30 m in der Muldenwand.**
+   Gemessen an der gebauten Hülle: gemeldet 3,60 × 4,30 m, gebaut 3,74 × 4,77 m.
+   Physisch berührt nichts (der Kollider ist der Kasten, nicht die Öse), und es
+   ist seit E-041 so. Gehört zum Container, nicht zur Wand.
+4. **VA-LAGER und BATTERIEN durchdringen sich mit ihren Flanken um 0,40 m**
+   (Mittenabstand 4,60 m, gebraucht würden 4,75 m). Bestand, in beiden Fassungen
+   der Liste, und der Grund, warum der Kollider-Wächter die HÖCHSTE erklärte
+   Wand an einer Stelle erwartet und nicht die eigene.
+
+**Abnahmekriterium.** `npm run build` grün. `npm test` grün: **131 Dateien,
+1 551 Tests.** `test/muldenwand.test.ts` hält für **jede** Mulde fest, dass
+Hinderniseintrag und gebaute Wand dasselbe Rechteck sind, dass Dicke, Länge und
+Lage aus `size` und `MULDE_STEIN` unabhängig nachgerechnet stimmen, und dass der
+Strahl von oben auf keiner Wand höher aufsetzt als die höchste erklärte Wand an
+dieser Stelle. Gegenprobe gefahren: Mit dem alten, bedingungslosen
+Rückwand-Kollider meldet der Wächter „Kollider auf 3.00 m, erklaert sind 1.00 m
+bei (−5.22 | −19.80)".
+
+**Messwerte.** Kollider je Mulde 3 statt 3 bzw. 4 (einer weniger, der
+unsichtbare); Bodies 66, Kollider 82 im kopflosen Platz mit 55 losen Teilen;
+Physik 1,42 ms je Schritt; Zeichenrufe unverändert — an den Steinen selbst
+wurde nichts geändert, es sind dieselben zwei `InstancedMesh` je Mulde.
+
+**Auf dem Gerät zu prüfen.**
+1. Fahr mit der Spinne über die niedrige Wand der Buntmetall-Mulde zum Bagger
+   hin und lass sie sinken: Sie muss jetzt **bis auf den Muldenboden** kommen,
+   statt über der Wand stehenzubleiben.
+2. Fahr mit dem Unterwagen langsam an die Nordflanke derselben Mulde heran: Die
+   Maschine muss **an den Steinen** anhalten, nicht 20 cm in ihnen und nicht
+   35 cm davor.
+3. Kipp mit der Spinne ein paar Stücke von oben in die Mulde und schau nach dem
+   Rand: Bleibt alles drin, oder rollt dir etwas über die Schwelle nach vorn?
+   Wenn es dich stört, machen wir die Schwelle eine Lage höher.
+4. Der Müllcontainer steht 10 cm weiter vorn als gestern. Steht er dir jetzt im
+   Weg — vor allem, wenn du geradeaus losfährst?
+
+### E-111 — Dreizehn Netze werden eins, und die Karosseriemaße ziehen aus dem Code in die Daten (22.09.2026)
+
+**Anlass.** Patricks Ansage vom 17.09.2026: „und autos, brauchen wir
+verschiedene modelle, farben und wrackzustände, bitte notieren". Die **Farben**
+sind mit E-105 gebaut. Modelle und Wrackzustände waren blockiert, und zwar aus
+einem gemessenen Grund (`docs/offene-punkte.md`): Ein Wrack kostete **25 Netze**,
+mit Schattenwurf **50 Zeichenrufe**, zwei Wracks 100 — **7,6 %** der auf
+Patricks Gerät gemessenen 1322 des ganzen Platzes. Fünf Modelle hätten diese
+Zahl fünffach verlangt. Wer die Silhouette ändert, bevor das Budget stimmt,
+baut fünf Varianten eines zu teuren Objekts.
+
+Dies sind **Schritt 1 und Schritt 2** der dort aufgeschriebenen Reihenfolge.
+Schritt 3 (die fünf Modelle) ändert die Silhouette und wartet auf Patricks
+Urteil am Bild; Schritt 4 (Wrackzustände) hängt an Schritt 3.
+
+---
+
+#### 1. Die dreizehn Anbauteile sind ein Netz mit Eckpunktfarben
+
+**Entscheidung.** Stoßstangen (2), Kühlergrill, Scheinwerfer (2),
+Rückleuchten (2), Radläufe (4) und Außenspiegel (2) werden zu **einem** Netz
+verschmolzen, die Farbe wandert von fünf Materialien in die Eckpunkte
+(`verschmelzeBunt` aus `excavator/bauteile.ts`, dasselbe Werkzeug wie am
+Bagger in E-025 und am Leiterrahmen in E-108).
+
+**Begründung.** Zeichenrufe sind in diesem Projekt der Engpass, nicht Dreiecke
+(E-025, gemessen 14.09.2026: 1322 Zeichenrufe bei 240k Dreiecken). Keines der
+dreizehn Teile geht je einzeln ab — sie hängen alle im `crushGroup` und werden
+nur als Ganzes mitgequetscht. Ein Teil, das nie einzeln angesprochen wird,
+braucht kein eigenes Netz.
+
+Gemessen mit `tools/wrackbild.ts`:
+
+| | vorher | nachher |
+|---|---|---|
+| Netze je Wrack | **25** | **13** |
+| Eckpunkte | 1440 | **1440** |
+| Dreiecke | 1412 | **1412** |
+| Geometrien | 21 | 13 |
+| Materialien | 12 | 9 |
+| Zeichenrufe mit Schatten | 50 | **26** |
+| zwei Wracks | 100 (7,6 %) | **52 (3,9 %)** |
+
+Eckpunkte und Dreiecke bleiben auf den Einzelwert gleich — verschmelzen
+verschiebt Arbeit vom Treiber in den Speicher, es wirft nichts weg.
+
+**Verworfene Alternative.** Zwei Netze statt einem: die vier Leuchten getrennt
+halten, damit sie ihr schwaches Eigenleuchten behalten
+(`emissive: 0x2a2418` / `0x2a0806`). Das hätte 14 statt 13 Netze gekostet und
+den Platz für ein Detail bezahlt, das man auf zwei Meter Entfernung nicht sieht.
+Stattdessen ist das Eigenleuchten **in die Eckpunktfarbe hineingerechnet**:
+0xf2eddc + 0x2a2418 = 0xfffff4, 0x8e2318 + 0x2a0806 = 0xb82b1e. Das ist die
+einzige bewusste Abweichung am Aussehen und sie steht in `carDef.ts` am
+Datensatz.
+
+Zwei weitere Kleinigkeiten, beide gemessen und beide absichtlich:
+
+- Ein Material für alle fünf Werkstoffe: Rauheit **0,7**, Metallglanz **0,2**
+  (SW, Mittel zwischen Kunststoff 0,85/0 und Chrom 0,35/0,8). Der Chromgrill
+  glänzt dadurch weniger; er ist 1,00 × 0,16 × 0,06 m groß.
+- `flatShading: true` am gemeinsamen Material. Das ist keine Bequemlichkeit:
+  Die Radläufe trugen vorher das **Lackmaterial**, und das ist flach schattiert.
+  Ohne diese Zeile wären die vier Bögen als einzige Teile am Wrack glatt
+  gerundet gewesen — eine sichtbare Änderung in einem Umbau, der keine sein soll.
+
+Das Material ist **einmal für das ganze Spiel** angelegt, nicht je Wrack: Es
+trägt keine wrackeigene Zahl mehr (die Farbe steckt in den Eckpunkten). Zwei
+Wracks kommen dadurch mit 17 statt 24 Materialien aus.
+
+#### 2. Chassis, Kabine und alle Anker stehen in `CarDef`
+
+**Entscheidung.** `KarosserieDef` und `AnbauDef` in `dismantle/carDef.ts`:
+Chassis `[1.7, 0.55, 4.0]`, Kabine `[1.5, 0.55, 2.0]`, deren Höhenlage, und die
+sechs Anbau-Datensätze. Vorher stand das als `BoxGeometry(1.7, 0.55, 4.0)` und
+zwanzig festen Koordinaten mitten im Code — Regel 3 (jede Zahl hat eine
+Herkunft) war nur halb erfüllt.
+
+**Anteile statt Meter, aber nur waagerecht.** x steht als Anteil der HALBEN
+Breite, z als Anteil der HALBEN Länge, die Breite eines Teils als Anteil der
+GANZEN Breite. Die **Höhe bleibt in Metern**, und das ist eine Entscheidung,
+keine Nachlässigkeit: Stoßstangen- und Scheinwerferhöhe sind in
+Zulassungsvorschriften absolut festgelegt, nicht als Anteil der Fahrzeuglänge —
+ein Kleinwagen hat seine Stoßstange auf derselben Höhe wie eine Limousine.
+
+Die Anteile stehen absichtlich als **Division** im Datensatz (`1.94 / 2.0`
+statt `0.97`). So ist links die Zahl von vorher zu lesen und rechts, worauf sie
+sich bezieht, und die Rückrechnung ist auf das letzte Bit genau.
+
+**Die vier Radläufe stehen NICHT in der Datenliste, sie folgen den Rädern.**
+Bogenradius = Radradius + 0,09 m, Sitz = Radanker, 1 cm weiter außen und höher.
+Das sind zwei Zahlen statt zwölf Koordinaten, und beim nächsten Modell zieht
+sich der Bogen von selbst mit, wenn das Rad wandert. Herkunft: 0,33 + 0,09 =
+0,42 und 0,82/0,33 + 0,01 = 0,83/0,34 — genau die alten Werte.
+
+**`formeKarosserie` hatte eine feste `HALB_L = 2.0`** und liest sie jetzt aus
+dem Hüllquader der übergebenen Geometrie. Ohne das hätte ein 3,60-m-Chassis
+seine Motorhaube im Nichts gehabt: Der vordere Rand liegt dann bei z = 1,80,
+und `t > 0.5` hätte erst ab 1,00 statt ab 0,90 gegriffen.
+
+**Was NICHT nach `CarDef` gewandert ist:** die Unterteilung `4 × 2 × 9` und
+`4 × 2 × 5`. Das sind keine Karosseriemaße, sondern die Auflösung, auf der
+`dent()` beult — sie hängt am Rechenbudget, nicht am Modell.
+
+---
+
+**Abnahmekriterium.** `test/wracknetze.test.ts`, acht Prüfungen, davon drei
+tragend:
+
+1. **Die Netzzahl bleibt 13.** Wächst sie zurück, meldet der Wächter es.
+2. **Die Zerlegemechanik ist unberührt.** Motor, Getriebe und die vier Räder
+   sind weiter sechs eigene Netze, gehen weiter einzeln ab, und nach sechs
+   Abrissen hängen sechs Netze weniger in der Wrackgruppe. Genau diese sechs
+   durften nicht verschmolzen werden.
+3. **Abweichung null.** Der Wächter baut die dreizehn Anbauteile noch einmal
+   nach dem ALTEN, fest verdrahteten Code — alle zwanzig Koordinaten stehen im
+   Test — und vergleicht **jeden der 580 Eckpunkte**. Dasselbe für Chassis und
+   Kabine. Gemessen: **unter 1 Nanometer**, also Gleitkomma-Rauschen. Mit
+   Gegenprobe: ein um einen Zentimeter verrutschtes Teil fällt durch.
+
+Dazu: `pressCrush` bringt das Wrack weiter auf Stufe 2 und das Anbau-Netz hängt
+weiter im `crushGroup` (geprüft am y-Maßstab). `test/wracklack.test.ts` (E-105)
+bleibt grün — die Lacke wirken weiter, der Lackton wird jetzt zusätzlich als
+Eckpunktfarbe der Radläufe geführt.
+
+**Zum Zufall (E-109).** Zwölf Netze und acht Geometrien je Wrack weniger heißt
+zwölf mal vier `generateUUID`-Ziehungen weniger aus demselben Strom, aus dem
+auch die Ladungen gewürfelt werden. Die Kipper-Wächter sind davon **strukturell
+nicht betroffen**: `test/kipperlauf.ts` legt einen `CompositeManager` an, ruft
+aber nie `spawnCar` — und der Manager selbst legt kein `Object3D` an. Es ist
+deshalb bitgleich derselbe Strom, und `test/kipper.test.ts` ist grün, ohne dass
+eine Zahl angefasst wurde. Ein Streuungslauf über 96 Saaten war damit nicht
+nötig; die Begründung ist billiger und härter als die Stichprobe.
+
+**Messwerte.** `tools/platzlast.ts` unverändert: 64 Kollider, 21 Körper,
+0,18 ms Physik im Mittel, Haufen ruhig ab Schritt 141 (2,4 s). Dieser Umbau
+legt keinen Körper und keinen Kollider an — er nimmt nur Netze heraus.
+
+**Auf dem Gerät zu prüfen.**
+1. Ein Wrack aus der Nähe ansehen: Sitzen Stoßstangen, Grill, Leuchten,
+   Radläufe und Spiegel noch da, wo sie saßen? Die Bögen über den Rädern sind
+   die Stelle, an der man einen Fehler am schnellsten sieht.
+2. Die Leuchten von vorn und von hinten ansehen — sie sind jetzt einen Hauch
+   heller statt schwach leuchtend. Reicht das, oder fehlt das Glimmen?
+3. Ein Wrack zerlegen: Motor, Getriebe und alle vier Räder müssen sich weiter
+   einzeln herausreißen lassen, und die Stoßstange darf dabei NICHT mitkommen.
+4. Ein Wrack in die Presse geben: Wird das Paket wie vorher, mit den
+   Anbauteilen darin?
+
+### E-112 — Die Spinne bekommt eine Kraft: gemessen wird gegen den rohen Befehl, nicht gegen den nachgebenden (22.09.2026)
+
+**Anlass.** Ansage Patrick: „baue alles nötige um schaden durch greifer zu verursachen". Ein Griff war bis hierher eine Sensorkugel plus ein starres Gelenk — es gab nur „gefasst" oder „nicht gefasst" und **überhaupt keine Kraft**. Ein Auto ließ sich kaputt**werfen** (die Quetschstufen in `dismantle/composites.ts` hängen am Δv des Wrackkörpers), aber nicht kaputt**drücken**. Der Briefing-Pivot vom 27.08.2026 stellt „Zerstörungs-Spaß und Masse-Gefühl" vor die Sortiertiefe; hier fehlte das Kernstück. Dieser Eintrag baut nur die **Kraft**, nicht die Wirkung am Wrack — die hängt der Bauleiter in `dismantle/` an.
+
+Dazu Patricks Vorgabe vom selben Tag: „nein, kaputt machen verliert keinen wert. warum auch, Motor entfernen durch rohe Gewalt ist eine art sortierung, auch ein kaputtes auto bringt gleich viel geld." **Die Kraft hängt deshalb an keinem Abzug** — kein Preisfaktor, kein Zustandswert, nichts, was in Kasse oder Ruf hineinrechnet. Rohe Gewalt ist ein zweiter Weg zu zerlegen, keine Strafe. Genau daraus folgt die Anforderung an das Ereignis: Es muss **abgestuft** melden, wie hart zugedrückt wurde, damit später daran hängen kann, welche Teile sich lösen. Eine Ja/Nein-Meldung „hat gedrückt" hätte nicht gereicht.
+
+---
+
+#### Erst gemessen: die Differenz entsteht — aber nur gegen den rohen Befehl
+
+`tools/greifkraft.ts`: Die Spinne wird in einer echten Rapier-Welt auf einen Gegenstand gesetzt (echter `Excavator.update()`, mit Rampen, Bodenanschlag und Krallenkollidern), dann 3 s lang die Leertaste gehalten. Abgelesen wird je Bild die befohlene gegen die erreichte Spreizung jeder einzelnen Schale.
+
+| Gegenstand | Schalen stehen bei | über „ganz zu" (31,48°) | gegen `currentSplay()` |
+|---|---|---|---|
+| Autowrack 4,2 m / 1100 kg | 38,45° | **6,97°** | 0,00° |
+| Brocken 0,85 m / 400 kg | 36,21° | **4,72°** | 0,00° |
+| Träger 2,4 m / 180 kg | 35,50° | **4,02°** | 0,00° |
+| Blech 1,2 m / 55 kg | 35,10° | **3,61°** | 0,00° |
+| Luft | 31,48° | **0,00°** | 0,00° |
+
+**Der Befund in einem Satz:** Gegen die befohlene Stellung, wie der Bagger sie heute rechnet (`currentSplay()`), ist die Differenz in **allen fünf Fällen exakt 0,00°** — auch beim Autowrack. Der Grund ist kein Fehler, sondern ein Kunstgriff, der seit dem Prototyp dasteht: `currentSplay()` **gibt unter Last selbst nach** (`ladungOffen`, 0,50 rad bei Nennlast). Der Befehl läuft der Schale hinterher, also ist er immer erreicht. Dazu kommt: Sobald ein Teil hängt, meldet auch die Tastkugel nichts mehr (`clawArt` = 00000 in allen Fällen) — die Schalen haben ihr Ziel ja erreicht und tasten nicht weiter.
+
+Deshalb rechnet die Kraft gegen `befohleneSpreizung()`: dieselbe Formel, nur mit `form.zu` statt des von der Ladung angehobenen Anschlags. **Patricks Vorschlag trägt** — er braucht nur den rohen Befehl als Maßstab, nicht den höflichen.
+
+#### Was die Kraft ist, und warum nicht die Differenz allein
+
+Die Differenz ist ein **Weg**, keine Kraft. In einer Hydraulik steigt der Druck, wenn der Zylinder **ansteht**, und zwar unabhängig davon, wo er ansteht; wie weit er noch fahren wollte, sagt nur, wieviel Material zwischen den Schalen liegt. Die Kraft ist deshalb das Produkt aus beidem:
+
+```
+Schliesskraft [kN] = Druckaufbau (0..1) · min(Stau / Nachdrueck-Reserve, 1) · 49,05 kN
+```
+
+| Größe | Herkunft |
+|---|---|
+| Stau | `clawSplayIst` der weitesten Schale minus `befohleneSpreizung()` — gemessen, siehe Tabelle |
+| Nachdrück-Reserve 0,38 rad | steht seit 13.09.2026 in `clawGeometry.ts`: der Winkel, den eine Schale gegen massiven Stahl noch nachdrücken darf. Der natürliche Vollausschlag |
+| 49,05 kN | Spinne und Hubwerk hängen an derselben Hydraulik, also am selben Druck: bei Nennlast (`NENNLAST_KG` = 5000 kg) stemmt sie 5000 · 9,81 N. Maßstab, nicht Wirkung — wo die Schadensschwelle liegt, entscheidet der Zuhörer (SW: am Faktor 1 zur Nennlast lässt sich drehen, ohne dass sich die Abstufung ändert) |
+| Druckaufbau 0,7 s | länger als der Anschlagsprung (0,22 s) und als das Schließen selbst (`CLOSE_TIME` 0,4 s), damit kein leeres Durchschnappen und kein Vorbeistreifen als Biss durchgeht; kürzer als das Quetschen im Greifsystem (`CRUSH_TIME` 1,1 s), damit die Kraft **vor** der Wirkung da ist |
+
+Gemessen ergibt das: Autowrack **15,70 kN**, Brocken **10,64 kN**, Träger **9,05 kN**, Blech **8,14 kN**, Luft **0,00 kN**. Abgestuft, wie verlangt.
+
+#### Entscheidung
+
+| Was | Warum | Verworfene Alternative |
+|---|---|---|
+| Die Kraft ist eine reine Nebenrechnung am bestehenden Schließweg | Sie liest `clawSplayIst`, `closure` und `closing` mit und schreibt nichts. Das Fixed Joint, die Sensorkugel, der Schließweg, die Reserve: unangetastet (Projektregel 2) | Ein Federgelenk mit Kraftmessung, wie v2 es mit der Spinne 2.0 versuchte. Auf dem iPad hing die Spinne 2 m neben dem Arm |
+| Gemessen wird gegen den **rohen** Befehl | Gegen `currentSplay()` ist die Differenz nachweislich immer 0 — der Befehl gibt unter Last nach. Gegen `form.zu` bleibt Luft bei 0 und jeder Gegenstand über 0 | `clawArt`/`krallenBlockiert` als Hindernis-Merker nehmen. Fällt aus: nach dem Zufassen ist er in allen Fällen 00000 |
+| **Ein Biss je Zudrücken**, Nachlegen erst nach Loslassen | Pumpen statt halten, wie an der echten Maschine, und der Zuhörer bekommt keine 60 Meldungen je Sekunde | Eine Meldung im Takt, wie `CRUSH_TIME` im Greifsystem. Dann hängt die Menge am Draufhalten, nicht an einer Absicht — offen als Rückfrage |
+| Der Bagger meldet über einen Haken (`onClawBite`), main.ts setzt ihn auf den Bus | Dieselbe Bauart wie `onClawSnap` und `onClawPierce`: der Bagger kennt keinen Ereignisbus. Die Nutzlast **ist** die des Ereignisses (`GameEvents["greifer:zugedrueckt"]`), damit es nicht zwei Formen für dieselbe Meldung gibt | Dem Greifsystem einen Bus in den Konstruktor geben. Hätte main.ts und den Prototyp-Aufbau angefasst, für nichts |
+| Kein Wertabzug, keine HUD-Anzeige | Ansage Patrick (kaputt verliert keinen Wert); `ui/` gehört einem anderen Bereich | — |
+
+**Neues Ereignis:** `"greifer:zugedrueckt": { handle, kraftKN, x, y, z }` — dieselbe Form wie `crushed`. `handle` vor dem Zugriff mit `isValid()` prüfen (E-103). Gemeldet wird für jeden Körper, der vor den Schalen steht **oder** in ihnen hängt.
+
+**Gegenprobe zu Projektregel 2.** `tools/greifzyklus.ts` fährt einen ganzen Zyklus (aufsetzen, zufassen, heben, schwenken, mitten im Schwenk werfen) und benutzt dabei ausschließlich Schnittstellen, die es vorher schon gab. In einem Vergleichsbaum auf `1cf347f` und danach:
+
+| | vorher | nachher |
+|---|---|---|
+| Griffweite | 54,5336° | **54,5336°** |
+| Haltedauer | 256 Bilder | **256 Bilder** |
+| Wurfweite | 3,1813 m | **3,1813 m** |
+| Pendelwinkel | 19,0810° | **19,0810°** |
+
+Ziffer für Ziffer gleich. Die vier Zahlen stehen als Wächter in `test/schliesskraft.test.ts`, damit das so bleibt.
+
+**Abnahmekriterium.** `test/schliesskraft.test.ts` grün: Zudrücken auf ein Hindernis ergibt Kraft > 0 und **genau ein** Ereignis mit dem Handle des Getroffenen; Zudrücken auf Luft ergibt über 180 Bilder Kraft 0,00 und **kein** Ereignis; Loslassen und erneutes Zudrücken ergibt den zweiten Biss; die vier Zahlen des Greifzyklus unverändert. Ganzer Lauf: 128 von 128 Dateien grün (isoliert gemessen, siehe unten).
+
+**Offen (Rückfrage an Patrick):** Soll dauerhaftes Draufhalten immer weiter beißen (dann Takt statt Pumpen), oder soll man für jeden Biss den Hebel loslassen? Gebaut ist Pumpen.
+
+**Auf dem Gerät zu prüfen:**
+1. Greif einen Träger vom Haufen — sitzt er so ruhig in der Spinne wie vorher, ohne Zittern und ohne zu schweben?
+2. Setz die Spinne auf ein Autowrack und halte die Leertaste (bzw. den rechten Stick rechts): Fühlt sich das Zudrücken an wie vorher, nur mit Wirkung, oder hakt die Spinne jetzt irgendwo?
+3. Schnapp die Spinne einmal in der Luft zu — es soll klingen und federn wie bisher, und **nichts** soll dabei passieren.
+
+### E-113 — Der Tag bekommt ein Ende und eine Abrechnung (22.09.2026)
+
+**Entscheidung.** Der Arbeitstag endet um **18:00** (`FEIERABEND_TIME = 0.75` in
+`src/economy/shift.ts`, Tageszeit wie `daylight.time`); eine Stunde vorher ist
+**Torschluss**, ab dann kommt keine Fuhre mehr herein. Zum Feierabend läutet
+eine prozedurale Werksglocke, ein Abrechnungsbild zeigt die drei Kennzahlen aus
+Briefing Kap. 11 — Sortierquote, Gewinn, ø Kundenzufriedenheit — sowie Umschlag,
+Kontostand und Fuhren, dazu **ein bis drei Sterne**. Nach WEITER steht die Uhr
+auf 6:43, die Tageszähler stehen auf null, der Kontostand bleibt.
+
+**Die Zahlen und ihre Herkunft.**
+
+| Zahl | Wert | Herkunft |
+|---|---|---|
+| Feierabend | 0,75 = 18:00 | Sonnenuntergang im Modell von `world/daylight.ts`; Flutlicht brennt ab 17:34, der Tag geht sichtbar zu Ende, bevor man es liest. Ergibt mit `DAY_LENGTH_S = 900` eine Schicht von **423 s ≈ 7 min** Echtzeit. |
+| Torschluss | 0,7083 = 17:00 | 37,5 s Echtzeit Nachlauf: genug, um die letzte Fuhre zu wiegen und abzukippen, zu kurz, um Wartezeit zu sein. |
+| Sortierquote | Σ(Masse × Reinheit) / Σ(Masse) | Briefing Kap. 11 („% korrekt einsortierte Masse"). Nach Masse gewichtet und am **Ausgang** gemessen: Was in der Box liegt, kann man noch nachsortieren; gewertet wird, was den Platz verlässt — dieselbe Masse, für die es Geld gibt. Definiert in `Shift.sortierquote`, nirgends sonst. |
+| 2 Sterne | ab 300 € **und** 65 % | 300 € ≈ 3,5 t sortenrein abgefahren (Stahl 0,25 €/kg Verkauf gegen 0,16 €/kg Ankauf = 90 €/t). 65 % ist die Schwelle, ab der die Ladezeile im HUD schon heute nicht mehr orange ist. |
+| 3 Sterne | ab 800 € **und** 90 % | 800 € ≈ 9 t sortenrein — oder viel weniger mit Buntmetall (Kupfer 7,2 €/kg): Masse oder Köpfchen, beides gilt. 90 % ist die Schwelle, ab der die Ladezeile grün wird (Erlös geht mit Reinheit², Kap. 7). |
+| ø Zufriedenheit | Mittel des Rufs, auf 0..1 | `economy/reputation.ts` ist die einzige Quelle; neutral (0) ergibt 50 %. |
+
+Alle fünf sind SW, am Gerät zu bestätigen. Beide Sternbedingungen müssen
+zutreffen; ein Stern ist der Boden (Kap. 11: „Kein Game Over").
+
+**Begründung.** `shift.ts` zählte den Durchsatz hoch und hörte nie auf — ein
+Punktestand ohne Anzeigetafel, und die drei Kennzahlen, die das Briefing „die
+KPI-Sprache des ganzen Spiels" nennt, waren nirgends zu sehen. Ein Tag ohne
+Ende hat außerdem still zwei gebaute Sachen kaputtgehalten: Janines „drei
+Händler heute" zählte über die ganze Sitzung, und ein Kunde von vor zwei
+Stunden war „heute schon mal da".
+
+**Verworfene Alternativen.**
+
+1. *Eine eigene Schichtuhr in `shift.ts`.* Zwei Uhren, die dasselbe wissen
+   müssten — der häufigste Fehler dieses Projekts. `shift` bekommt jetzt
+   `daylight.time` gereicht und vergleicht nur; ein Wächter liest gegen, dass
+   dort keine Zeit weitergezählt wird.
+2. *`turnoverKg` am Feierabend nullen* (wörtlich im Auftrag). Daran hängt der
+   Platzausbau (`upgrades.ts`: Büro ab 15 t, Kran ab 160 t) — eine
+   Tagesleistung sind wenige Tonnen, ab dem zweiten Tag wären alle Stufen
+   wieder gesperrt. `turnoverKg` bleibt darum der **Karrierezähler**; die
+   Tageszahl heißt `heuteKg` und fängt bei null an. `pickups` und `deliveries`
+   sind Tageszahlen (niemand sonst liest sie).
+3. *Die Sortierquote aus der Reinheit der Behälter.* Die schwankt beim
+   Nachsortieren, ist an sechs Behältern sechs Zahlen und hätte eine zweite
+   Rechnung neben der gebraucht, die den Erlös bestimmt.
+4. *Schema 3 für den Spielstand.* Nicht nötig: Alle neuen Felder sind wahlfrei,
+   `Shift.load()` ergänzt an einer Stelle, was fehlt — wie bei `greifer`
+   (E-059). Ein Stand vom 21.09. lädt unverändert.
+5. *Die Uhr über Mitternacht weiterlaufen lassen* statt auf 6:43 zu springen.
+   Das wären 8 Minuten Echtzeit Nacht ohne Verkehr.
+
+**Nebenbefund, mit behoben.** Weil die Uhr nun nie mehr über Mitternacht läuft,
+würde der Tageswechsel in `daylight.update()` nie wieder auslösen — der
+Kehrbesen käme nach einem Missgeschick nie zurück (E-031), der Müllcontainer
+würde nie geleert (E-034). `ui/abrechnung.ts` stößt beide Wege beim neuen
+Morgen ausdrücklich an. Sie zusammenzulegen bleibt ein eigenes Paket.
+
+**Abnahmekriterium.**
+- Um 17:00 sagt Mario „Tor ist zu. Letzte Fuhre.", die Tagesablaufzeile zeigt
+  „Tor zu · letzte Fuhre", und es fährt keiner mehr herein.
+- Um 18:00 läutet die Glocke zweimal, danach klingen so viele Töne wie Sterne.
+- Das Bild zeigt sechs Zeilen, alle Zahlen lesbar; WEITER ist mit dem Daumen zu
+  treffen (44 px).
+- Nach WEITER ist es wieder früher Morgen, „0,0 t umgeschlagen", der Kontostand
+  unverändert, gekaufte Ausbaustufen noch da.
+- Ein Spielstand, der mittags gespeichert und abends geladen wird, bekommt
+  dieselbe Abrechnung.
+
+**Auf dem Gerät zu prüfen.**
+1. Sind sieben Minuten Schicht zu kurz? (Zum Verlängern: `FEIERABEND_TIME` auf
+   0,79 ≈ 19:00 → 8,2 min. Die Tageslänge selbst nicht anfassen, sonst wandert
+   der Sonnenstand mit.)
+2. Passt das Abrechnungsbild auf dem iPhone mini quer ohne Scrollen?
+3. Hört man an den Tönen, wie viele Sterne es waren — ohne hinzusehen?
+4. Ist die Glocke zu leise oder zu lang (2,2 s Ausklang)?
+
+---
+
+## Einbau in main.ts
+
+**Eingebaut am 22.09.2026.** Alle sieben Stellen stehen in `src/main.ts`; der
+Wächter `test/feierabend.test.ts` prüft sie ab jetzt namentlich. Die Zeilen
+bleiben hier stehen, weil sie die einzige Stelle sind, an der die Naht zwischen
+Betrieb, Anzeige und Ton vollständig beschrieben ist.
+
+**1. Import** (zu den übrigen `./ui/...`-Importen):
+
+```ts
+import { installAbrechnung } from "./ui/abrechnung";
+import { zufriedenheit } from "./economy/shift";
+```
+
+`zufriedenheit` steht neben `Shift` in `economy/shift.ts` — falls dort schon
+`import { Shift } from "./economy/shift";` steht, reicht es, `zufriedenheit`
+in dieselbe Klammer zu setzen.
+
+**2. Bezugspunkt für den Gewinn** — direkt unter `shift.load(save?.shift);`
+(Zeile 365). `account` muss zu diesem Zeitpunkt schon bestehen; steht es weiter
+unten, gehört diese Zeile hinter die Zeile mit `const account = …`:
+
+```ts
+  // Kontostand am Morgen — Bezugspunkt fuer den Tagesgewinn (E-113).
+  // Ueberschreibt nichts: Ein Stand von mittags bringt seinen Morgen mit.
+  shift.starte(account.moneyEur);
+```
+
+**3. Das Feld anmelden** — irgendwo nach `const funk = new Funkzentrale();`
+(Zeile 799) und vor `function frame()`:
+
+```ts
+  /*
+   * Feierabend und Abrechnung (E-113). Das Feld haengt nur am Bus; die Uhr
+   * kommt aus `daylight`, die Zahlen aus `shift`, der Ruf aus `ruf`.
+   */
+  const abrechnung = installAbrechnung({
+    bus,
+    shift,
+    hud,
+    audio,
+    funk,
+    konto: () => account.moneyEur,
+    ruf,
+    daylight,
+  });
+```
+
+**4. Die Uhrzeit in den Betrieb geben** — Zeile 1422 ersetzen:
+
+```ts
+    shift.update(frameDt, looseKg, daylight.time);
+```
+
+**5. Die Reinheit mitzählen** — Zeile 971 ersetzen. Ohne diese Änderung gilt
+jede Fuhre als sortenrein und die Sortierquote steht immer auf 100 %:
+
+```ts
+      shift.noteTurnover(sale.massKg, sale.purity);
+```
+
+**6. Die Flanken abholen** — in der Bildschleife, direkt nach
+`shift.update(...)` aus Punkt 4:
+
+```ts
+    abrechnung.takt();
+```
+
+**7. Die Simulation ruht, solange abgerechnet wird** — Zeile 1146,
+`if (paused) {` ersetzen:
+
+```ts
+    if (paused || abrechnung.offen) {
+```
+
+Damit sind es sieben Stellen. Fehlt eine, meldet
+`test/feierabend.test.ts` sie beim Namen, sobald der Vermerk oben entfernt ist.
+
+### E-114 — Zudrücken richtet Schaden an, und zwar ohne einen Cent zu kosten (22.09.2026)
+
+**Anlass.** Patrick, 22.09.2026: „und was ist eigentlich mit schaden den wir mit
+der spinne verursachen wollen??" — und auf die Rückfrage nach dem Umfang: „baue
+alles nötige um schaden durch greifer zu verursachen".
+
+**Der Befund.** Schaden war gebaut, aber nur als **Aufprall**-Schaden und nur an
+Wracks: Blech beult mit echter Eckpunktverformung ab Δv 3 m/s, Scheiben bersten
+ab 4,5, zwei Quetschstufen ab 7 (`dismantle/composites.ts`, „Design-Wunsch
+2026-08-27"). Die Spinne selbst konnte nichts davon auslösen, weil es an ihr
+**überhaupt keine Kraft gab** — ein Griff war eine Sensorkugel plus ein starres
+Gelenk, also „gefasst" oder „nicht gefasst". Man konnte ein Auto
+kaputt**werfen**, aber nicht kaputt**drücken**. Dabei hat der Briefing-Pivot vom
+27.08.2026 „Zerstörungs-Spaß und Masse-Gefühl" ausdrücklich **vor** die Sortier-
+und Wirtschaftstiefe gesetzt; das Kernstück fehlte trotzdem.
+
+E-112 hat die Kraft gebaut, dieser Eintrag hängt die Wirkung daran.
+
+**Entscheidung 1 — Schaden kostet keinen Wert.** Ansage Patrick, während der
+Arbeit: „nein, kaputt machen verliert keinen wert. warum auch, Motor entfernen
+durch rohe Gewalt ist eine art sortierung, auch ein kaputtes auto bringt gleich
+viel geld."
+
+Damit ist rohe Gewalt **ein zweiter Weg zu zerlegen**, keine Strafe. Ein Biss
+mit genug Kraft reißt heraus, was unter den Schalen liegt — über dieselbe Suche
+(`findPartNear`) und dasselbe Herauslösen (`tearPart`), mit denen die Spinne auch
+zum Abschrauben ansetzt. Es gibt also keinen zweiten Weg, ein Teil vom Wrack zu
+trennen; es gibt nur einen zweiten Anlass. Die Karosse wird dabei genau um das
+leichter, was danebenliegt.
+
+*Begründung:* Ein Wertabzug hätte Zerstörungsspaß und Verdienst in
+verschiedene Richtungen ziehen lassen — der Spieler hätte das Beste am Spiel
+nicht benutzen dürfen, um gut zu wirtschaften. Und der Wert hängt an
+`currentMassKg`; Quetschen nimmt dort nichts weg, die Entscheidung passt also
+zum gebauten Stand statt ihn zu biegen.
+
+*Verworfene Alternative:* Ein Zustandsfaktor am Wrack, der in Preis oder Ruf
+hineinrechnet. Ich hatte ihn vorgeschlagen und lag falsch.
+
+**Entscheidung 2 — EIN Umrechnungsfaktor statt eigener Kraftschwellen.**
+`KN_JE_MS = 15,7 / 7` (kN je m/s). Die Schließkraft wird in ein
+Aufprall-Δv umgerechnet, und Beulen, Scheiben und Quetschstufen benutzen weiter
+**ihre drei bestehenden Schwellen**.
+
+*Begründung:* Ein zweiter Satz Schwellen neben `dv > 3`, `glassImpactDv` und
+`crushImpactDv` wäre die Fehlerklasse gewesen, die dieses Projekt neun Mal
+geplagt hat — zwei Stellen, die dasselbe wissen müssten, wissen es verschieden.
+Der Faktor ist **gemessen, nicht gewählt**: Ein voller Biss auf ein Autowrack
+sind 15,70 kN (E-112, `tools/greifkraft.ts`), und genau dieser Biss soll die
+Quetschschwelle **erreichen**, nicht überspringen. Die Abstufung ergibt sich
+danach von selbst, ohne eine einzige weitere Zahl:
+
+| Gegenstand | Kraft (E-112) | entspricht | Wirkung |
+|---|---|---|---|
+| Blech 55 kg | 8,14 kN | 3,63 m/s | beult |
+| Träger 180 kg | 9,05 kN | 4,03 m/s | beult |
+| Brocken 400 kg | 10,64 kN | 4,74 m/s | beult, Scheiben bersten |
+| Autowrack 1100 kg | 15,70 kN | 7,00 m/s | beult, Scheiben, eine Quetschstufe |
+| Luft | 0,00 kN | 0 | nichts |
+
+**Entscheidung 3 — die Druckrichtung ist die Achse Biss → Karossenmitte.** Wer
+von oben auf die Haube drückt, beult nach unten; wer seitlich zufasst, nach
+innen. `dent()` erwartet die Bewegungsrichtung vor dem Aufprall, und beim
+Zudrücken ist das genau diese Achse — es brauchte also keinen zweiten
+Eingabewert. Fällt sie zusammen, wird von oben gedrückt.
+
+**Verdrahtung.** Der Bagger kennt keine Wracks und die Wracks keinen Bagger:
+`excavator.onClawBite` gibt in `main.ts` eine Zeile auf den Bus,
+`CompositeManager` hört im Aufbau darauf und ordnet über `handle` zu — dasselbe
+Muster wie `despawnByBody`. Regel 10 bleibt gewahrt. Kein `isValid()` nötig, weil
+nur eine Zahl mit einer Zahl verglichen wird und nichts auf dem fremden Körper
+abgefragt wird (E-103).
+
+**Abnahmekriterium.** `test/greiferschaden.test.ts`, vier Wächter, grün:
+ein Biss auf Luft oder auf einen fremden Körper richtet nichts an · ein
+Blech-Biss beult, quetscht aber nicht · **die verlorene Masse ist auf 10 g genau
+die eines Bauteils, und das Teil liegt danach als eigenes Stück da** · ohne
+Bauteil unter den Schalen nimmt die Karosse je Biss genau eine Stufe, und bei
+zwei ist Schluss.
+
+**Bewusst NICHT entschieden.**
+
+1. **Ob ein Wrack nach zwei Bissen flach sein darf.** Die Presse macht es
+   sofort, hier sind es zwei — das ist schnell. Gestaltungsfrage.
+2. **Der Takt.** Gebissen wird je Zudrücken, nicht im Dauerdruck (Empfehlung aus
+   E-112). Wer weiterquetschen will, muss loslassen und erneut drücken.
+3. **Die Abstufung kommt daher, wieviel im Korb liegt**, nicht daher, wie
+   kräftig der Spieler drückt — mehr als voller Hebel gibt es nicht.
+4. **Ordinärer Schrott beult weiter nicht.** Verformung gibt es nur an Wracks;
+   Fässer, Kühler und Bleche bräuchten eigene formbare Netze und damit
+   Zeichenrufe.
+
+**Auf dem Gerät zu prüfen.**
+
+1. **Spinne auf die Motorhaube setzen und zudrücken.** Beult das Blech dort, wo
+   die Schalen sitzen — und kommt der Motor heraus, statt dass man ihn
+   abschraubt?
+2. **Ein Wrack zweimal voll zudrücken.** Nach dem zweiten Mal fliegen bis zu
+   zwei Räder aus der Aufhängung. Ist das zu schnell?
+3. **Verkaufen, was du kaputtgedrückt hast.** Der Erlös muss derselbe sein wie
+   bei einem sauber zerlegten Wrack. Wenn nicht, ist das ein Fehler und keine
+   Balancingfrage.
+4. **Einen Träger greifen und halten.** Nichts daran darf sich geändert haben —
+   kein Zittern, kein Schweben.
+
+### E-115 — Das Pendel wird frei, und geschleudert wird mit dem richtigen Punkt (22.09.2026)
+
+**Anlass.** Patrick, 22.09.2026, wörtlich: „die spinne soll frei schwenken können
+und teile zur seite durch schwung geschleudert werden können aber realistisch."
+Drei Punkte in einem Satz, und der letzte ist die Abnahmebedingung.
+
+*Nachtrag zur Entstehung:* Das Paket wurde von einem Agenten gebaut, der beim
+Sitzungsende gestoppt wurde, bevor er diesen Eintrag schreiben konnte. Quelltext,
+Messwerkzeuge und Wächter waren fertig und grün; der Eintrag ist danach aus den
+nachgefahrenen Messungen geschrieben worden. Alle Zahlen unten sind mit
+`npx vite-node tools/wurf.ts` und `tools/pendelausschlag.ts` am fertigen Stand
+nachgemessen, nicht aus einem Bericht übernommen.
+
+---
+
+**Entscheidung 1 — `GELENK_STEIFE` von 1,0 auf 0,0.**
+
+Die Winkelsperre `PENDEL_MAX` war mit E-105 ersatzlos entfallen; was den
+Ausschlag trotzdem klein hielt, war die künstliche Rückstellung
+`rueck = (G / L) * (1 + GELENK_STEIFE)` — sie verdoppelte die Kraft, mit der das
+Gelenk den Greifer wieder lotrecht zieht. Ein Greifer hat so eine Feder nicht;
+er hängt.
+
+Gemessen mit `tools/pendelausschlag.ts`, beide Greiferformen, leer und mit 900 kg:
+
+| Schwenk | Korb | höchster Ausschlag | Beharrung | Ruhe nach |
+|---|---|---|---|---|
+| antippen 1,0 s | leer | 24,1° | 16,1° | 2,52 s |
+| antippen 1,0 s | voll 1800 kg | 24,4° | 15,6° | 2,38 s |
+| voll 5,0 s | leer | 24,1° | 15,0° | 2,55 s |
+| voll 5,0 s | voll 1800 kg | 24,4° | 13,7° | 2,38 s |
+
+Rund **24°** im Höchstwert, Ruhe nach zweieinhalb Sekunden. Das ist ein
+hängender Greifer, keine Abrissbirne — die offene Frage aus E-105 („20° genug
+oder wirklich frei, etwa 40°") ist damit beantwortet, und zwar von der Physik
+und nicht von einer Zahl.
+
+*Verworfene Alternative:* Die Steife auf einen Zwischenwert wie 0,3 zu setzen.
+Das wäre wieder eine gewählte Zahl ohne Herkunft gewesen. Bei 0,0 rechnet das
+Pendel nur noch `g/L` — Erdbeschleunigung und Pendellänge, beides gemessen.
+
+---
+
+**Entscheidung 2 — jedes Teil bekommt seine eigene Abwurfgeschwindigkeit:
+`v = v_Gelenk + ω × r`.**
+
+`releaseAll()` gab bis dahin **allen** Teilen dieselbe Zahl, und zwar die
+Bahngeschwindigkeit des **Kardangelenks**. Das ist der falsche Punkt: Der Korb
+hängt 1,5 m tiefer und im Ausschlag weiter außen, und was außen im Korb liegt,
+läuft auf einem größeren Radius als was innen liegt.
+
+Gemessen (`tools/wurf.ts`): Dem Korb fehlten im Dauerschwenk 2,3 %, **im
+Rückschwung des Pendels 18 %** — der frühere Befund ist damit bestätigt. Drei
+radial versetzte Teile flogen mit exakt derselben Zahl los.
+
+Nachher, drei Teile gleichzeitig im Korb, halber Schwenk:
+
+| Stück | Versatz | v Abwurf | Weite |
+|---|---|---|---|
+| leicht 80 kg | −0,50 m | 4,55 m/s | 3,24 m |
+| leicht 80 kg | 0,00 m | 4,83 m/s | 3,14 m |
+| leicht 80 kg | +0,50 m | **5,11 m/s** | 4,44 m |
+| schwer 900 kg | −0,50 m | 4,21 m/s | 3,36 m |
+| schwer 900 kg | 0,00 m | 4,47 m/s | 1,91 m |
+| schwer 900 kg | +0,50 m | 4,73 m/s | 2,72 m |
+
+Ein Meter Versatz im Korb macht **0,56 m/s** Unterschied. Und schwer fliegt
+langsamer los als leicht — der Greifer schleppt die Masse mit und schwingt
+selbst weniger aus (14,8° gegen 13,0°).
+
+---
+
+**Entscheidung 3 — Wurf und Absetzen sind zwei Fälle, nicht eine Zahl.**
+
+`RELEASE_DOWN = 0,2` gab es, damit ein abgesetztes Teil nicht in der Luft stehen
+bleibt. Beim Wurf richtete derselbe Zuschlag Schaden an: Er zog das Teil nach
+unten statt seitlich, und `setAngvel(0,0,0)` nahm ihm auch noch den Drall — ein
+geschleudertes Teil hörte mitten im Flug auf zu rotieren.
+
+Die Schwelle ist `RELEASE_DOWN` **selbst**: Wer sich waagerecht langsamer bewegt
+als der Zuschlag groß ist, setzt ab; wer schneller ist, wirft. Damit kommt keine
+neue Zahl ins Spiel, und es gibt keine zweite Stelle, die gepflegt werden muss.
+
+---
+
+**Entscheidung 4 — die Obergrenze wird hergeleitet, nicht gesetzt.**
+
+Patricks „aber realistisch" ist in diesem Projekt keine Floskel: Ladung verließ
+den Kipper einmal mit 65,7 m/s, Faktor 220 über allem, was die Bewegung liefern
+kann (E-073). Es steht trotzdem **kein Deckel** im Wurfcode. Beide Größen
+kommen aus der gemessenen Bewegung der Maschine; mehr als ihre eigene
+Umfangsgeschwindigkeit kann nicht herauskommen. Gerechnet aus den Zahlen, die
+ohnehin im Code stehen:
+
+```
+  größte Ausladung Korb        9,67 m
+  Oberwagen 33°/s · 9,67 m  =  5,57 m/s
+  Rotator 120°/s · 0,80 m   =  1,68 m/s
+  Fahren                    =  3,20 m/s
+  -------------------------------------
+  v_max                     = 10,45 m/s
+```
+
+Gemessen werden 4,2 bis 5,1 m/s — rund die Hälfte, weil nie alles zugleich
+mitwirkt. Das Netz gegen Zahlenunfälle bleibt `clampSpeeds` (28 m/s), also
+weit darüber und nur als letzter Halt.
+
+*Verworfene Alternative:* Einen Deckel auf die Wurfgeschwindigkeit legen. Er
+hätte die Maschine an einer zweiten Stelle beschrieben — genau die Fehlerklasse,
+die dieses Projekt zehn Mal geplagt hat.
+
+---
+
+**Abnahmekriterium.** `test/wurfweite.test.ts`, fünf Wächter, grün: außen im
+Korb fliegt schneller los als innen · der Drall bleibt beim Wurf erhalten ·
+schwer fliegt langsamer los als leicht · kein Teil wird schneller als die
+10,45 m/s, die die Maschine hergibt · **reines Absetzen wirft nichts weg**
+(gemessen 0,000 m/s waagerecht, bei 80 kg wie bei 900 kg).
+
+Greifen selbst ist unverändert: Fixed Joint, Sensorkugel, Greiffenster,
+`insideGrapple` — kein Saugen in die Korbmitte (der v2-Fehler). Die
+Schließkraft aus E-112 und der Schaden aus E-114 sind unberührt.
+
+**Auf dem Gerät zu prüfen.**
+
+1. **Einmal zügig schwenken und wieder anhalten.** Der Greifer schwingt jetzt
+   bis 24° aus und braucht zweieinhalb Sekunden bis zur Ruhe. Ist das das
+   Gefühl, das du gemeint hast — oder schwingt es zu lange nach?
+2. **Mit vollem Korb schwenken und im Schwung loslassen.** Fliegen die Teile
+   seitlich weg, und **fächern sie auf**, statt als Klumpen zu fallen? Das ist
+   der eigentliche Punkt: Was außen liegt, muss weiter fliegen.
+3. **Ein schweres Stück und ein leichtes aus demselben Schwung werfen.** Das
+   schwere muss deutlich kürzer fliegen.
+4. **Ein Teil im Stand absetzen.** Es darf sich waagerecht überhaupt nicht
+   bewegen — kein Wegrutschen, kein Nachrollen.
+5. **Einen Träger greifen und halten.** Am Greifen selbst darf sich nichts
+   geändert haben.

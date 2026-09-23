@@ -264,6 +264,39 @@ export type Zahlungslage = "ok" | "knapp" | "leer";
 const PLATZ_DICHT = "#e08a5a";
 const NORMAL = "#f0d060";
 
+/**
+ * Ab hier ist eine Ladung sortenrein, darunter durchwachsen, darunter
+ * zusammengekippt.
+ *
+ * DIESELBEN ZWEI ZAHLEN STEHEN IN `economy/shift.ts` (`REIN_GUT`,
+ * `REIN_MITTEL`) — dort entscheiden sie über den Stern am Abend. Sie stehen
+ * hier zum zweiten Mal, und zwar mit Absicht: Das HUD darf nichts aus dem
+ * Wirtschaftsmodul importieren (Wächter „die Anzeige ruehrt den Kreislauf
+ * nicht an" in `test/kassenlage.test.ts`, E-081). Damit sie nicht
+ * auseinanderlaufen, liest `test/feierabend.test.ts` beide Quelltexte
+ * gegeneinander — ändert einer sich, fällt es auf.
+ */
+const REIN_GUT = 0.9;
+const REIN_MITTEL = 0.65;
+
+/**
+ * Das Urteil über eine Reinheit — Zeichen, Wort und Farbe, an einer Stelle.
+ *
+ * Die Ladezeile im Betrieb und die Sortierquote in der Abrechnung sagen
+ * dasselbe über dieselbe Zahl; sie sollen es auch gleich sagen. Das Zeichen
+ * ist der zweite Kanal (Briefing Kap. 20): Wer die Farben nicht
+ * unterscheidet, liest ✓, ! oder ✗.
+ */
+export function reinheitsUrteil(reinheit: number): {
+  zeichen: string;
+  wort: string;
+  farbe: string;
+} {
+  if (reinheit >= REIN_GUT) return { zeichen: "✓", wort: "sortenrein", farbe: "#7ec96a" };
+  if (reinheit >= REIN_MITTEL) return { zeichen: "!", wort: "durchwachsen", farbe: NORMAL };
+  return { zeichen: "✗", wort: "zusammengekippt", farbe: PLATZ_DICHT };
+}
+
 const KASSENLAGE: Record<Zahlungslage, { text: string; farbe?: string }> = {
   ok: { text: "" },
   // Orange wie eine Ladung unter 65 % sortenrein: „noch kein Fehler, aber sieh hin."
@@ -439,12 +472,11 @@ export class Hud {
       return;
     }
     const balken = "█".repeat(Math.round(p / 10)) + "░".repeat(10 - Math.round(p / 10));
-    // Ab 90 % lohnt das Abfahren, darunter drückt die Reinheit den Preis
-    schreib(
-      el,
-      `${ziel}: ${masseText(kg)} · ${balken} ${p} % sortenrein`,
-      p >= 90 ? "#7ec96a" : p >= 65 ? "#f0d060" : "#e08a5a"
-    );
+    // Ab 90 % lohnt das Abfahren, darunter drückt die Reinheit den Preis.
+    // Zeichen und Farbe kommen aus `reinheitsUrteil` — dieselbe Schwelle, die
+    // abends über den Stern entscheidet (E-113).
+    const u = reinheitsUrteil(purity);
+    schreib(el, `${ziel}: ${masseText(kg)} · ${balken} ${p} % sortenrein`, u.farbe);
   }
 
   /**
