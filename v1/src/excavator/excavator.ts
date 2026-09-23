@@ -48,6 +48,7 @@ import {
 } from "./kabinenhubParts";
 import { BAGGER_STAND } from "../world/baggerstand";
 import { naechsteSpreizung } from "./clawGeometry";
+import type { GameEvents } from "../core/events";
 import {
   SICHELKRALLE,
   type Greiferbau,
@@ -466,9 +467,41 @@ const ACC_GLAETTUNG_S = 0.09;
 /**
  * Zusaetzliche Rueckstellung des Kardangelenks, als Vielfaches der
  * Schwerkraftrueckstellung. 1 halbiert den Ausschlag gegenueber einem frei
- * haengenden Pendel.
+ * haengenden Pendel — deshalb stand hier bis zum 22.09.2026 eine 1.
+ *
+ * JETZT NULL: DER GREIFER HAENGT FREI (E-115, Ansage Patrick 22.09.2026,
+ * „die spinne soll frei schwenken koennen"). Damit ist die seit dem
+ * 17.09.2026 offene Frage aus E-105 entschieden — nicht auf einen Mittelwert,
+ * sondern auf frei, weil genau das die Ansage war.
+ *
+ * GEMESSEN (`npx vite-node tools/wurf.ts`, 22.09.2026), Ausschlag der
+ * Greiferachse gegen die Lotrechte:
+ *
+ *   |                          | 1.0 (vorher) | 0.0 (jetzt) |
+ *   |--------------------------|--------------|-------------|
+ *   | Antippen 1 s, leer       | 20,7° / 12,6°|24,1° / 16,1°|
+ *   | Dauerschwenk 5 s, leer   | 20,3° /  7,8°|24,1° / 15,0°|
+ *   | Dauerschwenk, 1800 kg    | 20,0° /  7,0°|24,4° / 13,7°|
+ *   | Ruhe nach dem Stopp      | 1,38–1,98 s  | 2,38–2,55 s |
+ *
+ *   (erste Zahl: hoechster Ausschlag, zweite: Beharrung im Schwenk)
+ *
+ * WARUM DAS KEINE ABRISSBIRNE IST, und warum die 45-Grad-Rechnung im alten
+ * Kommentar („frei haengend gut 27 Grad") nicht eingetreten ist: Der
+ * Oberwagen dreht mit 33 Grad je Sekunde, nicht mit 45. Die Fliehkraft am
+ * Korb reicht damit fuer 15 Grad Dauerschraeglage — das ist ein haengender
+ * Greifer, kein Ausholen. Der Ueberschwinger beim Anfahren liegt bei 24 Grad
+ * und ist nach zweieinhalb Sekunden weg.
+ *
+ * WAS DEN AUSSCHLAG JETZT NOCH BEGRENZT: nur `sin(Ausschlag)` in der
+ * Schwerkraftrueckstellung und `PENDEL_DAEMPFUNG_*`. 30 s Dauerschwenk bleiben
+ * damit unter 30 Grad — es gibt keinen Term, der mit dem Winkel waechst.
+ *
+ * DIE ZAHL BLEIBT ALS STELLSCHRAUBE STEHEN. Faellt das Nachpendeln auf dem
+ * Geraet zu lang aus, ist der naechste Schritt 0,25 (Ausschlag dann rund
+ * 22 Grad) — und nicht zurueck auf 1, denn der Wunsch nach „frei" bleibt.
  */
-const GELENK_STEIFE = 1.0;
+const GELENK_STEIFE = 0.0;
 /**
  * Ab hier gilt der Greifer als schraeg haengend (rad).
  *
@@ -570,11 +603,12 @@ const PENDEL_DAEMPFUNG_LAST = 4.0;
  * den Anschlag nie beruehrt — angefasst hat er nur den Ueberschwinger beim
  * Anfahren und beim Stoppen.
  *
- * Was den Ausschlag wirklich klein haelt, ist `GELENK_STEIFE` (siehe oben):
- * Sie verdoppelt die Rueckstellung und HALBIERT damit den Ausschlag. Ob der
- * Greifer weiter hinausschwingen soll, ist eine Gestaltungsfrage und steht als
- * offener Punkt in E-105 — sie wird dort NICHT mitentschieden, weil eine
- * Ansage ueber die Winkelsperre keine Ansage ueber die Rueckstellung ist.
+ * Was den Ausschlag damals wirklich klein hielt, war `GELENK_STEIFE` (siehe
+ * oben): Sie verdoppelte die Rueckstellung und HALBIERTE damit den Ausschlag.
+ * Der offene Punkt aus E-105 ist am 22.09.2026 entschieden — die Feder steht
+ * auf 0, der Greifer haengt frei (E-115). Die Zahlen in der Tabelle oben sind
+ * damit der Stand vom 17.09. und nicht mehr der von heute; die aktuellen
+ * stehen bei `GELENK_STEIFE`.
  */
 
 
@@ -1975,6 +2009,8 @@ export class Excavator {
     this.syncMeshes();
     this.resolveGroundClamp();
     this.updateClawBlocking(dt);
+    // Erst wenn die Schalen dieses Bildes stehen, steht auch der Druck (E-112).
+    this.updateSchliesskraft(dt);
     this.syncMeshes();
 
     // Fahrwerk und Arm werden getrennt geprüft: ein Hindernis neben den
@@ -2231,6 +2267,7 @@ export class Excavator {
     // Der Merker gilt je Schritt. Die Schnappabfrage weiter oben liest den
     // Stand des Vorschritts — bei 60 Hz ist das ein Sechzigstel Versatz.
     this.krallenBlockiert = false;
+    this.clawFunde.clear();
     const ziel = this.currentSplay();
     const schritt = this.form.rate * dt;
     const frei = this.form.nachdrueckReserve;
@@ -2274,8 +2311,19 @@ export class Excavator {
       if (fund.art === 1 && vorher > 0 && zu.reserve <= 0 && fund.koerper) {
         this.onClawPierce?.(fund.koerper);
       }
+      // Wer vor der Schale steht, steht auch unter ihrem Druck — die
+      // Schliesskraft weiter unten braucht die Handles (E-112).
+      if (fund.koerper) this.clawFunde.add((fund.koerper as RAPIER.RigidBody).handle);
     }
   }
+
+  /**
+   * Was die Schalen in diesem Schritt vor sich hatten (Rapier-Handles).
+   *
+   * Wird in `updateClawBlocking` gefuellt und in `updateSchliesskraft`
+   * gelesen — gesammelt, nicht im Abfrage-Callback verarbeitet (v2 E-044).
+   */
+  private clawFunde = new Set<number>();
 
   /**
    * Hat in diesem Schritt eine Kralle Material vor sich gehabt?
@@ -2293,6 +2341,158 @@ export class Excavator {
     let max = 0;
     for (const v of this.clawSplayIst) max = Math.max(max, v);
     return max;
+  }
+
+  /*
+   * ===== SCHLIESSKRAFT (E-112, 22.09.2026) =================================
+   *
+   * Bis hierher gab es am Greifer nur „gefasst" oder „nicht gefasst". Man
+   * konnte ein Auto kaputtWERFEN (die Quetschstufen haengen am Delta v des
+   * Wrackkoerpers), aber nicht kaputtDRUECKEN — es gab keine Kraft, die man
+   * lesen konnte.
+   *
+   * WAS GEMESSEN WURDE, BEVOR DAS HIER STAND (`tools/greifkraft.ts`):
+   * Die Spinne wird auf einen Gegenstand gesetzt und die Leertaste 3 s
+   * gehalten. Abgelesen wird die befohlene gegen die erreichte Spreizung.
+   *
+   *   Gegenstand                       Schalen stehen bei   ueber „ganz zu"
+   *   Autowrack 4,2 m / 1100 kg        38,45°               6,97°
+   *   Brocken 0,85 m / 400 kg          36,21°               4,73°
+   *   Traeger 2,4 m / 180 kg           35,50°               4,02°
+   *   Blech 1,2 m / 55 kg              35,10°               3,62°
+   *   Luft                             31,48°               0,00°
+   *
+   * Gegen `currentSplay()` gemessen ist die Differenz in ALLEN fuenf Faellen
+   * exakt 0,00° — auch beim Wrack. Der Vorschlag „Differenz zwischen
+   * befohlener und erreichter Stellung" trifft also etwas Echtes, aber nur,
+   * wenn man gegen den ROHEN Befehl misst: `currentSplay()` gibt unter Last
+   * selbst nach (`ladungOffen`), der Befehl laeuft der Schale hinterher, und
+   * die Differenz verschwindet. Deshalb rechnet die Kraft gegen
+   * `befohleneSpreizung()` — dieselbe Formel ohne das Nachgeben.
+   *
+   * WARUM NICHT DIE DIFFERENZ ALLEIN DIE KRAFT IST: Sie ist ein Weg, keine
+   * Kraft. In einer Hydraulik steigt der Druck, wenn der Zylinder ANSTEHT,
+   * und zwar unabhaengig davon, wo er ansteht; wie weit er noch fahren
+   * wollte, sagt nur, wieviel Material zwischen den Schalen liegt. Die Kraft
+   * ist deshalb das Produkt aus beidem: der Stau (wieviel dazwischen ist) und
+   * der Druckaufbau (wie lange der Spieler draufhaelt).
+   *
+   * AM GRIFF SELBST WURDE NICHTS GEAENDERT: kein Fixed Joint, keine
+   * Sensorkugel, kein Schliessweg, keine Reserve. Diese Rechnung liest nur
+   * mit.
+   */
+
+  /**
+   * Befohlene Spreizung OHNE das Nachgeben unter Last (rad).
+   *
+   * Wortweise `currentSplay()`, nur mit `form.zu` statt des von der Ladung
+   * angehobenen `minSplay`: Was die Hydraulik verlangt, weiss nichts davon,
+   * dass etwas dazwischen liegt. Der Anschlagsprung ist mit drin, sonst waere
+   * nach einem leeren Zuschnappen 0,22 s lang eine Kraft da, wo nichts ist.
+   */
+  private befohleneSpreizung(): number {
+    return THREE.MathUtils.lerp(this.form.offen, this.form.zu, this.closure) + this.anschlagWinkel;
+  }
+
+  /**
+   * Wieviel Winkel die Schalen dem Befehl schulden (rad) — die weiteste zaehlt.
+   *
+   * 0, wenn die Spinne frei durchfaehrt oder offen ist. Grundmass fuer die
+   * Schliesskraft und der Grund, warum Zudruecken auf Luft keine Kraft macht.
+   */
+  get schalenStau(): number {
+    const befohlen = this.befohleneSpreizung();
+    let stau = 0;
+    for (const w of this.clawSplayIst) stau = Math.max(stau, w - befohlen);
+    return Math.max(stau, 0);
+  }
+
+  /**
+   * Aufgebauter Zylinderdruck, 0 .. 1. Steigt, solange die Spinne gegen etwas
+   * zudrueckt, und faellt sofort, sobald der Befehl aufhoert oder der Weg frei
+   * wird.
+   */
+  private druck = 0;
+  /** Ist der Biss noch nicht gemeldet? Verhindert ein Ereignis je Bild. */
+  private bissScharf = true;
+
+  /**
+   * Schliesskraft der Spinne in Kilonewton — 0, wenn sie nichts drueckt.
+   *
+   * Der Wert, den andere Module lesen (HUD, Schaden, Ton). Er ist abgestuft:
+   * mehr Material zwischen den Schalen und laenger gehaltener Hebel ergeben
+   * mehr.
+   */
+  get schliesskraftKN(): number {
+    return (
+      this.druck *
+      Math.min(this.schalenStau / this.form.nachdrueckReserve, 1) *
+      Excavator.MAX_SCHLIESSKRAFT_KN
+    );
+  }
+
+  /**
+   * Volle Schliesskraft der Spinne (kN) — 49,05.
+   *
+   * Nicht gewaehlt, sondern von der Maschine abgeleitet: Spinne und Hubwerk
+   * haengen an derselben Hydraulik, also am selben Druck. Bei Nennlast
+   * (`NENNLAST_KG` = 5000 kg) stemmt sie 5000 · 9,81 N = 49,05 kN; dieselbe
+   * Groessenordnung steht an den Schliesszylindern. Die Zahl ist der MASSSTAB,
+   * nicht die Wirkung — wo die Schwelle fuer einen Schaden liegt, entscheidet
+   * der Zuhoerer des Ereignisses. (SW: ueber den Faktor 1 zur Nennlast laesst
+   * sich am Geraet drehen, ohne dass sich die Abstufung aendert.)
+   */
+  static readonly MAX_SCHLIESSKRAFT_KN = (NENNLAST_KG * 9.81) / 1000;
+  /**
+   * Wie lange voller Hebel braucht, bis der Druck steht (s).
+   *
+   * 0,7 s: laenger als der Anschlagsprung (0,22 s) und als das Schliessen
+   * selbst (`CLOSE_TIME` 0,4 s), damit kein Durchschnappen und kein
+   * Vorbeistreifen als Biss durchgeht; kuerzer als das Quetschen im
+   * Greifsystem (`CRUSH_TIME` 1,1 s), damit die Kraft VOR der Wirkung da ist.
+   */
+  private static readonly DRUCK_S = 0.7;
+
+  /**
+   * Der Biss: Ein Ereignis je Koerper, sobald der Druck steht.
+   *
+   * Dieselbe Bauart wie `onClawSnap` und `onClawPierce` — der Bagger kennt
+   * keinen Ereignisbus, main.ts haengt die eine Zeile daran:
+   * `excavator.onClawBite = (e) => bus.emit("greifer:zugedrueckt", e)`.
+   * Die Nutzlast IST die des Ereignisses, damit es nicht zwei Formen fuer
+   * dieselbe Meldung gibt.
+   *
+   * Nachgelegt wird erst, wenn der Spieler den Hebel loslaesst und wieder
+   * zudrueckt — pumpen statt halten, wie an der echten Maschine.
+   */
+  onClawBite: ((e: GameEvents["greifer:zugedrueckt"]) => void) | null = null;
+
+  private updateSchliesskraft(dt: number): void {
+    const stau = this.schalenStau;
+    // Druck steht nur, solange der Spieler zudrueckt UND etwas ansteht.
+    if (!this.closing || stau <= 0) {
+      this.druck = 0;
+      this.bissScharf = true;
+      return;
+    }
+    this.druck = Math.min(1, this.druck + dt / Excavator.DRUCK_S);
+    if (this.druck < 1 || !this.bissScharf || !this.onClawBite) return;
+    this.bissScharf = false;
+    const kraftKN = this.schliesskraftKN;
+    // Gedrueckt wird auf alles, was vor den Schalen steht oder in ihnen haengt.
+    for (const handle of this.clawFunde) this.biss(handle, kraftKN);
+    for (const handle of this.grippedHandles) {
+      if (!this.clawFunde.has(handle)) this.biss(handle, kraftKN);
+    }
+  }
+
+  private biss(handle: number, kraftKN: number): void {
+    const b = this.world.getRigidBody(handle);
+    // Ein entfernter Koerper darf nicht befragt werden — das zerlegt die ganze
+    // Physikwelt (E-103).
+    if (!b || !b.isValid()) return;
+    const p = b.translation();
+    this.onClawBite?.({ handle, kraftKN, x: p.x, y: p.y, z: p.z });
   }
 
   private aufsetzRay = new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 });

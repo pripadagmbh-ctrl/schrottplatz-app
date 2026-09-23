@@ -214,10 +214,14 @@ export class GripSystem {
   private probe = new THREE.Vector3();
   /** Letzte Weltpositionen der Spinne — daraus die Loslass-Geschwindigkeit */
   private spinneSpur: THREE.Vector3[] = [];
+  /** Letzte Weltdrehungen der Spinne — daraus die Winkelgeschwindigkeit */
+  private spinneDreh: THREE.Quaternion[] = [];
   private tmpA = new THREE.Vector3();
   private tmpB = new THREE.Vector3();
   private tmpQ = new THREE.Quaternion();
   private tmpQ2 = new THREE.Quaternion();
+  private tmpQ3 = new THREE.Quaternion();
+  private tmpOm = new THREE.Vector3();
   /**
    * Schonfrist nach dem Loslassen melden. Der Bagger schaltet dann seine
    * Krallen-Kollider kurz ab — beim Oeffnen sind sie noch fast zu und die
@@ -659,7 +663,12 @@ export class GripSystem {
   private trackGrapple(dt: number): void {
     const t = this.grappleBody.translation();
     this.spinneSpur.push(new THREE.Vector3(t.x, t.y, t.z));
-    if (this.spinneSpur.length > RELEASE_AVG_STEPS + 1) this.spinneSpur.shift();
+    const r = this.grappleBody.rotation();
+    this.spinneDreh.push(new THREE.Quaternion(r.x, r.y, r.z, r.w));
+    if (this.spinneSpur.length > RELEASE_AVG_STEPS + 1) {
+      this.spinneSpur.shift();
+      this.spinneDreh.shift();
+    }
     this.spinneDt = dt;
   }
 
@@ -679,16 +688,84 @@ export class GripSystem {
       .divideScalar((n - 1) * this.spinneDt);
   }
 
+  /**
+   * Winkelgeschwindigkeit der Spinne, aus derselben Spur wie `grappleVelocity`
+   * und mit derselben Fensterbreite.
+   *
+   * Sie enthaelt ALLES, was den Korb dreht: den Oberwagenschwenk, den Rotator
+   * und das Pendel. Darum braucht es keine drei Rechnungen — die Drehung des
+   * Greiferkoerpers ist die Summe.
+   */
+  private grappleAngvel(out: THREE.Vector3): THREE.Vector3 {
+    const n = this.spinneDreh.length;
+    if (n < 2 || this.spinneDt <= 0) return out.set(0, 0, 0);
+    // Restdrehung vom aeltesten zum neuesten Bild
+    const q = this.tmpQ3.copy(this.spinneDreh[0]!).invert().premultiply(this.spinneDreh[n - 1]!);
+    // kuerzester Weg: q und -q sind dieselbe Drehung
+    if (q.w < 0) q.set(-q.x, -q.y, -q.z, -q.w);
+    const sin = Math.sqrt(Math.max(0, 1 - q.w * q.w));
+    if (sin < 1e-7) return out.set(0, 0, 0);
+    const rate = (2 * Math.acos(THREE.MathUtils.clamp(q.w, -1, 1))) / ((n - 1) * this.spinneDt);
+    return out.set(q.x / sin, q.y / sin, q.z / sin).multiplyScalar(rate);
+  }
+
   releaseAll(): void {
     const count = this.items.length;
     const v = this.grappleVelocity(this.tmpB);
+    const om = this.grappleAngvel(this.tmpOm);
+    const g = this.grappleBody.translation();
     for (const item of this.items) {
       if (!item.body.isValid()) continue;
+      const p = item.body.translation();
+      /*
+       * JEDES TEIL BEKOMMT SEINE EIGENE GESCHWINDIGKEIT (E-115, 22.09.2026).
+       *
+       * Vorher bekamen alle Teile die Bahngeschwindigkeit des KARDANGELENKS.
+       * Das ist der falsche Punkt und fuer alle derselbe: Der Korb haengt
+       * 1,5 m tiefer und im Ausschlag weiter aussen, und was aussen im Korb
+       * liegt, laeuft auf einem groesseren Radius als was innen liegt.
+       * Gemessen (`tools/wurf.ts`, 22.09.2026): im Dauerschwenk fehlten dem
+       * Korb 2,3 %, im Rueckschwung des Pendels 18 %; drei radial versetzte
+       * Teile flogen mit exakt derselben Zahl los.
+       *
+       * Richtig ist der Starrkoerpersatz:  v = v_Gelenk + ω × r.
+       * `r` ist der Hebel vom Gelenk zum jeweiligen Teil. Damit fliegt, was
+       * aussen liegt, schneller — und das ist das "durch Schwung
+       * geschleudert", das hier gebaut werden sollte.
+       *
+       * Eine Obergrenze steht hier NICHT: Beide Groessen kommen aus der
+       * gemessenen Bewegung der Maschine, mehr als ihre eigene
+       * Umfangsgeschwindigkeit kann dabei nicht herauskommen
+       * (`test/wurfweite.test.ts` bewacht das). Das Netz gegen Zahlenunfaelle
+       * bleibt `clampSpeeds` (28 m/s).
+       */
+      const rx = p.x - g.x;
+      const ry = p.y - g.y;
+      const rz = p.z - g.z;
+      const vx = v.x + (om.y * rz - om.z * ry);
+      const vy = v.y + (om.z * rx - om.x * rz);
+      const vz = v.z + (om.x * ry - om.y * rx);
       item.body.setBodyType(RAPIER.RigidBodyType.Dynamic, true);
-      // Den Schwung der Spinne mitgeben, dazu etwas nach unten: So faellt das
-      // Teil, statt in der Luft stehen zu bleiben, und ein Wurf bleibt ein Wurf.
-      item.body.setLinvel({ x: v.x, y: v.y - RELEASE_DOWN, z: v.z }, true);
-      item.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      /*
+       * WURF ODER ABSETZEN — zwei Faelle, nicht eine Zahl.
+       *
+       * `RELEASE_DOWN` gab es, damit ein abgesetztes Teil nicht in der Luft
+       * stehen bleibt. Beim Wurf richtet derselbe Zuschlag Schaden an: Er
+       * zieht das Teil nach unten, statt es seitlich fliegen zu lassen, und
+       * `setAngvel(0)` nimmt ihm auch noch den Drall — ein geschleudertes
+       * Teil hoert dann mitten im Flug auf zu rotieren.
+       *
+       * Die Schwelle ist `RELEASE_DOWN` selbst: Wer sich langsamer bewegt als
+       * der Zuschlag gross ist, setzt ab; wer schneller ist, wirft. Damit
+       * kommt keine neue Zahl ins Spiel.
+       */
+      if (Math.hypot(vx, vz) > RELEASE_DOWN) {
+        item.body.setLinvel({ x: vx, y: vy, z: vz }, true);
+        item.body.setAngvel({ x: om.x, y: om.y, z: om.z }, true);
+      } else {
+        item.body.setLinvel({ x: vx, y: vy - RELEASE_DOWN, z: vz }, true);
+        item.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      }
       item.body.wakeUp();
     }
     this.items = [];
