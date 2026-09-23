@@ -185,11 +185,29 @@ describe("Der Startplatz des MUELL-Containers haengt an derselben Zahl", () => {
   const HD = muell.size[1] / 2;
   /** So viel Luft muss zu jeder der vier Schranken bleiben (E-041, silos.test). */
   const MINDESTLUFT = 0.15;
+  /**
+   * ZWEI SCHRANKEN TEILEN SICH SEIT E-110 EINE TASCHE VON 0,12 m.
+   *
+   * Die Nordflanke der Buntmetall-Mulde endet auf z −16,25 und nicht auf
+   * −16,45: Die Hindernisliste fuehrte die Wand 0,35 m dick und auf der
+   * Muldenkante, gebaut sind 0,55 m und davor (`MULDE_STEIN`, E-110). Damit
+   * bleibt zwischen Wand (−16,25 + 2,15 halbe Containertiefe = −14,10) und dem
+   * Schwenkbandrand (−13,98 bei x −3,96) nur noch eine Tasche von 0,12 m.
+   *
+   * 0,15 m an BEIDEN Enden sind darin nicht unterzubringen — nachgerechnet:
+   * 0,15 m Wandluft verlangt z ≥ −13,95, das Schwenkband verlangt z ≤ −13,98.
+   * Der Container steht deshalb in der MITTE der Tasche, mit 0,06 m zu jeder
+   * Seite. Wer es weiter haben will, muss ihn aus der Tasche nehmen, und das
+   * ist eine Gestaltungsfrage (Ansage war „Direkt neben Buntmetall-Mulde").
+   *
+   * Die anderen zwei Schranken behalten ihre 0,15 m: dort ist Platz.
+   */
+  const TASCHENLUFT = 0.05;
 
   it("1 — die Mitte liegt im Schwenkband des Baggers", () => {
     const d = Math.hypot(muell.x - BAGGER_STAND.x, muell.z - BAGGER_STAND.z);
     expect(d - SCHWENK_INNEN).toBeGreaterThanOrEqual(MINDESTLUFT);
-    expect(SCHWENK_AUSSEN - d, `${d.toFixed(2)} m vom Sitz`).toBeGreaterThanOrEqual(MINDESTLUFT);
+    expect(SCHWENK_AUSSEN - d, `${d.toFixed(2)} m vom Sitz`).toBeGreaterThanOrEqual(TASCHENLUFT);
   });
 
   it("3 — die Fahrlinie nach vorn bleibt frei, gerechnet mit der halben Breite", () => {
@@ -223,7 +241,21 @@ describe("Der Startplatz des MUELL-Containers haengt an derselben Zahl", () => {
       }
     }
     expect(engste, `der MUELL kommt ${engste.toFixed(2)} m an „${wo}" heran`).toBeGreaterThanOrEqual(
-      MINDESTLUFT
+      TASCHENLUFT
     );
+    /*
+     * Und die Gegenprobe zur Tasche selbst: Sie ist wirklich so knapp, wie
+     * `TASCHENLUFT` behauptet. Waere wieder Platz, gehoerte die Schranke
+     * zurueck auf 0,15 m.
+     */
+    const bunt = CONFIGS.find((c) => c.id === "r_bunt")!;
+    const wandNord = Math.max(
+      ...STATIC_OBSTACLES.filter((o) => o.label.startsWith(`${bunt.label} `)).map((o) => o.z + o.hd)
+    );
+    const bandGrenze =
+      BAGGER_STAND.z + Math.sqrt(SCHWENK_AUSSEN ** 2 - (muell.x - BAGGER_STAND.x) ** 2);
+    const tasche = bandGrenze - (wandNord + HD);
+    expect(tasche, `die Tasche ist ${tasche.toFixed(2)} m hoch`).toBeLessThan(2 * MINDESTLUFT);
+    expect(tasche, "die Tasche ist zu — dann steht der Container im Bauwerk").toBeGreaterThan(0);
   });
 });

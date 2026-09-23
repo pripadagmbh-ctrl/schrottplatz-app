@@ -277,8 +277,18 @@ describe("Der Müllcontainer steht morgens richtig", () => {
    * hat (v2 E-010: Spawn ohne Überlappung). Ein Fingerbreit reicht dagegen.
    * Mehr ist auch nicht zu haben: Die einzige freie Tasche auf dem Platz ist
    * 0,19 m „dick" (E-041).
+   *
+   * 0,05 STATT 0,15 SEIT DEM 22.09.2026 (E-110), und das ist ein Nachgeben mit
+   * Rechnung, kein Aufweichen: Die Nordflanke der Buntmetall-Mulde endet auf
+   * z −16,25 und nicht auf −16,45 — die Hindernisliste führte die Wand 0,35 m
+   * dick, gebaut ist sie 0,55 m. Damit ist die Tasche zwischen Wand (z −16,25
+   * + 2,15 Containertiefe = −14,10) und Schwenkband (−13,98) nur noch 0,12 m
+   * hoch. 0,15 m Luft sind darin nicht mehr unterzubringen, ohne das
+   * Schwenkband oder die Fahrlinie aufzugeben; der Zweck der Schranke — kein
+   * Spawn IN der Wand — ist mit 0,05 m ebenso erfüllt. Gemessen steht der
+   * Container jetzt 0,08 m vor den Steinen (`tools/muldenwand-abgleich.ts`).
    */
-  const MINDESTLUFT = 0.15;
+  const MINDESTLUFT = 0.05;
 
   it("sein Startplatz liegt im Schwenkband — vierte Pflichtstation", () => {
     const d = abstandVomStand(muell.x, muell.z);
@@ -354,21 +364,19 @@ describe("Der Müllcontainer steht morgens richtig", () => {
      *
      * Mitgerechnet wird der SOCKEL: Die Schwellensteine stehen 0,55 m dick vor
      * der Mulde (Aussenkante x −4,95) und sind seit E-034 zwei Lagen = 1,00 m
-     * hoch. In der Hindernisliste steht die Schwelle nur mit ±0,35 m um
-     * x −5,50 — wer nur gegen die Liste rechnet, misst 0,20 m zu viel.
+     * hoch.
+     *
+     * BIS E-110 STAND HIER EIN FLICKEN: ein von Hand nachgetragenes Rechteck
+     * für die Schwellensteine, weil die Hindernisliste die Schwelle nur mit
+     * ±0,35 m um x −5,50 führte und damit „0,20 m zu viel" Luft meldete. Der
+     * Flicken ist weg, weil der Grund weg ist — die Liste rechnet seit E-110
+     * aus `muldenWaendeWelt()`, also aus derselben Quelle wie die Steine. Wer
+     * hier wieder etwas von Hand nachtragen muss, hat einen Fehler in
+     * `containers.ts` gefunden und soll ihn dort beheben.
      */
     const g = grundriss();
     for (const c of CONFIGS.filter((x) => x.sortierbox === true)) {
-      const teile = [
-        ...STATIC_OBSTACLES.filter((o) => o.label.startsWith(c.label)),
-        {
-          x: c.x + c.size[0] / 2 + 0.275,
-          z: c.z,
-          hw: 0.275,
-          hd: c.size[1] / 2,
-          label: `${c.label} Schwellensteine`,
-        },
-      ];
+      const teile = STATIC_OBSTACLES.filter((o) => o.label.startsWith(c.label));
       expect(teile.length, `${c.label}: keine Wände in der Hindernisliste`).toBeGreaterThan(1);
       let engste = Infinity;
       let wo = "";

@@ -645,14 +645,21 @@ const GASSEN_KOPF: [number, number] = [MULDEN_GASSE_X, -2.0];
  * `vehicleModel.ts`). Die alte Rechnung nahm 3,0 m an und schickte den Wagen
  * 0,70 m in die Stirnwand — gefunden hat das erst `test/fahrumriss.test.ts`.
  *
- * WEST  Stirnwand innen auf x −38,65; bei −35,40 endet das Heck auf −38,54
- *       und bleibt 0,11 m davor.
- * SUED  Rueckwand innen auf z −27,65; bei −24,40 endet das Heck auf −27,54.
+ * WEST  Stirnwand innen auf x −39,00; bei −35,40 endet das Heck auf −38,54
+ *       und bleibt 0,46 m davor.
+ * SUED  Rueckwand innen auf z −28,00; bei −24,40 endet das Heck auf −27,54.
+ *
+ * DIE ZWEI WANDLAGEN SIND AM 22.09.2026 NACHGEZOGEN (E-110). Hier stand
+ * −38,65 und −27,65: die Innenflaeche, wie die Hindernisliste sie mit 0,35 m
+ * Wanddicke auf der Muldenkante ausrechnete. Gebaut stehen die Steine VOR der
+ * Kante und sind 0,55 m dick (`MULDE_STEIN`), die Innenflaeche liegt also auf
+ * der Muldenkante selbst. Der Wagen hat damit 0,35 m MEHR Luft als hier stand,
+ * nicht weniger — die Zahl wird nachgezogen, die Fahrt bleibt, wie sie ist.
  *
  * Nach vorn reicht die Ladeflaeche damit bis 0,6 m vor die Muldenoeffnung.
  * Die Blockadepruefung laesst das zu: Sie tastet mit 1,40 m Radius, die
- * Flanken stehen 2,10 m von der Mittellinie entfernt und sind 0,35 m dick —
- * es bleiben 0,20 m Luft je Seite.
+ * Flanken stehen mit ihrer Innenflaeche 2,10 m von der Mittellinie entfernt —
+ * es bleiben 0,70 m Luft je Seite.
  */
 const MULDE_TIEFE_X = -35.4;
 const MULDE_TIEFE_Z = -24.4;

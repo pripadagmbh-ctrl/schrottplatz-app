@@ -346,7 +346,17 @@ describe("Die Buntmetall-Mulde ist ein Puffer und kostet kein Geld", () => {
     const schwelle = STATIC_OBSTACLES.find((o) => o.label === `${bunt.label} Schwelle`);
     expect(schwelle, "die Schwelle fehlt in der Hindernisliste").toBeTruthy();
     expect(schwelle!.top).toBeCloseTo(bunt.niedrigeStirn!, 6);
-    expect(schwelle!.x).toBeCloseTo(bunt.x + bunt.size[0] / 2, 6);
+    /*
+     * MITTE DER STEINE, nicht Muldenkante (22.09.2026, E-110). Hier stand
+     * `bunt.x + w/2` — das war die Kante, an der die Steine ANFANGEN; sie
+     * stehen davor, also auf `w/2 + dicke/2`. Die alte Liste trug die Schwelle
+     * auf x −5,50 und 0,35 m breit (−5,85 … −5,15), gebaut ist sie −5,50 …
+     * −4,95: 0,35 m Sperre ohne Stein nach innen, 0,20 m Stein ohne Sperre
+     * nach aussen. Genau das war Patricks Befund „Kollisionsprüfung ohne Mauer
+     * bei Buntmetallmulde?".
+     */
+    expect(schwelle!.x).toBeCloseTo(bunt.x + bunt.size[0] / 2 + MULDE_STEIN.dicke / 2, 6);
+    expect(schwelle!.hw).toBeCloseTo(MULDE_STEIN.dicke / 2, 6);
     // Auf der Baggerseite, nicht auf der Lambertseite.
     expect(schwelle!.x, "die Schwelle steht auf der falschen Seite").toBeGreaterThan(bunt.x);
     expect(

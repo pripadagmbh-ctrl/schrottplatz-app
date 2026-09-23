@@ -19,7 +19,7 @@ import {
   TRENNSTEIN_T,
 } from "./yard";
 import { officeFootprints, hallenWaende } from "./office";
-import { CONFIGS, type ContainerConfig } from "./containers";
+import { CONFIGS, muldenWaendeWelt, type ContainerConfig } from "./containers";
 
 /**
  * Feste Bauten auf dem Platz — alles, wodurch niemand hindurchlaufen oder
@@ -64,10 +64,6 @@ const WALL_H = 1.8;
  * Die Öffnung bleibt frei — als Vollfläche eingetragen wäre der Innenraum
  * gesperrt und man käme mit der Spinne nicht mehr hinein.
  */
-const BAY_T = 0.35;
-/** Die Rueckwand steht zwei Betonlego-Lagen hoeher als die Flanken. */
-const RUECKWAND_PLUS = 1.0;
-
 function bayObstacles(cfg: ContainerConfig): Obstacle[] {
   if (cfg.kind === "halde") {
     /*
@@ -151,73 +147,44 @@ function bayObstacles(cfg: ContainerConfig): Obstacle[] {
     return out;
   }
   if (cfg.kind !== "bay") return []; // Haufen, Container und offene Flächen haben keine Wände
-  const [w, d, top] = cfg.size;
-  // Bei Öffnung nach Norden ist die Mulde gedreht: Breite und Tiefe tauschen
+  /*
+   * NUR NOCH ABGESCHRIEBEN, NICHT MEHR GERECHNET (22.09.2026, E-110).
+   *
+   * Hier stand die Muldengeometrie zum dritten Mal: mit eigener Wandstaerke
+   * `BAY_T = 0,35` (die Steine sind 0,55 dick) und mit den Mittellinien auf
+   * der Muldenkante statt auf der Steinmitte. Befund Patrick am Gerät:
+   * „Kollisionsprüfung ohne Mauer bei Buntmetallmulde?" — gemessen sperrte
+   * jede Flanke 0,35 m INNEN in der Mulde, wo kein Stein steht, und 0,20 m
+   * gebauter Stein nach aussen stand in keiner Liste. `shareEast`,
+   * `shareNorth`, `shareSouth` und `niedrigeStirn` waren hier ein zweites Mal
+   * ausgewertet.
+   *
+   * Jetzt kommt jede Wand aus `muldenWaendeWelt(cfg)` — derselben Liste, aus
+   * der die Steine gesetzt und die Rapier-Kollider gebaut werden. Wer dort
+   * eine Wand weglaesst, laesst sie hier weg.
+   *
+   * Die Namen bleiben Himmelsrichtungen, weil Tests und Messwerkzeuge sie so
+   * ansprechen: `<Mulde> Nord/Süd` fuer die Flanken einer nach Westen oder
+   * Osten offenen Mulde, `West/Ost` bei Nordoeffnung, und `Stirn` bzw.
+   * `Schwelle` fuer die geschlossene Stirnseite (bei Nordoeffnung `Süd`).
+   */
   const nord = cfg.facing === "north";
-  const hw = (nord ? d : w) / 2;
-  const hd = (nord ? w : d) / 2;
   const L = cfg.label;
-  if (nord) {
-    return [
-      { x: cfg.x, z: cfg.z - hd, hw, hd: BAY_T, top, label: `${L} Süd` },
-      { x: cfg.x - hw, z: cfg.z, hw: BAY_T, hd, top, label: `${L} West` },
-      { x: cfg.x + hw, z: cfg.z, hw: BAY_T, hd, top, label: `${L} Ost` },
-    ];
-  }
-  // Öffnung nach Westen (Standard) oder Osten — die andere Stirnseite ist zu.
-  // Sie steht zwei Lagen hoeher als die Flanken (siehe containers.ts), damit
-  // beim Einfuellen nichts dahinterfaellt.
-  const stirn = cfg.facing === "east" ? -hw : hw;
-  /*
-   * `shareSouth`/`shareNorth` nehmen eine Flanke heraus — dort steht schon
-   * etwas: bei der ersten Mulde der Westflanke die Aussenmauer, bei den
-   * beiden anderen die Nordwand ihres Nachbarn (E-010). Die Steine dafuer
-   * entfallen schon in containers.ts; ohne diese Zeilen bliebe hier eine
-   * unsichtbare Wand stehen. Genau so ein Paar aus gebautem und verzeichnetem
-   * Stand ist am 12.09.2026 als „unsichtbare Barriere" aufgefallen.
-   */
-  const waende: Obstacle[] = [];
-  if (!cfg.shareSouth)
-    waende.push({ x: cfg.x, z: cfg.z - hd, hw, hd: BAY_T, top, label: `${L} Süd` });
-  if (!cfg.shareNorth)
-    waende.push({ x: cfg.x, z: cfg.z + hd, hw, hd: BAY_T, top, label: `${L} Nord` });
-  /*
-   * `shareEast` nimmt die Stirnwand heraus (Ansage 13.09.2026: „Rueckwaende
-   * raus, nur Seitenwaende"). Die Steine dafuer entfallen schon in
-   * containers.ts; ohne diese Zeile bliebe hier eine unsichtbare Wand stehen,
-   * durch die der Greifer nicht kaeme.
-   */
-  if (!cfg.shareEast) {
-    waende.push({
-      x: cfg.x + stirn,
-      z: cfg.z,
-      hw: BAY_T,
-      hd,
-      top: top + RUECKWAND_PLUS,
-      label: `${L} Stirn`,
-    });
-  } else if (cfg.niedrigeStirn) {
-    /*
-     * Die niedrige Schwelle auf der Baggerseite (E-028). Sie steht an
-     * derselben Stelle wie die volle Stirnwand, ist aber nur `niedrigeStirn`
-     * hoch — `hitsObstacle` laesst Arm und Spinne darueber hinweg, und der
-     * Blick aus der abgesenkten Kabine geht ebenfalls darueber (gerechnet in
-     * `containers.ts`, `totenStreifen`).
-     *
-     * Sie MUSS hier stehen: Was gebaut ist und nicht verzeichnet, faellt
-     * Lambert und den LKW nicht auf — und was verzeichnet ist und nicht
-     * gebaut, ist die unsichtbare Barriere vom 12.09.2026.
-     */
-    waende.push({
-      x: cfg.x + stirn,
-      z: cfg.z,
-      hw: BAY_T,
-      hd,
-      top: cfg.niedrigeStirn,
-      label: `${L} Schwelle`,
-    });
-  }
-  return waende;
+  return muldenWaendeWelt(cfg).map((wand) => {
+    const flankeNS = wand.z > cfg.z ? "Nord" : "Süd";
+    const flankeWO = wand.x > cfg.x ? "Ost" : "West";
+    const teil =
+      wand.teil === "schwelle"
+        ? "Schwelle"
+        : wand.teil === "stirn"
+          ? nord
+            ? "Süd"
+            : "Stirn"
+          : nord
+            ? flankeWO
+            : flankeNS;
+    return { x: wand.x, z: wand.z, hw: wand.hw, hd: wand.hd, top: wand.top, label: `${L} ${teil}` };
+  });
 }
 
 export const STATIC_OBSTACLES: Obstacle[] = [

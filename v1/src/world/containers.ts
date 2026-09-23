@@ -388,8 +388,14 @@ export const CONFIGS: ContainerConfig[] = [
    *                              Band 5,8 … 9,2
    *   Muldenachse z −22,8 … −16,8  Abstand 7,11 … 8,98 m — **100 %** der
    *                              Achse erreichbar (vorher 93 %)
-   *   Suedflanke (Hindernis) bis z −23,15   0,40 m vor dem Pressenrahmen
-   *   Nordflanke (Hindernis) bis z −16,45   frei bis zur Kipperspur
+   *   Suedflanke bis z −23,35   0,20 m vor dem Pressenrahmen
+   *   Nordflanke bis z −16,25   frei bis zur Kipperspur
+   *
+   * DIE ZWEI FLANKENZAHLEN SIND AM 22.09.2026 NACHGEZOGEN (E-110): Hier stand
+   * −23,15 und −16,45, abgeschrieben aus der Hindernisliste, die die Wand
+   * 0,35 m dick fuehrte. Gebaut ist sie 0,55 m dick (`MULDE_STEIN`), sie steht
+   * also je Seite 0,20 m weiter aussen. Gemessen mit
+   * `tools/muldenwand-abgleich.ts`.
    *
    * Sie hat wie ihre Vorgaenger keine Rueckwand (`shareEast`, E-006, Ansage
    * 13.09.2026: „Rueckwaende raus, nur Seitenwaende"): Zum Bagger hin steht
@@ -467,7 +473,8 @@ export const CONFIGS: ContainerConfig[] = [
    * bei x ≤ −5,60 — HINTER der Schwelle der Mulde (Aussenkante −4,95).
    * Oestlich der Mulde, wo er bisher stand, gibt es also ueberhaupt keinen
    * Platz mehr, der nicht in der Fahrlinie liegt. Bleibt der Streifen
-   * NOERDLICH von ihr; ihre Nordwand endet auf z −16,45.
+   * NOERDLICH von ihr; ihre Nordwand endet auf z −16,25 (bis E-110 stand hier
+   * −16,45 — das war die zu duenn verzeichnete Wand, siehe unten beim MUELL).
    *
    * Abgesucht im 5-cm-Raster ueber den ganzen Platz (x −14 … 8, z −34 … −6,
    * `tools/unterwagen-rand.ts`, Abschnitt TASCHE) bleibt genau EINE freie
@@ -537,9 +544,30 @@ export const CONFIGS: ContainerConfig[] = [
    * verschwindet er ueber Nacht nicht, sondern landet in dem Muellsilo. Da
    * wird er dann gelagert. Und der Container stuende wieder bei mir." Damit hat
    * der Muell zum ersten Mal einen ganzen Weg: Wrack → Container → Silo.
+   *
+   * z −14,04 SEIT DEM 22.09.2026 (E-110) — 10 cm noerdlicher als vorher, und
+   * zwar nicht aus Geschmack: Die Nordflanke der Buntmetall-Mulde endet auf
+   * z −16,25 und nicht auf −16,45. Die 20 cm Unterschied sind die Steindicke,
+   * die in `obstacles.ts` mit 0,35 statt 0,55 m geführt war. Gegen die
+   * gebauten Steine gerechnet stand der Container mit 4 cm IN der Wand — ein
+   * dynamischer Koerper im Bauwerk, den Rapier im ersten Schritt heraussschiebt
+   * (v2 E-010). Gemessen mit `tools/muldenwand-abgleich.ts`.
+   *
+   * WIEVIEL PLATZ IN DER TASCHE UEBERHAUPT IST — die Rechnung, die diese Zahl
+   * erzwingt:
+   *
+   *   Suedgrenze   Muldenwand z −16,25 + halbe Containertiefe 2,15  → z −14,10
+   *   Nordgrenze   Schwenkband 9,20 m um den Sitz (−0,5 | −22,5)    → z −13,98
+   *                (bei x −3,96; weiter oestlich verbietet es die Fahrlinie)
+   *
+   * Die Tasche ist also 0,12 m „hoch", und z −14,04 ist ihre MITTE: 0,06 m Luft
+   * zur Muldenwand, 0,06 m Luft zum Schwenkbandrand. Die 0,15 m, die E-041 und
+   * E-107 an jeder der vier Schranken hatten, sind hier nicht mehr zu haben —
+   * das ist eine Gestaltungsfrage fuer Patrick und keine Rechnung mehr: Wer
+   * mehr Luft will, muss den Container aus der Tasche nehmen.
    */
   { id: "r_rubble", fractionId: "rubble", mitFraktionen: ["tires", "wood", "plastic"],
-    label: "MUELL", kind: "rolloff", x: -3.96, z: -14.14, size: [3.6, 4.3, 0.8],
+    label: "MUELL", kind: "rolloff", x: -3.96, z: -14.04, size: [3.6, 4.3, 0.8],
     platzinventar: true },
 
   /*
@@ -719,6 +747,130 @@ export function muldenWandSpannen(
     // quer darüber, bündig mit den Außenflächen der Flanken
     rueck: hatRueckwand ? [-(d / 2 + T), d / 2 + T] : [0, 0],
   };
+}
+
+/**
+ * EINE Wand einer Mulde — die einzige Beschreibung, aus der sie entsteht.
+ *
+ * Bis zum 22.09.2026 entschieden DREI Stellen unabhängig voneinander, wo eine
+ * Muldenwand steht und wie hoch sie ist:
+ *
+ *   Steine     `Container` (`kind === "bay"`), aus `muldenWandSpannen`
+ *   Kollider   derselbe Zweig, aber mit eigenen Formeln
+ *   Hindernis  `obstacles.ts`, `bayObstacles`, mit eigener Wandstaerke 0,35
+ *
+ * Beide Abweichungen sind am Gerät aufgefallen (Befunde 22.09.2026):
+ * „Kollisionsprüfung ohne Mauer bei Buntmetallmulde?" — die Liste sperrte
+ * 0,35 m INNEN in der Mulde, wo kein Stein steht, und liess 0,20 m Stein nach
+ * aussen unverzeichnet. Und: „die spinne bleibt über dem abgesenkten
+ * muldenwand stehen" — der Rueckwand-Kollider stand OHNE Bedingung da, also
+ * auch an der einen Mulde mit `shareEast`, wo gar keine Rueckwand gebaut wird:
+ * 3,00 m unsichtbare Wand über einer 1,00 m hohen Schwelle.
+ *
+ * Die Wand wird deshalb EINMAL beschrieben (Lauf, Lage, Oberkante) und
+ * dreimal gelesen. Dieselbe Form wie `pressWaende()`, `hallenWaende()` und
+ * `rolloffOberkante()` (E-108).
+ *
+ * Alle Zahlen im MULDENRAHMEN, also vor `bayDrehung` — genau so, wie die
+ * Steine gesetzt und die Kollider an den (mitgedrehten) Körper gehängt
+ * werden. Wer sie auf dem Platz braucht, nimmt `muldenWaendeWelt`.
+ */
+export interface MuldenWand {
+  /** Bauteil, nicht Himmelsrichtung: die dreht sich mit `facing` mit. */
+  teil: "flanke+" | "flanke-" | "stirn" | "schwelle";
+  /** Achse, längs derer die Steinreihe läuft */
+  achse: "x" | "z";
+  /** Anfang und Ende des Laufs auf dieser Achse (Außenkanten der Reihe) */
+  von: number;
+  bis: number;
+  /** Mitte der Wand auf der anderen Achse */
+  fest: number;
+  /** Oberkante über Grund = Zahl der Steinlagen × Steinhöhe */
+  top: number;
+}
+
+/**
+ * Die Wände einer Mulde im Muldenrahmen. Leer für alles, was keine `bay` ist.
+ *
+ * Reihenfolge = Bau-Reihenfolge (Nordflanke, Südflanke, Stirn): Die Farben und
+ * das Wackeln der Blöcke hängen am Zähler, und das Bild soll dasselbe bleiben.
+ */
+export function muldenWaende(cfg: ContainerConfig): MuldenWand[] {
+  if (cfg.kind !== "bay") return [];
+  const [w, d, h] = cfg.size;
+  const T = MULDE_STEIN.dicke;
+  const H = MULDE_STEIN.hoehe;
+  // Lagen, nicht Meter: gebaut werden ganze Steine (Bestand seit 27.08.2026)
+  const lagen = Math.max(2, Math.round(h / H));
+  const spannen = muldenWandSpannen(w, d, !cfg.shareEast);
+  // Die Stirn läuft immer über die volle Breite, auch als niedrige Schwelle
+  const quer = muldenWandSpannen(w, d, true).rueck;
+  const out: MuldenWand[] = [];
+  const flanke = (teil: "flanke+" | "flanke-", vorz: number): MuldenWand => ({
+    teil,
+    achse: "x",
+    von: spannen.flanke[0],
+    bis: spannen.flanke[1],
+    fest: vorz * (d / 2 + T / 2),
+    top: lagen * H,
+  });
+  if (!cfg.shareNorth) out.push(flanke("flanke+", 1));
+  if (!cfg.shareSouth) out.push(flanke("flanke-", -1));
+  if (!cfg.shareEast) {
+    // Zwei Lagen höher als die Flanken: Wer von oben einfüllt, wirft sonst
+    // regelmässig ein Stück über die hintere Kante, und dahinter ist es
+    // verloren.
+    out.push({ teil: "stirn", achse: "z", von: quer[0], bis: quer[1], fest: w / 2 + T / 2, top: (lagen + 2) * H });
+  } else if (cfg.niedrigeStirn) {
+    out.push({
+      teil: "schwelle",
+      achse: "z",
+      von: quer[0],
+      bis: quer[1],
+      fest: w / 2 + T / 2,
+      // Auf ganze Lagen gerundet — was gebaut wird, sperrt (E-028)
+      top: Math.max(1, Math.round(cfg.niedrigeStirn / H)) * H,
+    });
+  }
+  return out;
+}
+
+/** Ein achsenparalleles Rechteck mit Oberkante, wie `Obstacle` es braucht. */
+export interface MuldenWandWelt {
+  teil: MuldenWand["teil"];
+  x: number;
+  z: number;
+  hw: number;
+  hd: number;
+  top: number;
+}
+
+/**
+ * Dieselben Wände auf dem Platz: gedreht um `bayDrehung`, verschoben auf die
+ * Muldenmitte. Die Drehungen sind Vielfache von 90°, die Rechtecke bleiben
+ * also achsenparallel.
+ */
+export function muldenWaendeWelt(cfg: ContainerConfig): MuldenWandWelt[] {
+  const drehung = bayDrehung(cfg);
+  const c = Math.cos(drehung);
+  const s = Math.sin(drehung);
+  const T = MULDE_STEIN.dicke;
+  return muldenWaende(cfg).map((wand) => {
+    const halb = (wand.bis - wand.von) / 2;
+    const mitte = (wand.von + wand.bis) / 2;
+    const lx = wand.achse === "x" ? mitte : wand.fest;
+    const lz = wand.achse === "x" ? wand.fest : mitte;
+    const hw = wand.achse === "x" ? halb : T / 2;
+    const hd = wand.achse === "x" ? T / 2 : halb;
+    return {
+      teil: wand.teil,
+      x: cfg.x + lx * c + lz * s,
+      z: cfg.z - lx * s + lz * c,
+      hw: Math.abs(hw * c) + Math.abs(hd * s),
+      hd: Math.abs(hw * s) + Math.abs(hd * c),
+      top: wand.top,
+    };
+  });
 }
 
 /**
@@ -1146,15 +1298,16 @@ class GameContainer {
           nieten.push({ m: ohneStreckung.clone().multiply(niete.matrix), f });
         }
       };
-      // Wände: Ostseite + Nord + Süd. Die WESTseite bleibt offen — dorthin
-      // schaut der Bagger, von dort wird eingefüllt und ausgeräumt.
-      //
-      // Die Rückwand steht zwei Lagen höher als die Flanken: Wer von oben
-      // einfüllt, wirft regelmäßig ein Stück über die hintere Kante, und
-      // dahinter ist es verloren. Vorn ändert das nichts — dort wird
-      // eingefüllt, und die Reichweite des Arms haengt an der Muldenmitte.
-      const REIHEN_HINTEN = ROWS + 2;
       /*
+       * Wände: Ostseite + Nord + Süd. Die WESTseite bleibt offen — dorthin
+       * schaut der Bagger, von dort wird eingefüllt und ausgeräumt.
+       *
+       * WELCHE Wand wo steht und wie hoch sie ist, sagt `muldenWaende(cfg)` —
+       * dieselbe Liste, aus der gleich die Kollider entstehen und aus der
+       * `obstacles.ts` seine Einträge rechnet. Vorher entschied das jede der
+       * drei Stellen für sich; Ergebnis waren eine Sperre ohne Stein und ein
+       * 3 m hoher Kollider über einer 1 m hohen Schwelle (Befunde 22.09.2026).
+       *
        * Jede Lage wird von Wandkante zu Wandkante ausgelegt (`reihenstuecke`),
        * mit halbem Versatz in jeder zweiten Lage. Vorher lief hier eine
        * Schleife in ganzen Steinlängen mit 0,4 m Zugabe: An einer Mulde von
@@ -1162,31 +1315,22 @@ class GameContainer {
        * Kante und hinten 0,50 m über die Rückwand hinaus — „die Außenteile
        * stehen immer ab" (Befund 14.09.2026).
        */
-      const spannen = muldenWandSpannen(w, d, !cfg.shareEast);
-      for (let r = 0; r < REIHEN_HINTEN; r++) {
+      const waende = muldenWaende(cfg);
+      const hoechste = waende.reduce((m, wd) => Math.max(m, wd.top), 0);
+      for (let r = 0; r < Math.round(hoechste / BLOCK_H); r++) {
         const y = BLOCK_H / 2 + r * BLOCK_H;
         const versatz = (r % 2) * (BLOCK_L / 2);
-        if (r < ROWS) {
-          for (const s of reihenstuecke(spannen.flanke[0], spannen.flanke[1], BLOCK_L, versatz)) {
-            if (!cfg.shareNorth) placeBlock(s.mitte, y, d / 2 + BLOCK_T / 2, true, s.laenge);
-            if (!cfg.shareSouth) placeBlock(s.mitte, y, -(d / 2 + BLOCK_T / 2), true, s.laenge);
-          }
-        }
-        // Rückwand: entfällt, wenn die Nachbarmulde dahinter sie schon stellt
-        if (!cfg.shareEast) {
-          for (const s of reihenstuecke(spannen.rueck[0], spannen.rueck[1], BLOCK_L, versatz)) {
-            placeBlock(w / 2 + BLOCK_T / 2, y, s.mitte, false, s.laenge);
-          }
-        }
-        /*
-         * Die niedrige Schwelle auf der Baggerseite (E-028). Aus derselben
-         * Quelle wie jede andere Reihe seit E-018 (`reihenstuecke`), damit der
-         * letzte Stein an der Wandkante endet und nicht uebersteht.
-         */
-        if (cfg.niedrigeStirn && y < cfg.niedrigeStirn) {
-          const bord = muldenWandSpannen(w, d, true).rueck;
-          for (const s of reihenstuecke(bord[0], bord[1], BLOCK_L, versatz)) {
-            placeBlock(w / 2 + BLOCK_T / 2, y, s.mitte, false, s.laenge);
+        for (const wand of waende) {
+          if (y > wand.top) continue;
+          for (const s of reihenstuecke(wand.von, wand.bis, BLOCK_L, versatz)) {
+            const laengsX = wand.achse === "x";
+            placeBlock(
+              laengsX ? s.mitte : wand.fest,
+              y,
+              laengsX ? wand.fest : s.mitte,
+              laengsX,
+              s.laenge
+            );
           }
         }
       }
@@ -1236,42 +1380,30 @@ class GameContainer {
           .setRotation({ x: 0, y: Math.sin(drehung / 2), z: 0, w: Math.cos(drehung / 2) })
       );
       const wallH = ROWS * BLOCK_H;
-      for (const sz of [-1, 1]) {
-        // Genau so lang wie die Steine, die man sieht: von der offenen
-        // Vorderkante bis an die Rückwand. Vorher stand der Kollider 0,55 m
-        // länger als die Wand — vorn eine unsichtbare Barriere in der
-        // Einfüllöffnung, hinten eine hinter der Rückwand.
-        world.createCollider(
-          RAPIER.ColliderDesc.cuboid(w / 2, wallH / 2, BLOCK_T / 2).setTranslation(
-            0,
-            wallH / 2,
-            sz * (d / 2 + BLOCK_T / 2)
-          ),
-          body
-        );
-      }
-      // Rückwand-Kollider so hoch wie ihre Blöcke, sonst fliegt der Schrott
-      // durch die zwei zusätzlichen Lagen hindurch
-      const wallHinten = REIHEN_HINTEN * BLOCK_H;
-      world.createCollider(
-        RAPIER.ColliderDesc.cuboid(BLOCK_T / 2, wallHinten / 2, d / 2 + BLOCK_T).setTranslation(
-          w / 2 + BLOCK_T / 2,
-          wallHinten / 2,
-          0
-        ),
-        body
-      );
       /*
-       * Die niedrige Schwelle auf der Baggerseite (E-028). Sie sitzt an
-       * derselben Stelle wie die volle Stirnwand, nur eine Lage hoch.
+       * EIN Kollider je gebauter Wand, aus derselben Liste wie die Steine.
+       *
+       * Vorher rechnete dieser Abschnitt eigene Maße, und die Rückwand entstand
+       * OHNE Bedingung — auch an der einen Mulde, die `shareEast` trägt und
+       * statt der Rückwand nur eine 1,00 m hohe Schwelle hat. Dort stand damit
+       * eine unsichtbare Wand auf 3,00 m: `surfaceUnderClaws` (excavator.ts)
+       * schickt einen Strahl nach unten und nimmt den ersten festen Treffer als
+       * Grund, also blieb die Spinne über der niedrigen Wand stehen („die
+       * spinne bleibt über dem abgesenkten muldenwand stehen", 22.09.2026).
        */
-      if (cfg.niedrigeStirn) {
-        const hoehe = Math.max(1, Math.round(cfg.niedrigeStirn / BLOCK_H)) * BLOCK_H;
+      for (const wand of muldenWaende(cfg)) {
+        const laengsX = wand.achse === "x";
+        const halb = (wand.bis - wand.von) / 2;
+        const mitte = (wand.von + wand.bis) / 2;
         world.createCollider(
-          RAPIER.ColliderDesc.cuboid(BLOCK_T / 2, hoehe / 2, d / 2 + BLOCK_T).setTranslation(
-            w / 2 + BLOCK_T / 2,
-            hoehe / 2,
-            0
+          RAPIER.ColliderDesc.cuboid(
+            laengsX ? halb : BLOCK_T / 2,
+            wand.top / 2,
+            laengsX ? BLOCK_T / 2 : halb
+          ).setTranslation(
+            laengsX ? mitte : wand.fest,
+            wand.top / 2,
+            laengsX ? wand.fest : mitte
           ),
           body
         );
