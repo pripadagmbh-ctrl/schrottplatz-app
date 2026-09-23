@@ -13,6 +13,7 @@
 import { describe, it, expect } from "vitest";
 import * as THREE from "three";
 import { formeKarosserie, baueAnbauteile } from "../src/dismantle/composites";
+import { CAR_DEF } from "../src/dismantle/carDef";
 
 /** Größte halbe Breite in einem z-Band, optional nur oben oder unten. */
 function halbbreite(geo: THREE.BufferGeometry, zVon: number, zBis: number, oben?: boolean): number {
@@ -84,8 +85,17 @@ describe("Wrack-Karosserie", () => {
 
   it("Anbauteile sitzen am Auto, nicht daneben", () => {
     const gruppe = new THREE.Group();
-    baueAnbauteile(gruppe, new THREE.MeshStandardMaterial());
-    expect(gruppe.children.length, "keine Anbauteile gebaut").toBeGreaterThan(8);
+    /*
+     * Seit E-111 ist das EIN Netz mit Eckpunktfarben statt dreizehn Netzen —
+     * gezählt wird deshalb nicht mehr in Kindern, sondern in Eckpunkten:
+     * 9 Kästen à 24 plus 4 Halbtori à 91 = 580. Dass jedes Teil dabei genau da
+     * sitzt, wo es vorher saß, prüft `test/wracknetze.test.ts` Eckpunkt für
+     * Eckpunkt; hier geht es weiter nur darum, dass nichts neben dem Auto hängt.
+     */
+    baueAnbauteile(gruppe, CAR_DEF, 0x8c2f24);
+    expect(gruppe.children.length, "kein Anbau-Netz gebaut").toBe(1);
+    const ecken = (gruppe.children[0] as THREE.Mesh).geometry.getAttribute("position").count;
+    expect(ecken, "es fehlen Anbauteile").toBe(580);
     const box = new THREE.Box3().setFromObject(gruppe);
     // innerhalb der Fahrzeughuelle (Laenge 4 m, Breite 1,7 m, Hoehe bis Dach)
     expect(box.min.z).toBeGreaterThan(-2.2);

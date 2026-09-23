@@ -27,6 +27,62 @@ export interface PartDef {
   color: number;
 }
 
+/**
+ * EIN ANGEBAUTES TEIL — Stoßstange, Grill, Leuchte, Spiegel.
+ *
+ * Nichts davon geht je einzeln ab (anders als `PartDef`: Motor, Getriebe,
+ * Räder). Alle Anbauteile landen deshalb in EINEM Netz mit Eckpunktfarben
+ * (E-111) und sind im Szenengraph nicht mehr einzeln ansprechbar. Das ist der
+ * Preis; dafür kostet ein Wrack 26 statt 50 Zeichenrufe.
+ *
+ * ANTEILE STATT METER — und zwar nur waagerecht. Damit ein neues Modell
+ * (Kleinwagen, Kombi, Transporter) nur andere Maße braucht und keinen Code,
+ * stehen x und z als Anteile: x vom HALBEN `chassis`-Breitenmaß, z von der
+ * HALBEN `chassis`-Länge, die Breite eines Teils vom GANZEN Breitenmaß.
+ *
+ * Die HÖHE bleibt in Metern. Eine Stoßstange sitzt beim Kleinwagen so hoch wie
+ * bei der Limousine — Stoßstangenhöhe und Scheinwerferhöhe sind in
+ * Zulassungsvorschriften absolut festgelegt, nicht als Anteil der Fahrzeuglänge.
+ * Wer das für ein Modell doch verschieben will, schreibt eine andere Zahl hin.
+ */
+export interface AnbauDef {
+  name: string;
+  /** [Breite als ANTEIL der Karosseriebreite, Höhe in m, Tiefe in m] */
+  size: [number, number, number];
+  /** [x als Anteil der HALBEN Breite, y in m, z als Anteil der HALBEN Länge] */
+  anchor: [number, number, number];
+  /** Auch spiegelbildlich auf der anderen Seite bauen (Leuchten, Spiegel). */
+  paarweise?: boolean;
+  /** sRGB-Hex; wandert in die Eckpunktfarben des gemeinsamen Netzes. */
+  farbe: number;
+}
+
+/**
+ * DIE KAROSSERIEMASSE — bis E-111 standen sie als `BoxGeometry(1.7, 0.55, 4.0)`
+ * mitten im Code, dazu zwanzig feste Koordinaten in `baueAnbauteile`. Regel 3
+ * (jede Zahl hat eine Herkunft) war damit nur halb erfüllt, und ein zweites
+ * Modell hätte einen zweiten Codepfad gebraucht.
+ */
+export interface KarosserieDef {
+  /** Chassis [Breite, Höhe, Länge] in m */
+  chassis: [number, number, number];
+  /** Mitte des Chassis über dem Rumpfursprung, in m */
+  chassisY: number;
+  /** Kabine [Breite, Höhe, Länge] in m */
+  kabine: [number, number, number];
+  /** Mitte der Kabine über dem Rumpfursprung, in m */
+  kabineY: number;
+  /** Längssitz der Kabine als Anteil der HALBEN Chassislänge (0 = Mitte) */
+  kabineZ: number;
+  /** Bogenradius eines Radlaufs = Radradius + diese Luft, in m */
+  radlaufLuft: number;
+  /** Rohrdicke des Bogens, in m */
+  radlaufDicke: number;
+  /** Der Bogen sitzt so viel weiter außen UND höher als die Radmitte, in m */
+  radlaufVersatz: number;
+  anbau: AnbauDef[];
+}
+
 export interface WindowDef {
   id: string;
   anchor: [number, number, number];
@@ -51,6 +107,8 @@ export interface CarDef {
   /** Aufprall-Schwellen (Δv in m/s): Scheiben / Quetschstufe */
   glassImpactDv: number;
   crushImpactDv: number;
+  /** Chassis, Kabine, Anbauteile — alles, was das Wrack aussehen lässt */
+  karosserie: KarosserieDef;
   parts: PartDef[];
   windows: WindowDef[];
 }
@@ -85,6 +143,40 @@ export const CAR_DEF: CarDef = {
   crushScales: [1, 0.76, 0.55],
   glassImpactDv: 4.5,
   crushImpactDv: 7,
+  /*
+   * ALLE ZAHLEN HIER SIND DIE, DIE VORHER IM CODE STANDEN (E-111, reiner
+   * Umbau, Abweichung null). Die Anteile stehen absichtlich als Division da:
+   * So ist links die Zahl von vorher zu lesen und rechts, worauf sie sich
+   * bezieht — `1.94 / 2.0` heißt „1,94 m bei 2,0 m halber Länge".
+   */
+  karosserie: {
+    chassis: [1.7, 0.55, 4.0],
+    chassisY: 0.28,
+    kabine: [1.5, 0.55, 2.0],
+    kabineY: 0.83,
+    kabineZ: -0.2 / 2.0,
+    // 0,42 m Bogen über einem 0,33 m Rad; der Bogen sitzt 1 cm weiter außen
+    // und höher als die Radmitte, sonst schneidet er den Reifen.
+    radlaufLuft: 0.09,
+    radlaufDicke: 0.055,
+    radlaufVersatz: 0.01,
+    anbau: [
+      { name: "Stoßstange vorn", size: [1.5 / 1.7, 0.16, 0.16], anchor: [0, 0.22, 1.94 / 2.0], farbe: 0x24262a },
+      { name: "Stoßstange hinten", size: [1.5 / 1.7, 0.16, 0.16], anchor: [0, 0.22, -1.94 / 2.0], farbe: 0x24262a },
+      { name: "Kühlergrill", size: [1.0 / 1.7, 0.16, 0.06], anchor: [0, 0.42, 1.92 / 2.0], farbe: 0x9aa0a6 },
+      /*
+       * Leuchten: Vorher trugen sie ein eigenes Material mit schwachem
+       * Eigenleuchten (0x2a2418 bzw. 0x2a0806). Eckpunktfarben können kein
+       * Eigenleuchten tragen, deshalb ist es hier in die Farbe hineingerechnet
+       * — aufgehellt um genau diesen Betrag. Aus der Entfernung, in der man ein
+       * Wrack sieht, ist das derselbe Anblick (E-111).
+       */
+      { name: "Scheinwerfer", size: [0.3 / 1.7, 0.16, 0.06], anchor: [0.52 / 0.85, 0.44, 1.9 / 2.0], paarweise: true, farbe: 0xfffff4 },
+      { name: "Rückleuchte", size: [0.26 / 1.7, 0.18, 0.06], anchor: [0.55 / 0.85, 0.42, -1.9 / 2.0], paarweise: true, farbe: 0xb82b1e },
+      // Der Spiegel steht über die Karosserie hinaus, sein Anteil ist > 1.
+      { name: "Außenspiegel", size: [0.16 / 1.7, 0.1, 0.08], anchor: [0.92 / 0.85, 1.0, 0.62 / 2.0], paarweise: true, farbe: 0x24262a },
+    ],
+  },
   parts: [
     {
       id: "engine",

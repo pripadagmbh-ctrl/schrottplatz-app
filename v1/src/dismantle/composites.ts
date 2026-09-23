@@ -4,6 +4,7 @@ import { CAR_DEF, type CarDef, type PartDef } from "./carDef";
 import type { ItemManager } from "../world/scrapItems";
 import type { EventBus } from "../core/events";
 import { AUTOLACK, lackton, verwittert } from "../world/objektbau";
+import { farbstoff, verschmelzeBunt, type Bauteil } from "../excavator/bauteile";
 
 /**
  * Verbundobjekt-System (Briefing Kap. 8, M2-Umfang):
@@ -13,6 +14,16 @@ import { AUTOLACK, lackton, verwittert } from "../world/objektbau";
  * - Abreißen: Spinne fasst nahe eines Part-Ankers die Part statt des Rumpfs,
  *   Ziehen über tearSeconds reißt sie heraus → eigenständiges ScrapItem.
  */
+
+/**
+ * Wieviel Schliesskraft einem Aufprall-Delta-V entspricht (kN je m/s).
+ *
+ * EINE Zahl, damit Zudruecken und Aufprall dieselben drei Schwellen benutzen
+ * (siehe `CarComposite.beissen`). Hergeleitet aus der Messung in E-112: ein
+ * voller Biss auf ein Autowrack sind 15,70 kN und soll `crushImpactDv` (7)
+ * genau erreichen.
+ */
+const KN_JE_MS = 15.7 / 7;
 
 /** Reiß-Ziel für das Greifsystem */
 export interface TearTarget {
@@ -113,7 +124,15 @@ export function wrackLack(x: number, z: number): number {
  */
 export function formeKarosserie(geo: THREE.BufferGeometry): void {
   const pos = geo.getAttribute("position") as THREE.BufferAttribute;
-  const HALB_L = 2.0;
+  /*
+   * Die halbe Laenge kommt aus der Geometrie selbst, nicht aus einer Konstante
+   * (E-111). Vorher stand hier fest 2.0 — richtig fuer genau ein Modell. Ein
+   * kuerzeres Chassis haette damit seine Schnauze im Nichts gehabt: Bei 3,60 m
+   * Laenge liegt der vordere Rand bei z = 1,80, und `t > 0.5` haette erst ab
+   * 1,00 statt ab 0,90 gegriffen.
+   */
+  geo.computeBoundingBox();
+  const HALB_L = geo.boundingBox!.max.z;
   for (let i = 0; i < pos.count; i++) {
     let x = pos.getX(i);
     let y = pos.getY(i);
@@ -146,58 +165,74 @@ export function formeKarosserie(geo: THREE.BufferGeometry): void {
 }
 
 /**
- * Stossstangen, Leuchten, Kuehlergrill, Radlaeufe, Spiegel.
+ * Stossstangen, Leuchten, Kuehlergrill, Radlaeufe, Spiegel — EIN NETZ (E-111).
  *
  * Nichts davon ist noetig, damit das Wrack funktioniert — aber ein Kasten mit
  * Raedern liest sich erst als Auto, wenn vorne ein Gesicht dran ist. Alles
  * haengt im crushGroup, wird beim Pressen also mitgequetscht.
+ *
+ * WARUM EIN NETZ. Es waren dreizehn, jedes mit eigenem Material: ein Wrack
+ * kostete 25 Netze und mit Schattenwurf 50 Zeichenrufe, zwei Wracks 100 — 7,6 %
+ * der auf Patricks Geraet gemessenen 1322. Zeichenrufe sind hier der Engpass,
+ * nicht Dreiecke (E-025). Keines der dreizehn Teile geht je einzeln ab; sie
+ * gehoeren also zusammen, mit der Farbe an den Eckpunkten statt am Material —
+ * dieselbe Rechnung wie am Bagger (E-025) und am Leiterrahmen (E-108).
+ *
+ * Die Radlaeufe stehen nicht in der Datenliste, sondern FOLGEN DEN RAEDERN:
+ * Bogenradius = Radradius + `radlaufLuft`, Sitz = Radanker, 1 cm weiter aussen
+ * und hoeher. Vier Koordinatenpaare weniger, die beim naechsten Modell
+ * nachgezogen werden muessten.
  */
-export function baueAnbauteile(gruppe: THREE.Group, lack: THREE.Material): void {
-  const schwarz = new THREE.MeshStandardMaterial({ color: 0x24262a, roughness: 0.85 });
-  const chrom = new THREE.MeshStandardMaterial({ color: 0x9aa0a6, roughness: 0.35, metalness: 0.8 });
-  const klar = new THREE.MeshStandardMaterial({ color: 0xf2eddc, roughness: 0.25, emissive: 0x2a2418 });
-  const rot = new THREE.MeshStandardMaterial({ color: 0x8e2318, roughness: 0.35, emissive: 0x2a0806 });
+export function baueAnbauteile(gruppe: THREE.Group, def: CarDef, lack: number): THREE.Mesh {
+  const k = def.karosserie;
+  const halbeBreite = k.chassis[0] / 2;
+  const halbeLaenge = k.chassis[2] / 2;
+  const teile: Bauteil[] = [];
 
-  const add = (
-    geo: THREE.BufferGeometry,
-    mat: THREE.Material,
-    x: number, y: number, z: number,
-    rx = 0
-  ): void => {
-    const m = new THREE.Mesh(geo, mat);
-    m.position.set(x, y, z);
-    m.rotation.x = rx;
-    m.castShadow = true;
-    gruppe.add(m);
-  };
-
-  // Stossstangen
-  const stange = new THREE.BoxGeometry(1.5, 0.16, 0.16);
-  add(stange, schwarz, 0, 0.22, 1.94);
-  add(stange, schwarz, 0, 0.22, -1.94);
-  // Kuehlergrill
-  add(new THREE.BoxGeometry(1.0, 0.16, 0.06), chrom, 0, 0.42, 1.92);
-  // Scheinwerfer und Rueckleuchten
-  for (const sx of [-1, 1]) {
-    add(new THREE.BoxGeometry(0.3, 0.16, 0.06), klar, sx * 0.52, 0.44, 1.9);
-    add(new THREE.BoxGeometry(0.26, 0.18, 0.06), rot, sx * 0.55, 0.42, -1.9);
-  }
-  // Radlaeufe: flache Boegen ueber den Raedern, damit die Raeder nicht
-  // wie angeklebt wirken
-  const bogen = new THREE.TorusGeometry(0.42, 0.055, 6, 12, Math.PI);
-  for (const sx of [-1, 1]) {
-    for (const z of [1.25, -1.25]) {
-      const m = new THREE.Mesh(bogen, lack);
-      m.position.set(sx * 0.83, 0.34, z);
-      m.rotation.y = Math.PI / 2;
-      m.castShadow = true;
-      gruppe.add(m);
+  for (const a of def.karosserie.anbau) {
+    // Nicht paarweise heisst: einmal, an seinem x-Anteil (der dann 0 ist).
+    for (const seite of a.paarweise ? [-1, 1] : [1]) {
+      const geo = new THREE.BoxGeometry(a.size[0] * k.chassis[0], a.size[1], a.size[2]);
+      geo.translate(seite * a.anchor[0] * halbeBreite, a.anchor[1], a.anchor[2] * halbeLaenge);
+      teile.push({ geo, farbe: a.farbe });
     }
   }
-  // Aussenspiegel
-  for (const sx of [-1, 1]) {
-    add(new THREE.BoxGeometry(0.16, 0.1, 0.08), schwarz, sx * 0.92, 1.0, 0.62);
+  for (const rad of def.parts) {
+    if (rad.kind !== "wheel") continue;
+    const [rx, ry, rz] = rad.anchor;
+    const geo = new THREE.TorusGeometry(rad.size[0] + k.radlaufLuft, k.radlaufDicke, 6, 12, Math.PI);
+    geo.rotateY(Math.PI / 2);
+    geo.translate(rx + Math.sign(rx) * k.radlaufVersatz, ry + k.radlaufVersatz, rz);
+    teile.push({ geo, farbe: lack });
   }
+
+  const mesh = new THREE.Mesh(verschmelzeBunt(teile, "Anbauteile"), anbauStoff());
+  mesh.castShadow = true;
+  gruppe.add(mesh);
+  return mesh;
+}
+
+/**
+ * DAS EINE MATERIAL FUER ALLE ANBAUTEILE — einmal fuer das ganze Spiel.
+ *
+ * Es traegt keine wrackeigene Zahl (die Farben stecken in den Eckpunkten),
+ * also braucht kein Wrack ein eigenes: zwei Wracks kommen mit 17 statt 24
+ * Materialien aus, und der Renderer kann die Anbauteile beider Wracks
+ * hintereinander zeichnen, ohne den Zustand zu wechseln.
+ *
+ * Rauheit 0,7 und Metallglanz 0,2 liegen zwischen den fuenf Materialien von
+ * vorher (Kunststoff 0,85/0 bis Chrom 0,35/0,8). `flatShading` ist Absicht und
+ * nicht Bequemlichkeit: Die Radlaeufe trugen vorher das Lackmaterial, und das
+ * ist flach schattiert. Ohne diese Zeile waeren sie als einzige Teile am Wrack
+ * glatt gerundet.
+ */
+let ANBAU_STOFF: THREE.MeshStandardMaterial | null = null;
+function anbauStoff(): THREE.MeshStandardMaterial {
+  if (!ANBAU_STOFF) {
+    ANBAU_STOFF = farbstoff(0.7, 0.2); // SW, Mittel der fuenf Materialien von vorher
+    ANBAU_STOFF.flatShading = true;
+  }
+  return ANBAU_STOFF;
 }
 
 
@@ -212,6 +247,16 @@ export class CarComposite {
   private prevVel = new THREE.Vector3();
   private grace = SETTLE_GRACE_STEPS;
   private currentMassKg: number;
+  /**
+   * Was die Karosse jetzt noch wiegt.
+   *
+   * Nur zum Nachlesen: Herausgeloeste Teile leben als eigene Stuecke weiter,
+   * die Masse wandert also, sie verschwindet nicht (`test/greiferschaden.test.ts`,
+   * Ansage Patrick 22.09.2026: "kaputt machen verliert keinen wert").
+   */
+  get massKg(): number {
+    return this.currentMassKg;
+  }
   /** Blech-Meshes, die sich am Aufprallpunkt verbeulen (Vertex-Verformung) */
   private dentables: { mesh: THREE.Mesh; base: Float32Array }[] = [];
 
@@ -297,14 +342,18 @@ export class CarComposite {
 
     // Quetschbare Teile (Chassis, Kabine, Scheiben) — Ursprung an der Unterkante.
     // Unterteilte Geometrie, damit Aufprall-Beulen (dent) greifen können.
+    // Die MASSE stehen in `CarDef.karosserie` (E-111), die UNTERTEILUNG bleibt
+    // hier: 4x2x9 und 4x2x5 sind keine Karosseriemaße, sondern die Auflösung,
+    // auf der `dent()` beult — die haengt am Rechenbudget, nicht am Modell.
     this.group.add(this.crushGroup);
-    const chassis = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.55, 4.0, 4, 2, 9), paint);
+    const k = this.def.karosserie;
+    const chassis = new THREE.Mesh(new THREE.BoxGeometry(...k.chassis, 4, 2, 9), paint);
     formeKarosserie(chassis.geometry);
-    chassis.position.y = 0.28;
+    chassis.position.y = k.chassisY;
     chassis.castShadow = true;
     this.crushGroup.add(chassis);
-    const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.55, 2.0, 4, 2, 5), paint);
-    cabin.position.set(0, 0.83, -0.2);
+    const cabin = new THREE.Mesh(new THREE.BoxGeometry(...k.kabine, 4, 2, 5), paint);
+    cabin.position.set(0, k.kabineY, k.kabineZ * (k.chassis[2] / 2));
     cabin.castShadow = true;
     this.crushGroup.add(cabin);
     for (const m of [chassis, cabin]) {
@@ -319,7 +368,7 @@ export class CarComposite {
       this.windows.push({ id: w.id, mesh: pane, anchor: new THREE.Vector3(...w.anchor), intact: true });
     }
 
-    baueAnbauteile(this.crushGroup, paint);
+    baueAnbauteile(this.crushGroup, this.def, lack);
 
     // Parts (nicht quetschbar): Motor + Räder
     for (const p of this.def.parts) {
@@ -575,6 +624,84 @@ export class CarComposite {
   }
 
   /** Nächste greifbare Part nahe der Sensorposition (für die Reiß-Mechanik). */
+  /**
+   * Ein Biss der Spinne (E-114, 22.09.2026).
+   *
+   * ANSAGE PATRICK, 22.09.2026: "nein, kaputt machen verliert keinen wert.
+   * warum auch, Motor entfernen durch rohe Gewalt ist eine art sortierung,
+   * auch ein kaputtes auto bringt gleich viel geld." Deshalb nimmt diese
+   * Rechnung KEINE Masse weg und kennt keinen Preisfaktor: `currentMassKg`
+   * sinkt nur, wenn ein Teil wirklich herausgeht — und dann lebt es als
+   * eigenes Stueck weiter. Gewalt ist hier ein zweiter Weg zu zerlegen, keine
+   * Strafe.
+   *
+   * WARUM DIE KRAFT IN EIN DELTA-V UMGERECHNET WIRD, statt eigene Schwellen
+   * zu bekommen. Beulen, Scheiben und Quetschstufen haengen seit dem
+   * 27.08.2026 an DREI Schwellen (`dv > 3`, `glassImpactDv`,
+   * `crushImpactDv`). Eigene Kraftschwellen daneben waeren ein zweiter Satz
+   * Zahlen fuer dieselbe Sache — genau die Fehlerklasse, die dieses Projekt
+   * neun Mal geplagt hat. Es gibt deshalb EINEN Umrechnungsfaktor, und die
+   * Schwellen bleiben, wo sie sind.
+   *
+   * Der Faktor kommt aus der Messung in E-112 (`tools/greifkraft.ts`): Ein
+   * voller Biss auf ein Autowrack sind 15,70 kN. Genau dieser Biss soll die
+   * Quetschschwelle erreichen, nicht ueberspringen — also
+   *     15,70 kN / 7 (m/s) = 2,243 kN je (m/s).
+   * Damit ergibt sich von selbst eine Abstufung, ohne eine einzige weitere
+   * Zahl (gemessene Kraefte aus E-112):
+   *
+   *   Blech    8,14 kN -> dv 3,63  beult
+   *   Traeger  9,05 kN -> dv 4,03  beult
+   *   Brocken 10,64 kN -> dv 4,74  beult, Scheiben bersten
+   *   Wrack   15,70 kN -> dv 7,00  beult, Scheiben, eine Quetschstufe
+   *   Luft     0,00 kN -> dv 0     nichts
+   */
+  beissen(kraftKN: number, at: THREE.Vector3): void {
+    const dv = kraftKN / KN_JE_MS;
+    if (dv <= 0) return;
+
+    /*
+     * Die Druckrichtung ist die Achse Biss -> Karossenmitte: Wer von oben auf
+     * die Haube drueckt, beult nach unten, wer seitlich zufasst, nach innen.
+     * `dent` erwartet die Bewegungsrichtung VOR dem Aufprall, und das ist beim
+     * Zudruecken genau diese Achse. Faellt sie zusammen (Biss genau in der
+     * Mitte), wird von oben gedrueckt — der uebliche Fall.
+     */
+    const p = this.body.translation();
+    const richtung = new THREE.Vector3(p.x - at.x, p.y - at.y, p.z - at.z);
+    if (richtung.lengthSq() < 1e-6) richtung.set(0, -1, 0);
+
+    if (dv > 3) this.dent(richtung, dv);
+    if (dv > this.def.glassImpactDv) {
+      this.shatterWindows(dv > this.def.glassImpactDv * 1.6 ? 2 : 1);
+    }
+
+    /*
+     * ROHE GEWALT ALS SORTIERUNG. Was unter den Schalen liegt, geht heraus —
+     * dieselbe Suche, mit der die Spinne auch zum Abschrauben ansetzt
+     * (`findPartNear`), und dasselbe Herausloesen (`tearPart`). Es gibt also
+     * keinen zweiten Weg, ein Teil vom Wrack zu trennen; es gibt nur einen
+     * zweiten Anlass.
+     *
+     * Der Stoss danach ist klein gehalten (SW 40): Das Teil soll sichtbar
+     * wegkippen, aber nicht ueber den Platz fliegen — geworfen wird mit dem
+     * Schwenk, nicht mit dem Druck.
+     */
+    if (dv >= this.def.crushImpactDv) {
+      const ziel = this.findPartNear(at);
+      if (ziel) {
+        const koerper = ziel.tear();
+        koerper.applyImpulse(
+          { x: richtung.x * -40, y: 40, z: richtung.z * -40 },
+          true
+        );
+      } else if (this.crushStage < 2) {
+        // Nichts zu holen — dann trifft es die Karosse selbst.
+        this.crush();
+      }
+    }
+  }
+
   findPartNear(pos: THREE.Vector3): TearTarget | null {
     const tmp = new THREE.Vector3();
     for (const part of this.parts) {
@@ -610,7 +737,22 @@ export class CompositeManager {
     private world: RAPIER.World,
     private items: ItemManager,
     private bus: EventBus
-  ) {}
+  ) {
+    /*
+     * Der Biss der Spinne kommt ueber den Bus (Regel 10), nicht als Aufruf aus
+     * `main.ts`: Der Bagger kennt keine Wracks, und die Wracks kennen keinen
+     * Bagger. Die Zuordnung laeuft ueber `handle` — dasselbe Muster wie
+     * `despawnByBody`.
+     *
+     * Kein `isValid()` noetig: Verglichen wird nur eine Zahl mit einer Zahl,
+     * es wird nichts auf dem fremden Koerper abgefragt (E-103).
+     */
+    bus.on("greifer:zugedrueckt", (e) => {
+      const car = this.cars.find((c) => c.body.handle === e.handle);
+      if (!car) return; // gebissen wird viel, ein Wrack ist selten dabei
+      car.beissen(e.kraftKN, new THREE.Vector3(e.x, e.y, e.z));
+    });
+  }
 
   spawnCar(pos: THREE.Vector3): CarComposite {
     const car = new CarComposite(CAR_DEF, this.scene, this.world, this.items, this.bus, pos);
