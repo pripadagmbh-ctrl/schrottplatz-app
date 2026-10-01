@@ -93,10 +93,33 @@ describe("Kein Konfliktmarker kommt durch", () => {
      * leicht Dubletten, und im Log ist die Nummer die Kennung. Zwei Einträge
      * E-029 heisst, dass eine Entscheidung nicht mehr auffindbar ist.
      */
-    const log = readFileSync(resolve(wurzel, "docs/entscheidungen.md"), "utf8");
-    const nummern = [...log.matchAll(/^### (E-\d+)/gm)].map((m) => m[1]!);
-    expect(nummern.length, "keine Einträge gefunden").toBeGreaterThan(20);
-    const doppelt = nummern.filter((n, i) => nummern.indexOf(n) !== i);
-    expect([...new Set(doppelt)], "doppelte Nummern im Log").toEqual([]);
+    /*
+     * Seit dem 25.09.2026 ist `entscheidungen.md` ein Register mit einer
+     * Tabellenzeile je Eintrag; die Volltexte mit ihren `### E-xxx`-Ueberschriften
+     * stehen im Archiv `docs/log/E-xxx_bis_E-yyy.md`. Dieser Waechter las bis
+     * zum 01.10.2026 weiter das Register, fand dort null Ueberschriften und war
+     * seit der Umstellung rot, ohne dass es jemand bemerkt hat.
+     *
+     * Geprueft werden BEIDE Stellen, je fuer sich: jede Nummer hat genau einen
+     * Volltext im Archiv, und genau eine Zeile im Register. Dateien, die mit
+     * `_` beginnen, sind Sicherungen (`_original_entscheidungen_2026-09-25.md`
+     * enthaelt absichtlich jeden alten Eintrag ein zweites Mal) und zaehlen
+     * nicht mit.
+     */
+    const archiv = resolve(wurzel, "docs/log");
+    const volltexte = readdirSync(archiv)
+      .filter((f) => /^E-\d+_bis_E-\d+\.md$/.test(f))
+      .flatMap((f) =>
+        [...readFileSync(resolve(archiv, f), "utf8").matchAll(/^### (E-\d+)/gm)].map((m) => m[1]!)
+      );
+    expect(volltexte.length, "keine Volltexte im Archiv gefunden").toBeGreaterThan(20);
+    const doppeltArchiv = volltexte.filter((n, i) => volltexte.indexOf(n) !== i);
+    expect([...new Set(doppeltArchiv)], "doppelte Nummern im Archiv").toEqual([]);
+
+    const register = readFileSync(resolve(wurzel, "docs/entscheidungen.md"), "utf8");
+    const zeilen = [...register.matchAll(/^\| (E-\d+) \|/gm)].map((m) => m[1]!);
+    expect(zeilen.length, "keine Registerzeilen gefunden").toBeGreaterThan(20);
+    const doppeltRegister = zeilen.filter((n, i) => zeilen.indexOf(n) !== i);
+    expect([...new Set(doppeltRegister)], "doppelte Nummern im Register").toEqual([]);
   });
 });
