@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-117 | 01.10.2026 | Patrick wählt C: die weiche Karosserie mit Sicken wird Vorgabe | gebaut | [E-101_bis_E-120.md](log/E-101_bis_E-120.md) |
 | E-116 | 23.09.2026 | Drei Karosserieformen zur Wahl, umschaltbar im laufenden Spiel | gebaut | [E-101_bis_E-120.md](log/E-101_bis_E-120.md) |
 | E-115 | 22.09.2026 | Das Pendel wird frei, und geschleudert wird mit dem richtigen Punkt | gebaut | [E-101_bis_E-120.md](log/E-101_bis_E-120.md) |
 | E-114 | 22.09.2026 | Zudrücken richtet Schaden an, und zwar ohne einen Cent zu kosten | gebaut | [E-101_bis_E-120.md](log/E-101_bis_E-120.md) |
@@ -131,11 +132,16 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
 
+**E-117 — Patrick wählt C: die weiche Karosserie mit Sicken wird Vorgabe**
+- Das Spiel normal laden, ohne Zusatz in der Adresse: Sind alle Wracks jetzt die weiche Form — auch die auf den Lastern?
+- Ein Wrack von der Seite mehrmals zudrücken: Hebt sich die echte Beule von den Sicken ab, oder verschwindet sie darin?
+- Ein Wrack in die Presse geben: flach, Scheiben weg, Räder raus, Paket da?
+- Zum Vergleich einmal mit `?wrackform=bestand` laden. Bleibt es bei C?
+
 **E-116 — Drei Karosserieformen zur Wahl, umschaltbar im laufenden Spiel**
 - Mit `?wrackform=a` laden (`…/v1/?wrackform=a`), dann `b`, dann `c`: Sieht das Auto aus jeder Blickrichtung wie ein Auto — von vorn, von der Seite, von schräg oben aus der Kabine?
 - Ein Wrack von der Seite zudrücken: Beult die Flanke dort, wo die Spinne zufasst, und bleibt die Beule nach dem Loslassen stehen?
 - Ein Wrack in die Presse geben: Wird es flach, springen die Scheiben, fliegen zwei Räder heraus — und liegt danach ein Paket da?
-- Aus welcher der drei Fassungen soll es weitergehen? Danach fallen die beiden anderen Tabellen heraus.
 
 **E-115 — Das Pendel wird frei, und geschleudert wird mit dem richtigen Punkt**
 - Einmal zügig schwenken und wieder anhalten. Der Greifer schwingt jetzt bis 24° aus und braucht zweieinhalb Sekunden bis zur Ruhe. Ist das das Gefühl, das du gemeint hast — oder schwingt es zu lange nach?

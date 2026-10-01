@@ -252,19 +252,35 @@ function anbauStoff(): THREE.MeshStandardMaterial {
 /* ------------------------------------------------------------------------- */
 
 /**
- * Die Fassung, in der neue Wracks gebaut werden.
+ * Die Karosserieform, in der Wracks gebaut werden, wenn nichts anderes verlangt
+ * ist (E-117).
  *
- * `"bestand"` ist der Stand vor E-116 und bleibt der Vorgabewert, bis Patrick
- * gewählt hat: Solange nichts entschieden ist, darf sich das Spiel nicht von
- * selbst ändern. Umgeschaltet wird zur Laufzeit
- * (`__game.composites.zeigeForm("a")`) oder beim Laden über die Adresse
- * (`?wrackform=a`) — letzteres, damit die Fassungen auch auf dem iPad zu sehen
- * sind, wo es keine Entwicklerkonsole gibt.
+ * GEWAEHLT VON PATRICK, 01.10.2026, am Bild: drei Fassungen aus dem laufenden
+ * Spiel nebeneinander, dieselbe Stelle, derselbe Lack, dieselbe Kamera — er hat
+ * "C, weich mit Sicken" genommen. Bis dahin war `"bestand"` die Vorgabe, damit
+ * sich das Spiel nicht von selbst aendert, solange nichts entschieden ist.
+ *
+ * EINE Stelle fuer diese Wahl: Der Startwert unten und der Vorgabewert im
+ * Bauplan (`CarComposite`) lesen beide diese Konstante. Vorher standen dort zwei
+ * `"bestand"` — wer nur eines umgestellt haette, haette Spiel und Tests
+ * verschiedene Autos bauen lassen.
+ */
+export const VORGABE_FORM: WrackformId = "c";
+
+/**
+ * Die Fassung, in der neue Wracks gerade gebaut werden.
+ *
+ * Umgeschaltet wird zur Laufzeit (`__game.composites.zeigeForm("a")`) oder beim
+ * Laden ueber die Adresse (`?wrackform=a`) — letzteres, damit die Fassungen auch
+ * auf dem iPad zu sehen sind, wo es keine Entwicklerkonsole gibt. Auch
+ * `?wrackform=bestand` geht, damit der alte Stand zum Vergleich erreichbar bleibt.
  */
 let AKTIVE_FORM: WrackformId = ((): WrackformId => {
-  if (typeof location === "undefined") return "bestand";
+  if (typeof location === "undefined") return VORGABE_FORM;
   const wunsch = new URLSearchParams(location.search).get("wrackform");
-  return wunsch === "a" || wunsch === "b" || wunsch === "c" ? wunsch : "bestand";
+  return wunsch === "a" || wunsch === "b" || wunsch === "c" || wunsch === "bestand"
+    ? wunsch
+    : VORGABE_FORM;
 })();
 
 export function aktiveWrackform(): WrackformId {
@@ -359,7 +375,7 @@ export class CarComposite {
     private bus: EventBus,
     pos: THREE.Vector3,
     /** In welcher Fassung dieses Wrack gebaut wird (E-116). */
-    readonly formId: WrackformId = "bestand"
+    readonly formId: WrackformId = VORGABE_FORM
   ) {
     this.form = wrackform(formId);
     this.def = def = wrackDaten(def, formId);

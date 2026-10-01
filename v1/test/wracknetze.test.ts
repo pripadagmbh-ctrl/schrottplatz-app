@@ -25,7 +25,7 @@ import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { initPhysics } from "../src/physics/physicsWorld";
 import { ItemManager } from "../src/world/scrapItems";
-import { CompositeManager, baueAnbauteile, formeKarosserie } from "../src/dismantle/composites";
+import { CarComposite, CompositeManager, baueAnbauteile, formeKarosserie } from "../src/dismantle/composites";
 import { CAR_DEF } from "../src/dismantle/carDef";
 import { EventBus } from "../src/core/events";
 
@@ -104,8 +104,15 @@ describe("Ein Wrack im Zeichenruf-Budget", () => {
   }
 
   it(`besteht aus ${NETZE_JE_WRACK} Netzen, nicht mehr`, () => {
+    /*
+     * Eine OBERGRENZE, und zwar fuer das Auto, das das Spiel wirklich baut.
+     * Bis E-117 war das der Bestand mit genau 13 Netzen; seit Patrick die
+     * Karosserieform C gewaehlt hat (01.10.2026), sind es 12 — die Radlaeufe
+     * sind in die Haut geschnitten statt aufgesteckt. Weniger ist erlaubt,
+     * mehr nicht: Zeichenrufe sind der Engpass (E-025).
+     */
     const { car } = wrack();
-    expect(netze(car.group).length).toBe(NETZE_JE_WRACK);
+    expect(netze(car.group).length).toBeLessThanOrEqual(NETZE_JE_WRACK);
   });
 
   it("hat die dreizehn Anbauteile in EINEM Netz", () => {
@@ -132,7 +139,19 @@ describe("Ein Wrack im Zeichenruf-Budget", () => {
   });
 
   it("hat Chassis und Kabine unverändert, obwohl die Maße jetzt in CarDef stehen", () => {
-    const { car } = wrack();
+    /*
+     * Ein Waechter fuer den BESTAND, ausdruecklich als solcher gebaut: Er
+     * vergleicht Eckpunkt fuer Eckpunkt mit dem Stand vor E-111. Seit E-117
+     * ist der Bestand nicht mehr die Vorgabe, aber weiter erreichbar
+     * (`?wrackform=bestand`) — und dort muss er unveraendert sein. Deshalb wird
+     * er hier ausdruecklich als Bestand gebaut, statt die Vorgabe zu nehmen.
+     */
+    const scene = new THREE.Scene();
+    const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
+    const car = new CarComposite(
+      CAR_DEF, scene, world, new ItemManager(scene, world), new EventBus(),
+      new THREE.Vector3(0, 1, 0), "bestand"
+    );
     const alleNetze = netze(car.group);
     // Chassis: 5x3x10 = 150 Ecken -> BoxGeometry(…,4,2,9) hat 190; Kabine 126.
     const chassisNeu = alleNetze.find((m) => m.geometry.getAttribute("position").count === 190)!;
@@ -191,10 +210,17 @@ describe("Was NICHT verschmolzen werden darf", () => {
       (m) => m.parent !== car.group && m.parent!.scale.y === CAR_DEF.crushScales[2]
     );
     expect(gequetscht.length, "nichts hängt mehr im crushGroup").toBeGreaterThan(0);
-    expect(
-      gequetscht.some((m) => m.geometry.getAttribute("position").count === 580),
-      "die Anbauteile werden nicht mitgequetscht"
-    ).toBe(true);
+    /*
+     * ALLES, was zur Karosserie gehoert, muss mitgequetscht werden — nicht nur
+     * ein bestimmtes Netz. Bis E-117 suchte diese Zeile die Anbauteile an genau
+     * 580 Eckpunkten; das ist die Zahl des Bestands. In der Form C sind die
+     * Radlaeufe in die Haut geschnitten, die Zahl stimmt nicht mehr, die
+     * Absicht schon. Zerlegbare Teile (Motor, Getriebe, Raeder) haengen direkt
+     * an der Wrackgruppe und werden nicht gequetscht; alles andere schon.
+     */
+    const karosserie = netze(car.group).filter((m) => m.parent !== car.group);
+    const entkommen = karosserie.filter((m) => m.parent!.scale.y !== CAR_DEF.crushScales[2]);
+    expect(entkommen.length, "ein Teil der Karosserie entkommt dem Quetschen").toBe(0);
   });
 });
 

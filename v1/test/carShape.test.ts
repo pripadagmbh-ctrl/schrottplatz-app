@@ -28,6 +28,7 @@ import {
   formeKarosserie,
   wrackDaten,
   wrackform,
+  VORGABE_FORM,
 } from "../src/dismantle/composites";
 import { CAR_DEF } from "../src/dismantle/carDef";
 import { WRACKFORMEN, baueWrackform, type WrackformDef, type WrackformId } from "../src/dismantle/wrackformen";
@@ -412,12 +413,13 @@ describe("Die Fassungen im laufenden Spiel", () => {
     expect(comps.spawnCar(new THREE.Vector3(6, 1, 0)).formId).toBe("c");
   });
 
-  it("der Bestand bleibt die Vorgabe, solange nichts gewählt ist", () => {
+  it("C ist die Vorgabe, seit Patrick gewählt hat (E-117)", () => {
     /*
      * Geprueft wird die VORGABE des Bauplans, nicht die gerade eingestellte
      * Fassung: `zeigeForm` schaltet modulweit um, und in dieser Datei ist es
      * vorher schon ein paar Mal aufgerufen worden. Ein Wrack, das ohne Angabe
-     * gebaut wird, muss der Bestand sein — solange Patrick nicht gewaehlt hat.
+     * gebaut wird, ist seit dem 01.10.2026 eine C — Patrick hat sie am Bild
+     * gewaehlt. Bis dahin war es der Bestand.
      */
     const scene = new THREE.Scene();
     const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
@@ -425,7 +427,8 @@ describe("Die Fassungen im laufenden Spiel", () => {
     const car = new CarComposite(
       CAR_DEF, scene, world, items, new EventBus(), new THREE.Vector3(0, 1, 0)
     );
-    expect(car.formId).toBe("bestand");
-    expect(wrackform(car.formId), "der Bestand hat keine Formbeschreibung").toBeNull();
+    expect(car.formId).toBe("c");
+    expect(car.formId, "Bauplan und Startwert lesen dieselbe Konstante").toBe(VORGABE_FORM);
+    expect(wrackform(car.formId), "C hat eine Formbeschreibung").not.toBeNull();
   });
 });
