@@ -5,6 +5,7 @@ import type { ItemManager } from "../world/scrapItems";
 import type { EventBus } from "../core/events";
 import { AUTOLACK, lackton, verwittert } from "../world/objektbau";
 import { farbstoff, verschmelzeBunt, type Bauteil } from "../excavator/bauteile";
+import { WRACKFORMEN, baueWrackform, type WrackformDef, type WrackformId } from "./wrackformen";
 
 /**
  * Verbundobjekt-System (Briefing Kap. 8, M2-Umfang):
@@ -183,7 +184,18 @@ export function formeKarosserie(geo: THREE.BufferGeometry): void {
  * und hoeher. Vier Koordinatenpaare weniger, die beim naechsten Modell
  * nachgezogen werden muessten.
  */
-export function baueAnbauteile(gruppe: THREE.Group, def: CarDef, lack: number): THREE.Mesh {
+export function baueAnbauteile(
+  gruppe: THREE.Group,
+  def: CarDef,
+  lack: number,
+  /**
+   * Halbtori über den Rädern bauen. Beim Bestand ja — dort ist die Karosserie
+   * ein Kasten ohne Radlauf, und der Bogen ist das einzige, was einen andeutet.
+   * Bei den Fassungen aus E-116 nein: Die Karosserie hat dort einen echten
+   * Ausschnitt, und der Bogen läge mitten im Blech.
+   */
+  radlaufBogen = true
+): THREE.Mesh {
   const k = def.karosserie;
   const halbeBreite = k.chassis[0] / 2;
   const halbeLaenge = k.chassis[2] / 2;
@@ -197,7 +209,7 @@ export function baueAnbauteile(gruppe: THREE.Group, def: CarDef, lack: number): 
       teile.push({ geo, farbe: a.farbe });
     }
   }
-  for (const rad of def.parts) {
+  for (const rad of radlaufBogen ? def.parts : []) {
     if (rad.kind !== "wheel") continue;
     const [rx, ry, rz] = rad.anchor;
     const geo = new THREE.TorusGeometry(rad.size[0] + k.radlaufLuft, k.radlaufDicke, 6, 12, Math.PI);
@@ -235,6 +247,83 @@ function anbauStoff(): THREE.MeshStandardMaterial {
   return ANBAU_STOFF;
 }
 
+/* ------------------------------------------------------------------------- */
+/* WELCHE KAROSSERIEFORM GILT? (E-116)                                       */
+/* ------------------------------------------------------------------------- */
+
+/**
+ * Die Fassung, in der neue Wracks gebaut werden.
+ *
+ * `"bestand"` ist der Stand vor E-116 und bleibt der Vorgabewert, bis Patrick
+ * gewählt hat: Solange nichts entschieden ist, darf sich das Spiel nicht von
+ * selbst ändern. Umgeschaltet wird zur Laufzeit
+ * (`__game.composites.zeigeForm("a")`) oder beim Laden über die Adresse
+ * (`?wrackform=a`) — letzteres, damit die Fassungen auch auf dem iPad zu sehen
+ * sind, wo es keine Entwicklerkonsole gibt.
+ */
+let AKTIVE_FORM: WrackformId = ((): WrackformId => {
+  if (typeof location === "undefined") return "bestand";
+  const wunsch = new URLSearchParams(location.search).get("wrackform");
+  return wunsch === "a" || wunsch === "b" || wunsch === "c" ? wunsch : "bestand";
+})();
+
+export function aktiveWrackform(): WrackformId {
+  return AKTIVE_FORM;
+}
+
+/** Die Formbeschreibung zu einer Fassung; `null` heißt: Bestand, zwei Quader. */
+export function wrackform(id: WrackformId): WrackformDef | null {
+  return id === "bestand" ? null : WRACKFORMEN[id];
+}
+
+/**
+ * Die Fahrzeugdaten für eine Fassung.
+ *
+ * Nur die Räder können sich unterscheiden (Fassung B hat dicke Reifen). Radius
+ * und Ankerhöhe werden dabei GEMEINSAM gesetzt: Die Räder hängen als Netze am
+ * Rumpf, dessen Kollider mit der Unterkante auf y = 0 sitzt — ein dickeres Rad,
+ * dessen Anker nicht mitwandert, stünde im Boden. Alles Weitere (Masse,
+ * Zugzeit, Greifradius, Material) bleibt, damit Zerlegen und Wirtschaft
+ * unberührt sind.
+ */
+export function wrackDaten(basis: CarDef, id: WrackformId): CarDef {
+  const form = wrackform(id);
+  if (!form) return basis;
+  const parts = !form.rad
+    ? basis.parts
+    : basis.parts.map((p) =>
+        p.kind === "wheel"
+          ? {
+              ...p,
+              size: [form.rad![0], form.rad![1]],
+              anchor: [p.anchor[0]!, form.rad![0], p.anchor[2]!] as [number, number, number],
+            }
+          : p
+      );
+  const karosserie = form.anbau ? { ...basis.karosserie, anbau: form.anbau } : basis.karosserie;
+  return { ...basis, parts, karosserie };
+}
+
+/**
+ * Das Karosseriematerial je Fassung — EINES für alle Wracks.
+ *
+ * Möglich, weil der Lack an den Eckpunkten sitzt (E-105/E-111): Das Material
+ * trägt keine wrackeigene Zahl mehr, also braucht kein Wrack ein eigenes. Zwei
+ * Wracks derselben Fassung kann der Renderer damit hintereinander zeichnen.
+ */
+const LACK_STOFF = new Map<WrackformId, THREE.MeshStandardMaterial>();
+function lackStoff(form: WrackformDef, id: WrackformId): THREE.MeshStandardMaterial {
+  let stoff = LACK_STOFF.get(id);
+  if (!stoff) {
+    // Dieselben Werte wie beim Bestand: Ein Lack, der zehn Jahre auf dem Hof
+    // steht, glänzt nicht mehr (17.09.2026).
+    stoff = farbstoff(0.74, 0.12);
+    stoff.flatShading = !form.glatt;
+    LACK_STOFF.set(id, stoff);
+  }
+  return stoff;
+}
+
 
 export class CarComposite {
   readonly body: RAPIER.RigidBody;
@@ -259,6 +348,8 @@ export class CarComposite {
   }
   /** Blech-Meshes, die sich am Aufprallpunkt verbeulen (Vertex-Verformung) */
   private dentables: { mesh: THREE.Mesh; base: Float32Array }[] = [];
+  /** Die Karosserieform dieses Wracks; `null` = Bestand, zwei Quader (E-116). */
+  private form: WrackformDef | null;
 
   constructor(
     private def: CarDef,
@@ -266,8 +357,12 @@ export class CarComposite {
     private world: RAPIER.World,
     private items: ItemManager,
     private bus: EventBus,
-    pos: THREE.Vector3
+    pos: THREE.Vector3,
+    /** In welcher Fassung dieses Wrack gebaut wird (E-116). */
+    readonly formId: WrackformId = "bestand"
   ) {
+    this.form = wrackform(formId);
+    this.def = def = wrackDaten(def, formId);
     this.currentMassKg = def.totalMassKg;
     this.buildMeshes(wrackLack(pos.x, pos.z));
     this.group.position.copy(pos);
@@ -309,23 +404,6 @@ export class CarComposite {
   }
 
   private buildMeshes(lack: number): void {
-    /*
-     * DER LACK KOMMT VOM STANDORT, NICHT AUS EINER KONSTANTEN (17.09.2026).
-     *
-     * Hier stand 0x8c2f24 — jedes Wrack auf dem Platz war derselbe rote
-     * Kasten. `wrackLack` zieht einen der sechzehn Autolacke aus
-     * `objektbau.AUTOLACK` und lässt ihn verwittern.
-     *
-     * Rauheit 0,74 statt 0,50 und Metallglanz 0,12 statt 0,30: Ein Lack, der
-     * zehn Jahre auf dem Hof steht, glänzt nicht mehr. Der alte Wert war für
-     * einen Neuwagen gewählt und ließ jedes Wrack wie frisch poliert aussehen.
-     */
-    const paint = new THREE.MeshStandardMaterial({
-      color: lack,
-      roughness: 0.74, // SW, siehe oben
-      metalness: 0.12, // SW, siehe oben
-      flatShading: true,
-    });
     // Klar durchsichtig: Man soll durch die Scheiben hindurchsehen, nicht
     // gegen eine milchige Fläche schauen. Der leichte Blaustich und die
     // Spiegelung machen es trotzdem als Glas erkennbar.
@@ -340,12 +418,55 @@ export class CarComposite {
       side: THREE.DoubleSide,
     });
 
+    this.group.add(this.crushGroup);
+    if (this.form) this.baueFassung(this.form, lack, glassMat);
+    else this.baueBestand(lack, glassMat);
+
+    baueAnbauteile(this.crushGroup, this.def, lack, this.form ? !!this.form.radlaufBogen : true);
+
+    // Parts (nicht quetschbar): Motor + Räder
+    for (const p of this.def.parts) {
+      let mesh: THREE.Object3D;
+      if (p.kind === "wheel") {
+        const geo = new THREE.CylinderGeometry(p.size[0], p.size[0], p.size[1], 16);
+        geo.rotateZ(Math.PI / 2);
+        mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: p.color, roughness: 0.9 }));
+      } else {
+        mesh = new THREE.Mesh(
+          new THREE.BoxGeometry(p.size[0], p.size[1], p.size[2]),
+          new THREE.MeshStandardMaterial({ color: p.color, roughness: 0.7, metalness: 0.4 })
+        );
+      }
+      mesh.position.set(...p.anchor);
+      mesh.castShadow = true;
+      this.group.add(mesh);
+      this.parts.push({ def: p, mesh, attached: true });
+    }
+  }
+
+  /**
+   * DER BESTAND: zwei Quader plus vier Scheibenplatten (Stand vor E-116).
+   *
+   * Unverändert, bis Patrick eine Fassung gewählt hat — solange nichts
+   * entschieden ist, darf sich das Spiel nicht von selbst ändern.
+   */
+  private baueBestand(lack: number, glassMat: THREE.Material): void {
+    /*
+     * DER LACK KOMMT VOM STANDORT, NICHT AUS EINER KONSTANTEN (17.09.2026).
+     *
+     * Rauheit 0,74 statt 0,50 und Metallglanz 0,12 statt 0,30: Ein Lack, der
+     * zehn Jahre auf dem Hof steht, glänzt nicht mehr.
+     */
+    const paint = new THREE.MeshStandardMaterial({
+      color: lack,
+      roughness: 0.74, // SW, siehe oben
+      metalness: 0.12, // SW, siehe oben
+      flatShading: true,
+    });
     // Quetschbare Teile (Chassis, Kabine, Scheiben) — Ursprung an der Unterkante.
-    // Unterteilte Geometrie, damit Aufprall-Beulen (dent) greifen können.
     // Die MASSE stehen in `CarDef.karosserie` (E-111), die UNTERTEILUNG bleibt
     // hier: 4x2x9 und 4x2x5 sind keine Karosseriemaße, sondern die Auflösung,
     // auf der `dent()` beult — die haengt am Rechenbudget, nicht am Modell.
-    this.group.add(this.crushGroup);
     const k = this.def.karosserie;
     const chassis = new THREE.Mesh(new THREE.BoxGeometry(...k.chassis, 4, 2, 9), paint);
     formeKarosserie(chassis.geometry);
@@ -367,26 +488,35 @@ export class CarComposite {
       this.crushGroup.add(pane);
       this.windows.push({ id: w.id, mesh: pane, anchor: new THREE.Vector3(...w.anchor), intact: true });
     }
+  }
 
-    baueAnbauteile(this.crushGroup, this.def, lack);
-
-    // Parts (nicht quetschbar): Motor + Räder
-    for (const p of this.def.parts) {
-      let mesh: THREE.Object3D;
-      if (p.kind === "wheel") {
-        const geo = new THREE.CylinderGeometry(p.size[0], p.size[0], p.size[1], 16);
-        geo.rotateZ(Math.PI / 2);
-        mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: p.color, roughness: 0.9 }));
-      } else {
-        mesh = new THREE.Mesh(
-          new THREE.BoxGeometry(p.size[0], p.size[1], p.size[2]),
-          new THREE.MeshStandardMaterial({ color: p.color, roughness: 0.7, metalness: 0.4 })
-        );
-      }
-      mesh.position.set(...p.anchor);
-      mesh.castShadow = true;
-      this.group.add(mesh);
-      this.parts.push({ def: p, mesh, attached: true });
+  /**
+   * EINE DER FASSUNGEN AUS E-116: ein Längsschnitt als EIN Netz, die Scheiben
+   * als Felder in derselben Haut.
+   *
+   * Der ganze Wagen ist ein Netz — also EIN Beulkörper statt zwei, und ein
+   * Druck auf die A-Säule verformt Haube und Dach zusammen, statt an der Naht
+   * zwischen Rumpf und Kabine aufzureißen.
+   */
+  private baueFassung(form: WrackformDef, lack: number, glassMat: THREE.Material): void {
+    const bau = baueWrackform(form, lack);
+    const karosse = new THREE.Mesh(bau.koerper, lackStoff(form, this.formId));
+    karosse.castShadow = true;
+    this.crushGroup.add(karosse);
+    const pos = bau.koerper.getAttribute("position") as THREE.BufferAttribute;
+    this.dentables.push({ mesh: karosse, base: new Float32Array(pos.array as Float32Array) });
+    for (const s of bau.scheiben) {
+      const pane = new THREE.Mesh(s.geo, glassMat);
+      this.crushGroup.add(pane);
+      // Der Ankerpunkt ist nur für den Splitter-Partikel da: die Mitte der
+      // Scheibe, hier aus ihrer eigenen Geometrie statt aus einer Zahlenliste.
+      s.geo.computeBoundingSphere();
+      this.windows.push({
+        id: s.id,
+        mesh: pane,
+        anchor: s.geo.boundingSphere!.center.clone(),
+        intact: true,
+      });
     }
   }
 
@@ -475,7 +605,17 @@ export class CarComposite {
         attr.setXYZ(i, nx, ny, nz);
         touched = true;
       }
-      if (touched) attr.needsUpdate = true; // flatShading → keine Normalen-Neuberechnung nötig
+      if (!touched) continue;
+      attr.needsUpdate = true;
+      /*
+       * Flach schattiert holt sich der Renderer die Normale aus der Fläche
+       * selbst — da ist nach einer Beule nichts nachzurechnen. Eine GLATT
+       * schattierte Haut (Fassung C, E-116) liest die Normalen dagegen aus dem
+       * Puffer: ohne diese Zeile bliebe eine Beule dort unsichtbar, weil die
+       * Beleuchtung weiter die alte Wölbung zeigt. Die Rechnung läuft nur im
+       * Treffer-Bild und nur über die Karosserie (bis 300 Eckpunkte).
+       */
+      if (this.form?.glatt) d.mesh.geometry.computeVertexNormals();
     }
   }
 
@@ -755,9 +895,44 @@ export class CompositeManager {
   }
 
   spawnCar(pos: THREE.Vector3): CarComposite {
-    const car = new CarComposite(CAR_DEF, this.scene, this.world, this.items, this.bus, pos);
+    const car = new CarComposite(CAR_DEF, this.scene, this.world, this.items, this.bus, pos, AKTIVE_FORM);
     this.cars.push(car);
     return car;
+  }
+
+  /**
+   * DIE KAROSSERIEFORM ZUR LAUFZEIT UMSTELLEN (E-116) — zum Vorzeigen.
+   *
+   * Aufruf aus der Konsole: `__game.composites.zeigeForm("a")`. Alle Wracks,
+   * die auf dem Platz stehen, werden an ihrer Stelle und in ihrer Lage neu
+   * gebaut; neue Anlieferungen kommen ab jetzt in dieser Fassung.
+   *
+   * ZWEI GRENZEN, absichtlich:
+   *  - Ein Wrack, das gerade auf einer Pritsche liegt (kinematisch), bleibt
+   *    unangetastet. Der Lkw hält einen Verweis darauf; ein Austausch mitten
+   *    in der Fahrt würde seine Ladung ins Nichts zeigen lassen.
+   *  - Ein neu gebautes Wrack ist wieder heil. Schon abgerissene Teile liegen
+   *    weiter daneben — das ist eine Vorführhilfe, kein Spielstand.
+   */
+  zeigeForm(id: WrackformId): string {
+    AKTIVE_FORM = id;
+    const alt = this.cars.splice(0, this.cars.length);
+    let neu = 0;
+    for (const car of alt) {
+      if (!car.body.isValid() || car.body.isKinematic()) {
+        this.cars.push(car);
+        continue;
+      }
+      const t = car.body.translation();
+      const r = car.body.rotation();
+      const eintrag = this.items.itemByBody(car.body);
+      if (eintrag) this.items.remove(eintrag, false);
+      car.despawn();
+      this.spawnCar(new THREE.Vector3(t.x, t.y, t.z)).body.setRotation(r, true);
+      neu++;
+    }
+    const form = wrackform(id);
+    return `${form ? form.name : "Bestand (zwei Quader)"} — ${neu} Wrack(s) neu gebaut`;
   }
 
   update(): void {

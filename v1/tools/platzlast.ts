@@ -114,6 +114,15 @@ async function main(): Promise<void> {
   );
   /* Im Vergleichslauf auch die Wracks von gestern, sonst vergleicht man Aepfel mit Birnen. */
   const autos = alt ? [{ x: 3.6, z: -18.0 }, { x: 8.8, z: -19.0 }] : START_AUTOS;
+  /*
+   * Seit E-116 gibt es vier Karosserieformen (`WRACKFORM=a|b|c`). Die Physik
+   * darf sich davon nicht ruehren: Der Kollider ist in allen Fassungen derselbe
+   * Quader, und ein Wrack bleibt ein Koerper. Genau das wird hier nachgemessen,
+   * statt es zu behaupten.
+   */
+  const form = process.env.WRACKFORM;
+  if (form === "a" || form === "b" || form === "c") composites.zeigeForm(form);
+  console.log(`Karosserieform: ${form ?? "bestand"}`);
   if (process.env.OHNEAUTOS !== "1")
     for (const a of autos) composites.spawnCar(new THREE.Vector3(a.x, 0.5, a.z));
   randomCargo(START_STREU.teile).forEach((sp, i) => {

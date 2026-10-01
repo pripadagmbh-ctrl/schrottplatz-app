@@ -20,7 +20,7 @@ import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { initPhysics } from "../src/physics/physicsWorld";
 import { ItemManager } from "../src/world/scrapItems";
-import { CompositeManager } from "../src/dismantle/composites";
+import { CompositeManager, wrackform } from "../src/dismantle/composites";
 import { EventBus } from "../src/core/events";
 
 interface Zaehlung {
@@ -58,34 +58,36 @@ function zaehle(wurzel: THREE.Object3D): Zaehlung {
 
 async function main(): Promise<void> {
   await initPhysics();
-  const scene = new THREE.Scene();
-  const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
-  const items = new ItemManager(scene, world);
-  const comps = new CompositeManager(scene, world, items, new EventBus());
+  /*
+   * Seit E-116 gibt es vier Fassungen zur Wahl (Bestand plus A, B, C). Gemessen
+   * werden alle, in derselben Rechnung — sonst vergleicht man Zahlen aus zwei
+   * verschiedenen Nachmittagen.
+   */
+  for (const form of ["bestand", "a", "b", "c"] as const) {
+    const scene = new THREE.Scene();
+    const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
+    const items = new ItemManager(scene, world);
+    const comps = new CompositeManager(scene, world, items, new EventBus());
+    comps.zeigeForm(form);
 
-  const eins = comps.spawnCar(new THREE.Vector3(0, 1, 0));
-  const a = zaehle(eins.group);
-  console.log("EIN WRACK, frisch angeliefert");
-  console.log(`  Netze          ${a.netze}`);
-  console.log(`  Eckpunkte      ${a.ecken}`);
-  console.log(`  Dreiecke       ${Math.round(a.dreiecke)}`);
-  console.log(`  Geometrien     ${a.geometrien}`);
-  console.log(`  Materialien    ${a.materialien}`);
-  console.log(`  mit Schatten:  ${a.netze * 2} Zeichenrufe`);
-  console.log("  Aufteilung nach Eckpunktzahl:");
-  for (const [k, n] of [...a.namen.entries()].sort()) console.log(`    ${n} x ${k}`);
+    const eins = comps.spawnCar(new THREE.Vector3(0, 1, 0));
+    const a = zaehle(eins.group);
+    const def = wrackform(form);
+    console.log(`\n=== FASSUNG ${form.toUpperCase()} — ${def ? def.name : "Bestand, zwei Quader"}`);
+    console.log(`  Netze          ${a.netze}`);
+    console.log(`  Eckpunkte      ${a.ecken}`);
+    console.log(`  Dreiecke       ${Math.round(a.dreiecke)}`);
+    console.log(`  Geometrien     ${a.geometrien}`);
+    console.log(`  Materialien    ${a.materialien}`);
+    console.log(`  mit Schatten:  ${a.netze * 2} Zeichenrufe`);
+    console.log("  Aufteilung nach Eckpunktzahl:");
+    for (const [k, n] of [...a.namen.entries()].sort()) console.log(`    ${n} x ${k}`);
 
-  comps.spawnCar(new THREE.Vector3(6, 1, 0));
-  const beide = zaehle(scene);
-  console.log("\nZWEI WRACKS AUF DEM PLATZ");
-  console.log(`  Netze          ${beide.netze}`);
-  console.log(`  Eckpunkte      ${beide.ecken}`);
-  console.log(`  Materialien    ${beide.materialien}  (geteilt wird nichts: jedes Wrack baut eigene)`);
-  console.log(`  mit Schatten:  ${beide.netze * 2} Zeichenrufe`);
-  console.log(
-    `\nZum Vergleich: gemessene 1322 Zeichenrufe auf dem ganzen Platz —` +
-      ` zwei Wracks sind davon ${((beide.netze * 2 * 100) / 1322).toFixed(1)} %.`
-  );
+    comps.spawnCar(new THREE.Vector3(6, 1, 0));
+    const beide = zaehle(scene);
+    console.log(`  ZWEI WRACKS:   ${beide.netze} Netze · ${beide.materialien} Materialien · ` +
+      `${beide.netze * 2} Zeichenrufe = ${((beide.netze * 2 * 100) / 1322).toFixed(1)} % der gemessenen 1322`);
+  }
 }
 
 void main();

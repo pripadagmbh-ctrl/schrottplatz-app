@@ -1,0 +1,503 @@
+/**
+ * DREI KAROSSERIEFORMEN ZUR WAHL (E-116, 23.09.2026).
+ *
+ * ANLASS. Patrick, 23.09.2026: „grafisch sollten die autos viel besser werden.
+ * können wir das komplett neu denken?" — und auf die Rückfrage nach der
+ * Richtung: „Erst zeigen, dann entscheiden."
+ *
+ * WARUM DER BESTAND NICHT ZU RETTEN WAR. Ein Wrack war zwei Quader: Rumpf
+ * 1,70 x 0,55 x 4,00 (Gitter 4x2x9) und Kabine 1,50 x 0,55 x 2,00 (4x2x5).
+ * Zwei Unterteilungen in der Höhe heißt DREI Eckpunktreihen — unten, Mitte,
+ * oben. Eine Gürtellinie, eine geneigte Windschutzscheibe und ein sich
+ * verjüngendes Dach brauchen aber mindestens fünf. Sie waren also nicht
+ * ungemacht, sondern geometrisch unmöglich; `formeKarosserie` konnte daran nur
+ * noch Kosmetik machen (Schnauze 26 % schmaler, Haube 16 cm abfallend) und das
+ * Ergebnis war ein Brotlaib auf Rädern.
+ *
+ * DIE FORM STECKT JETZT GANZ IN DEN DATEN, und zwar als LÄNGSSCHNITT:
+ *
+ *   Eine Fassung ist eine Liste von QUERSCHNITTEN entlang der Fahrzeugachse.
+ *   Jeder Querschnitt gibt für jede EBENE (Schweller, Flanke, Gürtellinie,
+ *   Dachkante, Dachmitte …) eine halbe Breite und eine Höhe an. Die Haut
+ *   entsteht, indem benachbarte Querschnitte Ring an Ring verbunden werden.
+ *
+ * Damit ist alles, was am Bestand unmöglich war, eine Zahl in einer Tabelle:
+ * Die Haube fällt ab, weil ihre Gürtelebene vorn tiefer liegt. Die
+ * Windschutzscheibe ist geneigt, weil zwischen dem letzten Haubenschnitt und
+ * dem ersten Dachschnitt 53 cm Länge und 42 cm Höhe liegen. Das Glashaus ist
+ * eingezogen, weil die Dachkante schmaler ist als die Gürtellinie. Die
+ * Radläufe sind ausgeschnitten, weil die unteren Ebenen über dem Rad
+ * hochgezogen sind.
+ *
+ * WAS DAS FÜR DIE BEULMECHANIK BEDEUTET. Sie verschiebt Eckpunkte im Umkreis
+ * des Druckpunkts (`CarComposite.dent`) und rechnet auf keinem besonderen
+ * Gitter — sie wird mit jedem Eckpunkt feiner. Der Bestand hatte 316 Eckpunkte
+ * in Rumpf und Kabine, diese Fassungen haben 152 bis 300, aber über die ganze
+ * Karosserie verteilt statt in zwei Klötzen (Messung in `tools/wrackbild.ts`).
+ *
+ * WAS DAS FÜR DIE ZEICHENRUFE BEDEUTET. Aus zwei Netzen (Rumpf + Kabine) wird
+ * EINES. Ein Wrack kostet damit 12 statt 13 Netze, also 24 statt 26
+ * Zeichenrufe mit Schattenwurf — die Obergrenze aus E-111 bleibt unterboten.
+ * Dreiecke wachsen dafür, und das ist die richtige Richtung: Zeichenrufe sind
+ * der Engpass, nicht Dreiecke (E-025).
+ */
+
+import * as THREE from "three";
+import type { AnbauDef } from "./carDef";
+
+export type WrackformId = "bestand" | "a" | "b" | "c";
+
+/**
+ * DAS GESICHT FÜR ALLE DREI FASSUNGEN — Stoßstangen, Grill, Leuchten, Spiegel.
+ *
+ * WARUM NICHT DIE LISTE AUS `CarDef`. Nachgemessen am 23.09.2026: Dort sitzen
+ * Grill und Scheinwerfer bei z = 1,90 bis 1,95 m und damit INNERHALB der
+ * Karosserie, die bis z = 2,00 m reicht. Beim Bestand fällt das kaum auf, weil
+ * dessen Schnauze durch `formeKarosserie` 26 % schmaler wird und die Leuchten
+ * seitlich ein, zwei Zentimeter hervorschauen. Die Fassungen aus E-116 haben
+ * vorn einen geschlossenen Deckel — dort wären Grill und Leuchten vollständig
+ * verschluckt, und „ein Kasten mit Rädern liest sich erst als Auto, wenn vorne
+ * ein Gesicht dran ist" (E-111) gälte wieder nicht.
+ *
+ * Alle drei Fassungen teilen diese eine Liste: Ihre Deckel liegen alle bei
+ * z = ±2,00 m, ihr Gesicht ist also dasselbe. Wird eine Fassung gewählt, ist
+ * das der Ort, an dem ihr Gesicht feiner wird.
+ *
+ * Die Höhen sind absolute Meter (siehe `AnbauDef`): Stoßstange 0,30 m,
+ * Leuchten 0,56 m. Beides liegt im Bereich, den die Zulassung vorschreibt
+ * (Stoßstange 0,25–0,50 m, Scheinwerfer 0,50–1,20 m über der Fahrbahn) — der
+ * Bestand hatte 0,22 und 0,44 m, also beide zu tief. // Quelle: ECE-R 48
+ */
+export const ANBAU_E116: AnbauDef[] = [
+  { name: "Stoßstange vorn", size: [1.2 / 1.7, 0.18, 0.18], anchor: [0, 0.3, 1.96 / 2.0], farbe: 0x24262a },
+  { name: "Stoßstange hinten", size: [1.2 / 1.7, 0.18, 0.18], anchor: [0, 0.3, -1.96 / 2.0], farbe: 0x24262a },
+  // Der Deckel liegt bei 2,00 m, die Teile sind 6 cm tief: Sie stehen 3 cm vor.
+  { name: "Kühlergrill", size: [0.56 / 1.7, 0.18, 0.06], anchor: [0, 0.55, 2.0 / 2.0], farbe: 0x9aa0a6 },
+  // Farben mit eingerechnetem Eigenleuchten, wie in `CAR_DEF` (E-111).
+  { name: "Scheinwerfer", size: [0.28 / 1.7, 0.14, 0.06], anchor: [0.44 / 0.85, 0.56, 2.0 / 2.0], paarweise: true, farbe: 0xfffff4 },
+  { name: "Rückleuchte", size: [0.26 / 1.7, 0.2, 0.06], anchor: [0.46 / 0.85, 0.58, -2.0 / 2.0], paarweise: true, farbe: 0xb82b1e },
+  // Unverändert: der Spiegel steht über die Karosserie hinaus, sein Anteil ist > 1.
+  { name: "Außenspiegel", size: [0.16 / 1.7, 0.1, 0.08], anchor: [0.92 / 0.85, 1.0, 0.62 / 2.0], paarweise: true, farbe: 0x24262a },
+];
+
+/**
+ * EIN QUERSCHNITT durch die Karosserie.
+ *
+ * `b` und `y` haben so viele Einträge, wie die Fassung Ebenen hat — sonst wäre
+ * das Gitter nicht rechteckig, und `baueWrackform` bricht ab.
+ */
+export interface SchnittDef {
+  /** Wofür dieser Schnitt steht — Schnauze, Radlauf, A-Säule. Nur zum Lesen. */
+  name: string;
+  /** Längslage als Anteil der HALBEN Fahrzeuglänge: +1 Schnauze … −1 Heck */
+  z: number;
+  /** Halbe Breite je Ebene, als Anteil der HALBEN Fahrzeugbreite */
+  b: number[];
+  /**
+   * Höhe je Ebene über dem Boden, in m — muss von unten nach oben steigen,
+   * sonst schlägt der Querschnitt um. Fehlt sie, gelten die `ebenen` der
+   * Fassung unverändert.
+   */
+  y?: number[];
+  /** Schattenfuge: die Eckpunkte dieses Schnitts werden abgedunkelt. */
+  fuge?: boolean;
+}
+
+/**
+ * EINE SCHEIBE — als Feld im Gitter, nicht als eigene Kiste mit eigenen Maßen.
+ *
+ * Bis E-116 war jede Scheibe ein Quader mit vier handgesetzten Zahlen
+ * (`CarDef.windows`). Bei einer geneigten Windschutzscheibe stimmt so etwas nie
+ * lange: Ändert man die Dachhöhe um zwei Zentimeter, steht das Glas im Nichts.
+ * Deshalb ist eine Scheibe hier nur noch die ANGABE, WELCHES STÜCK HAUT Glas
+ * ist — ein rechteckiger Bereich von Querschnitten und Ringpunkten. Die
+ * Geometrie dazu kommt aus derselben Rechnung wie die Karosserie und passt
+ * damit immer.
+ *
+ * Die Haut darunter bleibt stehen. Zerspringt die Scheibe, sieht man also
+ * lackiertes Blech — genau wie vorher, und nicht durch das Auto hindurch.
+ */
+export interface ScheibeDef {
+  id: string;
+  /** Erster und letzter Querschnitt (Index in `schnitte`, einschließlich) */
+  vonSchnitt: number;
+  bisSchnitt: number;
+  /** Erster und letzter Ringpunkt (einschließlich), siehe Ringordnung unten */
+  vonRing: number;
+  bisRing: number;
+}
+
+export interface WrackformDef {
+  /** Name für die Bildunterschrift */
+  name: string;
+  /** Ein Satz, was an dieser Fassung anders gedacht ist */
+  absicht: string;
+  /**
+   * Breite und Länge in m. Beide stehen absichtlich auf den Maßen von
+   * `karosserie.chassis` (1,70 x 4,00): An ihnen hängen die Anbauteile (deren
+   * Sitz als Anteil der halben Breite/Länge angegeben ist), der Kollider und
+   * die Radanker. Eine Fassung, die daran dreht, braucht eine
+   * Erreichbarkeits- und Kollider-Rechnung obendrauf — das wäre ein eigener
+   * Auftrag.
+   */
+  breite: number;
+  laenge: number;
+  /** Grundhöhe je Ebene über dem Boden, in m — unten zuerst. */
+  ebenen: number[];
+  schnitte: SchnittDef[];
+  scheiben: ScheibeDef[];
+  /** Lack glatt schattieren statt flächig (weiche Übergänge). */
+  glatt?: boolean;
+  /**
+   * Halbtori über den Rädern bauen. Nur für den Bestand sinnvoll: Wo die
+   * Karosserie einen echten Radlauf-Ausschnitt hat, läge der Bogen im Blech.
+   */
+  radlaufBogen?: boolean;
+  /** Räder dieser Fassung [Radius, Breite] in m; fehlt → wie in `CarDef`. */
+  rad?: [number, number];
+  /** Anbauteile dieser Fassung; fehlt → die Liste aus `CarDef.karosserie`. */
+  anbau?: AnbauDef[];
+  /** Wie stark eine Schattenfuge abdunkelt, 0…1. */
+  fugeDunkel?: number;
+}
+
+/**
+ * Wie eine Scheibe über dem Blech liegt, in m.
+ *
+ * 12 mm: genug, dass die beiden Flächen sich auf dem iPhone nicht ins
+ * Z-Gefecht begeben (dort reichten bei der Abrechnungstafel 8 mm nicht immer),
+ * wenig genug, dass die Scheibe nicht als Platte aufliegt. // SW
+ */
+const SCHEIBEN_LUFT = 0.012;
+
+export interface Wrackbau {
+  /** Die ganze Karosserie als EIN Netz, Farbe an den Eckpunkten. */
+  koerper: THREE.BufferGeometry;
+  scheiben: { id: string; geo: THREE.BufferGeometry }[];
+}
+
+/**
+ * DIE RINGORDNUNG — sie ist der Schlüssel zu den Scheiben-Indizes.
+ *
+ * Ein Querschnitt mit n Ebenen hat 2n Ringpunkte:
+ *
+ *   r = 0 … n−1    rechte Seite, von der untersten Ebene nach oben
+ *   r = n … 2n−1   linke Seite, von der obersten Ebene nach unten
+ *
+ * Bei fünf Ebenen ist also r = 2 die rechte Gürtellinie, r = 3 die rechte
+ * Dachkante, r = 4 und r = 5 die Dachmitte rechts und links, r = 6 die linke
+ * Dachkante, r = 7 die linke Gürtellinie. Der Ring ist geschlossen: die
+ * Strecke von r = 2n−1 zurück zu r = 0 ist der Unterboden.
+ */
+function ringEbene(r: number, n: number): { ebene: number; seite: number } {
+  return r < n ? { ebene: r, seite: 1 } : { ebene: 2 * n - 1 - r, seite: -1 };
+}
+
+/**
+ * Aus einer Fassung die Karosserie und ihre Scheiben bauen.
+ *
+ * Der Lack sitzt an den Eckpunkten, nicht am Material (Regel aus E-025/E-105):
+ * Damit kommen alle Wracks mit EINEM Karosseriematerial je Fassung aus, und
+ * jedes trägt trotzdem seinen eigenen Standortlack.
+ */
+export function baueWrackform(form: WrackformDef, lack: number): Wrackbau {
+  const n = form.ebenen.length;
+  const R = 2 * n;
+  const S = form.schnitte.length;
+  if (S < 2) throw new Error(`${form.name}: eine Fassung braucht mindestens zwei Querschnitte`);
+  const hb = form.breite / 2;
+  const hl = form.laenge / 2;
+
+  const pos: number[] = [];
+  const col: number[] = [];
+  const idx: number[] = [];
+  const grund = new THREE.Color(lack);
+  const dunkel = grund.clone().multiplyScalar(1 - (form.fugeDunkel ?? 0.45));
+
+  for (const s of form.schnitte) {
+    const y = s.y ?? form.ebenen;
+    if (s.b.length !== n || y.length !== n) {
+      throw new Error(`${form.name}, Schnitt "${s.name}": ${n} Ebenen erwartet`);
+    }
+    const c = s.fuge ? dunkel : grund;
+    for (let r = 0; r < R; r++) {
+      const { ebene, seite } = ringEbene(r, n);
+      pos.push(seite * s.b[ebene]! * hb, y[ebene]!, s.z * hl);
+      col.push(c.r, c.g, c.b);
+    }
+  }
+
+  /*
+   * Die Haut: je zwei benachbarte Querschnitte und je zwei benachbarte
+   * Ringpunkte spannen ein Viereck auf. Die Umlaufrichtung ist nicht beliebig
+   * — mit den Querschnitten von der Schnauze zum Heck geordnet zeigen die
+   * Normalen so nach AUSSEN (nachgerechnet in `test/carShape.test.ts`, sonst
+   * wäre das Auto von außen unsichtbar).
+   */
+  for (let s = 0; s + 1 < S; s++) {
+    for (let r = 0; r < R; r++) {
+      const r1 = (r + 1) % R;
+      const a = s * R + r;
+      const b = (s + 1) * R + r;
+      const c = (s + 1) * R + r1;
+      const d = s * R + r1;
+      idx.push(a, b, c, a, c, d);
+    }
+  }
+
+  /*
+   * Deckel vorn und hinten. Ohne sie wäre die Karosserie ein offenes Rohr —
+   * man sähe von vorn in das Auto hinein. Der Fächer läuft von der Ringmitte
+   * aus; hinten in der Gegenrichtung, damit die Normale nach hinten zeigt.
+   */
+  for (const vorn of [true, false]) {
+    const s = vorn ? 0 : S - 1;
+    let mx = 0;
+    let my = 0;
+    let mz = 0;
+    for (let r = 0; r < R; r++) {
+      mx += pos[(s * R + r) * 3]!;
+      my += pos[(s * R + r) * 3 + 1]!;
+      mz += pos[(s * R + r) * 3 + 2]!;
+    }
+    const mitte = pos.length / 3;
+    pos.push(mx / R, my / R, mz / R);
+    const c = form.schnitte[s]!.fuge ? dunkel : grund;
+    col.push(c.r, c.g, c.b);
+    for (let r = 0; r < R; r++) {
+      const r1 = (r + 1) % R;
+      if (vorn) idx.push(mitte, s * R + r, s * R + r1);
+      else idx.push(mitte, s * R + r1, s * R + r);
+    }
+  }
+
+  const koerper = new THREE.BufferGeometry();
+  koerper.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  koerper.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+  koerper.setIndex(idx);
+  koerper.computeVertexNormals();
+
+  /*
+   * Die Scheiben liegen auf derselben Haut, nur ein Stück nach außen gerückt —
+   * entlang der Normalen, die gerade berechnet wurde. Deshalb passt eine
+   * Scheibe automatisch auf jede Wölbung und jede Neigung, ohne eine einzige
+   * eigene Zahl.
+   */
+  const norm = koerper.getAttribute("normal") as THREE.BufferAttribute;
+  const scheiben = form.scheiben.map((sch) => {
+    const sp: number[] = [];
+    const si: number[] = [];
+    const schnitte = sch.bisSchnitt - sch.vonSchnitt + 1;
+    const ringe = sch.bisRing - sch.vonRing + 1;
+    if (schnitte < 2 || ringe < 2) {
+      throw new Error(`${form.name}, Scheibe "${sch.id}": leeres Feld im Gitter`);
+    }
+    for (let s = sch.vonSchnitt; s <= sch.bisSchnitt; s++) {
+      for (let r = sch.vonRing; r <= sch.bisRing; r++) {
+        const i = s * R + r;
+        sp.push(
+          pos[i * 3]! + norm.getX(i) * SCHEIBEN_LUFT,
+          pos[i * 3 + 1]! + norm.getY(i) * SCHEIBEN_LUFT,
+          pos[i * 3 + 2]! + norm.getZ(i) * SCHEIBEN_LUFT
+        );
+      }
+    }
+    for (let s = 0; s + 1 < schnitte; s++) {
+      for (let r = 0; r + 1 < ringe; r++) {
+        const a = s * ringe + r;
+        const b = (s + 1) * ringe + r;
+        const c = (s + 1) * ringe + r + 1;
+        const d = s * ringe + r + 1;
+        si.push(a, b, c, a, c, d);
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(sp, 3));
+    geo.setIndex(si);
+    geo.computeVertexNormals();
+    return { id: sch.id, geo };
+  });
+
+  return { koerper, scheiben };
+}
+
+/* ------------------------------------------------------------------------- */
+/* FASSUNG A — kantig gebaut, glaubwürdige Proportionen                      */
+/* ------------------------------------------------------------------------- */
+
+/**
+ * Fünf Ebenen: Schwellerunterkante, breiteste Flanke, Gürtellinie,
+ * Dachkante, Dachmitte.
+ *
+ * Über der Haube und über dem Kofferraum gibt es kein Dach — dort liegen die
+ * beiden oberen Ebenen FLACH AUF DER HAUBE, nach innen gestaffelt. Das ist der
+ * Trick, der den durchgehenden Längsschnitt möglich macht: Das Gitter bleibt
+ * rechteckig (jeder Schnitt hat fünf Ebenen), und trotzdem hat das Auto vorn
+ * eine Haube und in der Mitte ein Dach. Die Windschutzscheibe ist genau das
+ * Stück Haut zwischen dem letzten Haubenschnitt und dem ersten Dachschnitt.
+ *
+ * Höhe 1,40 m, Breite 1,70 m, Länge 4,00 m — die Proportion eines Kompaktwagens
+ * (Briefing Kap. 8 nennt keine Maße; die 1,70 x 4,00 kommen aus `CarDef`,
+ * 1,40 m Dachhöhe ist der Wert, der dazu passt // SW).
+ */
+export const FORM_A: WrackformDef = {
+  name: "A — kantige Limousine",
+  absicht:
+    "Echte Autoproportionen, flächig schattiert: Haube, geneigte Scheibe, " +
+    "eingezogenes Glashaus, ausgeschnittene Radläufe.",
+  breite: 1.7,
+  laenge: 4.0,
+  ebenen: [0.2, 0.5, 0.9, 1.3, 1.4],
+  anbau: ANBAU_E116,
+  fugeDunkel: 0.45,
+  schnitte: [
+    // z            Schweller  Flanke  Gürtel  Dachkante  Dachmitte
+    { name: "Schnauze", z: 1.0, b: [0.6, 0.86, 0.8, 0.58, 0.28], y: [0.24, 0.5, 0.78, 0.78, 0.78] },
+    { name: "Haube vorn", z: 0.9, b: [0.78, 0.97, 0.94, 0.7, 0.35], y: [0.21, 0.5, 0.83, 0.83, 0.83] },
+    { name: "Radlauf vorn, Kante", z: 0.835, b: [0.82, 1.0, 0.97, 0.73, 0.36], y: [0.2, 0.5, 0.85, 0.85, 0.85] },
+    // Über dem Rad ist die Karosserie ausgeschnitten: die beiden unteren
+    // Ebenen steigen über den Reifen (Radmitte 0,33 m + Radius 0,33 m = 0,66 m
+    // Reifenoberkante, der Bogen läuft 4 cm darüber).
+    { name: "Radlauf vorn, Flanke", z: 0.73, b: [0.84, 1.0, 0.98, 0.74, 0.37], y: [0.46, 0.56, 0.86, 0.86, 0.86] },
+    { name: "Radmitte vorn", z: 0.625, b: [0.84, 1.0, 0.99, 0.74, 0.37], y: [0.7, 0.76, 0.87, 0.87, 0.87] },
+    { name: "Radlauf vorn, hinten", z: 0.52, b: [0.84, 1.0, 0.99, 0.74, 0.37], y: [0.46, 0.56, 0.87, 0.87, 0.87] },
+    { name: "Haube hinten", z: 0.415, b: [0.84, 1.0, 0.99, 0.74, 0.37], y: [0.2, 0.5, 0.88, 0.88, 0.88] },
+    // Hier steigt das Dach: 53 cm Länge auf 42 cm Höhe — eine
+    // Windschutzscheibe, die 52° aus der Senkrechten liegt.
+    { name: "Dach vorn", z: 0.15, b: [0.84, 1.0, 1.0, 0.8, 0.6], y: [0.2, 0.5, 0.9, 1.3, 1.4] },
+    { name: "Dach Mitte", z: -0.15, b: [0.84, 1.0, 1.0, 0.81, 0.61], y: [0.2, 0.5, 0.9, 1.31, 1.41] },
+    { name: "Dach hinten", z: -0.34, b: [0.84, 1.0, 1.0, 0.79, 0.59], y: [0.2, 0.5, 0.9, 1.28, 1.38] },
+    { name: "C-Säule", z: -0.415, b: [0.84, 1.0, 0.99, 0.76, 0.57], y: [0.2, 0.5, 0.9, 1.22, 1.31] },
+    { name: "Kofferraum vorn", z: -0.52, b: [0.83, 0.99, 0.98, 0.72, 0.36], y: [0.46, 0.56, 0.93, 0.95, 0.95] },
+    { name: "Radmitte hinten", z: -0.625, b: [0.83, 0.99, 0.98, 0.72, 0.36], y: [0.7, 0.76, 0.93, 0.94, 0.94] },
+    { name: "Radlauf hinten, Kante", z: -0.835, b: [0.8, 0.96, 0.95, 0.7, 0.35], y: [0.2, 0.5, 0.91, 0.92, 0.92] },
+    { name: "Heck", z: -1.0, b: [0.66, 0.88, 0.84, 0.6, 0.3], y: [0.24, 0.5, 0.88, 0.88, 0.88] },
+  ],
+  scheiben: [
+    // Ringpunkte 3…6 = rechte Dachkante über die Dachmitte zur linken
+    // Dachkante: die Bahn, die zwischen Haube und Dach die Scheibe bildet.
+    { id: "front", vonSchnitt: 6, bisSchnitt: 7, vonRing: 3, bisRing: 6 },
+    { id: "rear", vonSchnitt: 10, bisSchnitt: 11, vonRing: 3, bisRing: 6 },
+    // Seitenscheiben: die Flanke zwischen Gürtellinie (2) und Dachkante (3).
+    { id: "right", vonSchnitt: 7, bisSchnitt: 9, vonRing: 2, bisRing: 3 },
+    { id: "left", vonSchnitt: 7, bisSchnitt: 9, vonRing: 6, bisRing: 7 },
+  ],
+};
+
+/* ------------------------------------------------------------------------- */
+/* FASSUNG B — grob und wuchtig, bewusst stilisiert                          */
+/* ------------------------------------------------------------------------- */
+
+/**
+ * Dieselben fünf Ebenen wie A, aber übertrieben: Dach auf 1,56 m,
+ * Gürtellinie auf 1,04 m, die breiteste Flanke 6 % ÜBER der nominellen
+ * Breite (1,80 m statt 1,70 m) und dicke Räder mit 0,40 m Radius statt 0,33 m.
+ *
+ * Nur zehn Querschnitte, dafür mit harten Sprüngen: Schweller 0,88, Flanke
+ * 1,06, Gürtel 1,03, Dachkante 0,92, Dachmitte 0,68 — das sind vier starke
+ * Fasen übereinander, die auf kleinem Schirm sofort als Auto lesbar sind. Die
+ * Radläufe sind V-Kerben statt Bögen, weil je Rad nur drei Schnitte da sind;
+ * das ist hier Absicht und nicht Sparsamkeit. // SW, Formfindung
+ */
+export const FORM_B: WrackformDef = {
+  name: "B — Klotz",
+  absicht:
+    "Kantige Blöcke mit starken Fasen, übertriebene Proportionen, dicke " +
+    "Reifen — liest sich auf kleinem Schirm sofort, Beulen wirken stark.",
+  breite: 1.7,
+  laenge: 4.0,
+  ebenen: [0.28, 0.6, 1.04, 1.5, 1.56],
+  anbau: ANBAU_E116,
+  rad: [0.4, 0.34],
+  fugeDunkel: 0.45,
+  schnitte: [
+    { name: "Schnauze", z: 1.0, b: [0.7, 1.0, 0.96, 0.76, 0.4], y: [0.3, 0.62, 1.0, 1.0, 1.0] },
+    { name: "Radlauf vorn, Kante", z: 0.87, b: [0.86, 1.06, 1.02, 0.8, 0.42], y: [0.28, 0.6, 1.02, 1.02, 1.02] },
+    // Reifenoberkante bei 0,80 m (Radmitte 0,40 + Radius 0,40), Kerbe 6 cm darüber.
+    { name: "Radmitte vorn", z: 0.625, b: [0.88, 1.06, 1.03, 0.81, 0.42], y: [0.86, 0.92, 1.03, 1.03, 1.03] },
+    { name: "Radlauf vorn, hinten", z: 0.38, b: [0.88, 1.06, 1.03, 0.82, 0.42], y: [0.28, 0.6, 1.04, 1.04, 1.04] },
+    // Kurze, steile Scheibe: 30 cm Länge auf 46 cm Höhe — 33° aus der Senkrechten.
+    { name: "Dach vorn", z: 0.23, b: [0.88, 1.06, 1.04, 0.92, 0.68], y: [0.28, 0.6, 1.06, 1.5, 1.56] },
+    { name: "Dach hinten", z: -0.23, b: [0.88, 1.06, 1.04, 0.92, 0.68], y: [0.28, 0.6, 1.06, 1.5, 1.56] },
+    { name: "Radlauf hinten, Kante", z: -0.38, b: [0.88, 1.06, 1.03, 0.82, 0.42], y: [0.28, 0.6, 1.06, 1.06, 1.06] },
+    { name: "Radmitte hinten", z: -0.625, b: [0.88, 1.06, 1.03, 0.81, 0.42], y: [0.86, 0.92, 1.05, 1.05, 1.05] },
+    { name: "Radlauf hinten, hinten", z: -0.87, b: [0.86, 1.0, 0.98, 0.78, 0.4], y: [0.28, 0.6, 1.04, 1.04, 1.04] },
+    { name: "Heck", z: -1.0, b: [0.7, 1.0, 0.96, 0.76, 0.4], y: [0.3, 0.62, 1.02, 1.02, 1.02] },
+  ],
+  scheiben: [
+    { id: "front", vonSchnitt: 3, bisSchnitt: 4, vonRing: 3, bisRing: 6 },
+    { id: "rear", vonSchnitt: 5, bisSchnitt: 6, vonRing: 3, bisRing: 6 },
+    { id: "right", vonSchnitt: 4, bisSchnitt: 5, vonRing: 2, bisRing: 3 },
+    { id: "left", vonSchnitt: 4, bisSchnitt: 5, vonRing: 6, bisRing: 7 },
+  ],
+};
+
+/* ------------------------------------------------------------------------- */
+/* FASSUNG C — so echt, wie das Netzbudget erlaubt                           */
+/* ------------------------------------------------------------------------- */
+
+/**
+ * SIEBEN Ebenen und siebzehn Querschnitte, glatt schattiert.
+ *
+ * Die zwei zusätzlichen Ebenen sind eine SICKE: Ebene 2 ist die breiteste
+ * Stelle (0,46 m Höhe), Ebene 3 zieht sich 4 cm zurück (0,58 m), Ebene 4 ist
+ * die Gürtellinie. Über diesen Knick läuft glatt schattiert eine Lichtkante
+ * von vorn nach hinten — das, was ein Auto von einem Kasten unterscheidet.
+ *
+ * SCHATTENFUGEN: Zwei Paare von Querschnitten liegen nur 3 cm auseinander und
+ * tragen einen abgedunkelten Lack (`fuge`). Daraus wird ein schmaler dunkler
+ * Streifen quer über die Karosserie — die Trennlinie von Haube und Kotflügel
+ * bzw. von Heckklappe und Seitenteil. Eine Fuge ist damit eine Zeile in dieser
+ * Tabelle, kein Textur-Bild.
+ *
+ * GEWÖLBTE SCHEIBEN kommen von selbst: Windschutz und Heckscheibe laufen über
+ * DREI Querschnitte statt über zwei, der mittlere liegt dazwischen nach außen
+ * — die Scheibe ist also gekrümmt, weil das Blech darunter gekrümmt ist.
+ */
+export const FORM_C: WrackformDef = {
+  name: "C — weich, mit Sicken",
+  absicht:
+    "Weichere Übergänge, Sicken in den Flanken, Schattenfugen zwischen den " +
+    "Bauteilen, gewölbte Scheiben — so echt, wie das Netzbudget erlaubt.",
+  breite: 1.7,
+  laenge: 4.0,
+  ebenen: [0.2, 0.32, 0.46, 0.58, 0.92, 1.3, 1.42],
+  anbau: ANBAU_E116,
+  glatt: true,
+  fugeDunkel: 0.45,
+  schnitte: [
+    { name: "Nase", z: 1.0, b: [0.56, 0.68, 0.76, 0.74, 0.72, 0.5, 0.25], y: [0.26, 0.36, 0.48, 0.58, 0.74, 0.76, 0.78] },
+    { name: "Stoßfänger", z: 0.945, b: [0.72, 0.84, 0.9, 0.88, 0.88, 0.64, 0.32], y: [0.22, 0.34, 0.46, 0.58, 0.8, 0.82, 0.83] },
+    { name: "Haube vorn", z: 0.88, b: [0.8, 0.92, 0.97, 0.94, 0.94, 0.7, 0.35], y: [0.2, 0.32, 0.46, 0.58, 0.84, 0.85, 0.86] },
+    { name: "Radlauf vorn, Kante", z: 0.8, b: [0.82, 0.94, 1.0, 0.96, 0.97, 0.72, 0.36], y: [0.3, 0.4, 0.5, 0.6, 0.86, 0.87, 0.87] },
+    // Reifenoberkante 0,66 m, der Bogen läuft 4 cm darüber; die vier unteren
+    // Ebenen steigen gemeinsam, damit der Querschnitt nicht umschlägt.
+    { name: "Radmitte vorn", z: 0.625, b: [0.82, 0.94, 1.0, 0.96, 0.98, 0.73, 0.36], y: [0.7, 0.74, 0.78, 0.82, 0.87, 0.88, 0.88] },
+    { name: "Radlauf vorn, hinten", z: 0.45, b: [0.82, 0.94, 1.0, 0.96, 0.98, 0.74, 0.37], y: [0.3, 0.4, 0.5, 0.6, 0.88, 0.89, 0.89] },
+    { name: "Fuge Haube, vorn", z: 0.4, b: [0.82, 0.94, 1.0, 0.96, 0.98, 0.74, 0.37], y: [0.2, 0.32, 0.46, 0.58, 0.88, 0.89, 0.89], fuge: true },
+    { name: "Fuge Haube, hinten", z: 0.385, b: [0.82, 0.94, 1.0, 0.96, 0.98, 0.74, 0.37], y: [0.2, 0.32, 0.46, 0.58, 0.89, 0.9, 0.9], fuge: true },
+    { name: "Windschutz Mitte", z: 0.27, b: [0.83, 0.95, 1.0, 0.96, 0.99, 0.76, 0.48], y: [0.2, 0.32, 0.46, 0.58, 0.9, 1.06, 1.14] },
+    { name: "Dach vorn", z: 0.12, b: [0.83, 0.95, 1.0, 0.96, 1.0, 0.79, 0.6], y: [0.2, 0.32, 0.46, 0.58, 0.92, 1.3, 1.42] },
+    { name: "Dach hinten", z: -0.18, b: [0.83, 0.95, 1.0, 0.96, 1.0, 0.79, 0.6], y: [0.2, 0.32, 0.46, 0.58, 0.92, 1.3, 1.42] },
+    { name: "Heckscheibe Mitte", z: -0.42, b: [0.82, 0.94, 1.0, 0.96, 0.99, 0.76, 0.52], y: [0.2, 0.32, 0.46, 0.58, 0.92, 1.14, 1.24] },
+    { name: "Fuge Klappe, vorn", z: -0.52, b: [0.82, 0.94, 0.99, 0.95, 0.98, 0.74, 0.4], y: [0.3, 0.4, 0.5, 0.6, 0.94, 0.99, 1.0], fuge: true },
+    { name: "Fuge Klappe, hinten", z: -0.535, b: [0.82, 0.94, 0.99, 0.95, 0.98, 0.74, 0.4], y: [0.3, 0.4, 0.5, 0.6, 0.94, 0.98, 0.99], fuge: true },
+    { name: "Radmitte hinten", z: -0.625, b: [0.82, 0.94, 0.99, 0.95, 0.98, 0.74, 0.39], y: [0.7, 0.74, 0.78, 0.82, 0.94, 0.97, 0.98] },
+    { name: "Radlauf hinten, Kante", z: -0.82, b: [0.8, 0.92, 0.97, 0.93, 0.96, 0.72, 0.37], y: [0.3, 0.4, 0.5, 0.6, 0.93, 0.95, 0.96] },
+    { name: "Heck", z: -1.0, b: [0.62, 0.74, 0.82, 0.8, 0.8, 0.56, 0.28], y: [0.26, 0.36, 0.48, 0.58, 0.88, 0.9, 0.9] },
+  ],
+  scheiben: [
+    // Sieben Ebenen: r = 5 rechte Dachkante, 6 Dachmitte rechts, 7 Dachmitte
+    // links, 8 linke Dachkante; r = 4 ist die rechte, r = 9 die linke Gürtellinie.
+    { id: "front", vonSchnitt: 7, bisSchnitt: 9, vonRing: 5, bisRing: 8 },
+    { id: "rear", vonSchnitt: 10, bisSchnitt: 12, vonRing: 5, bisRing: 8 },
+    { id: "right", vonSchnitt: 9, bisSchnitt: 11, vonRing: 4, bisRing: 5 },
+    { id: "left", vonSchnitt: 9, bisSchnitt: 11, vonRing: 8, bisRing: 9 },
+  ],
+};
+
+export const WRACKFORMEN: Record<Exclude<WrackformId, "bestand">, WrackformDef> = {
+  a: FORM_A,
+  b: FORM_B,
+  c: FORM_C,
+};
