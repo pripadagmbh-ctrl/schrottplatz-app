@@ -10,7 +10,7 @@ Schrottplatz-Simulation mit Fuchsbagger und Greifspinne. Web-Stack: TypeScript, 
 | `prototype/` | Referenz, eingefroren | **Nie ändern.** Nachschauen, wie etwas gemeint war und wie es sich anfühlte. |
 | `v2/` | Archiv, eingefroren | **Nie ändern, nie darauf aufbauen.** Nur nachschlagen: `v2/docs/entscheidungen.md` enthält Rapier- und Safari-Lehren, die weiter gelten (siehe unten). |
 | `docs/` | Design-Grundlage | `02_Briefing.md` (24 Kapitel) ist das GDD des Prototyps und bleibt Maßstab für Spielinhalt, Wirtschaft, Materialien. |
-| `v1/docs/` | Log und Messungen | `entscheidungen.md` (neu, ab E-001), `messungen/` je Gerätetest. |
+| `v1/docs/` | Log und Messungen | `entscheidungen.md` = **Register** (eine Zeile je Entscheidung, neueste oben, plus „Offen für Patrick“); Volltexte in `log/E-xxx_bis_E-yyy.md` (20 je Datei); `messungen/` je Gerätetest. |
 
 Hintergrund: v2 war ein Neuaufbau in Schichten; Patrick fand den Prototyp besser gelungen (Spinne, Greifen) und arbeitet ab 14.09. in `v1/` weiter.
 
@@ -19,7 +19,7 @@ Hintergrund: v2 war ein Neuaufbau in Schichten; Patrick fand den Prototyp besser
 1. **`prototype/` und `v2/` werden nie angefasst.** Kopieren statt verweisen.
 2. **Spielgefühl des Prototyps ist der Maßstab.** Spinne, Greifen, Pendel, Kamera bleiben, wie sie im Prototyp sind; Änderungen daran nur auf ausdrücklichen Wunsch und in kleinen, einzeln auf dem iPad abgenommenen Schritten. Kein „Saugen" gegriffener Teile in die Korbmitte (v2-Fehler).
 3. **Jede Zahl hat eine Herkunft.** Neue Balancing-Werte mit Kommentar (`// SW: …` = Startwert zum Austesten, oder Verweis auf Briefing-Kapitel/Messung).
-4. **Entscheidungen ins Log** (`v1/docs/entscheidungen.md`): Nummer, Datum, Entscheidung, Begründung, verworfene Alternative, Abnahmekriterium, „Auf dem Gerät zu prüfen". Nichts wird zweimal diskutiert.
+4. **Entscheidungen ins Log — zweiteilig (seit 25.09.2026):** Der **Volltext** (Nummer, Datum, Entscheidung, Begründung, verworfene Alternative, Abnahmekriterium, „Auf dem Gerät zu prüfen“) kommt **unten** an die aktuelle Archivdatei `v1/docs/log/E-xxx_bis_E-yyy.md`; dazu eine **Registerzeile oben** in `v1/docs/entscheidungen.md` (Nr. · Datum · Titel ≤ 12 Wörter · Status · Link) und die Gerätetest-Fragen in den Abschnitt „Offen für Patrick“. Vor der Arbeit wird das **Register** gelesen und nur die Volltexte, die der Auftrag nennt — nicht mehr „die letzten drei Einträge“. Nichts wird zweimal diskutiert.
 5. **Kein Meilenstein ist fertig ohne Gerätetest durch Patrick.** Jede Übergabe endet mit „Auf dem Gerät zu prüfen: …".
 6. **Lieber nachfragen als raten** — mit Erklärung für einen technisch interessierten Laien, mit Vergleichen. Patrick will dazulernen.
 7. **Ton-Leitplanke:** Milieu aus Beruf, Familie, Geschäft — nie aus Herkunft. Keine Gruppe wird als kriminell markiert.
