@@ -52,7 +52,13 @@ function draussen(quelle: string, aufrufe: string[]): string[] {
 
 /** Was nur im Betrieb laufen darf — je Bild bzw. je Physikschritt. */
 const NUR_BETRIEB_AUFRUFE = [
-  "shift.update(",
+  /*
+   * Der Tagesablauf MIT Uhrzeit — daran haengen Torschluss und Feierabend
+   * (E-113). Seit E-122 laeuft `shift.update` auch im Sandkasten, aber OHNE
+   * Uhrzeit: nur fuer den Takt der Anlieferer nach losem Schrott. Gesperrt
+   * bleibt also genau der Aufruf, der die Uhr hineingibt.
+   */
+  "shift.update(frameDt, looseKg, daylight.time",
   "abrechnung.takt()",
   "funk.platzlage(",
   "tutorial.update(",
@@ -141,7 +147,20 @@ describe("main.ts haengt im Simulator ab, was Geld und Leute ins Bild bringt", (
     ]) {
       expect(block, `${haken} bleibt verdrahtet`).toContain(`"${haken}"`);
     }
-    expect(block).toContain("vehicles.acceptDeliveries = false");
+    /*
+     * Bis E-122 stand hier `acceptDeliveries = false`: keine Fuhren nach Uhr.
+     * Patrick, 06.10.2026: "LKWs kommen automatisch." Seitdem folgt die
+     * Einfahrt im Sandkasten dem Stau, im selben Takt wie im Betrieb.
+     */
+    expect(block, "die Einfahrt ist im Sandkasten wieder fest zu").not.toContain(
+      "vehicles.acceptDeliveries = false"
+    );
+    expect(main, "die Einfahrt folgt im Sandkasten nicht dem Stau").toContain(
+      "vehicles.acceptDeliveries = !shift.jammed"
+    );
+    expect(main, "der Sandkasten-Takt bekommt doch eine Uhrzeit").toContain(
+      "shift.update(frameDt, looseKg);"
+    );
     expect(block).toContain("staff.ausblenden()");
     expect(block).toContain("hud.preiseZeigen = false");
     expect(block).toContain("containers.preiseZeigen = false");
