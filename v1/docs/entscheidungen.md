@@ -10,6 +10,8 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-119 | 06.10.2026 | Fünf Fahrkünste werden gemessen, nicht geschätzt | gebaut | [E-101_bis_E-120.md](log/E-101_bis_E-120.md) |
+| E-118 | 06.10.2026 | Das Spiel wird ein Bagger-Simulator: Hauptmenü, Sandkasten, Wirtschaft abgeschaltet | gebaut | [E-101_bis_E-120.md](log/E-101_bis_E-120.md) |
 | E-117 | 01.10.2026 | Patrick wählt C: die weiche Karosserie mit Sicken wird Vorgabe | gebaut | [E-101_bis_E-120.md](log/E-101_bis_E-120.md) |
 | E-116 | 23.09.2026 | Drei Karosserieformen zur Wahl, umschaltbar im laufenden Spiel | gebaut | [E-101_bis_E-120.md](log/E-101_bis_E-120.md) |
 | E-115 | 22.09.2026 | Das Pendel wird frei, und geschleudert wird mit dem richtigen Punkt | gebaut | [E-101_bis_E-120.md](log/E-101_bis_E-120.md) |
@@ -131,6 +133,16 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 ## Offen für Patrick — Auf dem Gerät zu prüfen
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
+
+**E-119 — Fünf Fahrkünste werden gemessen, nicht geschätzt**
+- Noch nichts zu sehen. Einen Träger greifen, rüberschwenken, im Schwung loslassen: Fühlt sich Greifen, Pendeln und Werfen genau so an wie vorher?
+- Zehn Umschläge hintereinander: läuft es so flüssig wie gestern?
+
+**E-118 — Das Spiel wird ein Bagger-Simulator: Hauptmenü, Sandkasten, Wirtschaft abgeschaltet**
+- Spiel öffnen: Hauptmenü mit SANDKASTEN und ausgegrautem CHALLENGES — auf dem iPhone mini lesbar?
+- SANDKASTEN: kein Konto, keine Uhr, keine Tutorialkarte, kein Lambert, keine Janine?
+- Kranz: sechs Einträge mit NACHSCHUB. Dreimal NACHSCHUB bringt Kipper, Pritsche, Wrack — ohne Waage-Meldung, ohne Verhandeln?
+- Griff-Info ohne €/t, Muldenschild ohne Erlös, Ampel wie bisher; Spinne, Greifen, Pendel unverändert?
 
 **E-117 — Patrick wählt C: die weiche Karosserie mit Sicken wird Vorgabe**
 - Das Spiel normal laden, ohne Zusatz in der Adresse: Sind alle Wracks jetzt die weiche Form — auch die auf den Lastern?

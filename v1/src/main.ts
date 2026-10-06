@@ -59,6 +59,7 @@ import { clearSave, readSave, speichereGreifer, storeSave, type SaveData } from 
 import { Zwischenbild } from "./core/zwischenbild";
 import { BETRIEB, NUR_IM_BETRIEB, NUR_IM_SIMULATOR } from "./core/spielart";
 import { waehleSpielart } from "./ui/hauptmenue";
+import { Fahrkunst } from "./skills/fahrkunst";
 import { NACHSCHUB_FOLGE, NACHSCHUB_MELDUNG, profilFuer } from "./delivery/nachschub";
 
 const FIXED_DT = 1 / 60;
@@ -316,6 +317,14 @@ async function main(): Promise<void> {
   };
   excavator.getVehicleBoxes = alleFahrzeugBoxen;
   const grip = new GripSystem(physics.world, excavator.grappleBody);
+  /*
+   * Die Fahrkunst-Messung (E-119): Praezision, Ruhe, Tempo, Wurf, Gefuehl —
+   * gemessen aus dem, was Bagger und Physik ohnehin wissen, ohne etwas daran
+   * zu aendern. Sie meldet je gezaehltem Zyklus ueber den Bus; wer zuhoert,
+   * entscheidet die Anzeige (Etappe 3).
+   */
+  const fahrkunst = new Fahrkunst(grip, excavator);
+  fahrkunst.onZyklus = (e) => bus.emit("fahrkunst:zyklus", e);
   /*
    * Welcher Greifer haengt (E-059, geaendert durch E-105).
    *
@@ -1099,6 +1108,9 @@ async function main(): Promise<void> {
     excavator.update(FIXED_DT, input);
     excavator.getSensorPosition(sensorPos);
     grip.update(excavator.closure, excavator.closing, sensorPos, FIXED_DT);
+    // Direkt nach dem Greifen und VOR dem Physikschritt: Nur hier ist linvel()
+    // noch die Abwurfgeschwindigkeit, die releaseAll eben gesetzt hat (E-119).
+    fahrkunst.update(FIXED_DT);
     excavator.carriedMassKg = grip.totalMassKg;
     excavator.carriedCount = grip.grippedCount;
     // Was in der Spinne hängt, darf sie nicht selbst blockieren
@@ -1147,6 +1159,7 @@ async function main(): Promise<void> {
       items,
       containers,
       composites,
+      fahrkunst,
       fence,
       vehicles,
       account,
