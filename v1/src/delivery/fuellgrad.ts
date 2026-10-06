@@ -141,8 +141,49 @@ export const ANHAENGER_WAND = 0.34;
 
 /** Rand, der an beiden Enden frei bleibt. Quelle: `vehicles.LADE_RAND`. */
 export const LADE_RAND = 0.2;
-/** Wie weit die Ladung über die Bordwand darf. Quelle: `vehicles.LADUNG_UEBERSTAND`. */
+/**
+ * Wie weit die Ladung über die Bordwand darf (Wunsch Patrick 11.09.2026:
+ * „die Ladung sollte sich an der Kastenform orientieren").
+ *
+ * DIE QUELLE. Bis E-126 stand dieselbe Zahl als eigene Konstante auch in
+ * `vehicles.ts`, und ein Wächter hielt die beiden Abschriften gleich. Seit es
+ * zwei Höhenregeln gibt (Schüttgut und Einzelstück), lesen beide
+ * `ladeHoeheGrenze` weiter unten — und die liest diese Zeile.
+ */
 export const LADUNG_UEBERSTAND = 0.35;
+
+/**
+ * Höchste Gesamthöhe eines Fahrzeugs samt Ladung: 4,00 m (StVZO § 32 Abs. 2).
+ * Gilt nur für das Einzelstück (E-126); Schüttgut endet weit darunter.
+ */
+export const GESAMTHOEHE_MAX = 4.0;
+
+/**
+ * Oberkante des Ladeflächenbodens über der Straße, beim LKW: die Fläche
+ * hängt auf y 1,05 (`vehicleModel`, `bedGroup.position.set(0, 1.05, …)`),
+ * abgesetzt wird 0,10 darüber (`vehicles.LADE_BODEN`). Gespiegelt wie
+ * `WAND_HOEHE`; `test/einzelstueck.test.ts` liest beide Quelltexte nach.
+ */
+export const LADEBODEN_UEBER_STRASSE = 1.05 + 0.1;
+
+/**
+ * DIE HÖHENGRENZE DER LADUNG — EINE Regel für alle, die fragen (E-126).
+ *
+ *   Schüttgut      Bordwand + `LADUNG_UEBERSTAND`. Die Fuhre endet knapp
+ *                  über der Bordwand, wie Patrick sie am 11.09. bestellt hat.
+ *   Einzelstück    Ein einziges großes Teil allein auf der Fläche darf so
+ *                  hoch sein, wie der Wagen samt Ladung auf die Straße darf:
+ *                  4,00 m minus Flächenhöhe = 2,85 m über dem Boden. Die
+ *                  Regel „Ladung folgt dem Kasten" war für Schüttgut gemeint
+ *                  — ein Minibagger folgt keinem Kasten (E-106, Frage 1).
+ *
+ * Gefragt wird sie von `vehicles.laderaum`, `vehicleModel.auslegerHoehe`,
+ * `customers` (welche Teile allein auf die Pritsche passen) und
+ * `tools/grossteile.ts`. Wer hier etwas ändert, ändert alle vier.
+ */
+export function ladeHoeheGrenze(wand: number, einzelstueck = false): number {
+  return einzelstueck ? GESAMTHOEHE_MAX - LADEBODEN_UEBER_STRASSE : wand + LADUNG_UEBERSTAND;
+}
 
 /**
  * Bordwandhöhe je Aufbau. Quelle: `vehicleModel.wandHoehe`.
@@ -170,7 +211,7 @@ export function ladeVolumen(kind: Fahrzeugart, aufbau: Aufbau = "flach"): number
   const laenge = Math.max(0, BED_LEN[kind] - 2 * LADE_RAND);
   const halbBreite = kind === "pkw" ? ANHAENGER_HALB_BREITE : LKW_HALB_BREITE;
   const wand = kind === "pkw" ? ANHAENGER_WAND : WAND_HOEHE[aufbau];
-  return halbBreite * 2 * laenge * (wand + LADUNG_UEBERSTAND);
+  return halbBreite * 2 * laenge * ladeHoeheGrenze(wand);
 }
 
 /**

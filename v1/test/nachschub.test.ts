@@ -1,20 +1,41 @@
 import { describe, it, expect } from "vitest";
-import { NACHSCHUB_FOLGE, NACHSCHUB_MELDUNG, profilFuer } from "../src/delivery/nachschub";
+import {
+  NACHSCHUB_FOLGE,
+  NACHSCHUB_MELDUNG,
+  nachschubMeldung,
+  profilFuer,
+} from "../src/delivery/nachschub";
 import { rollCustomer } from "../src/delivery/customers";
 
 /*
  * NACHSCHUB im Sandkasten (E-118): Kipper, Pritsche, Wrack reihum, mit einem
- * Profil, dessen Ladung zum Fahrzeug passt.
+ * Profil, dessen Ladung zum Fahrzeug passt. Seit E-126 als vierte Art das
+ * Großteil — ein Teil allein auf der flachen Pritsche.
  */
 describe("Nachschub", () => {
-  it("reihum Kipper, Pritsche, Wrack", () => {
-    expect([...NACHSCHUB_FOLGE]).toEqual(["kipper", "pritsche", "wrack"]);
+  it("reihum Kipper, Pritsche, Wrack, Großteil", () => {
+    expect([...NACHSCHUB_FOLGE]).toEqual(["kipper", "pritsche", "wrack", "einzelstueck"]);
   });
 
   it("das Profil hat das verlangte Fahrzeug — 50 Mal je Art", () => {
     for (const art of NACHSCHUB_FOLGE) {
-      for (let i = 0; i < 50; i++) expect(profilFuer(art).vehicle).toBe(art);
+      for (let i = 0; i < 50; i++) {
+        const c = profilFuer(art);
+        if (art === "einzelstueck") {
+          expect(c.einzelstueck, "das Großteil fehlt").toBeDefined();
+          expect(c.vehicle).toBe("pritsche");
+        } else {
+          expect(c.vehicle).toBe(art);
+          // Pritsche heißt Schüttgut-Pritsche — kein Großteil durch die Hintertür
+          expect(c.einzelstueck).toBeUndefined();
+        }
+      }
     }
+  });
+
+  it("die Meldung zum Großteil sagt Großteil, nicht Pritsche", () => {
+    expect(nachschubMeldung(profilFuer("einzelstueck"))).toBe(NACHSCHUB_MELDUNG.einzelstueck);
+    expect(nachschubMeldung(profilFuer("kipper"))).toBe(NACHSCHUB_MELDUNG.kipper);
   });
 
   it("die Meldung nennt das Fahrzeug, keinen Kunden", () => {

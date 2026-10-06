@@ -204,7 +204,14 @@ describe("Herkunft der Ladeflächenmaße", () => {
 
   it("Rand und Überstand sind die aus `vehicles.ts`", () => {
     const text = quelle("vehicles.ts");
-    expect(text).toContain(`const LADUNG_UEBERSTAND = ${LADUNG_UEBERSTAND};`);
+    /*
+     * E-126: Der Überstand steht nicht mehr als Abschrift in `vehicles.ts`.
+     * Bewacht wird jetzt, dass es KEINE zweite gibt und der Laderaum die
+     * gemeinsame Regel fragt (wie bei `BED_LEN` weiter oben).
+     */
+    expect(LADUNG_UEBERSTAND).toBe(0.35);
+    expect(text).not.toMatch(/const LADUNG_UEBERSTAND\s*=/);
+    expect(text).toContain("ladeHoeheGrenze(");
     expect(text).toContain(`const LADE_RAND = ${LADE_RAND};`);
   });
 

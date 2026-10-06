@@ -30,11 +30,15 @@ import {
   ANHAENGER_HALB_BREITE,
   ANHAENGER_WAND,
   LADE_RAND,
-  LADUNG_UEBERSTAND,
+  ladeHoeheGrenze,
   type Aufbau,
 } from "../src/delivery/fuellgrad";
 import { wandHoehe } from "../src/delivery/vehicleModel";
-import { rollCustomer, type CustomerProfile } from "../src/delivery/customers";
+import {
+  rollAnlieferung,
+  EINZELSTUECK_FLAECHE,
+  type CustomerProfile,
+} from "../src/delivery/customers";
 import { getMaterial } from "../src/materials/catalog";
 import { PURCHASE_PRICE_PER_KG, SORTING_BONUS_PER_KG } from "../src/economy/account";
 
@@ -71,7 +75,7 @@ export function flaecheFuer(kind: string, aufbau: Aufbau): Flaeche {
     name: `${kind}/${aufbau}`,
     halbBreite: anhaenger ? ANHAENGER_HALB_BREITE : BED_HALF_W - 0.08,
     nutzLaenge: bedLenFor(kind) - 2 * LADE_RAND,
-    maxHoehe: (anhaenger ? ANHAENGER_WAND : wandHoehe(kind, aufbau)) + LADUNG_UEBERSTAND,
+    maxHoehe: ladeHoeheGrenze(anhaenger ? ANHAENGER_WAND : wandHoehe(kind, aufbau)),
   };
 }
 
@@ -86,6 +90,13 @@ export const LIEFERFLAECHEN: Flaeche[] = [
   flaecheFuer("kipper", "rungen"),
   flaecheFuer("kipper", "koffer"),
 ];
+
+/**
+ * E-126: die flache Pritsche mit EINEM Stueck, erhoehte Hoehengrenze. Steht
+ * absichtlich NICHT in `LIEFERFLAECHEN`: Darauf kommen nur Teile aus
+ * `customers.EINZELSTUECKE`, nicht alles, was allein darauf passen wuerde.
+ */
+const EINZEL_FLAECHE: Flaeche = { name: "pritsche/einzeln", ...EINZELSTUECK_FLAECHE };
 
 /**
  * Grundriss eines Stücks, so wie `packeLadung` ihn belegt.
@@ -199,6 +210,26 @@ export interface FuhrenErgebnis {
  * auf der Fläche liegt.
  */
 export function packeFuhre(c: CustomerProfile): FuhrenErgebnis {
+  /*
+   * Die Einzelstueck-Fuhre (E-126), wie `loadCargo`: ein Teil, keine Runde,
+   * kein Umlegen — es liegt, und es wiegt, was es wiegt. Es kommt nur aus
+   * `EINZELSTUECKE`, und die passen alle (Waechter `test/einzelstueck.test.ts`).
+   */
+  if (c.einzelstueck) {
+    const sp = c.einzelstueck;
+    const h = HERKUNFT.get(schluessel(sp.name, sp.dims)) ?? "SPECS";
+    return {
+      kind: c.vehicle,
+      gruppe: "einzelstueck",
+      schwer: false,
+      gezogen: { SPECS: 0, BIG: 0, HUGE: 0, [h]: 1 },
+      gelegt: { SPECS: 0, BIG: 0, HUGE: 0, [h]: 1 },
+      namenGelegt: [sp.name ?? "?"],
+      namenWeg: [],
+      fracht: [{ materialId: sp.materialId, massKg: sp.massKg }],
+      angekuendigtKg: c.massKg,
+    };
+  }
   const klein = c.group === "privat";
   const schwer = !klein && !c.sortedMaterial && Math.random() < 0.28;
   const MINDEST_FUELLUNG = 0.3;
@@ -390,6 +421,11 @@ function main(): void {
     );
   }
   console.log(`  Gruende: ${JSON.stringify(grundZaehler)}`);
+  const alleinOk = nie.filter(({ sp }) => hindernis(sp, EINZEL_FLAECHE) === "passt").length;
+  console.log(
+    `  davon passen ALLEIN auf die Pritsche (E-126, ${EINZEL_FLAECHE.maxHoehe.toFixed(2)} m): ${alleinOk}` +
+      ` — als Einzelstueck kommen nur die aus customers.EINZELSTUECKE`
+  );
 
   console.log(`\n=== 2. DURCHLAUF ueber ${SAATEN} Saaten ===\n`);
   const summeG: Record<string, number> = { SPECS: 0, BIG: 0, HUGE: 0 };
@@ -415,14 +451,14 @@ function main(): void {
      * sind die 960 Kunden in beiden Laeufen dieselben.
      */
     const getrennt = process.argv.includes("--getrennt");
-    const kunden = getrennt ? Array.from({ length: 10 }, () => rollCustomer()) : [];
+    const kunden = getrennt ? Array.from({ length: 10 }, () => rollAnlieferung()) : [];
     // Zehn Kunden je Saat — ein Spieltag hat rund so viele Anlieferungen.
     for (let i = 0; i < 10; i++) {
       if (getrennt) {
         zurueck();
         zurueck = festerZufall(31337 + s * 7919 + i * 104729);
       }
-      const c = getrennt ? kunden[i]! : rollCustomer();
+      const c = getrennt ? kunden[i]! : rollAnlieferung();
       const r = packeFuhre(c);
       fuhren++;
       if (r.schwer) schwere++;
@@ -502,7 +538,9 @@ function main(): void {
       const n = sp.name ?? "?";
       const an = angekommen.get(n) ?? 0;
       const weg = verworfen.get(n) ?? 0;
-      const flaechen = LIEFERFLAECHEN.filter((f) => hindernis(sp, f) === "passt").map((f) => f.name);
+      const flaechen = [...LIEFERFLAECHEN, EINZEL_FLAECHE]
+        .filter((f) => hindernis(sp, f) === "passt")
+        .map((f) => f.name);
       console.log(
         `  ${z(an + weg, 7)}${z(an, 12)}${((an / fuhren) * 100).toFixed(2).padStart(15)}  ` +
           `${n}  [${flaechen.join(", ") || "KEINE"}]`

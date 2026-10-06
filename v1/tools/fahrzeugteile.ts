@@ -39,6 +39,7 @@ import {
   type Pruefteil,
 } from "./durchdringung";
 import { BAUGRUPPE, BAUGRUPPEN, wandHoehe } from "../src/delivery/vehicleModel";
+import { ladeHoeheGrenze, LADEBODEN_UEBER_STRASSE } from "../src/delivery/fuellgrad";
 import {
   BED_HALF_W,
   CRANE_SWING,
@@ -296,9 +297,8 @@ export function messeBauart(
  * dürfen bis `wandHoehe + LADUNG_UEBERSTAND` hoch stapeln.
  */
 export function ladungOberkante(kind: string, aufbau: Aufbau): number {
-  const LADE_BODEN = 0.1; // vehicles.ts
-  const LADUNG_UEBERSTAND = 0.35; // vehicles.ts
-  return 1.05 + LADE_BODEN + wandHoehe(kind, aufbau) + LADUNG_UEBERSTAND;
+  // Flaechenhoehe samt LADE_BODEN und die Hoehengrenze aus EINER Quelle (E-126).
+  return LADEBODEN_UEBER_STRASSE + ladeHoeheGrenze(wandHoehe(kind, aufbau));
 }
 
 /**

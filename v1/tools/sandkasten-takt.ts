@@ -10,7 +10,9 @@
  * Stau-Zustand, und ob ein Wagen steckt.
  *
  * Aufruf: npx vite-node tools/sandkasten-takt.ts      (MIN=20 für 20 Minuten,
- *        KIPPER=1 für nur Kipper)
+ *        KIPPER=1 für nur Kipper, EINZEL=1 für nur Einzelstück-Fuhren (E-126),
+ *        ABLADEN=20: ein „Spieler" nimmt nach 20 s am Abladeplatz alles von
+ *        der Fläche — so faehrt die Fuhre ab, statt ihre Standzeit auszustehen)
  */
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
@@ -22,6 +24,7 @@ import { EventBus } from "../src/core/events";
 import { BAGGER_STAND } from "../src/world/baggerstand";
 import { setBaggerOrt } from "../src/delivery/routes";
 import { Shift } from "../src/economy/shift";
+import { rollEinzelstueck } from "../src/delivery/customers";
 
 async function main(): Promise<void> {
   await initPhysics();
@@ -43,6 +46,17 @@ async function main(): Promise<void> {
     const spawn = m.spawnNow.bind(m);
     m.spawnNow = (kind, kunde) => spawn(kind ?? "kipper", kunde);
   }
+
+  if (process.env.EINZEL) {
+    const spawn = m.spawnNow.bind(m);
+    m.spawnNow = (kind, kunde) => {
+      if (kind === "abholer") return spawn(kind, kunde);
+      const c = kunde ?? rollEinzelstueck();
+      spawn(c.vehicle, c);
+    };
+  }
+  const abladenS = Number(process.env.ABLADEN ?? 0);
+  let amPlatz = 0;
 
   // Wie `measureLoose` in main.ts
   const lose = (): number => {
@@ -80,6 +94,16 @@ async function main(): Promise<void> {
     m.acceptDeliveries = !shift.jammed;
     m.intervalFactor = shift.intervalFactor(looseKg);
 
+    if (abladenS > 0) {
+      const v = (m as unknown as {
+        active: { phaseName: string; cargo: { items: Parameters<typeof items.remove>[0][] } } | null;
+      }).active;
+      amPlatz = v?.phaseName === "waitUnload" ? amPlatz + dt : 0;
+      if (v && amPlatz >= abladenS) {
+        for (const it of [...v.cargo.items]) if (items.items.includes(it)) items.remove(it);
+        amPlatz = 0;
+      }
+    }
     const jetzt = m.activeKind;
     if (jetzt !== vorher) {
       const was = jetzt ? `kommt: ${jetzt}` : `weg: ${vorher} (${(t - seit).toFixed(0)} s)`;

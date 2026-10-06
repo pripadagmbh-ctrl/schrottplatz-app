@@ -21,10 +21,17 @@ import {
   baueFuhre,
   rollAufbau,
   rollFuellgrad,
+  ladeHoeheGrenze,
+  BED_LEN,
+  LADE_RAND,
+  LKW_HALB_BREITE,
+  WAND_HOEHE,
   type Aufbau,
   type Fahrzeugart,
 } from "./fuellgrad";
 import type { Aussehen, KundenEintrag } from "./aussehen";
+import { KATALOG_BIG, KATALOG_HUGE, type PileSpec } from "../world/objektkatalog";
+import { packeLadung, stueckMass } from "./ladung";
 
 export type CustomerGroup = "privat" | "haendler" | "gewerbe";
 
@@ -61,6 +68,12 @@ export interface CustomerProfile {
    * zu wissen meint. Prüfstände nehmen `AUSSEHEN_NEUTRAL` aus `aussehen.ts`.
    */
   aussehen: Aussehen;
+  /**
+   * DIE EINZELSTÜCK-FUHRE (E-126): Der Wagen bringt genau dieses eine Teil
+   * und sonst nichts. Fehlt das Feld, ist es eine gewöhnliche Fuhre.
+   * Optional, damit Prüfstände ihre Profile nicht anfassen müssen.
+   */
+  einzelstueck?: PileSpec;
 }
 
 /**
@@ -575,6 +588,134 @@ export function alleKunden(): KundenEintrag[] {
  * gerettet. Das Feld ist pflichtig, der Typlauf über `test/` (E-038) setzt es
  * durch, und wer es mit einer Umtypung umgeht, bekommt es gesagt.
  */
+/* ------------------------------------------- Die Einzelstück-Fuhre ------- */
+
+/**
+ * EIN LASTER, EIN GROSSES TEIL (E-126).
+ *
+ * Patrick, 06.10.2026: „Die Schrottsorten sollen mehr grossteile beinhalten,
+ * container, gerüste, kleine bagger." E-123 hat sie in den Katalog gebracht
+ * und gemessen, dass die schweren fast nie ankommen (Absetzmulde und beide
+ * Minibagger 0,04 bis 0,08 je 100 Fuhren): In einer Schüttgutfuhre teilen sie
+ * sich die Ziehung mit über hundert anderen Teilen, und auf einer flachen
+ * Pritsche sind sie zu hoch für „Bordwand + 0,35 m". Ein Teil, das nie
+ * ankommt, gibt es für den Spieler nicht.
+ *
+ * Darum eine eigene Fuhre: eine flache Pritsche, ohne Kran, mit genau einem
+ * Stück. Allein auf der Fläche darf es höher sein (`ladeHoeheGrenze`).
+ */
+
+/**
+ * Welche Bauarten als Einzelstück kommen — Patricks drei Wörter, als Daten:
+ * Container (`container`, `mulde`, `deckelmulde`), Gerüste (`geruest`,
+ * `geruestfeld`), kleine Bagger (`minibagger`, `raupe`). Ein neuer
+ * Katalogeintrag mit einer dieser Bauarten kommt von selbst mit.
+ */
+export const EINZELSTUECK_BAU: ReadonlySet<string> = new Set([
+  "container",
+  "mulde",
+  "deckelmulde",
+  "geruest",
+  "geruestfeld",
+  "minibagger",
+  "raupe",
+]);
+
+/** Die Fläche der Einzelstück-Pritsche: flach, LKW-Breite, erhöhte Grenze. */
+export const EINZELSTUECK_FLAECHE = {
+  halbBreite: LKW_HALB_BREITE,
+  nutzLaenge: BED_LEN.pritsche - 2 * LADE_RAND,
+  maxHoehe: ladeHoeheGrenze(WAND_HOEHE.flach, true),
+};
+
+/**
+ * Die Teile, die als Einzelstück kommen können. Drei Bedingungen, keine
+ * davon eine neue Zahl:
+ *
+ *   1. ein Großteil (`KATALOG_BIG`/`KATALOG_HUGE`) mit einer Bauart aus
+ *      `EINZELSTUECK_BAU`;
+ *   2. es liegt allein auf der Pritsche — gerechnet von `packeLadung`, wie
+ *      beim Beladen; die 2,40 m breiten Seecontainer scheitern weiter an
+ *      der Breite (E-106: 0,20-m-Raster samt `ladung.LUFT`);
+ *   3. es wiegt mindestens `MINDEST_FUHRE_KG` — für 105 kg Gerüstfeld fährt
+ *      niemand einen Lkw vor. Die leichten Teile kommen weiter in der
+ *      gemischten Fuhre.
+ */
+export const EINZELSTUECKE: readonly PileSpec[] = [...KATALOG_BIG, ...KATALOG_HUGE].filter(
+  (sp) =>
+    EINZELSTUECK_BAU.has(sp.bau ?? "") &&
+    sp.massKg >= MINDEST_FUHRE_KG &&
+    packeLadung(
+      [stueckMass(sp.kind, sp.dims)],
+      EINZELSTUECK_FLAECHE.halbBreite,
+      EINZELSTUECK_FLAECHE.nutzLaenge,
+      EINZELSTUECK_FLAECHE.maxHoehe
+    )[0] !== null
+);
+
+/**
+ * Anteil der Einzelstück-Fuhren an allen Anlieferungen.
+ *
+ * // SW: 0,35 — gerechnet aus dem Ziel des Auftrags zu E-126: Jedes Teil aus
+ * `EINZELSTUECKE` soll in einer Sandkastenstunde im Mittel mindestens einmal
+ * kommen. Angenommen ist eine Fuhre alle drei Minuten (12,6 Stück je Fuhre,
+ * E-106, bei rund einem Griff je 15 s — Schwenk allein 3,7 bis 7,6 s, E-122;
+ * gemessen 12 je Stunde, wenn niemand ablädt, E-122) und eine Einzelstück-
+ * Fuhre in anderthalb Minuten (ein Griff). Bei 0,35 sind das 24 Fuhren in
+ * der Stunde, 8,5 davon Einzelstücke, je Teil der acht 1,06. Bei 0,30 wären
+ * es 0,88 — knapp darunter. `test/einzelstueck.test.ts` rechnet nach.
+ */
+export const EINZELSTUECK_ANTEIL = 0.35;
+
+/** Was der Fahrer sagt — Geschäft und Baustelle, sonst nichts. */
+const EINZELSTUECK_SPRUECHE = [
+  "Nur ein Stück heute, aber ein großes.",
+  "Kommt von einer Baustellenräumung.",
+  "Der Verleiher wollte es nicht mehr reparieren.",
+];
+
+/**
+ * Eine Einzelstück-Fuhre würfeln. Der Händler bringt sie — er „nimmt mit,
+ * was er kriegt" (siehe `rollHaendler`), auch ein ausgemustertes Gerät.
+ */
+export function rollEinzelstueck(): CustomerProfile {
+  const f = pick(FAMILIES);
+  const teil = pick(EINZELSTUECKE as PileSpec[]);
+  const s = stueckMass(teil.kind, teil.dims);
+  const flaeche = EINZELSTUECK_FLAECHE.halbBreite * 2 * EINZELSTUECK_FLAECHE.nutzLaenge;
+  return {
+    group: "haendler",
+    name: f.firstName,
+    subtitle: f.family,
+    // Die Waage wiegt das Teil — keine Schüttung, kein Füllgrad-Rechnen.
+    massKg: teil.massKg,
+    vehicle: "pritsche",
+    // Flach: Über Rungen oder Koffer müsste die Spinne ein Teil von 2 t
+    // herausheben, das die Wände knapp freilassen.
+    aufbau: "flach",
+    // Was man sieht: die belegte Grundfläche.
+    fuellgrad: (s.breite * s.laenge) / flaeche,
+    dichte: teil.massKg / (s.breite * s.laenge * s.hoehe),
+    sortedMaterial: null,
+    // Seine Fremdstoffe stehen in der Zusammensetzung des Teils, nicht als Beifang.
+    contaminantShare: 0,
+    hardness: f.hardness,
+    greeting: pick(EINZELSTUECK_SPRUECHE),
+    aussehen: f.aussehen,
+    einzelstueck: teil,
+  };
+}
+
+/**
+ * Wer als Nächstes ans Tor kommt: mit `EINZELSTUECK_ANTEIL` eine
+ * Einzelstück-Fuhre, sonst die gewohnte Kundschaft. `rollCustomer` selbst
+ * bleibt die Schüttgut-Kundschaft — seine Wächter (Füllgrad, Dichte, Menge)
+ * gelten für sie unverändert.
+ */
+export function rollAnlieferung(): CustomerProfile {
+  return Math.random() < EINZELSTUECK_ANTEIL ? rollEinzelstueck() : rollCustomer();
+}
+
 /* ------------------------------------------------- Der Abholfahrer ------- */
 
 /**

@@ -11,6 +11,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
 | E-127 | 06.10.2026 | Greifer fragt alle Bleche, Türen bis zum Schweller, Spiegel am Auto | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
+| E-126 | 06.10.2026 | Einzelstück-Fuhre: ein Laster, ein Großteil, allein darf es höher sein | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-124 | 06.10.2026 | Das Wrack wird hohl und gibt dort nach, wo die Spinne zielt | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-123 | 06.10.2026 | Container, Gerüste, kleine Bagger; jede Sorte hat ein eigenes Bild | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-122 | 06.10.2026 | Mischschrott und Stahlschrott tauschen, Anlieferer kommen wieder von selbst | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
@@ -145,6 +146,12 @@ Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet ha
 - **Ein Wrack greifen und heben, an Dach, Tür und Kofferraum.** Geht es so wie vorher — nicht seltener, nicht wackliger?
 - **Ein Wrack von vorn und von der Seite ansehen.** Sitzen die beiden Außenspiegel jetzt am Auto, vorn am Fenster, statt daneben in der Luft?
 - **Einen Träger und ein Kleinteil vom Haufen greifen und werfen.** Fühlt es sich genau so an wie gestern?
+
+**E-126 — Einzelstück-Fuhre: ein Laster, ein Großteil, allein darf es höher sein**
+- **Im Sandkasten ein paar Laster abwarten.** Kommt etwa jeder dritte mit nur einem Stück — Container, Mulde, Gerüstpaket, Minibagger — mittig auf der flachen Pritsche und ohne Kran? Ist das zu oft, zu selten?
+- **Den Minibagger oder die Absetzmulde mit der Spinne von der Pritsche heben.** Bekommst du ihn zu fassen, und schaffst du es mit dem Gewicht (1,3 bzw. 2,5 t beim Minibagger, 0,8 t bei der Mulde)? Fährt der Laster danach leer ab?
+- **Viermal NACHSCHUB tippen.** Kommen Kipper, Pritsche, Wrack — und beim vierten Mal ein Großteil?
+- *Entscheidung offen:* Im Betrieb kostet der Anteil von 35 % ein Drittel des Tagesgelds — nur im Sandkasten, oder überall?
 
 **E-124 — Das Wrack wird hohl und gibt dort nach, wo die Spinne zielt**
 - **Spinne mittig über das Dach, absenken, dreimal zudrücken** (jedes Mal loslassen). Sinkt das Dach dort ein, wo die Spinne sitzt — und kommt die Spinne beim nächsten Absenken sichtbar tiefer?

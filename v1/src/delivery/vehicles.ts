@@ -67,8 +67,11 @@ const VOLL_PRUEF_S = 0.25;
 const ABHOLER_CONTAINER_KG = 1800;
 /** Rueckwaertstempo beim Einparken (m/s) — Schrittgeschwindigkeit. */
 const PARK_RUECK_SPEED = 1.6;
-/** So weit darf die Ladung ueber die Bordwand ragen (m). */
-const LADUNG_UEBERSTAND = 0.35;
+/*
+ * Hier stand `LADUNG_UEBERSTAND = 0.35` als zweite Abschrift. Seit E-126 gibt
+ * es zwei Hoehenregeln (Schuettgut, Einzelstueck); beide stehen an EINER
+ * Stelle: `fuellgrad.ladeHoeheGrenze`.
+ */
 /** Oberkante des Flaechenbodens im Ladeflaechen-System. */
 const LADE_BODEN = 0.1;
 /** Rand vorn und hinten, damit nichts ueber die Kante steht. */
@@ -99,6 +102,7 @@ import { BAGGER_STAND } from "../world/baggerstand";
 import { lagerMuldeFuer, type ContainerConfig } from "../world/containers";
 import {
   rollCustomer,
+  rollAnlieferung,
   vehicleForCustomer,
   fahrerfunk,
   anliefererfunk,
@@ -115,8 +119,10 @@ import {
   WRACK_KG,
   FUELL_KLASSEN,
   NUTZLAST,
+  ladeHoeheGrenze,
   type Aufbau,
 } from "./fuellgrad";
+import { getMaterial } from "../materials/catalog";
 import type { PlatzinventarPort } from "./platzinventarAbholung";
 
 /**
@@ -1251,8 +1257,11 @@ class DeliveryVehicle {
       bedLen: this.bedLen,
       // Schrotthändler fahren ihren eigenen Ladekran mit — Gewerbe und
       // Privatleute nicht. Der Kran laedt nichts ab, er gehoert zum Bild.
+      // Ein Einzelstueck (E-126) ragt ueber die Hoehe, auf der der Ausleger
+      // liegt (`vehicleModel.auslegerHoehe`) — dieser Wagen kommt ohne Kran.
       withCrane:
         this.customer?.group === "haendler" &&
+        !this.customer.einzelstueck &&
         (this.kind === "kipper" || this.kind === "pritsche"),
       // Haendler fahren nicht alle denselben Wagen: mal flache Bordwaende, mal
       // der klassische Rungenaufbau, mal ein geschlossener Kasten. Gewerbe und
@@ -1617,8 +1626,10 @@ class DeliveryVehicle {
     const anhaenger = this.kind === "pkw";
     const halbBreite = anhaenger ? ANHAENGER_HALB_BREITE : BED_HALF_W - 0.08;
     const nutzLaenge = this.bedLen - 2 * LADE_RAND;
-    const maxHoehe =
-      (anhaenger ? ANHAENGER_WAND : wandHoehe(this.kind, this.bodyStyleName)) + LADUNG_UEBERSTAND;
+    const maxHoehe = ladeHoeheGrenze(
+      anhaenger ? ANHAENGER_WAND : wandHoehe(this.kind, this.bodyStyleName),
+      !!this.customer?.einzelstueck
+    );
     return { halbBreite, nutzLaenge, maxHoehe, raum: halbBreite * 2 * nutzLaenge * maxHoehe };
   }
 
@@ -1656,9 +1667,10 @@ class DeliveryVehicle {
      */
     const c = this.customer;
     const klein = c?.group === "privat";
+    const einzel = c?.einzelstueck ?? null;
     // Jede vierte grosse Fuhre bringt ein Schwergewicht — Tank, Fahrerhaus,
     // Drehgestell. Dann passt weniger daneben, das ist gewollt.
-    const schwer = !klein && !this.sortedMaterial && Math.random() < 0.28;
+    const schwer = !einzel && !klein && !this.sortedMaterial && Math.random() < 0.28;
     /*
      * DER FUELLGRAD KOMMT VOM KUNDEN (15.09.2026, E-033 zu Ende gebracht).
      *
@@ -1705,8 +1717,39 @@ class DeliveryVehicle {
      * ohnehin gross zuerst, deshalb wird jedes Mal neu gepackt statt
      * angestueckelt.
      */
+    /*
+     * DIE EINZELSTUECK-FUHRE (E-126): genau ein Teil, MITTEN auf die Flaeche.
+     * `packeLadung` setzt ein Stueck an die erste tiefste Stelle, also in die
+     * vordere linke Ecke — fuer eine Fuhre aus Kleinkram richtig, fuer einen
+     * Minibagger nicht: Er soll mittig liegen, wo die Spinne ihn von oben
+     * fasst und die Federung ihn gleich auf beide Achsen verteilt. Ob er
+     * laengs oder quer liegt, sagt weiter `packeLadung`.
+     */
+    if (einzel) {
+      specs = [
+        {
+          materialId: einzel.materialId,
+          massKg: einzel.massKg,
+          shape: {
+            kind: einzel.kind,
+            dims: einzel.dims,
+            color: getMaterial(einzel.materialId).color,
+            bau: einzel.bau,
+            name: einzel.name,
+            zusammensetzung: einzel.zusammensetzung,
+            massiv: einzel.massiv,
+            trennbar: einzel.trennbar,
+            nurWerkzeug: einzel.nurWerkzeug,
+          },
+        },
+      ];
+      stuecke = [stueckMass(einzel.kind, einzel.dims)];
+      const lage = packeLadung(stuecke, halbBreite, nutzLaenge, maxHoehe)[0];
+      plaetze = [{ x: 0, y: 0, z: nutzLaenge / 2, quer: lage?.quer ?? false }];
+      fuellung = raum > 0 ? deckelVolumen(einzel.kind, einzel.dims) / raum : 0;
+    }
     let leerlauf = 0;
-    for (let runde = 0; runde < 12 && fuellung < zielFuellung; runde++) {
+    for (let runde = 0; !einzel && runde < 12 && fuellung < zielFuellung; runde++) {
       const erste = runde === 0;
       /*
        * Die erste Runde richtet sich nach dem ZIEL, nicht nach der Bauart.
@@ -1866,7 +1909,8 @@ class DeliveryVehicle {
       DICHTE_MAX * deckelVolumen(specs[i]!.shape.kind, specs[i]!.shape.dims) * 0.55;
     const gewicht = new Map<number, number>();
     for (const i of draufIdx) gewicht.set(i, specs[i]!.massKg);
-    if (c && summeDrauf > 0) {
+    // Ein Einzelstueck wiegt, was es wiegt — die Kundenmenge IST sein Gewicht.
+    if (c && summeDrauf > 0 && !einzel) {
       /*
        * DAS UMLEGEN HAT DIE FUHRE AUFGEFRESSEN (Befund 15.09.2026, E-044).
        *
@@ -3276,7 +3320,10 @@ export class VehicleManager {
     // Erst die Kundschaft, dann das Fahrzeug dazu: ein Privatmann kommt nicht
     // mit dem Sattelzug, und ein Abbruchbetrieb nicht mit dem PKW-Anhänger.
     // Zweimal zu würfeln hätte Fahrzeug und Kunde entkoppelt.
-    const gezogen = kunde ?? rollCustomer();
+    // Ohne verlangtes Fahrzeug kommt, wer ans Tor kommt — auch die
+    // Einzelstueck-Fuhre (E-126). Wer ein Fahrzeug verlangt (Pruefstaende,
+    // Tutorial), bekommt die gewohnte Schuettgut-Kundschaft dazu.
+    const gezogen = kunde ?? (kind ? rollCustomer() : rollAnlieferung());
     const k: DeliveryKind =
       kind ?? vehicleForCustomer(gezogen);
     const c = k === "abholer" ? null : gezogen;

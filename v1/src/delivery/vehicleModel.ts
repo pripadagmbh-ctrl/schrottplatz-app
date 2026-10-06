@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { BED_HALF_W } from "./routes";
+import { ladeHoeheGrenze } from "./fuellgrad";
 
 /**
  * Oberkante des Ladeflächen-KOLLIDERS in Flächenkoordinaten.
@@ -137,7 +138,9 @@ export function kabinenMitte(bedLen: number, mitKran: boolean): number {
  * 0,02 m UNTER dem Gelenk. Ohne Reserve stünde er also genau in der Ladung.
  */
 export function auslegerHoehe(kind: string, bodyStyle?: string): number {
-  return 1.05 + 0.1 + wandHoehe(kind, bodyStyle) + 0.35 + 0.2;
+  // Die Ladungsgrenze kommt aus `fuellgrad.ladeHoeheGrenze` (E-126) — nicht
+  // abgeschrieben. Ein Wagen mit Einzelstueck faehrt ohne Kran (`vehicles.ts`).
+  return 1.05 + 0.1 + ladeHoeheGrenze(wandHoehe(kind, bodyStyle)) + 0.2;
 }
 
 /**
