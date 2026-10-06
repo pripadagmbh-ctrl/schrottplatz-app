@@ -57,6 +57,9 @@ import { WEIGH_X, WEIGH_Z, KAFFEE_POS } from "./world/yard";
 import { setBaggerOrt } from "./delivery/routes";
 import { clearSave, readSave, speichereGreifer, storeSave, type SaveData } from "./core/save";
 import { Zwischenbild } from "./core/zwischenbild";
+import { BETRIEB, NUR_IM_BETRIEB, NUR_IM_SIMULATOR } from "./core/spielart";
+import { waehleSpielart } from "./ui/hauptmenue";
+import { NACHSCHUB_FOLGE, NACHSCHUB_MELDUNG, profilFuer } from "./delivery/nachschub";
 
 const FIXED_DT = 1 / 60;
 const MAX_STEPS_PER_FRAME = 5; // Spiral-of-death-Schutz
@@ -74,7 +77,15 @@ const LADUNG_TAKT_S = 0.25;
 const RECOUNT_INTERVAL = 10; // Container-Zählung alle 10 Steps
 
 async function main(): Promise<void> {
-  await initPhysics();
+  const physikBereit = initPhysics();
+  /*
+   * Hauptmenue (E-118). Im Simulator wird erst gewaehlt, dann gebaut — so kann
+   * eine Challenge (Etappe 3) ihren eigenen Platz bekommen. Die Physik laedt
+   * derweil schon. Im Betrieb gibt es kein Menue, es geht direkt los wie bis
+   * E-117.
+   */
+  if (!BETRIEB) await waehleSpielart();
+  await physikBereit;
   document.getElementById("loading")!.remove();
 
   // --- Renderer & Szene ---
@@ -127,6 +138,17 @@ async function main(): Promise<void> {
   const bus = new EventBus();
   const physics = new PhysicsWorld();
   const input = new Input(renderer.domElement);
+  /*
+   * Was nur zur anderen Spielart gehoert, kommt aus dem Bild (E-118, Liste in
+   * core/spielart.ts). VOR dem Touch-Aufbau: Der Kranz liest seine Eintraege
+   * einmal beim Start, darum werden Kranz-Spans entfernt. Alles andere wird
+   * nur verborgen — HUD und Pausenmenue greifen es fest.
+   */
+  for (const id of BETRIEB ? NUR_IM_SIMULATOR : NUR_IM_BETRIEB) {
+    const el = document.getElementById(id)!;
+    if (el.closest(".hidden-actions")) el.remove();
+    else el.style.setProperty("display", "none", "important");
+  }
   const touch = new TouchControls(renderer.domElement);
   // Der Platz baut sich selbst; ein Handle brauchen wir nicht mehr, seit die
   // Schrottberge nur noch Kulisse ausserhalb der Mauer sind.
@@ -635,7 +657,8 @@ async function main(): Promise<void> {
      * Pruefung zuerst, kaeme das Zerlegen nie dran.
      */
     if (it && items.brauchtWerkzeug(it)) {
-      hud.toast(`${it.shape?.name ?? "Das Teil"} braucht Werkzeug — Arbeit für Lambert.`);
+      // Im Simulator gibt es keinen Lambert (E-118) — dann bleibt es beim Befund
+      hud.toast(`${it.shape?.name ?? "Das Teil"} braucht Werkzeug${BETRIEB ? " — Arbeit für Lambert" : ""}.`);
       return false;
     }
     if (!it || (!items.isCrushable(it) && !items.istTrennbar(it))) return false;
@@ -1004,6 +1027,52 @@ async function main(): Promise<void> {
     }
   };
 
+  /*
+   * SIMULATOR: ABHAENGEN (E-118, Patrick 06.10.2026: „Abschalten, im Code
+   * lassen").
+   *
+   * Oben ist alles verdrahtet wie im Betrieb — und bleibt es, damit der
+   * Rueckweg ein Wort in core/spielart.ts ist. Hier wird im Simulator wieder
+   * abgehaengt, was Geld, Kundschaft und Belegschaft ins Bild bringt. Die
+   * Fahrzeuge selbst fahren weiter: ueber die Waage, aber ohne Wiegung, ohne
+   * Verhandeln, ohne Bezahlung. Fuhren kommen nur noch auf NACHSCHUB.
+   *
+   * Was die Bildschleife je Bild rechnet (Tagesablauf, Feierabend, Funk,
+   * Tutorial, Kasse), steht dort unter `if (BETRIEB)`.
+   */
+  if (!BETRIEB) {
+    const stumm = [
+      "onWeighIn", // Wiegemeldung und Verhandeln an der Waage
+      "onWeighOut", // Bezahlung der Fuhre
+      "onCustomerArrived", // Begruessung der Kundschaft
+      "onPickupFunk", // Funk der Fahrer
+      "onAbholerTara", // Wiegungen des Abholers
+      "onAbholerBrutto",
+      "onPickupDepart", // Verkauf beim Abholer
+    ] as const;
+    for (const k of stumm) vehicles[k] = null;
+    vehicles.acceptDeliveries = false; // keine Fuhren nach Uhr
+    staff.ausblenden(); // Mario, Janine, Lambert, Radlader
+    excavator.getStaffPos = null; // ein unsichtbarer Lambert ist kein Hindernis
+    hud.preiseZeigen = false; // Griff-Info ohne €/t
+    containers.preiseZeigen = false; // Muldenschild ohne Erloes
+  }
+  /*
+   * NACHSCHUB (E-118): Kipper, Pritsche, Wrack reihum, ohne Waage und ohne
+   * Geld. Steht noch eine Fuhre auf dem Platz, wartet der Knopf — eine
+   * zweite im Anflug haette keinen Abladeplatz.
+   */
+  let nachschubNr = 0;
+  const holeNachschub = (): void => {
+    if (vehicles.activeKind !== null) {
+      hud.toast("Noch eine Fuhre auf dem Platz — Nachschub erst, wenn sie weg ist.");
+      return;
+    }
+    const profil = profilFuer(NACHSCHUB_FOLGE[nachschubNr++ % NACHSCHUB_FOLGE.length]);
+    vehicles.spawnNow(profil.vehicle, profil);
+    hud.toast(NACHSCHUB_MELDUNG[profil.vehicle]);
+  };
+
   // --- Fester Physik-Step, von Loop und Test-Handle gemeinsam genutzt ---
   let stepCount = 0;
   /** Bildschleife rechnet selbst? Beim Messen von aussen abschaltbar. */
@@ -1055,8 +1124,11 @@ async function main(): Promise<void> {
     fence.update();
     vehicles.update(FIXED_DT);
     press.update(FIXED_DT);
-    staff.update(FIXED_DT, vehicles.maneuveringTruck());
-    polizei.update(FIXED_DT);
+    // Belegschaft und Streifenwagen gibt es nur im Betrieb (E-118)
+    if (BETRIEB) {
+      staff.update(FIXED_DT, vehicles.maneuveringTruck());
+      polizei.update(FIXED_DT);
+    }
     stepCount++;
     if (stepCount % RECOUNT_INTERVAL === 0) {
       const grippedHandles = new Set(grip.grippedBodies.map((b) => b.handle));
@@ -1194,7 +1266,9 @@ async function main(): Promise<void> {
     }
     // Abholung: steht ein beladener Container bereit, fährt er ab —
     // sonst öffnet die Bestellung, in der die Fraktion gewählt wird
-    if (input.wasPressed("KeyV") || touch.consumePress("KeyV")) {
+    if (!BETRIEB && (input.wasPressed("Digit1") || touch.consumePress("Digit1"))) holeNachschub();
+    // Abholung, Lambert und Ausbau gibt es nur im Betrieb (E-118)
+    if (BETRIEB && (input.wasPressed("KeyV") || touch.consumePress("KeyV"))) {
       if (vehicles.pickupTruck?.waitingForLoad) {
         vehicles.requestPickup();
         hud.toast("Container geht raus …");
@@ -1212,7 +1286,7 @@ async function main(): Promise<void> {
      * Sortierboxen leer und faehrt das Material zu der Mulde seiner Fraktion
      * an der Ostwand. Von sich aus kommt er nicht mehr.
      */
-    if (input.wasPressed("KeyY") || touch.consumePress("KeyY")) {
+    if (BETRIEB && (input.wasPressed("KeyY") || touch.consumePress("KeyY"))) {
       const antwort = staff.rufeLambert();
       hud.toast(
         antwort === "kommt"
@@ -1228,7 +1302,7 @@ async function main(): Promise<void> {
       if (r === "geschickt") hud.toast("Der Fahrer faehrt zur Waage.");
       else hud.toast("Gerade ist kein Fahrzeug auf dem Platz.");
     }
-    if (input.wasPressed("KeyZ") || touch.consumePress("KeyZ")) zeigeAusbau();
+    if (BETRIEB && (input.wasPressed("KeyZ") || touch.consumePress("KeyZ"))) zeigeAusbau();
     if (input.wasPressed("KeyU") || touch.consumePress("KeyU")) {
       hud.toast(radioWeiter(audio));
     }
@@ -1416,67 +1490,74 @@ async function main(): Promise<void> {
       if (gespart > 0) hud.toast(`${gespart} Kleinteile zu Bündeln zusammengefasst`);
     }
     lanes.update(frameDt);
-    // Störfall nur beim Wechsel melden, nicht in Dauerschleife
-    if (lanes.blocked !== stoerfallGemeldet) {
-      stoerfallGemeldet = lanes.blocked;
-      hud.toast(lanes.blocked ? lanes.message + " — freiräumen!" : "Fahrspur wieder frei.");
-    }
     /*
-     * Hier wird zugestellt — auch fuer Mario und Janine. Ihre Sprueche warten
-     * 3,5 s auf ihren Anlass, damit sie die Maschinenmeldung nicht
-     * ueberschreiben; ohne diesen Aufruf kaeme keiner davon je an.
+     * Tagesablauf, Feierabend, Funk, Tutorial, Kasse und Fahrspur-Meldung
+     * gibt es nur im Betrieb (E-118). Im Simulator laeuft keine Uhr ab, und
+     * Fuhren kommen nur auf NACHSCHUB.
      */
-    funk.platzlage({
-      loseKg: looseKg,
-      spurBlockiert: lanes.blocked,
-      lambertArbeitet: staff.lambertArbeitet,
-    });
-    if (
-      tutorial.update(frameDt, {
-        verhandeltGerade: haggleEl.classList.contains("open"),
-        preisVereinbart: tutPreis,
-        looseKg,
-        sortiertKg: tutSortiertKg,
-        gepresst: tutGepresst,
-        abholerBestellt: tutAbholer,
-        turnoverKg: shift.turnoverKg,
-      })
-    ) {
-      zeigeTutorial();
-    }
-    shift.update(frameDt, looseKg, daylight.time);
-    abrechnung.takt();
-    // Zahlungsdruck: Wer die Ware nicht bezahlen kann, bekommt keine mehr.
-    // Erst wenn wieder Geld hereinkommt, liefern die Händler weiter.
-    vehicles.acceptDeliveries = shift.acceptsDeliveries && account.canBuy;
-    if (!account.canBuy !== zahlungsUnfaehig) {
-      zahlungsUnfaehig = !account.canBuy;
-      if (zahlungsUnfaehig) {
-        hud.toast("Konto leer — es liefert niemand mehr. Erst verkaufen, dann ankaufen!");
-      } else {
-        hud.toast("Wieder zahlungsfähig — die Händler kommen zurück.");
+    if (BETRIEB) {
+      // Störfall nur beim Wechsel melden, nicht in Dauerschleife
+      if (lanes.blocked !== stoerfallGemeldet) {
+        stoerfallGemeldet = lanes.blocked;
+        hud.toast(lanes.blocked ? lanes.message + " — freiräumen!" : "Fahrspur wieder frei.");
       }
+      /*
+       * Hier wird zugestellt — auch fuer Mario und Janine. Ihre Sprueche warten
+       * 3,5 s auf ihren Anlass, damit sie die Maschinenmeldung nicht
+       * ueberschreiben; ohne diesen Aufruf kaeme keiner davon je an.
+       */
+      funk.platzlage({
+        loseKg: looseKg,
+        spurBlockiert: lanes.blocked,
+        lambertArbeitet: staff.lambertArbeitet,
+      });
+      if (
+        tutorial.update(frameDt, {
+          verhandeltGerade: haggleEl.classList.contains("open"),
+          preisVereinbart: tutPreis,
+          looseKg,
+          sortiertKg: tutSortiertKg,
+          gepresst: tutGepresst,
+          abholerBestellt: tutAbholer,
+          turnoverKg: shift.turnoverKg,
+        })
+      ) {
+        zeigeTutorial();
+      }
+      shift.update(frameDt, looseKg, daylight.time);
+      abrechnung.takt();
+      // Zahlungsdruck: Wer die Ware nicht bezahlen kann, bekommt keine mehr.
+      // Erst wenn wieder Geld hereinkommt, liefern die Händler weiter.
+      vehicles.acceptDeliveries = shift.acceptsDeliveries && account.canBuy;
+      if (!account.canBuy !== zahlungsUnfaehig) {
+        zahlungsUnfaehig = !account.canBuy;
+        if (zahlungsUnfaehig) {
+          hud.toast("Konto leer — es liefert niemand mehr. Erst verkaufen, dann ankaufen!");
+        } else {
+          hud.toast("Wieder zahlungsfähig — die Händler kommen zurück.");
+        }
+      }
+      vehicles.intervalFactor = shift.intervalFactor(looseKg);
+      /*
+       * Und dieselbe Lage noch einmal als STEHENDE Zeile (E-081).
+       *
+       * Der Toast oben meldet den Wechsel und ist nach 2,6 s weg — der Zustand
+       * bleibt. „Platz dicht" steht seit jeher im Tagesablauf; die Zahlungslage
+       * steht ab hier daneben, in derselben Zeile und mit denselben Mitteln.
+       * Entschieden wird sie hier, aus denselben zwei Fragen, die auch die
+       * Einfahrt oben aufmachen oder zumachen — das HUD bekommt nur das Wort.
+       */
+      const kassenlage: Zahlungslage = !account.canBuy
+        ? "leer"
+        : account.lowOnCash
+          ? "knapp"
+          : "ok";
+      hud.updateShift(
+        `${daylight.clock} · ${shift.statusText(looseKg)}`,
+        shift.jammed,
+        kassenlage
+      );
     }
-    vehicles.intervalFactor = shift.intervalFactor(looseKg);
-    /*
-     * Und dieselbe Lage noch einmal als STEHENDE Zeile (E-081).
-     *
-     * Der Toast oben meldet den Wechsel und ist nach 2,6 s weg — der Zustand
-     * bleibt. „Platz dicht" steht seit jeher im Tagesablauf; die Zahlungslage
-     * steht ab hier daneben, in derselben Zeile und mit denselben Mitteln.
-     * Entschieden wird sie hier, aus denselben zwei Fragen, die auch die
-     * Einfahrt oben aufmachen oder zumachen — das HUD bekommt nur das Wort.
-     */
-    const kassenlage: Zahlungslage = !account.canBuy
-      ? "leer"
-      : account.lowOnCash
-        ? "knapp"
-        : "ok";
-    hud.updateShift(
-      `${daylight.clock} · ${shift.statusText(looseKg)}`,
-      shift.jammed,
-      kassenlage
-    );
     excavator.updateInstruments(frameDt);
     containers.updateLabels(orbit.camera.position);
     // Bewegliche Behaelter sind Hindernisse wie jedes Bauwerk — nur wandern
@@ -1511,7 +1592,9 @@ async function main(): Promise<void> {
       ladungTakt = 0;
       hud.updateLoad(null, 1, null);
     }
-    hud.updateMoney(account.moneyEur, containers.totalValue());
+    if (BETRIEB) {
+      hud.updateMoney(account.moneyEur, containers.totalValue());
+    }
     audio.updateEngine(excavator.activity, Math.min(grip.totalMassKg / 2000, 1));
     // Platzkulisse: Wind, ferne Schlaege, Flex, Kraehen — und der
     // Rueckfahrwarner, solange ein LKW rangiert.
@@ -1570,6 +1653,7 @@ async function main(): Promise<void> {
     input.endFrame();
     requestAnimationFrame(frame);
   }
+  if (!BETRIEB) hud.toast("Sandkasten: Der Platz gehört dir. NACHSCHUB im Funktionskranz holt eine Fuhre.");
   requestAnimationFrame(frame);
 }
 

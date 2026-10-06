@@ -1769,7 +1769,7 @@ class GameContainer {
    * darüber steht, kommen Füllung, Sortenreinheit und Erlös dazu — dann
    * braucht man sie auch (Design-Fix 29.08.2026).
    */
-  refreshLabel(ampel: AmpelState | null = null): void {
+  refreshLabel(ampel: AmpelState | null = null, mitPreis = true): void {
     if (ampel === null) {
       this.label.draw([this.cfg.label], null);
       return;
@@ -1778,7 +1778,8 @@ class GameContainer {
       [
         this.cfg.label,
         `${this.contentKg.toFixed(0)} kg · ${(this.purity * 100).toFixed(0)} %`,
-        `≈ ${this.value.toFixed(0)} €`,
+        // Im Simulator (E-118) gibt es kein Geld — dann auch keinen Erlös am Schild
+        ...(mitPreis ? [`≈ ${this.value.toFixed(0)} €`] : []),
       ],
       ampel
     );
@@ -1877,6 +1878,8 @@ class ContainerLabel {
 export class ContainerManager {
   readonly containers: GameContainer[] = [];
   private hovered: GameContainer | null = null;
+  /** Erlös am Schild zeigen? Im Simulator (E-118) setzt `main.ts` das auf false. */
+  preiseZeigen = true;
 
   constructor(scene: THREE.Scene, world: RAPIER.World, private bus: EventBus) {
     for (const cfg of CONFIGS) {
@@ -1962,7 +1965,7 @@ export class ContainerManager {
       if (!gehoertHierhin(c.cfg, item.materialId)) c.contaminationKg += item.massKg;
     }
     for (const c of this.containers) {
-      c.refreshLabel(c === this.hovered ? this.hoverAmpel : null);
+      c.refreshLabel(c === this.hovered ? this.hoverAmpel : null, this.preiseZeigen);
       c.wiegeLadung();
     }
 
@@ -2004,10 +2007,10 @@ export class ContainerManager {
     }
     if (over !== this.hovered) {
       this.hovered?.refreshLabel(null);
-      over?.refreshLabel(this.hoverAmpel);
+      over?.refreshLabel(this.hoverAmpel, this.preiseZeigen);
       this.hovered = over;
     } else if (over) {
-      over.refreshLabel(this.hoverAmpel);
+      over.refreshLabel(this.hoverAmpel, this.preiseZeigen);
     }
     return result;
   }

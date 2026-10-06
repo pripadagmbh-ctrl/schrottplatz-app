@@ -139,6 +139,8 @@ const TASTEN: Record<string, Zeile> = {
   KeyV: { wirkung: "Abholung rufen/abfahren", touch: "Kranz: ABHOLEN" },
   KeyJ: { wirkung: "zur Waage schicken", touch: "Kranz: ZUR WAAGE" },
   KeyY: { wirkung: "Lambert rufen", touch: "Kranz: LAMBERT" },
+  // E-118: nur im Simulator; ABHOLEN und LAMBERT gibt es dort nicht
+  Digit1: { wirkung: "Nachschub holen", touch: "Kranz: NACHSCHUB" },
   /*
    * E-093: SCHILDER zog aus dem Kranz ins Pausenmenue (`pause-markierungen`).
    * Der Waechter wurde dafuer NICHT gelockert — er verlangt fuer „Menue: …"

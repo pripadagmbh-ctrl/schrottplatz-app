@@ -431,6 +431,8 @@ type LambertState =
 export class StaffManager {
   private lambert: PersonParts;
   private mario!: PersonParts;
+  /** Nur fuer `ausblenden()` gemerkt; sonst steht sie still im Kaffeewagen. */
+  private janine!: PersonParts;
   /** Wohin Mario zur Kontrolle geht und wohin er zurueckkehrt */
   private readonly pruefPos = new THREE.Vector3();
   private readonly bueroTuer = new THREE.Vector3();
@@ -779,6 +781,7 @@ export class StaffManager {
     janine.legLeft.visible = false; // steht hinter der Theke
     janine.legRight.visible = false;
     wagen.add(janine.group);
+    this.janine = janine;
 
     // Lambert Prison — Platzwart in Warnweste
     this.lambert = buildPerson({ shirt: 0xf2c018, trousers: 0x2f3a45, hair: 0x5a4632 });
@@ -799,6 +802,20 @@ export class StaffManager {
     vest.position.set(0, 1.08, 0);
     this.lambert.group.add(vest);
     this.lambertTarget.copy(RAEUMT_AUF ? this.patrol[1] : OSTPOSTEN);
+  }
+
+  /**
+   * Simulator ohne Belegschaft (E-118): Mario, Janine, Lambert und sein
+   * Radlader sind nicht zu sehen. Angelegt bleiben sie — der Code bleibt im
+   * Spiel, und `main.ts` ruft dann `update` nicht auf, also bewegt sich auch
+   * niemand unsichtbar ueber den Platz. Der Kaffeewagen bleibt stehen: Er ist
+   * Kulisse und steht als festes Hindernis in `obstacles.ts`.
+   */
+  ausblenden(): void {
+    this.mario.group.visible = false;
+    this.janine.group.visible = false;
+    this.lambert.group.visible = false;
+    this.loader?.setVisible(false);
   }
 
   /*

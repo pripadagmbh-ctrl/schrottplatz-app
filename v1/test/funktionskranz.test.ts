@@ -136,7 +136,15 @@ describe("Funktionskranz: sieben Eintraege, und was der achte bis zehnte kosten"
      * gemeldet, aber erst nachdem jemand darauf getippt haette.
      */
     expect(labels, "der Kippknopf steht wieder im Kranz").not.toContain("KIPPEN");
-    expect(labels.length, `der Kranz hat ${labels.length} statt sieben Eintraege`).toBe(7);
+    /*
+     * E-118 (06.10.2026): Auf der SEITE stehen acht — NACHSCHUB kam fuer den
+     * Simulator dazu. Im SPIEL sind es nie mehr als sieben: `main.ts` nimmt je
+     * Spielart heraus, was nicht dazugehoert (Liste in `core/spielart.ts`) —
+     * im Simulator ABHOLEN und LAMBERT (also sechs), im Betrieb NACHSCHUB.
+     * Gemessen wird unten trotzdem mit allen acht, also mit dem engsten Fall.
+     */
+    expect(labels.length, `der Kranz hat ${labels.length} statt acht Eintraege`).toBe(8);
+    expect(labels, "NACHSCHUB fehlt auf der Seite (E-118)").toContain("NACHSCHUB");
   });
 
   it("SCHILDER ist NICHT mehr dabei — es steht im Pausenmenue (E-093)", () => {

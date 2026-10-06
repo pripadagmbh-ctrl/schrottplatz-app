@@ -700,6 +700,41 @@
         }
         #tutorial p { font-size: 11px; }
       }
+      /* --- Hauptmenue (E-118) ---
+         Steht VOR dem Aufbau der Welt, darum deckend statt durchscheinend:
+         Dahinter ist noch nichts. Knoepfe wie im Pausenfeld, die Erklaerzeile
+         13 px, damit sie auf dem iPhone mini lesbar bleibt. */
+      #hauptmenue {
+        display: none; position: fixed; inset: 0; z-index: 30;
+        background: #1a1c1e; align-items: center; justify-content: center;
+        padding: var(--sa-t) var(--sa-r) var(--sa-b) var(--sa-l);
+        box-sizing: border-box;
+      }
+      #hauptmenue.open { display: flex; }
+      #hauptmenue .panel {
+        background: rgba(24,27,30,0.96); border: 2px solid rgba(255,255,255,0.18);
+        border-radius: 14px; padding: 24px 28px; text-align: center;
+        min-width: 260px; max-width: 420px; box-sizing: border-box;
+        max-height: 88vh; overflow-y: auto; -webkit-overflow-scrolling: touch;
+        color: #e8e8e4; font-family: "Consolas", monospace;
+      }
+      #hauptmenue h1 { margin: 0 0 4px; font-size: 24px; letter-spacing: 4px; color: #f0b429; }
+      #hauptmenue .sub { margin: 0 0 16px; font-size: 13px; color: #9aa2a8; }
+      #hauptmenue button {
+        display: block; width: 100%; margin: 10px 0; padding: 14px 18px; cursor: pointer;
+        background: rgba(46,52,57,0.95); color: #e8e8e4; font: 700 17px "Consolas", monospace;
+        letter-spacing: 2px; border: 2px solid rgba(255,255,255,0.22); border-radius: 9px;
+        touch-action: manipulation;
+      }
+      #hauptmenue button small {
+        display: block; margin-top: 5px; font-weight: 400; font-size: 13px;
+        letter-spacing: 0; line-height: 1.45; color: #9aa2a8;
+      }
+      #hauptmenue button:hover:not(:disabled), #hauptmenue button:active:not(:disabled) {
+        background: rgba(240,180,41,0.75); color: #1a1c1e;
+      }
+      #hauptmenue button:hover:not(:disabled) small { color: #3a3020; }
+      #hauptmenue button:disabled { opacity: 0.45; cursor: default; }
       /* --- Dialoge: Abholung bestellen, Verhandeln, Platz ausbauen ---
          Ein gemeinsamer Stil für alle drei. Sie waren zuvor ohne jede Regel
          im Dokument und wurden dadurch unsichtbar hinter dem Bild gerendert:
@@ -877,6 +912,7 @@
       Y&nbsp;&nbsp;Lambert rufen (räumt die Sortierboxen leer)<br />
       I&nbsp;&nbsp;Räumschild heben/senken<br />
       J&nbsp;&nbsp;LKW zur Waage schicken &nbsp;·&nbsp; U&nbsp;&nbsp;Radio<br />
+      1&nbsp;&nbsp;Nachschub holen (Sandkasten)<br />
       M&nbsp;&nbsp;Markierungen an/aus &nbsp;·&nbsp; K&nbsp;&nbsp;Speichern<br />
       ESC oder P&nbsp;&nbsp;Pause<br />
       Z&nbsp;&nbsp;Platz ausbauen (Maschinen kaufen)<br />
@@ -947,6 +983,10 @@
         <span id="btn-pickup">ABHOLEN</span>
         <span id="btn-away">ZUR WAAGE</span>
         <span id="btn-lambert">LAMBERT</span>
+        <!-- Nur im Simulator (E-118): eine neue Fuhre ohne Waage und ohne Geld.
+             ABHOLEN und LAMBERT nimmt main.ts dort heraus, NACHSCHUB im
+             Betrieb — der Kranz zeigt also nie mehr als sieben. -->
+        <span id="btn-nachschub">NACHSCHUB</span>
       </div>
       <!-- Nicht auf den Joystickkopf: Ausbau, Musik, Pause und die
            Zonenmarkierungen sind keine Maschinenfunktionen. Sie liegen hinter
@@ -1080,6 +1120,18 @@
         <p class="sub" id="abr-sterne"></p>
         <div id="abr-zahlen"></div>
         <button id="abr-weiter">WEITER</button>
+      </div>
+    </div>
+    <!-- Hauptmenue (E-118). Steht vor dem Aufbau der Welt; main.ts wartet auf
+         die Wahl. Etappe 3 haengt die Challenges als Knoepfe in
+         #hm-challenges — der Kasten ist heute leer. -->
+    <div id="hauptmenue">
+      <div class="panel">
+        <h1>RUSTNREIBACH</h1>
+        <p class="sub">Bagger-Simulator</p>
+        <button id="hm-sandkasten">SANDKASTEN<small>Der Platz voller Schrott und Wracks. Ohne Ziel, ohne Uhr — zum Üben und Kaputtmachen.</small></button>
+        <button id="hm-challenges-knopf" disabled>CHALLENGES<small>Kommen als Nächstes — noch nicht spielbar.</small></button>
+        <div id="hm-challenges"></div>
       </div>
     </div>
     <div id="loading">Lade Physik …</div>

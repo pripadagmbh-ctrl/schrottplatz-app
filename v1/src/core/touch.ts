@@ -181,6 +181,8 @@ export class TouchControls {
     this.bindTap("btn-away", "KeyJ");
     this.bindTap("btn-lambert", "KeyY");
     this.bindTap("btn-blade", "KeyI");
+    // E-118: nur im Simulator auf der Seite; im Betrieb nimmt main.ts den Span heraus
+    this.bindTap("btn-nachschub", "Digit1");
     // Menue statt Kranz: Diese Spans tragen nur den Tastencode. Gedrueckt
     // werden sie nie — die echten Knoepfe stehen im Pausenfeld.
     this.bindTap("btn-music", "KeyU");

@@ -158,10 +158,12 @@ function mitFraktion(item: GriffStueck): string {
  * Es ist ein einzelnes Stueck, also eine begrenzte Zeile — hier gibt es nichts
  * zu kuerzen.
  */
-export function griffZiel(item: GriffStueck): GriffZeilen {
+export function griffZiel(item: GriffStueck, mitPreis = true): GriffZeilen {
   const mat = getMaterial(item.materialId);
+  // Im Simulator (E-118) gibt es kein Geld — dann endet die Zeile beim Gewicht
+  const preis = mitPreis ? ` · ${preisProTonne(mat)} ${euroIndicator(mat)}` : "";
   return {
-    kopf: `▼ ${mitFraktion(item)} · ${masseText(item.massKg)} · ${preisProTonne(mat)} ${euroIndicator(mat)}`,
+    kopf: `▼ ${mitFraktion(item)} · ${masseText(item.massKg)}${preis}`,
     liste: "",
   };
 }
@@ -350,6 +352,8 @@ export class Hud {
   private loadEl = document.getElementById("load");
   private shiftEl = document.getElementById("shift");
   private displayedValue = 0;
+  /** Preis in der Griff-Info zeigen? Im Simulator (E-118) setzt `main.ts` das auf false. */
+  preiseZeigen = true;
 
   /**
    * Schreibt beide Zeilen der Griff-Info.
@@ -403,7 +407,7 @@ export class Hud {
       this.verbergeGriff();
       return;
     }
-    this.setzeGriff(griffZiel(item), false);
+    this.setzeGriff(griffZiel(item, this.preiseZeigen), false);
   }
 
   /** Griff-Info beim Tragen: Ladungsliste + Ampel. */
