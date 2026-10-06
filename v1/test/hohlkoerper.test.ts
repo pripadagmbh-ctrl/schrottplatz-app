@@ -73,8 +73,8 @@ describe("Hohlkoerper (E-124)", () => {
     expect(werkbank("c").car.kolliderZahl).toBe(FORM_C.bleche!.length);
     expect(FORM_C.bleche!.length).toBe(8);
     expect(werkbank("bestand").car.kolliderZahl).toBe(1);
-    // Kollider 0 ist der Boden: Der Bagger fragt in `krallenKontakte` NUR ihn
-    // (gemessen: ohne Bodenwanne bis 0,58 m liess sich das Wrack nicht mehr fassen).
+    // Kollider 0 ist der Boden und traegt die Masse. Der Bagger fragt seit
+    // E-127 in `krallenKontakte` alle Kollider, nicht mehr nur ihn.
     expect(FORM_C.bleche![0]!.name).toBe("Boden");
     expect(FORM_C.bleche![0]!.max).toBe(0);
   });
@@ -171,6 +171,50 @@ describe("Hohlkoerper (E-124)", () => {
     }
     expect(dachkante, "das Dach ist sichtbar eingedrueckt").toBeGreaterThan(0.15);
     expect(guertel, "die Guertellinie unter dem Dach bleibt stehen").toBeLessThan(0.01);
+  });
+
+  it("die Bodenwanne endet am Schweller (0,32 m), und alles Uebrige steht lueckenlos darauf (E-127)", () => {
+    const [boden, ...rest] = FORM_C.bleche!;
+    const oben = boden!.mitte[1] + boden!.halb[1];
+    // Ebene 1 der Fassung C ist die Schwellerkante
+    expect(oben).toBeCloseTo(FORM_C.ebenen[1]!, 9);
+    for (const b of rest) {
+      if (b.name === "Dach") continue; // liegt auf dem Glashaus, nicht auf dem Boden
+      expect(b.mitte[1] - b.halb[1], `${b.name} steht auf dem Boden, ohne Spalt`).toBeCloseTo(oben, 9);
+    }
+  });
+
+  it("die Tuer gibt bis zum Schweller nach, nicht nur bis zur Sicke (E-127)", () => {
+    const { world, bus, comps, car } = werkbank("c");
+    let karosse: THREE.Mesh | null = null;
+    car.group.traverse((o) => {
+      if (!karosse && (o as THREE.Mesh).isMesh && (o as THREE.Mesh).geometry.getAttribute("color")) karosse = o as THREE.Mesh;
+    });
+    const attr = (karosse as unknown as THREE.Mesh).geometry.getAttribute("position") as THREE.BufferAttribute;
+    const vorher = new Float32Array(attr.array as Float32Array);
+    for (let i = 0; i < 30; i++) world.step();
+    spinneAuf(world, 0.77, 0.34, 0.92);
+    car.body.wakeUp();
+    world.step();
+    comps.update();
+    biss(bus, car);
+    expect(blech(car, "Tür vorn rechts")).toBeCloseTo(0.2, 6);
+    // Wie weit geht die rechte Flanke unter der Tuer je Hoehe nach innen?
+    const nachInnen = (hoehe: number): number => {
+      let m = 0;
+      for (let i = 0; i < attr.count; i++) {
+        const [x0, y0, z0] = [vorher[i * 3]!, vorher[i * 3 + 1]!, vorher[i * 3 + 2]!];
+        if (x0 > 0.3 && Math.abs(y0 - hoehe) < 0.005 && z0 > 0 && z0 < 0.7) m = Math.max(m, x0 - attr.getX(i));
+      }
+      return m;
+    };
+    /*
+     * Gemessen 06.10.2026 bei 0,20 m Eindruck (Knitter ±20 %, dazu die Beule):
+     *   Hoehe        0,20   0,32   0,46   0,58
+     *   Boden 0,58   0,000  0,022  0,072  0,196   (E-124)
+     *   Boden 0,32   0,136  0,166  0,120  0,196   (E-127)
+     */
+    for (const h of [0.2, 0.32, 0.46]) expect(nachInnen(h), `Flanke auf ${h} m`).toBeGreaterThan(0.1);
   });
 
   it("Eindruecken kostet keine Masse (E-114): nur herausgerissene Teile machen das Wrack leichter", () => {

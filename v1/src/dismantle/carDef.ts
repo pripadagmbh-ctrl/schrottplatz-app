@@ -53,6 +53,13 @@ export interface AnbauDef {
   anchor: [number, number, number];
   /** Auch spiegelbildlich auf der anderen Seite bauen (Leuchten, Spiegel). */
   paarweise?: boolean;
+  /**
+   * x kommt aus der Karosserie statt aus `anchor[0]` (E-127): Die Innenseite
+   * liegt an der breitesten Stelle der Flanke, die das Teil auf seiner Höhe
+   * berührt (`aufDieFlanke` in `wrackformen.ts`). Nur bei Fassungen mit
+   * Längsschnitt; `anchor[0]` steht dann auf 0 und wird nicht gelesen.
+   */
+  amFlanke?: boolean;
   /** sRGB-Hex; wandert in die Eckpunktfarben des gemeinsamen Netzes. */
   farbe: number;
 }

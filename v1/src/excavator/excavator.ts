@@ -3192,10 +3192,19 @@ export class Excavator {
    * der Spinne liegen"). Wer wirklich gefasst ist, hat mehrere Schalen an sich.
    *
    * Geprueft werden Spitze und Mitte jeder Kralle gegen die Oberflaeche.
+   *
+   * ALLE Kollider des Koerpers, nicht nur Kollider 0 (E-127): Das Wrack der
+   * Fassung C ist ein Verbund aus acht Blechen (E-124), und eine Schale an der
+   * Tuer liegt an der Tuer an, nicht an der Bodenwanne. Eine Kralle zaehlt,
+   * wenn sie irgendeinem Kollider nahe ist. Bei einem Kollider ist das
+   * dieselbe Rechnung wie vorher, Abfrage fuer Abfrage
+   * (`test/krallenkontakte.test.ts`).
    */
   krallenKontakte(body: RAPIER.RigidBody): number {
-    const col = body.collider(0);
-    if (!col) return 0;
+    // Ein entfernter Koerper zerstoert sonst die ganze Physikwelt (E-103).
+    if (!body.isValid()) return 0;
+    const n = body.numColliders();
+    if (n === 0) return 0;
     this.grappleGroup.updateWorldMatrix(true, false);
     let treffer = 0;
     for (let c = 0; c < this.form.schalen; c++) {
@@ -3205,17 +3214,19 @@ export class Excavator {
       for (const seg of [this.form.stationen, Math.round(this.form.stationen * 0.6)]) {
         this.form.punkt(a, splay, seg, this.clawA);
         this.clawA.applyMatrix4(this.grappleGroup.matrixWorld);
-        const pr = col.projectPoint({ x: this.clawA.x, y: this.clawA.y, z: this.clawA.z }, false);
-        if (!pr) continue;
-        const d = Math.hypot(
-          pr.point.x - this.clawA.x,
-          pr.point.y - this.clawA.y,
-          pr.point.z - this.clawA.z
-        );
-        if (pr.isInside || d <= KONTAKT_NAH) {
-          nah = true;
-          break;
+        for (let i = 0; i < n && !nah; i++) {
+          const col = body.collider(i);
+          if (!col.isValid()) continue;
+          const pr = col.projectPoint({ x: this.clawA.x, y: this.clawA.y, z: this.clawA.z }, false);
+          if (!pr) continue;
+          const d = Math.hypot(
+            pr.point.x - this.clawA.x,
+            pr.point.y - this.clawA.y,
+            pr.point.z - this.clawA.z
+          );
+          nah = pr.isInside || d <= KONTAKT_NAH;
         }
+        if (nah) break;
       }
       if (nah) treffer++;
     }

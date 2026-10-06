@@ -76,9 +76,69 @@ export const ANBAU_E116: AnbauDef[] = [
   // Farben mit eingerechnetem Eigenleuchten, wie in `CAR_DEF` (E-111).
   { name: "Scheinwerfer", size: [0.28 / 1.7, 0.14, 0.06], anchor: [0.44 / 0.85, 0.56, 2.0 / 2.0], paarweise: true, farbe: 0xfffff4 },
   { name: "Rückleuchte", size: [0.26 / 1.7, 0.2, 0.06], anchor: [0.46 / 0.85, 0.58, -2.0 / 2.0], paarweise: true, farbe: 0xb82b1e },
-  // Unverändert: der Spiegel steht über die Karosserie hinaus, sein Anteil ist > 1.
-  { name: "Außenspiegel", size: [0.16 / 1.7, 0.1, 0.08], anchor: [0.92 / 0.85, 1.0, 0.62 / 2.0], paarweise: true, farbe: 0x24262a },
+  /*
+   * Der Spiegel sitzt AUF DER FLANKE, x folgt aus den Querschnitten (E-127).
+   * Bis dahin stand er auf x = 0,92 m wie am Bestand-Kasten — das Glashaus
+   * der Fassungen ist eingezogen, und auf Patricks Fotos vom 06.10.2026
+   * schwebte er als schwarzer Würfel neben dem Auto. Höhe 1,0 m und Längslage
+   * 0,62 m (Fuß der A-Säule) bleiben, wie sie waren.
+   */
+  { name: "Außenspiegel", size: [0.16 / 1.7, 0.1, 0.08], anchor: [0, 1.0, 0.62 / 2.0], paarweise: true, amFlanke: true, farbe: 0x24262a },
 ];
+
+/**
+ * Halbe Breite der Haut in m, auf Höhe `y` bei Längslage `z` (Wrack-lokal,
+ * ungequetscht) — genau so, wie `baueWrackform` sie spannt: Zwischen zwei
+ * Querschnitten ist die rechte Flanke aus Dreiecken (a, b, c) und (a, c, d)
+ * gebaut; gesucht ist der äußerste Punkt, an dem die Waagerechte durch (y, z)
+ * eines davon trifft. Ein Mischen der Querschnitte in z, dann in y, lag an
+ * der A-Säule bis 9 cm daneben — so weit wie die Diagonale die Vierecke
+ * knickt. Keine Haut auf dieser Höhe → 0.
+ */
+export function halbeBreiteBei(form: WrackformDef, y: number, z: number): number {
+  const S = form.schnitte;
+  const n = form.ebenen.length;
+  const punkt = (k: number, e: number): [number, number, number] => {
+    const s = S[k]!;
+    return [s.b[e]! * (form.breite / 2), (s.y ?? form.ebenen)[e]!, s.z * (form.laenge / 2)];
+  };
+  let best = 0;
+  for (let s = 0; s + 1 < S.length; s++) {
+    for (let e = 0; e + 1 < n; e++) {
+      const a = punkt(s, e);
+      const b = punkt(s + 1, e);
+      const c = punkt(s + 1, e + 1);
+      const d = punkt(s, e + 1);
+      for (const [p, q, r] of [[a, b, c], [a, c, d]] as const) {
+        // Schwerpunktkoordinaten in der (y, z)-Ebene
+        const det = (q[1] - p[1]) * (r[2] - p[2]) - (r[1] - p[1]) * (q[2] - p[2]);
+        if (Math.abs(det) < 1e-12) continue;
+        const u = ((y - p[1]) * (r[2] - p[2]) - (r[1] - p[1]) * (z - p[2])) / det;
+        const v = ((q[1] - p[1]) * (z - p[2]) - (y - p[1]) * (q[2] - p[2])) / det;
+        if (u < -1e-9 || v < -1e-9 || u + v > 1 + 1e-9) continue;
+        best = Math.max(best, p[0] + u * (q[0] - p[0]) + v * (r[0] - p[0]));
+      }
+    }
+  }
+  return best;
+}
+
+/**
+ * Ein Anbauteil mit `amFlanke` an die Karosserie dieser Fassung setzen: Seine
+ * Innenseite liegt an der breitesten Stelle der Flanke über seiner ganzen Höhe
+ * — so berührt es das Blech, statt zu schweben, und steckt nirgends darin.
+ * Abgetastet in 21 Höhen (beim Spiegel alle 5 mm).
+ */
+export function aufDieFlanke(form: WrackformDef, a: AnbauDef): AnbauDef {
+  if (!a.amFlanke) return a;
+  const z = a.anchor[2] * (form.laenge / 2);
+  const unten = a.anchor[1] - a.size[1] / 2;
+  const oben = a.anchor[1] + a.size[1] / 2;
+  let flanke = 0;
+  for (let k = 0; k <= 20; k++) flanke = Math.max(flanke, halbeBreiteBei(form, unten + ((oben - unten) * k) / 20, z));
+  const x = flanke + (a.size[0] * form.breite) / 2;
+  return { ...a, anchor: [x / (form.breite / 2), a.anchor[1], a.anchor[2]] };
+}
 
 /**
  * EIN QUERSCHNITT durch die Karosserie.
@@ -163,7 +223,7 @@ export interface WrackformDef {
    * Der hohle Körper für die Physik (E-124): ein Verbund aus Quadern statt
    * EINES Klotzes. Fehlt die Liste, bleibt das Wrack der Quader aus
    * `CarDef.colliderHalf` (Bestand, A, B). Der ERSTE Eintrag ist der Boden: Er
-   * trägt die Masse, und `krallenKontakte` des Baggers fragt Kollider 0.
+   * trägt die Masse. Der Bagger fragt beim Zufassen alle Kollider (E-127).
    */
   bleche?: BlechDef[];
 }
@@ -532,14 +592,20 @@ export const FORM_C: WrackformDef = {
   ],
   /*
    * DER HOHLKÖRPER (E-124). Acht Quader, abgelesen an der Tabelle oben
-   * (z = Anteil · 2,00 m): Boden bis 0,32 m (die Räder sind nur Netze, der
-   * Wagen steht wie bisher auf y = 0); Vorderwagen von der Haubenfuge (0,80)
-   * bis zur Nase, oben auf Haubenhöhe 0,86; Heck ab der Klappenfuge (−1,04),
-   * oben 0,97; dazwischen die Fahrgastzelle — vier Türen bis zur Gürtellinie
+   * (z = Anteil · 2,00 m): Boden bis zur Schwellerkante 0,32 m, Ebene 1 (die
+   * Räder sind nur Netze, der Wagen steht wie bisher auf y = 0); alles Weitere
+   * steht lückenlos darauf — Vorderwagen von der Haubenfuge (0,80) bis zur
+   * Nase, oben auf Haubenhöhe 0,86; Heck ab der Klappenfuge (−1,04), oben 0,97;
+   * dazwischen die Fahrgastzelle — vier Türen vom Schweller bis zur Gürtellinie
    * 0,92 und das Dach zwischen „Dach vorn" (0,24) und „Dach hinten" (−0,36) auf
    * 1,30…1,42 m, so breit wie die Dachkante (0,79 · 0,85 m). Wo Glas ist, ist
    * KEIN Kollider: Durch Windschutz-, Heck- und Seitenscheiben kommt eine
    * Schale in den Innenraum.
+   *
+   * Bis E-127 reichte der Boden bis 0,58 m (Sicke), weil der Bagger beim
+   * Zufassen nur Kollider 0 fragte — mit 0,32 m war das Wrack an 0 von 4
+   * Stellen zu greifen. Seit er alle Kollider fragt, geben die Türen bis zum
+   * Schweller nach statt nur bis zur Sicke.
    *
    * Wie weit jedes Stück nachgibt (`max`), ist ein Startwert zum Austesten
    * (SW): Dach bis knapp über die Gürtellinie (1,42 − 0,45 = 0,97), Haube
@@ -547,13 +613,13 @@ export const FORM_C: WrackformDef = {
    * 35 cm (die Zelle bleibt zwischen zwei eingedrückten Türen 0,68 m breit).
    */
   bleche: [
-    { name: "Boden", mitte: [0, 0.29, 0], halb: [0.85, 0.29, 2.0], nach: "-y", max: 0, voll: 0, fuss: 0 },
-    { name: "Vorderwagen", mitte: [0, 0.72, 1.4], halb: [0.8, 0.14, 0.6], nach: "-y", max: 0.25, voll: 0, fuss: 0.28 },
-    { name: "Heck", mitte: [0, 0.775, -1.52], halb: [0.8, 0.195, 0.48], nach: "-y", max: 0.3, voll: 0, fuss: 0.39 },
-    { name: "Tür vorn rechts", mitte: [0.77, 0.75, 0.34], halb: [0.08, 0.17, 0.46], nach: "-x", max: 0.35, voll: 0.16, fuss: 0.5 },
-    { name: "Tür vorn links", mitte: [-0.77, 0.75, 0.34], halb: [0.08, 0.17, 0.46], nach: "+x", max: 0.35, voll: 0.16, fuss: 0.5 },
-    { name: "Tür hinten rechts", mitte: [0.77, 0.75, -0.58], halb: [0.08, 0.17, 0.46], nach: "-x", max: 0.35, voll: 0.16, fuss: 0.5 },
-    { name: "Tür hinten links", mitte: [-0.77, 0.75, -0.58], halb: [0.08, 0.17, 0.46], nach: "+x", max: 0.35, voll: 0.16, fuss: 0.5 },
+    { name: "Boden", mitte: [0, 0.16, 0], halb: [0.85, 0.16, 2.0], nach: "-y", max: 0, voll: 0, fuss: 0 },
+    { name: "Vorderwagen", mitte: [0, 0.59, 1.4], halb: [0.8, 0.27, 0.6], nach: "-y", max: 0.25, voll: 0, fuss: 0.28 },
+    { name: "Heck", mitte: [0, 0.645, -1.52], halb: [0.8, 0.325, 0.48], nach: "-y", max: 0.3, voll: 0, fuss: 0.39 },
+    { name: "Tür vorn rechts", mitte: [0.77, 0.62, 0.34], halb: [0.08, 0.3, 0.46], nach: "-x", max: 0.35, voll: 0.16, fuss: 0.5 },
+    { name: "Tür vorn links", mitte: [-0.77, 0.62, 0.34], halb: [0.08, 0.3, 0.46], nach: "+x", max: 0.35, voll: 0.16, fuss: 0.5 },
+    { name: "Tür hinten rechts", mitte: [0.77, 0.62, -0.58], halb: [0.08, 0.3, 0.46], nach: "-x", max: 0.35, voll: 0.16, fuss: 0.5 },
+    { name: "Tür hinten links", mitte: [-0.77, 0.62, -0.58], halb: [0.08, 0.3, 0.46], nach: "+x", max: 0.35, voll: 0.16, fuss: 0.5 },
     { name: "Dach", mitte: [0, 1.36, -0.06], halb: [0.67, 0.06, 0.3], nach: "-y", max: 0.45, voll: 0.12, fuss: 0.5 },
   ],
 };

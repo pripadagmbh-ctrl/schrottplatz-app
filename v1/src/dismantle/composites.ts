@@ -7,6 +7,7 @@ import { AUTOLACK, lackton, verwittert } from "../world/objektbau";
 import { farbstoff, verschmelzeBunt, type Bauteil } from "../excavator/bauteile";
 import {
   WRACKFORMEN,
+  aufDieFlanke,
   baueWrackform,
   type BlechDef,
   type Druckrichtung,
@@ -407,7 +408,10 @@ export function wrackDaten(basis: CarDef, id: WrackformId): CarDef {
             }
           : p
       );
-  const karosserie = form.anbau ? { ...basis.karosserie, anbau: form.anbau } : basis.karosserie;
+  // Teile mit `amFlanke` (die Spiegel) setzen sich an die Haut DIESER Fassung (E-127).
+  const karosserie = form.anbau
+    ? { ...basis.karosserie, anbau: form.anbau.map((a) => aufDieFlanke(form, a)) }
+    : basis.karosserie;
   return { ...basis, parts, karosserie };
 }
 

@@ -30,7 +30,7 @@ import {
   wrackform,
   VORGABE_FORM,
 } from "../src/dismantle/composites";
-import { CAR_DEF } from "../src/dismantle/carDef";
+import { CAR_DEF, type AnbauDef } from "../src/dismantle/carDef";
 import { WRACKFORMEN, baueWrackform, type WrackformDef, type WrackformId } from "../src/dismantle/wrackformen";
 import { ItemManager } from "../src/world/scrapItems";
 import { initPhysics } from "../src/physics/physicsWorld";
@@ -293,6 +293,51 @@ describe.each(Object.entries(WRACKFORMEN))("Fassung %s", (id, form) => {
         z + Math.sign(z) * (a.size[2] / 2)
       );
       expect(istInnen(koerper, p), `${a.name} steckt in der Karosserie`).toBe(false);
+    }
+  });
+
+  it("jedes Anbauteil berührt die Haut, und die Spiegel stecken nicht darin (E-127)", () => {
+    const koerper = karosseriemesh(form);
+    koerper.updateMatrixWorld(true);
+    const def = wrackDaten(CAR_DEF, id as WrackformId);
+    const hb = def.karosserie.chassis[0] / 2;
+    const hl = def.karosserie.chassis[2] / 2;
+    /** Ein Teil als Quader in m: Mitte und halbe Maße (rechte Seite). */
+    const quader = (a: AnbauDef): { m: THREE.Vector3; h: THREE.Vector3 } => ({
+      m: new THREE.Vector3(a.anchor[0] * hb, a.anchor[1], a.anchor[2] * hl),
+      h: new THREE.Vector3((a.size[0] * def.karosserie.chassis[0]) / 2, a.size[1] / 2, a.size[2] / 2),
+    });
+    /** Liegt irgendein Punkt des Teils, 1 cm aufgeweitet, im Blech? */
+    const beruehrt = (a: AnbauDef): boolean => {
+      const { m, h } = quader(a);
+      const p = new THREE.Vector3();
+      for (let i = 0; i <= 4; i++)
+        for (let j = 0; j <= 4; j++)
+          for (let k = 0; k <= 4; k++) {
+            p.set(
+              m.x + (h.x + 0.01) * (i / 2 - 1),
+              m.y + (h.y + 0.01) * (j / 2 - 1),
+              m.z + (h.z + 0.01) * (k / 2 - 1)
+            );
+            if (istInnen(koerper, p)) return true;
+          }
+      return false;
+    };
+    for (const a of def.karosserie.anbau) expect(beruehrt(a), `${a.name} schwebt neben dem Auto`).toBe(true);
+    const spiegel = def.karosserie.anbau.filter((a) => a.amFlanke);
+    expect(spiegel.map((a) => a.name)).toEqual(["Außenspiegel"]);
+    for (const a of spiegel) {
+      const { m, h } = quader(a);
+      // Die Innenseite, 1 cm nach außen gerückt, liegt auf keiner Höhe im Blech
+      for (let j = 0; j <= 4; j++) {
+        const p = new THREE.Vector3(m.x - h.x + 0.01, m.y + h.y * (j / 2 - 1), m.z);
+        expect(istInnen(koerper, p), `${a.name} steckt ${j} im Blech`).toBe(false);
+      }
+    }
+    // Gegenprobe: der Spiegel am Anker des Bestand-Kastens (0,92 m) schwebte an C.
+    if (id === "c") {
+      const alt = { ...spiegel[0]!, anchor: [0.92 / 0.85, 1.0, 0.62 / 2.0] as [number, number, number] };
+      expect(beruehrt(alt)).toBe(false);
     }
   });
 
