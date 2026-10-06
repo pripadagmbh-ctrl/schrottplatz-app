@@ -159,6 +159,42 @@ export interface WrackformDef {
   anbau?: AnbauDef[];
   /** Wie stark eine Schattenfuge abdunkelt, 0…1. */
   fugeDunkel?: number;
+  /**
+   * Der hohle Körper für die Physik (E-124): ein Verbund aus Quadern statt
+   * EINES Klotzes. Fehlt die Liste, bleibt das Wrack der Quader aus
+   * `CarDef.colliderHalf` (Bestand, A, B). Der ERSTE Eintrag ist der Boden: Er
+   * trägt die Masse, und `krallenKontakte` des Baggers fragt Kollider 0.
+   */
+  bleche?: BlechDef[];
+}
+
+/** Achse und Richtung, in die ein Blech eingedrückt wird. */
+export type Druckrichtung = "-y" | "+x" | "-x" | "+z" | "-z";
+
+/**
+ * EIN STÜCK HOHLKÖRPER (E-124) — ein Quader im Verbund, der dort nachgibt, wo
+ * die Spinne drückt.
+ *
+ * Gedrückt wird immer die AUSSENFLÄCHE in Richtung `nach`. Ein dickes Stück
+ * (Vorderwagen, Heck) wird dabei gestaucht, bis es `MIN_DICKE` hat; ein dünnes
+ * (Dach, Tür) wandert als Platte nach innen. Die Haut folgt demselben Maß:
+ * bis `voll` hinter der Außenfläche ganz, bis `fuss` auslaufend, dahinter gar
+ * nicht — damit die Schalen genau dort anstehen, wo man das Blech sieht.
+ *
+ * Alle Maße in m, Wrack-lokal (Ursprung Mitte Unterkante, +z Schnauze), am
+ * ungequetschten Wrack.
+ */
+export interface BlechDef {
+  name: string;
+  mitte: [number, number, number];
+  halb: [number, number, number];
+  nach: Druckrichtung;
+  /** Wie weit es höchstens nachgibt (0 = gar nicht, der Boden). */
+  max: number;
+  /** Bis zu dieser Tiefe hinter der Außenfläche geht die Haut voll mit. */
+  voll: number;
+  /** Ab dieser Tiefe geht die Haut gar nicht mehr mit. */
+  fuss: number;
 }
 
 /**
@@ -493,6 +529,32 @@ export const FORM_C: WrackformDef = {
     { id: "rear", vonSchnitt: 10, bisSchnitt: 12, vonRing: 5, bisRing: 8 },
     { id: "right", vonSchnitt: 9, bisSchnitt: 11, vonRing: 4, bisRing: 5 },
     { id: "left", vonSchnitt: 9, bisSchnitt: 11, vonRing: 8, bisRing: 9 },
+  ],
+  /*
+   * DER HOHLKÖRPER (E-124). Acht Quader, abgelesen an der Tabelle oben
+   * (z = Anteil · 2,00 m): Boden bis 0,32 m (die Räder sind nur Netze, der
+   * Wagen steht wie bisher auf y = 0); Vorderwagen von der Haubenfuge (0,80)
+   * bis zur Nase, oben auf Haubenhöhe 0,86; Heck ab der Klappenfuge (−1,04),
+   * oben 0,97; dazwischen die Fahrgastzelle — vier Türen bis zur Gürtellinie
+   * 0,92 und das Dach zwischen „Dach vorn" (0,24) und „Dach hinten" (−0,36) auf
+   * 1,30…1,42 m, so breit wie die Dachkante (0,79 · 0,85 m). Wo Glas ist, ist
+   * KEIN Kollider: Durch Windschutz-, Heck- und Seitenscheiben kommt eine
+   * Schale in den Innenraum.
+   *
+   * Wie weit jedes Stück nachgibt (`max`), ist ein Startwert zum Austesten
+   * (SW): Dach bis knapp über die Gürtellinie (1,42 − 0,45 = 0,97), Haube
+   * 25 cm (der Motor oben bei 0,83 m schaut dann heraus), Heck 30 cm, Tür
+   * 35 cm (die Zelle bleibt zwischen zwei eingedrückten Türen 0,68 m breit).
+   */
+  bleche: [
+    { name: "Boden", mitte: [0, 0.29, 0], halb: [0.85, 0.29, 2.0], nach: "-y", max: 0, voll: 0, fuss: 0 },
+    { name: "Vorderwagen", mitte: [0, 0.72, 1.4], halb: [0.8, 0.14, 0.6], nach: "-y", max: 0.25, voll: 0, fuss: 0.28 },
+    { name: "Heck", mitte: [0, 0.775, -1.52], halb: [0.8, 0.195, 0.48], nach: "-y", max: 0.3, voll: 0, fuss: 0.39 },
+    { name: "Tür vorn rechts", mitte: [0.77, 0.75, 0.34], halb: [0.08, 0.17, 0.46], nach: "-x", max: 0.35, voll: 0.16, fuss: 0.5 },
+    { name: "Tür vorn links", mitte: [-0.77, 0.75, 0.34], halb: [0.08, 0.17, 0.46], nach: "+x", max: 0.35, voll: 0.16, fuss: 0.5 },
+    { name: "Tür hinten rechts", mitte: [0.77, 0.75, -0.58], halb: [0.08, 0.17, 0.46], nach: "-x", max: 0.35, voll: 0.16, fuss: 0.5 },
+    { name: "Tür hinten links", mitte: [-0.77, 0.75, -0.58], halb: [0.08, 0.17, 0.46], nach: "+x", max: 0.35, voll: 0.16, fuss: 0.5 },
+    { name: "Dach", mitte: [0, 1.36, -0.06], halb: [0.67, 0.06, 0.3], nach: "-y", max: 0.45, voll: 0.12, fuss: 0.5 },
   ],
 };
 
