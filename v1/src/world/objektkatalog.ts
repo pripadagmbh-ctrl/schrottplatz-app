@@ -566,7 +566,9 @@ export const KATALOG_BIG: PileSpec[] = [
   { materialId: "rubble", massKg: 340, kind: "cyl", dims: [0.7, 0.9], bau: "beton", name: "Schachtring" },
   { materialId: "wood", massKg: 220, kind: "box", dims: [3.2, 1.4, 0.2], bau: "gitterturm", name: "Dachstuhl-Binder" },
   { materialId: "alu", massKg: 280, kind: "box", dims: [2.6, 2.2, 0.2], bau: "fensterflaeche", name: "Fensterfront (Pfosten-Riegel)" },
-  { materialId: "steel", massKg: 520, kind: "box", dims: [2.2, 1.3, 3.2], bau: "container", name: "Schuttcontainer (Absetzmulde)" },
+  // E-123: war `container` — mit Eckbeschlaegen und Tuerfluegeln wie ein
+  // Seecontainer. Eine Absetzmulde ist ein offener Trog mit schraegen Stirnwaenden.
+  { materialId: "steel", massKg: 520, kind: "box", dims: [2.2, 1.3, 3.2], bau: "mulde", name: "Schuttcontainer (Absetzmulde)" },
   { materialId: "wood", massKg: 340, kind: "box", dims: [2.1, 2.1, 3.2], bau: "kabine", name: "Bauwagen (alt, Holz)" },
 
   // --- Gebäudetechnik ---
@@ -606,6 +608,65 @@ export const KATALOG_BIG: PileSpec[] = [
   { materialId: "steel", massKg: 400, kind: "box", dims: [1.0, 0.8, 0.9], bau: "stapel", name: "Bremsscheiben (Palette)" },
   // Gegengewicht eines Gabelstaplers, Gussblock. -> 30,5 mm
   { materialId: "steel", massKg: 450, kind: "box", dims: [0.9, 0.5, 0.35], bau: "klotz", name: "Stapler-Gegengewicht" }, // E-063: war `motor`
+
+  /* ====================================================================== *
+   * CONTAINER, GERUESTE, KLEINE BAGGER (E-123, 06.10.2026)
+   *
+   * Patrick: „Die Schrottsorten sollen mehr grossteile beinhalten, container,
+   * gerüste, kleine bagger."
+   *
+   * Jedes Mass ist so gewaehlt, dass das Stueck auf eine Ladeflaeche des
+   * Spiels PASST — Breite bis 2,28 m (12 Rasterfelder samt `ladung.LUFT`),
+   * Hoehe bis 0,99 / 1,40 / 1,90 m (flach / Rungen / Koffer). Wo das echte
+   * Ding hoeher ist (Seecontainer, Minibagger mit Dach), steht es hier in der
+   * Form, in der es auf einem Lkw ankommt: ohne Dach, ohne Arm, liegend.
+   * Gemessen mit `tools/grossteile.ts`; `test/grossteileNeu.test.ts` haelt fest,
+   * dass jedes davon auf mindestens einen Wagen passt.
+   *
+   * Massen GERECHNET, wo es eine Rechnung gibt (Blechflaeche × Dicke × 7850
+   * kg/m³), sonst Startwert (SW) aus der Groessenklasse. Die Fraktion rechnet
+   * wie immer `fraktionVonTeil` aus — sie steht im Kommentar nur zum Lesen.
+   *
+   * Verzinktes ist Zink: Das ist die Hausregel seit dem 12.09.2026 („Zink aus
+   * Dachrinnen, Fallrohren und Verzinktem", `materials/catalog.ts`) und gilt
+   * schon fuer die verzinkten Gitterroste und Leitungsrinnen.
+   * ====================================================================== */
+
+  // --- Container ---
+  // Werkzeugcontainer der Baustelle, Trapezblech 2 mm: Huelle 2,0 × 1,3 × 1,3 m
+  // = 13,6 m² × 0,002 × 7850 = 214 kg, dazu Rahmenprofile und Holzboden
+  // ≈ 380 kg (SW). Holz 12 %, Dichtungen und Griffe 3 % -> Mischschrott.
+  { materialId: "steel", massKg: 380, kind: "box", dims: [1.3, 1.3, 2.0], bau: "container", name: "Werkzeugcontainer (Baustelle)", zusammensetzung: [{ materialId: "steel", anteil: 0.85 }, { materialId: "wood", anteil: 0.12 }, { materialId: "plastic", anteil: 0.03 }] },
+  // Kippbehaelter fuer den Stapler, 4 mm Blech: offener Trog 1,2 × 1,6 m,
+  // 0,95 m hoch (unter der flachen Bordwand + Ueberstand von 0,99 m) — rund
+  // 7,5 m² × 0,004 × 7850 = 236 kg, mit Gabeltaschen 260 kg. -> 3,6 mm, Mischschrott.
+  { materialId: "steel", massKg: 260, kind: "box", dims: [1.2, 0.95, 1.6], bau: "mulde", name: "Kippbehälter (Stapler)" },
+
+  // --- Gerueste ---
+  // Stahl-Stellrahmen 0,73 × 2,00 m wiegt 18–19 kg (Rahmengeruest, Groessenordnung
+  // der Herstellerkataloge); 18 Stueck flach gestapelt = 335 kg bei 0,9 m Hoehe.
+  { materialId: "zinc", massKg: 335, kind: "box", dims: [0.8, 0.9, 2.1], bau: "geruest", name: "Gerüstrahmen (Paket, verzinkt)" },
+  // Alu-Rollgeruest, zerlegt: vier Rahmen, Plattform, Streben, Rollen —
+  // rund 160 kg fuer ein Geruest mit 7 m Arbeitshoehe (SW).
+  { materialId: "alu", massKg: 160, kind: "box", dims: [0.8, 0.6, 2.6], bau: "geruest", name: "Alu-Rollgerüst (zerlegt, Paket)" },
+  // Geruestrohr 48,3 × 3,2 mm wiegt 3,56 kg/m (DIN EN 39); 20 Rohre à 4 m mit
+  // Kupplungen = 285 + 15 kg. Liegt laengs auf jeder Pritsche (4,12 m mit Luft).
+  { materialId: "zinc", massKg: 300, kind: "box", dims: [0.3, 0.3, 4.0], bau: "buendel", name: "Gerüstrohre verzinkt (Bund)" },
+  // Ein Feld, aus dem Verband gerissen und auf die Seite gelegt: zwei Rahmen
+  // (je 18,5 kg), zwei Stahlboeden (je 19 kg), Diagonale, Gelaender, Bordbrett
+  // aus Holz — 105 kg. Das Holz macht es zu Mischschrott.
+  { materialId: "zinc", massKg: 105, kind: "box", dims: [2.0, 0.75, 2.6], bau: "geruestfeld", name: "Gerüstfeld (ausgerissen)", zusammensetzung: [{ materialId: "zinc", anteil: 0.88 }, { materialId: "wood", anteil: 0.12 }] },
+
+  // --- Kleine Bagger ---
+  // Raupenunterwagen eines 1,5-t-Minibaggers: Kettenlaenge 1,55 m plus Schild,
+  // Spurbreite 1,0 m. Rund 450 kg, davon zwei Gummiketten à 45 kg = 20 %
+  // Gummi (Fraktion Reifen) -> Mischschrott. Trockengelegt: Ein Schrottplatz
+  // nimmt keine Maschine mit Oel (Altoelverordnung), darum steht kein Oel drin.
+  { materialId: "steel", massKg: 450, kind: "box", dims: [1.0, 0.5, 1.9], bau: "raupe", name: "Minibagger-Raupenunterwagen", zusammensetzung: [{ materialId: "steel", anteil: 0.8 }, { materialId: "tires", anteil: 0.2 }] },
+  // Ausleger mit Stiel und drei Zylindern, 1,5-t-Klasse, 240 kg (SW).
+  // Auslegerbleche 10–15 mm und massive Kolbenstangen: Rechnerisch nur 6,0 mm,
+  // weil der Huellquader die Kroepfung mitzaehlt -> `massiv`.
+  { materialId: "steel", massKg: 240, kind: "box", dims: [0.35, 0.55, 2.6], bau: "ausleger", name: "Minibagger-Ausleger mit Stiel", massiv: true, zusammensetzung: [{ materialId: "steel", anteil: 0.96 }, { materialId: "plastic", anteil: 0.04 }] },
 ];
 
 
@@ -652,7 +713,14 @@ export const KATALOG_HUGE: PileSpec[] = [
   { materialId: "steel", massKg: 2400, kind: "box", dims: [2.5, 1.2, 4.8], bau: "fahrgestell", name: "Sattelauflieger-Chassis" },
 
   // --- Bauabbruch ---
-  { materialId: "steel", massKg: 2500, kind: "box", dims: [2.2, 2.2, 3.4], bau: "karosserie", name: "Minibagger (ausgeschlachtet)", zusammensetzung: [{ materialId: "steel", anteil: 0.86 }, { materialId: "plastic", anteil: 0.06 }, { materialId: "copper", anteil: 0.04 }, { materialId: "rubble", anteil: 0.04 }] },
+  // E-123: war 2,2 × 2,2 × 3,4 m und `karosserie` — ein Auto mit Scheiben,
+  // und 2,2 m hoch kam er auf keinen Wagen (`tools/grossteile.ts`: nie
+  // angekommen). 2,5 t ausgeschlachtet ist die 3,5-t-Klasse ohne Kabine und
+  // Arm: Spur 1,7 m, Unterwagen samt Schild 2,6 m, bis Oberkante Sitzlehne
+  // 1,40 m (SW) — knapp unter der Rungen-Grenze von 1,40 m, damit er nicht nur
+  // im Koffer kommt (gemessen mit 1,55 m: 0 von 7 gezogenen kamen an).
+  // Masse und Stueckliste unveraendert.
+  { materialId: "steel", massKg: 2500, kind: "box", dims: [1.7, 1.4, 2.6], bau: "minibagger", name: "Minibagger (ausgeschlachtet)", zusammensetzung: [{ materialId: "steel", anteil: 0.86 }, { materialId: "plastic", anteil: 0.06 }, { materialId: "copper", anteil: 0.04 }, { materialId: "rubble", anteil: 0.04 }] },
   { materialId: "steel", massKg: 2200, kind: "cyl", dims: [0.85, 2.1], bau: "trommel", name: "Vibrationswalze (Bandage)" }, // E-063: war `tank`
   { materialId: "steel", massKg: 1200, kind: "box", dims: [1.4, 1.4, 4.8], bau: "gitterturm", name: "Turmdrehkran-Ausleger" },
   { materialId: "rubble", massKg: 2400, kind: "box", dims: [2.4, 0.8, 1.8], bau: "beton", name: "Kranballast-Platten" },
@@ -683,6 +751,20 @@ export const KATALOG_HUGE: PileSpec[] = [
   { materialId: "steel", massKg: 2400, kind: "box", dims: [2.4, 2.6, 4.6], bau: "container", name: "Bürocontainer", zusammensetzung: [{ materialId: "steel", anteil: 0.7 }, { materialId: "plastic", anteil: 0.15 }, { materialId: "wood", anteil: 0.1 }, { materialId: "alu", anteil: 0.05 }] },
   { materialId: "steel", massKg: 2500, kind: "box", dims: [2.4, 2.6, 4.6], bau: "container", name: "Werkstattcontainer", zusammensetzung: [{ materialId: "steel", anteil: 0.74 }, { materialId: "plastic", anteil: 0.12 }, { materialId: "wood", anteil: 0.1 }, { materialId: "alu", anteil: 0.04 }] },
   { materialId: "steel", massKg: 2600, kind: "box", dims: [1.8, 1.9, 3.2], bau: "motor", name: "Schiffsmotor (Diesel)", zusammensetzung: [{ materialId: "steel", anteil: 0.84 }, { materialId: "alu", anteil: 0.1 }, { materialId: "copper", anteil: 0.06 }] },
+
+  /* --- Container und kleine Bagger (E-123, 06.10.2026) — Einleitung bei KATALOG_BIG --- */
+  // Absetzmulde 5 m³ mit Klappdeckel. Trog aus 5-mm-Blech (Boden 2,25 × 1,75,
+  // Seiten trapezfoermig 2,25 → 3,30 m, schraege Stirnwaende): 16,6 m² ×
+  // 0,005 × 7850 = 652 kg; Deckel 3 mm, 5,8 m² = 136 kg; Zapfen und Profile
+  // 30 kg -> 820 kg. 1,35 m hoch: passt auf Rungen und Koffer. -> Mischschrott.
+  { materialId: "steel", massKg: 820, kind: "box", dims: [1.75, 1.35, 3.3], bau: "deckelmulde", name: "Absetzmulde 5 m³ (Klappdeckel)" },
+  // Minibagger der 1,5-t-Klasse, Ausleger und Schutzdach abgebaut: Laenge
+  // 2,1 m (Unterwagen 1,55 m + Schild), Breite 1,0 m, Hoehe 1,3 m bis zur
+  // Lehne. 1,5 t minus Arm (240 kg, eigener Eintrag) = rund 1300 kg.
+  // Gummiketten 7 %, Haube/Sitz/Schlaeuche 4 %, Kuehler (Alu) 2 %, Kabelbaum
+  // und Lichtmaschine (Kupfer) 1 % -> 14 % Fremdstoff, also Mischschrott.
+  // Trockengelegt, siehe Raupenunterwagen.
+  { materialId: "steel", massKg: 1300, kind: "box", dims: [1.0, 1.3, 2.1], bau: "minibagger", name: "Minibagger 1,5 t (ohne Arm/Dach)", zusammensetzung: [{ materialId: "steel", anteil: 0.86 }, { materialId: "tires", anteil: 0.07 }, { materialId: "plastic", anteil: 0.04 }, { materialId: "alu", anteil: 0.02 }, { materialId: "copper", anteil: 0.01 }] },
 ];
 
 /*

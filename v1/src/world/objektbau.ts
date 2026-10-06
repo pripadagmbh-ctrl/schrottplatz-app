@@ -31,6 +31,7 @@
  */
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { MATERIALS } from "../materials/catalog";
 
 /** Welcher Bau — steht am Katalogeintrag. */
 export type BauId =
@@ -86,6 +87,19 @@ export type BauId =
   | "propeller"
   /** Stockanker: Schaft, Stock, zwei Flunken, Ring. */
   | "anker"
+  /* --- E-123, 06.10.2026: Grossteile, die es bis dahin nicht gab ---------- */
+  /** Minibagger ohne Arm und Dach: Raupe, Planierschild, Oberwagen, Gegengewicht. */
+  | "minibagger"
+  /** Raupenunterwagen eines Minibaggers allein: Gummiketten, Schild, Drehkranz. */
+  | "raupe"
+  /** Paket aus flach gestapelten Geruestrahmen auf zwei Unterlegern. */
+  | "geruest"
+  /** Ein ausgerissenes Geruestfeld: zwei Rahmen, Boeden, Diagonale, Bordbrett. */
+  | "geruestfeld"
+  /** Absetzmulde, Kippbehaelter: offener Trog mit schraegen Stirnwaenden. */
+  | "mulde"
+  /** Dieselbe Mulde mit zweiteiligem Klappdeckel. */
+  | "deckelmulde"
   /** Der Kehrbesen aus zusammengequetschtem Maschendraht (E-031, 15.09.2026). */
   | "besen";
 
@@ -180,20 +194,27 @@ function z(
 function faerbeUndVerschmelze(liste: Teil[]): THREE.BufferGeometry | null {
   if (liste.length === 0) return null;
   const farbe = new THREE.Color();
-  for (const t of liste) {
-    const n = t.geo.getAttribute("position").count;
+  const ecke = new THREE.Color();
+  // Das Fraktionsbild gilt nur fuer den Koerper, nie fuer Scheiben (E-123).
+  const b = liste === teile ? bild : undefined;
+  liste.forEach((t, ti) => {
+    const pos = t.geo.getAttribute("position");
+    const n = pos.count;
     const c = new Float32Array(n * 3);
-    farbe.set(t.farbe);
+    farbe.set(b ? flicken(b, t.farbe, ti) : t.farbe);
+    const fleckig = b?.patina && (b.patina.ueberall || tonFamilie.has(t.farbe));
     for (let i = 0; i < n; i++) {
-      c[i * 3] = farbe.r;
-      c[i * 3 + 1] = farbe.g;
-      c[i * 3 + 2] = farbe.b;
+      ecke.copy(farbe);
+      if (fleckig) patiniere(ecke, b!.patina!, pos.getX(i), pos.getY(i), pos.getZ(i));
+      c[i * 3] = ecke.r;
+      c[i * 3 + 1] = ecke.g;
+      c[i * 3 + 2] = ecke.b;
     }
     t.geo.setAttribute("color", new THREE.BufferAttribute(c, 3));
     // Alle Teile brauchen dieselben Attribute, sonst weigert sich das
     // Verschmelzen. BoxGeometry und CylinderGeometry bringen uv mit.
     t.geo.deleteAttribute("uv1");
-  }
+  });
   const geo = mergeGeometries(
     liste.map((t) => t.geo),
     false
@@ -335,17 +356,23 @@ const BLEI = 0x8d9099;
  * der Sache.
  *
  * Die Werte sind dieselben wie in `materials/catalog.ts` — wer die Mulde
- * kennt, erkennt das Stueck wieder. Sie stehen hier als Kopie, weil
- * `world/objektbau.ts` sonst von `materials/` abhaengt; `test/bauart.test.ts`
- * haelt die beiden Listen zusammen.
+ * kennt, erkennt das Stueck wieder.
+ *
+ * E-123 (06.10.2026): Bis dahin standen sie hier als KOPIE, „weil
+ * `world/objektbau.ts` sonst von `materials/` abhaengt". `catalog.ts`
+ * importiert nichts, die Abhaengigkeit kostet also nichts — die Kopie dagegen
+ * ist genau die Fehlerklasse, die dieses Projekt am haeufigsten trifft: zwei
+ * Stellen, die dasselbe wissen sollen. Jetzt wird nachgeschlagen; Muldenschild,
+ * Zielring und Bauteil lesen denselben Wert.
  */
-const FRAKTIONSTON: Record<string, number> = {
-  va: 0xdfe6ea,
-  alu: 0x928d85,
-  copper: 0xc7622b,
-  brass: 0xc9a227,
-  zinc: 0x9aa6ad,
-  cable: 0xb0682a,
+const FRAKTIONSTON: Record<string, number> = Object.fromEntries(
+  [
+    "va",
+    "alu",
+    "copper",
+    "brass",
+    "zinc",
+    "cable",
   /*
    * DIE VIER ABFALLSORTEN, dazugekommen am 16.09.2026 („Stoerstoff aufloesen").
    *
@@ -368,11 +395,12 @@ const FRAKTIONSTON: Record<string, number> = {
    * annimmt (stapel, buendel, platte, haufen, tank, trommel). Polster, Kiste
    * und Beton bringen ihren eigenen Anblick mit und bleiben unberuehrt.
    */
-  wood: 0x8a6a42,
-  rubble: 0x9a9083,
-  tires: 0x2e2c2b,
-  plastic: 0x3f6d8a,
-};
+    "wood",
+    "rubble",
+    "tires",
+    "plastic",
+  ].map((id) => [id, MATERIALS[id]!.color])
+);
 
 /**
  * Der Grundton eines blanken Bauteils: nach Fraktion, wo die Fraktionsfarbe
@@ -393,7 +421,11 @@ function dunkler(hex: number, f: number): number {
   const r = Math.round(((hex >> 16) & 255) * f);
   const g = Math.round(((hex >> 8) & 255) * f);
   const b = Math.round((hex & 255) * f);
-  return (r << 16) | (g << 8) | b;
+  const out = (r << 16) | (g << 8) | b;
+  // Abschattungen des Grundtons gehoeren zu ihm — sie bekommen dieselbe
+  // Patina wie der Grundton selbst (E-123, `tonFamilie`).
+  if (tonFamilie.has(hex)) tonFamilie.add(out);
+  return out;
 }
 
 /**
@@ -468,6 +500,213 @@ export function verwittert(hex: number, alter: number): number {
   const gg = misch(g, (LACKROST >> 8) & 255);
   const bb = misch(b, LACKROST & 255);
   return (rr << 16) | (gg << 8) | bb;
+}
+
+/* ------------------------------------------------------------------------ */
+/* Das Fraktionsbild — woran man die Sorte im Greifer erkennt (E-123)         */
+/* ------------------------------------------------------------------------ */
+
+/**
+ * WAS MAN SIEHT, BEVOR MAN LIEST.
+ *
+ * Patrick, 06.10.2026: „Kupfer, Va, Aluminium, misschrott und stahlschrott
+ * müssen als solches besser erkennbar sein." Ziel: aus der Kabine, ohne
+ * Schild und ohne Anzeige sagen koennen, was im Greifer haengt.
+ *
+ * Bis dahin trug die Sorte genau EIN Merkmal: den Grundton (`metallton`). Und
+ * den nur bei Buntmetall — Stahlschrott und Mischschrott bekamen beide
+ * `STAHL`, also dasselbe neutrale Grau (`test/bauart.test.ts`, E-063). Dazu
+ * hatten Kupfer, Messing und Alu dieselbe Oberflaeche (Rauheit 0,35), und VA
+ * war genauso stumpf wie Stahl (0,75). Ein blanker VA-Kessel und ein matter
+ * Alu-Kessel unterschieden sich nur in der Helligkeit.
+ *
+ * Jetzt sind es drei Merkmale, alle ohne neues Material und ohne Textur:
+ *
+ *  1. OBERFLAECHE — Rauheit und Metallglanz des einen Materials, das jedes
+ *     Teil ohnehin hat (`scrapItems.spawnScrap`). Uniforms, kein neues
+ *     Shaderprogramm, kein Zeichenruf mehr.
+ *  2. PATINA — in die Eckpunktfarben gerechnet: Rost auf Stahl, Gruenspan auf
+ *     Kupfer, weisser Oxidbelag auf Alu. VA bleibt blank — das IST sein
+ *     Merkmal.
+ *  3. FLICKEN — nur Mischschrott: Einzelne Bauteile tragen die Farbe einer
+ *     anderen Sorte. Ein Mischschrotteil sieht aus wie das, was es ist:
+ *     zusammengewuerfelt.
+ *
+ * Gewuerfelt wird dabei NICHTS. Die Flecken haengen an der Lage der Ecke und
+ * an den Massen des Stuecks (`rausch`, `salz`) — dasselbe Stueck sieht nach
+ * dem Laden gleich aus, und `Math.random` wird kein einziges Mal OEFTER
+ * gerufen als vorher (`test/grossteileNeu.test.ts` zaehlt nach). Das ist Absicht: Jeder zusaetzliche Zufallszug verschiebt die
+ * Folge fuer alle Waechter dahinter (Kipper, Lambert).
+ *
+ * Grundtoene kommen weiter aus `materials/catalog.ts` (ueber `FRAKTIONSTON`),
+ * die Patinatoene stehen hier, neben `ROST` und `LACKROST`: Sie sind
+ * Verwitterung, keine Sorte — kein Muldenschild zeigt Gruenspan.
+ *
+ * ALLE ZAHLEN SIND STARTWERTE (SW) zum Abnehmen auf dem iPad, abgeleitet aus
+ * dem, was im Haus schon steht. Die Begruendung je Wert steht an der Zeile.
+ */
+export interface Fraktionsbild {
+  /** `MeshStandardMaterial.roughness` — 0 spiegelt, 1 ist Kreide. */
+  rauheit: number;
+  /**
+   * `MeshStandardMaterial.metalness`. Bewusst nie ueber 0,5: Die Szene hat
+   * KEINE Umgebungskarte (nur Halbkugel- und Sonnenlicht, `main.ts`). Ein
+   * Metall ohne Umgebung spiegelt nichts und wird schwarz — bei 0,5 bleibt
+   * die halbe Grundfarbe als diffuser Anteil stehen, und die Sonne setzt
+   * trotzdem einen Glanzpunkt.
+   */
+  glanz: number;
+  /** Anlauf in den Eckpunkten. */
+  patina?: {
+    farbe: number;
+    /** 0..1 — wie stark (ueberall) bzw. auf welchem Anteil der Ecken (fleckig). */
+    anteil: number;
+    /**
+     * `true`: jede Ecke jedes Bauteils, mit schwankender Staerke (Rost frisst
+     * auch den Lack). `false`: nur einzelne Ecken, und nur an Bauteilen im
+     * Grundton der Sorte — Gruenspan sitzt am Kupfer, nicht am Gummigurt.
+     */
+    ueberall: boolean;
+  };
+  /** Mischschrott: Farben, in denen einzelne Bauteile stehen. */
+  flicken?: number[];
+}
+
+/** Bild des Stuecks, das gerade gebaut wird (gesetzt in `baueGeometrie`). */
+let bild: Fraktionsbild | undefined;
+/** Grundton der Sorte und alle Abschattungen davon, die der Bau benutzt hat. */
+const tonFamilie = new Set<number>();
+/** Fester Versatz je Stueck aus seinen Massen — wie `lackton`. */
+let salz = 0;
+
+/**
+ * Altrost fuer Stahlschrott: `ROST` zu 40 % in Richtung `GUSS` gezogen und
+ * auf 72 % abgedunkelt. Nicht der reine `ROST`: Der liegt im Farbton neben
+ * Kupfer, und mit ihm rueckte der Stahlschrott auf ΔE 11,8 an die
+ * Kupferteile heran (vorher 16,3) — genau die Verwechslung, die teuer ist.
+ */
+const ALTROST = dunkler(mische(ROST, GUSS, 0.4), 0.72);
+/**
+ * Gruenspan. RAL 6000 Patinagruen ist #316650; je Kanal × 1,35 aufgehellt,
+ * aus demselben Grund wie `PVC_GRUEN`: Der Normton wird auf dem Schirm fast
+ * schwarz.
+ */
+const GRUENSPAN = 0x428a6c;
+
+/** Zwei Farben mischen, je Kanal in sRGB. `t` = 0 ist `a`, 1 ist `b`. */
+function mische(a: number, b: number, t: number): number {
+  const k = (s: number): number =>
+    Math.round(((a >> s) & 255) + ((((b >> s) & 255) - ((a >> s) & 255)) * t));
+  return (k(16) << 16) | (k(8) << 8) | k(0);
+}
+
+/*
+ * GEMESSEN mit `tools/sortenbild.ts` (alle gebauten Katalogteile je Sorte,
+ * flaechengemittelt, diffuser Anteil = Farbe × (1 − Glanz)). ΔE2000, unter 10
+ * gilt als dieselbe Farbe:
+ *
+ *                       vorher   jetzt
+ *   Stahl  <-> Misch       5,3    11,6
+ *   Misch  <-> Alu         4,6    11,4
+ *   Stahl  <-> Alu         9,7    22,2
+ *   Stahl  <-> Kupfer     16,3    15,8
+ *   VA     <-> Alu        19,3    13,0   (dafuer glaenzt VA jetzt, Alu nicht —
+ *                                        das misst ΔE nicht, das sieht man)
+ *   kleinster Abstand      4,6    11,4
+ *
+ * „vorher" ist mit dem behobenen Kupferrohr-Bund gerechnet (siehe
+ * `baueGeometrie`, Ring), sonst stuende dort ein NaN-Mittel.
+ *
+ * Mischschrott wird ausserdem am MUSTER erkannt, nicht nur am Mittel: 28 %
+ * seiner Flaeche weichen um mehr als ΔE 15 vom eigenen Stueck ab, beim
+ * Stahlschrott 1 %.
+ */
+const FRAKTIONSBILD: Record<string, Fraktionsbild> = {
+  /*
+   * Stahlschrott ist nach E-042 das Dickwandige: Traeger, Achsen, Guss,
+   * Verschleissblech. Altrost auf jeder Ecke, 39 bis 65 % stark (`anteil`
+   * × 0,6 … 1,0, siehe `patiniere`) — auch ueber dem Lack eines Loeffels.
+   * Rauheit 0,9: Rost glaenzt nicht.
+   */
+  steel: { rauheit: 0.9, glanz: 0.2, patina: { farbe: ALTROST, anteil: 0.65, ueberall: true } },
+  /*
+   * Mischschrott: Blech, Verbund, Sammelschrott. Kaum Rost (8 %), dafuer
+   * Flicken: Stahlbraun, verzinkt und zwei ausgeblichene Lackreste. Bewusst
+   * KEIN Kupfer-, Messing- oder Aluton: Mischschrott darf nicht nach
+   * Buntmetall aussehen (dann greift man ihn fuer Geld, das er nicht bringt),
+   * und mit dem Aluton im Topf lagen Misch und Alu bei ΔE 9,5.
+   */
+  mixed: {
+    rauheit: 0.8,
+    glanz: 0.2,
+    patina: { farbe: ROST, anteil: 0.08, ueberall: true },
+    flicken: [
+      MATERIALS.steel!.color,
+      MATERIALS.zinc!.color,
+      verwittert(LACK_ROT, 0.5),
+      verwittert(LACK_BLAU, 0.5),
+    ],
+  },
+  /*
+   * VA: blank — die niedrigste Rauheit auf dem Platz, damit die Sonne einen
+   * scharfen Glanzpunkt setzt; keine Patina. Glanz nur 0,2: Mit 0,45 wurde
+   * der diffuse Anteil so dunkel, dass VA und Alu im Mittel auf ΔE 7,4
+   * zusammenrueckten.
+   */
+  va: { rauheit: 0.25, glanz: 0.2 },
+  /*
+   * Alu: matt (Patrick 15.09.2026: „Aluminium ist in den meisten Faellen
+   * grau" — der Ton bleibt). Weisser Oxidbelag halb zwischen `ALU` und
+   * `WEISS`, auf knapp der Haelfte der Ecken.
+   */
+  alu: { rauheit: 0.85, glanz: 0.1, patina: { farbe: mische(ALU, WEISS, 0.5), anteil: 0.45, ueberall: false } },
+  /*
+   * Kupfer: glatter Schimmer, Gruenspan auf jeder siebten Ecke. Glanz 0,2
+   * aus demselben Grund wie bei VA — bei 0,5 wurde Kupfer im Schatten braun
+   * und lag neben dem Stahlschrott.
+   */
+  copper: { rauheit: 0.35, glanz: 0.2, patina: { farbe: GRUENSPAN, anteil: 0.15, ueberall: false } },
+  /* Messing: gelb, glatt, ohne Patina — sein Ton traegt es allein. */
+  brass: { rauheit: 0.3, glanz: 0.3 },
+};
+
+/** Das Fraktionsbild einer Sorte — `undefined` heisst: wie bisher. */
+export function fraktionsbild(materialId?: string): Fraktionsbild | undefined {
+  return FRAKTIONSBILD[materialId ?? ""];
+}
+
+/** Ein fester Zufallswert 0..1 aus drei Koordinaten — derselbe Kniff wie im Presspaket. */
+function rausch(x: number, y: number, z: number): number {
+  const k = Math.abs(Math.sin(x * 12.9898 + y * 78.233 + z * 37.719 + salz) * 43758.5453);
+  return k - Math.floor(k);
+}
+
+/**
+ * Welche Farbe ein Bauteil bekommt. Nur Mischschrott tauscht: Das erste
+ * Bauteil (der Korpus) bleibt, von den uebrigen steht knapp jedes zweite in
+ * einer Flickenfarbe.
+ */
+function flicken(b: Fraktionsbild, farbe: number, ti: number): number {
+  if (!b.flicken || ti === 0 || farbe === GLAS) return farbe;
+  const r = rausch(ti * 1.37, ti * 0.61, 0.5);
+  const ANTEIL = 0.45; // SW: knapp jedes zweite Bauteil
+  if (r >= ANTEIL) return farbe;
+  return b.flicken[Math.floor((r / ANTEIL) * b.flicken.length)]!;
+}
+
+const patinaFarbe = new THREE.Color();
+/** Patina in eine Eckfarbe rechnen (linear, wie das Material sie liest). */
+function patiniere(
+  c: THREE.Color,
+  p: NonNullable<Fraktionsbild["patina"]>,
+  x: number,
+  y: number,
+  z: number
+): void {
+  const r = rausch(x, y, z);
+  patinaFarbe.set(p.farbe);
+  if (p.ueberall) c.lerp(patinaFarbe, p.anteil * (0.6 + 0.4 * r));
+  else if (r > 1 - p.anteil) c.lerp(patinaFarbe, 0.75);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -1597,6 +1836,189 @@ function besen(w: number, h: number, d: number): Bauteil {
   return teil;
 }
 
+/* ------------------------------------------------------------------------ */
+/* Grossteile aus E-123: Minibagger, Gerueste, Mulden                         */
+/* ------------------------------------------------------------------------ */
+/*
+ * Fuer alle fuenf gilt: Jedes Bauteil bleibt INNERHALB der Katalogmasse
+ * (±w/2, ±h/2, ±d/2). Der Kollider ist die konvexe Huelle dieser Ecken
+ * (`scrapItems.spawnScrap`), der Packer rechnet mit den Katalogmassen
+ * (`ladung.stueckMass`) — ragte etwas heraus, raeumte der Packer einen Platz
+ * frei, in den das Teil nicht passt. `test/grossteileNeu.test.ts` misst es nach.
+ *
+ * Keine Scheiben (`GLAS`), also EIN Netz je Teil.
+ */
+
+/** Baumaschinenlack: gelb, rot, blau. Kein Orange — das laege neben Kupfer. */
+const BAUMASCHINE = [LACK_GELB, LACK_ROT, LACK_BLAU];
+
+/**
+ * Ein Raupenfahrwerk: zwei Gummiketten mit runden Umlenkungen, Mittelteil,
+ * Planierschild vorn. Unterkante bei `y0`, Hoehe `hr`, Laenge in Z.
+ */
+function raupenwerk(w: number, hr: number, d: number, y0: number, lack: number): void {
+  // Kettenbreite: 230 mm bei 1,5 t, 300 mm bei 3,5 t (Gummikettenmasse der Klassen, SW)
+  const kb = Math.min(0.32, w * 0.23);
+  const kl = d * 0.8; // Kette; die vorderen 20 % gehoeren dem Schild
+  const zk = -d / 2 + kl / 2;
+  const rk = hr * 0.4;
+  for (const sx of [-1, 1]) {
+    const x = sx * (w / 2 - kb / 2);
+    q(kb, rk * 2, kl - rk * 2, GUMMI, x, y0 + rk, zk); // Kettenstrang
+    for (const sz of [-1, 1]) z(rk, kb, GUMMI, "x", x, y0 + rk, zk + sz * (kl / 2 - rk), 12); // Umlenkung
+    // Kettenrahmen und Laufrollen, innen sichtbar
+    q(kb * 0.4, rk * 1.1, kl * 0.7, lack, x - sx * kb * 0.55, y0 + rk, zk);
+  }
+  q(Math.max(0.05, w - 2 * kb), hr * 0.45, kl * 0.5, STAHL_DUNKEL, 0, y0 + hr * 0.55, zk); // Mittelstueck
+  // Planierschild und seine zwei Arme
+  const tief = d - kl;
+  q(w, hr * 0.7, 0.07, lack, 0, y0 + hr * 0.35, d / 2 - 0.035);
+  for (const sx of [-1, 1])
+    q(0.07, hr * 0.25, Math.max(0.05, tief - 0.07), STAHL_DUNKEL, sx * w * 0.22, y0 + hr * 0.45, d / 2 - 0.07 - (tief - 0.07) / 2);
+}
+
+/**
+ * Minibagger ohne Ausleger und Schutzdach — so steht er auf dem Platz, wenn
+ * der Haendler Arm und Dach einzeln verkauft hat.
+ */
+function minibagger(w: number, h: number, d: number): Bauteil {
+  const lack = lackton(BAUMASCHINE, w, h, d);
+  const y0 = -h / 2;
+  const hr = h * 0.3; // Fahrwerk 0,39 m bei 1,30 m Gesamthoehe (SW, Kettenhoehe 1,5-t-Klasse)
+  raupenwerk(w, hr, d, y0, lack);
+  const zo = -d * 0.08;
+  const yd = y0 + hr;
+  z(w * 0.3, h * 0.05, STAHL_DUNKEL, "y", 0, yd + h * 0.025, zo, 16); // Drehkranz
+  const yo = yd + h * 0.05;
+  const ho = h * 0.33;
+  const lo = d * 0.5;
+  q(w * 0.94, ho, lo, lack, 0, yo + ho / 2, zo); // Oberwagen mit Motorhaube
+  q(w * 0.94, ho * 0.9, d * 0.1, GUSS, 0, yo + ho * 0.45, zo - lo / 2 - d * 0.05); // Gegengewicht
+  q(w * 0.24, ho * 0.8, d * 0.1, GUSS, 0, yo + ho * 0.4, zo + lo / 2 + d * 0.05); // Schwenkbock, Arm ab
+  for (const sx of [-1, 1]) z(0.025, d * 0.1, GUMMI, "z", sx * w * 0.07, yo + ho * 0.85, zo + lo / 2 + d * 0.05, 6); // Schlauchstummel
+  // Fahrerplatz: Sitz, Lehne, zwei Steuerhebel, Stummel der abgebauten Dachpfosten
+  const ys = yo + ho;
+  q(w * 0.4, h * 0.08, w * 0.36, 0x24262a, -w * 0.12, ys + h * 0.04, zo + lo * 0.05);
+  q(w * 0.4, h * 0.32, 0.07, 0x24262a, -w * 0.12, ys + h * 0.16, zo + lo * 0.05 - w * 0.18); // Lehne, hoechster Punkt
+  for (const sx of [-1, 1]) z(0.018, h * 0.12, STAHL_DUNKEL, "y", -w * 0.12 + sx * w * 0.26, ys + h * 0.06, zo + lo * 0.15, 6);
+  for (const sx of [-1, 1]) q(0.07, h * 0.06, 0.07, STAHL_DUNKEL, sx * w * 0.4, ys + h * 0.03, zo - lo * 0.4);
+  return fertig();
+}
+
+/** Raupenunterwagen allein: Fahrwerk ueber die volle Hoehe, oben der Drehkranz. */
+function raupenUnterwagen(w: number, h: number, d: number): Bauteil {
+  const lack = lackton(BAUMASCHINE, w, h, d);
+  raupenwerk(w, h * 0.88, d, -h / 2, lack);
+  z(w * 0.3, h * 0.1, STAHL_DUNKEL, "y", 0, h / 2 - h * 0.08, -d * 0.1, 16);
+  return fertig();
+}
+
+/**
+ * Paket aus Geruestrahmen, flach gestapelt auf zwei Unterlegern, mit zwei
+ * Spanngurten. Ein Rahmen ist zwei Staender plus drei Riegel; Rohr 48,3 mm
+ * (Geruestrohr nach DIN EN 39), hier als Vierkant von 45 mm — aus der Kabine
+ * nicht zu unterscheiden, und ein Quader kostet die Haelfte der Ecken.
+ */
+function geruest(w: number, h: number, d: number, ton: number): Bauteil {
+  const unter = 0.08;
+  for (const sz of [-1, 1]) q(w, unter, 0.1, HOLZ_ROH_DUNKEL, 0, -h / 2 + unter / 2, sz * d * 0.35);
+  const r = 0.045;
+  const n = Math.max(3, Math.round((h - unter - 0.01) / 0.05));
+  const lage = (h - unter - 0.01) / n;
+  const zweit = ton === STAHL ? VERZINKT_ALT : dunkler(ton, 0.82);
+  for (let i = 0; i < n; i++) {
+    const y = -h / 2 + unter + lage * (i + 0.5);
+    const farbe = i % 3 === 1 ? zweit : ton;
+    const vx = (((i * 37) % 11) / 11 - 0.5) * 0.04; // nie ganz buendig gestapelt
+    for (const sx of [-1, 1]) q(r, Math.min(r, lage), d * 0.96, farbe, sx * (w / 2 - r / 2 - 0.02) + vx, y, 0);
+    for (const zr of [-0.42, -0.1, 0.44]) q(w - 0.06, Math.min(r, lage) * 0.8, r * 0.8, farbe, vx, y, zr * d);
+  }
+  // Spanngurte quer ueber das Paket
+  for (const sz of [-1, 1]) {
+    q(w, 0.01, 0.05, LACK_ROT, 0, h / 2 - 0.005, sz * d * 0.25);
+    for (const sx of [-1, 1]) q(0.01, h - unter, 0.05, LACK_ROT, sx * (w / 2 - 0.005), unter / 2, sz * d * 0.25);
+  }
+  return fertig();
+}
+
+/**
+ * Ein ausgerissenes Geruestfeld, auf der Seite liegend: zwei Rahmen an den
+ * Enden (ihre 2-m-Hoehe liegt jetzt in X), dazwischen Belag, Diagonale,
+ * Gelaender und das Bordbrett aus Holz.
+ */
+function geruestfeld(w: number, h: number, d: number): Bauteil {
+  const r = 0.045;
+  for (const sz of [-1, 1]) {
+    const zz = sz * (d / 2 - r / 2);
+    for (const sy of [-1, 1]) q(w, r, r, VERZINKT, 0, sy * (h / 2 - r / 2), zz); // Staender
+    for (const xr of [-0.47, 0.0, 0.47]) q(r, h - r, r * 0.8, VERZINKT, xr * w, 0, zz); // Riegel
+  }
+  // Belag: zwei Stahlboeden 0,32 m an der ehemaligen Oberkante
+  for (const sy of [-1, 1]) q(0.05, 0.31, d - 2 * r, VERZINKT_ALT, w / 2 - 0.03, sy * 0.16, 0);
+  // Bordbrett, Holz
+  q(0.15, 0.03, d - 2 * r, HOLZ_ROH, w / 2 - 0.13, h / 2 - 0.03, 0);
+  // Gelaender und Zwischengelaender
+  for (const xr of [-0.45, -0.05]) q(r, r, d - 2 * r, VERZINKT, xr * w, h / 2 - r / 2, 0);
+  // Diagonale, ein wenig verbogen: zwei Stuecke mit Knick
+  const knick = new THREE.Vector3(0.05 * w, -h / 2 + r, 0);
+  draht(new THREE.Vector3(-w / 2 + r, -h / 2 + r, -d / 2 + r), knick, r, VERZINKT);
+  draht(knick, new THREE.Vector3(w / 2 - r, -h / 2 + r, d / 2 - r), r, VERZINKT);
+  return fertig();
+}
+
+/**
+ * Trapezwand: ein Quader, dessen Laenge (Z) von `unten` nach `oben` mit der
+ * Hoehe waechst — die Seitenwand einer Mulde mit schraegen Stirnwaenden.
+ */
+function trapez(w: number, h: number, unten: number, oben: number, farbe: number, x: number, y: number, zz: number): void {
+  const geo = new THREE.BoxGeometry(w, h, 1);
+  const p = geo.getAttribute("position") as THREE.BufferAttribute;
+  for (let i = 0; i < p.count; i++) p.setZ(i, p.getZ(i) * (unten + (oben - unten) * (p.getY(i) / h + 0.5)));
+  geo.translate(x, y, zz);
+  teile.push({ geo, farbe });
+}
+
+/**
+ * Absetzmulde oder Stapler-Kippbehaelter: offener Trog, Boden kuerzer als
+ * die Oberkante, Stirnwaende schraeg; Kufen, Rahmenprofil oben, Sicken,
+ * Aufnahmezapfen. Innen Rost — aus der Kabine schaut man hinein.
+ */
+function mulde(w: number, h: number, d: number, deckel: boolean): Bauteil {
+  const lack = lackton([LACK_BLAU, LACK_GRUEN, LACK_GELB, ROST], w, h, d);
+  const t = 0.04; // Blech als Bauteil: dicker als 5 mm, sonst flimmert es (wie `platte`)
+  const kufe = 0.08;
+  const rand = 0.12; // Platz fuer Zapfen und Sicken ausserhalb der Wand
+  const lb = d * 0.68; // Bodenlaenge: DIN-Absetzmulde 5 m³ ≈ 2,25 m unten zu 3,30 m oben (SW)
+  const oben = deckel ? h / 2 - 0.05 : h / 2;
+  const y0 = -h / 2 + kufe;
+  const hw = oben - y0;
+  const xw = w / 2 - rand;
+  for (const sx of [-1, 1]) q(0.12, kufe, lb, STAHL_DUNKEL, sx * xw * 0.6, -h / 2 + kufe / 2, 0); // Kufen
+  q(xw * 2, t, lb, lack, 0, y0 + t / 2, 0); // Boden
+  q(xw * 2 - 0.04, 0.01, lb * 0.95, ROST, 0, y0 + t + 0.005, 0); // Rost innen
+  for (const sx of [-1, 1]) trapez(t, hw, lb, d, lack, sx * (xw - t / 2), y0 + hw / 2, 0); // Seitenwaende
+  // Stirnwaende, schraeg von der Bodenkante zur Oberkante
+  const lang = Math.hypot((d - lb) / 2, hw);
+  const neig = Math.atan2((d - lb) / 2, hw);
+  for (const sz of [-1, 1]) {
+    const geo = new THREE.BoxGeometry(xw * 2, lang, t);
+    geo.rotateX(sz * neig);
+    geo.translate(0, y0 + hw / 2, sz * ((lb + d) / 4 - t / 2));
+    teile.push({ geo, farbe: lack });
+  }
+  // Rahmenprofil oben, Sicken, Zapfen
+  for (const sx of [-1, 1]) {
+    q(0.08, 0.08, d - 0.04, STAHL_DUNKEL, sx * (xw - 0.04), oben - 0.04, 0);
+    for (const zr of [-0.25, 0, 0.25]) q(0.04, hw * 0.8, 0.08, lack, sx * (xw + 0.02), y0 + hw * 0.45, zr * lb);
+    z(0.07, rand, STAHL_DUNKEL, "x", sx * (w / 2 - rand / 2), y0 + hw * 0.62, d * 0.04, 10);
+  }
+  if (deckel) {
+    for (const sx of [-1, 1]) q(xw - 0.02, 0.04, d - 0.06, dunkler(lack, 0.85), sx * xw / 2, h / 2 - 0.02, 0);
+    z(0.025, d - 0.06, STAHL_DUNKEL, "z", 0, h / 2 - 0.025, 0, 8); // Scharnier
+  }
+  return fertig();
+}
+
 /**
  * Alle Eckpunkte einer Geometrie zwischen zwei Hoehen — fuer Teilhuellen.
  *
@@ -1659,11 +2081,27 @@ export function baueGeometrie(
    * Der Kollider fing das schon ab (`scrapItems.ts`, `sauber`) — das Netz
    * nicht. Ein Ballen ist rund: Kantenlaenge = Durchmesser.
    */
-  const w = kind === "cyl" || kind === "wire" ? a * 2 : a;
-  const h = kind === "cyl" ? a * 2 : kind === "wire" ? a * 2 : b;
-  const d = kind === "cyl" ? b : kind === "wire" ? a * 2 : c;
+  /*
+   * E-123: `torus` hat ebenfalls nur ZWEI Werte — Ringhalbmesser und
+   * Rohrhalbmesser. Derselbe Fehler wie oben bei `wire`, nur seltener: Der
+   * „Kupferrohr-Bund" (BIG_SPECS, `bau: "buendel"`) bekam `undefined` als
+   * Laenge und ein Netz voller NaN — im Spiel unsichtbar, und zwar ausgerechnet
+   * das zweithaeufigste Grossteil, das ankommt (82 von 960 Fuhren, E-106).
+   * Den Waechter in `test/fraktionen.test.ts` umging er, weil der nur die
+   * Katalogdatei prueft, nicht die alten Listen in `scrapItems.ts`.
+   * Huelle des Rings: Kante = Aussendurchmesser, Hoehe = Rohrdurchmesser.
+   */
+  const ring = kind === "torus";
+  const w = kind === "cyl" || kind === "wire" ? a * 2 : ring ? (a + b) * 2 : a;
+  const h = kind === "cyl" ? a * 2 : kind === "wire" ? a * 2 : b * (ring ? 2 : 1);
+  const d = kind === "cyl" ? b : kind === "wire" ? a * 2 : ring ? (a + b) * 2 : c;
   const ton = metallton(materialId);
   teile.length = 0;
+  // Fraktionsbild fuer dieses Stueck (E-123). Ohne Fraktion: wie vorher.
+  bild = fraktionsbild(materialId);
+  tonFamilie.clear();
+  tonFamilie.add(ton);
+  salz = (w * 977 + h * 613 + d * 419) % 97; // dieselben Faktoren wie `lackton`
   switch (bau) {
     case "weisseWare":
       return weisseWare(w, h, d);
@@ -1739,6 +2177,18 @@ export function baueGeometrie(
       return fensterflaeche(w, h, d) as Bauteil;
     case "besen":
       return besen(w, h, d);
+    case "minibagger":
+      return minibagger(w, h, d);
+    case "raupe":
+      return raupenUnterwagen(w, h, d);
+    case "geruest":
+      return geruest(w, h, d, ton);
+    case "geruestfeld":
+      return geruestfeld(w, h, d);
+    case "mulde":
+      return mulde(w, h, d, false);
+    case "deckelmulde":
+      return mulde(w, h, d, true);
     default:
       return { koerper: new THREE.BoxGeometry(w, h, d), glas: null };
   }

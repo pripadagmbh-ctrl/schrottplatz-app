@@ -3,7 +3,7 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import { ABFALLFRAKTIONEN, getMaterial } from "../materials/catalog";
 import { type Anteil, fraktionVonTeil, istPressbar } from "../materials/purity";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { baueGeometrie, type BauId } from "./objektbau";
+import { baueGeometrie, fraktionsbild, type BauId } from "./objektbau";
 import {
   KATALOG_BIG,
   KATALOG_HUGE,
@@ -1484,12 +1484,16 @@ export class ItemManager {
         };
       }
     }
+    // Oberflaeche nach Sorte (E-123, `objektbau.fraktionsbild`): VA blank,
+    // Alu matt, Stahlschrott rau. Ohne Eintrag gilt die alte Regel.
+    const bild = fraktionsbild(materialId);
     const material = new THREE.MeshStandardMaterial({
       color: shape.bau ? 0xffffff : shape.color,
       vertexColors: !!shape.bau,
       roughness:
-        materialId === "copper" || materialId === "brass" || materialId === "alu" ? 0.35 : 0.75,
-      metalness: NICHTMETALLE.has(materialId) || materialId === "cable" ? 0 : 0.4,
+        bild?.rauheit ??
+        (materialId === "copper" || materialId === "brass" || materialId === "alu" ? 0.35 : 0.75),
+      metalness: bild?.glanz ?? (NICHTMETALLE.has(materialId) || materialId === "cable" ? 0 : 0.4),
     });
     let geo: THREE.BufferGeometry;
     let collider: RAPIER.ColliderDesc;

@@ -111,7 +111,7 @@ describe("Was der Katalog daraus macht", () => {
    * Zahlen halten den Stand fest. Wandern sie, hat jemand den Katalog
    * umgebaut, und dann gehört die Bestandsaufnahme nachgezogen.
    */
-  it("327 erreichbare Einträge, davon 55 mit Stückliste", () => {
+  it("337 erreichbare Einträge, davon 60 mit Stückliste", () => {
     // 271 waren es bis E-042; neun massive Kleinteile sind dazugekommen
     // (Bremsscheibe, Bahnschwelle, Schienenabschnitt, Kurbelwelle …), weil
     // Patricks eigene Premium-Beispiele im Katalog fehlten.
@@ -133,15 +133,21 @@ describe("Was der Katalog daraus macht", () => {
     // in der Kleinteil-Klasse **null** Gegenstaende), vier Reifen, zwei Holz.
     // Keiner davon hat eine Stueckliste — ein Reifen ist ein Reifen —, und
     // genau deshalb bleibt die zweite Zahl stehen.
-    expect(ALLE.length).toBe(327);
-    expect(ALLE.filter((s) => s.zusammensetzung).length).toBe(55);
+    //
+    // 327 waren es bis E-123. Zehn Grossteile sind dazugekommen — Container,
+    // Gerueste, kleine Bagger (Patrick, 06.10.2026). Fuenf davon haben eine
+    // Stueckliste: Werkzeugcontainer (Holzboden), Geruestfeld (Bordbrett),
+    // Raupenunterwagen (Gummiketten), Minibagger 1,5 t und Minibagger-Ausleger.
+    expect(ALLE.length).toBe(337);
+    expect(ALLE.filter((s) => s.zusammensetzung).length).toBe(60);
   });
 
-  it("von den 55 werden 53 zu Mischschrott, genau 2 bleiben sortenrein", () => {
+  it("von den 60 werden 57 zu Mischschrott, genau 3 bleiben sortenrein", () => {
     const mitZus = ALLE.filter((s) => s.zusammensetzung);
-    expect(mitZus.filter((s) => s.materialId === "mixed").length).toBe(53);
+    expect(mitZus.filter((s) => s.materialId === "mixed").length).toBe(57);
+    // E-123: Der Minibagger-Ausleger kommt dazu — 4 % Schlaeuche, massives Blech.
     const rein = mitZus.filter((s) => s.materialId !== "mixed").map((s) => s.name);
-    expect(rein.sort()).toEqual(["Baggerlöffel", "Seecontainer 20 Fuß"]);
+    expect(rein.sort()).toEqual(["Baggerlöffel", "Minibagger-Ausleger mit Stiel", "Seecontainer 20 Fuß"]);
   });
 
   it("die abgeleitete Fraktion stimmt mit der Regel überein — bei jedem Eintrag", () => {

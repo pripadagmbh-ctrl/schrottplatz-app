@@ -283,6 +283,13 @@ describe("Wer einen Bau traegt, heisst auch danach (E-063)", () => {
     ["kiste", /Kiste|Kasten/i],
     ["anker", /Anker/i],
     ["beton", /Beton|Schacht|Hohlkammer|Ballast/i],
+    // E-123: die Bauten der neuen Grossteile
+    ["minibagger", /bagger/i],
+    ["raupe", /bagger|Raupe/i],
+    ["geruest", /Gerüst/i],
+    ["geruestfeld", /Gerüst/i],
+    ["mulde", /Mulde|Kippbehälter/i],
+    ["deckelmulde", /Mulde/i],
   ];
 
   for (const [bau, re] of NAMENSBAU) {

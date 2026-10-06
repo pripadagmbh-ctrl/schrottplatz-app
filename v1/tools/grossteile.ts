@@ -400,15 +400,29 @@ function main(): void {
   const angekommen = new Map<string, number>();
   const verworfen = new Map<string, number>();
   let kgAn = 0;
+  const kgJeFraktion = new Map<string, number>();
   let kgAngekuendigt = 0;
   let ankauf = 0;
   let erloes = 0;
   let praemie = 0;
   for (let s = 0; s < SAATEN; s++) {
-    const zurueck = festerZufall(20260917 + s * 7919);
+    let zurueck = festerZufall(20260917 + s * 7919);
+    /*
+     * `--getrennt` (E-123): Kunden und Packen ziehen aus GETRENNTEN Folgen.
+     * Ohne das kippt jede Katalogaenderung die ganze Kundenreihe hinter der
+     * ersten anders gepackten Fuhre — und ein Vorher/Nachher der Tagesbilanz
+     * misst dann zur Haelfte, welche Kunden zufaellig kamen. Mit dem Schalter
+     * sind die 960 Kunden in beiden Laeufen dieselben.
+     */
+    const getrennt = process.argv.includes("--getrennt");
+    const kunden = getrennt ? Array.from({ length: 10 }, () => rollCustomer()) : [];
     // Zehn Kunden je Saat — ein Spieltag hat rund so viele Anlieferungen.
     for (let i = 0; i < 10; i++) {
-      const c = rollCustomer();
+      if (getrennt) {
+        zurueck();
+        zurueck = festerZufall(31337 + s * 7919 + i * 104729);
+      }
+      const c = getrennt ? kunden[i]! : rollCustomer();
       const r = packeFuhre(c);
       fuhren++;
       if (r.schwer) schwere++;
@@ -433,6 +447,7 @@ function main(): void {
       kgAngekuendigt += r.angekuendigtKg;
       for (const f of r.fracht) {
         kgAn += f.massKg;
+        kgJeFraktion.set(f.materialId, (kgJeFraktion.get(f.materialId) ?? 0) + f.massKg);
         ankauf += f.massKg * PURCHASE_PRICE_PER_KG;
         praemie += f.massKg * SORTING_BONUS_PER_KG;
         erloes += f.massKg * getMaterial(f.materialId).sellPricePerKg;
@@ -472,6 +487,29 @@ function main(): void {
   console.log("Am haeufigsten angekommen (BIG/HUGE):");
   for (const [n, c] of da) console.log(`  ${z(c, 5)} x ${n}`);
 
+  /*
+   * EINZELNE TEILE NACHSEHEN (E-123): `--zeige=Mulde|Gerüst|bagger` druckt je
+   * passendem Grossteil, wie oft es gezogen wurde, wie oft es ankam und auf
+   * welche Flaechen es ueberhaupt passt. Ein Teil, das nie ankommt, gibt es
+   * fuer Patrick nicht — das soll man je Name sehen, nicht nur in der Summe.
+   */
+  const zeige = process.argv.find((a) => a.startsWith("--zeige="))?.slice(8);
+  if (zeige) {
+    const muster = new RegExp(zeige, "i");
+    console.log(`\nEinzeln (--zeige=${zeige}), je ${fuhren} Fuhren:`);
+    console.log("  gezogen  angekommen  je 100 Fuhren  passt auf");
+    for (const sp of grosseEintraege.filter((s) => muster.test(s.name ?? ""))) {
+      const n = sp.name ?? "?";
+      const an = angekommen.get(n) ?? 0;
+      const weg = verworfen.get(n) ?? 0;
+      const flaechen = LIEFERFLAECHEN.filter((f) => hindernis(sp, f) === "passt").map((f) => f.name);
+      console.log(
+        `  ${z(an + weg, 7)}${z(an, 12)}${((an / fuhren) * 100).toFixed(2).padStart(15)}  ` +
+          `${n}  [${flaechen.join(", ") || "KEINE"}]`
+      );
+    }
+  }
+
   const tage = fuhren / 10;
   const eur = (n: number): string => (n / tage).toFixed(2).padStart(12);
   console.log(`\n=== 3. TAGESBILANZ (${tage} Tage a 10 Fuhren, alles richtig sortiert) ===\n`);
@@ -483,6 +521,9 @@ function main(): void {
   console.log(`  Verkaufserloes  ${eur(erloes)} EUR`);
   console.log(`  ------------------------------------`);
   console.log(`  TAGESVERDIENST  ${eur(erloes + praemie - ankauf)} EUR`);
+  console.log("\n  kg je Tag und Fraktion:");
+  for (const [id, kg] of [...kgJeFraktion.entries()].sort((a, b) => b[1] - a[1]))
+    console.log(`    ${id.padEnd(8)}${(kg / tage).toFixed(0).padStart(8)} kg`);
 }
 
 main();
