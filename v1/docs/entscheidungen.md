@@ -10,6 +10,10 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-124 | 06.10.2026 | Das Wrack wird hohl und gibt dort nach, wo die Spinne zielt | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
+| E-123 | 06.10.2026 | Container, Gerüste, kleine Bagger; jede Sorte hat ein eigenes Bild | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
+| E-122 | 06.10.2026 | Mischschrott und Stahlschrott tauschen, Anlieferer kommen wieder von selbst | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
+| E-121 | 06.10.2026 | Greifen, Schrott und Kehren bekommen ihren Ton | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-120 | 06.10.2026 | Halt an der Waage, Abholer fährt voll los, nichts verschwindet direkt | gebaut | [E-101_bis_E-120.md](log/E-101_bis_E-120.md) |
 | E-119 | 06.10.2026 | Fünf Fahrkünste werden gemessen, nicht geschätzt | gebaut | [E-101_bis_E-120.md](log/E-101_bis_E-120.md) |
 | E-118 | 06.10.2026 | Das Spiel wird ein Bagger-Simulator: Hauptmenü, Sandkasten, Wirtschaft abgeschaltet | gebaut | [E-101_bis_E-120.md](log/E-101_bis_E-120.md) |
@@ -134,6 +138,30 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 ## Offen für Patrick — Auf dem Gerät zu prüfen
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
+
+**E-124 — Das Wrack wird hohl und gibt dort nach, wo die Spinne zielt**
+- **Spinne mittig über das Dach, absenken, dreimal zudrücken** (jedes Mal loslassen). Sinkt das Dach dort ein, wo die Spinne sitzt — und kommt die Spinne beim nächsten Absenken sichtbar tiefer?
+- **Spinne über die rechte hintere Tür, zudrücken.** Gibt diese Tür nach, und nicht die auf der anderen Seite?
+- **Ein Wrack greifen und heben.** Geht es so wie vorher — nicht seltener, nicht wackliger?
+- **Ein eingedrücktes Wrack in die Presse geben.** Wird es flach, fliegen zwei Räder heraus, liegt danach ein Paket da?
+- **Stehen die Schalen auf dem Dach jetzt auf dem Blech** statt darin? (Vorher tauchten sie 32 cm ein.)
+
+**E-123 — Container, Gerüste, kleine Bagger; jede Sorte hat ein eigenes Bild**
+- **Aus der Kabine drei Stücke nacheinander greifen, ohne aufs Schild zu sehen:** einen Träger oder ein Frontgewicht (Stahlschrott), einen Kühlschrank oder ein Blech (Mischschrott), ein VA-Rohrbündel oder einen VA-Tank. Sagst du vor dem Ablegen richtig, was es ist? Stahlschrott müsste dunkel-rostbraun sein, Mischschrott fleckig-bunt, VA hell mit Glanzpunkt in der Sonne.
+- **Ein Alu-Teil und ein VA-Teil nebeneinander legen und den Oberwagen schwenken:** Glänzt das VA auf, wenn die Sonne darüber wandert, und bleibt das Alu stumpf mit hellen Flecken? Hat ein Kupferstück grüne Stellen, und ist es noch klar als Kupfer zu lesen?
+- **Ein paar Händlerfuhren abwarten:** Kommen Gerüstpakete, Gerüstrohre, ein Kippbehälter oder ein Minibagger-Ausleger? Sehen sie aus wie das, was ihr Name sagt — und liegt der Kupferrohr-Bund, der bisher unsichtbar war, jetzt sichtbar auf dem Wagen?
+
+**E-122 — Mischschrott und Stahlschrott tauschen, Anlieferer kommen wieder von selbst**
+- SANDKASTEN starten und nach hinten schauen: Liegt MISCHSCHROTT jetzt rechts (zur Presse), STAHLSCHROTT links (zum Abladeplatz)? Stehen die Schilder über der richtigen Halde, und zeigt die Ampel beim Ablegen richtig?
+- Nichts tippen und warten: Kommt nach rund 12 Sekunden ein Laster von selbst, hält an der Waage, lädt ab — und kommt nach der Abfahrt nach einigen Sekunden der nächste?
+- Einen Abholer rufen, solange ein Anlieferer steht, und NACHSCHUB tippen, solange der Abholer steht: Fährt immer nur einer auf den Abladeplatz?
+
+**E-121 — Greifen, Schrott und Kehren bekommen ihren Ton**
+- Jemand zieht die Spinne einmal über den Beton und einmal über die Ladefläche eines LKW. Hörst du, welches was war?
+- Die Spinne wird leer durch einen Schrotthaufen gezogen. Hörst du, dass es Schrott ist und kein Boden?
+- Jemand drückt die Spinne auf ein Teil, erst leicht, dann voll. Hörst du, wann er voll zudrückt? Hörst du das Zischen, wenn er am Anschlag ist?
+- Ein Teil fällt auf den Beton, dasselbe in eine Mulde. Hörst du den Unterschied? Und ob es ein schweres Stahlteil war oder ein Stück Blech?
+- Ein ganzer Haufen rutscht von der Ladefläche. Rasselt es, ohne dass es klirrt oder dauerrauscht? (Augen auf: ruckelt das Bild dabei?)
 
 **E-120 — Halt an der Waage, Abholer fährt voll los, nichts verschwindet direkt**
 - NACHSCHUB holen und dem Laster nachsehen, wenn er vom Hof fährt (Kipper von selbst, Pritsche nach ZUR WAAGE): hält er bei der Ausfahrt rund sechs Sekunden auf der Waage?
