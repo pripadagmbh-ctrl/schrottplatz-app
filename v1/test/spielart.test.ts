@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { seite, wurzel } from "./cssmass";
-import { BETRIEB, NUR_IM_BETRIEB, NUR_IM_SIMULATOR, SPIELART } from "../src/core/spielart";
+import { BETRIEB, NUR_IM_BETRIEB, NUR_IM_SANDKASTEN, NUR_IM_SIMULATOR, SPIELART } from "../src/core/spielart";
 import { griffZiel } from "../src/ui/hud";
 
 /*
@@ -97,7 +97,7 @@ describe("Ein Schalter fuer die Spielart", () => {
   });
 
   it("jede Kennung der beiden Listen gibt es auf der Seite", () => {
-    for (const id of [...NUR_IM_BETRIEB, ...NUR_IM_SIMULATOR]) {
+    for (const id of [...NUR_IM_BETRIEB, ...NUR_IM_SIMULATOR, ...NUR_IM_SANDKASTEN]) {
       expect(seite.includes(`id="${id}"`), `${id} steht nicht in index.html`).toBe(true);
     }
   });
@@ -180,10 +180,18 @@ describe("main.ts haengt im Simulator ab, was Geld und Leute ins Bild bringt", (
 });
 
 describe("Hauptmenue", () => {
-  it("SANDKASTEN ist waehlbar, CHALLENGES sichtbar und gesperrt, die Liste wartet", () => {
+  /*
+   * Bis E-124 stand hier ein gesperrter CHALLENGES-Knopf („Kommen als
+   * Naechstes"). Seit E-125 fuellt `ui/hauptmenue.ts` die Liste aus
+   * `challenges/katalog.ts` — der Platzhalter ist weg.
+   */
+  it("SANDKASTEN ist waehlbar, die Challenges kommen aus dem Katalog", () => {
     expect(seite).toContain('<button id="hm-sandkasten">SANDKASTEN');
-    expect(seite).toMatch(/<button id="hm-challenges-knopf" disabled>CHALLENGES/);
+    expect(seite).not.toContain("hm-challenges-knopf");
     expect(seite).toContain('<div id="hm-challenges"></div>');
+    const menue = readFileSync(resolve(wurzel, "src/ui/hauptmenue.ts"), "utf8");
+    expect(menue).toMatch(/CHALLENGES\.forEach/);
+    expect(menue).toContain('getElementById("hm-challenges")');
   });
 });
 

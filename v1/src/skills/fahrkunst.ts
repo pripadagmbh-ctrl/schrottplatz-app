@@ -20,7 +20,9 @@ import type { Excavator } from "../excavator/excavator";
  *   Abwurf            `linvel()` der Teile im Bild des Loslassens — das ist
  *                     genau die Zahl, die `releaseAll` gesetzt hat
  *                     (v = v_Gelenk + ω × r, E-115), nicht nachgerechnet
- *   Liegen            `isSleeping()` — die Physik sagt, wann ein Teil ruht
+ *   Liegen            `isSleeping()` — die Physik sagt, wann ein Teil ruht;
+ *                     ebenso, wenn der naechste Griff beginnt oder die Presse
+ *                     anlaeuft (`jetztLiegtSie`, E-125)
  *   Fangradius        `Greiferform.sensorRadius` des angehaengten Greifers
  *
  * DIE FUENF DEFINITIONEN — hier und nur hier:
@@ -108,6 +110,20 @@ export class Fahrkunst {
   /** Uhr fuers Tempo ab jetzt stellen (Challenge-Start). Misst nichts um. */
   neuBeginnen(): void {
     this.uhr = this.zeit;
+  }
+
+  /**
+   * Die losgelassene Ladung gilt ab jetzt als liegend — wie beim naechsten
+   * Griff. Aufruf, wenn die Presse anlaeuft (E-125): Gleich schiebt der
+   * Stempel alles weg, danach waere der Ort nicht mehr der des Spielers.
+   *
+   * Gemessen 06.10.2026 (`tools/challenge-ruhe.ts`): Ein Wrack, das quer auf
+   * der Kammer liegt (auf Wandkrone und offener Klappe), schlaeft nie ein —
+   * es zittert dort mit 0,3–1 mm/s. Ohne diesen Ausloeser bliebe sein Zyklus
+   * offen, bis jemand wieder zugreift.
+   */
+  jetztLiegtSie(): void {
+    if (this.offen && this.gehalten.length === 0) this.abschliessen(this.offen);
   }
 
   /**

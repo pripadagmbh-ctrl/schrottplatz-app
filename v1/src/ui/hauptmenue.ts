@@ -2,28 +2,71 @@
  * DAS HAUPTMENÜ (E-118) — zwei Spielarten: SANDKASTEN und CHALLENGES.
  *
  * Es steht VOR dem Aufbau der Welt: `main.ts` wartet auf die Wahl und baut
- * erst dann den Platz. So kann eine Challenge (Etappe 3) ihren eigenen Platz
- * bekommen, ohne dass ein schon gebauter Platz wieder abgeräumt werden muss.
+ * erst dann den Platz. So bekommt eine Challenge ihren eigenen Platz, ohne
+ * dass ein schon gebauter Platz wieder abgeräumt werden muss.
  *
- * Für Etappe 3 vorgesehen, aber hier bewusst NICHT gebaut: Die Challenges
- * kommen als Knöpfe in `#hm-challenges` (auf der Seite schon vorhanden, heute
- * leer), und `Spielwahl` bekommt eine zweite Form, etwa
- * `{ art: "challenge"; id: string }`. Das Menü selbst bleibt, wie es ist.
+ * Seit E-125 (06.10.2026) stehen die Challenges als Knöpfe in
+ * `#hm-challenges`, mit der besten Sternzahl. Und das Menü kommt beim
+ * ALLERERSTEN Start gar nicht erst: Patrick, „Mit Challenges soll das Spiel
+ * anfangen, damit die Steuerung klar wird." Wer noch nie eine Challenge
+ * begonnen hat (`leseChallenges()` in `core/save.ts` ist leer), landet direkt
+ * in der ersten.
  */
-export type Spielwahl = { art: "sandkasten" };
+import { CHALLENGES } from "../challenges/katalog";
+import { leseChallenges } from "../core/save";
+import { sterneZeile } from "./abrechnung";
 
-/** Menü zeigen und auf die Wahl warten. */
+export type Spielwahl = { art: "sandkasten" } | { art: "challenge"; id: string };
+
+/*
+ * NOCHMAL nach einer Challenge: Die Welt wird beim Start gebaut und nie
+ * abgeräumt, also heißt nochmal „neu laden, und zwar direkt in dieselbe
+ * Challenge". Das sagt die Adresse (`#challenge=verladen`) — keine Ablage,
+ * nur ein Wegweiser für den nächsten Start, der beim Lesen gelöscht wird.
+ */
+const ADRESSE = /^#challenge=([\w-]+)$/;
+
+function challengeAusAdresse(): string | null {
+  const m = ADRESSE.exec(location.hash);
+  if (!m) return null;
+  history.replaceState(null, "", location.pathname + location.search);
+  return CHALLENGES.some((c) => c.id === m[1]) ? m[1]! : null;
+}
+
+export function nochmal(id: string): void {
+  location.hash = `challenge=${id}`;
+  location.reload();
+}
+
+export function zumMenue(): void {
+  history.replaceState(null, "", location.pathname + location.search);
+  location.reload();
+}
+
+/** Menü zeigen und auf die Wahl warten — oder gleich in eine Challenge. */
 export function waehleSpielart(): Promise<Spielwahl> {
+  const stand = leseChallenges();
+  const direkt = challengeAusAdresse() ?? (Object.keys(stand).length === 0 ? CHALLENGES[0]!.id : null);
+  if (direkt) return Promise.resolve({ art: "challenge", id: direkt });
+
   const el = document.getElementById("hauptmenue")!;
+  const liste = document.getElementById("hm-challenges")!;
   el.classList.add("open");
   return new Promise((fertig) => {
-    document.getElementById("hm-sandkasten")!.addEventListener(
-      "click",
-      () => {
-        el.classList.remove("open");
-        fertig({ art: "sandkasten" });
-      },
-      { once: true }
-    );
+    const waehle = (w: Spielwahl): void => {
+      el.classList.remove("open");
+      fertig(w);
+    };
+    document.getElementById("hm-sandkasten")!.addEventListener("click", () => waehle({ art: "sandkasten" }), {
+      once: true,
+    });
+    CHALLENGES.forEach((c, i) => {
+      const b = document.createElement("button");
+      const s = stand[c.id]?.sterne ?? 0;
+      b.innerHTML = `CHALLENGE ${i + 1} · ${c.name}<small></small>`;
+      b.querySelector("small")!.textContent = `${c.beschreibung} ${s > 0 ? sterneZeile(s) : "Noch nicht geschafft."}`;
+      b.addEventListener("click", () => waehle({ art: "challenge", id: c.id }), { once: true });
+      liste.appendChild(b);
+    });
   });
 }

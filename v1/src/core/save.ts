@@ -175,6 +175,43 @@ export function readSave(): SaveData | null {
   }
 }
 
+/**
+ * WAS DER SPIELER IN DEN CHALLENGES GESCHAFFT HAT (E-125) — je Challenge die
+ * beste Sternzahl; 0 heisst „begonnen, nicht geschafft".
+ *
+ * Daraus folgt der ERSTE START: Steht hier noch nichts, hat der Spieler nie
+ * eine Challenge begonnen, und das Spiel faengt mit der ersten an.
+ *
+ * Bewusst NICHT im Spielstand (`SAVE_KEY`): Den gibt es erst, wenn jemand im
+ * Sandkasten speichert, und ein Stand ohne Welt liesse den Sandkasten leer
+ * booten (Laden = Seite bootet aus dem Save). „Neues Spiel" raeumt den Platz,
+ * nicht die Sterne. Derselbe Weg wie die Stickbelegung
+ * (`schrottplatz.controls.v3`): ein eigener Schluessel, hier in save.ts, mit
+ * denselben Schutzhuellen gegen gesperrten Speicher.
+ */
+export const CHALLENGE_KEY = "schrottplatz_challenges";
+export type ChallengeStand = Record<string, { sterne: number }>;
+
+export function leseChallenges(): ChallengeStand {
+  try {
+    const d = JSON.parse(localStorage.getItem(CHALLENGE_KEY) ?? "{}") as unknown;
+    return typeof d === "object" && d !== null ? (d as ChallengeStand) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Ergebnis merken — die bessere Sternzahl bleibt. */
+export function merkeChallenge(id: string, sterne: number): void {
+  const d = leseChallenges();
+  d[id] = { sterne: Math.max(sterne, d[id]?.sterne ?? 0) };
+  try {
+    localStorage.setItem(CHALLENGE_KEY, JSON.stringify(d));
+  } catch {
+    /* privates Fenster: gilt fuer diese Sitzung nicht — dann eben wieder Challenge 1 */
+  }
+}
+
 export function clearSave(): void {
   try {
     localStorage.removeItem(SAVE_KEY);

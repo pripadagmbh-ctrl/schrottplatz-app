@@ -26,7 +26,9 @@ import { START_TIME } from "../world/daylight";
 import { platzwache } from "../world/platzinventar";
 import { zufriedenheit, type Shift, type Tagesbilanz } from "../economy/shift";
 import { reinheitsUrteil } from "./hud";
-import type { EventBus } from "../core/events";
+import type { EventBus, GameEvents } from "../core/events";
+import { erfuellt, type ChallengeMessung, type Schwellen } from "../challenges/challenge";
+import { nochmal, zumMenue } from "./hauptmenue";
 
 /** Eine Zeile der Abrechnung: links das Wort, rechts die Zahl. */
 export interface Abrechnungszeile {
@@ -84,6 +86,47 @@ export function abrechnungszeilen(b: Tagesbilanz): Abrechnungszeile[] {
   ];
 }
 
+/** Minuten:Sekunden, wie auf einer Stoppuhr. */
+function uhr(s: number): string {
+  const r = Math.round(s);
+  return `${Math.floor(r / 60)}:${String(r % 60).padStart(2, "0")} min`;
+}
+
+/**
+ * Je Messgroesse ein Name und eine Schreibweise (E-125). Die Namen sind die
+ * der Fahrkuenste (E-119); `wort` steht nur hinter dem eigenen Wert, nicht
+ * hinter der Schwelle — sonst wird die Zeile zu breit fuers iPhone mini.
+ */
+const KRITERIEN: Record<keyof ChallengeMessung, { name: string; zahl: (v: number) => string; wort: string }> = {
+  zeitS: { name: "Zeit", zahl: uhr, wort: "" },
+  ruheGrad: { name: "Ruhe", zahl: (v) => `${Math.round(v)}°`, wort: " Pendel" },
+  praezisionCm: { name: "Präzision", zahl: (v) => `${Math.round(v)} cm`, wort: " daneben" },
+};
+
+/**
+ * Die Zahlen einer Challenge als Zeilen — ohne DOM, damit sie prüfbar bleiben.
+ * Eine Zeile je Messgroesse, nach der die Challenge wertet; dahinter, was es
+ * für drei Sterne braucht. Ob eine Schwelle erfuellt ist, entscheidet
+ * `erfuellt` aus `challenges/challenge.ts` — hier wird nichts nachgerechnet.
+ * Zeichen UND Farbe (Kap. 20): ✓ reicht für drei Sterne, ✗ nicht einmal für zwei.
+ */
+export function challengeZeilen(e: GameEvents["challenge:geschafft"]): Abrechnungszeile[] {
+  const { zwei, drei } = e.wertung;
+  const arten = (Object.keys(KRITERIEN) as Array<keyof ChallengeMessung>).filter(
+    (k) => k in zwei || k in drei
+  );
+  return arten.map((k) => {
+    const v = e.messung[k];
+    const kr = KRITERIEN[k];
+    if (v === null) return { name: kr.name, wert: "✗ nicht gemessen", farbe: "#e08a5a" };
+    const wert = `${kr.zahl(v)}${kr.wort}${drei[k] === undefined ? "" : ` (★★★ bis ${kr.zahl(drei[k]!)})`}`;
+    const nur = (s: Schwellen): Schwellen => ({ [k]: s[k] });
+    if (k in drei && erfuellt(nur(drei), e.messung)) return { name: kr.name, wert: `✓ ${wert}`, farbe: "#7ec96a" };
+    if (k in zwei && !erfuellt(nur(zwei), e.messung)) return { name: kr.name, wert: `✗ ${wert}`, farbe: "#e08a5a" };
+    return { name: kr.name, wert };
+  });
+}
+
 /** Was das Feld von außen braucht — mehr nicht. */
 export interface AbrechnungsAnschluss {
   bus: EventBus;
@@ -114,19 +157,13 @@ export function installAbrechnung(m: AbrechnungsAnschluss): Abrechnung {
   const weiter = document.getElementById("abr-weiter");
   let offen = false;
 
-  const zeige = (b: Tagesbilanz): void => {
-    m.audio.playFeierabend();
-    m.audio.playSterne(b.sterne);
-    if (!feld || !kopf || !sterneEl || !zahlen) {
-      // Ohne Markup bleibt die Abrechnung eine Einblendung — das Spiel läuft
-      // weiter, statt am fehlenden Feld hängenzubleiben.
-      m.hud.toast(`Feierabend · ${tonnen(b.umschlagKg)} · ${sterneZeile(b.sterne)}`);
-      return;
-    }
-    kopf.textContent = `FEIERABEND · TAG ${b.tag}`;
-    sterneEl.textContent = sterneZeile(b.sterne);
+  /** Kopf, Sternzeile und Zahlen in die Tafel — fuer Feierabend und Challenge (E-125). */
+  const fuelle = (kopfText: string, sterne: number, zeilen: Abrechnungszeile[]): boolean => {
+    if (!feld || !kopf || !sterneEl || !zahlen) return false;
+    kopf.textContent = kopfText;
+    sterneEl.textContent = sterneZeile(sterne);
     zahlen.innerHTML = "";
-    for (const z of abrechnungszeilen(b)) {
+    for (const z of zeilen) {
       const zeile = document.createElement("div");
       zeile.className = "zeile";
       const name = document.createElement("span");
@@ -140,10 +177,44 @@ export function installAbrechnung(m: AbrechnungsAnschluss): Abrechnung {
     }
     feld.classList.add("open");
     offen = true;
+    return true;
   };
+
+  const zeige = (b: Tagesbilanz): void => {
+    m.audio.playFeierabend();
+    m.audio.playSterne(b.sterne);
+    if (!fuelle(`FEIERABEND · TAG ${b.tag}`, b.sterne, abrechnungszeilen(b))) {
+      // Ohne Markup bleibt die Abrechnung eine Einblendung — das Spiel läuft
+      // weiter, statt am fehlenden Feld hängenzubleiben.
+      m.hud.toast(`Feierabend · ${tonnen(b.umschlagKg)} · ${sterneZeile(b.sterne)}`);
+    }
+  };
+
+  /*
+   * Das Ende einer Challenge (E-125) — dieselbe Tafel, keine zweite Art
+   * Abschlussbild. WEITER heisst hier NOCHMAL, darunter steht ZUM MENÜ.
+   * Ohne Glocke: Es ist kein Feierabend, nur die Sterntöne.
+   */
+  let challengeId: string | null = null;
+  const menue = document.getElementById("abr-menue");
+  m.bus.on("challenge:geschafft", (e) => {
+    m.audio.playSterne(e.sterne);
+    challengeId = e.id;
+    if (!fuelle(`GESCHAFFT · ${e.name}`, e.sterne, challengeZeilen(e))) {
+      m.hud.toast(`Geschafft · ${sterneZeile(e.sterne)}`);
+      return;
+    }
+    if (weiter) weiter.textContent = "NOCHMAL";
+    if (menue) menue.hidden = false;
+  });
+  menue?.addEventListener("click", zumMenue);
 
   const weiterSpielen = (): void => {
     if (!offen) return;
+    if (challengeId) {
+      nochmal(challengeId);
+      return;
+    }
     offen = false;
     feld?.classList.remove("open");
     /*

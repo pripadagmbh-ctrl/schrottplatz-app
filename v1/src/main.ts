@@ -55,10 +55,13 @@ import { getMaterial, ABFALL } from "./materials/catalog";
 import { StaffManager } from "./world/people";
 import { WEIGH_X, WEIGH_Z, KAFFEE_POS } from "./world/yard";
 import { setBaggerOrt } from "./delivery/routes";
-import { clearSave, readSave, speichereGreifer, storeSave, type SaveData } from "./core/save";
+import { clearSave, merkeChallenge, readSave, speichereGreifer, storeSave, type SaveData } from "./core/save";
 import { Zwischenbild } from "./core/zwischenbild";
-import { BETRIEB, NUR_IM_BETRIEB, NUR_IM_SIMULATOR } from "./core/spielart";
-import { waehleSpielart } from "./ui/hauptmenue";
+import { BETRIEB, NUR_IM_BETRIEB, NUR_IM_SANDKASTEN, NUR_IM_SIMULATOR } from "./core/spielart";
+import { waehleSpielart, type Spielwahl } from "./ui/hauptmenue";
+import { challengeNach } from "./challenges/katalog";
+import { ChallengeLauf } from "./challenges/challenge";
+import { installChallengeKarte } from "./ui/challengekarte";
 import { Fahrkunst } from "./skills/fahrkunst";
 import { NACHSCHUB_FOLGE, NACHSCHUB_MELDUNG, profilFuer } from "./delivery/nachschub";
 
@@ -84,8 +87,13 @@ async function main(): Promise<void> {
    * eine Challenge (Etappe 3) ihren eigenen Platz bekommen. Die Physik laedt
    * derweil schon. Im Betrieb gibt es kein Menue, es geht direkt los wie bis
    * E-117.
+   *
+   * Seit E-125 kann die Wahl eine Challenge sein — und beim allerersten Start
+   * faellt sie ohne Menue auf die erste. Eine Challenge ist keine dritte
+   * Spielart, sondern eine Wahl im Simulator (Begruendung in core/spielart.ts).
    */
-  if (!BETRIEB) await waehleSpielart();
+  const wahl: Spielwahl = BETRIEB ? { art: "sandkasten" } : await waehleSpielart();
+  const challengeDaten = wahl.art === "challenge" ? challengeNach(wahl.id) : null;
   await physikBereit;
   document.getElementById("loading")!.remove();
 
@@ -145,7 +153,17 @@ async function main(): Promise<void> {
    * einmal beim Start, darum werden Kranz-Spans entfernt. Alles andere wird
    * nur verborgen — HUD und Pausenmenue greifen es fest.
    */
-  for (const id of BETRIEB ? NUR_IM_SIMULATOR : NUR_IM_BETRIEB) {
+  /*
+   * In einer Challenge (E-125) kommt dazu, was nur ins freie Spiel gehoert
+   * (`NUR_IM_SANDKASTEN`). Die Lernkarte `#tutorial` bleibt dort im Bild: Sie
+   * zeigt die Schritte der Challenge (`ui/challengekarte.ts`).
+   */
+  const ausblenden = BETRIEB
+    ? NUR_IM_SIMULATOR
+    : challengeDaten
+      ? [...NUR_IM_BETRIEB.filter((id) => id !== "tutorial"), ...NUR_IM_SANDKASTEN]
+      : NUR_IM_BETRIEB;
+  for (const id of new Set(ausblenden)) {
     const el = document.getElementById(id)!;
     if (el.closest(".hidden-actions")) el.remove();
     else el.style.setProperty("display", "none", "important");
@@ -168,8 +186,11 @@ async function main(): Promise<void> {
   const composites = new CompositeManager(scene, physics.world, items, bus);
   const account = new Account();
 
-  // Boot: vorhandener Spielstand → Welt aus dem Save; sonst Neues Spiel
-  const save = readSave();
+  // Boot: vorhandener Spielstand → Welt aus dem Save; sonst Neues Spiel.
+  // Eine Challenge baut ihren eigenen Platz und liest keinen Stand (E-125) —
+  // nur die Senderwahl kommt mit, sie gehoert dem Spieler, nicht dem Platz.
+  const gespeichert = readSave();
+  const save = challengeDaten ? null : gespeichert;
   let fence: FenceManager;
   if (save) {
     account.moneyEur = save.moneyEur;
@@ -188,6 +209,14 @@ async function main(): Promise<void> {
       car.body.setRotation({ x: c.rot[0], y: c.rot[1], z: c.rot[2], w: c.rot[3] }, true);
       car.restoreState(c);
     }
+  } else if (challengeDaten) {
+    /*
+     * DER PLATZ EINER CHALLENGE (E-125): aufgeraeumt — kein Haufen, kein
+     * Streuschrott, keine Startautos. Nur, was die Challenge aufbaut.
+     */
+    fence = new FenceManager(scene, physics.world, items, bus);
+    for (const w of challengeDaten.aufbau.wracks) composites.spawnCar(new THREE.Vector3(w.x, 0.5, w.z));
+    items.settle(physics.world);
   } else {
     fence = new FenceManager(scene, physics.world, items, bus);
     /*
@@ -349,6 +378,37 @@ async function main(): Promise<void> {
   const hud = new Hud();
   const particles = new Particles(scene);
 
+  /*
+   * DIE CHALLENGE (E-125). Sie beobachtet nur: was in der Spinne haengt, ob
+   * das Wrack ueber der Kammer steht oder darin liegt (die Pruefung der Presse
+   * selbst), und die Fahrkunst-Zyklen fuer Ruhe und Praezision. Karte und
+   * Abschlussbild haengen am Bus.
+   */
+  let challenge: ChallengeLauf | null = null;
+  if (challengeDaten) {
+    const wrack = composites.cars[0] ?? null;
+    const lauf = new ChallengeLauf(
+      challengeDaten,
+      {
+        wrack: () => (wrack?.body.isValid() ? wrack.body : null),
+        gegriffen: () => grip.grippedBodies,
+        ueberKammer: (p) => press.ueberKammer(p),
+        inKammer: (p) => press.inChamber(p),
+      },
+      bus
+    );
+    challenge = lauf;
+    // Die beiden Stellschrauben, die E-119 fuer die Challenge vorgesehen hat
+    fahrkunst.ziel = challengeDaten.ablageziel;
+    fahrkunst.neuBeginnen();
+    bus.on("fahrkunst:zyklus", (e) => lauf.zyklusGemessen(e));
+    bus.on("challenge:geschafft", (e) => merkeChallenge(e.id, e.sterne));
+    // Begonnen ist begonnen: Der naechste Start zeigt das Menue
+    merkeChallenge(challengeDaten.id, 0);
+    installChallengeKarte({ bus, steuerung: () => touch.config, audio });
+    vehicles.acceptDeliveries = false;
+  }
+
   // --- Pausenmenü ---
   // Tagesablauf: Annahme → Sortieren → Annahme (Briefing Kap. 21)
   // Fahrspuren überwachen: liegt Schrott im Weg, steht der Betrieb
@@ -383,15 +443,18 @@ async function main(): Promise<void> {
     document.getElementById("tut-pause")!.textContent = tutorial.paused ? "weiter" : "Pause";
     tutEl.classList.add("open");
   };
-  document.getElementById("tut-skip")!.addEventListener("click", () => {
-    tutorial.skip();
+  // In einer Challenge gehoert die Karte der Challenge (E-125)
+  if (!challenge) {
+    document.getElementById("tut-skip")!.addEventListener("click", () => {
+      tutorial.skip();
+      zeigeTutorial();
+    });
+    document.getElementById("tut-pause")!.addEventListener("click", () => {
+      tutorial.togglePause();
+      zeigeTutorial();
+    });
     zeigeTutorial();
-  });
-  document.getElementById("tut-pause")!.addEventListener("click", () => {
-    tutorial.togglePause();
-    zeigeTutorial();
-  });
-  zeigeTutorial();
+  }
 
   const shift = new Shift();
   shift.load(save?.shift);
@@ -458,6 +521,8 @@ async function main(): Promise<void> {
     hud.toast(storeSave(buildSaveData()) ? "Gespeichert." : "Speichern fehlgeschlagen!");
     setPaused(false);
   });
+  // In der Challenge fuehrt derselbe Knopf ins Menue — neu geladen wird ohnehin
+  if (challenge) document.getElementById("pause-load")!.textContent = "Zum Hauptmenü";
   document.getElementById("pause-load")!.addEventListener("click", () => location.reload());
   document.getElementById("pause-new")!.addEventListener("click", () => {
     clearSave();
@@ -741,12 +806,15 @@ async function main(): Promise<void> {
     particles.spawn(evPos.set(e.x, 0.3, e.z), 8, 0x9a8b74, 1.5, 1.2, 0.6);
   });
   press.onStart = () => {
+    // Was eben losgelassen wurde, liegt jetzt — gleich schiebt der Stempel (E-125)
+    fahrkunst.jetztLiegtSie();
     audio.playGrab(); // Hydraulik läuft an
     hud.toast("Schere: Klappen schließen …");
   };
   press.onLidsClosed = () => audio.playCrash(0.6); // Eisenplatten schlagen auf
   press.onStamp = (count, pos) => {
     if (count > 0) tutGepresst = true;
+    challenge?.presseHatGestempelt();
     audio.playCrash(1);
     audio.playTear();
     particles.spawn(pos, 16, 0x9a8b74, 2.5, 1.8, 0.7);
@@ -848,7 +916,7 @@ async function main(): Promise<void> {
     audio,
     toast: (t) => hud.toast(t),
     verlassePause: () => setPaused(false),
-    gewaehlt: save?.radio?.songId,
+    gewaehlt: gespeichert?.radio?.songId,
   });
 
   /*
@@ -1098,6 +1166,7 @@ async function main(): Promise<void> {
    */
   let nachschubNr = 0;
   const holeNachschub = (): void => {
+    if (challenge) return; // keine Fuhre mitten in die Aufgabe (E-125)
     if (vehicles.activeKind !== null) {
       hud.toast("Noch eine Fuhre auf dem Platz — Nachschub erst, wenn sie weg ist.");
       return;
@@ -1185,6 +1254,7 @@ async function main(): Promise<void> {
       containers,
       composites,
       fahrkunst,
+      challenge,
       fence,
       vehicles,
       account,
@@ -1311,7 +1381,7 @@ async function main(): Promise<void> {
     if (!BETRIEB && (input.wasPressed("Digit1") || touch.consumePress("Digit1"))) holeNachschub();
     // Lambert und Ausbau gibt es nur im Betrieb (E-118); die Abholung seit
     // E-120 auch im Sandkasten — dort ohne Fraktionswahl, es gibt kein Geld.
-    if (input.wasPressed("KeyV") || touch.consumePress("KeyV")) {
+    if (!challenge && (input.wasPressed("KeyV") || touch.consumePress("KeyV"))) {
       if (vehicles.pickupTruck?.waitingForLoad) {
         vehicles.requestPickup();
         hud.toast("Container geht raus …");
@@ -1355,16 +1425,19 @@ async function main(): Promise<void> {
     if (input.wasPressed("KeyU") || touch.consumePress("KeyU")) {
       hud.toast(radioWeiter(audio));
     }
-    if (input.wasPressed("KeyK")) {
+    if (!challenge && input.wasPressed("KeyK")) {
       hud.toast(storeSave(buildSaveData()) ? "Gespeichert." : "Speichern fehlgeschlagen!");
     }
     if (input.wasPressed("KeyB") || touch.consumePress("KeyB")) {
-      if (!press.start()) hud.toast("Presse läuft bereits …");
+      // Challenge: erst pressen, wenn das Wrack losgelassen in der Kammer ist (E-125)
+      if (challenge && !challenge.pressenErlaubt()) {
+        hud.toast("Erst das Wrack in die Kammer legen und loslassen — dann SCHERE.");
+      } else if (!press.start()) hud.toast("Presse läuft bereits …");
     }
     if (input.wasPressed("KeyL")) {
       location.reload(); // Boot lädt den letzten Stand
     }
-    if (input.wasPressed("KeyN")) {
+    if (!challenge && input.wasPressed("KeyN")) {
       clearSave();
       location.reload();
     }
@@ -1606,6 +1679,9 @@ async function main(): Promise<void> {
         shift.jammed,
         kassenlage
       );
+    } else if (challenge) {
+      // Challenge (E-125): keine Anlieferer, die Uhr der Aufgabe laeuft
+      challenge.takt(frameDt);
     } else {
       /*
        * SANDKASTEN: DIE ANLIEFERER KOMMEN WIEDER VON SELBST (E-122, Patrick
@@ -1742,7 +1818,8 @@ async function main(): Promise<void> {
     input.endFrame();
     requestAnimationFrame(frame);
   }
-  if (!BETRIEB) hud.toast("Sandkasten: Der Platz gehört dir. Die Laster kommen von selbst — NACHSCHUB holt sofort einen.");
+  challenge?.start();
+  if (!BETRIEB && !challenge) hud.toast("Sandkasten: Der Platz gehört dir. Die Laster kommen von selbst — NACHSCHUB holt sofort einen.");
   requestAnimationFrame(frame);
 }
 

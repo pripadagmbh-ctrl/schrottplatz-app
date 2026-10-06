@@ -12,6 +12,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 |---|---|---|---|---|
 | E-127 | 06.10.2026 | Greifer fragt alle Bleche, Türen bis zum Schweller, Spiegel am Auto | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-126 | 06.10.2026 | Einzelstück-Fuhre: ein Laster, ein Großteil, allein darf es höher sein | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
+| E-125 | 06.10.2026 | Das Spiel fängt mit einer Challenge an: ein Auto in die Presse | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-124 | 06.10.2026 | Das Wrack wird hohl und gibt dort nach, wo die Spinne zielt | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-123 | 06.10.2026 | Container, Gerüste, kleine Bagger; jede Sorte hat ein eigenes Bild | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
 | E-122 | 06.10.2026 | Mischschrott und Stahlschrott tauschen, Anlieferer kommen wieder von selbst | gebaut | [E-121_bis_E-140.md](log/E-121_bis_E-140.md) |
@@ -152,6 +153,13 @@ Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet ha
 - **Den Minibagger oder die Absetzmulde mit der Spinne von der Pritsche heben.** Bekommst du ihn zu fassen, und schaffst du es mit dem Gewicht (1,3 bzw. 2,5 t beim Minibagger, 0,8 t bei der Mulde)? Fährt der Laster danach leer ab?
 - **Viermal NACHSCHUB tippen.** Kommen Kipper, Pritsche, Wrack — und beim vierten Mal ein Großteil?
 - *Entscheidung offen:* Im Betrieb kostet der Anteil von 35 % ein Drittel des Tagesgelds — nur im Sandkasten, oder überall?
+
+**E-125 — Das Spiel fängt mit einer Challenge an: ein Auto in die Presse**
+- **Das Spiel nach dem Update zum ersten Mal öffnen.** Kommt statt des Menüs direkt der Bagger mit der Karte „1/4 Greif das Wrack"? Steht dort „Rechter Stick nach rechts: Spinne schließen" — und stimmt das mit deinem Daumen überein?
+- **Die Challenge durchspielen.** Wechselt die Karte beim Zufassen auf „Ab zur Presse", über der Kammer auf „Ablegen", nach dem Loslassen auf „Pressen" — und klickt es jedes Mal? Sind die Texte kurz genug?
+- **SCHERE über den Funktionskranz.** Läuft die Presse, und kommt danach „GESCHAFFT" mit Sternen, Zeit, Ruhe und Präzision? Passt das Bild auf dem iPhone mini quer? NOCHMAL startet direkt neu, ZUM MENÜ zeigt den Challenge-Knopf mit deinen Sternen?
+- **Wie liegt das Wrack in der Presse?** Quer oben auf der Kammer oder längs drin — stört es, wenn es oben aufliegt, oder soll man es längs einlegen müssen?
+- **Sind die Sterne zu leicht oder zu schwer?** (drei: Pendel unter 3°, unter 40 cm neben der Mitte, unter 2 Minuten)
 
 **E-124 — Das Wrack wird hohl und gibt dort nach, wo die Spinne zielt**
 - **Spinne mittig über das Dach, absenken, dreimal zudrücken** (jedes Mal loslassen). Sinkt das Dach dort ein, wo die Spinne sitzt — und kommt die Spinne beim nächsten Absenken sichtbar tiefer?

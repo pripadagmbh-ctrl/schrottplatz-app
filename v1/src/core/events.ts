@@ -1,4 +1,5 @@
 import type { Tagesbilanz } from "../economy/shift";
+import type { ChallengeMessung, ChallengeWertung } from "../challenges/challenge";
 
 /**
  * Typisierter Event-Bus (Briefing Kap. 17): Module kommunizieren nur über Events,
@@ -99,6 +100,27 @@ export interface GameEvents {
     gefuehlKN: number | null;
     x: number;
     z: number;
+  };
+  /**
+   * Eine Challenge zeigt ihren naechsten Lernschritt (E-125, 06.10.2026).
+   *
+   * `nr` zaehlt ab 1, `von` ist die Zahl der Schritte. `text` traegt noch die
+   * Platzhalter der Bedienung (`{schliessen}` usw.) — welcher Stick das ist,
+   * weiss nur die Anzeige, denn die Belegung ist frei waehlbar.
+   */
+  "challenge:schritt": { id: string; nr: number; von: number; titel: string; text: string };
+  /**
+   * Eine Challenge ist geschafft (E-125). Die Sterne sind fertig gerechnet
+   * (`challenges/challenge.ts`); das Abschlussbild liest sie nur ab.
+   * `wertung` sind die Schwellen der Challenge, damit das Bild sagen kann,
+   * was zum naechsten Stern fehlt.
+   */
+  "challenge:geschafft": {
+    id: string;
+    name: string;
+    sterne: number;
+    messung: ChallengeMessung;
+    wertung: ChallengeWertung;
   };
   /**
    * Ein Schrottteil schlaegt auf (E-121, 06.10.2026).

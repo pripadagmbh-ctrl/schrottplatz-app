@@ -608,14 +608,20 @@ export class PressManager {
     return this.phase !== "idle";
   }
 
-  /** Ist der Punkt in der Muldenkammer? (Prüfung im gedrehten Muldenrahmen) */
-  private inChamber(p: { x: number; y: number; z: number }): boolean {
-    const l = this.toLocal(p);
-    return (
-      Math.abs(l.x) < INNER_W / 2 + 0.2 &&
-      Math.abs(l.z) < INNER_D / 2 + 0.2 &&
-      l.y < WALL_H + 1.0
-    );
+  /**
+   * Ist der Punkt in der Muldenkammer? (Prüfung im gedrehten Muldenrahmen)
+   *
+   * Öffentlich seit E-125: Die Challenge fragt genau diese Prüfung, statt eine
+   * zweite Kammergeometrie zu rechnen — was hier als „drin" gilt, wird gepresst.
+   */
+  inChamber(p: { x: number; y: number; z: number }): boolean {
+    return this.ueberKammer(p) && this.toLocal(p).y < WALL_H + 1.0;
+  }
+
+  /** Dieselbe Prüfung ohne Höhe: steht der Punkt waagerecht über der Kammer? (E-125) */
+  ueberKammer(p: { x: number; z: number }): boolean {
+    const l = this.toLocal({ x: p.x, y: 0, z: p.z });
+    return Math.abs(l.x) < INNER_W / 2 + 0.2 && Math.abs(l.z) < INNER_D / 2 + 0.2;
   }
 
   private toLocal(p: { x: number; y: number; z: number }): THREE.Vector3 {

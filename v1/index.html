@@ -691,7 +691,9 @@
       #tutorial h3 {
         margin: 0 0 5px; font-size: 15px; letter-spacing: 1px; color: #f0b429;
       }
-      #tutorial p { margin: 0; font-size: 12.5px; line-height: 1.55; color: #c8ced2; }
+      /* pre-line: Die Lernschritte einer Challenge stehen zeilenweise, je
+         Zeile ein Bedienelement (E-125); der Fliesstext bricht wie bisher um. */
+      #tutorial p { margin: 0; font-size: 12.5px; line-height: 1.55; color: #c8ced2; white-space: pre-line; }
       @media (max-height: 430px) {
         #tutorial {
           max-width: 260px;
@@ -803,6 +805,10 @@
       #abrechnung .zeile .wert { font-weight: 700; white-space: nowrap; }
       /* Der einzige Knopf im Bild — und mit 44 px der Daumenflaeche gewachsen. */
       #abr-weiter { min-height: 44px; margin-top: 14px !important; }
+      /* Nach einer Challenge der zweite Knopf (E-125), ebenso daumengross.
+         `hidden` muss gegen `display: block` der Knopfregel oben ankommen. */
+      #abr-menue { min-height: 44px; }
+      #abrechnung button[hidden] { display: none; }
       /* --- Radio: Senderwahl ---
          Gleiches Feld wie der Platzausbau, damit nichts Neues zu lernen ist.
          Die Knoepfe stehen auf mindestens 44 px, auch auf flachen Displays:
@@ -1120,17 +1126,18 @@
         <p class="sub" id="abr-sterne"></p>
         <div id="abr-zahlen"></div>
         <button id="abr-weiter">WEITER</button>
+        <!-- Nur nach einer Challenge (E-125): WEITER heisst dann NOCHMAL -->
+        <button id="abr-menue" hidden>ZUM MENÜ</button>
       </div>
     </div>
     <!-- Hauptmenue (E-118). Steht vor dem Aufbau der Welt; main.ts wartet auf
-         die Wahl. Etappe 3 haengt die Challenges als Knoepfe in
-         #hm-challenges — der Kasten ist heute leer. -->
+         die Wahl. Die Challenges haengt ui/hauptmenue.ts als Knoepfe in
+         #hm-challenges, je mit der besten Sternzahl (E-125). -->
     <div id="hauptmenue">
       <div class="panel">
         <h1>RUSTNREIBACH</h1>
         <p class="sub">Bagger-Simulator</p>
         <button id="hm-sandkasten">SANDKASTEN<small>Der Platz voller Schrott und Wracks. Ohne Ziel, ohne Uhr — zum Üben und Kaputtmachen.</small></button>
-        <button id="hm-challenges-knopf" disabled>CHALLENGES<small>Kommen als Nächstes — noch nicht spielbar.</small></button>
         <div id="hm-challenges"></div>
       </div>
     </div>

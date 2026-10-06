@@ -49,3 +49,19 @@ export const NUR_IM_BETRIEB: readonly string[] = [
 export const NUR_IM_SIMULATOR: readonly string[] = [
   "btn-nachschub", // Kranz: NACHSCHUB
 ];
+
+/*
+ * CHALLENGE IST KEINE DRITTE SPIELART (E-125). Sie ist eine WAHL im
+ * Hauptmenue des Simulators, wie der Sandkasten — gewaehlt zur Laufzeit,
+ * nicht beim Bauen. `SPIELART` entscheidet, ob es Geld und Leute gibt; das
+ * gilt fuer beide Wahlen gleich. Was nur im freien Spiel gebraucht wird und
+ * in einer Challenge stoeren wuerde, steht hier — `main.ts` nimmt es in der
+ * Challenge aus dem Bild, auf demselben Weg wie die Listen oben.
+ */
+export const NUR_IM_SANDKASTEN: readonly string[] = [
+  "btn-nachschub", // Kranz: keine Fuhre mitten in die Aufgabe
+  "btn-pickup", // Kranz: kein Abholer
+  "btn-away", // Kranz: ZUR WAAGE — es faehrt keiner
+  "pause-save", // eine Challenge-Welt darf den Sandkasten-Stand nicht ueberschreiben
+  "pause-new", // „Neues Spiel" loescht den Sandkasten-Stand
+];
