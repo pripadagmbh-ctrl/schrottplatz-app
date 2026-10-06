@@ -63,7 +63,7 @@ import { challengeNach } from "./challenges/katalog";
 import { ChallengeLauf } from "./challenges/challenge";
 import { installChallengeKarte } from "./ui/challengekarte";
 import { Fahrkunst } from "./skills/fahrkunst";
-import { NACHSCHUB_FOLGE, NACHSCHUB_MELDUNG, profilFuer } from "./delivery/nachschub";
+import { NACHSCHUB_FOLGE, nachschubMeldung, profilFuer } from "./delivery/nachschub";
 
 const FIXED_DT = 1 / 60;
 const MAX_STEPS_PER_FRAME = 5; // Spiral-of-death-Schutz
@@ -1173,7 +1173,9 @@ async function main(): Promise<void> {
     }
     const profil = profilFuer(NACHSCHUB_FOLGE[nachschubNr++ % NACHSCHUB_FOLGE.length]);
     vehicles.spawnNow(profil.vehicle, profil);
-    hud.toast(NACHSCHUB_MELDUNG[profil.vehicle]);
+    // E-126: Die Meldung kennt das Grossteil, nicht nur das Fahrzeug —
+    // sonst hiesse ein einzelner Minibagger "Eine Pritsche ist unterwegs".
+    hud.toast(nachschubMeldung(profil));
   };
 
   // --- Fester Physik-Step, von Loop und Test-Handle gemeinsam genutzt ---
