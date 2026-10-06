@@ -1880,6 +1880,13 @@ export class ContainerManager {
   private hovered: GameContainer | null = null;
   /** Erlös am Schild zeigen? Im Simulator (E-118) setzt `main.ts` das auf false. */
   preiseZeigen = true;
+  /**
+   * Leert sich das Platzinventar beim Tageswechsel (`nachtschicht`)? Im
+   * Simulator setzt `main.ts` das auf false (E-120, Patrick 06.10.2026:
+   * „Schrott soll auch nicht direkt verschwinden") — dort laeuft der Tag
+   * weiter, und der Muellcontainer waere jede Nacht auf einen Schlag leer.
+   */
+  nachtschichtAktiv = true;
 
   constructor(scene: THREE.Scene, world: RAPIER.World, private bus: EventBus) {
     for (const cfg of CONFIGS) {
@@ -1930,7 +1937,11 @@ export class ContainerManager {
      * unten die versetzten Stücke gleich an ihrem neuen Ort — andersherum
      * stünde eine Runde lang die alte Füllung auf dem Schild.
      */
-    if (platzwache.tagGewechselt("platzinventar")) this.nachtschicht(itemManager);
+    // Erst fragen, dann schalten: Der Tageswechsel wird auch abgeschaltet
+    // verbraucht, sonst raeumte ein spaeteres Einschalten alte Naechte nach.
+    if (platzwache.tagGewechselt("platzinventar") && this.nachtschichtAktiv) {
+      this.nachtschicht(itemManager);
+    }
     const changes: Array<{ item: ScrapItem; from: string | null; to: string | null }> = [];
     for (const item of itemManager.items) {
       let to: string | null = null;

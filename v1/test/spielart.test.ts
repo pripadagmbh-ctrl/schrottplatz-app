@@ -103,7 +103,8 @@ describe("Ein Schalter fuer die Spielart", () => {
     const simulator = ids.filter((id) => !NUR_IM_BETRIEB.includes(id));
     const betrieb = ids.filter((id) => !NUR_IM_SIMULATOR.includes(id));
     expect(simulator).toContain("btn-nachschub");
-    expect(simulator).not.toContain("btn-pickup");
+    // ABHOLEN gibt es seit E-120 auch im Sandkasten (ohne Fraktionswahl)
+    expect(simulator).toContain("btn-pickup");
     expect(simulator).not.toContain("btn-lambert");
     expect(betrieb).not.toContain("btn-nachschub");
     expect(simulator.length).toBeLessThanOrEqual(7);

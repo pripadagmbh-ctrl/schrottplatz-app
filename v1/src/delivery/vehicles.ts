@@ -13,8 +13,37 @@ import { AUSSEHEN_NEUTRAL } from "./aussehen";
 import type { Box } from "../world/boxen";
 import { packeLadung, stueckMass, deckelVolumen } from "./ladung";
 
-/** So lange haelt ein beladener Abholer auf der Waage fuer Marios Kontrolle. */
+/**
+ * So lange haelt JEDER Laster bei der Ausfahrt auf der Waage (s).
+ *
+ * Bis E-119 nur der Abholer. Seit E-120 (Patrick, 06.10.2026: „Er soll immer
+ * noch an der Waage halten") alle, in beiden Spielarten.
+ */
 const WIEGE_HALT_S = 6;
+/**
+ * Ab dieser Geschwindigkeit liegt Ladung NICHT ruhig (m/s).
+ *
+ * Eine Zahl fuer zwei Fragen: Hat sich die Fuhre des Anlieferers vor der
+ * Einfahrt gesetzt (`cargoAtRest`)? Liegt die Ladung des Abholers ruhig,
+ * bevor er voll losfaehrt (E-120)? Der Wert stand vorher nur in
+ * `cargoAtRest`.
+ */
+const LADUNG_RUHIG_MS = 0.9;
+/**
+ * So lange muss der Abholer voll UND ruhig sein, bevor er von selbst
+ * losfaehrt (s). SW (E-120): Drei Sekunden reichen, damit ein gerade
+ * hineingeworfenes Teil zur Ruhe kommt und der Spieler sieht, dass der Wagen
+ * voll ist — kurz genug, dass niemand auf ihn wartet.
+ */
+const VOLL_WARTE_S = 3;
+/**
+ * Wie oft „voll und ruhig" geprueft wird (s). SW (E-120), derselbe Takt wie
+ * die Ladeanzeige des Abholers (`LADUNG_TAKT_S` in main.ts): viermal je
+ * Sekunde ist schneller, als man ablaedt. Gemessen am 06.10.2026 kostet EINE
+ * Pruefung bei 260 Teilen auf dem Platz rund 0,86 ms (Node, Desktop) — jedes
+ * Bild gerechnet waere das so viel wie ein ganzer Physikschritt.
+ */
+const VOLL_PRUEF_S = 0.25;
 /**
  * Leergewicht des Abrollcontainers, den der Abholer mitbringt (kg).
  *
@@ -84,6 +113,8 @@ import {
   ANHAENGER_HALB_BREITE,
   ANHAENGER_WAND,
   WRACK_KG,
+  FUELL_KLASSEN,
+  NUTZLAST,
   type Aufbau,
 } from "./fuellgrad";
 import type { PlatzinventarPort } from "./platzinventarAbholung";
@@ -1566,6 +1597,31 @@ class DeliveryVehicle {
    */
   private composites: CompositeManager | null = null;
 
+  /**
+   * Der Laderaum dieses Wagens — EINE Rechnung fuer Beladen und „voll" (E-120).
+   *
+   * Stand bis zum 06.10.2026 mitten in `loadCargo`. Seit der Abholer im
+   * Sandkasten von selbst losfaehrt, wenn er voll ist, fragt auch er danach;
+   * zwei Abschriften derselben Formel waeren die Fehlerklasse aus E-044/E-070.
+   *
+   * DER PKW-ANHAENGER IST KEIN LKW (15.09.2026).
+   *
+   * Gepackt wurde er bis heute mit LKW-Massen: 2,54 m breit und bis 0,99 m
+   * hoch. In Wirklichkeit ist er 1,74 m breit (Boden 1,86, Bordwaende 0,06
+   * bei x = ±0,90) und hat 0,34 m Bordwand. Die Volumenrechnung in
+   * `fuellgrad.ts` nimmt die echten Masse — diese Stelle noch nicht, und
+   * damit standen die Teile eines „vollen" Anhaengers zur Haelfte neben ihm.
+   * Beide lesen jetzt dieselben Konstanten.
+   */
+  private laderaum(): { halbBreite: number; nutzLaenge: number; maxHoehe: number; raum: number } {
+    const anhaenger = this.kind === "pkw";
+    const halbBreite = anhaenger ? ANHAENGER_HALB_BREITE : BED_HALF_W - 0.08;
+    const nutzLaenge = this.bedLen - 2 * LADE_RAND;
+    const maxHoehe =
+      (anhaenger ? ANHAENGER_WAND : wandHoehe(this.kind, this.bodyStyleName)) + LADUNG_UEBERSTAND;
+    return { halbBreite, nutzLaenge, maxHoehe, raum: halbBreite * 2 * nutzLaenge * maxHoehe };
+  }
+
   loadCargo(items: ItemManager, composites: CompositeManager): void {
     this.composites = composites;
     this.group.updateWorldMatrix(true, true);
@@ -1635,22 +1691,7 @@ class DeliveryVehicle {
      */
     const mindestFuellung = Math.min(MINDEST_FUELLUNG, zielFuellung);
 
-    /*
-     * DER PKW-ANHAENGER IST KEIN LKW (15.09.2026).
-     *
-     * Gepackt wurde er bis heute mit LKW-Massen: 2,54 m breit und bis 0,99 m
-     * hoch. In Wirklichkeit ist er 1,74 m breit (Boden 1,86, Bordwaende 0,06
-     * bei x = ±0,90) und hat 0,34 m Bordwand. Die Volumenrechnung in
-     * `fuellgrad.ts` nimmt die echten Masse — diese Stelle noch nicht, und
-     * damit standen die Teile eines „vollen" Anhaengers zur Haelfte neben ihm.
-     * Beide lesen jetzt dieselben Konstanten.
-     */
-    const anhaenger = this.kind === "pkw";
-    const halbBreite = anhaenger ? ANHAENGER_HALB_BREITE : BED_HALF_W - 0.08;
-    const nutzLaenge = this.bedLen - 2 * LADE_RAND;
-    const maxHoehe =
-      (anhaenger ? ANHAENGER_WAND : wandHoehe(this.kind, this.bodyStyleName)) + LADUNG_UEBERSTAND;
-    const raum = halbBreite * 2 * nutzLaenge * maxHoehe;
+    const { halbBreite, nutzLaenge, maxHoehe, raum } = this.laderaum();
 
     type Spec = { materialId: string; massKg: number; shape: ScrapShape };
     let specs: Spec[] = [];
@@ -2102,9 +2143,90 @@ class DeliveryVehicle {
     for (const it of this.cargo.items) {
       if (!it.body.isValid()) continue;
       const v = it.body.linvel();
-      if (Math.hypot(v.x, v.y, v.z) > 0.9) return false;
+      if (Math.hypot(v.x, v.y, v.z) > LADUNG_RUHIG_MS) return false;
     }
     return true;
+  }
+
+  /* ------------------------------------- VOLL FAEHRT LOS (E-120) -------- */
+
+  /**
+   * Faehrt der Abholer von selbst los, sobald er voll ist? Gesetzt vom
+   * `VehicleManager` beim Anlegen; der Schalter selbst steht in `main.ts`
+   * (Block „Simulator: abhaengen"). Dieses Modul kennt keine Spielart.
+   */
+  vollFaehrtLos = false;
+  /** Was die Spinne gerade haelt — gesetzt vom `VehicleManager`. */
+  gegriffen: (() => readonly RAPIER.RigidBody[]) | null = null;
+  /** Wie lange „voll und ruhig" schon ununterbrochen gilt (s). */
+  private vollSeitS = 0;
+  /** Restzeit bis zur naechsten Pruefung (s). */
+  private vollPruefT = 0;
+
+  /**
+   * Wie voll ist die Flaeche (0 … 1 und darueber)? Fuer den Abholer.
+   *
+   * Dieselbe Rechnung, mit der eine Anlieferung beladen wird (E-033):
+   * Σ `deckelVolumen` der Teile durch den Laderaum. Gezaehlt wird, was
+   * `aufDerFlaeche` liegt — dasselbe Fenster wie Verriegeln, Waage und
+   * Verkauf. Teile ohne Form (Karossen) haben hier kein Volumen.
+   */
+  ladeflaecheFuellgrad(): number {
+    const { raum } = this.laderaum();
+    if (raum <= 0) return 0;
+    this.bedGroup.updateWorldMatrix(true, false);
+    let belegt = 0;
+    for (const it of this.itemQuelle?.items ?? []) {
+      if (it.shape && this.aufDerFlaeche(it.body)) {
+        belegt += deckelVolumen(it.shape.kind, it.shape.dims);
+      }
+    }
+    return belegt / raum;
+  }
+
+  /**
+   * Ist der Abholer voll? EINES genuegt (E-120):
+   *
+   *  - Fuellgrad ab `FUELL_KLASSEN.randvoll.von` (0,8) — ab da heisst eine
+   *    Anlieferung „randvoll" (E-033).
+   *  - Last ab `NUTZLAST.pritsche` (8 500 kg). `NUTZLAST` kennt keinen
+   *    Abholer; die Pritsche hat dieselbe Flaechenlaenge (5,4 m, `routes.ts`)
+   *    und ist der Wagen, dessen Nutzlast seiner am naechsten kommt. Ohne
+   *    diese zweite Schranke wuerde ein Wagen voll Messing nie „voll".
+   *
+   * Gewogen wird mit `ladeflaecheKg` — derselben Zahl wie an der Waage.
+   */
+  abholerVoll(): boolean {
+    return (
+      this.ladeflaecheFuellgrad() >= FUELL_KLASSEN.randvoll.von ||
+      this.ladeflaecheKg() >= NUTZLAST.pritsche
+    );
+  }
+
+  /** Liegt alles auf der Flaeche ruhig? Mass wie `cargoAtRest`. */
+  private ladeflaecheRuhig(): boolean {
+    this.bedGroup.updateWorldMatrix(true, false);
+    for (const it of this.itemQuelle?.items ?? []) {
+      if (!this.aufDerFlaeche(it.body)) continue;
+      const v = it.body.linvel();
+      if (Math.hypot(v.x, v.y, v.z) > LADUNG_RUHIG_MS) return false;
+    }
+    return true;
+  }
+
+  /**
+   * Haengt ein gegriffenes Teil ueber der Flaeche? Dann faehrt er NICHT.
+   *
+   * Sonst koppelte `verriegeleLadeflaeche` das Teil an den Wagen, waehrend
+   * es noch am Fixed Joint der Spinne haengt — zwei Herren fuer einen
+   * Koerper, und einer davon ist der Griff-Kern (Regel 2). Gefragt wird
+   * dasselbe Fenster, mit dem verriegelt wird.
+   */
+  private greiferUeberFlaeche(): boolean {
+    const g = this.gegriffen?.() ?? [];
+    if (g.length === 0) return false;
+    this.bedGroup.updateWorldMatrix(true, false);
+    return g.some((b) => this.aufDerFlaeche(b));
   }
 
   /** Nach dem Setzen: alles für die Fahrt an die Mulde koppeln. */
@@ -2367,7 +2489,7 @@ class DeliveryVehicle {
   /** Steht es gerade zur Kontrolle auf der Waage? (siehe VehicleManager) */
   get aufDerWaage(): boolean {
     if (this.phase === "weighIn") return true;
-    return this.isPickup && this.wiegeHaltS > 0;
+    return this.wiegeHaltS > 0; // seit E-120 haelt jeder bei der Ausfahrt
   }
 
   /** Fahrschritt mit Blockade-Prüfung; liefert true, wenn tatsächlich gefahren wurde. */
@@ -2622,6 +2744,27 @@ class DeliveryVehicle {
            * welche.
            */
           this.starteAusfaedeln(this.routeOut, "out", 0);
+        } else if (this.vollFaehrtLos) {
+          /*
+           * VOLL FAEHRT ER VON SELBST (E-120, Patrick 06.10.2026: „LKW faehrt
+           * automatisch weg, sobald vollbeladen").
+           *
+           * KEIN DRITTER AUSGANG: Losgefahren wird ueber `sendAway()` — genau
+           * den Weg, den ZUR WAAGE nimmt (`VehicleManager.zurWaage`). E-087:
+           * Zwei Ausgaenge fuer ein Ereignis, und einer fuhr an der Abrechnung
+           * vorbei. Wer hier ein eigenes `phase = …` setzt, baut ihn wieder.
+           *
+           * Erst wenn voll, ruhig und kein gegriffenes Teil ueber der Flaeche
+           * — und das `VOLL_WARTE_S` lang am Stueck.
+           */
+          this.vollPruefT -= dt;
+          if (this.vollPruefT <= 0) {
+            this.vollPruefT += VOLL_PRUEF_S;
+            const bereit =
+              !this.greiferUeberFlaeche() && this.ladeflaecheRuhig() && this.abholerVoll();
+            this.vollSeitS = bereit ? this.vollSeitS + VOLL_PRUEF_S : 0;
+            if (this.vollSeitS >= VOLL_WARTE_S) this.sendAway();
+          }
         }
         break;
       case "tipping":
@@ -2797,7 +2940,7 @@ class DeliveryVehicle {
         break;
       case "out":
         this.sideOpenTarget = 0; // Bordwände zu, bevor es vom Platz geht
-        // Abholer halten auf der Waage, solange Mario die Ladung ansieht
+        // Jeder Laster haelt auf der Waage, solange Mario die Ladung ansieht
         if (this.wiegeHaltS > 0) {
           this.wiegeHaltS -= dt;
           break;
@@ -2805,9 +2948,15 @@ class DeliveryVehicle {
         this.advance(this.routeOut, SPEED * dt, false, dt);
         if (!this.weighedOut && this.group.position.z >= WEIGH_Z) {
           this.weighedOut = true;
+          /*
+           * JEDER HAELT AUCH BEI DER AUSFAHRT (E-120). Bis zum 06.10.2026 nur
+           * der Abholer — „ein Anlieferer faehrt leer hinaus und hat nichts
+           * vorzuzeigen". Patrick am selben Tag: „Er soll immer noch an der
+           * Waage halten." Ohne Ausnahme, in beiden Spielarten: Auch ein
+           * Anlieferer, der Reste mitnimmt, wird leer (Tara) gewogen.
+           */
+          this.wiegeHaltS = WIEGE_HALT_S;
           if (this.isPickup) {
-            // Voll vom Hof: kurz stehen bleiben, damit die Ladung geprüft wird
-            this.wiegeHaltS = WIEGE_HALT_S;
             /*
              * Und jetzt die zweite Haelfte des Lieferscheins (E-064): Brutto
              * minus der Tara von der Einfahrt ist, was er mitnimmt. Gewogen
@@ -2920,6 +3069,27 @@ class DeliveryVehicle {
   despawn(): void {
     for (const w of this.sideWalls) this.world.removeRigidBody(w.body);
     this.sideWalls = [];
+    /*
+     * DER ABHOLER NIMMT SEINE LADUNG MIT — und zwar erst HIER, am Ende der
+     * Ausfahrt, ausser Sicht (E-120, Patrick 06.10.2026: „Schrott soll auch
+     * nicht direkt verschwinden").
+     *
+     * Bis dahin blieben die verriegelten Teile, wenn niemand sie verkaufte
+     * (Sandkasten: `onPickupDepart` abgehaengt), als kinematische Leichen am
+     * Ende der Ausfahrt und in `items.items` liegen. Im Betrieb hat der
+     * Verkauf die meisten schon entfernt (`isValid` ist dann falsch); was er
+     * nicht nahm — etwa den Besen —, geht jetzt ebenfalls, und das
+     * Platzinventar kommt am naechsten Tag wieder (E-031).
+     */
+    if (this.isPickup) {
+      for (const r of this.riding) {
+        if (!r.body.isValid()) continue;
+        const it = this.itemQuelle?.itemByBody(r.body);
+        if (it) this.itemQuelle!.remove(it, true);
+        else this.composites?.despawnByBody(r.body);
+      }
+      this.riding = [];
+    }
     // Was noch auf der Ladeflaeche klemmt, stellt der Fahrer beim Wegfahren ab —
     // sonst fuehre er Material vom Platz und es waere fuer den Spieler weg.
     //
@@ -3010,6 +3180,19 @@ export class VehicleManager {
    * bekommt etwas Luft, ein leerer Nachschub im Minutentakt.
    */
   intervalFactor = 1;
+  /**
+   * Faehrt ein Abholer von selbst los, sobald er voll ist (E-120)?
+   *
+   * Der Schalter steht HIER und wird in `main.ts` im Block „Simulator:
+   * abhaengen" gesetzt — so bleibt er eine Stelle, und dieses Modul muss die
+   * Spielart nicht kennen. Im Betrieb bleibt es bei Taste V und Standzeit.
+   */
+  vollFaehrtLos = false;
+  /**
+   * Was die Spinne gerade haelt; von main gesetzt. Ein Abholer faehrt nicht
+   * von selbst los, solange davon etwas ueber seiner Flaeche haengt (E-120).
+   */
+  gegriffen: (() => readonly RAPIER.RigidBody[]) | null = null;
 
   /** Baggerposition für die Blockade-Prüfung; von main gesetzt. */
   getExcavatorPos: (() => THREE.Vector3) | null = null;
@@ -3128,6 +3311,9 @@ export class VehicleManager {
       // Die beiden Wiegungen (E-064) — leer herein, voll hinaus.
       wagen.onTara = (tara) => this.onAbholerTara?.(tara);
       wagen.onAbholungGewogen = (tara, brutto) => this.onAbholerBrutto?.(tara, brutto);
+      // Voll faehrt er von selbst (E-120) — nie mit einem Teil in der Spinne.
+      wagen.vollFaehrtLos = this.vollFaehrtLos;
+      wagen.gegriffen = () => this.gegriffen?.() ?? [];
     } else {
       /*
        * Und der Anlieferer spricht ebenfalls (E-082) — derselbe Kanal zum
@@ -3256,9 +3442,8 @@ export class VehicleManager {
    * aus dem Büro und sieht sich die Ladung an (Wunsch 11.09.2026).
    *
    * Bei der Einfahrt gilt das für jedes Fahrzeug — seit E-064 auch für den
-   * Abholer, der dort leer gewogen wird. Bei der Ausfahrt nur für ihn: Er
-   * fährt beladen vom Hof, und was rausgeht, wird geprüft. Ein Anlieferer
-   * fährt leer hinaus und hat nichts vorzuzeigen — dafür bleibt Mario drin.
+   * Abholer, der dort leer gewogen wird. Bei der Ausfahrt seit E-120 ebenfalls
+   * für jedes (Patrick, 06.10.2026: „Er soll immer noch an der Waage halten").
    */
   wiegeKontrolle(): THREE.Vector3 | null {
     for (const v of [this.active, ...this.parked]) {

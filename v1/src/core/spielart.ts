@@ -43,7 +43,7 @@ export const NUR_IM_BETRIEB: readonly string[] = [
   "load", // Ladeanzeige des Abholers (Erlös hängt daran)
   "tutorial", // geführter Einstieg in den Handelskreislauf
   "pause-shop", // Platz ausbauen
-  "btn-pickup", // Kranz: ABHOLEN
+  // "btn-pickup" (ABHOLEN) gehoert seit E-120 zu beiden Spielarten
   "btn-lambert", // Kranz: LAMBERT
 ];
 export const NUR_IM_SIMULATOR: readonly string[] = [

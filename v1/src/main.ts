@@ -1065,7 +1065,13 @@ async function main(): Promise<void> {
     excavator.getStaffPos = null; // ein unsichtbarer Lambert ist kein Hindernis
     hud.preiseZeigen = false; // Griff-Info ohne €/t
     containers.preiseZeigen = false; // Muldenschild ohne Erloes
+    // E-120: Der Abholer faehrt voll von selbst, und nichts verschwindet auf
+    // einen Schlag — der Muellcontainer leert sich nachts nicht mehr.
+    vehicles.vollFaehrtLos = true;
+    containers.nachtschichtAktiv = false;
   }
+  // Ein Abholer faehrt nie los, solange die Spinne etwas ueber ihm haelt (E-120)
+  vehicles.gegriffen = () => grip.grippedBodies;
   /*
    * NACHSCHUB (E-118): Kipper, Pritsche, Wrack reihum, ohne Waage und ohne
    * Geld. Steht noch eine Fuhre auf dem Platz, wartet der Knopf — eine
@@ -1280,17 +1286,24 @@ async function main(): Promise<void> {
     // Abholung: steht ein beladener Container bereit, fährt er ab —
     // sonst öffnet die Bestellung, in der die Fraktion gewählt wird
     if (!BETRIEB && (input.wasPressed("Digit1") || touch.consumePress("Digit1"))) holeNachschub();
-    // Abholung, Lambert und Ausbau gibt es nur im Betrieb (E-118)
-    if (BETRIEB && (input.wasPressed("KeyV") || touch.consumePress("KeyV"))) {
+    // Lambert und Ausbau gibt es nur im Betrieb (E-118); die Abholung seit
+    // E-120 auch im Sandkasten — dort ohne Fraktionswahl, es gibt kein Geld.
+    if (input.wasPressed("KeyV") || touch.consumePress("KeyV")) {
       if (vehicles.pickupTruck?.waitingForLoad) {
         vehicles.requestPickup();
         hud.toast("Container geht raus …");
       } else if (vehicles.abholungVorgemerkt) {
         hud.toast("Die Abholung ist schon vorgemerkt und fährt als nächstes vor.");
-      } else {
+      } else if (BETRIEB) {
         // Auch bei belegtem Platz bestellbar: Die Abholung hat Vorrang und
         // wird vorgemerkt, statt an einem laufenden Anlieferer zu scheitern.
         showPickup(true);
+      } else {
+        hud.toast(
+          vehicles.requestPickup(null) === "vorgemerkt"
+            ? "Abholer vorgemerkt — er kommt, sobald die Fuhre weg ist."
+            : "Abholer kommt leer — voll fährt er von selbst los."
+        );
       }
     }
     /*

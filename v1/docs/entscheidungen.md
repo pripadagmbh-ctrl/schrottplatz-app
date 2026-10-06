@@ -10,6 +10,7 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 | Nr. | Datum | Titel | Status | Volltext |
 |---|---|---|---|---|
+| E-120 | 06.10.2026 | Halt an der Waage, Abholer fährt voll los, nichts verschwindet direkt | gebaut | [E-101_bis_E-120.md](log/E-101_bis_E-120.md) |
 | E-119 | 06.10.2026 | Fünf Fahrkünste werden gemessen, nicht geschätzt | gebaut | [E-101_bis_E-120.md](log/E-101_bis_E-120.md) |
 | E-118 | 06.10.2026 | Das Spiel wird ein Bagger-Simulator: Hauptmenü, Sandkasten, Wirtschaft abgeschaltet | gebaut | [E-101_bis_E-120.md](log/E-101_bis_E-120.md) |
 | E-117 | 01.10.2026 | Patrick wählt C: die weiche Karosserie mit Sicken wird Vorgabe | gebaut | [E-101_bis_E-120.md](log/E-101_bis_E-120.md) |
@@ -134,6 +135,12 @@ Status: `gebaut` = Prüfkette grün, Gerätetest offen · `abgenommen` = auf iPa
 
 Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet hat, trägt das Ergebnis in den Volltext ein und setzt den Status oben auf `abgenommen`; danach fliegt die Zeile hier raus.
 
+**E-120 — Halt an der Waage, Abholer fährt voll los, nichts verschwindet direkt**
+- NACHSCHUB holen und dem Laster nachsehen, wenn er vom Hof fährt (Kipper von selbst, Pritsche nach ZUR WAAGE): hält er bei der Ausfahrt rund sechs Sekunden auf der Waage?
+- ABHOLEN im Kranz: kommt ein leerer Abholer ohne Auswahlliste? Voll beladen: fährt er etwa drei Sekunden nach dem letzten Teil von selbst los und hält an der Waage?
+- Kurz vor voll ein Teil über der Mulde in der Spinne halten: bleibt er stehen, bis du loslässt? Spinne und Greifen unverändert?
+- Dem vollen Abholer nachsehen: liegt die Ladung die ganze Fahrt sichtbar auf dem Wagen? Bleibt der Müllcontainer über Nacht so voll, wie du ihn gelassen hast?
+
 **E-119 — Fünf Fahrkünste werden gemessen, nicht geschätzt**
 - Noch nichts zu sehen. Einen Träger greifen, rüberschwenken, im Schwung loslassen: Fühlt sich Greifen, Pendeln und Werfen genau so an wie vorher?
 - Zehn Umschläge hintereinander: läuft es so flüssig wie gestern?
@@ -141,7 +148,7 @@ Alle Gerätetest-Fragen aus den Volltexten, nach Nummer. Wer eine beantwortet ha
 **E-118 — Das Spiel wird ein Bagger-Simulator: Hauptmenü, Sandkasten, Wirtschaft abgeschaltet**
 - Spiel öffnen: Hauptmenü mit SANDKASTEN und ausgegrautem CHALLENGES — auf dem iPhone mini lesbar?
 - SANDKASTEN: kein Konto, keine Uhr, keine Tutorialkarte, kein Lambert, keine Janine?
-- Kranz: sechs Einträge mit NACHSCHUB. Dreimal NACHSCHUB bringt Kipper, Pritsche, Wrack — ohne Waage-Meldung, ohne Verhandeln?
+- Kranz: sechs Einträge mit NACHSCHUB (seit E-120 sieben, mit ABHOLEN). Dreimal NACHSCHUB bringt Kipper, Pritsche, Wrack — ohne Waage-Meldung, ohne Verhandeln?
 - Griff-Info ohne €/t, Muldenschild ohne Erlös, Ampel wie bisher; Spinne, Greifen, Pendel unverändert?
 
 **E-117 — Patrick wählt C: die weiche Karosserie mit Sicken wird Vorgabe**
