@@ -15,6 +15,18 @@
 import { Music } from "./music";
 import { findeSender, STANDARD_SENDER, type Song } from "./songs";
 import { brauchtNeuaufbau, brauchtWeckruf, istHoerbar, type Tondiagnose } from "./tonzustand";
+import {
+  aufprallKlang,
+  bissPegel,
+  dauerVon,
+  kehrKlang,
+  Rasselbett,
+  Stimmenbudget,
+  stoehnen,
+  type Schlag,
+  type Untergrund,
+} from "./klangregeln";
+import type { EventBus, GameEvents } from "../core/events";
 
 /**
  * Nachfassfristen in Millisekunden. `resume()` loest sein Versprechen auf iOS
@@ -48,7 +60,28 @@ export class AudioManager {
   private engineGain: GainNode | null = null;
   private hydraulicGain: GainNode | null = null;
   private hydOsc: OscillatorNode | null = null;
-  private scrapeGain: GainNode | null = null;
+  /**
+   * Schlag-Bus mit Begrenzer (E-121): alle Ereignisklaenge und die
+   * Materialschicht laufen hier durch, damit zwanzig gleichzeitige Schlaege
+   * nicht klirren. Motor und Radio laufen daran vorbei (tonkonzept.md:
+   * „Dauerklaenge nicht auf den Schlag-Kompressor").
+   */
+  private sfx: GainNode | null = null;
+  /** Kehren: je Untergrund ein eigener Klangweg (E-121) */
+  private kehr: Record<Untergrund, { gain: GainNode; filter: BiquadFilterNode }> | null = null;
+  private kornQuelle: AudioBufferSourceNode | null = null;
+  private rasselQuelle: AudioBufferSourceNode | null = null;
+  private bettGain: GainNode | null = null;
+  /** Greifen: Stoehnen unter Last, Ventilzischen, Fliessen beim Bewegen */
+  private stoehnOsc: OscillatorNode[] = [];
+  private stoehnFilter: BiquadFilterNode | null = null;
+  private stoehnGain: GainNode | null = null;
+  private ventilGain: GainNode | null = null;
+  private schalenOsc: OscillatorNode | null = null;
+  private schalenGain: GainNode | null = null;
+  private readonly budget = new Stimmenbudget();
+  private readonly bett = new Rasselbett();
+  private letzterBiss = -1;
   /** Alle Dauerquellen, damit sie nach einer Unterbrechung ersetzt werden koennen */
   private dauerquellen: AudioScheduledSourceNode[] = [];
   /** Vergebliche Weckrufe, seit der Ton zuletzt lief */
@@ -56,7 +89,16 @@ export class AudioManager {
   /** Seit dem letzten hoerbaren Moment gab es eine Unterbrechung */
   private unterbrochen = false;
 
-  constructor() {
+  /**
+   * @param bus Ereignisbus (Regel 10). Ohne Bus (Labor) bleiben Aufprall,
+   *   Biss und Loslassen stumm, alles andere klingt wie bisher.
+   */
+  constructor(bus?: EventBus) {
+    if (bus) {
+      bus.on("schrott:aufprall", (e) => this.playAufprallEreignis(e));
+      bus.on("greifer:zugedrueckt", (e) => this.playBiss(e.kraftKN));
+      bus.on("released", () => this.playLoslassen());
+    }
     const start = (): void => this.ensureStarted();
     // Mobile Browser geben den Ton erst nach einer echten Geste frei, und
     // welches Ereignis dabei zählt, unterscheidet sich je nach System — daher
@@ -204,8 +246,10 @@ export class AudioManager {
     this.music = null;
     this.ctx = null;
     this.master = null;
-    // Der Rauschpuffer gehoert zum alten Kanal und waere im neuen unbrauchbar
+    // Die Rauschpuffer gehoeren zum alten Kanal und waeren im neuen unbrauchbar
     this.cachedNoise = null;
+    this.puffer.clear();
+    this.sfx = null;
     this.weckversuche = 0;
     this.unterbrochen = false;
     try {
@@ -223,6 +267,19 @@ export class AudioManager {
       this.master = ctx.createGain();
       this.master.gain.value = 0.5;
       this.master.connect(ctx.destination);
+      /*
+       * Begrenzer statt Kompressor: Er greift erst kurz vor dem Klirren und
+       * laesst schnell wieder los, damit er nicht pumpt (tonkonzept.md, die
+       * Lehre aus dem Diesel). SW: -6 dB, 20:1, 2 ms an, 120 ms los.
+       */
+      this.sfx = ctx.createGain();
+      const begrenzer = ctx.createDynamicsCompressor();
+      begrenzer.threshold.value = -6;
+      begrenzer.knee.value = 3;
+      begrenzer.ratio.value = 20;
+      begrenzer.attack.value = 0.002;
+      begrenzer.release.value = 0.12;
+      this.sfx.connect(begrenzer).connect(this.master);
       this.unterbrochen = false;
       this.weckversuche = 0;
 
@@ -290,20 +347,103 @@ export class AudioManager {
     lfo.connect(lfoGain).connect(this.hydOsc.frequency);
     lfo.start();
 
-    // Kratzen auf Beton: helleres, raueres Rauschband — Gain folgt der Kontakt-Intensität
-    const scrapeNoise = ctx.createBufferSource();
-    scrapeNoise.buffer = this.noiseBuffer();
-    scrapeNoise.loop = true;
-    const scrapeFilter = ctx.createBiquadFilter();
-    scrapeFilter.type = "bandpass";
-    scrapeFilter.frequency.value = 2600;
-    scrapeFilter.Q.value = 1.2;
-    this.scrapeGain = ctx.createGain();
-    this.scrapeGain.gain.value = 0;
-    scrapeNoise.connect(scrapeFilter).connect(this.scrapeGain).connect(master);
-    scrapeNoise.start();
+    this.dauerquellen = [this.engineOsc, this.hydOsc, lfo, ...this.baueMaterialschicht(ctx)];
+  }
 
-    this.dauerquellen = [this.engineOsc, this.hydOsc, lfo, scrapeNoise];
+  /**
+   * Kehren, Rasseln und Greifen (E-121) — alles Dauerquellen auf Pegel 0,
+   * die erst die Setter und Ereignisse hochziehen. Liefert die Quellen fuer
+   * den Unterbrechungs-Ersatz.
+   *
+   * Drei Rauschquellen fuer alles: weisses Rauschen, eine dichte Koernung
+   * (Schaben) und ein lockeres Klappern (Geroell). Eine Quelle darf mehrere
+   * Filter speisen, das spart Knoten.
+   */
+  private baueMaterialschicht(ctx: AudioContext): AudioScheduledSourceNode[] {
+    const sfx = this.sfx!;
+    const loop = (buf: AudioBuffer): AudioBufferSourceNode => {
+      const q = ctx.createBufferSource();
+      q.buffer = buf;
+      q.loop = true;
+      q.start();
+      return q;
+    };
+    const band = (hz: number, q: number, typ: BiquadFilterType = "bandpass"): BiquadFilterNode => {
+      const f = ctx.createBiquadFilter();
+      f.type = typ;
+      f.frequency.value = hz;
+      f.Q.value = q;
+      return f;
+    };
+    const stumm = (): GainNode => {
+      const g = ctx.createGain();
+      g.gain.value = 0;
+      g.connect(sfx);
+      return g;
+    };
+    const weiss = loop(this.noiseBuffer());
+    // SW: Koernung 220 Koerner/s à 6 ms, Geroell 35 Schlaege/s à 25 ms
+    const korn = loop(this.knisterPuffer("korn", 220, 0.006));
+    const rassel = loop(this.knisterPuffer("rassel", 35, 0.025));
+    this.kornQuelle = korn;
+    this.rasselQuelle = rassel;
+
+    // Beton: raues Schaben — Koernung plus etwas Rauschen durch ein breites Band
+    const beton = { gain: stumm(), filter: band(1100, 0.9) };
+    korn.connect(beton.filter);
+    const betonRausch = ctx.createGain();
+    betonRausch.gain.value = 0.35; // SW
+    weiss.connect(betonRausch).connect(beton.filter);
+    beton.filter.connect(beton.gain);
+    // Stahl: Kreischen — enges, hohes Band plus ein leise jaulender Ton
+    const stahl = { gain: stumm(), filter: band(2400, 8) };
+    weiss.connect(stahl.filter).connect(stahl.gain);
+    const quietsch = ctx.createOscillator();
+    quietsch.frequency.value = 2300;
+    const quietschLfo = ctx.createOscillator();
+    quietschLfo.frequency.value = 6.3; // SW: unruhig, nicht musikalisch
+    const quietschTiefe = ctx.createGain();
+    quietschTiefe.gain.value = 40;
+    quietschLfo.connect(quietschTiefe).connect(quietsch.frequency);
+    const quietschLaut = ctx.createGain();
+    quietschLaut.gain.value = 0.25; // SW: Anteil am Stahlkreischen
+    quietsch.connect(quietschLaut).connect(stahl.gain);
+    quietsch.start();
+    quietschLfo.start();
+    // Schrott: Klappern und Rutschen
+    const schrott = { gain: stumm(), filter: band(1500, 0.8) };
+    rassel.connect(schrott.filter).connect(schrott.gain);
+    this.kehr = { beton, stahl, schrott };
+
+    // Rasselbett: was keinen eigenen Schlag bekommt, rasselt hier
+    this.bettGain = stumm();
+    rassel.connect(band(1800, 0.6)).connect(this.bettGain);
+
+    // Stoehnen: zwei leicht verstimmte Saegezaehne, die gegeneinander schweben
+    this.stoehnFilter = band(500, 1.5);
+    this.stoehnGain = stumm();
+    this.stoehnFilter.connect(this.stoehnGain);
+    this.stoehnOsc = [0, 12].map((cent) => {
+      const o = ctx.createOscillator();
+      o.type = "sawtooth";
+      o.frequency.value = 95;
+      o.detune.value = cent;
+      o.connect(this.stoehnFilter!);
+      o.start();
+      return o;
+    });
+    // Druckbegrenzungsventil: Zischen, wenn die Spinne am Ende ist
+    this.ventilGain = stumm();
+    weiss.connect(band(3500, 0.7, "highpass")).connect(this.ventilGain);
+    // Schalen in Bewegung: das Oel fliesst, ein Singen ueber der Pumpe
+    this.schalenOsc = ctx.createOscillator();
+    this.schalenOsc.type = "triangle";
+    this.schalenOsc.frequency.value = 170;
+    this.schalenGain = stumm();
+    this.schalenOsc.connect(band(1200, 0.7, "lowpass")).connect(this.schalenGain);
+    this.schalenOsc.start();
+
+    return [weiss, korn, rassel, quietsch, quietschLfo, ...this.stoehnOsc, this.schalenOsc];
   }
 
   /** Alte Dauerquellen abstellen und abhaengen, damit nichts doppelt laeuft. */
@@ -325,7 +465,16 @@ export class AudioManager {
     this.engineGain = null;
     this.hydOsc = null;
     this.hydraulicGain = null;
-    this.scrapeGain = null;
+    this.kehr = null;
+    this.kornQuelle = null;
+    this.rasselQuelle = null;
+    this.bettGain = null;
+    this.stoehnOsc = [];
+    this.stoehnFilter = null;
+    this.stoehnGain = null;
+    this.ventilGain = null;
+    this.schalenOsc = null;
+    this.schalenGain = null;
   }
 
   /** Pro Frame: activity 0..1 (Achsbewegung), load 0..1 (Traglast-Anteil). */
@@ -342,10 +491,145 @@ export class AudioManager {
     this.hydraulicGain.gain.setTargetAtTime(0.028 * Math.min(activity * 1.6, 1), t, 0.1);
   }
 
-  /** Pro Frame: Kratz-Intensität 0..1 (Zackenspitzen schleifen über den Boden). */
-  setScrape(intensity: number): void {
-    if (!this.ctx || !this.scrapeGain) return;
-    this.scrapeGain.gain.setTargetAtTime(0.14 * intensity, this.ctx.currentTime, 0.06);
+  /**
+   * Pro Frame: Die Spinne schleift (E-121). `intensity` 0..1 ist das Tempo,
+   * `untergrund` sagt worueber. Die beiden anderen Klangwege blenden in
+   * 80 ms aus — wer von Beton auf die Ladeflaeche zieht, hoert den Wechsel.
+   */
+  setScrape(intensity: number, untergrund: Untergrund = "beton"): void {
+    if (!this.ctx || !this.kehr) return;
+    const t = this.ctx.currentTime;
+    const k = kehrKlang(intensity, untergrund);
+    for (const g of ["beton", "stahl", "schrott"] as const) {
+      const weg = this.kehr[g];
+      weg.gain.gain.setTargetAtTime(g === untergrund ? k.laut : 0, t, g === untergrund ? 0.06 : 0.08);
+      if (g === untergrund) weg.filter.frequency.setTargetAtTime(k.hz, t, 0.06);
+    }
+    // Schneller schleifen = dichter koernen. Die Rasselquelle teilt sich das
+    // Kehren auf Schrott mit dem Rasselbett — beide werden dann lebhafter.
+    if (untergrund === "beton") this.kornQuelle?.playbackRate.setTargetAtTime(k.rate, t, 0.1);
+    if (untergrund === "schrott") this.rasselQuelle?.playbackRate.setTargetAtTime(k.rate, t, 0.1);
+  }
+
+  /**
+   * Pro Frame: die Spinne (E-121). `schalenTempo` 0..1 = wie schnell die
+   * Schalen gerade fahren (Oel fliesst), `kraft` 0..1 = Schliesskraft durch
+   * Hoechstkraft (Zylinder steht unter Druck). Beides darf gleichzeitig sein.
+   */
+  setGreifer(schalenTempo: number, kraft: number): void {
+    if (!this.ctx || !this.stoehnGain || !this.stoehnFilter || !this.ventilGain || !this.schalenGain) return;
+    const t = this.ctx.currentTime;
+    const s = stoehnen(kraft);
+    this.stoehnGain.gain.setTargetAtTime(s.laut, t, 0.08);
+    for (const o of this.stoehnOsc) o.frequency.setTargetAtTime(s.hz, t, 0.12);
+    this.stoehnFilter.frequency.setTargetAtTime(s.filterHz, t, 0.1);
+    this.ventilGain.gain.setTargetAtTime(s.zischen, t, 0.05);
+    const v = Math.min(1, Math.max(0, schalenTempo));
+    // SW: 170..260 Hz, hoechstens 0,035 — leiser als das Stoehnen
+    this.schalenOsc?.frequency.setTargetAtTime(170 + 90 * v, t, 0.08);
+    this.schalenGain.gain.setTargetAtTime(0.035 * v, t, 0.06);
+  }
+
+  /** Gerade klingende Aufprall-Schlaege (Messung, Waechter). */
+  get stimmen(): number {
+    return this.ctx ? this.budget.aktiv(this.ctx.currentTime) : 0;
+  }
+
+  /**
+   * Ein Schrottteil schlaegt auf (Ereignis `schrott:aufprall`, E-121).
+   *
+   * Drei Wege: zu schwach → nur Rasseln; kein Platz im Stimmenbudget →
+   * Rasseln, staerker; sonst ein eigener Schlag aus Teil und Untergrund.
+   */
+  playAufprallEreignis(e: GameEvents["schrott:aufprall"]): void {
+    if (!this.ctx || !this.sfx) return;
+    const t = this.ctx.currentTime;
+    const r = aufprallKlang(e);
+    if (!r) {
+      this.rassle(t, 0.06 * Math.min(1, e.wucht / 1.5)); // SW
+      return;
+    }
+    if (!this.budget.darf(t, dauerVon(r.teil), r.pegel)) {
+      this.rassle(t, 0.25 * r.pegel); // SW
+      return;
+    }
+    this.schlag(r.teil, r.pegel);
+    this.schlag(r.grund, r.pegel);
+    if (e.untergrund === "schrott") this.rassle(t, 0.15 * r.pegel); // SW: es rutscht nach
+  }
+
+  /** Energie ins Rasselbett, Pegel folgt mit Abklingen. SW: voll = 0,12. */
+  private rassle(t: number, menge: number): void {
+    if (!this.bettGain) return;
+    const stand = this.bett.dazu(t, menge);
+    const g = this.bettGain.gain;
+    g.cancelScheduledValues(t);
+    g.setTargetAtTime(0.12 * stand, t, 0.015);
+    g.setTargetAtTime(0, t + 0.05, this.bett.tau);
+  }
+
+  /**
+   * Der Biss (Ereignis `greifer:zugedrueckt`, E-112/E-121): das Material
+   * knirscht unter dem Druck, lauter je haerter. Ein Biss trifft oft mehrere
+   * Koerper im selben Bild — es knirscht trotzdem nur einmal.
+   */
+  playBiss(kraftKN: number): void {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    if (t - this.letzterBiss < 0.08) return; // SW: ein Knirschen je Moment
+    this.letzterBiss = t;
+    const p = bissPegel(kraftKN);
+    // SW: drei kurze, tiefe Knirscher, dazu das Anriss-Rauschen
+    const teile = [180, 290, 460, 720, 1150];
+    const abkling = [0.12, 0.1, 0.08, 0.06, 0.05];
+    for (const [i, d] of [0, 0.03, 0.07].entries()) {
+      this.metalHit(teile, abkling, 0.28 * p * Math.pow(0.6, i), {
+        transient: 2500,
+        transientGain: 0.25 * p * Math.pow(0.6, i),
+        spread: 0.1,
+      }, d);
+    }
+  }
+
+  /**
+   * Loslassen (Ereignis `released`, E-121): das Ventil oeffnet, der Druck
+   * entweicht mit einem fallenden Zischen, die Schalen klacken auf.
+   */
+  playLoslassen(): void {
+    if (!this.ctx || !this.sfx) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noiseBuffer();
+    const f = ctx.createBiquadFilter();
+    f.type = "bandpass";
+    f.Q.value = 1.2;
+    // SW: 3,2 kHz → 1,2 kHz in 0,35 s, Pegel 0,07
+    f.frequency.setValueAtTime(3200, t);
+    f.frequency.exponentialRampToValueAtTime(1200, t + 0.35);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.07, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
+    src.connect(f).connect(g).connect(this.sfx);
+    src.start(t);
+    src.stop(t + 0.42);
+    this.tone(900, 0.03, 0.05, 0.02);
+  }
+
+  /** Ein Schlag nach Rezept, mit Nachklappern und Rascheln. */
+  private schlag(s: Schlag, pegel: number): void {
+    for (let i = 0; i <= s.scheppern; i++) {
+      const d = i === 0 ? 0 : 0.045 * i * (1 + Math.random() * 0.3); // SW: 45 ms Abstand
+      const f = Math.pow(0.5, i);
+      this.metalHit(
+        i === 0 ? s.teiltoene : s.teiltoene.slice(1),
+        i === 0 ? s.abkling : s.abkling.slice(1).map((x) => x * 0.6),
+        s.laut * pegel * f,
+        { transient: s.anriss, transientGain: s.anrissLaut * pegel * f, spread: s.streu * (1 + i) },
+        d
+      );
+    }
+    if (s.rascheln > 0) this.noiseBurst(s.rascheln, 0.2, 0.16 * pegel);
   }
 
   /**
@@ -365,10 +649,15 @@ export class AudioManager {
     });
   }
 
-  playGrab(_materialId?: string): void {
+  playGrab(materialId?: string): void {
     // sattes Zupacken: kurzer Rauschimpuls + tiefer Thump
     this.burst([70], 0.18, 0.35, "triangle");
     this.noiseBurst(500, 0.08, 0.25);
+    // E-121: dazu das Material, leise — man hoert, WAS man gefasst hat.
+    // SW: wie ein Aufprall mit 4 m/s, auf Pegel 0,35 gedeckelt.
+    if (!materialId) return;
+    const r = aufprallKlang({ materialId, massKg: 50, wucht: 4, blech: false, untergrund: "schrott" });
+    if (r) this.schlag(r.teil, Math.min(r.pegel, 0.35));
   }
 
   /**
@@ -441,12 +730,14 @@ export class AudioManager {
     partials: number[],
     decays: number[],
     gain: number,
-    opts: { transient: number; transientGain: number; spread: number }
+    opts: { transient: number; transientGain: number; spread: number },
+    delay = 0
   ): void {
     if (!this.ctx || !this.master) return;
-    const t = this.ctx.currentTime;
+    const t = this.ctx.currentTime + delay;
+    const ziel = this.ausgang;
     // Aufprall: sehr kurzer, gefilterter Rauschimpuls
-    this.noiseBurst(opts.transient, 0.045, opts.transientGain);
+    this.noiseBurst(opts.transient, 0.045, opts.transientGain, delay);
     partials.forEach((f, i) => {
       const osc = this.ctx!.createOscillator();
       // leichte Verstimmung je Anschlag — kein Ton klingt exakt wie der vorige
@@ -455,9 +746,9 @@ export class AudioManager {
       const g = this.ctx!.createGain();
       const amp = (gain / (i + 1.4)) * (0.85 + Math.random() * 0.3);
       g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(amp, t + 0.006); // harter Anschlag
+      g.gain.exponentialRampToValueAtTime(Math.max(amp, 0.0002), t + 0.006); // harter Anschlag
       g.gain.exponentialRampToValueAtTime(0.0001, t + decays[i]);
-      osc.connect(g).connect(this.master!);
+      osc.connect(g).connect(ziel);
       osc.start(t);
       osc.stop(t + decays[i] + 0.05);
     });
@@ -481,7 +772,11 @@ export class AudioManager {
    * ------------------------------------------------------------------
    */
 
-  /** Ein Teil schlaegt auf. Stumm, bis der Ton einzeln geprueft wird. */
+  /**
+   * Alter Direktaufruf aus main.ts — bleibt stumm. Seit E-121 klingt der
+   * Aufprall ueber das Ereignis `schrott:aufprall` (`playAufprallEreignis`).
+   * Entfernen, sobald main.ts das Ereignis sendet statt hier anzurufen.
+   */
   playAufprall(_materialId: string, _wucht: number, _aufStahl: boolean): void {}
 
   /** Rueckfahrwarner eines rangierenden LKW. Stumm, siehe oben. */
@@ -500,7 +795,7 @@ export class AudioManager {
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(0.22, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
-    osc.connect(g).connect(this.master);
+    osc.connect(g).connect(this.ausgang);
     osc.start(t);
     osc.stop(t + 0.55);
     this.noiseBurst(1800, 0.35, 0.3);
@@ -603,7 +898,7 @@ export class AudioManager {
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(gain, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    osc.connect(g).connect(this.master);
+    osc.connect(g).connect(this.ausgang);
     osc.start(t);
     osc.stop(t + dur + 0.05);
   }
@@ -618,15 +913,15 @@ export class AudioManager {
       const g = this.ctx.createGain();
       g.gain.setValueAtTime(gain / freqs.length, t);
       g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-      osc.connect(g).connect(this.master);
+      osc.connect(g).connect(this.ausgang);
       osc.start(t);
       osc.stop(t + dur + 0.05);
     }
   }
 
-  private noiseBurst(cutoff: number, dur: number, gain: number): void {
+  private noiseBurst(cutoff: number, dur: number, gain: number, delay = 0): void {
     if (!this.ctx || !this.master) return;
-    const t = this.ctx.currentTime;
+    const t = this.ctx.currentTime + delay;
     const src = this.ctx.createBufferSource();
     src.buffer = this.noiseBuffer();
     const filter = this.ctx.createBiquadFilter();
@@ -635,9 +930,41 @@ export class AudioManager {
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(gain, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    src.connect(filter).connect(g).connect(this.master);
+    src.connect(filter).connect(g).connect(this.ausgang);
     src.start(t);
     src.stop(t + dur + 0.05);
+  }
+
+  /** Wohin Ereignisklaenge gehen: Schlag-Bus mit Begrenzer, sonst direkt. */
+  private get ausgang(): AudioNode {
+    return this.sfx ?? this.master!;
+  }
+
+  /**
+   * Knisterpuffer (E-121): eine Sekunde einzelner, kurz abklingender Koerner
+   * in zufaelligem Abstand — Grundstoff fuer Schaben und Geroell. Einmal je
+   * Kanal gerechnet, danach in Schleife gespielt.
+   * @param dichte Koerner je Sekunde
+   * @param abkling Abklingzeit eines Korns (s)
+   */
+  private puffer = new Map<string, AudioBuffer>();
+  private knisterPuffer(name: string, dichte: number, abkling: number): AudioBuffer {
+    const da = this.puffer.get(name);
+    if (da) return da;
+    const ctx = this.ctx!;
+    const len = ctx.sampleRate;
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    const p = dichte / len;
+    const fall = Math.exp(-1 / (abkling * len));
+    let huell = 0;
+    for (let i = 0; i < len; i++) {
+      if (Math.random() < p) huell = Math.max(huell, 0.3 + 0.7 * Math.random() ** 2);
+      data[i] = huell * (Math.random() * 2 - 1);
+      huell *= fall;
+    }
+    this.puffer.set(name, buf);
+    return buf;
   }
 
   private cachedNoise: AudioBuffer | null = null;

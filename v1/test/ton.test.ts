@@ -49,6 +49,13 @@ function knoten(z: Zaehler, istQuelle: boolean): Record<string, unknown> {
     frequency: param(),
     Q: param(),
     detune: param(),
+    playbackRate: param(),
+    // Begrenzer (E-121)
+    threshold: param(),
+    knee: param(),
+    ratio: param(),
+    attack: param(),
+    release: param(),
     type: "",
     buffer: null,
     loop: false,
@@ -77,6 +84,7 @@ class FakeCtx {
   createGain = (): unknown => knoten(this.zaehler, false);
   createBiquadFilter = (): unknown => knoten(this.zaehler, false);
   createWaveShaper = (): unknown => knoten(this.zaehler, false);
+  createDynamicsCompressor = (): unknown => knoten(this.zaehler, false);
   createOscillator = (): unknown => knoten(this.zaehler, true);
   createBufferSource = (): unknown => knoten(this.zaehler, true);
   createBuffer = (_k: number, len: number): unknown => ({

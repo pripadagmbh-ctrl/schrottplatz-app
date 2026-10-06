@@ -11,7 +11,10 @@ export interface GameEvents {
   itemLeft: { itemId: string; containerId: string };
   /** Greifer hat zugepackt */
   grabbed: { count: number; massKg: number };
-  /** Greifer hat losgelassen */
+  /**
+   * Greifer hat losgelassen. Seit E-121 mit Zuhoerer (Ton: Ventil oeffnet);
+   * ausgeloest von `grip.onReleased` in main.ts.
+   */
   released: { count: number };
   /** Eine Scheibe ist geborsten (Position für Partikel/Sound) */
   glassShattered: { x: number; y: number; z: number };
@@ -95,6 +98,29 @@ export interface GameEvents {
     /** Abstand der Spitzenkraft zur vorgegebenen Kraft (kN), null ohne Vorgabe */
     gefuehlKN: number | null;
     x: number;
+    z: number;
+  };
+  /**
+   * Ein Schrottteil schlaegt auf (E-121, 06.10.2026).
+   *
+   * Ausgeloest von `items.onAufprall` in main.ts (der Melder sitzt in
+   * `world/scrapItems.ts`: Tempoverlust in einem Schritt, je Teil hoechstens
+   * alle 0,18 s). `wucht` ist dieser Tempoverlust in m/s. `blech` heisst:
+   * nachgiebig (`items.isCrushable`) — Stahlblech scheppert, massiver Stahl
+   * wummert. `untergrund` sagt, worauf es faellt: Beton (Platz, Betonboxen),
+   * Stahl (Ladeflaeche, Mulde) oder Schrott (auf anderen Teilen).
+   *
+   * Der Ton entscheidet selbst, was davon einen eigenen Schlag bekommt und was
+   * nur ins Rasseln geht — der Melder meldet alles.
+   */
+  "schrott:aufprall": {
+    materialId: string;
+    massKg: number;
+    wucht: number;
+    blech: boolean;
+    untergrund: "beton" | "stahl" | "schrott";
+    x: number;
+    y: number;
     z: number;
   };
 }
