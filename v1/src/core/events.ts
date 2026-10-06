@@ -69,6 +69,34 @@ export interface GameEvents {
    * Kontostand bleibt. Wer etwas je Tag zurücksetzt, hängt sich hier an.
    */
   "tag:neu": { tag: number };
+  /**
+   * Ein Umschlag ist fertig: gegriffen, losgelassen, und die Ladung liegt
+   * (E-119, 06.10.2026). Je gezaehltem Zyklus EIN Ereignis mit allen fuenf
+   * Fahrkuensten.
+   *
+   * Die Definitionen stehen an EINER Stelle: im Kopf von
+   * `skills/fahrkunst.ts`. Anzeige und Challenge lesen die Zahlen nur ab und
+   * rechnen nichts nach. `null` heisst „ohne Vorgabe nicht messbar" — dann
+   * wurde kein Ziel erfunden. `x/z` ist der Ladungspunkt im Liegen.
+   */
+  "fahrkunst:zyklus": {
+    /** Abstand zum Ablageziel (cm), null ohne Ziel */
+    praezisionCm: number | null;
+    /** Pendelausschlag beim Loslassen (Grad) */
+    ruheGrad: number;
+    /** Zyklen pro Minute, null beim ersten Zyklus ohne Startzeit */
+    tempoProMin: number | null;
+    /** Abwurfgeschwindigkeit (m/s) */
+    wurfMS: number;
+    /** Weite vom Loslasspunkt bis zum Liegen (m) */
+    wurfweiteM: number;
+    /** Hoechste Schliesskraft waehrend des Haltens (kN) */
+    kraftKN: number;
+    /** Abstand der Spitzenkraft zur vorgegebenen Kraft (kN), null ohne Vorgabe */
+    gefuehlKN: number | null;
+    x: number;
+    z: number;
+  };
 }
 
 type Handler<K extends keyof GameEvents> = (payload: GameEvents[K]) => void;
