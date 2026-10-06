@@ -345,7 +345,7 @@ async function main(): Promise<void> {
   const orbit = new OrbitCamera(window.innerWidth / window.innerHeight);
   const debug = new DebugOverlay();
   const aimRing = new AimRing(scene);
-  const audio = new AudioManager();
+  const audio = new AudioManager(bus);
   const hud = new Hud();
   const particles = new Particles(scene);
 
@@ -582,6 +582,7 @@ async function main(): Promise<void> {
     }
   };
   grip.onTear = () => audio.playTear();
+  grip.onReleased = (count) => bus.emit("released", { count }); // E-121: Ton beim Loslassen
   /*
    * Aufschlaege: Der wichtigste Klang auf dem Platz. Ob es metallisch
    * wummert oder dumpf auf Beton klatscht, haengt daran, ob das Teil auf
@@ -606,10 +607,28 @@ async function main(): Promise<void> {
     const namen = teile.map((x) => getMaterial(x.materialId).name).join(" + ");
     hud.toast(`Lambert hat ${name} getrennt: ${namen}`);
   };
+  /*
+   * Worauf ein Teil oder die Spinne trifft (E-121). Stahl: Ladeflaechen und
+   * Mulden (Absetz-, Abroll-, Grosscontainer). Betonboxen und Halden haben
+   * Betonboden. Der Ton haengt am Ereignis, nicht an diesem Aufruf (Regel 10).
+   */
+  const STAHLBODEN = new Set(["box", "rolloff", "grosscontainer"]);
+  const stahlGrund = (x: number, y: number, z: number): boolean =>
+    findeBox(x, z, alleFahrzeugBoxen(), 0.4) !== null ||
+    containers.containers.some((c) => STAHLBODEN.has(c.cfg.kind) && c.containsPoint({ x, y, z }));
   items.onAufprall = (item, wucht) => {
     const p = item.body.translation();
-    const aufStahl = findeBox(p.x, p.z, alleFahrzeugBoxen(), 0.4) !== null;
-    audio.playAufprall(item.materialId, wucht, aufStahl);
+    bus.emit("schrott:aufprall", {
+      materialId: item.materialId,
+      massKg: item.massKg,
+      wucht,
+      blech: items.isCrushable(item),
+      // ponytail: "auf Schrott" nach Hoehe der Teilmitte (ueber 0,7 m); Strahl nach unten, falls es falsch klingt
+      untergrund: stahlGrund(p.x, p.y, p.z) ? "stahl" : p.y > 0.7 ? "schrott" : "beton",
+      x: p.x,
+      y: p.y,
+      z: p.z,
+    });
   };
   // Zaehne treffen aufeinander — hoerbar, auch wenn nichts drin ist
   excavator.onClawSnap = (haerte) => audio.playClawSnap(haerte);
@@ -1044,7 +1063,8 @@ async function main(): Promise<void> {
    * Rueckweg ein Wort in core/spielart.ts ist. Hier wird im Simulator wieder
    * abgehaengt, was Geld, Kundschaft und Belegschaft ins Bild bringt. Die
    * Fahrzeuge selbst fahren weiter: ueber die Waage, aber ohne Wiegung, ohne
-   * Verhandeln, ohne Bezahlung. Fuhren kommen nur noch auf NACHSCHUB.
+   * Verhandeln, ohne Bezahlung. Fuhren kommen seit E-122 wieder von selbst
+   * (Takt nach losem Schrott), NACHSCHUB holt eine sofort.
    *
    * Was die Bildschleife je Bild rechnet (Tagesablauf, Feierabend, Funk,
    * Tutorial, Kasse), steht dort unter `if (BETRIEB)`.
@@ -1060,7 +1080,6 @@ async function main(): Promise<void> {
       "onPickupDepart", // Verkauf beim Abholer
     ] as const;
     for (const k of stumm) vehicles[k] = null;
-    vehicles.acceptDeliveries = false; // keine Fuhren nach Uhr
     staff.ausblenden(); // Mario, Janine, Lambert, Radlader
     excavator.getStaffPos = null; // ein unsichtbarer Lambert ist kein Hindernis
     hud.preiseZeigen = false; // Griff-Info ohne €/t
@@ -1223,6 +1242,10 @@ async function main(): Promise<void> {
   const gegriffeneNetze: THREE.Object3D[] = [];
   let lastTime = performance.now();
   let frameCount = 0;
+  // E-121: Weg der Spinne und der Schalen je Bild, fuer Kehren und Greifen
+  const kehrVorher = excavator.getSensorPosition(new THREE.Vector3());
+  const kehrJetzt = new THREE.Vector3();
+  let schalenVorher = excavator.closure;
   /* Restzeit bis zur naechsten Ladungs-Durchrechnung, siehe LADUNG_TAKT_S. */
   let ladungTakt = 0;
   /* --- Zonenmarkierungen: Taste M und Menueknopf, ein Weg (E-093) ---------
@@ -1518,8 +1541,8 @@ async function main(): Promise<void> {
     lanes.update(frameDt);
     /*
      * Tagesablauf, Feierabend, Funk, Tutorial, Kasse und Fahrspur-Meldung
-     * gibt es nur im Betrieb (E-118). Im Simulator laeuft keine Uhr ab, und
-     * Fuhren kommen nur auf NACHSCHUB.
+     * gibt es nur im Betrieb (E-118). Im Simulator laeuft keine Uhr ab; die
+     * Fuhren kommen nach dem Takt im else-Zweig unten (E-122).
      */
     if (BETRIEB) {
       // Störfall nur beim Wechsel melden, nicht in Dauerschleife
@@ -1583,6 +1606,18 @@ async function main(): Promise<void> {
         shift.jammed,
         kassenlage
       );
+    } else {
+      /*
+       * SANDKASTEN: DIE ANLIEFERER KOMMEN WIEDER VON SELBST (E-122, Patrick
+       * 06.10.2026: "LKWs kommen automatisch"). Derselbe Takt wie im Betrieb:
+       * Wartezeit nach losem Schrott (`shift.intervalFactor`), Einfahrt zu ab
+       * `JAM_KG` bis unter `JAM_CLEAR_KG`. OHNE Tageszeit — sonst schloesse
+       * um 17:00 das Tor, und im Sandkasten macht kein Feierabend es wieder
+       * auf. Ohne Kasse — es gibt kein Geld, also kein "Konto leer".
+       */
+      shift.update(frameDt, looseKg);
+      vehicles.acceptDeliveries = !shift.jammed;
+      vehicles.intervalFactor = shift.intervalFactor(looseKg);
     }
     excavator.updateInstruments(frameDt);
     containers.updateLabels(orbit.camera.position);
@@ -1632,14 +1667,42 @@ async function main(): Promise<void> {
     particles.update(frameDt);
     const gc = excavator.groundContact;
     if (gc.active && gc.intensity > 0.03) {
-      audio.setScrape(gc.intensity);
       if (frameCount % 3 === 0) particles.spawn(gc.point, 2, 0x9a8b74, 0.9, 0.9, 0.6);
       if (gc.intensity > 0.45 && frameCount % 4 === 0) {
         particles.spawn(gc.point, 3, 0xffc060, 3.5, 1.8, 0.4);
       }
+    }
+    /*
+     * Kehren (E-121): Das Tempo kommt aus dem Weg der Spinne je Bild — so
+     * zaehlt auch das Ziehen mit dem Stiel, nicht nur Drehen und Fahren.
+     * Ueber Schrott schleift sie, wenn sie keinen tragenden Grund hat, aber
+     * leer durch lose Teile gezogen wird.
+     */
+    excavator.getSensorPosition(kehrJetzt);
+    const dtSicher = Math.max(frameDt, 1e-3);
+    // SW: 1,5 m/s Spinnenweg = volles Schleifen
+    const kehrTempo = Math.min(1, Math.hypot(kehrJetzt.x - kehrVorher.x, kehrJetzt.z - kehrVorher.z) / dtSicher / 1.5);
+    kehrVorher.copy(kehrJetzt);
+    if (gc.active && Math.max(gc.intensity, kehrTempo) > 0.03) {
+      audio.setScrape(Math.max(gc.intensity, kehrTempo), stahlGrund(gc.point.x, gc.point.y, gc.point.z) ? "stahl" : "beton");
+    } else if (
+      !gc.active &&
+      kehrTempo > 0.03 &&
+      grip.grippedCount === 0 &&
+      // ponytail: Naehe der Teilmitte (0,8 m) statt echter Kontakt; Kontaktabfrage, falls es in der Luft klappert
+      items.items.some((i) => {
+        const p = i.body.translation();
+        return Math.abs(p.x - kehrJetzt.x) < 0.8 && Math.abs(p.z - kehrJetzt.z) < 0.8 && Math.abs(p.y - kehrJetzt.y) < 0.8;
+      })
+    ) {
+      audio.setScrape(kehrTempo, "schrott");
     } else {
       audio.setScrape(0);
     }
+    // Greifen (E-121): Schalenfahrt (0,4 s = voller Weg) und Schliesskraft
+    const schalenTempo = Math.min(1, (Math.abs(excavator.closure - schalenVorher) / dtSicher) * 0.4);
+    schalenVorher = excavator.closure;
+    audio.setGreifer(schalenTempo, excavator.schliesskraftKN / Excavator.MAX_SCHLIESSKRAFT_KN);
 
     /*
      * Messpunkt fuer das offene Raetsel vom 14.09.2026: Frame 21,0 ms, davon
@@ -1679,7 +1742,7 @@ async function main(): Promise<void> {
     input.endFrame();
     requestAnimationFrame(frame);
   }
-  if (!BETRIEB) hud.toast("Sandkasten: Der Platz gehört dir. NACHSCHUB im Funktionskranz holt eine Fuhre.");
+  if (!BETRIEB) hud.toast("Sandkasten: Der Platz gehört dir. Die Laster kommen von selbst — NACHSCHUB holt sofort einen.");
   requestAnimationFrame(frame);
 }
 

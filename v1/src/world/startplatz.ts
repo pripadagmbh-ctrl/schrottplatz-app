@@ -74,7 +74,13 @@ const HAUFEN_TEILE = LEERER_START ? 0 : 85;
 /** Dasselbe fuer das Streugut ringsum. */
 const STREU_TEILE = LEERER_START ? 0 : 10;
 
-export const START_HAUFEN = { x: 4.0, z: -32.0, streuung: 2.9, teile: HAUFEN_TEILE };
+/*
+ * E-122 (06.10.2026): mit dem Mischschrott von x 4,0 nach −3,0 gezogen. Die Zahl
+ * steht hier abgeschrieben, weil ein Import von CONFIGS einen Ringschluss gaebe
+ * (containers → scrapItems → startplatz); `test/startplatz.test.ts` haelt sie
+ * gegen die Halde.
+ */
+export const START_HAUFEN = { x: -3.0, z: -32.0, streuung: 2.9, teile: HAUFEN_TEILE };
 
 /**
  * Die beiden Altfahrzeuge, je eines an der vorderen Kante einer Halde.
@@ -85,6 +91,12 @@ export const START_HAUFEN = { x: 4.0, z: -32.0, streuung: 2.9, teile: HAUFEN_TEI
  * Mischschrott (7,9 m) und eines in der noch leeren Stahlhalde (8,7 m), beide
  * im Band, beide 1,5 m von den Trennsteinen weg und keines im Starthaufen
  * (der reicht von z −35,9 bis −30,1).
+ *
+ * E-122 (06.10.2026): Die Halden haben die Plaetze getauscht, die Autos nicht
+ * — gespiegelt laege das zweite bei (3,2 | −31,0) und damit 9,27 m vom Sitz,
+ * ausserhalb des Bands. Das erste steht jetzt in der Stahlhalde, das zweite
+ * im Mischschrott und dort im Kreis des Starthaufens; solange `LEERER_START`
+ * gilt, liegt dort nichts.
  */
 export const START_AUTOS: Array<{ x: number; z: number }> = [
   { x: 2.4, z: -29.8 },
@@ -92,7 +104,7 @@ export const START_AUTOS: Array<{ x: number; z: number }> = [
 ];
 
 /** Streuschrott ringsum: zehn Teile auf einem Kreis um den Haufen. */
-export const START_STREU = { x: 4.0, z: -32.0, radius: 2.9, teile: STREU_TEILE };
+export const START_STREU = { x: START_HAUFEN.x, z: START_HAUFEN.z, radius: 2.9, teile: STREU_TEILE };
 
 /**
  * Wo der eine Kehrbesen liegt (E-031, neu gerechnet in E-037 und E-049).

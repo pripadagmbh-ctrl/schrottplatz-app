@@ -46,7 +46,7 @@ function presseFuss(): { x: number; z: number; hw: number; hd: number } {
   return { x: (x0 + x1) / 2, z: (z0 + z1) / 2, hw: (x1 - x0) / 2, hd: (z1 - z0) / 2 };
 }
 import { BAGGER_STAND } from "../src/world/baggerstand";
-import { WEIGH_X, WEIGH_Z } from "../src/world/yard";
+import { WEIGH_X, WEIGH_Z, TRENNSTEIN_X } from "../src/world/yard";
 import {
   CLAW_OPEN_SPLAY,
   CLAW_SEGMENTS,
@@ -304,8 +304,13 @@ describe("Feste Bauten", () => {
     expect(hitsObstacle(s.x, s.z, 0), "Innenraum der Stahlhalde frei").toBeNull();
     // Nach Norden offen: dort steht der Bagger und greift hinein.
     expect(hitsObstacle(h.x, h.z + d / 2 + 1.2, 0), "Vorderseite offen").toBeNull();
-    // Aussen haelt die Buchtwand — dieselbe Probe, nur 10 cm weiter draussen.
-    const aussen = hitsObstacle(h.x + w / 2 + 0.2, h.z, 0);
+    /*
+     * Aussen haelt die Buchtwand — dieselbe Probe, nur 10 cm weiter draussen.
+     * „Aussen" ist die Seite weg von den Trennsteinen; seit dem Tausch E-122
+     * ist das beim Mischschrott −x. Aus der Lage gerechnet statt abgeschrieben.
+     */
+    const weg = Math.sign(h.x - TRENNSTEIN_X);
+    const aussen = hitsObstacle(h.x + weg * (w / 2 + 0.2), h.z, 0);
     expect(aussen, "Aussenwand sperrt").not.toBeNull();
     expect(aussen!.label, "es ist nicht die Buchtwand").toContain("Bucht");
     /*
@@ -315,7 +320,7 @@ describe("Feste Bauten", () => {
      * 2,5 m ist dort nichts mehr.
      */
     expect(
-      hitsObstacle(h.x - w / 2 - 0.4, h.z, 0, 2.5),
+      hitsObstacle(h.x - weg * (w / 2 + 0.4), h.z, 0, 2.5),
       "zur Stahlhalde hin steht etwas Hohes im Weg"
     ).toBeNull();
   });
@@ -501,8 +506,10 @@ describe("Reichweite des Baggers", () => {
     const halde = CONFIGS.find((c) => c.id === "c_mixed")!;
     const stahl = CONFIGS.find((c) => c.id === "c_steel")!;
     const presse = presseFuss();
-    expect(presse.x, "Presse nicht rechts vom Sitz").toBeLessThan(stahl.x);
-    expect(halde.x, "Mischschrott nicht links von der Stahlbox").toBeGreaterThan(stahl.x);
+    expect(presse.x, "Presse nicht rechts vom Sitz").toBeLessThan(halde.x);
+    // E-122 (06.10.2026, „Plaetze fuer Mischschrott und Stahlschrott
+    // tauschen"): Mischschrott rechts (−x, zur Presse), Stahlschrott links.
+    expect(stahl.x, "Stahlschrott nicht links vom Mischschrott").toBeGreaterThan(halde.x);
     // Und da, wo sie stand, darf keine unsichtbare Wand zurueckbleiben.
     expect(hitsObstacle(6.6, -24.6, 0), "die alte Pressenstelle sperrt noch").toBeNull();
     /*

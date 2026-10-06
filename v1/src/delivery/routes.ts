@@ -69,7 +69,9 @@ export const ROUTE_IN_FWD: Array<[number, number]> = [
  *    z −24,0 bis −18,6 auf x 4,95 bis 7,65; ihre vier Ecken sind 5,65 · 8,35 ·
  *    6,94 · 9,04 m vom Sitz entfernt — die ganze Flaeche im Schwenkband.
  *  - Der Schwenkweg zur Mischschrott-Halde schrumpft von 180 auf 52 Grad:
- *    bei 14 Grad/s sind das 3,7 s statt 12,9 s je Griff.
+ *    bei 14 Grad/s sind das 3,7 s statt 12,9 s je Griff. SEIT E-122
+ *    (06.10.2026) liegt dort die STAHLSCHROTT-Halde; zum Mischschrott sind
+ *    es jetzt 107 Grad (7,6 s).
  *
  * Die Stelle ist FEST, nicht mehr aus der Baggerstellung gerechnet. Sie haengt
  * an der Ecke, die die Presse geraeumt hat — und an der Muellmulde daneben:
@@ -289,7 +291,8 @@ export const VERLADE_RANGIER_M = 8.0;
  * 5,88 · 6,32 · 8,44 · 8,76 m entfernt — alle vier im Schwenkband 5,80 bis
  * 9,20 m (dieselbe Rechnung wie E-022/E-029). Ein zweiter Platz mit
  * derselben Eigenschaft waere eine zweite Wahrheit; und die Halden liegen
- * ohnehin genau dort: Stahlschrott 6,96 m, Mischschrott 7,91 m vom Sitz.
+ * ohnehin genau dort: Mischschrott 6,96 m, Stahlschrott 7,91 m vom Sitz
+ * (seit dem Tausch E-122; vorher umgekehrt).
  */
 
 /** Wohin diese Fuhre gehoert: das Lagersilo der bestellten Fraktion — oder keins. */

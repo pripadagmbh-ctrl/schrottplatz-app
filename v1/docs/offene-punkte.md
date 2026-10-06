@@ -554,6 +554,36 @@ Abgehakt wird erst, wenn **er** es am Gerät bestätigt hat, nicht wenn es live 
 
 ### Offen
 
+- [ ] **Elf Punkte aus einer Ansage, 06.10.2026** — Patrick, wörtlich:
+      „Also, wir müssen uns um das Spiel als solches kümmern, geräusche beim
+      greifen, schrott geräusche. Plätze für Mischschrott und Stahlschrott
+      tauschen. Die Schrottsorten sollen mehr grossteile beinhalten,
+      container, gerüste, kleine bagger. LKWs kommen automatisch. Kupfer, Va,
+      Aluminium, misschrott und stahlschrott müssen als solches besser
+      erkennbar sein. Autos müssen hole elemente werden, die man zerdrücken
+      kann. Geäusche entscheidend. Kehr geräusch der Spinne überarbeiten. Mit
+      Challenges soll das Spiel anfangen, damit die Steuerung klar wird. Wir
+      starten bswp. mit dem verladen eines autos in die Presse"
+
+      Zerlegt, damit keiner verlorengeht. Je Punkt das Paket, das ihn trägt:
+
+      | # | Punkt | Paket |
+      |---|---|---|
+      | 1 | Geräusche beim Greifen | Ton |
+      | 2 | Schrottgeräusche | Ton |
+      | 3 | Geräusche sind entscheidend | Ton (Vorrang) |
+      | 4 | Kehrgeräusch der Spinne überarbeiten | Ton |
+      | 5 | Plätze Mischschrott/Stahlschrott tauschen | Platz und Verkehr |
+      | 6 | LKWs kommen automatisch (kehrt E-118 im Sandkasten um) | Platz und Verkehr |
+      | 7 | Mehr Großteile: Container, Gerüste, kleine Bagger | Schrottteile |
+      | 8 | Kupfer, VA, Alu, Misch, Stahl besser erkennbar | Schrottteile |
+      | 9 | Autos als hohle Körper, die man zerdrücken kann | Wracks |
+      | 10 | Das Spiel beginnt mit Challenges, damit die Steuerung klar wird | Challenges |
+      | 11 | Erste Challenge: Auto in die Presse verladen | Challenges |
+
+      Abgehakt wird jeder Punkt erst, wenn **er** ihn am Gerät bestätigt hat.
+
+
 - [x] **„Kollisionsprüfung ohne Mauer bei Buntmetallmulde?"** (22.09.2026) —
       **gemessen und behoben (E-110).** Nachgemessen mit
       `tools/muldenwand-abgleich.ts`, Abschnitt A: Die Hindernisliste rechnete

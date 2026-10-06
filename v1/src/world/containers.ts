@@ -259,7 +259,7 @@ export const CONFIGS: ContainerConfig[] = [
    */
 
   /*
-   * MISCHSCHROTT — in der Ausbuchtung, links hinter dem Bagger.
+   * MISCHSCHROTT — in der Ausbuchtung, seit E-122 rechts hinter dem Bagger.
    *
    * Hier liegt der Mengenstrom. Die Halde hat keine eigenen Waende mehr: Was
    * sie haelt, ist die Ausbuchtung selbst (`yard.ts`, `BUCHT_*`), rundum
@@ -276,12 +276,21 @@ export const CONFIGS: ContainerConfig[] = [
    * Entfernung zum Sitz; was sich aendert, ist der Stauraum: 40,8 statt
    * 61,2 m² je Halde.
    */
-  { id: "c_mixed", fractionId: "mixed", label: "MISCHSCHROTT", kind: "halde", x: 4.0,
+  /*
+   * PLAETZE GETAUSCHT AM 06.10.2026 (E-122). Ansage Patrick: „Plaetze fuer
+   * Mischschrott und Stahlschrott tauschen." Bis dahin lag Mischschrott links
+   * vom Sitz (x 4,0), Stahlschrott rechts (x −3,0). Getauscht ist nur die
+   * Lage: Beide Halden sind gleich gross und haben keine eigenen Waende — die
+   * Bucht und die Trennsteine bleiben, wo sie sind (gespiegelt um die Fuge
+   * x 0,5, `TRENNSTEIN_X`). Vordere Kante jetzt 6,96 m vom Sitz (vorher 7,91);
+   * vom Abladeplatz (Wagenmitte 6,3 | −23,0) sind es 107 Grad Schwenk statt 51.
+   */
+  { id: "c_mixed", fractionId: "mixed", label: "MISCHSCHROTT", kind: "halde", x: -3.0,
     z: -32.0, size: [6.8, 6.0, 5.0],
     haldeWaende: { rueck: false, aussen: false, nord: false, trenn: false } },
 
   /*
-   * STAHLSCHROTT — die zweite Halde, rechts daneben, gleich gross.
+   * STAHLSCHROTT — die zweite Halde, seit E-122 links daneben, gleich gross.
    *
    * Zwischen beiden stehen nur die Trennsteine (`yard.ts`, `TRENNSTEINE`):
    * in der Mitte 2,4 m, zu beiden Seiten auf 0,6 m ablaufend. Ansage
@@ -291,7 +300,7 @@ export const CONFIGS: ContainerConfig[] = [
    * Stahl bekommt kein Silo mehr (E-010): Er ist der groesste Mengenstrom
    * und wird direkt an der Halde verladen; ein Silo dafuer waere ein Umweg.
    */
-  { id: "c_steel", fractionId: "steel", label: "STAHLSCHROTT", kind: "halde", x: -3.0,
+  { id: "c_steel", fractionId: "steel", label: "STAHLSCHROTT", kind: "halde", x: 4.0,
     z: -32.0, size: [6.8, 6.0, 5.0],
     haldeWaende: { rueck: false, aussen: false, nord: false, trenn: false } },
 
